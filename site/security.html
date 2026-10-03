@@ -61,10 +61,10 @@
 
 <h2>What stays on your computer</h2>
 <p>ComplyEaze&nbsp;Bridge keeps a log of every call: the tool, the time, the company’s Tally identifier, fingerprints of the question and the answer, how many rows came back, and the last requests it sent to Tally. The log is designed to hold no figures, names or narrations, though sizes in it can hint at the length of a name.</p>
-<p>It also keeps copies of the vouchers it prepared or posted, the proof of what Tally read back, and every row of a bank statement you asked it to read. The copies hold dates, amounts and narrations. None of these files is encrypted. ComplyEaze&nbsp;Bridge does not delete or trim any of them, and removing the extension may leave them. Section 7 of the Privacy Policy says where they are and how to archive them.</p>
+<p>It also keeps copies of the vouchers it prepared or posted, the proof of what Tally read back, every row of a bank statement you asked it to read, and a small record, with your operating-system account name, when you record a review of a posted voucher. The copies hold dates, amounts and narrations. None of these files is encrypted. ComplyEaze&nbsp;Bridge does not delete or trim any of them, and removing the extension may leave them. Section 7 of the Privacy Policy says where they are and how to archive them.</p>
 
 <h2>What reaches your AI provider</h2>
-<p>Your AI provider (Anthropic, if you use Claude) receives whatever the assistant reads, as part of the chat: company names, party names, amounts and, when it asks for them, details such as PAN, GSTIN and bank account numbers.</p>
+<p>Your AI provider (Anthropic, if you use Claude) receives whatever the assistant reads, as part of the chat: company names, party names, amounts and, when it asks for them, details such as PAN, GSTIN and bank account numbers. Claude Desktop may also keep its own record of the conversation and results on your computer.</p>
 <p>The extension’s “Response redaction” setting (off by default) can shorten party and ledger names or drop narrations. Neither choice hides amounts, company names, or PAN and GSTIN numbers. Masking leaves a name written inside a narration or reference as it is; dropping narrations removes narrations but not references. How long the provider keeps what it receives, whether it trains on it, and where it is processed (which may be outside India) depend on your plan and the provider’s own terms.</p>
 
 <h2>What reaches ComplyEaze</h2>
@@ -73,7 +73,7 @@
 <h2>Posting waits for your approval</h2>
 <p>Posting is off in a new install; if you upgraded from an earlier version, check the setting. Reading, checking ledger names, reading a bank statement and preparing a voucher file write nothing to Tally.</p>
 <p>With posting on, it can post one Journal, Payment, Receipt or Contra at a time, and only after you approve that voucher in a separate window. No ComplyEaze&nbsp;Bridge tool can approve it for you, but software that controls your screen could click the window, so do not let it. An approval is used once and stays valid for at most 15 minutes after you give it.</p>
-<p>After each post it reads the voucher back and reports what it found. It compares some details, not every one, and a match does not mean the entry is correct. ComplyEaze&nbsp;Bridge has no tool to delete or undo a posted voucher; you correct it in Tally.</p>
+<p>After each post it reads the voucher back and reports what it found. It compares some details, not every one, and a match does not mean the entry is correct. Two known limits can send a post to the wrong place: a company renamed to, or loaded under, the target’s name just after the last check, and a ledger renamed and replaced in the same moment. It may not be able to say where the voucher went. ComplyEaze&nbsp;Bridge has no tool to delete or undo a posted voucher; you correct it in Tally. The README gives these limits in full.</p>
 
 <h2>The connection to Tally</h2>
 <p>ComplyEaze&nbsp;Bridge connects to Tally only at an address that means “this computer”: <code>localhost</code>, <code>127.0.0.1</code> (or any <code>127.x.x.x</code>) and <code>::1</code>. It does not use a proxy or follow redirects. If you or your IT support forward that address somewhere else, its requests go wherever you forwarded them.</p>
@@ -86,8 +86,8 @@
 <ul>
 <li>It is not yet code-signed or notarised: Apple and Microsoft have not certified it as coming from us, so your computer may warn you before opening it. Compare each download with the <code>.sha256</code> file on the same release before opening it.</li>
 <li>No independent security audit has been done. The source code is public and the project runs its own checks, but that is not an external review.</li>
-<li>Not yet run by us in a controlled test against a real TallyPrime: posting with a published package against a live TallyPrime; the approval window on Windows; posting on TallyPrime Education; posting on TallyPrime Gold with its approval step recorded.</li>
-<li>Not measured: a network capture of the running extension on Windows or a Mac, and the permissions its data folder ends up with on Windows. On a Mac the folder is private to your user account.</li>
+<li>Not yet run by us in a controlled test: posting with a published package against a live TallyPrime; each way of declining in the Windows approval window (one was tried); the tools answering through Claude Desktop on macOS after the Terms are accepted; posting on TallyPrime Education; posting on TallyPrime Gold with its approval step recorded. The README lists what has been run.</li>
+<li>Not measured: a network capture of the running extension on Windows or a Mac; the permissions its data folder ends up with on Windows (on a Mac, ComplyEaze&nbsp;Bridge restricts its folder to your user account through file permissions); and whether PDFium, the PDF library it uses only to read a bank statement you name, opens any network connection or file other than that PDF.</li>
 </ul>
 <p>The <a href="https://github.com/ComplyEaze/bridge/blob/master/docs/security-and-privacy.md" target="_blank" rel="noopener noreferrer">security and privacy notes</a> give each answer in more detail, with what was measured and what was not. The <a href="https://github.com/ComplyEaze/bridge#readme" target="_blank" rel="noopener noreferrer">README</a> lists each run against Tally.</p>
 </article>

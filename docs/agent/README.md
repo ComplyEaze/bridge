@@ -1226,7 +1226,9 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    changed since approval, or whose REMOTEID the journal already records refuses
    with `import_batch_not_found`, `import_already_attempted`,
    `import_batch_changed` or `import_remote_id_reused`, and this post sends
-   nothing. Rebuild only when `attempt_recorded` is `false`, except after
+   nothing. An approval withdrawn after this call took it, and before it is
+   spent there, refuses the same way with `import_approval_revoked` (#791).
+   Rebuild only when `attempt_recorded` is `false`, except after
    `import_txn_already_posted` (below), where a rebuilt row is refused again.
    A batch holding a row that another batch of the same company already sent to
    Tally, or that a readback found posted, refuses with

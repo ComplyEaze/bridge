@@ -19,7 +19,9 @@
 //! a withdrawal of the batch or a restart.
 use super::post::NativePostRequest;
 use super::{sha256_hex, write_private, ImportCompanyTuple, ImportLedgerLine};
-use crate::tally::approved_import::{Answered, ApprovedImport, PendingPostApproval};
+use crate::tally::approved_import::{
+    Answered, ApprovedImport, PendingPostApproval, UnderLockRefusal,
+};
 use bridge_tally_protocol::StandardLedgerCatalogBinding;
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{json, Value};
@@ -664,7 +666,7 @@ impl PostApprovals {
     /// Spend the approval, once. Called under the import admission lock just
     /// before the dispatch intent is written; a second call, or one after a
     /// revocation, is refused and writes no intent.
-    pub(super) fn spend(&self, batch_id: &str, approval: Uuid) -> Result<(), String> {
+    pub(super) fn spend(&self, batch_id: &str, approval: Uuid) -> Result<(), UnderLockRefusal> {
         let mut slot = self.slot();
         match slot.as_ref() {
             Some((held_batch, Held::Redeeming { id, .. }))
@@ -673,7 +675,7 @@ impl PostApprovals {
                 *slot = None;
                 Ok(())
             }
-            _ => Err("import_approval_revoked".into()),
+            _ => Err(UnderLockRefusal::ApprovalRevoked),
         }
     }
 

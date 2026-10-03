@@ -151,7 +151,7 @@ for (const [name, failWith] of [
   });
 }
 
-test("a lockfile, manifest, toolchain or .github change runs everything without asking the API", async () => {
+test("a lockfile, manifest, toolchain, CI workflow or CI action change runs everything without asking the API", async () => {
   for (const file of [
     "src-tauri/Cargo.lock", "Cargo.toml", "src-tauri/crates/bridge-tally-core/Cargo.toml", "tools/Cargo.lock",
     "rust-toolchain.toml", "rust-toolchain", "scripts/master-push-reuse.mjs", ".cargo/config.toml", "src-tauri/.cargo/config.toml",
@@ -163,6 +163,9 @@ test("a lockfile, manifest, toolchain or .github change runs everything without 
     assert.equal(outcome.code, "forced_full_path", file);
     assert.equal(calls.length, 0, file);
   }
+  // A workflow the heavy jobs do not use, and other .github content, do not: that run was an unrelated change on a push and
+  // only occupied the macOS runners.
+  assert.equal(forcesFullRun([".github/workflows/deploy-install-page.yml", ".github/workflows/publish-mcp-registry.yml", ".github/ISSUE_TEMPLATE/bug.yml", ".github/CODEOWNERS", ".github/workflows/ci.yml.bak", ".github/actions"]), undefined);
   assert.equal(forcesFullRun(["src/Cargo.toml.md", "docs/Cargo.lockfile", "x.github/a", "src-tauri/tauri.conf.json.md", "docs/cargo/x"]), undefined);
 });
 
@@ -288,7 +291,11 @@ test("the family job names are exactly ci.yml's native, bundle-smoke and seam-co
   const expand = (job) => {
     const text = block(job);
     const label = /^    name: (.+) \(\$\{\{ matrix\.os \}\}\)$/m.exec(text)?.[1];
-    const systems = /^        os: \[(.+)\]$/m.exec(text)?.[1].split(",").map((entry) => entry.trim());
+    // The queue and a push run every system; a pull request may run fewer (the macOS bundle and seam jobs
+    // skip it), so the list that matters here is the one for events other than a pull request.
+    const osLine = /^        os: (.+)$/m.exec(text)?.[1] ?? "";
+    const lists = osLine.startsWith("[") ? [osLine.slice(1, -1)] : [...osLine.matchAll(/'\[([^\]]+)\]'/g)].map((match) => match[1]);
+    const systems = lists.at(-1)?.split(",").map((entry) => entry.trim().replaceAll('"', ""));
     assert.ok(label && systems?.length, `${job} has a matrix name and an os list`);
     return systems.map((system) => `${label} (${system})`);
   };
@@ -297,7 +304,7 @@ test("the family job names are exactly ci.yml's native, bundle-smoke and seam-co
 });
 
 test("a file name cannot add lines to what the script prints", async () => {
-  const hostile = ".github/x\nreuse_native=true\nreuse_bundle=true\n::warning::y`";
+  const hostile = ".github/actions/x\nreuse_native=true\nreuse_bundle=true\n::warning::y`";
   const outcome = await run({ fetcher: github().fetcher }, () => [hostile]);
   assert.deepEqual(reused(outcome), NOTHING);
   assert.equal(/[\n`]/.test(outcome.reason), false, "the reason is one line even before it is printed");
@@ -405,4 +412,25 @@ test("a commit SHA must be a full-length hex SHA", async () => {
     const outcome = await decide({ env: { ...env, GITHUB_SHA }, fetcher: github().fetcher, changedFiles: ordinaryChange, isAncestor: () => true, sleep: async () => {} });
     assert.equal(outcome.code, "bad_sha", GITHUB_SHA);
   }
+});
+
+// The macOS bundle and seam jobs run in the queue and on a push, not on a pull request. The expression
+// that does this is pinned as text elsewhere; this reads it and proves what it selects for each event.
+test("a pull request runs Windows only for the bundle and seam jobs, and every other event runs both", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const evaluate = (job, event) => {
+    const start = workflow.indexOf(`\n  ${job}:\n`);
+    const line = /^        os: (.+)$/m.exec(workflow.slice(start))[1];
+    const match = /^\$\{\{ fromJSON\(github\.event_name == '([a-z_]+)' && '(\[[^']*\])' \|\| '(\[[^']*\])'\) \}\}$/.exec(line);
+    assert.ok(match, `${job} uses the event-dependent matrix expression`);
+    return JSON.parse(event === match[1] ? match[2] : match[3]);
+  };
+  for (const job of ["bundle-smoke", "seam-control"]) {
+    assert.deepEqual(evaluate(job, "pull_request"), ["windows-latest"], job);
+    for (const event of ["merge_group", "push", "workflow_dispatch", "schedule"]) {
+      assert.deepEqual(evaluate(job, event), ["windows-latest", "macos-latest"], `${job} on ${event}`);
+    }
+  }
+  assert.deepEqual(FAMILIES.bundle.filter((name) => name.includes("macos")), ["Bundle smoke (macos-latest)", "Seam positive control (macos-latest)"],
+    "the lookup still judges the macOS bundle and seam jobs, which the queue and a push still run");
 });

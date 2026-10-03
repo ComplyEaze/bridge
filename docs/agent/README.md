@@ -92,6 +92,7 @@ The ordinary default tools, in name order:
 - `profit_and_loss`
 - `purchase_register`
 - `read_evidence`
+- `sales_register`
 - `stock_summary`
 - `tally_status`
 - `trial_balance`
@@ -102,7 +103,8 @@ The ordinary default tools, in name order:
 - `vouchers`
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
-`local_data_report` were added in release 0.4.0. `local_data_report` (also
+`local_data_report` were added in release 0.4.0; `sales_register` is in source and not
+in a published release. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -622,6 +624,35 @@ known to help; the refusal's remediation says so. A
 `ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
 after it, before any voucher is read.
 
+A ledger name that `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
+cannot resolve refuses as `ledger_not_found` (no ledger has that name once case, spaces, symbols and
+accent marks are ignored) or `ledger_ambiguous` (several do, and none is spelled as requested). Bridge
+does not change how a name resolves: a lone ledger whose key equals the request's is still read, and
+the refusals only add what to show the user. Both can carry `candidates`, from the catalogue
+already read, so no request is added: each is `{name, rule}`, with no score, none marked best (the
+order is by rule strength and then name, not by likelihood), and none is ever chosen for the caller.
+`candidates_listing` says what the list means: `listed`; `truncated` (more were found than fit, with the
+full count in `candidates_total`, and `candidates_total_is_lower_bound` when that count is a floor;
+`candidates_truncated` is true for it and for `withheld`); `withheld` (a whole family of ledgers
+resembles the name and none stands out: counted, not listed); `none` (nothing resembles the name; it
+does not mean the ledger is absent); `unavailable` (the search could not run, with `candidates_reason`
+and no count: a book holding a name the binding rules refuse, such as a bidirectional-control or
+zero-width character, or a name with too many identifiers, or a book past their bounds) or
+`names_masked` (`mask_parties` hides the names; nothing is searched and no count is given, because a
+count would answer "does a ledger start with this?" for every prefix a caller tries). A ledger named
+by an embedded number is shown with the rule `identifier_match`, and the count is a floor
+(`name_search_not_run`): the name search was not made, so it is not every ledger like the name, and
+it is never used as the answer. The refusal's remediation tells the assistant to ask the user which
+ledger they meant. The candidate fields that carry a list are attached only when `max_bytes` is at
+least 16,384 (the list is framed twice and an error has no page to trim, so a list that does not fit
+would cost the refusal its code), each list is cut to a sixteenth of the cap; the states that carry no
+list (`none`, `withheld`, `unavailable`, `names_masked`) and the remediation need 4,096. A requested
+ledger name that is not spelled exactly as a ledger in the book and carries `…` or `...` (Bridge
+writes `…` only to shorten a masked name) is refused as `ledger_name_masked` whatever the setting is
+now, because the lookup ignores everything but letters and digits and `Ra…rs` would find a ledger named
+`RARS`; under `mask_parties`, one that reads like the shortened form of another ledger's name (`Ra..rs`,
+`Ra rs`) is refused too. A ledger spelled exactly as asked is still reached.
+
 The runtime retains its paired read, verified company and book-extent checks.
 Native ledger openings, basic/compliance ledger balances, and native outstandings
 require a freshly observed supported product and licence mode before and after
@@ -724,6 +755,158 @@ or vouchers.
   with several currencies; any GSTIN, `REFERENCEDATE`, or cancelled, optional or
   post-dated voucher in the captures the tests use. The captures are one
   synthetic lab book and one month.
+
+### Sales register (`sales_register`)
+
+The mirror of `purchase_register`: it lists the Sales and Credit Note vouchers
+of a date window that touch a ledger under Duties & Taxes, and says per entry
+what the books record. It is the same code with two things changed: the register's
+voucher classes (Sales and Credit Note instead of Purchase and Debit Note) and
+the group of the taxable ledgers (Sales Accounts instead of Purchase Accounts).
+Everything else is shared: the reads, the company pin, the snapshot binding, the
+states, the refusals, the paging, the masking, and the rule that tax comes only
+from the GST duty head on the ledger master, never from a name or an amount.
+Read the purchase register's section above for each of them. The response's
+`profile` is `agent_sales_register_v1`; vouchers with no Duties & Taxes entry are
+counted in `sales_vouchers_without_duties_taxes_entry`; each row carries
+`party_group` and the tool does not decide whether a Credit Note is a sales
+return or a credit note issued to a supplier. It decides no place of supply, tax
+rate or return section, and matches nothing against any portal.
+
+- **Measured.** `sales_register` was run against a live Tally on two synthetic
+  companies (TallyPrime 7.1 Silver). On the first, once per day, for one taxed
+  Sales item invoice and one untaxed one: the taxed sale came back as one row
+  (voucher type Sales in the invoice view, the party as a debit entry, the sales
+  ledger as its taxable entry, and two credit entries on tax ledgers whose
+  masters carry the heads CGST and SGST/UTGST), and the untaxed one was counted
+  under `sales_vouchers_without_duties_taxes_entry`. On the second, which has 44
+  ledgers, for one Credit Note in voucher view booked on account: one row with
+  its CGST and state-tax heads and its sales ledger as the taxable entry. The
+  voucher windows of the first two invoices are committed, and the parsed
+  windows have exactly those entries (a test); the requests are the ones the
+  code sends (a test). The taxed invoice's day was read again on 2 Oct 2026
+  by the build at commit 8c674d5e, with the book's own ledger masters, groups and
+  company listings, and is replayed end to end from that recorded call (a test;
+  the answer file carries that build's `coverage` wording). The untaxed
+  invoice's day was read once by an earlier build; only its voucher window is
+  committed, not its masters or the tool's answer, and a test with a Sales
+  voucher whose tax entries are removed stands in for its list. The Credit Note day, and a Debit Note day through
+  `purchase_register`, are also replayed end to end from their recorded calls
+  (tests). One Sales accounting voucher (not an invoice) is also classified, in
+  tests, against the ledger masters of the purchase register's lab book.
+- **What `complete` rests on.** The response `state` is `complete` when the
+  company's marks and the ledger masters read the same before and after the
+  window (and, for an empty window, its corroboration read confirmed it). It
+  does not mean the window was admitted against a separate voucher count: on the
+  small book measured, the call sent no voucher census, and a small window that
+  `vouchers` calls `partial` can be `complete` here. A row's `status` of
+  `complete` is a different thing: every entry the voucher touches classified.
+- **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
+  reversed as Tally sends them: the tool neither nets nor flips, so a caller that
+  sums tax over a window must add signed amounts. The measured Credit Note of
+  1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry
+  `-1000.00`, each tax entry `-90.00` and the party entry `1180.00`, where a Sales
+  row has the sales and tax entries positive and the party entry negative.
+- **The cost varies by book.** The same call sent 96 requests on a book with 8
+  ledgers and one currency and 118 on one with 44 ledgers and two currencies (a
+  voucher census and base-currency reads are added). The result does not report
+  the cost.
+- **There are two recognised state-side heads.** One is `state_tax` (raw `State Tax`)
+  on one measured book and the other `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
+  recognised heads for the same side of the tax, so a caller must not look for
+  one of them only.
+- **Not shown by any run, and said so in the tool's text and in each
+  response's `coverage`:** an invoice-view Credit Note; an inter-state (IGST)
+  line; a cancelled or optional sales voucher; an unrecognised or missing duty
+  head on a sale; more than one voucher in a window; paging; a company with a
+  registration; a tax Tally computes itself (rate or HSN on the item); a sale
+  typed on Tally's screen; accounting-invoice mode; a post-dated sale; a
+  `REFERENCE` or a populated `PARTYGSTIN` on a sale; `REFERENCEDATE` (not
+  returned); a ledger or voucher kept in a currency other than the book's base
+  (the Credit Note run's book defines a second currency, but all of its ledgers
+  are in the base).
+- **A row of a kind no capture covers says so, where the row itself shows the
+  kind.** It is returned, not withheld, with `not_measured_live` listing why:
+  `invoice_view_credit_note`, `inter_state_line`, `sales_ledger_not_an_entry`
+  (tax is present but no entry is on a Sales Accounts ledger: the sales ledger
+  may sit in an inventory allocation), `cancelled`, `optional`, `post_dated`,
+  `party_gstin_present`, `reference_present`. A row the captures cover has no
+  such field, and the purchase register's rows never carry it. Some kinds a row
+  cannot show, so they are never marked and are not vouched for: a sale typed on
+  Tally's screen in voucher view, a tax Tally computed itself, a duty head no
+  sales capture has (such as cess), an invoice of another shape than the one run
+  (for example several goods lines), and a ledger or voucher kept in a currency
+  other than the book's base; an unmarked row is
+  not a measured one in those respects. A row is marked `inter_state_line` only
+  when a tax entry's ledger master carries a recognised IGST head; an IGST
+  ledger with no head, or an unrecognised head, is listed under the without-head
+  or unrecognised list and the status is not complete.
+  `sales_vouchers_without_duties_taxes_entry` lists such vouchers by identity
+  only; the tool does not say why one carries no tax entry. A Debit Note, even
+  to a customer, is not a sales row: it is listed apart by identity and ledger
+  names, with no amount.
+
+### Pages of a `vouchers` window
+
+`offset` and `limit` restrict the output, not the read: before this change every
+page read the whole window again and applied the offset to the new read. A page
+read that way could skip or repeat vouchers if the book changed between pages,
+while each page said `complete`, and a long window cost its whole read once per
+page. Now a `complete` window is held in memory (its rows after every check and
+selector, unredacted; never written to disk) and a later page (`offset` above 0)
+is served from it with one paired marks read in place of the window, while the
+company's two marks (`ALTVCHID` and `ALTMSTID`) equal the ones read when the
+window read began. Each screen action measured so far moved a mark (below), so a
+change of that kind makes a later page read afresh, or refuse when it names its
+snapshot, instead of serving the older read as current. Redaction and party
+marking are applied to each page as it is served. The result carries `snapshot`
+(`id`, `master_alter_id`, `voucher_alter_id`, `read_at`, `reused`); a served
+page's `window` timings and `read_at` are the first page's, and its `evidence`
+covers only the identity and marks reads it sent.
+
+- **A named snapshot is loud.** A later page that passes the first page's
+  `snapshot_id` is refused as `listing_snapshot_changed` (cause
+  `book_changed_since_first_page`, or `snapshot_not_held` when the window has
+  expired, was replaced, was evicted by the byte cap, or was dropped by a write
+  through this server). `snapshot_id` is read on later pages only. Only a page
+  whose `snapshot.reused` is true continues the earlier pages: a later page with
+  `reused` false, or with no `snapshot`, is a fresh read, and its offsets may not
+  continue them (a held window dropped by a write through this server, expired or
+  evicted leaves no trace to flag).
+- **An unnamed page says when the book moved.** Without the name, a page that
+  cannot be served reads the window again, as before. If a held window of the
+  same question was found and the book had moved on, the result carries
+  `earlier_snapshot` (`id`, `cause` `book_changed_since_first_page`,
+  `offsets_do_not_continue` true): the page is a correct read of the book as it
+  is, but its offsets do not continue the earlier pages; start again from offset 0.
+- **What is held.** Only a `complete` window; a `partial` one (an uncounted
+  small book, a withheld foreign-currency voucher) is read again by each page.
+  One window per company and question (dates, ledger, voucher-type selector),
+  for ten minutes after the read finished, within 64 MiB of its own, counted as
+  the rows' JSON text, a proxy for memory (the ledger listings have another
+  64 MiB); a window larger than that is not held and its
+  result carries no `snapshot`. A write through this server drops the company's
+  held windows. The desktop screen holds nothing. A later page is served only
+  for the same question: the same dates (a date is the same question however it
+  is written, `2026-08-01` or `20260801`), the same voucher-type selector and the
+  `ledger` argument exactly as typed on the first page; a differently spelled
+  `ledger` is a different question and reads the whole window again.
+- **What a page cannot see.** A change that moves neither mark. The screen
+  actions measured so far each moved a mark (§11c.5, one run each: a voucher
+  delete moved `ALTVCHID` by 2, a cancel and a save with no change by 1, a
+  regroup, an opening change and a ledger create or delete `ALTMSTID` by 1).
+  Not shown or not established: the second `ALTVCHID` step seen on marking a
+  voucher optional, whether a company feature or configuration change that
+  alters export content moves a mark (enabling cost centres moved `ALTMSTID` in
+  one PARTIAL run), a restored copy of the company with the same GUID and marks,
+  and whether a Tally Gold remote user's save shows in the local `ALTVCHID` read
+  at once. A write from the desktop app, another MCP process or Tally's screens
+  never reaches this server's store; the marks read is then the only check.
+- **What it costs.** A page served from a held window sends the identity read
+  and one marks read in place of the whole window. Measured once on a synthetic
+  book (a month of 2,542 vouchers, a release build): the first page took 68 s and
+  sent 232 requests, and a later page naming its snapshot took 1.2 s and sent 10
+  requests. Before this change each later page repeated the whole read.
 
 ### Foreign-currency composites in `vouchers`
 
@@ -1118,6 +1301,92 @@ An intent may exist even if the request never reached Tally: this is deliberatel
 an unknown outcome, not permission to build a replacement voucher. The saved
 response metadata helps distinguish clean counters from readback alone.
 
+A native post writes the narration as given, print-ready, with no `[BRIDGE:…]`
+tag. A file built for a person to import by hand keeps the tag, because Bridge
+never sees that import.
+
+The posted vouchers are identified by their place in the post's own range of
+Tally AlterIDs (protocol reference §9.15). The dispatch intent records the
+company's voucher mark from the last read before the POST, and the readback
+binds each voucher to the Tally GUID its POST created. Binding needs a clean
+response (`CREATED` equal to the voucher count, and `LASTVCHID`), the mark after
+the POST moved by exactly `CREATED`, and the vouchers in that range in the order
+sent with the content sent. If the mark after the POST could not be read, the
+range the clean response implies is used instead. A post whose response was lost
+is never bound. The binding, or a refusal of it, is recorded once with the
+batch: a refusal is final, while a read that failed is not, and the next
+`verify_import` tries again. A bound voucher is then verified by its GUID
+(`"marker": "post_span_binding"`).
+
+The readback reports, each as `reconciliation_required`: a bound voucher the
+window no longer holds as `bound_not_in_window`, never `not_found`; and, for a
+company whose voucher mark reads below the mark the post left, every voucher it
+no longer holds as `book_rolled_back`, never `not_found`, with nothing bound in
+it. Such a book was rolled back (a backup restored, or another copy put in its
+place). The check sees a rollback only while the mark reads below the post's: a
+book keyed past it again after a restore is not seen as rolled back, and if
+Tally then gave new vouchers the MasterIDs the post's vouchers held (unmeasured),
+a bound voucher names another voucher, which reads `posted_divergent`, or a false
+`posted_verified` when its content is the same (bridge#1050). Bridge still records those rows as posted, so a rebuilt batch holding
+them is refused as `import_txn_already_posted`; re-entering them in that book is
+the person's decision. The result's `post_span_binding` names the binding's
+`state`: `bound`, `refused` with its `code`, `unsettled` with its `code` (for
+example `binding_effective_date_not_observed`, when the read left out a
+Payment, Receipt or Contra's effective date: never refused for it, and decided
+again by the next verification),
+`not_bound`, `book_rolled_back` or `not_applicable`.
+
+A native post that sent no tag is never attributed by one: a row carrying its
+batch's tag is a hand import of the batch's file, matched by content only. The
+binding compares narration byte for byte. A narration holding the one sequence
+the agent readers are known to rewrite (a literal U+FFFD followed by `#`, digits
+and `;`) is refused when the batch is built (`voucher_text_invalid`), and
+`post_import` refuses a batch saved before that check in the same way, before
+any request; it is still admitted for review and reconciliation. Other text,
+such as Devanagari or the rupee sign, is admitted, and whether it reads back
+byte for byte is not yet measured: a narration that reads back changed refuses
+that post's binding for good.
+
+A voucher of an untagged native post that was not bound (its binding refused or
+its response lost), and that its content no longer finds (for example after an
+edit in Tally), is `sent_not_attributed`, never `not_found`. In the post's own
+readback only, when the post sent one voucher and its own answer from Tally
+reported every counter, created none and reported one exception, with nothing
+else counted, that voucher is `tally_reported_not_created` instead
+(bridge#1108). The person is told to check that it is not in Tally and enter it
+there by hand, not through Tally's Import menu. A later `verify_import` never
+reads the post's answer, since someone may have entered the voucher by hand and
+edited it since: it reads `sent_not_attributed`. A batch is never read as not
+created: a partial commit's count does not say which voucher Tally rejected, and
+no batch Tally rejected whole has been captured. A binding refusal is final: an
+edit to one voucher of a batch in Tally before the binding is made
+(a deferred bind, or a later `verify_import`) refuses it for the whole batch,
+whose vouchers are then matched by content only. Such a batch stays
+`reconciliation_required`: the person checks its vouchers in Tally, and
+`acknowledge_post_review` does not apply to it, because it records a review only
+of a doubt beside vouchers that read back verified (closing such a batch inside
+Bridge is bridge#1039). `voucher_presence` cannot identify a native post's
+vouchers, because they carry no marker: one edited or re-dated in Tally can read
+`absent` there. Check a natively posted batch with `verify_import`, which finds
+its vouchers by the GUIDs its post created once its binding is made (and
+otherwise reports them as never absent), before posting any of them again.
+
+If the last read before the POST does not yield the company's voucher mark, the
+post is refused as `post_mark_unrecorded` before its dispatch intent is recorded
+and before anything is sent,
+and the approval is withdrawn, so the next call asks again. Known limits:
+identical vouchers in one batch are bound by position alone, since they are
+identical in content and their own order cannot be observed (the request order of
+vouchers that can be told apart was measured in two raw runs); the local journal is the trust root for the bindings (a lost journal
+leaves the batch unknown, `import_batch_not_found`; in an edited journal, a
+bound voucher's GUID, MasterID and content are still read against the book,
+but not whether this post created it); and whether a write from another Gold
+user's process can share or skip the mark Bridge reads is unmeasured. Open
+follow-ups: the hand-import file still carries the tag (bridge#1037); re-posting
+the rows of a rolled-back batch needs the person's approval (bridge#1038);
+closing a batch whose binding was refused (bridge#1039); and detecting a restore
+keyed past the post's mark (bridge#1050).
+
 Posting binds the saved batch to its loopback endpoint and full company tuple.
 Legacy batches without that endpoint binding remain readable/verifiable but
 cannot be posted. Only a uniquely selectable loaded company is admitted.
@@ -1129,7 +1398,10 @@ availability without deleting reconciliation evidence.
 record carrying a field it does not know. So after a native post, an older
 connector refuses the whole journal, including reconciliation of batches it
 wrote itself. Since bridge#579, each native dispatch intent records the
-REMOTEID it sent, which 0.2.0 and earlier do not know.
+REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post made
+with this version, the dispatch intent also records the pre-POST voucher mark and
+the journal a binding record, which an older connector refuses: do not downgrade
+after posting with it. A downgrade before that first post is harmless.
 
 This is a bounded first posting slice, not blanket host/licence qualification.
 A ledger mapper is unnecessary for exact existing names: `validate_masters`
@@ -1221,11 +1493,18 @@ source evidence are not fabricated; zero retained bytes does not establish that
 no HTTP request was attempted. Local-only tools and refusals without retained
 source observations carry local evidence.
 
-`outstandings` returns the runtime's paired native result. A complete read has
+`outstandings` returns the runtime's paired native result. Its `result.as_of` (YYYYMMDD) is always the date read as of, in every state: the caller's `as_of`, or this computer's date when it was left out. `tally_status.today` is that date. A complete read has
 billed totals explicitly scoped to open bills, four overdue-age buckets, an
 `unaged` bucket for future-due or unobserved ages, top parties,
 open bills, and unallocated counts and directional totals; a refused runtime read instead has `state: "partial"` and its
-exact `partial_reason`. `ledger_movement` returns literal-window voucher
+exact `partial_reason`. A Bills report row whose dates Bridge cannot read refuses the whole
+read (leaving a bill out would change the totals) with its `cause` (a typed code
+for the rule that failed), a `bill_row` (`report`, `receivable` or `payable`, and
+the 1-based `row` in the order Tally sent them: never the bill's party, reference
+or date) and a next step. A refusal that is not about one row (an amount, the
+shape of the report, the book window) has a `cause` and no `bill_row`. A due date
+printed with a four-digit year of 2100 or later is read as written; no other form
+is added (protocol reference section 12a.3, one observation). `ledger_movement` returns literal-window voucher
 movement with exact decimal `opening`, `debit`, `credit`, `closing`, parent,
 and `vouchers_touching`. `ledger_masters` accepts `fields: "compliance"` to
 return the paired party-master GSTIN/PAN/MSME/bank/IFSC/email/phone/state and
@@ -1271,7 +1550,24 @@ requests. Incoming frames are limited to 5 MB. All responses obey the configured
 byte cap, including control replies, the JSON-RPC wrapper, and newline. A tool
 catalogue that cannot fit returns `agent_response_too_large`; the session remains
 usable. Text content contains the same
-serialized, redacted JSON as `structuredContent` for older clients.
+serialized, redacted JSON as `structuredContent` for older clients. The `initialize` result also
+carries `instructions`, a short text for the client to show its model: start with `list_companies`,
+use the one open company only when the user named no client (or exactly one open company matches the
+name they gave), otherwise ask which and offer the list, state the company, dates and ledger used in
+the first line, anything partial, withheld, not established or not checked ahead of the figures, ask
+before a read that scans vouchers over more than one month unless the user gave the dates or the
+financial year, and always before an outstandings party detail, which reads from the start of the books,
+that what is read goes to the AI provider, and what to do with a refusal (relay it, take only a
+different read, narrower dates or one repeat of the same read that it names, otherwise ask the user).
+Its closing sentences follow the posting settings: with posting on, ask before preparing or posting
+anything and never choose a ledger for a voucher; with import only, this connection cannot post, only
+prepare a local import file the user imports themselves, and the assistant asks before preparing
+anything and never chooses a ledger; with neither, it cannot prepare or post vouchers, and still never
+chooses a ledger. Both of the latter tell the assistant to say so and never say anything was or will
+be posted from the chat. It is left out when
+`max_bytes` is below 4,096 or the request id is over 256 bytes, so that a client asking for tiny
+responses still gets its handshake. The company rule is also in `list_companies`' own description, so
+a client that does not pass the instructions on keeps it; the other sentences are not repeated there.
 
 `tally_status.education_mode` is a boolean: `true` for observed Education mode,
 `false` for observed Licensed mode, and `null` when mode is unobserved. Product
@@ -1327,6 +1623,10 @@ grant admission.
 
 Top-party ranking uses `gross_exposure`, with billed and unallocated receivable
 and payable fields kept separate. `totals.scope` is `open_bills_only`.
+`open_bills_total` counts every open bill in the requested direction (the bills `totals` and
+`ageing_buckets` cover; on a partial read, the base-currency ledgers' bills only, beside those figures) and `open_bills_shown` counts the bills on the page returned. A page cut by
+the response size keeps `limit` unchanged and restates `open_bills_shown`, so a page shorter than the
+total is read from `open_bills_shown` and `next_offset`, never from `limit`.
 `unallocated.totals` contains `receivable`, `payable`, `gross_unallocated` and
 `by_composition` (the same gross split by composition, below).
 The previous ambiguous `outstanding_total` and `unallocated.amount` fields have
@@ -1454,7 +1754,9 @@ narration marker share a UUID derived from the generated batch ID and caller's
 `bridge_txn_id`. The caller ID remains the local transaction label; it is not
 sent directly as Tally's upsert key. Reused labels in independent batches therefore
 have different wire identities, so rebuilding after losing the batch journal
-creates a new identity and does not deduplicate the business event.
+creates a new identity and does not deduplicate the business event. That is the
+file a person imports; a native post sends its own fresh `REMOTEID` and no
+narration marker, and is bound by its own span (Approved voucher posting).
 
 **An unknown outcome requires reconciliation for every voucher type, which writes nothing to Tally.**
 Preserve the original batch and saved file, then call `verify_import`. Do not

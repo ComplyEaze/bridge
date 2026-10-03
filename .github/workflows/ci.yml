@@ -111,7 +111,7 @@ jobs:
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/|\.github/actions/setup-windows-native/|rust-toolchain\.toml|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-)'; then
+          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/|\.github/actions/setup-windows-native/|rust-toolchain\.toml|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.py$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes\.py$|retain-macos-test-binaries\.py$))'; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
@@ -134,7 +134,11 @@ jobs:
   frontend:
     name: Frontend build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The Playwright system packages are about 125 MB from the runner's apt mirror and are not run under `timeout`
+    # (see the install step). Normally that takes about 30 s, but on 2 Oct 2026 one runner fetched at a steady
+    # 77 kB/s, which needs about 27 minutes, and the old 15-minute limit cancelled the job (and, in the merge queue,
+    # dropped the entry). 40 minutes covers that rate with margin; a hung apt is still bounded by it.
+    timeout-minutes: 40
     permissions:
       contents: read
     steps:
@@ -166,18 +170,39 @@ jobs:
         env:
           CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
         run: |
-          if [ "$CACHE_HIT" = "true" ]; then
-            command=(corepack pnpm exec playwright install-deps chromium webkit)
-          else
-            command=(corepack pnpm exec playwright install --with-deps chromium webkit)
-          fi
+          # The system packages are installed by apt, as root, and are NOT run under `timeout`: when `timeout` stops the
+          # command it kills the wrapper but not the root apt-get it started, which keeps the dpkg lock, so the next
+          # attempt fails at once with "Could not get lock /var/lib/dpkg/lock-frontend". That is what failed this
+          # required job on all three attempts on 2 Oct 2026 (a slow mirror took longer than the 240 s limit; attempts
+          # 2 and 3 then met the orphaned apt-get). apt also waits for the lock, within reason, rather than failing.
+          # The job's own time limit (40 minutes, see its header) bounds a hung apt. At normal speed the worst case (a
+          # browser cache miss, two install attempts that each wait out the lock, a third that succeeds, then three
+          # timed-out downloads) takes about 18 minutes, inside that limit, and ends with the `exit 1` below. Only a
+          # slow apt download reaches the limit; the job's timeout then fails this required job as loudly as `exit 1`.
+          echo 'DPkg::Lock::Timeout "150";' | sudo tee /etc/apt/apt.conf.d/99-bridge-lock-timeout > /dev/null
           for attempt in 1 2 3; do
-            if timeout --kill-after=10 240 "${command[@]}"; then
-              exit 0
+            if corepack pnpm exec playwright install-deps chromium webkit; then
+              break
             fi
-            echo "Playwright install attempt $attempt of 3 failed or timed out after 240 s"
+            echo "Playwright system dependencies attempt $attempt of 3 failed"
+            [ "$attempt" = 3 ] && exit 1
+            # an apt that died mid-unpack leaves dpkg interrupted, and every retry would then fail; finish it first.
+            # dpkg does not read apt's DPkg::Lock::Timeout, so if something holds the lock this fails at once and
+            # `|| true` hides that; it is harmless, because the next apt attempt waits for the lock (up to 150 s).
+            sudo dpkg --configure -a || true
           done
-          exit 1
+          # The browser download is what hung until the job's time limit about eight times in two days, so it is the
+          # part that keeps a short limit and a bounded number of attempts. It runs no apt and holds no lock.
+          # This block ends the step (exit 0 or exit 1 inside it): add nothing after it without checking that.
+          if [ "$CACHE_HIT" != "true" ]; then
+            for attempt in 1 2 3; do
+              if timeout --kill-after=10 240 corepack pnpm exec playwright install chromium webkit; then
+                exit 0
+              fi
+              echo "Playwright browser download attempt $attempt of 3 failed or timed out after 240 s"
+            done
+            exit 1
+          fi
       - run: corepack pnpm test
       - run: corepack pnpm run build
 
@@ -241,6 +266,9 @@ jobs:
       - run: node scripts/check-gh-api-pagination.mjs
       - run: node --test scripts/prune-package-compiler-cache.test.mjs
       - run: node --test scripts/master-push-reuse.test.mjs scripts/master-push-scope.test.mjs
+      # A committed merge-conflict marker passes every other check and ships as text.
+      - run: node scripts/check-conflict-markers.mjs
+      - run: node --test scripts/check-conflict-markers.test.mjs
       - run: python3 scripts/collect-macos-test-crashes.test.py
       - run: python3 scripts/retain-macos-test-binaries.test.py
       - run: python3 scripts/bank_statement_import.test.py
@@ -592,7 +620,10 @@ jobs:
     needs: changes
     # Bundle output is validated for packaging-relevant pull requests and for every
     # manual or scheduled run, and on a master push unless the merge queue already ran it
-    # on that commit. Rust/Tauri PRs retain the native platform matrix above.
+    # on that commit. Rust/Tauri PRs retain the native platform matrix above. A pull request
+    # runs Windows only: the macOS bundle and seam jobs run in the merge queue and on a master
+    # push, so a macOS-only packaging failure is found at the queue (it ejects that entry)
+    # rather than costing every pull request about 12 macOS runner minutes.
     if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
@@ -601,7 +632,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["windows-latest", "macos-latest"]') }}
     env:
       SCCACHE_DIR: ${{ github.workspace }}/.cache/bridge-package-sccache
       SCCACHE_CACHE_SIZE: 64M
@@ -808,7 +839,7 @@ jobs:
     # rather than after it: it builds the bridge lib unit-test executable in
     # release and requires the marker there, so a clean scan of the shipped
     # executables means the scan could have seen the seam. Same scope and
-    # platforms as bundle-smoke, whose runs it guards.
+    # platforms as bundle-smoke, whose runs it guards (on a pull request, Windows only).
     if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -817,7 +848,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["windows-latest", "macos-latest"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

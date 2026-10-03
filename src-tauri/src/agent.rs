@@ -43,6 +43,9 @@ use company::*;
 mod changes;
 #[path = "agent_headline.rs"]
 mod headline;
+#[path = "agent_ledger_candidates.rs"]
+mod ledger_candidates;
+use ledger_candidates::resolve_ledger_or_refuse;
 #[path = "agent_ledgers.rs"]
 mod ledgers;
 #[path = "agent_masters.rs"]
@@ -50,6 +53,7 @@ mod masters;
 #[path = "agent_stock_summary.rs"]
 mod stock_summary;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
+use vouchers::VoucherPages;
 #[path = "agent_bill_trail.rs"]
 mod bill_trail;
 #[path = "agent_outstandings.rs"]
@@ -413,6 +417,9 @@ struct Server {
     /// Ledger listings read once and served page by page (#630). In memory
     /// only; see `agent_ledgers.rs`.
     listings: Arc<Mutex<ListingSnapshots>>,
+    /// `vouchers` windows read once and served page by page (#485). In memory
+    /// only; see `agent_vouchers.rs`.
+    voucher_pages: Arc<Mutex<VoucherPages>>,
     /// A post dialog or approval that outlived the call which asked it
     /// (#725). In memory only; see `agent_import_approval.rs`.
     post_approvals: Arc<agent_import::PostApprovals>,
@@ -474,6 +481,16 @@ struct ReadDetail {
     /// How many data requests a refused window read needed, at least, against
     /// the allowance it may spend.
     planned_reads: Option<PlannedReads>,
+    /// The report kind and 1-based row of a Bills report whose row could not be
+    /// read (bridge#1091). A word and a number: never the bill's party or reference.
+    bill_row: Option<BillRowRef>,
+}
+
+/// See [`ReadDetail::bill_row`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct BillRowRef {
+    report: Option<&'static str>,
+    row: u32,
 }
 
 impl ToolFailure {
@@ -522,6 +539,10 @@ struct IncompleteRead {
 struct Candidates {
     requested: Option<String>,
     items: Vec<Value>,
+    /// Set for a ledger name that was not found or was ambiguous: what the
+    /// listing means, so an empty or cut list is never read as "no such
+    /// ledger".
+    miss: Option<ledger_candidates::LedgerMiss>,
 }
 
 /// A compliance read refused before any ledger request was sent because its
@@ -736,6 +757,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(statement.code());
         }
+        if let Some(outstandings) =
+            cause.downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
+        {
+            return Some(outstandings.code());
+        }
         if let Some(derivation) =
             cause.downcast_ref::<crate::reports::statements::StatementsError>()
         {
@@ -758,6 +784,13 @@ const GENERIC_RUNTIME_READ_FAILURE: &str = "agent_runtime_read_failed";
 /// default, so only a caller that has deliberately asked for tiny responses
 /// gives it up.
 const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
+
+/// The floor for a ledger refusal's candidate list. The whole refusal is
+/// framed twice (as a structured result and as its text copy) and an error
+/// object has no page to trim, so a list that does not fit costs the caller
+/// the refusal code. At a sixteenth of this budget, the list, the guidance
+/// and the framing together stay well inside it.
+const LEDGER_CANDIDATES_MIN_RESPONSE_BUDGET: usize = 16_384;
 
 /// The causes of a movement's ledger catalogue read that outlived its deadline
 /// or the response cap. The catalogue lists every ledger in the book, so it does
@@ -807,16 +840,48 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "register_ledger_currency_excluded" => Some(
             "A voucher in this window touches a ledger that the compliance read of the ledger \
              masters set aside because it is kept in another currency (or its balance is a \
-             currency composite), so purchase_register cannot classify the voucher and refuses \
+             currency composite), so the purchase or sales register cannot classify the voucher and refuses \
              the whole window rather than leave it out. Narrow from and to so the window holds \
              no such voucher, or read it with `vouchers`. Retrying the same window refuses \
              again.",
         ),
         "register_master_mark_unavailable" => Some(
-            "Tally did not report the company's master-alteration mark, which purchase_register \
-             needs to bind the ledger masters to the voucher window. It cannot be answered \
+            "Tally did not report the company's master-alteration mark, which the purchase and sales \
+             registers need to bind the ledger masters to the voucher window. It cannot be answered \
              from this book as Tally reports it; `ledger_masters` with fields=compliance and \
              `vouchers` still read it separately.",
+        ),
+        "ledger_not_found" => Some(
+            "No ledger in this company has this name, even ignoring case, spaces, symbols and \
+             accent marks, and ComplyEaze Bridge chose none. Show the user the ledgers in \
+             `candidates`, if there are any, and ask which one they meant: even one candidate \
+             needs the user's confirmation, and none is marked best: the order is by rule \
+             strength and then name, not by likelihood. Then call again with that name exactly \
+             as listed. `candidates_listing` says what an empty list means: `none` (nothing \
+             resembles the name: ask the user to check the spelling, and do not say the ledger \
+             does not exist), `withheld` (too many ledgers resemble it to list: ask for more \
+             of the name), `truncated` (more were found than are listed: ask for more of the \
+             name), `names_masked` (the redaction setting hides the names: ask the user to \
+             type the full name) or `unavailable` (the search could not run: ask the user for \
+             the exact name). If `candidates_total_is_lower_bound` is true, there may be more \
+             ledgers than are counted. If `candidates_listing` is absent, no candidates were \
+             attached because the response budget is small: ask the user for the exact name.",
+        ),
+        "ledger_ambiguous" => Some(
+            "More than one ledger in this company matches this name once case, spaces, \
+             symbols and accent marks are ignored, and none is spelled exactly as requested, \
+             so ComplyEaze Bridge chose none. Show the user every ledger in `candidates` and \
+             ask which one they meant, then call again with that name exactly as listed. If \
+             `candidates_listing` is `truncated`, more ledgers match than are listed, and if \
+             it is `names_masked` or absent the names are not shown: ask the user to type the \
+             full name of the ledger exactly as spelled in Tally, since the names that clash \
+             may differ only in case, punctuation or accents.",
+        ),
+        "ledger_name_masked" => Some(
+            "Refused: ask the user to type the full ledger name exactly as spelled in Tally. \
+             This name looks like a shortened, masked name (party names are shortened with `…` \
+             when masking is on), and using it could open a different ledger from the one \
+             meant, so ComplyEaze Bridge did not use it.",
         ),
         "ledger_masters_as_of_requires_compliance" => Some(
             "`as_of` selects the date `party_gstin` is read as of, which only \
@@ -948,10 +1013,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              released nothing.",
         ),
         "ledger_count_company_differs" => Some(
-            "ComplyEaze Bridge counts this book's ledgers by AlterID span, and Tally's own count of the \
-             company's ledgers is higher than that census found: the census missed ledgers, either \
-             because a ledger was added during the read or (reasoned, not reproduced) because \
-             the company was closed and reopened while it ran, and a read sized from the low \
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span, and Tally's own count \
+             of the company's ledgers is higher than that census found: the census missed ledgers, \
+             because a ledger was added during the read or (reasoned, not reproduced) because a \
+             ledger was altered during it before its slice was read, so its new AlterID is past \
+             every slice, or the company was closed and reopened while it ran, and a read sized \
+             from the low \
              count would have been sized too small. No master was requested. Retry once with the company left alone and \
              nobody editing it in Tally. A repeat means the census and Tally's count disagree \
              about this book: call ledger_masters with fields=basic instead."
@@ -1036,17 +1103,21 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // Narration, reference and voucher number share this code for several
         // unrelated text failures (empty, over the schema's character cap, a
-        // control character); the least discoverable of them is specific to
-        // the voucher number, so it is named here rather than left for a
-        // caller to reverse-engineer.
+        // control character); the least discoverable of them applies to the
+        // voucher number and the narration, so it is named here rather than
+        // left for a caller to reverse-engineer.
         "voucher_text_invalid" => Some(
-            "The voucher number is empty, longer than the schema allows, holds a control \
-             character, or — the one cause that is not visible by inspection — begins a \
-             literal U+FFFD immediately followed by `#`, digits and `;` (for example \
-             U+FFFD#5;). ComplyEaze Bridge's own agent readers rewrite exactly that sequence before \
-             parsing, so a voucher number carrying it would read back as different text and \
-             could never be confirmed as posted. Remove that sequence from the voucher number \
-             and resubmit; narration and reference may carry it freely.",
+            "A narration, reference or voucher number is empty, longer than the schema \
+             allows, or holds a control character; or — the one cause that is not visible by \
+             inspection — the voucher number or narration holds a literal U+FFFD immediately \
+             followed by `#`, digits and `;` (for example U+FFFD#5;). ComplyEaze Bridge's own agent \
+             readers rewrite exactly that sequence before parsing, so a voucher number \
+             carrying it could never be confirmed as posted, and a native post of a narration \
+             carrying it could never be bound to the voucher it created, so never confirmed \
+             either. Remove that sequence from the voucher number or narration and build the \
+             batch again with build_import_xml: a saved batch cannot be changed, and \
+             post_import refuses one saved with such a narration. The reference may carry it \
+             freely.",
         ),
         // Same shared-code shape as voucher_text_invalid, for a ledger name
         // instead of the voucher number.
@@ -1139,6 +1210,54 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "Before posting, ComplyEaze Bridge checks the batch's whole date range in one request, and \
              this range holds too many vouchers for one request to stay within its bound. \
              Build the batch again over fewer days, then post that batch.",
+        ),
+        _ => None,
+    }
+}
+
+/// The next step for a refusal: its own code's, else its cause's, and the outstandings
+/// causes' only under the outstandings code.
+fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
+    refusal_remediation(code)
+        .or_else(|| cause.and_then(refusal_remediation))
+        .or_else(|| {
+            (code == "native_outstandings_read_failed")
+                .then(|| cause.and_then(outstandings_cause_remediation))
+                .flatten()
+        })
+}
+
+/// The next step for a cause of `native_outstandings_read_failed` (bridge#1091). It is chosen
+/// only under that code: the same cause codes reach other tools through `?` sites that never
+/// read the Bills report, and the text below would be wrong for them. A refusal is whole:
+/// leaving one bill out would change the totals, so nothing is returned.
+fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
+    match cause {
+        cause if cause.starts_with("native_date_") => Some(
+            "A date in one row of Tally's Bills Receivable or Payable report is not one \
+             ComplyEaze Bridge can read, so no figures were returned: leaving that bill out would \
+             change the totals. When the refusal carries a `bill_row`, it names the report and the row \
+             in the order Tally sent them, which may not be the order on screen: look in that \
+             report for a bill with a very long credit period or an unusual date and tell the \
+             user what Tally shows. A refusal about the book's date window has no `bill_row`: tell \
+             the user what the cause says. The \
+             book did not change during the read, so retrying gives the same refusal. Do not retry.",
+        ),
+        cause if cause.starts_with("bills_") => Some(
+            "Tally's Bills Receivable or Payable report came back in a shape ComplyEaze Bridge \
+             does not recognise (the cause names the rule it broke; `bill_row` names the report \
+             and row when a row is the problem), so no figures were returned. The book did not \
+             change during the read, so retrying gives the same refusal. Do not retry; tell the \
+             user what the cause says.",
+        ),
+        "native_amount_invalid" | "native_arithmetic_overflow" => Some(
+            "A bill amount in Tally's Bills report could not be read exactly, so no figures were \
+             returned. Do not retry; tell the user what the cause says.",
+        ),
+        "native_tally_reported_failure" => Some(
+            "Tally answered the Bills report request with a failure, so no figures were returned. \
+             Ask the user to check that the company is open in Tally and that its Bills \
+             Receivable report opens, then call outstandings once more.",
         ),
         _ => None,
     }
@@ -1285,6 +1404,12 @@ impl ToolFailure {
                 .map(|failure| Box::new(evidence_from_runtime_read(failure.evidence.clone())))
         });
         let cause = runtime_refusal_cause(&error).filter(|cause| *cause != code);
+        let bill_row = error.chain().find_map(|cause| {
+            cause
+                .downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
+                .and_then(|error| error.bill_row())
+                .map(|(report, row)| BillRowRef { report, row })
+        });
         Self {
             code: code.to_string(),
             evidence,
@@ -1295,7 +1420,12 @@ impl ToolFailure {
             unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
-            read_detail: None,
+            read_detail: bill_row.map(|bill_row| {
+                Box::new(ReadDetail {
+                    bill_row: Some(bill_row),
+                    ..ReadDetail::default()
+                })
+            }),
         }
     }
 
@@ -1318,6 +1448,7 @@ impl Server {
             runtime: TallyRuntime::default(),
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
+            voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
             post_approvals,
             terms: terms::TermsGate::NotRequired,
         }
@@ -1465,9 +1596,7 @@ impl Server {
                 // A shared operation code can still have a cause with its own
                 // next step (#637), so the cause is consulted when the code has
                 // none.
-                if let Some(remediation) =
-                    refusal_remediation(&code).or_else(|| cause.and_then(refusal_remediation))
-                {
+                if let Some(remediation) = remediation_for(&code, cause) {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);
                     }
@@ -1512,26 +1641,94 @@ impl Server {
                         error["endpoint"] = json!(endpoint);
                     }
                 }
-                // The list grows with the window, so it is kept only within a
-                // quarter of the response budget, like `window` below: the
-                // refusal code must survive the byte cap.
+                // A voucher-type list grows with the window, so it is kept only
+                // within a quarter of the response budget, like `window` below:
+                // the refusal code must survive the byte cap. A ledger list
+                // rides in the response twice and grows with the book, so it
+                // has its own larger floor and a sixteenth of the budget; the
+                // states that carry no list only need the guidance floor.
                 if let Some(candidates) = candidates {
-                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
-                        if let Some(requested) = &candidates.requested {
-                            error["requested"] = json!(requested);
+                    let max_bytes = self.settings.max_bytes;
+                    match &candidates.miss {
+                        Some(miss) => {
+                            let floor = if miss.listing.has_list() {
+                                LEDGER_CANDIDATES_MIN_RESPONSE_BUDGET
+                            } else {
+                                REMEDIATION_MIN_RESPONSE_BUDGET
+                            };
+                            if max_bytes >= floor {
+                                use ledger_candidates::Listing;
+                                match miss.listing {
+                                    // Masked: the state only, no names and no
+                                    // count. A count is a yes or no on every
+                                    // prefix a caller tries.
+                                    Listing::NamesMasked => {
+                                        error["candidates_listing"] = json!(miss.listing.as_str());
+                                    }
+                                    // The search could not run: the state and
+                                    // why, and no count (a 0 would read as
+                                    // "no ledgers").
+                                    Listing::Unavailable => {
+                                        error["candidates_listing"] = json!(miss.listing.as_str());
+                                        if let Some(reason) = miss.reason {
+                                            error["candidates_reason"] = json!(reason);
+                                        }
+                                    }
+                                    Listing::None
+                                    | Listing::Withheld
+                                    | Listing::Listed
+                                    | Listing::Truncated => {
+                                        let fields =
+                                            candidate_fields(&candidates.items, max_bytes / 16);
+                                        for (key, value) in fields {
+                                            error[key] = value;
+                                        }
+                                        // A list cut to fit is `truncated`;
+                                        // `candidates_truncated` says whether
+                                        // anything was left out, which a
+                                        // withheld family also is.
+                                        let cut = error["candidates_truncated"] == json!(true);
+                                        let word = miss.listing_word(cut);
+                                        error["candidates_listing"] = json!(word);
+                                        error["candidates_truncated"] =
+                                            json!(word == "truncated" || word == "withheld");
+                                        error["candidates_total"] = json!(miss.found);
+                                        error["candidates_total_is_lower_bound"] =
+                                            json!(miss.found_is_lower_bound);
+                                        if let Some(reason) = miss.reason {
+                                            error["candidates_reason"] = json!(reason);
+                                        }
+                                    }
+                                }
+                            }
                         }
-                        let fields =
-                            candidate_fields(&candidates.items, self.settings.max_bytes / 4);
-                        for (key, value) in fields {
-                            error[key] = value;
+                        None if max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET => {
+                            if let Some(requested) = &candidates.requested {
+                                error["requested"] = json!(requested);
+                            }
+                            for (key, value) in candidate_fields(&candidates.items, max_bytes / 4) {
+                                error[key] = value;
+                            }
                         }
+                        None => {}
                     }
                 }
                 // The partial read's own reason, under the same budget rule:
                 // a few codes, kept beside the refusal's code.
-                let (incomplete_read, planned_reads) = read_detail
-                    .map(|detail| (detail.incomplete_read, detail.planned_reads))
+                let (incomplete_read, planned_reads, bill_row) = read_detail
+                    .map(|detail| {
+                        (
+                            detail.incomplete_read,
+                            detail.planned_reads,
+                            detail.bill_row,
+                        )
+                    })
                     .unwrap_or_default();
+                if let Some(bill_row) = bill_row {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["bill_row"] = json!({"report": bill_row.report, "row": bill_row.row});
+                    }
+                }
                 if let Some(read) = incomplete_read {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["partial_reason"] = json!(read.partial_reason);
@@ -1731,8 +1928,9 @@ impl Server {
             }
             "post_import" => self.post_import(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
-            "purchase_register" => self.purchase_register(args).await,
+            "purchase_register" => self.register(register::RegisterKind::Purchase, args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
+            "sales_register" => self.register(register::RegisterKind::Sales, args).await,
             "stock_summary" => self.stock_summary(args).await,
             "tally_status" => {
                 let (result, evidence) = self.status().await?;
@@ -1911,17 +2109,13 @@ pub(crate) async fn desktop_selected_vouchers(
             "offset": offset,
             "limit": limit,
         }),
-        vouchers::VoucherOperationScope {
-            guid: company_guid,
-            from: normalized_from,
-            to: normalized_to,
+        vouchers::VoucherOperationScope::desktop(
+            company_guid,
+            normalized_from,
+            normalized_to,
             company,
             identity,
-            initial_evidence: None,
-            // The desktop screen cannot show a withheld voucher, so a
-            // foreign-currency composite still refuses its window (#674).
-            composites: vouchers::VoucherComposites::Refuse,
-        },
+        ),
     )
     .await
     .map_err(|failure| failure.code)?;

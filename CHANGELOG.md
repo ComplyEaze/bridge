@@ -12,6 +12,59 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+### In plain words: the next build, since `mcp-v0.4.1`
+
+These changes are in source and not yet in a published build.
+
+**Safer or fixed**
+
+- `outstandings` no longer refuses because one bill's due date in the Bills
+  Receivable report is printed with a four-digit year (a bill with a credit period
+  of about 83 years, `1-Dec-2108`): that one date made the whole read fail with no
+  reason. Not measured: that the rest of the read then completes on such a book. A
+  due date is now read as written when Tally prints its year in full and the year
+  is 2100 or later. A bill row whose dates ComplyEaze Bridge cannot read still
+  refuses the read; the refusal now carries a typed `cause`, the report and the
+  row number when it is a row that fails, and a next step, never the bill's party
+  or reference. A due date that far out gives no overdue days in the ageing (#1091).
+
+**What the next build adds**
+
+- Read a register of the tax in the books for sales: the Sales and Credit Note
+  vouchers of a date window that touch a Duties & Taxes ledger, with each
+  entry's tax taken only from the GST duty head on that ledger's master, never
+  from a name or an amount. It reads as the purchase register does. It was run
+  against a live Tally for one taxed Sales item invoice, one untaxed one (read
+  once by an earlier build; only its voucher window is committed) and one Credit
+  Note, on two synthetic companies. A Credit Note keeps Tally's signs
+  (nothing is netted or flipped, so add signed amounts), and the state-side tax
+  head has two recognised forms, `state_tax` and `sgst_utgst`, for the same
+  side. An inter-state line, a cancelled or optional sale, an unrecognised or
+  missing duty head, more than one voucher in a window and paging were not
+  shown. A sale of a kind a row can show as unmeasured is marked
+  `not_measured_live`; the tool's text says what cannot be marked. The response
+  `state` is `complete` when the company marks and the ledger masters read the
+  same before and after the window, not when the window was counted as
+  `vouchers` now requires (#1009).
+
+**Safer or fixed**
+
+- `vouchers` no longer re-reads a whole window for every page. A later page of a
+  `complete` window is served from the first page's read while the company's
+  books have not changed in a way that moves their marks, and a page that names
+  the first page's `snapshot_id` is refused if they did, instead of continuing
+  from a different read. Without the name, a page that reads afresh (the held
+  window moved on, expired or was dropped) has offsets that may not continue the
+  earlier pages, which the result says when it knows (`earlier_snapshot`). Before,
+  a book that changed between pages could skip or repeat vouchers while every
+  page said `complete`. A window that is only `partial` is read again for each
+  page, as before (#485).
+- In the desktop app, the button on an export notice that shows the file
+  (Show in Finder, Show in Explorer or Open folder) now opens only a file
+  ComplyEaze Bridge exported since it started. Any other path is refused
+  before the file manager opens, so a compromised app window cannot use it to
+  point at other files on the computer. Exports work as before (#915, #1051).
+
 ## [0.4.1] - 2026-10-02
 
 ### In plain words: ComplyEaze Bridge 0.4.1, since 0.4.0 (2 Oct 2026)

@@ -101,7 +101,7 @@ fn hash12_sha256(text: &str) -> String {
 
 /// Which s.40A(3) exclusion role (if any) a payee ledger falls under, by its full group chain
 /// (not just the immediate parent).
-fn classify_kind(ledger: Option<&Ledger>) -> &'static str {
+pub(crate) fn classify_kind(ledger: Option<&Ledger>) -> &'static str {
     let Some(ledger) = ledger else {
         return "expenditure";
     };
@@ -113,7 +113,7 @@ fn classify_kind(ledger: Option<&Ledger>) -> &'static str {
     "expenditure"
 }
 
-fn group_for_kind(kind: &str) -> Result<&'static str> {
+pub(crate) fn group_for_kind(kind: &str) -> Result<&'static str> {
     GROUP_BY_KIND
         .iter()
         .find(|(k, _)| *k == kind)

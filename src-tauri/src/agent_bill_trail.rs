@@ -870,7 +870,11 @@ impl Server {
         limits: DetailLimits,
     ) -> Result<(Value, Evidence), ToolFailure> {
         let (catalogue, mut evidence) = self.read_ledger_catalogue(identity, &company.name).await?;
-        let party = resolve_ledger_name(catalogue.iter().map(String::as_str), party_argument)?;
+        let party = resolve_ledger_or_refuse(
+            catalogue.iter().map(String::as_str),
+            party_argument,
+            self.settings.redaction,
+        )?;
         let books_from = company
             .books_from
             .clone()

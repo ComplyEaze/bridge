@@ -781,3 +781,95 @@ fn a_same_company_part_year_window_on_a_heavy_book_passes_the_gate() {
     assert_eq!(statuses(&tie), vec![("Sales Accounts", TieStatus::Matched)]);
     assert!(tie.derived_only.is_empty());
 }
+
+/// A Tally line that reads 0.00 in both columns is a zero amount: over a derived
+/// line with an amount it is a difference and names the line, on both
+/// statements (#1067). Before the fix it was "not compared" and no failure, so
+/// the results were established.
+#[test]
+fn a_present_zero_tally_line_over_a_derived_amount_is_a_difference() {
+    // Balance Sheet: Tally's "Current Assets" reads 0.00 / 0.00; derived is -11027.00.
+    let tally = balance_sheet(&[
+        ("Current Assets", "0.00", "0.00"),
+        ("Profit & Loss A/c", "", "11027.00"),
+    ]);
+    let derived = derive(known_lab(), &tally);
+    assert_every_result(&derived, &differs(&["Current Assets"]));
+
+    // Profit and Loss: Tally's "Sales Accounts" reads 0.00 / 0.00; derived is 4027.00.
+    let derived = derive_with_profit_and_loss(
+        known_lab(),
+        &profit_and_loss(&[("Sales Accounts", "0.00", "0.00")]),
+    );
+    assert_movement_refused(&derived, &["Sales Accounts"]);
+}
+
+/// A present zero over a derived zero still ties, and a line with both columns
+/// present and an amount is still uncompared and still refuses.
+#[test]
+fn a_present_zero_over_a_derived_zero_ties_and_a_present_amount_still_refuses() {
+    let tally = balance_sheet(&[
+        ("Capital Account", "0.00", "0.00"),
+        ("Current Assets", "", "-11027.00"),
+        ("Profit & Loss A/c", "", "11027.00"),
+    ]);
+    let derived = derive(known_lab(), &tally);
+    assert_established(&derived.net_result, "4027.00");
+    assert!(derived
+        .balance_sheet_tie
+        .lines
+        .iter()
+        .any(|line| line.name == "Capital Account" && line.status == TieStatus::Matched));
+
+    let tally = balance_sheet(&[
+        ("Current Assets", "-1.00", "-11027.00"),
+        ("Profit & Loss A/c", "", "11027.00"),
+    ]);
+    let derived = derive(known_lab(), &tally);
+    assert_every_result(&derived, &differs(&["Current Assets"]));
+    // One zero column beside an amount, in either column, is not a zero line:
+    // it stays uncompared, and refuses.
+    let tally = balance_sheet(&[
+        ("Current Assets", "-11027.00", "0.00"),
+        ("Profit & Loss A/c", "", "11027.00"),
+    ]);
+    let derived = derive(known_lab(), &tally);
+    assert_every_result(&derived, &differs(&["Current Assets"]));
+    assert!(derived
+        .balance_sheet_tie
+        .lines
+        .iter()
+        .any(|line| line.name == "Current Assets"
+            && line.status
+                == TieStatus::NotCompared {
+                    reason: "both_tally_columns_present"
+                }));
+    // The Profit and Loss gate, the same: an amount in one column of a pair
+    // refuses, in either order.
+    for (sub, main) in [
+        ("4027.00", "0.00"),
+        ("0.00", "4027.00"),
+        ("1.00", "4026.00"),
+    ] {
+        let derived = derive_with_profit_and_loss(
+            known_lab(),
+            &profit_and_loss(&[("Sales Accounts", sub, main)]),
+        );
+        assert_movement_refused(&derived, &["Sales Accounts"]);
+    }
+    let tally = balance_sheet(&[
+        ("Current Assets", "0.00", "-11027.00"),
+        ("Profit & Loss A/c", "", "11027.00"),
+    ]);
+    let derived = derive(known_lab(), &tally);
+    assert_every_result(&derived, &differs(&["Current Assets"]));
+    assert!(derived
+        .balance_sheet_tie
+        .lines
+        .iter()
+        .any(|line| line.name == "Current Assets"
+            && line.status
+                == TieStatus::NotCompared {
+                    reason: "both_tally_columns_present"
+                }));
+}

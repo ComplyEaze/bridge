@@ -226,3 +226,83 @@
 .legal th, .legal td { text-align: left; vertical-align: top; padding: 8px 10px; border: 1px solid var(--paper-line); min-width: 9ch; }
 .legal th { font-weight: 650; background: var(--paper-line); }
 .legal-summary { margin: 24px 0; padding: 18px 20px 6px; background: var(--card); border: 1px solid var(--paper-line); border-left: 4px solid var(--cover); border-radius: var(--r-md); }
+
+/* --------------------------------------------------------------------- faq */
+/* One question to a line, each a native <details>: it opens without script, reads in a screen reader as a
+   disclosure, and the text stays in the page for a reader that never opens it. */
+.faq-topics { padding: 28px 0 8px; }
+.faq-topics + .faq-jobs { border-top: 0; }
+.faq-group { padding: 36px 0; }
+.faq-index { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; font-weight: 500; }
+.faq-index a { display: inline-block; color: var(--ink-soft); text-decoration: none !important; border: 1px solid var(--paper-line); border-radius: var(--r-pill); padding: 5px 12px; }
+.faq-index a:hover, .faq-index a:focus-visible { color: var(--ink); background: var(--paper-line); }
+.faq-group { scroll-margin-top: var(--header-h); }
+.faq-list { border-top: 1px solid var(--paper-line); }
+.faq-item { border-bottom: 1px solid var(--paper-line); scroll-margin-top: calc(var(--header-h) + 8px); }
+.faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding: 14px 2px;
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--font-head);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after {
+  content: "";
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  border-right: 2px solid var(--ink-soft);
+  border-bottom: 2px solid var(--ink-soft);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.15s ease;
+}
+.faq-item[open] summary::after { transform: rotate(-135deg) translate(-2px, -1px); }
+.faq-item summary:hover { color: var(--link); }
+.faq-answer { padding: 0 2px 22px; font-size: 15px; line-height: 1.65; color: var(--ink); max-width: 66ch; }
+.faq-answer strong { font-weight: 650; }
+.faq-answer p { margin: 0 0 12px; }
+.faq-answer > :last-child { margin-bottom: 0; }
+.faq-answer ul { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 7px; }
+.faq-answer code { font-family: var(--font-mono); font-size: 12.5px; background: var(--paper-line); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+.faq-next { margin: 0 0 24px; padding-left: 20px; display: grid; gap: 8px; font-size: 15px; line-height: 1.55; color: var(--ink-soft); }
+@media (max-width: 640px) { .faq-item summary { font-size: 16px; } }
+@media (prefers-reduced-motion: reduce) { .faq-item summary::after { transition: none; } }
+
+/* the topic band: the pills, and the button that opens every answer once the script has run */
+.faq-topics { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
+.faq-openall { font: inherit; font-size: 13px; font-weight: 500; color: var(--ink); background: transparent; border: 1px solid var(--ink-faint); border-radius: var(--r-pill); padding: 5px 14px; cursor: pointer; }
+.faq-openall:hover, .faq-openall:focus-visible { background: var(--paper-line); }
+.faq-openall[hidden] { display: none; }
+.faq-foot { margin: 14px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); max-width: 66ch; }
+.page-hero time { white-space: nowrap; }
+
+/* the jobs table above the questions: two columns, so it reads the same on a phone */
+.faq-jobs { padding-bottom: 12px; }
+.faq-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.faq-table thead th { text-align: left; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); padding: 0 0 8px; border-bottom: 1px solid var(--ink); }
+.faq-table thead th:last-child, .faq-table td { width: 1%; white-space: nowrap; text-align: right; }
+.faq-table tbody th { text-align: left; font-weight: 500; color: var(--ink); line-height: 1.4; padding: 12px 16px 12px 0; border-bottom: 1px solid var(--paper-line); }
+.ce-page .faq-table tbody th a { color: var(--ink); text-decoration: none; }
+.ce-page .faq-table tbody th a:hover, .ce-page .faq-table tbody th a:focus-visible { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+.faq-table td { padding: 12px 0; border-bottom: 1px solid var(--paper-line); }
+.faq-table small { display: block; margin-top: 2px; font-size: 13px; font-weight: 400; color: var(--ink-soft); }
+.faq-verdict { display: inline-block; min-width: 4.5em; text-align: center; font-size: 13px; font-weight: 600; padding: 3px 11px; border-radius: var(--r-pill); border: 1px solid var(--ink); }
+.faq-verdict--yes { background: var(--ink); color: var(--paper); }
+.faq-verdict--partly { background: transparent; color: var(--ink); }
+.faq-verdict--no { background: transparent; color: var(--ink-soft); border-color: var(--ink-faint); border-style: dashed; }
+.faq-verdict--notyet { background: transparent; color: var(--ink-soft); border-color: var(--ink-faint); border-style: dotted; font-style: italic; }
+
+.faq-before ol { margin: 0; padding: 0; list-style: none; counter-reset: before; display: grid; gap: 10px; }
+.faq-before li { counter-increment: before; position: relative; padding: 12px 16px 12px 52px; background: var(--card); border: 1px solid var(--paper-line); border-radius: var(--r-md); font-size: 15px; line-height: 1.5; color: var(--ink); }
+.faq-before li::before { content: counter(before); position: absolute; left: 16px; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 600; line-height: 24px; text-align: center; }

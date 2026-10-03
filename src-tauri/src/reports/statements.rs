@@ -688,6 +688,15 @@ fn compare(
                 }
             };
         }
+        // Both columns present and both zero is a zero amount, compared with
+        // the derived line like any other: it is neither "not compared" nor a
+        // pass (#1067). Both present with an amount stays uncompared, and the
+        // gate counts that as a failure.
+        (NativeStatementAmount::Present(sub), NativeStatementAmount::Present(main))
+            if sub.is_zero() && main.is_zero() =>
+        {
+            sub
+        }
         (NativeStatementAmount::Present(_), NativeStatementAmount::Present(_)) => {
             return TieStatus::NotCompared {
                 reason: "both_tally_columns_present",

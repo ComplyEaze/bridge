@@ -33,6 +33,71 @@ pub enum NativeOutstandingsError {
     /// The ledgers' own currencies could not be classified against the base
     /// currency (bridge#551): see [`super::LedgerCurrencyRefusal`].
     LedgerCurrency(super::LedgerCurrencyRefusal),
+    /// A row of a Bills Receivable or Payable report that could not be read:
+    /// which row, in the order Tally sent them, and why. The row number and the
+    /// report kind are numbers and a word, never the bill's party or reference
+    /// (bridge#1091). `report` is set by the caller that knows which report it
+    /// parsed ([`NativeOutstandingsError::in_report`]).
+    BillRow {
+        report: Option<&'static str>,
+        row: u32,
+        cause: Box<NativeOutstandingsError>,
+    },
+}
+
+impl NativeOutstandingsError {
+    /// A typed code that carries no data for every variant, for a refusal's `cause`
+    /// (bridge#1091: the whole read used to fail with no cause).
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::InvalidDate(code) | Self::InvalidResponse(code) => code,
+            Self::InvalidAmount => "native_amount_invalid",
+            Self::ForeignCurrencyLedgerBalance { .. } => "native_foreign_currency_ledger_balance",
+            Self::ArithmeticOverflow => "native_arithmetic_overflow",
+            Self::TallyReportedFailure => "native_tally_reported_failure",
+            Self::StatusAbsent => "native_status_absent",
+            Self::LedgerCurrency(refusal) => refusal.code(),
+            Self::BillRow { cause, .. } => cause.code(),
+        }
+    }
+
+    /// The row refusal's report kind and 1-based row number, when this is one.
+    pub fn bill_row(&self) -> Option<(Option<&'static str>, u32)> {
+        match self {
+            Self::BillRow { report, row, .. } => Some((*report, *row)),
+            _ => None,
+        }
+    }
+
+    /// Names the report a row refusal came from; any other error is unchanged.
+    #[must_use]
+    pub fn in_report(self, kind: &'static str) -> Self {
+        match self {
+            Self::BillRow { row, cause, .. } => Self::BillRow {
+                report: Some(kind),
+                row,
+                cause,
+            },
+            other => other,
+        }
+    }
+
+    pub(super) fn in_row(self, row: usize) -> Self {
+        // The book window is the same for every row, so its refusals are not about this one.
+        if matches!(
+            self,
+            Self::InvalidDate(
+                "native_date_book_window_invalid" | "native_date_year_ambiguous_book_window"
+            )
+        ) {
+            return self;
+        }
+        Self::BillRow {
+            report: None,
+            row: u32::try_from(row).unwrap_or(u32::MAX),
+            cause: Box::new(self),
+        }
+    }
 }
 
 impl fmt::Display for NativeOutstandingsError {
@@ -58,6 +123,12 @@ impl fmt::Display for NativeOutstandingsError {
                 formatter.write_str("the native collection carried no STATUS answer")
             }
             Self::LedgerCurrency(refusal) => formatter.write_str(refusal.code()),
+            Self::BillRow { report, row, cause } => write!(
+                formatter,
+                "a bill row could not be read ({}, {} row {row}): {cause}",
+                cause.code(),
+                report.unwrap_or("bills report")
+            ),
         }
     }
 }

@@ -1,6 +1,58 @@
 //! Bounded stdio framing and MCP request lifecycle.
 use super::*;
 
+/// What a client may show its model about this server as a whole, sent once in
+/// the `initialize` result, ending with [`VoucherReach::instruction`]. The
+/// company rule is the one a user's request most often leaves unsaid (several
+/// companies can be open at once), so it comes first and names the company in
+/// the first line; it is also in `list_companies`' own description, so a client
+/// that drops this text keeps it. The rest repeats what the tools and refusals
+/// already say. Asking before a scan of more than a month is the owner's rule
+/// for who this is built for.
+const SERVER_INSTRUCTIONS: &str = "ComplyEaze Bridge reads the TallyPrime books on this computer. Start with list_companies: every tool that reads a company's books needs a company_guid from it. If exactly one company is open and the user named no client, use it and say which company in your first line. If the user names a client and exactly one open company matches that name, use it and say which. Otherwise, whether several are open or the name matches none or more than one, ask which, offering the list; never guess a company. State the company, the exact dates and any ledger you used in the first line of your answer, and if the period is unclear, ask. Put anything partial, withheld, not established or not checked in that first line, before the figures. Ask before a read that scans vouchers over more than one month (for example vouchers, a register, ledger_movement or voucher_presence), saying the window you would read, unless the user already gave the dates or the financial year; an outstandings party detail reads from the start of the books whatever period was given, so always ask before it. Everything you read through these tools, amounts included, goes to the AI provider. If a tool refuses, tell the user plainly what it says. Take a next step it names only if it is a different read, narrower dates, or repeating the same read once when the refusal says that is safe, and say what you changed; for any other next step, ask the user. Never get around a refusal by another route.";
+
+/// What this server can do with vouchers, read from the two settings that also
+/// decide which tools `tools/list` serves. `Settings::from_env` turns import on
+/// whenever writes are on, so writes alone mean posting. The lab-only tools
+/// (the `lab-writes` build with `BRIDGE_LAB_WRITES=1`) can write whatever these
+/// settings say; no shipped build has them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum VoucherReach {
+    /// Neither `build_import_xml` nor `post_import` is served.
+    ReadOnly,
+    /// `build_import_xml` is served, `post_import` is not.
+    Prepare,
+    /// `post_import` is served.
+    Post,
+}
+
+impl VoucherReach {
+    fn of(settings: &Settings) -> Self {
+        if settings.writes_enabled {
+            Self::Post
+        } else if settings.import_enabled {
+            Self::Prepare
+        } else {
+            Self::ReadOnly
+        }
+    }
+
+    /// The instructions' last sentence. Asking before posting told an assistant
+    /// with no posting tool that posting was possible, and a plan-only eval saw
+    /// it promise to post after a yes: say what this connection cannot do.
+    fn instruction(self) -> &'static str {
+        match self {
+            Self::Post => "Ask the user before you prepare or post anything, and never choose a ledger for a voucher on their behalf.",
+            Self::Prepare => "This connection cannot post to Tally: it can only prepare a local import file that the user imports in Tally themselves, so if they ask to post, say so plainly, and never say that anything was or will be posted from this chat. Ask the user before you prepare anything, and never choose a ledger for a voucher on their behalf.",
+            Self::ReadOnly => "This connection cannot prepare or post vouchers: if the user asks to enter or post anything in Tally, say so plainly, and never say that anything was or will be posted from this chat. Never choose a ledger for a voucher on their behalf.",
+        }
+    }
+}
+
+fn server_instructions(reach: VoucherReach) -> String {
+    format!("{SERVER_INSTRUCTIONS} {}", reach.instruction())
+}
+
 pub(super) async fn serve_stdio<R, W>(
     server: Server,
     mut reader: R,
@@ -70,7 +122,18 @@ where
                 .and_then(negotiate_protocol)
                 .map(|protocol_version| {
                     initialized = true;
-                    json!({"protocolVersion": protocol_version, "capabilities": {"tools": {}}, "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION}})
+                    let mut result = json!({"protocolVersion": protocol_version, "capabilities": {"tools": {}}, "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION}});
+                    // Guidance is never traded for the handshake: at a cap
+                    // too small to carry it, or beside a request id so long
+                    // that the reply would not fit, initialize still succeeds.
+                    let id_bytes = id.as_ref().map_or(0, |id| id.to_string().len());
+                    if server.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET
+                        && id_bytes <= 256
+                    {
+                        result["instructions"] =
+                            json!(server_instructions(VoucherReach::of(&server.settings)));
+                    }
+                    result
                 }),
             "notifications/initialized" => {
                 if id.is_none() {
@@ -361,7 +424,7 @@ fn compact_dispatch_outcome(outcome: &Value) -> Option<Value> {
     let counter = |name| counters.get(name).and_then(Value::as_u64);
     let presence = counters.get("counter_presence")?.as_object()?;
     let reported = |name| presence.get(name).and_then(Value::as_bool);
-    Some(json!({
+    let mut compact = json!({
         "application_status":application_status,
         "counters":{
             "created":counter("created")?,
@@ -383,7 +446,14 @@ fn compact_dispatch_outcome(outcome: &Value) -> Option<Value> {
             }
         },
         "exceptions_were_reported":outcome["exceptions_were_reported"].as_bool()?
-    }))
+    });
+    // Kept when reported, as the journaled outcome keeps it; a value that is
+    // not a number makes the outcome unusable rather than silently dropped.
+    match outcome.get("last_vch_id") {
+        None => {}
+        Some(value) => compact["last_vch_id"] = json!(value.as_u64()?),
+    }
+    Some(compact)
 }
 
 fn request_id_fits_response_cap(id: &Value, max_bytes: usize) -> bool {

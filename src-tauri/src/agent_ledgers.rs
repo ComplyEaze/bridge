@@ -327,18 +327,21 @@ fn requested_gstin_as_of(args: &Value) -> Result<Option<String>, String> {
 
 /// How long a ledger listing snapshot may serve its continuation pages
 /// (#630). A continuation page is served from the snapshot only while the
-/// book's extent, including `ALTMSTID` and `ALTVCHID`, is unchanged. Whether a
-/// regroup, an alteration made in Tally's own screens, or a deletion moves
-/// those marks is unmeasured (ADR 0004), so a change of that kind can leave a
-/// continuation page up to this old. A first page is always read fresh.
-const LISTING_SNAPSHOT_TTL: std::time::Duration = std::time::Duration::from_secs(600);
+/// book's extent, including `ALTMSTID` and `ALTVCHID`, is unchanged. A
+/// regroup, an opening change, a ledger create or delete, a voucher delete (+2),
+/// a cancel and a save with no change each moved a mark in the screen-action
+/// table of the protocol reference (§11c.5, one run each); a change that moves
+/// neither mark is not seen, so it can leave a continuation page up to this old
+/// (the limits are listed in §11c.5 and in the tool text). A first page is
+/// always read fresh.
+pub(super) const LISTING_SNAPSHOT_TTL: std::time::Duration = std::time::Duration::from_secs(600);
 
 /// The most bytes all listing snapshots may hold together (#630), counted as
 /// their rows and frame serialized as JSON plus their groups' names, parents
 /// and reserved names. That is a proxy for the memory they take, not a bound
 /// on it: a parsed value takes more than its text. The oldest snapshot is
 /// dropped first; a listing larger than this is not held.
-const LISTING_SNAPSHOT_MAX_BYTES: usize = 64 * 1024 * 1024;
+pub(super) const LISTING_SNAPSHOT_MAX_BYTES: usize = 64 * 1024 * 1024;
 
 /// Which read a listing snapshot holds. A `basic` listing with a `group`
 /// filter also holds the group collection, so it is a different read; a
@@ -549,7 +552,7 @@ impl ListingSnapshots {
 /// Why a continuation page that named its snapshot could not be served from
 /// it: the book moved, or the snapshot is no longer held (expired, replaced
 /// by a newer first page, evicted, or never held).
-fn snapshot_refusal(cause: &'static str) -> ToolFailure {
+pub(super) fn snapshot_refusal(cause: &'static str) -> ToolFailure {
     let mut failure = ToolFailure::from("listing_snapshot_changed".to_string());
     failure.cause = Some(cause);
     failure
@@ -708,6 +711,7 @@ impl Server {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .drop_company(company_guid);
+        self.drop_voucher_pages(company_guid);
     }
 
     /// One fresh read of a ledger listing: the rows unfiltered and unredacted,

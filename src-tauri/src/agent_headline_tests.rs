@@ -168,7 +168,7 @@ fn a_response_without_a_headline_is_left_alone() {
     assert_eq!(response, json!({"result": {"ledgers": [1, 2]}}));
 }
 
-/// Tally's company name is free text: control characters, bidirectional
+/// Tally's company name is unrestricted text: control characters, bidirectional
 /// overrides and zero-width marks are removed so that it cannot reorder or
 /// hide the words around it, quotes inside it become apostrophes, it is always
 /// quoted, and it is held to a bound.

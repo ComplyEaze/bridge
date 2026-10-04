@@ -25,8 +25,9 @@ pub struct CallerData {
     /// A bank statement (`bank_reconciliation`, which refuses without one; `high_value_register`,
     /// whose s.194N section reports none supplied).
     pub bank_statement: Option<crate::documents::BankStatementDoc>,
-    /// The reader's plain-words reason a supplied statement was refused (`high_value_register`'s
-    /// s.194N coverage says so); `None` when none was supplied or it was read.
+    /// The reader's plain-words reason a supplied statement was refused (`bank_reconciliation`
+    /// gives its `refused` result; `high_value_register`'s s.194N coverage says so); `None` when
+    /// none was supplied or it was read.
     pub bank_statement_refused: Option<String>,
 }
 
@@ -48,7 +49,15 @@ pub const PORTED: &[PortedTest] = &[
     PortedTest {
         id: "bank_reconciliation",
         min_figures: 40,
-        run_on: |e, b, r, c| crate::bank_reconciliation_on(e, b, r, c.bank_statement.as_ref()),
+        run_on: |e, b, r, c| {
+            crate::bank_reconciliation_on(
+                e,
+                b,
+                r,
+                c.bank_statement.as_ref(),
+                c.bank_statement_refused.as_deref(),
+            )
+        },
     },
     PortedTest {
         id: "book_keeping_quality",

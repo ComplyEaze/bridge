@@ -6,6 +6,10 @@
 //! `--emit-bank-statement` writes from the reference's own adapters, so both sides of a parity run
 //! see the same rows. A real client's rows are client data and never belong in this repository; CI
 //! uses invented rows only.
+//!
+//! The bank statement reader also refuses, as the reference's reader does, a statement that would
+//! read falsely: no declared opening or closing balance, a row outside its own period, or a date
+//! that steps back in an order its running balance does not confirm ([`StatementRefusal`]).
 
 use bridge_tally_primitives::TallyDate;
 use serde_json::Value;
@@ -85,6 +89,156 @@ pub struct BankStatementRow {
     pub debit_paise: i64,
     pub credit_paise: i64,
     pub balance_paise: Option<i64>,
+}
+
+/// Which declared balance a statement lacks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BalanceField {
+    Opening,
+    Closing,
+}
+
+/// Why the reference's bank-statement reader (`adapters/bank_documents.py`) refuses a statement:
+/// the statement is well formed, but reading it would put a false sentence in front of the CA.
+/// `row` is a 0-based position in the statement's list; [`StatementRefusal::reason`] is the
+/// reader's plain-words reason, which `bank_reconciliation::refused` reports.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StatementRefusal {
+    /// The statement declares no opening or closing balance: an absent balance is not Rs 0.
+    BalanceMissing(BalanceField),
+    /// A row dated outside the statement's own period, which may not meet its books entry.
+    OutsidePeriod {
+        row: usize,
+        date: TallyDate,
+        start: TallyDate,
+        end: TallyDate,
+    },
+    /// The first row dated before the row listed above it, in an order the running balance does
+    /// not confirm: `first_break` is the date of the first row whose balance does not follow the
+    /// row before, or `None` when some row carries no balance to show it.
+    OutOfOrder {
+        row: usize,
+        date: TallyDate,
+        previous: TallyDate,
+        first_break: Option<TallyDate>,
+    },
+}
+
+impl StatementRefusal {
+    /// The reader's reason, word for word: what the statement does, completing "the bank
+    /// statement ...".
+    pub fn reason(&self) -> String {
+        match self {
+            Self::BalanceMissing(BalanceField::Opening) => {
+                "declares no opening balance".to_string()
+            }
+            Self::BalanceMissing(BalanceField::Closing) => {
+                "declares no closing balance".to_string()
+            }
+            Self::OutsidePeriod {
+                date, start, end, ..
+            } => format!(
+                "lists a transaction dated {} outside its own period, {} to {}",
+                day_mon_year(date),
+                day_mon_year(start),
+                day_mon_year(end)
+            ),
+            Self::OutOfOrder {
+                date,
+                previous,
+                first_break,
+                ..
+            } => {
+                let how = match first_break {
+                    None => "a row carries no running balance to show that order is the bank's"
+                        .to_string(),
+                    Some(at) => format!(
+                        "its running balance does not hold in the listed order (it first breaks \
+                         at the transaction dated {})",
+                        day_mon_year(at)
+                    ),
+                };
+                format!(
+                    "lists a transaction dated {} after one dated {}, and {how}",
+                    day_mon_year(date),
+                    day_mon_year(previous)
+                )
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for StatementRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BalanceMissing(_) => write!(
+                f,
+                "the bank statement {}; supply a statement extraction that carries it (an absent \
+                 balance is not read as zero)",
+                self.reason()
+            ),
+            Self::OutsidePeriod { row, .. } | Self::OutOfOrder { row, .. } => write!(
+                f,
+                "the bank statement {} (transaction {row}, counted from 0)",
+                self.reason()
+            ),
+        }
+    }
+}
+
+/// A date as Python's `strftime('%d-%b-%Y')` writes it in the C locale: `05-Jun-2025`.
+fn day_mon_year(date: &TallyDate) -> String {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let s = date.as_str();
+    let month: usize = s[4..6].parse().expect("a TallyDate's month is 01..12");
+    format!("{}-{}-{}", &s[6..8], MONTHS[month - 1], &s[0..4])
+}
+
+/// The running-balance tolerance the order check allows (Re 1), as the reference's reader keeps
+/// its own copy of `bank_reconciliation`'s.
+const BALANCE_TOL_PAISE: i128 = 100;
+
+/// The reference's `_check_order`: a date that steps back is refused unless every row carries a
+/// balance and each follows the one listed before it within Re 1.
+fn check_order(rows: &[BankStatementRow]) -> Result<()> {
+    let Some(back) = (1..rows.len()).find(|&i| rows[i].txn_date < rows[i - 1].txn_date) else {
+        return Ok(());
+    };
+    let refused = |first_break: Option<&TallyDate>| {
+        AuditError::StatementRefused(StatementRefusal::OutOfOrder {
+            row: back,
+            date: rows[back].txn_date.clone(),
+            previous: rows[back - 1].txn_date.clone(),
+            first_break: first_break.cloned(),
+        })
+    };
+    let mut balances = Vec::with_capacity(rows.len());
+    for r in rows {
+        match r.balance_paise {
+            Some(b) => balances.push(i128::from(b)),
+            None => return Err(refused(None)),
+        }
+    }
+    // The reason names where the chain first breaks, which need not be at the back-step.
+    for i in 1..rows.len() {
+        let moved = i128::from(rows[i].credit_paise) - i128::from(rows[i].debit_paise);
+        if (balances[i - 1] + moved - balances[i]).abs() > BALANCE_TOL_PAISE {
+            return Err(refused(Some(&rows[i].txn_date)));
+        }
+    }
+    Ok(())
+}
+
+/// A declared balance: absent or null is refused as missing, never read as zero.
+fn declared_balance(v: &Value, key: &str, field: BalanceField) -> Result<i64> {
+    match v.get(key) {
+        None | Some(Value::Null) => Err(AuditError::StatementRefused(
+            StatementRefusal::BalanceMissing(field),
+        )),
+        Some(_) => int(v, key, "statement"),
+    }
 }
 
 /// A malformed field; the public reader it came through adds which document it was.
@@ -196,6 +350,12 @@ fn traces_documents(v: &Value) -> Result<TracesDocuments> {
 
 /// The JSON `parity/python_golden.py --emit-bank-statement` writes: the document's own facts, a
 /// `period` of `start`/`end`, and its `rows` (each `balance_paise` an integer or null).
+///
+/// A well-formed statement the reference's reader refuses is refused with
+/// [`AuditError::StatementRefused`], checked in the reader's own order: a row outside the period,
+/// then a date that steps back ([`StatementRefusal::OutOfOrder`]), then an absent or null opening
+/// and then closing balance. Rows are read in the listed order, which the statement's own checks in
+/// `bank_reconciliation` rely on.
 pub fn bank_statement_from_json(v: &Value) -> Result<BankStatementDoc> {
     bank_statement(v).map_err(document("bank statement"))
 }
@@ -251,21 +411,39 @@ fn bank_statement(v: &Value) -> Result<BankStatementDoc> {
             if row.debit_paise != 0 && row.credit_paise != 0 {
                 return Err(bad(&format!("{at} is both a debit and a credit")));
             }
-            if row.txn_date < start || row.txn_date > end {
-                return Err(bad(&format!("{at}.txn_date is outside the period")));
-            }
             Ok(row)
         })
-        .collect::<Result<_>>()?;
+        .collect::<Result<Vec<_>>>()?;
+    let source_sha256 = text(v, "source_sha256", "statement")?;
+    let bank = text(v, "bank", "statement")?;
+    // The reference reader's refusals, in its order.
+    if let Some(i) = rows
+        .iter()
+        .position(|r| !(start <= r.txn_date && r.txn_date <= end))
+    {
+        return Err(AuditError::StatementRefused(
+            StatementRefusal::OutsidePeriod {
+                row: i,
+                date: rows[i].txn_date.clone(),
+                start,
+                end,
+            },
+        ));
+    }
+    check_order(&rows)?;
+    let opening_balance_paise =
+        declared_balance(v, "opening_balance_paise", BalanceField::Opening)?;
+    let closing_balance_paise =
+        declared_balance(v, "closing_balance_paise", BalanceField::Closing)?;
     Ok(BankStatementDoc {
         doc_id,
-        source_sha256: text(v, "source_sha256", "statement")?,
+        source_sha256,
         account_ref,
-        bank: text(v, "bank", "statement")?,
+        bank,
         start,
         end,
-        opening_balance_paise: int(v, "opening_balance_paise", "statement")?,
-        closing_balance_paise: int(v, "closing_balance_paise", "statement")?,
+        opening_balance_paise,
+        closing_balance_paise,
         rows,
     })
 }
@@ -394,6 +572,196 @@ mod tests {
         assert!(
             bank_statement_from_json(&broken).is_err(),
             "start after end"
+        );
+    }
+
+    /// A June 2025 statement in the emitter's shape: rows of (date, debit paise, balance).
+    fn june(opening: Value, closing: Value, rows: &[(&str, i64, Option<i64>)]) -> Value {
+        let rows: Vec<Value> = rows
+            .iter()
+            .enumerate()
+            .map(|(i, (on, debit, balance))| {
+                json!({"doc": "bank:t", "row": i, "account_ref": "XX34", "txn_date": on,
+                       "narration": "NEFT payment", "debit_paise": debit, "credit_paise": 0,
+                       "balance_paise": balance})
+            })
+            .collect();
+        json!({"doc_id": "bank:t", "source_sha256": "ab", "account_ref": "XX34", "bank": "B",
+               "period": {"start": "2025-06-01", "end": "2025-06-30"},
+               "opening_balance_paise": opening, "closing_balance_paise": closing, "rows": rows})
+    }
+
+    fn refusal(v: &Value) -> StatementRefusal {
+        match bank_statement_from_json(v) {
+            Err(AuditError::StatementRefused(r)) => r,
+            other => panic!("not refused: {other:?}"),
+        }
+    }
+
+    /// The reference reader's own selftest cases (`selftest/test_bank_documents.py` at reference
+    /// `da9e2d3d`), on the emitter's shape: each refusal by its variant, with the reader's words.
+    #[test]
+    fn a_statement_the_reference_reader_refuses_is_refused_with_its_reason() {
+        let one = [("2025-06-05", 100_000, Some(400_000))];
+        // An absent or null balance is refused, opening first; a declared zero is a balance.
+        for (key, value) in [
+            ("opening_balance_paise", None),
+            ("opening_balance_paise", Some(Value::Null)),
+            ("closing_balance_paise", None),
+            ("closing_balance_paise", Some(Value::Null)),
+        ] {
+            let mut v = june(json!(500_000), json!(400_000), &one);
+            match value {
+                Some(x) => v[key] = x,
+                None => {
+                    v.as_object_mut().unwrap().remove(key);
+                }
+            }
+            let field = if key.starts_with("opening") {
+                BalanceField::Opening
+            } else {
+                BalanceField::Closing
+            };
+            assert_eq!(
+                refusal(&v),
+                StatementRefusal::BalanceMissing(field),
+                "{key}"
+            );
+        }
+        assert_eq!(
+            refusal(&june(Value::Null, Value::Null, &one)),
+            StatementRefusal::BalanceMissing(BalanceField::Opening)
+        );
+        assert_eq!(
+            refusal(&june(json!(500_000), Value::Null, &one)).reason(),
+            "declares no closing balance"
+        );
+        let zero = bank_statement_from_json(&june(json!(0), json!(0), &[])).unwrap();
+        assert_eq!(
+            (zero.opening_balance_paise, zero.closing_balance_paise),
+            (0, 0)
+        );
+
+        // A back-valued row with an intact running balance is read, in the listed order.
+        let back = [
+            ("2025-06-10", 50_000, Some(450_000)),
+            ("2025-06-12", 40_000, Some(410_000)),
+            ("2025-06-11", 60_000, Some(350_000)),
+        ];
+        let d = bank_statement_from_json(&june(json!(500_000), json!(350_000), &back)).unwrap();
+        let days: Vec<&str> = d.rows.iter().map(|r| &r.txn_date.as_str()[6..]).collect();
+        assert_eq!(days, ["10", "12", "11"]);
+        // Newest first: the balances do not run in that order.
+        let newest = [
+            ("2025-06-20", 50_000, Some(400_000)),
+            ("2025-06-05", 50_000, Some(450_000)),
+        ];
+        let r = refusal(&june(json!(500_000), json!(400_000), &newest));
+        assert!(
+            matches!(r, StatementRefusal::OutOfOrder { row: 1, .. }),
+            "{r:?}"
+        );
+        assert_eq!(
+            r.reason(),
+            "lists a transaction dated 05-Jun-2025 after one dated 20-Jun-2025, and its running \
+             balance does not hold in the listed order (it first breaks at the transaction dated \
+             05-Jun-2025)"
+        );
+        // Rows with no balance cannot show the order is the bank's.
+        let bare = [("2025-06-20", 50_000, None), ("2025-06-05", 50_000, None)];
+        assert_eq!(
+            refusal(&june(json!(500_000), json!(400_000), &bare)).reason(),
+            "lists a transaction dated 05-Jun-2025 after one dated 20-Jun-2025, and a row carries \
+             no running balance to show that order is the bank's"
+        );
+        // A break away from the back-step is named where it is.
+        let mut later = vec![
+            ("2025-06-02", 1_000, Some(9_000)),
+            ("2025-06-01", 1_000, Some(8_000)),
+        ];
+        for (on, balance) in [
+            ("2025-06-03", 7_000),
+            ("2025-06-04", 6_000),
+            ("2025-06-05", 5_000),
+            ("2025-06-06", 4_000),
+            ("2025-06-07", 500),
+        ] {
+            later.push((on, 1_000, Some(balance)));
+        }
+        let r = refusal(&june(json!(10_000), json!(500), &later));
+        assert!(
+            matches!(&r, StatementRefusal::OutOfOrder { row: 1, first_break: Some(at), .. } if at.as_str() == "20250607"),
+            "{r:?}"
+        );
+        // The order chain allows Re 1 and not a paisa more.
+        for (last, read) in [(349_900, true), (349_899, false)] {
+            let rows = [
+                ("2025-06-10", 50_000, Some(450_000)),
+                ("2025-06-09", 100_000, Some(last)),
+            ];
+            let got = bank_statement_from_json(&june(json!(500_000), json!(last), &rows));
+            assert_eq!(got.is_ok(), read, "{last}: {got:?}");
+        }
+        // Rows on one date, and in date order, are read.
+        let same = [
+            ("2025-06-05", 50_000, None),
+            ("2025-06-05", 40_000, None),
+            ("2025-06-20", 10_000, None),
+        ];
+        assert!(bank_statement_from_json(&june(json!(500_000), json!(400_000), &same)).is_ok());
+
+        // A row outside the period, either side, is refused naming its date and the period; rows
+        // on its first and last days are read.
+        for (on, shown) in [("2025-05-31", "31-May-2025"), ("2025-07-01", "01-Jul-2025")] {
+            let rows = [
+                ("2025-06-05", 50_000, Some(450_000)),
+                (on, 50_000, Some(400_000)),
+            ];
+            let r = refusal(&june(json!(500_000), json!(400_000), &rows));
+            assert!(
+                matches!(r, StatementRefusal::OutsidePeriod { row: 1, .. }),
+                "{r:?}"
+            );
+            assert_eq!(
+                r.reason(),
+                format!("lists a transaction dated {shown} outside its own period, 01-Jun-2025 to 30-Jun-2025")
+            );
+        }
+        let ends = [
+            ("2025-06-01", 50_000, Some(450_000)),
+            ("2025-06-30", 50_000, Some(400_000)),
+        ];
+        assert!(bank_statement_from_json(&june(json!(500_000), json!(400_000), &ends)).is_ok());
+        // The reader's order: the period before the order, the order before the balances.
+        let both = [
+            ("2025-06-20", 50_000, None),
+            ("2025-06-05", 50_000, None),
+            ("2025-07-01", 50_000, None),
+        ];
+        let r = refusal(&june(Value::Null, Value::Null, &both));
+        assert!(
+            matches!(r, StatementRefusal::OutsidePeriod { row: 2, .. }),
+            "{r:?}"
+        );
+        let r = refusal(&june(Value::Null, Value::Null, &both[..2]));
+        assert!(
+            matches!(r, StatementRefusal::OutOfOrder { row: 1, .. }),
+            "{r:?}"
+        );
+        // The message adds the position, as the reader's does, and every month is named.
+        assert_eq!(
+            format!("{}", AuditError::StatementRefused(r)),
+            "the bank statement lists a transaction dated 05-Jun-2025 after one dated 20-Jun-2025, \
+             and a row carries no running balance to show that order is the bank's (transaction \
+             1, counted from 0)"
+        );
+        let months: Vec<String> = (1..=12)
+            .map(|m| day_mon_year(&TallyDate::parse(format!("2025{m:02}09")).unwrap()))
+            .collect();
+        assert_eq!(
+            months.join(" "),
+            "09-Jan-2025 09-Feb-2025 09-Mar-2025 09-Apr-2025 09-May-2025 09-Jun-2025 09-Jul-2025 \
+             09-Aug-2025 09-Sep-2025 09-Oct-2025 09-Nov-2025 09-Dec-2025"
         );
     }
 }

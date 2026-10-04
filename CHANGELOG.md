@@ -18,6 +18,14 @@ These changes are in source and not yet in a published build.
 
 **Safer or fixed**
 
+- New read-only tool `statement_tie_out`: after `parse_bank_statement`, it says
+  whether the bank ledger in Tally stands where the statement says it stood at the
+  start and at the end of the statement's dates, as three gaps (book less
+  statement), before an import or after one made by hand. It covers whole
+  statements only, returns no balances, names no cause and writes nothing. It is
+  not yet run against a live book; the parse's proposals file now also records the
+  statement's first and last dates, which the result never returns.
+
 - `purchase_register` and `sales_register` now take their `state` from the rule
   `vouchers` uses. A non-empty window is `complete` only when every voucher read
   was checked against a separate count of the window; a window nothing counted,

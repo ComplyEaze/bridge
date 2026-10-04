@@ -40,40 +40,19 @@ yourself. This page does not rank products.
     Check for an outside review, a security policy with a way to report a
     problem, and what the terms say about liability.
 
-## Tally's own plug-in, and what ComplyEaze Bridge adds
+## Tally's own tools, next to ComplyEaze Bridge
 
-Tally Solutions offers its own TallyPrime MCP plug-in for Claude Desktop. Its
-help pages (last updated 18 September 2026, read on 4 October 2026) list 28
-tools, all for reading your books, and a setup that has you refresh your
-licence in TallyPrime with your Tally.NET ID, has you install Node.js and edit
-Claude Desktop's configuration file. Put the ten questions to it as well;
-Tally's pages are the place to check what it needs. ComplyEaze
-Bridge is not a product of Tally Solutions, we have not run the two side by
-side, and this page does not rank them. If you only want to ask questions of
-your books, check whether the plug-in covers what you need first.
+Tally's features as described on its help pages (read on 4 October 2026; check
+the pages themselves), beside ComplyEaze Bridge's. ComplyEaze Bridge is not made
+by, or affiliated with, Tally Solutions, we have not run the two side by side,
+and this page does not rank them.
 
-What ComplyEaze Bridge adds, so you can judge whether you need it:
+| Job | Tally Solutions | ComplyEaze Bridge |
+| --- | --- | --- |
+| Ask Claude about a client's books | TallyPrime MCP plug-in for Claude Desktop: 28 tools in six groups for viewing company, master, accounting, inventory, outstanding and transaction data (Tally's help pages, last updated 18 September 2026) | Read tools for companies, the trial balance, outstandings with ageing, vouchers, ledger movement, the purchase and sales registers and stock values; it changes nothing in TallyPrime unless you turn posting on |
+| Bank statements | TallyPrime's Bank Statement import, in the formats Tally lists for each bank (Tally's list of supported banks) | Reads a client's statement in a supported layout (the README lists them) into Payment, Receipt and Contra vouchers as a file you import yourself, and can read the batch back; the whole path has not yet been recorded end to end against TallyPrime |
 
-- **A PDF bank statement step.** It reads a password-protected PDF statement
-  from State Bank of India, HDFC Bank or Union Bank of India into Payment,
-  Receipt and Contra vouchers as a file you import in TallyPrime yourself. It
-  checks your ledger names against the book first, and after you import it can
-  read the batch back from TallyPrime. TallyPrime's own bank statement import
-  takes statement files such as CSV or Excel from the bank's portal, not PDF (Tally's help page
-  "Bank statement", read on 4 October 2026), so if your client already sends
-  one of those, TallyPrime's own import may be all you need. The whole path,
-  from the PDF to the batch read back, has not yet been recorded end to end
-  against TallyPrime.
-- **Its own install.** One extension file in Claude Desktop, with no Node.js
-  and no configuration file to edit. You turn on TallyPrime's own HTTP gateway
-  (on a Mac, inside a Windows virtual machine with its port forwarded), and it
-  connects through that gateway, so it does not need a Tally plug-in. Most recorded runs used licensed TallyPrime Silver
-  and Gold 7.1; see the
-  [README](../../README.md#what-has-been-run-against-a-real-tallyprime).
-
-Where it is behind: three banks, where TallyPrime's own import lists many more
-(Tally's list of supported banks); no reconciling of a bank statement inside
-TallyPrime; no stock quantities (the plug-in has an inventory group); not yet
+Where ComplyEaze Bridge is behind: three banks' statement layouts; no stock quantities; not yet
 code-signed; and a short list of runs against a real TallyPrime (the README
 lists each run).
 

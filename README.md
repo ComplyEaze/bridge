@@ -18,16 +18,12 @@ default, so as installed it never posts to TallyPrime: it reads from it and
 prepares files on your computer. If you turn posting on in the extension, it
 posts vouchers one at a time, after you approve each one.
 
-If a client sends you a password-protected PDF bank statement from State Bank
-of India, HDFC Bank or Union Bank of India, ComplyEaze Bridge reads it, checks
-your ledger names against the book, and prepares the vouchers as a file you
-import yourself; after you import it, it can read the batch back. The whole
-path, from the PDF to the batch read back, has not yet been recorded end to end
-against TallyPrime. It adds a PDF bank statement step: TallyPrime's own bank
-statement import takes statement files such as CSV or Excel from the bank's
-portal, not PDF. Tally Solutions also offers its own TallyPrime MCP plug-in for
-Claude Desktop; its help pages (read on 4 October 2026) list 28 tools, all for
-reading your books. ComplyEaze Bridge is not a product of Tally Solutions.
+Tally Solutions also offers its own TallyPrime MCP plug-in for Claude Desktop;
+its help pages (read on 4 October 2026) describe 28 tools for viewing company,
+master, accounting, inventory, outstanding and transaction data. ComplyEaze
+Bridge is not made by, or affiliated with, Tally Solutions, and we have not run
+the two side by side. TallyPrime also has its own Bank Statement import, which
+takes statement files in the formats Tally lists for each bank.
 
 **Current release:**
 <!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,

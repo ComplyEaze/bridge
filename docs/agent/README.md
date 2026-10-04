@@ -1101,9 +1101,13 @@ that turns that on.
    When the vouchers come from a `parse_bank_statement` proposals file, the build
    also checks the two ledgers the statement was parsed for: a `bank_ledger`
    under Cash-in-Hand is refused (`statement_bank_ledger_not_a_bank`), since a
-   statement belongs to a bank account, and a `suspense_ledger` that is not under
-   Suspense A/c builds with the warning `suspense_ledger_outside_suspense_group`.
-   A file that names neither ledger is not held to either rule.
+   statement belongs to a bank account. The suspense ledger is only warned
+   about, in the result's `statement_ledger_warnings` (each with a `code`):
+   `suspense_ledger_outside_suspense_group` when its group is established and is
+   not Suspense A/c (with the group reached), `suspense_ledger_group_not_established`
+   when the ledger is in the book but its group does not lead to a reserved
+   group, and `suspense_ledger_not_in_book`. A file that names neither ledger is
+   not held to either rule.
 4. In Tally, with the intended company open, use **Gateway of Tally → Import →
    Vouchers** to import the file. Bridge does not dispatch this manual step.
    Alternatively, use the separately approved MCP voucher posting (or, for a

@@ -726,7 +726,7 @@ impl Server {
             // collection, so a Journal-only batch keeps the request sequence its
             // own qualification was measured on.
             let mut group_evidence = None;
-            let mut statement_suspense_warning = false;
+            let mut statement_warnings: Vec<Value> = Vec::new();
             if renders_bank_shape(&payload.vouchers) || !resolved.cash_ledgers.is_empty() {
                 let (groups, evidence) = self.read_group_collection(&identity, &company.name).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence.clone());
@@ -769,16 +769,22 @@ impl Server {
                     });
                 }
                 if let Some(ledgers) = &resolved.statement_ledgers {
-                    let findings = statement_ledger_findings(ledgers, &observed);
+                    let findings = statement_ledger_findings(ledgers, &observed, |name| {
+                        ledger_masters.parents().any(|(known, _)| known == name)
+                    });
                     if findings.bank_in_cash_in_hand {
+                        let row = refused_ledger_row(
+                            &ledgers.bank_ledger,
+                            "bank",
+                            &observed.classify(&ledgers.bank_ledger),
+                            None,
+                        );
+                        let mut budget = refusal_diagnostic_budget(self.settings.max_bytes);
+                        let (refused, omitted) = super::bank_statement::bounded(vec![row], &mut budget);
                         return Ok(ToolOutcome {
                             payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                                 "state":"refused", "reason":"statement_bank_ledger_not_a_bank",
-                                "refused_ledgers":[{
-                                    "ledger": party_name(ledgers.bank_ledger.as_str()),
-                                    "requires": "bank",
-                                    "reserved_group": "Cash-in-Hand",
-                                }],
+                                "refused_ledgers":refused, "refused_ledgers_omitted":omitted,
                                 "group_evidence_sha256":evidence.response_sha256,
                                 "next_step":"No file was written. The bank ledger this statement was parsed for is under Cash-in-Hand, and a statement belongs to a bank account. Parse the statement again with the ledger of the bank account that issued it, which must be under Bank Accounts or Bank OD A/c."
                             }}),
@@ -787,7 +793,7 @@ impl Server {
                             truncated: false,
                         });
                     }
-                    statement_suspense_warning = findings.suspense_outside_suspense;
+                    statement_warnings = findings.suspense.warning(&ledgers.suspense_ledger);
                 }
                 group_evidence = Some(evidence);
             }
@@ -1019,11 +1025,6 @@ impl Server {
                     voucher.voucher_type.bank_shape().is_some() && voucher.entries.len() > 2
                 }),
             );
-            if statement_suspense_warning {
-                if let Some(list) = warnings.as_array_mut() {
-                    list.push(json!(SUSPENSE_OUTSIDE_GROUP_WARNING));
-                }
-            }
             let next_step = match &amendment {
                 Some(_) => {
                     if let Some(list) = warnings.as_array_mut() {
@@ -1056,6 +1057,7 @@ impl Server {
                     "endpoint_origin": line.endpoint_origin,
                     "observed_profile": opening_profile.observed_profile,
                     "warnings": warnings,
+                    "statement_ledger_warnings": statement_warnings,
                     "next_step": next_step
                 }}),
                 evidence: accumulated.clone(),
@@ -2696,20 +2698,84 @@ struct StatementLedgerFindings {
     /// Refused: a statement belongs to a bank account.
     bank_in_cash_in_hand: bool,
     /// Warned, not refused: some books keep a bank suspense ledger elsewhere.
-    suspense_outside_suspense: bool,
+    suspense: SuspenseFinding,
+}
+
+/// Where a statement file's suspense ledger sits. Only a group that is
+/// established and is not Suspense A/c is "outside"; a ledger the book lacks,
+/// or one whose group cannot be established, is said to be exactly that.
+enum SuspenseFinding {
+    Inside,
+    OutsideGroup(String),
+    GroupNotEstablished,
+    NotInBook,
+}
+
+impl SuspenseFinding {
+    /// The typed warning for the build result, or none.
+    fn warning(&self, ledger: &str) -> Vec<Value> {
+        let (code, message, group) = match self {
+            Self::Inside => return Vec::new(),
+            Self::OutsideGroup(group) => (
+                "suspense_ledger_outside_suspense_group",
+                "The suspense ledger this statement was parsed for is under another reserved group, not Suspense A/c. The lines it receives are tagged in their narration and counted in suspense_lines, but a review that reads the Suspense A/c group will not see them. Some books keep a bank suspense ledger elsewhere on purpose; check that this is the one intended.",
+                Some(group.as_str()),
+            ),
+            Self::GroupNotEstablished => (
+                "suspense_ledger_group_not_established",
+                "The suspense ledger this statement was parsed for is in the book, but its group does not lead to a reserved group, so it is not established whether it is under Suspense A/c.",
+                None,
+            ),
+            Self::NotInBook => (
+                "suspense_ledger_not_in_book",
+                "The suspense ledger this statement was parsed for is not in the book's ledger catalogue, so it is not under Suspense A/c. No voucher in this file uses it, or the build would have refused the file.",
+                None,
+            ),
+        };
+        vec![json!({
+            "code": code,
+            "ledger": party_name(ledger),
+            "reserved_group": group,
+            "message": message,
+        })]
+    }
 }
 
 fn statement_ledger_findings(
     ledgers: &super::bank_statement::StatementLedgers,
     observed: &ObservedMasters,
+    in_catalogue: impl Fn(&str) -> bool,
 ) -> StatementLedgerFindings {
+    let suspense = observed.classify(&ledgers.suspense_ledger);
     StatementLedgerFindings {
         bank_in_cash_in_hand: observed.classify(&ledgers.bank_ledger).is_cash_in_hand(),
-        suspense_outside_suspense: !observed.classify(&ledgers.suspense_ledger).is_suspense(),
+        suspense: if suspense.is_suspense() {
+            SuspenseFinding::Inside
+        } else if let Some(group) = suspense.reserved_group() {
+            SuspenseFinding::OutsideGroup(group.to_string())
+        } else if in_catalogue(&ledgers.suspense_ledger) {
+            SuspenseFinding::GroupNotEstablished
+        } else {
+            SuspenseFinding::NotInBook
+        },
     }
 }
 
-const SUSPENSE_OUTSIDE_GROUP_WARNING: &str = "suspense_ledger_outside_suspense_group: the suspense ledger this statement was parsed for is not under the reserved Suspense A/c group in this book. The lines it receives are tagged in their narration and counted in suspense_lines, but a review that reads the Suspense A/c group will not see them. Some books keep a bank suspense ledger elsewhere on purpose; check that this is the one intended.";
+/// One refused ledger, as every ledger-group refusal of a build reports it.
+fn refused_ledger_row(
+    ledger: &str,
+    requires: &str,
+    state: &CashBankState,
+    first_bridge_txn_id: Option<&str>,
+) -> Value {
+    json!({
+        "ledger": party_name(ledger),
+        "requires": requires,
+        "state": state.state(),
+        "reserved_group": state.reserved_group(),
+        "first_bridge_txn_id": first_bridge_txn_id,
+    })
+}
 
 fn cash_bank_refusals(
     payload: &ImportPayload,
@@ -3087,13 +3153,7 @@ fn answered_ledger_refusals(
             continue;
         };
         refused.entry(need.ledger.as_str()).or_insert_with(|| {
-            json!({
-                "ledger": party_name(need.ledger.as_str()),
-                "requires": requires,
-                "state": state.state(),
-                "reserved_group": state.reserved_group(),
-                "first_bridge_txn_id": need.bridge_txn_id,
-            })
+            refused_ledger_row(&need.ledger, requires, &state, Some(&need.bridge_txn_id))
         });
     }
     let (reason, refused) = if !not_cash.is_empty() {

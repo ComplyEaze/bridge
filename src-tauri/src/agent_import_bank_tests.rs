@@ -2012,7 +2012,16 @@ async fn a_parsed_statement_builds_an_import_file_by_proposals_id() {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&data, std::fs::Permissions::from_mode(0o700)).unwrap();
     }
-    let simulator = SequenceSimulator::spawn(bank_build_plans()).expect("bank build plan");
+    // The captured book's only money ledger is Cash, under Cash-in-Hand, which a
+    // statement file's bank ledger may not be: Cash is moved under Bank Accounts
+    // in the replayed catalogue for this test only.
+    let simulator = SequenceSimulator::spawn(bank_plans_moving(
+        "Cash",
+        "Cash-in-Hand",
+        "Bank Accounts",
+        None,
+    ))
+    .expect("bank build plan");
     let server = bank_server(&data, simulator.address().port());
 
     let parsed = server
@@ -2043,6 +2052,14 @@ async fn a_parsed_statement_builds_an_import_file_by_proposals_id() {
         .value;
     let result = &built["structuredContent"]["result"];
     assert_eq!(result["voucher_count"], 6, "{built}");
+    // The suspense ledger named here is a debtor, in an established group other
+    // than Suspense A/c.
+    let warnings = result["statement_ledger_warnings"].as_array().unwrap();
+    assert_eq!(warnings.len(), 1, "{built}");
+    assert_eq!(
+        warnings[0]["code"],
+        "suspense_ledger_outside_suspense_group"
+    );
     let xml = std::fs::read_to_string(
         data.join("imports")
             .join(format!("{}.xml", result["batch_id"].as_str().unwrap())),
@@ -2522,18 +2539,27 @@ fn statement_ledgers(
     }
 }
 
+fn findings_masters() -> (ObservedMasters, Vec<(String, Option<String>)>) {
+    let mut ledgers = captured_demo_ledger_parents();
+    ledgers.push(("Bank Suspense".into(), Some("Suspense A/c".into())));
+    ledgers.push(("Parking".into(), Some("Current Assets".into())));
+    ledgers.push(("Orphan".into(), Some("A Group The Book Lacks".into())));
+    (observed(&ledgers, captured_demo_groups()), ledgers)
+}
+
 /// A statement belongs to a bank account: a bank ledger that reaches
 /// Cash-in-Hand is refused, a real bank ledger and an unknown name are not.
 /// (An unknown name is the vouchers' own admission to refuse, not this rule's.)
 #[test]
 fn a_statements_bank_ledger_in_cash_in_hand_is_found_and_a_bank_is_not() {
-    let mut ledgers = captured_demo_ledger_parents();
-    ledgers.push(("Bank Suspense".into(), Some("Suspense A/c".into())));
-    ledgers.push(("Parking".into(), Some("Current Assets".into())));
-    let masters = observed(&ledgers, captured_demo_groups());
+    let (masters, ledgers) = findings_masters();
     let bank_in_cash = |bank: &str| {
-        statement_ledger_findings(&statement_ledgers(bank, "Bank Suspense"), &masters)
-            .bank_in_cash_in_hand
+        statement_ledger_findings(
+            &statement_ledgers(bank, "Bank Suspense"),
+            &masters,
+            |name| ledgers.iter().any(|(known, _)| known == name),
+        )
+        .bank_in_cash_in_hand
     };
     assert!(bank_in_cash("Cash"));
     assert!(!bank_in_cash("HDFC Bank Current Account"));
@@ -2545,24 +2571,37 @@ fn a_statements_bank_ledger_in_cash_in_hand_is_found_and_a_bank_is_not() {
     );
 }
 
+/// Outside Suspense A/c is said only of a group that is established and is not
+/// Suspense A/c; a ledger the book lacks, or one whose group does not lead to a
+/// reserved group, is said to be exactly that.
 #[test]
-fn a_statements_suspense_ledger_outside_suspense_a_c_is_found_and_one_inside_is_not() {
-    let mut ledgers = captured_demo_ledger_parents();
-    ledgers.push(("Bank Suspense".into(), Some("Suspense A/c".into())));
-    ledgers.push(("Parking".into(), Some("Current Assets".into())));
-    let masters = observed(&ledgers, captured_demo_groups());
-    let outside = |suspense: &str| {
+fn a_statements_suspense_ledger_is_told_apart_as_inside_outside_unestablished_or_absent() {
+    let (masters, ledgers) = findings_masters();
+    let warning = |suspense: &str| {
         statement_ledger_findings(
             &statement_ledgers("HDFC Bank Current Account", suspense),
             &masters,
+            |name| ledgers.iter().any(|(known, _)| known == name),
         )
-        .suspense_outside_suspense
+        .suspense
+        .warning(suspense)
     };
-    assert!(!outside("Bank Suspense"));
-    assert!(outside("Parking"));
-    assert!(outside("Gujarat Poly Industries"));
-    // Not in the book at all: it does not reach Suspense A/c either.
-    assert!(outside("A Ledger The Book Lacks"));
+    assert!(warning("Bank Suspense").is_empty());
+    let outside = warning("Parking");
+    assert_eq!(outside.len(), 1);
+    assert_eq!(outside[0]["code"], "suspense_ledger_outside_suspense_group");
+    assert_eq!(outside[0]["reserved_group"], "Current Assets");
+    let party = warning("Gujarat Poly Industries");
+    assert_eq!(party[0]["code"], "suspense_ledger_outside_suspense_group");
+    assert_eq!(party[0]["reserved_group"], "Sundry Creditors");
+    let unestablished = warning("Orphan");
+    assert_eq!(
+        unestablished[0]["code"],
+        "suspense_ledger_group_not_established"
+    );
+    assert_eq!(unestablished[0]["reserved_group"], Value::Null);
+    let absent = warning("A Ledger The Book Lacks");
+    assert_eq!(absent[0]["code"], "suspense_ledger_not_in_book");
 }
 
 /// Publish `vouchers` as a proposals file for a parse of `bank_ledger` with
@@ -2631,7 +2670,9 @@ async fn a_statement_whose_bank_ledger_is_cash_in_hand_is_refused_before_any_fil
     assert_eq!(result["reason"], "statement_bank_ledger_not_a_bank");
     let refused = result["refused_ledgers"].as_array().unwrap();
     assert_eq!(refused.len(), 1);
+    assert_eq!(result["refused_ledgers_omitted"], 0);
     assert_eq!(refused[0]["requires"], "bank");
+    assert_eq!(refused[0]["state"], "cash_bank");
     assert_eq!(refused[0]["reserved_group"], "Cash-in-Hand");
     assert!(!directory.path().join("imports").exists());
     assert_eq!(simulator.finish().expect("requests").len(), 18);
@@ -2642,12 +2683,12 @@ async fn a_statement_whose_bank_ledger_is_cash_in_hand_is_refused_before_any_fil
 /// ledger is outside Suspense A/c, so the build warns and still writes.
 #[tokio::test]
 async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a_warning() {
-    let warnings_of = |response: &Value| {
-        response["structuredContent"]["result"]["warnings"]
+    let codes_of = |response: &Value| {
+        response["structuredContent"]["result"]["statement_ledger_warnings"]
             .as_array()
             .unwrap()
             .iter()
-            .filter_map(|warning| warning.as_str().map(str::to_string))
+            .map(|warning| warning["code"].as_str().unwrap().to_string())
             .collect::<Vec<_>>()
     };
     let vouchers = serde_json::to_value(captured_bank_payload().vouchers).unwrap();
@@ -2667,11 +2708,15 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
         .value;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["voucher_count"], 2, "{response}");
-    let named = warnings_of(&response)
-        .into_iter()
-        .filter(|warning| warning.starts_with("suspense_ledger_outside_suspense_group:"))
-        .collect::<Vec<_>>();
-    assert_eq!(named.len(), 1, "{response}");
+    assert_eq!(
+        codes_of(&response),
+        ["suspense_ledger_outside_suspense_group"],
+        "{response}"
+    );
+    assert_eq!(
+        response["structuredContent"]["result"]["statement_ledger_warnings"][0]["reserved_group"],
+        "Sales Accounts"
+    );
     assert!(directory
         .path()
         .join("imports")
@@ -2709,11 +2754,6 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
         response["structuredContent"]["result"]["voucher_count"], 2,
         "{response}"
     );
-    assert!(
-        warnings_of(&response)
-            .iter()
-            .all(|warning| !warning.starts_with("suspense_ledger_outside_suspense_group")),
-        "{response}"
-    );
+    assert!(codes_of(&response).is_empty(), "{response}");
     assert_eq!(simulator.finish().expect("requests").len(), 44);
 }

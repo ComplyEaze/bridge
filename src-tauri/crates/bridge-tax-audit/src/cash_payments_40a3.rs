@@ -172,15 +172,19 @@ fn evidence_for_vouchers(vouchers: &BTreeMap<String, &Voucher>) -> Vec<EvidenceR
         .collect()
 }
 
-/// Evidence refs across every voucher touched by any row in `rows`, deduplicated by guid.
+/// Evidence refs across every voucher touched by any row in `rows`, deduplicated by GUID and label
+/// as the reference's set of refs is: two vouchers sharing a GUID (blank, or one GUID on different
+/// days) are both cited (#1134).
 fn evidence_for_rows(rows: &RowMap<'_>) -> Vec<EvidenceRef> {
-    let mut all: BTreeMap<String, &Voucher> = BTreeMap::new();
+    let mut all: BTreeSet<(String, String)> = BTreeSet::new();
     for agg in rows.values() {
         for (g, v) in &agg.vouchers {
-            all.insert(g.clone(), v);
+            all.insert((g.clone(), voucher_label(v)));
         }
     }
-    evidence_for_vouchers(&all)
+    all.into_iter()
+        .map(|(g, label)| EvidenceRef::with_label("voucher", &g, &label))
+        .collect()
 }
 
 /// (in_scope_rows, excluded_rows) keyed by (date, payee ledger name); `excluded_rows` has one

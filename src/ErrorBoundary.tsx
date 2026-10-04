@@ -131,7 +131,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       }
       this.reload(guard);
     } catch {
-      if (this.mounted) this.setState({ reloadBlockedReason: "Bridge could not confirm native close state. Resolve it before reloading.", reloadConfirmation: false });
+      if (this.mounted) this.setState({ reloadBlockedReason: "ComplyEaze Bridge could not confirm native close state. Resolve it before reloading.", reloadConfirmation: false });
     } finally {
       if (!this.reloading && guard.reloadAdmissionRef.current === this.reloadAdmissionToken) {
         guard.reloadAdmissionRef.current = null;

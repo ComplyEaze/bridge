@@ -12,7 +12,7 @@ The last pin of `high_value_register` (reference commit `140bc7d3`, 26 Sep 2026)
 
 ## How they were produced
 
-At the reference engine (a private repository), commit `c62a4ab4` (the last change to its `tae/` and `selftest/`), under Python 3.13:
+At the reference engine (a private repository), commit `c62a4ab4`, under Python 3.13. The goldens below also regenerate byte-identical at its later commit `da9e2d3d` (checked 3 Oct 2026), the last change to its `tae/` and `selftest/` that day; the changes after `c62a4ab4` touch only `counter_cheques_40a3`:
 
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
         --with striprtf --with pdfplumber python parity/python_golden.py ENGINE \

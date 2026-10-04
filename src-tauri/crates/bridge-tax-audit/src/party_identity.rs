@@ -10,11 +10,14 @@
 //! recorded one. A chain that is incomplete and does not already settle the answer refuses the test
 //! rather than defaulting to "not a party" (`PARTY-chain-incomplete`).
 //!
-//! Divergence, deliberate, and not parity: the reference reads the optional `[party_identity]` table
-//! leniently (a table that is not a table, or a key of the wrong type, is read as empty or by
-//! Python's truthiness, so a string for a list becomes the set of its characters). Here every such
-//! value refuses with a typed `Config` error, and only this test fails. A key the reference does not
-//! read, at either level of the table, also refuses here where the reference ignores it.
+//! Divergence, deliberate, and not parity: a wrong-typed value in the optional `[party_identity]`
+//! table refuses here with a typed `Config` error, and only this test fails. A list location or
+//! `overrides` of the wrong shape never reaches this module on either side: binding refuses it first
+//! (`BIND-ID-MALFORMED`). What differs is the rest, which the reference reads by Python's truthiness
+//! or not at all: a text `derive_pan_from_gstin` turns derivation on there; a falsy override counts
+//! as none there; a truthy non-table override, or a non-text field, raises there once that ledger is
+//! a party; a numeric `pan` binds on the number there; and a key it does not read, at either level of
+//! the table, is ignored there (#1145).
 //!
 //! The table's ledger and group names reach this module already bound to the Book by
 //! [`crate::binding::bind`], as the reference's binding binds them before any test runs.
@@ -542,5 +545,43 @@ additional_party_ledgers = [\"A\"]\nexcluded_ledgers = [\"E\"]\nround_off_ledger
         let entity = index.entity_for_ledger("Beta Mart").unwrap();
         assert_eq!(entity.ledgers.len(), 3);
         assert!(!entity.names_agree);
+    }
+    /// Duties & Taxes is decided first: a tax ledger under a configured party group, or named as a
+    /// party, is still not one (#1145).
+    #[test]
+    fn a_duties_and_taxes_ledger_is_never_a_party_even_in_a_party_group() {
+        let mut tax = debtor("GST Payable", "PAN-TAX-1", "");
+        tax.parent = "Duties & Taxes".to_string();
+        tax.chain = vec![
+            "Duties & Taxes".to_string(),
+            "Current Liabilities".to_string(),
+        ];
+        let book = book_with(vec![tax]);
+        let config = PartyConfig {
+            party_groups: vec!["Current Liabilities".to_string()],
+            additional_party_ledgers: ["GST Payable".to_string()].into(),
+            ..PartyConfig::default()
+        };
+        let index = build_party_index(&book, &config).unwrap();
+        assert!(index.entity_for_ledger("GST Payable").is_none());
+    }
+
+    /// Every stopword is dropped from a name's words, and a word of two letters or fewer is too.
+    #[test]
+    fn every_stopword_is_left_out_of_a_names_words() {
+        let words =
+            name_tokens("Alpha Pvt Private Ltd Limited And Co Company The LLP Inc Corp & XY Sons");
+        assert_eq!(
+            words,
+            ["alpha", "sons"].iter().map(|w| (*w).to_string()).collect()
+        );
+    }
+
+    /// A segment that upper-cases to more than ten characters is not a PAN, even when its first ten
+    /// are shaped like one (the reference's anchored pattern refuses it too).
+    #[test]
+    fn a_segment_that_grows_when_upper_cased_is_not_a_pan() {
+        let segment = ["AAAAA", "1111", "\u{df}"].concat(); // sharp s upper-cases to "SS"
+        assert_eq!(pan_from_gstin(&format!("27{segment}1Z5")), None);
     }
 }

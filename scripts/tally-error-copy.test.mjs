@@ -41,7 +41,8 @@ test("a plain endpoint failure gives the operator one clear next step", () => {
 test("a persisted-profile failure stays local instead of directing the operator to Tally", () => {
   const guidance = classifyUnstructuredTallyError("persisted_tally_company_profiles_unavailable");
 
-  assert.match(guidance.category, /saved company profiles are unavailable/i);
-  assert.match(guidance.action, /restart complyeaze bridge/i);
-  assert.match(guidance.action, /keep tally unchanged/i);
+  assert.deepEqual(guidance, {
+    category: "ComplyEaze Bridge's saved company profiles are unavailable",
+    action: "ComplyEaze Bridge could not read its local saved company profiles. Restart ComplyEaze Bridge. If this happens again, keep Tally unchanged and ask for help with ComplyEaze Bridge's local data.",
+  });
 });

@@ -1666,7 +1666,7 @@ test("disables source and Journal admission when listener registration fails bef
   document.body.append(host);
   const root = await mountProtected(host);
   await act(async () => {});
-  expect(host.textContent).toContain("Bridge could not install native close protection: event permission denied");
+  expect(host.textContent).toContain("ComplyEaze Bridge could not install native close protection: event permission denied");
   expect(button(host, "Choose source XML").disabled).toBe(true);
   expect(mocks.invoke).not.toHaveBeenCalledWith("desktop_register_source_draft_lifecycle_renderer", expect.anything());
   root.unmount();
@@ -1696,7 +1696,7 @@ test("uses the controller after the source screen ErrorBoundary unmounts", async
 
   pending = exit;
   await act(async () => listener?.({ payload: exit }));
-  expect(document.body.textContent).toContain("Discard unsaved proposals and quit Bridge?");
+  expect(document.body.textContent).toContain("Discard unsaved proposals and quit ComplyEaze Bridge?");
   expect(mocks.invoke).not.toHaveBeenCalledWith("desktop_complete_source_draft_lifecycle_request", { request: exit });
   await act(async () => button(document.body, "Keep editing").click());
   root.unmount();
@@ -1923,9 +1923,9 @@ test("does not let a late failed request lookup replace a newer dialog", async (
   pending = second;
   deferFirst = false;
   await act(async () => listener?.({ payload: second }));
-  expect(document.body.textContent).toContain("Discard unsaved proposals and quit Bridge?");
+  expect(document.body.textContent).toContain("Discard unsaved proposals and quit ComplyEaze Bridge?");
   await act(async () => rejectFirst(new Error("late lookup failure")));
-  expect(document.body.textContent).toContain("Discard unsaved proposals and quit Bridge?");
+  expect(document.body.textContent).toContain("Discard unsaved proposals and quit ComplyEaze Bridge?");
   root.unmount();
 });
 
@@ -2076,7 +2076,7 @@ test("promotes a newer native request returned by a deferred lookup instead of u
   const newer = { request_id: "authoritative-b", kind: "exit" as const };
   pending = newer;
   await act(async () => resolveLookup(newer));
-  expect(document.body.textContent).toContain("Discard unsaved proposals and quit Bridge?");
+  expect(document.body.textContent).toContain("Discard unsaved proposals and quit ComplyEaze Bridge?");
   expect(mocks.invoke).not.toHaveBeenCalledWith("desktop_complete_source_draft_lifecycle_request", { request: newer });
   root.unmount();
 });
@@ -2113,7 +2113,7 @@ test("re-queries a newer native request received while cancelling the current on
   pending = second;
   listener?.({ payload: second });
   await act(async () => resolveCancel());
-  expect(document.body.textContent).toContain("Discard unsaved proposals and quit Bridge?");
+  expect(document.body.textContent).toContain("Discard unsaved proposals and quit ComplyEaze Bridge?");
   expect(mocks.invoke).not.toHaveBeenCalledWith("desktop_complete_source_draft_lifecycle_request", { request: second });
   root.unmount();
 });
@@ -2150,7 +2150,7 @@ test("keeps the mounted Journal outcome and blocks lifecycle completion while po
 
   pending = exit;
   await act(async () => listener?.({ payload: exit }));
-  expect(host.textContent).toContain("Review a Bridge Journal");
+  expect(host.textContent).toContain("Review a ComplyEaze Bridge Journal");
   expect(document.body.textContent).toContain("A Journal action is in progress.");
   expect(button(document.body, "Discard and quit").disabled).toBe(true);
   expect(mocks.invoke).not.toHaveBeenCalledWith("desktop_complete_source_draft_lifecycle_request", { request: exit });
@@ -2160,7 +2160,7 @@ test("keeps the mounted Journal outcome and blocks lifecycle completion while po
     batchId: journalReview.batchId,
     result: { result: { dispatch: { state: "posted_verified", resent: false } } },
   }));
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   root.unmount();
 });
 
@@ -2316,6 +2316,6 @@ test("a save failure with no recognizable shape keeps this screen's own fallback
   const root = await mount(host);
   await act(async () => button(host, "Choose source XML").click());
   await act(async () => button(host, "Save draft").click());
-  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Bridge could not complete that source-draft action.");
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("ComplyEaze Bridge could not complete that source-draft action.");
   root.unmount();
 });

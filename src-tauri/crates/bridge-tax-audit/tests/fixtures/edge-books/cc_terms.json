@@ -1,5 +1,5 @@
 {
- "comment": "counter_cheques_40a3 with terms: a term matches case-insensitively, repeated and case-variant terms stay one set member each, the empty term counts in configured_terms_count but matches nothing, a non-ASCII term upper-cases as Python does (straße against STRASSE; the ligature fi against FINAL), a payment of exactly the limit is not over and one paisa more is, per-line rows (two lines on one ledger, two ledgers on one voucher), a zero line, a Contra voucher, a voucher with a cash leg, a receipt that also debits an expense, a bank line and a cash line of nil, a cash ledger and another bank ledger on the debit side, an optional and a cancelled voucher, an empty narration, and one excluded payee for each of four group roles (capital, loans (liability), fixed assets, duties and taxes; no payee is under Loans & Advances (Asset)).",
+ "comment": "counter_cheques_40a3 with terms: a term matches case-insensitively, repeated and case-variant terms stay one set member each, the empty term counts in configured_terms_count but matches nothing, a non-ASCII term upper-cases as Python does (straße against STRASSE; the ligature fi against FINAL), a payment of exactly the limit is not over and one paisa more is, per-line rows (two lines on one ledger, two ledgers on one voucher), a zero line, a Contra voucher, a voucher with a cash leg, a receipt that also debits an expense, a bank line and a cash line of nil, a cash ledger and another bank ledger on the debit side, an optional and a cancelled voucher, an empty narration, and one excluded payee for each of four group roles (capital, loans (liability), fixed assets, duties and taxes; no payee is under Loans & Advances (Asset)). A term holding U+019B (a small lambda with stroke) does not match a narration holding U+A7DC: Python 3.13 upper-cases neither, while Rust's own tables map the first to the second, so only py_upper keeps the two apart.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -93,16 +93,16 @@
   {
    "ledger": "Wages",
    "opening": 0,
-   "debit": 17500000,
+   "debit": 19000000,
    "credit": 0,
-   "closing": 17500000
+   "closing": 19000000
   },
   {
    "ledger": "Bank1",
    "opening": 0,
    "debit": 1500000,
-   "credit": 23200001,
-   "closing": -21700001
+   "credit": 24700001,
+   "closing": -23200001
   },
   {
    "ledger": "Rent",
@@ -555,6 +555,22 @@
     ]
    ],
    "narration": "counter, other bank debited"
+  },
+  {
+   "guid": "v23",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank1",
+     -1500000
+    ]
+   ],
+   "narration": "Paid on slip Ƛ"
   }
  ],
  "cash": [
@@ -572,7 +588,8 @@
   "Self",
   "",
   "straße",
-  "ﬁnal"
+  "ﬁnal",
+  "ƛ"
  ],
  "tests": [
   "counter_cheques_40a3"

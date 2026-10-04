@@ -55,7 +55,7 @@
     },
     {
       "id": "counter_cheques_40a3.configured_terms_count",
-      "value": 7,
+      "value": 8,
       "unit": "count",
       "definition_sha256_16": "9d0dcec115af5eff",
       "definition_text": "Bank-narration terms the client configuration identifies as counter-encashed or non-account-payee payments (roles.counter_cheque_narration_terms). Zero means this test was not configured and found nothing because it looked at nothing.",

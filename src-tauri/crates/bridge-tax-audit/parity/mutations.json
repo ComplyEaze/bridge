@@ -3602,7 +3602,7 @@
  {
   "id": "Y02",
   "by": "author",
-  "what": "the no-party row ref loses its label",
+  "what": "the no-party row ref drops the printed names from its label",
   "file": "src/cash_payments_40a3.rs",
   "from": "            &row.names.label(UNIDENTIFIED_PARTY),",
   "to": "            UNIDENTIFIED_PARTY,"
@@ -6988,8 +6988,8 @@
   "by": "author",
   "what": "CCQ-1 accepts a total that is not the sum",
   "file": "src/counter_cheques_40a3.rs",
-  "from": "if i128::from(total) != rows {",
-  "to": "if i128::from(total) == rows {"
+  "from": "i128::from(total) != sum",
+  "to": "i128::from(total) == sum"
  },
  {
   "id": "CQ-23",
@@ -8198,5 +8198,109 @@
   "file": "src/party_identity.rs",
   "from": ".fold(first, |acc, s| acc.intersection(&s).cloned().collect())",
   "to": ".take(1).fold(first, |acc, s| acc.intersection(&s).cloned().collect())"
+ },
+ {
+  "id": "CQ-27",
+  "by": "author",
+  "what": "CCQ-1 passes when the total is absent or not an integer",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "None => out.push(\"CCQ-1: over_limit_total figure absent or not an integer\".to_string()),",
+  "to": "None => {}"
+ },
+ {
+  "id": "CQ-28",
+  "by": "author",
+  "what": "CCQ-2 passes when the count is absent or not an integer",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "None => out.push(\"CCQ-2: over_limit_count figure absent or not an integer\".to_string()),",
+  "to": "None => {}"
+ },
+ {
+  "id": "CQ-29",
+  "by": "author",
+  "what": "a row amount that is not an integer is not reported",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "if bad_rows > 0 {",
+  "to": "if false {"
+ },
+ {
+  "id": "CQ-30",
+  "by": "author",
+  "what": "the total is compared with a row sum that skips a non-integer row",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "if bad_rows == 0 && i128::from(total) != sum {",
+  "to": "if i128::from(total) != sum {"
+ },
+ {
+  "id": "CQ-31",
+  "by": "author",
+  "what": "a term is upper-cased with Rust's tables, not Python's",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": ".filter(|t| !t.is_empty() && text.contains(py_upper(t).as_str()))",
+  "to": ".filter(|t| !t.is_empty() && text.contains(t.to_uppercase().as_str()))"
+ },
+ {
+  "id": "CP-46",
+  "by": "author",
+  "what": "a figure's evidence keeps one voucher per GUID, so a second voucher sharing it is not cited",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "all.insert((g.clone(), voucher_label(v)));",
+  "to": "if !all.iter().any(|(x, _)| x == g) { all.insert((g.clone(), voucher_label(v))); }"
+ },
+ {
+  "id": "CP-47",
+  "by": "author",
+  "what": "a candidate's opposite entries are listed in line order, not sorted",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "let opposite: BTreeSet<&String> = per_side",
+  "to": "let opposite: Vec<&String> = per_side"
+ },
+ {
+  "id": "EG-58",
+  "by": "author",
+  "what": "a ledger under Duties & Taxes is a party when a party group or the party list names it",
+  "file": "src/party_identity.rs",
+  "from": "|| ledger.under(DUTIES_TAXES_GROUP)",
+  "to": "|| (ledger.under(DUTIES_TAXES_GROUP) && !config.party_groups.iter().any(|g| ledger.under(g)) && !config.additional_party_ledgers.contains(&ledger.name))"
+ },
+ {
+  "id": "EG-59",
+  "by": "author",
+  "what": "'limited' is not a stopword",
+  "file": "src/party_identity.rs",
+  "from": "\"pvt\", \"private\", \"ltd\", \"limited\", \"and\",",
+  "to": "\"pvt\", \"private\", \"ltd\", \"limitedx\", \"and\","
+ },
+ {
+  "id": "EG-60",
+  "by": "author",
+  "what": "a segment longer than ten characters after upper-casing can be a PAN",
+  "file": "src/party_identity.rs",
+  "from": "let pan_shaped = s.len() == 10",
+  "to": "let pan_shaped = s.len() >= 10"
+ },
+ {
+  "id": "EG-61",
+  "by": "author",
+  "what": "entity_269st_gap reads no bank ledgers",
+  "file": "src/lib.rs",
+  "from": "entity_269st_gap::run(book, rules, &cash, &bank, &index, &round_off_ledgers)",
+  "to": "entity_269st_gap::run(book, rules, &cash, &BTreeSet::new(), &index, &round_off_ledgers)"
+ },
+ {
+  "id": "EG-62",
+  "by": "author",
+  "what": "entity_269st_gap reads the round-off ledgers as written, not as bound",
+  "file": "src/lib.rs",
+  "from": "entity_269st_gap::run(book, rules, &cash, &bank, &index, &round_off_ledgers)",
+  "to": "entity_269st_gap::run(book, rules, &cash, &bank, &index, &engagement.round_off_ledgers.iter().cloned().collect())"
+ },
+ {
+  "id": "CQ-32",
+  "by": "author",
+  "what": "a figure's evidence keeps one voucher per GUID, so a second voucher sharing it is not cited",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "refs.into_iter()",
+  "to": "refs.into_iter().filter({ let mut seen = BTreeSet::new(); move |(g, _)| seen.insert(*g) })"
  }
 ]

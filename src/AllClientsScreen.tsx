@@ -133,11 +133,11 @@ function clientGroupLabelDegradationMessage(
 
   switch (reason.code) {
     case "read":
-      return "Bridge could not read the saved client-group labels. No labels are shown; the file has not been changed.";
+      return "ComplyEaze Bridge could not read the saved client-group labels. No labels are shown; the file has not been changed.";
     case "corrupt_file":
       return "Saved client-group labels could not be understood. No labels are shown; the file has not been changed.";
     case "unsupported_version":
-      return `These client-group labels were written by a newer Bridge (found v${reason.found}; this build reads v${reason.supported}). No labels are shown; the file has not been changed.`;
+      return `These client-group labels were written by a newer ComplyEaze Bridge (found v${reason.found}; this build reads v${reason.supported}). No labels are shown; the file has not been changed.`;
     case "normalized_key_collision":
       return "Saved client-group labels contain duplicate keys after normalisation. No labels are shown; the file has not been changed.";
   }
@@ -396,7 +396,7 @@ export function AllClientsScreen({ config, companies, onOpenCompany, onBack, liv
           attemptedLabel,
           persistedGroupLabels.current,
         ));
-        setGroupLabelError("Bridge could not save this group label. The previous label was restored; your figures are unchanged.");
+        setGroupLabelError("ComplyEaze Bridge could not save this group label. The previous label was restored; your figures are unchanged.");
       });
   }, []);
 
@@ -508,14 +508,14 @@ export function AllClientsScreen({ config, companies, onOpenCompany, onBack, liv
       {companies.length === 0 && (
         <div className="outstandings-state">
           <strong>No verified companies yet</strong>
-          <span>Open your client books in Tally and choose them under Manage Tally. Bridge reads each one in turn.</span>
+          <span>Open your client books in Tally and choose them under Manage Tally. ComplyEaze Bridge reads each one in turn.</span>
         </div>
       )}
 
       {!entries && !loading && companies.length > 0 && (
         <div className="outstandings-state">
           <strong>Ready</strong>
-          <span>Bridge reads each book in turn, one request at a time. Roughly a third of a second per company.</span>
+          <span>ComplyEaze Bridge reads each book in turn, one request at a time. Roughly a third of a second per company.</span>
         </div>
       )}
 

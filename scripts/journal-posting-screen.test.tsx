@@ -100,7 +100,7 @@ test("renders the review flow and keeps safe recovery actions after each backend
   await act(async () => {
     button(host, "Reconcile original batch").click();
   });
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   expect(button(host, "Choose another file")).toBeTruthy();
   expect([...host.querySelectorAll("button")].some((item) => item.textContent?.includes("Post Journal"))).toBe(false);
 
@@ -108,7 +108,7 @@ test("renders the review flow and keeps safe recovery actions after each backend
   await act(async () => {
     button(host, "Choose another file").click();
   });
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   expect([...host.querySelectorAll("button")].some((item) => item.textContent?.includes("Post Journal"))).toBe(false);
 
   root.unmount();
@@ -148,7 +148,7 @@ test("reports a busy Journal action until the native post result is rendered", a
     await pendingPost;
   });
   expect(busyStates.at(-1)).toBe(false);
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   expect([...host.querySelectorAll("button")].some((item) => item.textContent?.includes("Post Journal"))).toBe(false);
   root.unmount();
 });
@@ -198,7 +198,7 @@ test("retains an attempted Journal and response evidence through failed reconcil
   });
 
   const details = host.querySelector("details");
-  expect(details?.textContent).toContain("Tally's response is retained for reconciliation; Bridge only confirms posting after a matching Journal readback.");
+  expect(details?.textContent).toContain("Tally's response is retained for reconciliation; ComplyEaze Bridge only confirms posting after a matching Journal readback.");
   expect(details?.textContent).toContain("success");
   expect(details?.textContent).toContain("Created 1");
   expect(details?.textContent).toContain("Line errors 0");
@@ -231,14 +231,14 @@ test("retains an attempted Journal and response evidence through failed reconcil
     result: { result: { dispatch: { state: "previous_attempt_reconciled", resent: false } } },
   });
   await act(async () => { button(host, "Reconcile original batch").click(); });
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   expect(button(host, "Choose another file")).toBeTruthy();
   expect(host.textContent).not.toContain("Post Journal");
   root.unmount();
 });
 
 for (const [code, expected] of [
-  ["import_approval_timed_out", "The approval dialog expired before Bridge could post this Journal."],
+  ["import_approval_timed_out", "The approval dialog expired before ComplyEaze Bridge could post this Journal."],
   ["import_approval_declined", "The Journal was not posted because approval was declined."],
 ] as const) {
   test(`explains ${code} while keeping Post Journal available`, async () => {
@@ -359,7 +359,7 @@ test("an active or unresolved snapshot blocks posting from an already-open revie
   });
   await act(async () => { button(host, "Post Journal").click(); });
   expect(mocks.invoke.mock.calls[1][0]).toBe("desktop_post_reviewed_journal");
-  expect(host.textContent).toContain("Bridge confirmed the original Journal and its saved batch.");
+  expect(host.textContent).toContain("ComplyEaze Bridge confirmed the original Journal and its saved batch.");
   root.unmount();
 });
 
@@ -368,7 +368,7 @@ test("does not admit Journal actions before native lifecycle protection is ready
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
-  await act(async () => { root.render(<JournalPostingScreen config={config} lifecycleAdmissionReady={false} lifecycleAdmissionError="Bridge could not install native close protection." />); });
+  await act(async () => { root.render(<JournalPostingScreen config={config} lifecycleAdmissionReady={false} lifecycleAdmissionError="ComplyEaze Bridge could not install native close protection." />); });
   expect(host.textContent).toContain("Native close protection unavailable");
   expect(button(host, "Choose Journal file").disabled).toBe(true);
   await act(async () => { button(host, "Choose Journal file").click(); });

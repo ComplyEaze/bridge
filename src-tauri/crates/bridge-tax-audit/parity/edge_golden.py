@@ -58,11 +58,13 @@ default false: true sets the module's NET_REVERSALS switch, reaching the dormant
 in the module invariant alike); and for `partners_40b_194t`: `entity_type` as for `tds_payees`, `partners`
 ({key: {capital_ledgers, interest_ledger?, remuneration_ledger?}}, default {}), `deed` (a table such as
 {interest_rate_bp}, absent meaning none) and `tds_payable_ledgers` (as for `tds_payees`); and for `bank_reconciliation`: `bank_statement` (an invented
-statement in the shape `parity/python_golden.py --emit-bank-statement` writes), `bank_reconciliation_ledger`
+statement in the shape `parity/python_golden.py --emit-bank-statement` writes, either balance null where the
+statement declares none), `bank_reconciliation_ledger`
 and `bank_charge_terms` (default []); the statement's rows also feed the module invariant, as the
-reference's pack sets `eng.bank`; and for `high_value_register`: `bank_statement` (optional here, absent
-meaning none supplied), `ais` as above, `s194n_terms` and `round_off_ledgers` (default []),
-`bank_statement_refused` (the reader's plain-words reason a supplied statement was refused; default none) and `counterparty_types` ({ledger: type}, the map pack.py builds from the loan ledgers and
+reference's pack sets `eng.bank`; a statement the reference's own reader refuses gives the module's
+`refused` result, with the reader's reason, as the pack does; and for `high_value_register`: `bank_statement` (optional here, absent
+meaning none supplied, and none supplied with the reader's reason when that reader refuses it), `ais` as above, `s194n_terms` and `round_off_ledgers` (default []),
+`bank_statement_refused` (the reader's plain-words reason a supplied statement was refused, with no `bank_statement`; default none) and `counterparty_types` ({ledger: type}, the map pack.py builds from the loan ledgers and
 `[roles].counterparty_type_by_ledger`; default {}) and `s194n_recipient_type` (one of the module's two
 recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it); and
 for `cash_payments_40a3`: `loan_ledgers` and `round_off_ledgers` (default []); for `entity_269st_gap`: `party_identity` (the engagement's own
@@ -79,6 +81,7 @@ from __future__ import annotations
 import copy
 import json
 import sys
+import tempfile
 from types import SimpleNamespace
 from datetime import date
 from pathlib import Path
@@ -89,7 +92,8 @@ STATUS = ("regular", "optional", "cancelled", "postdated")
 def main() -> int:
     engine, spec_path, out_dir = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
     sys.path.insert(0, str(Path(engine).resolve()))
-    from tae.adapters.bank_documents import BankStatementDoc
+    from tae.adapters.bank_documents import (BankStatementDoc, StatementBalanceMissing, StatementOrderRefused,
+                                             StatementPeriodRefused, load_bank_statement_json)
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
     from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, cash_book_integrity, cash_payments_40a3, counter_cheques_40a3,
@@ -209,8 +213,41 @@ def main() -> int:
             opening_balance_paise=bs["opening_balance_paise"], closing_balance_paise=bs["closing_balance_paise"],
             rows=rows)
 
+    def statement_refused(bs):
+        """As tae/pack.py reads a statement: the reference's own reader, on the same statement in the extraction's
+        shape (amounts as rupee text, an absent balance as null), and its plain-words reason when it refuses one (no
+        declared balance, a row outside the period, a date that steps back with no running balance to confirm it).
+        None when it reads it, after checking it read the rows the spec gives."""
+        def rupees(p):
+            return None if p is None else f"{'-' if p < 0 else ''}{abs(p) // 100}.{abs(p) % 100:02d}"
+        raw = {"account_no_masked": bs["account_ref"], "bank": bs["bank"],
+               "period_from": bs["period"]["start"], "period_to": bs["period"]["end"],
+               "opening_balance": rupees(bs.get("opening_balance_paise")),
+               "closing_balance": rupees(bs.get("closing_balance_paise")),
+               "transactions": [{"date": r["txn_date"], "description": r["narration"], "debit": rupees(r["debit_paise"]),
+                                 "credit": rupees(r["credit_paise"]), "balance": rupees(r["balance_paise"])}
+                                for r in bs["rows"]]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "statement.json"
+            path.write_text(json.dumps(raw), encoding="ascii")
+            try:
+                doc = load_bank_statement_json(path, "edge")
+            except (StatementBalanceMissing, StatementOrderRefused, StatementPeriodRefused) as e:
+                return e.reason
+        read = [(r.txn_date.isoformat(), r.narration, r.debit_paise, r.credit_paise, r.balance_paise) for r in doc.rows]
+        given = [(r["txn_date"], r["narration"], r["debit_paise"], r["credit_paise"], r["balance_paise"])
+                 for r in bs["rows"]]
+        if (read, doc.opening_balance_paise, doc.closing_balance_paise) != (
+                given, bs["opening_balance_paise"], bs["closing_balance_paise"]):
+            raise SystemExit(f"{spec_path.name}: the reference's reader read another statement than the spec gives")
+        return None
+
     def bank_reconciliation_run():
-        # As tae/pack.py: the statement is caller data, and eng.bank carries its rows for BANK-1.
+        # As tae/pack.py: a statement its reader refuses is reconciled as refused, with the reason; otherwise the
+        # statement is caller data, and eng.bank carries its rows for BANK-1.
+        reason = statement_refused(spec["bank_statement"])
+        if reason is not None:
+            return bank_reconciliation, bank_reconciliation.refused(eng, rules, reason)
         statement = bank_statement(spec["bank_statement"])
         eng.bank = list(statement.rows)
         return bank_reconciliation, bank_reconciliation.run(
@@ -222,6 +259,12 @@ def main() -> int:
         # given already merged; the recipient type follows entity_type as pack.py maps it, unless
         # the spec names one ("unknown" meaning none).
         bs = spec.get("bank_statement")
+        refused = spec.get("bank_statement_refused")
+        # As tae/pack.py: a statement its reader refuses is not supplied, and the reader's reason is passed
+        if bs is not None and (reason := statement_refused(bs)) is not None:
+            if refused is not None:
+                raise SystemExit(f"{spec_path.name}: bank_statement_refused is given and the reader refuses the statement")
+            bs, refused = None, reason
         recipient = spec.get("s194n_recipient_type")
         if recipient is None:
             recipient = (high_value_register.RECIPIENT_NOT_CO_OPERATIVE
@@ -238,7 +281,7 @@ def main() -> int:
             s194n_narration_terms=frozenset(spec.get("s194n_terms", [])), ais_rows=ais,
             s194n_recipient_type=recipient, round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])),
             counterparty_type_by_ledger=dict(spec.get("counterparty_types", {})),
-            bank_statement_refused=spec.get("bank_statement_refused"))
+            bank_statement_refused=refused)
 
     def stock_run():
         # As tae/pack.py: invented masters and both Stock Summaries, typed strictly as

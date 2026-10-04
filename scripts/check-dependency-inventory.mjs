@@ -23,6 +23,14 @@ if ([...modes].some((mode) => !["--frontend", "--rust"].includes(mode))) {
   throw new Error("Usage: check-dependency-inventory.mjs [--frontend] [--rust]");
 }
 
+// Says why a command failed: a runner flake (a network error from cargo) and a real drift look the same
+// without the command's own error, so the last lines of stderr are kept, bounded.
+const commandFailure = (label, result) => {
+  const cause = result.error ? `could not run: ${result.error.message}` : `${result.signal ? `signal ${result.signal}` : `exit status ${result.status}`}`;
+  const tail = String(result.stderr ?? "").trimEnd().split(/\r?\n/).slice(-20).join("\n").slice(-2000);
+  return `${label} inventory command failed (${cause})${tail ? `:\n${tail}` : ""}`;
+};
+
 const runJson = (command, args, label) => {
   const result = spawnSync(command, args, {
     cwd: root,
@@ -31,7 +39,7 @@ const runJson = (command, args, label) => {
     windowsHide: true,
   });
   if (result.error || result.status !== 0) {
-    throw new Error(`${label} inventory command failed`);
+    throw new Error(commandFailure(label, result));
   }
   try {
     return JSON.parse(result.stdout);
@@ -48,7 +56,7 @@ const runText = (command, args, label) => {
     windowsHide: true,
   });
   if (result.error || result.status !== 0) {
-    throw new Error(`${label} inventory command failed`);
+    throw new Error(commandFailure(label, result));
   }
   return result.stdout;
 };

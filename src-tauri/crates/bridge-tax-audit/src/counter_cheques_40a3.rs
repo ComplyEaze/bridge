@@ -132,16 +132,16 @@ fn compute_rows<'a>(
     Ok((in_scope, excluded))
 }
 
-/// Voucher evidence for a set of rows: one ref per distinct voucher, sorted by guid, each with
-/// the fixed voucher label.
+/// Voucher evidence for a set of rows: one ref per distinct GUID and label, as the reference's set
+/// of refs is, so vouchers sharing a GUID (blank, or one GUID on different days) are each cited
+/// (#1134).
 fn ev(rows: &[&Row<'_>]) -> Vec<EvidenceRef> {
-    let mut by_guid: BTreeMap<&str, &Voucher> = BTreeMap::new();
-    for row in rows {
-        by_guid.insert(row.voucher.guid.as_str(), row.voucher);
-    }
-    by_guid
-        .into_iter()
-        .map(|(g, v)| EvidenceRef::with_label("voucher", g, &voucher_label(v)))
+    let refs: BTreeSet<(&str, String)> = rows
+        .iter()
+        .map(|row| (row.voucher.guid.as_str(), voucher_label(row.voucher)))
+        .collect();
+    refs.into_iter()
+        .map(|(g, label)| EvidenceRef::with_label("voucher", g, &label))
         .collect()
 }
 

@@ -34,7 +34,7 @@ The edge books are written by hand in a small generator, as data, then read by b
 | --- | ---: | --- | --- |
 | `cp_unnamed.json` | 7,978 | `f099436d35a0469c76a478708dcd0fe6fe0b09ee339426d0ea710276bc96ea8c` | `edge-books/cp_unnamed.json` |
 | `edge.cp_unnamed.cash_payments_40a3.json` | 69,333 | `dd2022e8a772178aef8e7ea8aaecd66fb6bb21b43c3e95005abcce73412e6fa6` | `golden/edge.cp_unnamed.cash_payments_40a3.json` |
-| `cp_loans.json` | 6,940 | `f2e4f126b9333091b9321656ba3e730ad288a1165ee2f239e0fb7dfbc61f76de` | `edge-books/cp_loans.json` |
+| `cp_loans.json` | 7,004 | `a25a79803ea038dc52fdfae10a8f0346ff594eb96bf795dbe7fce5aef7f09cb2` | `edge-books/cp_loans.json` |
 | `edge.cp_loans.cash_payments_40a3.json` | 49,254 | `35fdf62af4e7c91942495c1fcb883a4e656f59b6df8d35040509b0fcba99a96c` | `golden/edge.cp_loans.cash_payments_40a3.json` |
 | `cp_loan_blank.json` | 1,290 | `b75ad26a2b52a035cf118704cc3194f8c56fe656e9eadd60e11b730747e01f04` | `edge-books/cp_loan_blank.json` |
 | `edge.cp_loan_blank.cash_payments_40a3.json` | 10,343 | `19e40a0256b5779780879b79351516c708f100a02e17c14c235c247841db6d6b` | `golden/edge.cp_loan_blank.cash_payments_40a3.json` |

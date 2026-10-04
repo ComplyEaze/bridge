@@ -67,12 +67,57 @@ The figure floor in `registry.rs` is structural: every book gives 5 figures and 
 
 ## Reference commit and invocations
 
-Current pin: `b0a4f91aa84dd5cc52a1fa5ae05ba0cc92d31459` (the Phase A re-pin below; before it, `87e2f03e0f5687692c638c17b66b92341c99534f`). Every golden below was
+Current pin: `da9e2d3d85fa68c5298643ec5c6491ae49729a39` (the bridge#802/#803 re-pin below; before it, `b0a4f91aa84dd5cc52a1fa5ae05ba0cc92d31459`, the Phase A re-pin, and `87e2f03e0f5687692c638c17b66b92341c99534f`). Every golden below was
 regenerated from an archive of that commit (its `tae/` and `selftest/` only) by the invocations below,
 with ENGINE the archive of the current pin. History: produced at `76310f60`, re-checked byte-identical at
 `9d64c743`, re-pinned at `250eaedf` (the second CA-facing wording pass, text only) and at `6813a635` (the
 s.269SS/269T limit written in rupees, one definition per golden); `../PROVENANCE.md` records those
 regenerations, and the re-pin below is recorded here.
+
+### Re-pin for bridge#802, bridge#803 and the s.194A bounds (2026-10-05)
+
+Between `b0a4f91a` and `da9e2d3d` the reference's `loans_interest.py` changed in three places, each ported
+here (`src/loans_interest.rs`):
+
+- bridge#803 (its `0a2ded0a`): a voucher whose other lines are only TDS ledgers and other configured loans is
+  a TDS journal only when no other loan is on the opposite side; a transfer between two loans carrying TDS
+  is a row on each loan.
+- bridge#802, in its closing form (its `38846495`): the walk marks each row with whether a principal
+  repayment on or after the first interest credited to the loan came before it. A loan taken so marked that
+  reaches the s.269SS/269T limit on the breach balance (principal plus interest credited and not yet paid)
+  but not on the walked principal is listed as not computed (`not_computed/interest_first_...`), outside
+  the reportable totals and the flag count, with a possible s.269SS where the upper bound would flag it.
+- The s.194A threshold (its `6c2d6be2`): read on per-line bounds of the listed interest, from the total
+  with every listed reversal line to the total with every listed credit line, so a listed pair netting to
+  nil still leaves the threshold open; mixed lines get their own wording.
+
+Between them the reference also made and reverted a certain-shortfall gate (`5e8462f5`, `f3e4adce`,
+reverted by `7c3e2fae`) and a net-amount reading of the other loan (`5bcc397e`, reverted by `60be2e2a`);
+neither is ported, as neither is in `da9e2d3d`.
+
+- Seven goldens change in two count definitions only (`clause31_not_computed_row_count`,
+  `s269ss_269t_possible_not_computed_count`): `phase_a`, `phase_a_refund_no_rate`, `phase_a_s194a`,
+  `phase_a_unbalanced`, `phase_a_unknown_deductor`, `questions` and `walks`. No other golden, and no figure
+  value or finding in any existing golden, changes; `synthetic.loans_interest.json` regenerates
+  byte-identical.
+- `edge-books/loans_interest_interest_first.json` (a firm; bridge#802) reaches: a loan taken in cash after
+  interest was credited and the principal repaid, under the limit on the principal walk and over it on the
+  breach balance (listed, a possible s.269SS); the same with interest and repayment on one day (listed:
+  on or after the first interest); and controls that are not listed: no interest ledger, interest credited
+  only after the repayment, an interest reversal before any interest is credited, and the principal alone
+  over the limit (computed as before). The First shape taken by bank is listed but not a possible s.269SS.
+- `edge-books/loans_interest_loan_transfer_tds.json` (a firm; bridge#803): a journal moving one loan to
+  another lender's loan with TDS on it is a repayment of one and a loan taken on the other, both flagged in
+  journal mode; a TDS journal on one loan stays neither taken nor repaid.
+- `edge-books/loans_interest_s194a_bounds.json` (a firm with no TDS; s.194A threshold Rs 10,000): a listed
+  pair crediting and reversing one amount, on two vouchers or on one voucher beside a non-interest line,
+  leaves the threshold open where the net reading did not; the least exactly at the threshold is not over
+  it; listed lines all credits keep the earlier wording; over the threshold in every reading, the s.194A
+  finding stays. LOAN-2 fires on each listed voucher carrying interest, as in the Phase A books (the
+  reference's own check, unchanged).
+- Produced at `da9e2d3d` (5 Oct 2026) from an archive of its `tae/` and `selftest/` only, by the
+  invocations below. Each of the three new books also regenerates at `b0a4f91a`'s content (the reference's
+  `a50bf6d0`, the same `loans_interest.py`) to a different golden, so each reaches a changed behaviour.
 
 ### Re-pin at #779 Phase A (Lane E3, 2026-09-28)
 
@@ -149,7 +194,7 @@ and regenerating all seven goldens there gives byte-identical files.
 | `edge.loans_interest_individual_at.loans_interest.json` | 15,815 | `d9cacbf44985888197ec43e933844c349afb6f9de5c09c9c89c6fbf0487c89d5` | `golden/edge.loans_interest_individual_at.loans_interest.json` |
 | `edge.loans_interest_individual_over.loans_interest.json` | 14,577 | `d42bdc09a333cdd70ce8fee54ad376a93a882fb1d174869c91c5bb6b26e4dbf6` | `golden/edge.loans_interest_individual_over.loans_interest.json` |
 | `edge.loans_interest_invariants.loans_interest.json` | 33,404 | `259634170b9077c57cd72bb6f8ca53a2a66d0296fff3ec5003cdc4d28c10efea` | `golden/edge.loans_interest_invariants.loans_interest.json` |
-| `edge.loans_interest_questions.loans_interest.json` | 135,303 | `73c4dcc319d6dffe006f35f0acfc2df0ef66dfdff06b5552c573a8c1df5fd288` | `golden/edge.loans_interest_questions.loans_interest.json` |
+| `edge.loans_interest_questions.loans_interest.json` | 135,486 | `e7d49f9c089658ee3f6e1d327261ba0629658521f002b64177b8996f4f361419` | `golden/edge.loans_interest_questions.loans_interest.json` |
 | `edge.loans_interest_shared.loans_interest.json` | 15,641 | `347dfb628fcc4de2023776d0f8033d3c4a6b91a0cc8d1f7ff49c7421137d888e` | `golden/edge.loans_interest_shared.loans_interest.json` |
 | `edge.loans_interest_shared_reversals.loans_interest.json` | 16,630 | `80ed225dc149bb0a861a6679b1bbe2c015f4bb90e65155b5dcb81dee481e378b` | `golden/edge.loans_interest_shared_reversals.loans_interest.json` |
 | `edge.loans_interest_tds_coverage.loans_interest.json` | 68,199 | `ab8f851a6e7616c81c95c8f35f301a0a825dc390ec6561e96666ac8d30f796fe` | `golden/edge.loans_interest_tds_coverage.loans_interest.json` |
@@ -157,12 +202,18 @@ and regenerating all seven goldens there gives byte-identical files.
 | `loans_interest_phase_a.json` | 11,102 | `8a26c7645ec4b0deb6081d96e3c028cf53d019f78e3586d61d3a257aceb914f8` | `edge-books/loans_interest_phase_a.json` |
 | `loans_interest_phase_a_s194a.json` | 10,335 | `2cfd9fb1ad4f59aee46cbc4f3e729b0915f21281a225ef0c3e68e690c8a66134` | `edge-books/loans_interest_phase_a_s194a.json` |
 | `loans_interest_phase_a_unbalanced.json` | 1,838 | `e46eb5bfd5bac1cc5bd68f0ae1b37608b8ec9ac66ee0256a840531ec4157fc47` | `edge-books/loans_interest_phase_a_unbalanced.json` |
-| `edge.loans_interest_phase_a.loans_interest.json` | 122,580 | `448ab03a5941d40c20ca0ed35cc6f51217e2749ed1fff3059350e86c099bbac7` | `golden/edge.loans_interest_phase_a.loans_interest.json` |
-| `edge.loans_interest_phase_a_s194a.loans_interest.json` | 94,901 | `550b1762e50b4cbc845ce059bc5bc64d47d29cfd11900b0c69ca286926fad899` | `golden/edge.loans_interest_phase_a_s194a.loans_interest.json` |
-| `edge.loans_interest_phase_a_unbalanced.loans_interest.json` | 19,364 | `e1cf5683e1699b9a75e6739830098be32b262008f5fd21a9beeb55c6163e713f` | `golden/edge.loans_interest_phase_a_unbalanced.loans_interest.json` |
+| `edge.loans_interest_phase_a.loans_interest.json` | 122,763 | `af646fe37cc7b402dd156a132f60d62be79ce24657de35c298d499ece3039965` | `golden/edge.loans_interest_phase_a.loans_interest.json` |
+| `edge.loans_interest_phase_a_s194a.loans_interest.json` | 94,994 | `10e7576a6a86ff8bf2dce072dd84c06835efbc00ce71860dd4c12a1b8438fcad` | `golden/edge.loans_interest_phase_a_s194a.loans_interest.json` |
+| `edge.loans_interest_phase_a_unbalanced.loans_interest.json` | 19,454 | `95e219d47d5f3b5e179df42b67ebad2d0b672694082c8d16bc12158887ce121f` | `golden/edge.loans_interest_phase_a_unbalanced.loans_interest.json` |
 | `loans_interest_phase_a_refund_no_rate.json` | 5,820 | `f6ae1a827dfa5ab45a4e37408229376fe2351485f067b5f5d23b713459277c0d` | `edge-books/loans_interest_phase_a_refund_no_rate.json` |
 | `loans_interest_phase_a_unknown_deductor.json` | 4,533 | `1a7b049ac2b7b66a1c1b6309a78b06b26054cf95642f8a99241ef7107f0f259e` | `edge-books/loans_interest_phase_a_unknown_deductor.json` |
-| `edge.loans_interest_phase_a_refund_no_rate.loans_interest.json` | 48,173 | `6e1a3b6392aeaa2687e46268642def4771a24876e466e990d3fc4e4cfdcca597` | `golden/edge.loans_interest_phase_a_refund_no_rate.loans_interest.json` |
-| `edge.loans_interest_phase_a_unknown_deductor.loans_interest.json` | 36,192 | `f92b22ffc06e683003a71dcd9f81936e2a2e37860c1c87993fad6988244fd8ed` | `golden/edge.loans_interest_phase_a_unknown_deductor.loans_interest.json` |
+| `edge.loans_interest_phase_a_refund_no_rate.loans_interest.json` | 48,356 | `403314ed1937efdf6c10416a9ed2a68446004f44152c6445d661818f207ac075` | `golden/edge.loans_interest_phase_a_refund_no_rate.loans_interest.json` |
+| `edge.loans_interest_phase_a_unknown_deductor.loans_interest.json` | 36,285 | `51fca9cb6a607ddeab0ee44a277a016a694956047190b32df685892764ae6a3b` | `golden/edge.loans_interest_phase_a_unknown_deductor.loans_interest.json` |
 | `loans_interest_walks.json` | 3,973 | `977ea16a4d85add2e98a814a792b94072bcac30d02a612fe1335b5806e7f3a58` | `edge-books/loans_interest_walks.json` |
-| `edge.loans_interest_walks.loans_interest.json` | 23,227 | `3cc13695e0db312245ca90cc41b91ee813061dcfc57cb46560aa4328a7130e0c` | `golden/edge.loans_interest_walks.loans_interest.json` |
+| `edge.loans_interest_walks.loans_interest.json` | 23,320 | `e659af2833275c8c0dde461c77c3a8e9d552fabe4cbdeff7b7e9b6310b16a120` | `golden/edge.loans_interest_walks.loans_interest.json` |
+| `loans_interest_interest_first.json` | 9,807 | `f1a4dcbb5f31854bf4cc4f0b0c1a12adafbb019ae5a9a5ec147d59bb28a43195` | `edge-books/loans_interest_interest_first.json` |
+| `edge.loans_interest_interest_first.loans_interest.json` | 75,624 | `50b5a48fbc99252429ac5a6b1d7771732228c3e9420418812caa398c77c28f7b` | `golden/edge.loans_interest_interest_first.loans_interest.json` |
+| `loans_interest_loan_transfer_tds.json` | 3,050 | `5ce7a271ad8a227b88252e8e17304276ac7c0832e2db691ccd2e9aa91e55294c` | `edge-books/loans_interest_loan_transfer_tds.json` |
+| `edge.loans_interest_loan_transfer_tds.loans_interest.json` | 27,128 | `c88d8c96d5e84d7f1a96bd53ee76ad519b627e863d5ef04d0560c0c514337206` | `golden/edge.loans_interest_loan_transfer_tds.loans_interest.json` |
+| `loans_interest_s194a_bounds.json` | 7,995 | `82fdd737fb17d19ba7255a977ba2044610d9e09d790d4301e97ab260b3561bb7` | `edge-books/loans_interest_s194a_bounds.json` |
+| `edge.loans_interest_s194a_bounds.loans_interest.json` | 93,133 | `3929b7dc283b3c01639222cc773118dfc33f361640479f8f531ccaea50126ff9` | `golden/edge.loans_interest_s194a_bounds.loans_interest.json` |

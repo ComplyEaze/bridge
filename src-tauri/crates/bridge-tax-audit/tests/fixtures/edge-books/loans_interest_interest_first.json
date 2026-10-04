@@ -1,5 +1,5 @@
 {
- "comment": "loans_interest, bridge#802, a firm: a loan taken in cash after a repayment made once interest was credited, under the limit on the walked principal and over it on principal plus the interest not yet paid, is listed as not computed (First Loan; Same Loan, interest and repayment on one day). Controls: no interest (Plain Loan), interest credited only after the repayment (Late Loan), the principal alone over the limit (Over Loan), and the First shape taken by bank (Bank Loan, listed but not a possible s.269SS).",
+ "comment": "loans_interest, bridge#802, a firm: a loan taken in cash after a repayment made once interest was credited, under the limit on the walked principal and over it on principal plus the interest not yet paid, is listed as not computed (First Loan; Same Loan, interest and repayment on one day). Controls: no interest (Plain Loan), interest credited only after the repayment (Late Loan), the principal alone over the limit (Over Loan), and the First shape taken by bank (Bank Loan, listed but not a possible s.269SS), and an interest reversal before any interest is credited, which does not count as interest credited (Reversed Loan).",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -109,6 +109,21 @@
     "Indirect Expenses"
    ],
    "guid": "edge-loans_interest_interest_first-012"
+  },
+  {
+   "name": "Reversed Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-013"
+  },
+  {
+   "name": "Interest Reversed",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_interest_first-014"
   }
  ],
  "tb": [
@@ -116,8 +131,8 @@
    "ledger": "Bank A",
    "opening": 0,
    "debit": 1600000,
-   "credit": 16000000,
-   "closing": -14400000
+   "credit": 19000000,
+   "closing": -17400000
   },
   {
    "ledger": "Bank Loan",
@@ -129,9 +144,9 @@
   {
    "ledger": "Cash",
    "opening": 0,
-   "debit": 8000000,
+   "debit": 9600000,
    "credit": 0,
-   "closing": 8000000
+   "closing": 9600000
   },
   {
    "ledger": "First Loan",
@@ -169,6 +184,13 @@
    "closing": 500000
   },
   {
+   "ledger": "Interest Reversed",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 100000,
+   "closing": 400000
+  },
+  {
    "ledger": "Interest Same",
    "opening": 0,
    "debit": 500000,
@@ -195,6 +217,13 @@
    "debit": 3000000,
    "credit": 1600000,
    "closing": -1600000
+  },
+  {
+   "ledger": "Reversed Loan",
+   "opening": -3000000,
+   "debit": 3100000,
+   "credit": 2100000,
+   "closing": -2000000
   },
   {
    "ledger": "Same Loan",
@@ -459,6 +488,66 @@
      -1600000
     ]
    ]
+  },
+  {
+   "guid": "r01",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Reversed Loan",
+     100000
+    ],
+    [
+     "Interest Reversed",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "r02",
+   "date": "2025-06-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Reversed Loan",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "r03",
+   "date": "2025-07-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Reversed",
+     500000
+    ],
+    [
+     "Reversed Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "r04",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1600000
+    ],
+    [
+     "Reversed Loan",
+     -1600000
+    ]
+   ]
   }
  ],
  "tests": [
@@ -500,6 +589,11 @@
    "lender": "Invented Bank Lender",
    "lender_type": "person",
    "interest_ledger": "Interest Bank"
+  },
+  "Reversed Loan": {
+   "lender": "Invented Reversed Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Reversed"
   }
  }
 }

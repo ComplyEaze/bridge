@@ -8302,5 +8302,93 @@
   "file": "src/counter_cheques_40a3.rs",
   "from": "refs.into_iter()",
   "to": "refs.into_iter().filter({ let mut seen = BTreeSet::new(); move |(g, _)| seen.insert(*g) })"
+ },
+ {
+  "id": "LR-67",
+  "by": "author",
+  "what": "a transfer between two loans carrying TDS is read as a TDS journal again (bridge#803)",
+  "file": "src/loans_interest.rs",
+  "from": "            && !opposite_loan\n",
+  "to": "\n"
+ },
+ {
+  "id": "LR-68",
+  "by": "author",
+  "what": "another loan on the same side, not the opposite one, makes a transfer",
+  "file": "src/loans_interest.rs",
+  "from": "&& i128::from(l.amount_paise).signum() * loan_amt.signum() < 0",
+  "to": "&& i128::from(l.amount_paise).signum() * loan_amt.signum() > 0"
+ },
+ {
+  "id": "LR-69",
+  "by": "author",
+  "what": "the first interest date counts interest reversals too",
+  "file": "src/loans_interest.rs",
+  "from": ".filter(|row| row.4 && row.3 == \"taken\")",
+  "to": ".filter(|row| row.4)"
+ },
+ {
+  "id": "LR-70",
+  "by": "author",
+  "what": "a repayment on the day of the first interest does not count as made once interest was credited",
+  "file": "src/loans_interest.rs",
+  "from": "first_interest.is_some_and(|d| pop[at].date >= *d)",
+  "to": "first_interest.is_some_and(|d| pop[at].date > *d)"
+ },
+ {
+  "id": "LR-71",
+  "by": "author",
+  "what": "a repayment made once interest was credited is never recorded (bridge#802 never fires)",
+  "file": "src/loans_interest.rs",
+  "from": "repaid_since_interest = true;",
+  "to": "repaid_since_interest = false;"
+ },
+ {
+  "id": "LR-72",
+  "by": "author",
+  "what": "a taken row the principal alone makes reportable is also listed as interest-first",
+  "file": "src/loans_interest.rs",
+  "from": "if verdict_b.0 && !verdict_p.0 {",
+  "to": "if verdict_b.0 {"
+ },
+ {
+  "id": "LR-73",
+  "by": "author",
+  "what": "an interest-first loan taken in cash is not counted as a possible s.269SS",
+  "file": "src/loans_interest.rs",
+  "from": "n.possible_count += usize::from(verdict_b.1);",
+  "to": "n.possible_count += 0;"
+ },
+ {
+  "id": "LR-74",
+  "by": "author",
+  "what": "the least interest leaves out the listed reversal lines (the old net reading)",
+  "file": "src/loans_interest.rs",
+  "from": ".filter(|x| **x < 0)",
+  "to": ".filter(|_| false)"
+ },
+ {
+  "id": "LR-75",
+  "by": "author",
+  "what": "the most interest leaves out the listed credit lines",
+  "file": "src/loans_interest.rs",
+  "from": ".filter(|x| **x > 0)",
+  "to": ".filter(|_| false)"
+ },
+ {
+  "id": "LR-76",
+  "by": "author",
+  "what": "the least interest at the threshold counts as over it",
+  "file": "src/loans_interest.rs",
+  "from": "(interest_least > threshold_194a) != (interest_most > threshold_194a)",
+  "to": "(interest_least >= threshold_194a) != (interest_most > threshold_194a)"
+ },
+ {
+  "id": "LR-77",
+  "by": "author",
+  "what": "listed lines all credits get the mixed-lines wording",
+  "file": "src/loans_interest.rs",
+  "from": "if interest_least == interest_total {",
+  "to": "if interest_least != interest_total {"
  }
 ]

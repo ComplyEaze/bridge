@@ -4225,8 +4225,14 @@ fn assert_reported_not_created(posted: &Value) {
         result["counts"]["tally_reported_not_created"], 1,
         "{posted}"
     );
-    // Tally created nothing, so the post is not bound to its span.
+    // Tally created nothing, so the post is not bound to its span, and its
+    // first line names Tally's answer as the cause (#1108).
     assert_eq!(result["post_span_binding"]["state"], "refused", "{posted}");
+    assert_eq!(
+        result["post_span_binding"]["summary"],
+        "Tally reported that this post created none of its vouchers: follow each voucher's next step.",
+        "{posted}"
+    );
     let voucher = &result["vouchers"][0];
     assert_eq!(voucher["status"], "tally_reported_not_created", "{posted}");
     let next_step = voucher["next_step"].as_str().expect("a next step");
@@ -4612,6 +4618,11 @@ async fn a_batch_tally_rejected_whole_reads_as_not_created_by_tally() {
         result["counts"]["tally_reported_not_created"], 3,
         "{posted}"
     );
+    assert_eq!(
+        result["post_span_binding"]["summary"],
+        "Tally reported that this post created none of its vouchers: follow each voucher's next step.",
+        "{posted}"
+    );
     let vouchers = result["vouchers"].as_array().expect("the vouchers");
     assert_eq!(vouchers.len(), 3, "{posted}");
     for voucher in vouchers {
@@ -4636,6 +4647,11 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
     assert_eq!(
         result["counts"].get("tally_reported_not_created"),
         None,
+        "{posted}"
+    );
+    assert_ne!(
+        result["post_span_binding"]["summary"],
+        "Tally reported that this post created none of its vouchers: follow each voucher's next step.",
         "{posted}"
     );
 }

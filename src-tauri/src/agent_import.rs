@@ -434,7 +434,7 @@ impl super::WindowRow for ReadVoucher {
 
 /// The report of how a native post was attributed, with one plain line a
 /// person reads first. The codes stay beside it for the assistant.
-fn with_post_span_summary(mut report: Value) -> Value {
+fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     let summary = match report["state"].as_str() {
         Some("bound") => "Each voucher was matched to the Tally voucher this post created.",
         Some("refused") => "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.",
@@ -448,6 +448,21 @@ fn with_post_span_summary(mut report: Value) -> Value {
         Some("not_bound") => "ComplyEaze Bridge has no readable answer from Tally to this post, so it cannot confirm it: check the vouchers in Tally and do not post them again.",
         Some("book_rolled_back") => "The company's books are older than this post (probably restored from a backup or replaced by another copy), so its vouchers are no longer there: check in Tally before posting again.",
         _ => return report,
+    };
+    // When Tally's own answer reported every voucher of this post as not
+    // created (#1116, #1126), the first line names that cause and agrees with
+    // the vouchers' next step, rather than leaving the cause open (#1108). A
+    // batch that is partly created never reads so, and keeps the line above.
+    let reported_not_created = vouchers.as_array().is_some_and(|vouchers| {
+        !vouchers.is_empty()
+            && vouchers
+                .iter()
+                .all(|voucher| voucher["status"] == "tally_reported_not_created")
+    });
+    let summary = if reported_not_created {
+        "Tally reported that this post created none of its vouchers: follow each voucher's next step."
+    } else {
+        summary
     };
     report["summary"] = json!(summary);
     report
@@ -1361,7 +1376,7 @@ impl Server {
                     &observed.rows,
                 ),
                 "counts": result["counts"], "vouchers": result["vouchers"], "duplicates": result["duplicates"],
-                "post_span_binding": with_post_span_summary(span.report),
+                "post_span_binding": with_post_span_summary(span.report, &result["vouchers"]),
                 "unrelated_duplicates_in_window": result["unrelated_duplicates_in_window"],
                 "evidence": {"mode_opening": opening_mode.evidence, "mode_closing": closing_mode_evidence, "company": identity_evidence, "voucher_read": observed_evidence, "voucher_read_corroboration": corroboration_evidence, "voucher_read_sha256": voucher_read_sha256}
             });

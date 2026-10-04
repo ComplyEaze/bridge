@@ -6258,10 +6258,10 @@
  {
   "id": "E4-88",
   "by": "author",
-  "what": "PWM-2 nets the cash and bank lines",
+  "what": "PWM-2 nets the cash and bank lines instead of reading each one",
   "file": "src/party_monthly.rs",
   "from": "                .filter(|l| money.contains(l.ledger.as_str()))\n                .any(|l| i128::from(l.amount_paise.signum()) * raw.signum() > 0);",
-  "to": "                .map(|l| i128::from(l.amount_paise))\n                .sum::<i128>()\n                .signum()\n                * raw.signum()\n                > 0;"
+  "to": "                .filter(|l| money.contains(l.ledger.as_str()))\n                .map(|l| i128::from(l.amount_paise))\n                .sum::<i128>()\n                .signum()\n                * raw.signum()\n                > 0;"
  },
  {
   "id": "E4-89",
@@ -6358,6 +6358,54 @@
   "file": "src/lib.rs",
   "from": "party_monthly::check_invariants(book, &bound.period, &result, &cash, &bank)?",
   "to": "party_monthly::check_invariants(book, &bound.period, &result, &bank, &bank)?"
+ },
+ {
+  "id": "E4-101",
+  "by": "author",
+  "what": "the money reason is given with no party on the voucher",
+  "file": "src/party_monthly.rs",
+  "from": "} else if expense && !named.is_empty() && money_on_side {",
+  "to": "} else if expense && money_on_side {"
+ },
+ {
+  "id": "E4-102",
+  "by": "author",
+  "what": "block lines netting to nil are not attributed with no party on the voucher",
+  "file": "src/party_monthly.rs",
+  "from": "let reason = if !on_voucher.is_empty() && block_net == 0 {",
+  "to": "let reason = if block_net == 0 {"
+ },
+ {
+  "id": "E4-103",
+  "by": "author",
+  "what": "PWM-2 gives an invoice-class voucher a not-attributed reason",
+  "file": "src/party_monthly.rs",
+  "from": "let reason = if invoice || present.is_empty() {",
+  "to": "let reason = if present.is_empty() {"
+ },
+ {
+  "id": "E4-104",
+  "by": "author",
+  "what": "PWM-2 never gives the other-side reason",
+  "file": "src/party_monthly.rs",
+  "from": "} else if named.is_empty() {\n                Some(\"other_side\")",
+  "to": "} else if false {\n                Some(\"other_side\")"
+ },
+ {
+  "id": "E4-105",
+  "by": "author",
+  "what": "PWM-2 gives a cash-or-bank row to every block",
+  "file": "src/party_monthly.rs",
+  "from": "if matches!(block, \"sales\" | \"purchases\")",
+  "to": "if true"
+ },
+ {
+  "id": "E4-106",
+  "by": "author",
+  "what": "the money reason's scope is indirect expenses only",
+  "file": "src/party_monthly.rs",
+  "from": "let expense = block == \"direct_expenses\" || block == \"indirect_expenses\";",
+  "to": "let expense = block == \"indirect_expenses\";"
  },
  {
   "id": "TR-01",

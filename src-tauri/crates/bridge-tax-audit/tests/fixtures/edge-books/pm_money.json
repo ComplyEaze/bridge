@@ -1,5 +1,5 @@
 {
- "comment": "party_monthly's money reason (owner ruling 7b, as the reference applies it at da9e2d3d), every voucher in the books and the Trial Balance tying in every block. Indirect expenses: a supplier paid in cash with rent credited on the cash's side (a credit line read by its side); a receipt net of bank charges from two customers (several parties); a receipt net of charges that also pays a supplier, so the bank nets to the other side but one bank line is on the charges' side (gross, not net); a round-off on a receipt (a stated limit); a round-off on a cash sales invoice, the customer's though cash is on its side (invoice-class); rent with the bank on the supplier's side, the supplier's; rent reversed to a supplier beside a nil bank line, the supplier's (a nil line is on neither side). Sales and purchases: a journal sale beside a cash line on the sales' side, and a payment with purchases credited beside the bank, each the party's (the money reason is for the expense blocks only). Direct expenses: three receipts net of collection charges, two identical (one GUID, number, date and lines) and one with no GUID, each counted and cited, and a supplier paid with freight on its side and no GUID (not on the other side, with the expense example).",
+ "comment": "party_monthly's money reason (owner ruling 7b, as the reference applies it at da9e2d3d), every voucher in the books and the Trial Balance tying in every block. Indirect expenses: a supplier paid in cash with rent credited on the cash's side (a credit line read by its side); a receipt net of bank charges from two customers (several parties); a receipt net of charges that also pays a supplier, so the bank nets to the other side but one bank line is on the charges' side (gross, not net); a round-off on a receipt (a stated limit); a round-off on a cash sales invoice, the customer's though cash is on its side (invoice-class); rent with the bank on the supplier's side, the supplier's; rent reversed to a supplier beside a nil bank line, the supplier's (a nil line is on neither side); bank charges on a contra with the bank on their side and no party ledger, and a journal moving rent to bank charges (lines netting to nil) with no party ledger, each No party (no party ledger, so no not-attributed reason). Sales and purchases: a journal sale beside a cash line on the sales' side, and a payment with purchases credited beside the bank, each the party's (the money reason is for the expense blocks only). Direct expenses: three receipts net of collection charges, two identical (one GUID, number, date and lines) and one with no GUID, each counted and cited, and a supplier paid with freight on its side and no GUID (not on the other side, with the expense example).",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -107,23 +107,23 @@
   {
    "ledger": "Bank",
    "opening": 0,
-   "debit": 2376960,
+   "debit": 3366960,
    "credit": 1960000,
-   "closing": 416960
+   "closing": 1406960
   },
   {
    "ledger": "Bank Charges",
    "opening": 0,
-   "debit": 20000,
-   "credit": 0,
-   "closing": 20000
+   "debit": 30000,
+   "credit": 100000,
+   "closing": -70000
   },
   {
    "ledger": "Cash",
    "opening": 0,
    "debit": 50000,
-   "credit": 1000000,
-   "closing": -950000
+   "credit": 2000000,
+   "closing": -1950000
   },
   {
    "ledger": "Collection Charges",
@@ -163,9 +163,9 @@
   {
    "ledger": "Rent",
    "opening": 0,
-   "debit": 200000,
+   "debit": 300000,
    "credit": 110000,
-   "closing": 90000
+   "closing": 190000
   },
   {
    "ledger": "Round Off",
@@ -454,6 +454,40 @@
     [
      "Bank",
      0
+    ]
+   ]
+  },
+  {
+   "guid": "m14",
+   "date": "2026-01-10",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Bank",
+     990000
+    ],
+    [
+     "Bank Charges",
+     10000
+    ],
+    [
+     "Cash",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "m15",
+   "date": "2026-02-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Rent",
+     100000
+    ],
+    [
+     "Bank Charges",
+     -100000
     ]
    ]
   }

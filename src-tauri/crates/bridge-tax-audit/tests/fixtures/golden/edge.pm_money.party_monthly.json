@@ -190,6 +190,34 @@
       ]
     },
     {
+      "id": "party_monthly.indirect_expenses_jan_45f857c2",
+      "value": 10000,
+      "unit": "paise",
+      "definition_sha256_16": "2612716cd8191c8b",
+      "definition_text": "Indirect Expenses: amount dated in January for this row (debits less credits).",
+      "evidence": [
+        {
+          "kind": "row",
+          "id": "indirect_expenses:no_party",
+          "label": "No party"
+        }
+      ]
+    },
+    {
+      "id": "party_monthly.indirect_expenses_jan_f3dd4d07",
+      "value": 10000,
+      "unit": "paise",
+      "definition_sha256_16": "2612716cd8191c8b",
+      "definition_text": "Indirect Expenses: amount dated in January for this row (debits less credits).",
+      "evidence": [
+        {
+          "kind": "row",
+          "id": "indirect_expenses:total",
+          "label": "Total"
+        }
+      ]
+    },
+    {
       "id": "party_monthly.indirect_expenses_jul_6c8f7958",
       "value": 40,
       "unit": "paise",
@@ -347,7 +375,7 @@
     },
     {
       "id": "party_monthly.indirect_expenses_tb_movement",
-      "value": 110080,
+      "value": 120080,
       "unit": "paise",
       "definition_sha256_16": "7e539603dab797f5",
       "definition_text": "Indirect Expenses: the Trial Balance's period debits less credits on its ledgers (opening balances excluded).",
@@ -384,6 +412,20 @@
       ]
     },
     {
+      "id": "party_monthly.indirect_expenses_vouchers_45f857c2",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "2012e77139b808d6",
+      "definition_text": "Indirect Expenses: vouchers in this row, including any dated outside the period.",
+      "evidence": [
+        {
+          "kind": "row",
+          "id": "indirect_expenses:no_party",
+          "label": "No party"
+        }
+      ]
+    },
+    {
       "id": "party_monthly.indirect_expenses_vouchers_6c8f7958",
       "value": 4,
       "unit": "count",
@@ -399,7 +441,7 @@
     },
     {
       "id": "party_monthly.indirect_expenses_vouchers_f3dd4d07",
-      "value": 7,
+      "value": 9,
       "unit": "count",
       "definition_sha256_16": "2012e77139b808d6",
       "definition_text": "Indirect Expenses: vouchers in this row, including any dated outside the period.",
@@ -440,6 +482,20 @@
       ]
     },
     {
+      "id": "party_monthly.indirect_expenses_year_45f857c2",
+      "value": 10000,
+      "unit": "paise",
+      "definition_sha256_16": "7b0935da16718ef0",
+      "definition_text": "Indirect Expenses: amount dated inside the period for this row (debits less credits).",
+      "evidence": [
+        {
+          "kind": "row",
+          "id": "indirect_expenses:no_party",
+          "label": "No party"
+        }
+      ]
+    },
+    {
       "id": "party_monthly.indirect_expenses_year_6c8f7958",
       "value": -79960,
       "unit": "paise",
@@ -455,7 +511,7 @@
     },
     {
       "id": "party_monthly.indirect_expenses_year_f3dd4d07",
-      "value": 110080,
+      "value": 120080,
       "unit": "paise",
       "definition_sha256_16": "7b0935da16718ef0",
       "definition_text": "Indirect Expenses: amount dated inside the period for this row (debits less credits).",

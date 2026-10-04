@@ -1638,6 +1638,7 @@ async fn a_path_that_is_not_on_a_local_disk_is_refused_before_any_open() {
 /// and latest dates are neither the first nor the last row printed), built
 /// without a PDF, optionally through a from/to window.
 fn windowed_parse(
+    bank_ledger: &str,
     date_from: Option<Date>,
     date_to: Option<Date>,
 ) -> (OwnedRequest, ParsedStatement) {
@@ -1668,7 +1669,7 @@ fn windowed_parse(
         "closing_balance": "970.00",
         "total_debits": "30.00",
         "total_credits": "0.00",
-        "bank_ledger": "Synthetic Bank Ledger",
+        "bank_ledger": bank_ledger,
         "suspense_ledger": "Suspense"
     });
     let request = OwnedRequest::from_args(&args).unwrap();
@@ -1677,7 +1678,7 @@ fn windowed_parse(
         Bank::Hdfc,
         &Mapping::default(),
         &BuildOptions {
-            bank_ledger: "Synthetic Bank Ledger",
+            bank_ledger,
             suspense_ledger: "Suspense",
             account_label: "Synthetic CA xx4321",
             account_number: "00000000004321",
@@ -1692,11 +1693,22 @@ fn windowed_parse(
         statement_rows: rows.len(),
         closing: bridge_tally_core::ExactDecimal::parse("970.00").unwrap(),
         totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
-        check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+        check: selfcheck(&build, bank_ledger).unwrap(),
         counterparties: group_counterparties(&build.records).unwrap(),
         build,
     };
     (request, parsed)
+}
+
+/// The id and digest of a proposals file written by `persist`, the code
+/// `parse_bank_statement` runs after a parse, from the synthetic statement
+/// above, in `data_dir`. For a test of another tool that reads the file.
+pub(in crate::agent) fn persisted_synthetic_statement(
+    data_dir: &Path,
+    bank_ledger: &str,
+) -> (String, String) {
+    let (request, parsed) = windowed_parse(bank_ledger, None, None);
+    persist(data_dir, &request, &parsed, &"0".repeat(64)).unwrap()
 }
 
 fn persisted_document(request: &OwnedRequest, parsed: &ParsedStatement) -> Value {
@@ -1711,7 +1723,7 @@ fn persisted_document(request: &OwnedRequest, parsed: &ParsedStatement) -> Value
 
 #[test]
 fn the_file_records_the_statements_own_span_and_whether_the_window_was_all_of_it() {
-    let (request, parsed) = windowed_parse(None, None);
+    let (request, parsed) = windowed_parse("Synthetic Bank Ledger", None, None);
     let document = persisted_document(&request, &parsed);
     assert_eq!(
         document["window"],
@@ -1724,7 +1736,7 @@ fn the_file_records_the_statements_own_span_and_whether_the_window_was_all_of_it
 
     // A window that drops a row: the span is still the statement's own, and
     // the window is no longer the whole of it.
-    let (request, parsed) = windowed_parse(Date::new(2026, 8, 2), None);
+    let (request, parsed) = windowed_parse("Synthetic Bank Ledger", Date::new(2026, 8, 2), None);
     let document = persisted_document(&request, &parsed);
     assert_eq!(
         document["window"],
@@ -1734,7 +1746,7 @@ fn the_file_records_the_statements_own_span_and_whether_the_window_was_all_of_it
 
 #[test]
 fn a_build_with_no_span_writes_no_window_field() {
-    let (request, mut parsed) = windowed_parse(None, None);
+    let (request, mut parsed) = windowed_parse("Synthetic Bank Ledger", None, None);
     parsed.build.span = None;
     let document = persisted_document(&request, &parsed);
     assert!(document.get("window").is_none(), "{document}");
@@ -1742,7 +1754,7 @@ fn a_build_with_no_span_writes_no_window_field() {
 
 #[test]
 fn the_window_never_reaches_the_summary() {
-    let (request, parsed) = windowed_parse(None, None);
+    let (request, parsed) = windowed_parse("Synthetic Bank Ledger", None, None);
     let summary = summary(&request, &parsed, "statement-x", "0", 200_000).to_string();
     for needle in [
         "\"window\"",

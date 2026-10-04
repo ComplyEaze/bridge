@@ -828,4 +828,4 @@ pub(super) fn resolve_import_arguments(
 
 #[cfg(test)]
 #[path = "agent_bank_statement_tests.rs"]
-mod tests;
+pub(super) mod tests;

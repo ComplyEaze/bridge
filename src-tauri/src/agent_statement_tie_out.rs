@@ -4,28 +4,31 @@
 //!
 //! Read-only. It writes nothing to Tally, never posts and never blocks a post.
 //! It reads the proposals file `parse_bank_statement` wrote and the book's
-//! ledger catalogue at three dates, and returns three gaps and the dates.
+//! ledger list at three dates, and returns three gaps, the dates and a fixed
+//! reading.
 //!
 //! **Whole statements only.** A statement narrowed with from/to would need the
 //! running balance at its edges, which the result of `parse_bank_statement`
 //! deliberately never carries. On a whole statement the two edge figures are
-//! the opening and closing balances the caller supplied, so a gap reveals
-//! nothing the caller did not already hold. A narrowed file is
+//! the opening and closing balances the caller supplied. A narrowed file is
 //! `not_established`.
 //!
-//! **No figure beyond the gaps and the dates is returned**: not the book's
-//! opening or closing, not the statement's.
+//! **What the result reveals.** The book's own opening and closing are not
+//! returned, but a gap plus the statement balance the caller supplied gives
+//! the book's balance, so they are derivable. The result also carries the
+//! company block, the stage and the reading.
+//!
+//! **The file is not bound to a company.** It names a bank ledger, not the
+//! company it was parsed for; the caller must pass the company the statement
+//! belongs to.
 //!
 //! **The sign is a type.** Tally holds a debit (asset) balance as a negative
 //! number; a statement prints money in the account as positive. [`BankSide`]
 //! is the statement's sign, and [`BankSide::from_book`] is the one place a
 //! Tally figure is converted into it.
-//!
-//! Reading text is fixed, built in one place ([`reading`]) and pinned by a test
-//! that compares the exact words. It names every gap that is not zero and every
-//! figure that is not established, and prescribes no remedy.
 use super::*;
 use bridge_bank_statement::date::Date;
+use bridge_bank_statement::proposals::format_amount;
 use bridge_tally_core::{ExactDecimal, TallyDate};
 
 /// Whether this file's own vouchers are counted into the closing figure.
@@ -63,7 +66,12 @@ enum NotEstablished {
     WindowPrecedesBooksFrom,
     BankLedgerNotInBook,
     BookChangedDuringRead,
-    OpeningBalanceNotObserved,
+    /// `before_build` only: a row of the statement has no voucher in the file,
+    /// so the file cannot say what the book would hold once it is imported.
+    RowsWithoutVoucher,
+    /// `before_build` only: the import journal already holds a row of this
+    /// file, so its vouchers may already be in the book.
+    FileAlreadyPartlyPosted,
 }
 
 impl NotEstablished {
@@ -74,7 +82,8 @@ impl NotEstablished {
             Self::WindowPrecedesBooksFrom => "window_precedes_books_from",
             Self::BankLedgerNotInBook => "bank_ledger_not_in_book",
             Self::BookChangedDuringRead => "book_changed_during_read",
-            Self::OpeningBalanceNotObserved => "opening_balance_not_observed",
+            Self::RowsWithoutVoucher => "rows_without_voucher",
+            Self::FileAlreadyPartlyPosted => "file_already_partly_posted",
         }
     }
 
@@ -85,66 +94,73 @@ impl NotEstablished {
             Self::WindowPrecedesBooksFrom => "the statement starts before the company's books begin",
             Self::BankLedgerNotInBook => "the file's bank ledger is not in the book under that exact name",
             Self::BookChangedDuringRead => "the bank ledger changed while it was being read; read again",
-            Self::OpeningBalanceNotObserved => "Tally returned no opening balance for the bank ledger at one of the dates",
+            Self::RowsWithoutVoucher => "some rows of the statement have no voucher in this file, so what the book would hold once it is imported is not known; use stage after_post once what is wanted is in the book",
+            Self::FileAlreadyPartlyPosted => "a row of this file has already been sent to Tally or found posted, so counting the file's vouchers again would count them twice; use stage after_post",
         }
     }
 }
 
 /// An amount in the statement's sign: positive is money in the bank account.
+/// Held in canonical form, so equal amounts are equal values.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct BankSide(ExactDecimal);
 
 impl BankSide {
+    fn canonical(value: ExactDecimal, code: &str) -> Result<Self, String> {
+        ExactDecimal::zero()
+            .checked_add(&value)
+            .map(Self)
+            .map_err(|_| code.to_string())
+    }
+
     /// A figure as the statement prints it, or an entry of the file read the
     /// same way (a debit to the bank ledger is money in).
     fn from_printed(text: &str) -> Result<Self, String> {
-        ExactDecimal::parse(text)
-            .map(Self)
-            .map_err(|_| "proposals_file_invalid".to_string())
+        let value = ExactDecimal::parse(text).map_err(|_| "proposals_file_invalid".to_string())?;
+        Self::canonical(value, "proposals_file_invalid")
     }
 
     /// The one conversion from Tally's sign, where a debit balance is negative.
     fn from_book(native: &str) -> Result<Self, String> {
-        let native =
-            ExactDecimal::parse(native).map_err(|_| "ledger_opening_invalid".to_string())?;
-        ExactDecimal::zero()
+        let invalid = || "ledger_opening_invalid".to_string();
+        let native = ExactDecimal::parse(native).map_err(|_| invalid())?;
+        let negated = ExactDecimal::zero()
             .checked_subtract(&native)
-            .map(Self)
-            .map_err(|_| "ledger_opening_invalid".to_string())
+            .map_err(|_| invalid())?;
+        Self::canonical(negated, "ledger_opening_invalid")
     }
 
     fn plus(&self, other: &Self) -> Result<Self, String> {
-        self.0
-            .checked_add(&other.0)
-            .map(Self)
-            .map_err(|_| "voucher_amount_invalid".to_string())
+        Self::canonical(
+            self.0.checked_add(&other.0).map_err(overflow)?,
+            "tie_out_arithmetic_out_of_range",
+        )
     }
 
     fn minus(&self, other: &Self) -> Result<Self, String> {
-        self.0
-            .checked_subtract(&other.0)
-            .map(Self)
-            .map_err(|_| "voucher_amount_invalid".to_string())
+        Self::canonical(
+            self.0.checked_subtract(&other.0).map_err(overflow)?,
+            "tie_out_arithmetic_out_of_range",
+        )
     }
 
     fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
 
-    /// Exact, at least two decimal places: no digit is rounded away, and a
-    /// zero never carries a sign.
+    /// Exact, at least two decimal places.
     fn text(&self) -> String {
-        if self.is_zero() {
-            return "0.00".to_string();
-        }
-        let raw = self.0.as_str();
-        let (whole, fraction) = raw.split_once('.').unwrap_or((raw, ""));
-        let mut fraction = fraction.trim_end_matches('0').to_string();
-        while fraction.len() < 2 {
-            fraction.push('0');
-        }
-        format!("{whole}.{fraction}")
+        format_amount(&self.0)
     }
+
+    /// The same without its sign.
+    fn magnitude_text(&self) -> String {
+        format_amount(&self.0.magnitude())
+    }
+}
+
+fn overflow(_: impl std::fmt::Debug) -> String {
+    "tie_out_arithmetic_out_of_range".to_string()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -177,11 +193,22 @@ impl Figure {
     }
 }
 
+/// The three figures. Built only by [`gaps`] and [`all_not_established`], so
+/// the figures that are not established share one reason.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Gaps {
     opening: Figure,
     closing: Figure,
     change: Figure,
+}
+
+fn all_not_established(reason: NotEstablished) -> Gaps {
+    let figure = Figure::NotEstablished(reason);
+    Gaps {
+        opening: figure.clone(),
+        closing: figure.clone(),
+        change: figure,
+    }
 }
 
 /// What the file says about the statement, read once.
@@ -195,25 +222,41 @@ struct StatementFile {
     window: Result<(Date, Date), NotEstablished>,
     /// What this file's vouchers add to the bank ledger.
     proposals_net: BankSide,
+    /// Rows of the statement with no voucher in the file: a cash line not yet
+    /// answered, or a row skipped because another account's Contra carries it.
+    rows_without_voucher: usize,
 }
 
 impl StatementFile {
     /// Every field is parsed here, once, and a file that cannot be read is
     /// `proposals_file_invalid`: an empty or unreadable figure is not zero.
     fn read(document: &Value) -> Result<Self, String> {
+        fn text(value: &Value) -> Result<&str, String> {
+            value
+                .as_str()
+                .ok_or_else(|| "proposals_file_invalid".to_string())
+        }
         let invalid = || "proposals_file_invalid".to_string();
-        let text = |value: &Value| value.as_str().map(str::to_string).ok_or_else(invalid);
-        let bank_ledger = text(&document["bank_ledger"])?;
-        let opening = BankSide::from_printed(&text(&document["controls"]["opening_balance"])?)?;
-        let closing = BankSide::from_printed(&text(&document["controls"]["closing_balance"])?)?;
-        let window = recorded_window(document)?;
+        let bank_ledger = text(&document["bank_ledger"])?.to_string();
         let proposals_net = proposals_net(document, &bank_ledger)?;
+        let rows_without_voucher = document["records"]
+            .as_array()
+            .ok_or_else(invalid)?
+            .iter()
+            .filter(|record| {
+                matches!(
+                    record["disposition"].as_str(),
+                    Some("needs_answer" | "skipped")
+                )
+            })
+            .count();
         Ok(Self {
+            opening: BankSide::from_printed(text(&document["controls"]["opening_balance"])?)?,
+            closing: BankSide::from_printed(text(&document["controls"]["closing_balance"])?)?,
+            window: recorded_window(document)?,
             bank_ledger,
-            opening,
-            closing,
-            window,
             proposals_net,
+            rows_without_voucher,
         })
     }
 }
@@ -274,24 +317,27 @@ fn proposals_net(document: &Value, bank_ledger: &str) -> Result<BankSide, String
     Ok(net)
 }
 
-/// The bank ledger as one catalogue read showed it.
+/// The bank ledger as one catalogue read showed it, in the statement's sign.
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum LedgerRead {
     Absent,
-    Present { opening: Option<String> },
+    Present(BankSide),
 }
 
 impl LedgerRead {
-    /// By exact name. A name that appears twice in one catalogue is not a
-    /// book this check can read.
+    /// By exact name. A name that appears twice in one catalogue is not a book
+    /// this check can read, and a row without an opening is not read as zero.
     fn of(ledgers: &[TallyLedger], name: &str) -> Result<Self, String> {
         let mut found = ledgers.iter().filter(|ledger| ledger.name == name);
         match (found.next(), found.next()) {
             (None, _) => Ok(Self::Absent),
-            (Some(ledger), None) => Ok(Self::Present {
-                opening: ledger.opening_balance.clone(),
-            }),
-            _ => Err("ledger_snapshot_drifted".to_string()),
+            (Some(ledger), None) => ledger
+                .opening_balance
+                .as_deref()
+                .ok_or_else(|| "ledger_opening_missing".to_string())
+                .and_then(BankSide::from_book)
+                .map(Self::Present),
+            _ => Err("ledger_name_duplicated_in_catalogue".to_string()),
         }
     }
 }
@@ -316,9 +362,15 @@ fn read_dates(first: Date, last: Date) -> Result<[TallyDate; 3], String> {
     Ok([first.clone(), after_last, first])
 }
 
-/// The three gaps from the three reads, or the reason none can be given.
-fn gaps(stage: Stage, file: &StatementFile, observed: &Observed) -> Result<Gaps, String> {
-    let (start, end, start_again) = match (
+/// The three gaps from the three reads. `partly_posted` is whether the import
+/// journal already holds a row of this file.
+fn gaps(
+    stage: Stage,
+    file: &StatementFile,
+    observed: &Observed,
+    partly_posted: bool,
+) -> Result<Gaps, String> {
+    let (start, end) = match (
         &observed.at_first,
         &observed.after_last,
         &observed.at_first_again,
@@ -326,64 +378,46 @@ fn gaps(stage: Stage, file: &StatementFile, observed: &Observed) -> Result<Gaps,
         (LedgerRead::Absent, LedgerRead::Absent, LedgerRead::Absent) => {
             return Ok(all_not_established(NotEstablished::BankLedgerNotInBook))
         }
-        (
-            LedgerRead::Present { opening: start },
-            LedgerRead::Present { opening: end },
-            LedgerRead::Present {
-                opening: start_again,
-            },
-        ) => (start, end, start_again),
-        // Present in one read and absent in another.
+        (LedgerRead::Present(start), LedgerRead::Present(end), LedgerRead::Present(again))
+            if start == again =>
+        {
+            (start, end)
+        }
+        // Present in one read and absent in another, or moved between the two
+        // reads at the first date.
         _ => return Ok(all_not_established(NotEstablished::BookChangedDuringRead)),
     };
-    if !same_opening(start.as_deref(), start_again.as_deref())? {
-        return Ok(all_not_established(NotEstablished::BookChangedDuringRead));
-    }
-    let not_observed = Figure::NotEstablished(NotEstablished::OpeningBalanceNotObserved);
-    let opening = match start {
-        None => not_observed.clone(),
-        Some(native) => Figure::Gap(BankSide::from_book(native)?.minus(&file.opening)?),
+    let opening = start.minus(&file.opening)?;
+    // The file's own vouchers are counted into the closing figure only when
+    // the file says what the book would hold, and only once.
+    let blocked = match stage {
+        Stage::AfterPost => None,
+        Stage::BeforeBuild if file.rows_without_voucher > 0 => {
+            Some(NotEstablished::RowsWithoutVoucher)
+        }
+        Stage::BeforeBuild if partly_posted => Some(NotEstablished::FileAlreadyPartlyPosted),
+        Stage::BeforeBuild => None,
     };
-    let closing = match end {
-        None => not_observed.clone(),
-        Some(native) => {
-            let book = BankSide::from_book(native)?;
+    let (closing, change) = match blocked {
+        Some(reason) => (
+            Figure::NotEstablished(reason),
+            Figure::NotEstablished(reason),
+        ),
+        None => {
             let book = match stage {
-                Stage::AfterPost => book,
-                Stage::BeforeBuild => book.plus(&file.proposals_net)?,
+                Stage::AfterPost => end.clone(),
+                Stage::BeforeBuild => end.plus(&file.proposals_net)?,
             };
-            Figure::Gap(book.minus(&file.closing)?)
+            let closing = book.minus(&file.closing)?;
+            let change = closing.minus(&opening)?;
+            (Figure::Gap(closing), Figure::Gap(change))
         }
     };
-    let change = match (&opening, &closing) {
-        (Figure::Gap(opening), Figure::Gap(closing)) => Figure::Gap(closing.minus(opening)?),
-        _ => not_observed,
-    };
     Ok(Gaps {
-        opening,
+        opening: Figure::Gap(opening),
         closing,
         change,
     })
-}
-
-fn all_not_established(reason: NotEstablished) -> Gaps {
-    Gaps {
-        opening: Figure::NotEstablished(reason),
-        closing: Figure::NotEstablished(reason),
-        change: Figure::NotEstablished(reason),
-    }
-}
-
-/// Whether two reads of one opening agree, by value: `-1500` and `-1500.00`
-/// are one figure. One read with a figure and one without do not agree.
-fn same_opening(left: Option<&str>, right: Option<&str>) -> Result<bool, String> {
-    let parse =
-        |text: &str| ExactDecimal::parse(text).map_err(|_| "ledger_opening_invalid".to_string());
-    match (left, right) {
-        (None, None) => Ok(true),
-        (Some(left), Some(right)) => Ok(parse(left)?.numeric_eq(&parse(right)?)),
-        _ => Ok(false),
-    }
 }
 
 const SIGN_SENTENCE: &str = "A positive amount means the book shows more money in the bank than the statement does; a negative amount, less.";
@@ -391,14 +425,10 @@ const POSSIBLE_CAUSES: &str = "Uncleared cheques and deposits in transit explain
 const SCOPE: &str =
     "This checks the bank ledger only. A wrong party or expense ledger is not caught here.";
 
-/// The fixed reading text. The headline comes first and names every gap that is
-/// not zero and every figure that is not established; nothing is prescribed.
+/// The fixed reading text. The headline comes first; it names every figure
+/// that is not established, then every gap that is not zero, and prescribes
+/// nothing.
 fn reading(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
-    let figures = [
-        ("opening gap", &gaps.opening),
-        ("closing gap", &gaps.closing),
-        ("change in window", &gaps.change),
-    ];
     let subject = match window {
         Some((first, last)) => format!(
             "Bank ledger against the statement, {} to {}",
@@ -407,32 +437,33 @@ fn reading(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
         ),
         None => "Bank ledger against the statement".to_string(),
     };
+    let figures = [
+        ("opening gap", &gaps.opening),
+        ("closing gap", &gaps.closing),
+        ("change in window", &gaps.change),
+    ];
     let mut parts = Vec::new();
+    // The figures that are not established share one reason.
+    let missing = figures
+        .iter()
+        .filter(|(_, figure)| figure.reason().is_some())
+        .collect::<Vec<_>>();
+    if let Some(reason) = missing.first().and_then(|(_, figure)| figure.reason()) {
+        let labels = missing.iter().map(|(label, _)| *label).collect::<Vec<_>>();
+        parts.push(format!(
+            "{} not established ({})",
+            join_and(&labels),
+            reason.explanation()
+        ));
+    }
     let mut differs = false;
-    for (label, figure) in figures {
+    for (label, figure) in &figures[..2] {
         if let Figure::Gap(gap) = figure {
             if !gap.is_zero() {
                 differs = true;
                 parts.push(format!("{label} {}", gap.text()));
             }
         }
-    }
-    // One clause per reason, in the order the figures first show it.
-    let mut unestablished: Vec<(NotEstablished, Vec<&str>)> = Vec::new();
-    for (label, figure) in figures {
-        if let Some(reason) = figure.reason() {
-            match unestablished.iter_mut().find(|(known, _)| *known == reason) {
-                Some((_, labels)) => labels.push(label),
-                None => unestablished.push((reason, vec![label])),
-            }
-        }
-    }
-    for (reason, labels) in &unestablished {
-        parts.push(format!(
-            "{} not established ({})",
-            join_and(labels),
-            reason.explanation()
-        ));
     }
     let mut headline = if parts.is_empty() {
         format!("{subject}: tied at the start and at the end.")
@@ -443,6 +474,21 @@ fn reading(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
         headline.push(' ');
         headline.push_str(SIGN_SENTENCE);
     }
+    let mut changed = false;
+    if let Figure::Gap(change) = &gaps.change {
+        if !change.is_zero() {
+            changed = true;
+            headline.push_str(&format!(
+                " Within these dates the book moved {} {} the statement did.",
+                change.magnitude_text(),
+                if change.0.is_negative() {
+                    "less than"
+                } else {
+                    "more than"
+                },
+            ));
+        }
+    }
     let mut text = json!({
         "headline": headline,
         "stage": match stage {
@@ -451,7 +497,7 @@ fn reading(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
         },
         "scope": SCOPE,
     });
-    if differs {
+    if differs || changed {
         text["possible_causes"] = json!(POSSIBLE_CAUSES);
     }
     text
@@ -466,7 +512,12 @@ fn join_and(labels: &[&str]) -> String {
     }
 }
 
-fn result_json(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
+fn result_json(
+    stage: Stage,
+    window: Option<(Date, Date)>,
+    rows_without_voucher: usize,
+    gaps: &Gaps,
+) -> Value {
     let figure = |figure: &Figure| {
         json!({
             "state": figure.state(),
@@ -481,27 +532,12 @@ fn result_json(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value
             "last_row_date": last.iso(),
         })),
         "gap_basis": "book_minus_statement_in_the_statements_sign",
+        "rows_without_voucher": rows_without_voucher,
         "opening_gap": figure(&gaps.opening),
         "closing_gap": figure(&gaps.closing),
         "change_in_window": figure(&gaps.change),
         "reading": reading(stage, window, gaps),
     })
-}
-
-/// The evidence of a result: complete only when every figure was established,
-/// otherwise partial with the first reason that was not.
-fn judged(evidence: Evidence, gaps: &Gaps) -> Evidence {
-    let reason = [&gaps.opening, &gaps.closing, &gaps.change]
-        .into_iter()
-        .find_map(Figure::reason);
-    match reason {
-        None => evidence,
-        Some(reason) => Evidence {
-            state: "partial",
-            reason_code: Some(reason.code().to_string()),
-            ..evidence
-        },
-    }
 }
 
 impl Server {
@@ -515,70 +551,67 @@ impl Server {
             args.get("proposals_sha256"),
         )?;
         let file = StatementFile::read(&document)?;
-        // A file whose window is not the whole statement is answered from the
-        // file alone: nothing is read from Tally to compare against.
-        let (first, last) = match file.window {
-            Ok(window) => window,
-            Err(reason) => {
-                let gaps = all_not_established(reason);
-                let payload = json!({"result": result_json(stage, None, &gaps)});
-                let evidence = Evidence {
-                    request_sha256: sha256_hex(b"statement_tie_out"),
-                    response_sha256: sha256_json(&payload),
-                    bytes: serde_json::to_vec(&payload).map_or(0, |bytes| bytes.len()),
-                    state: "complete",
-                    read_at: None,
-                    duration_ms: None,
-                    reason_code: None,
-                };
-                return Ok(ToolOutcome {
-                    payload,
-                    evidence: judged(evidence, &gaps),
-                    company_guid: None,
-                    truncated: false,
-                });
-            }
-        };
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
-            let books_from = normalized_date(
-                company
-                    .books_from
-                    .as_deref()
-                    .ok_or_else(|| "company_identity_incomplete".to_string())?,
-            )?;
-            let gaps =
-                if ensure_movement_window_within_books(&first.iso().replace('-', ""), &books_from)
+            let (window, gaps) = match file.window {
+                // The file alone answers: nothing is read to compare against.
+                Err(reason) => (None, all_not_established(reason)),
+                Ok((first, last)) => {
+                    let books_from = normalized_date(
+                        company
+                            .books_from
+                            .as_deref()
+                            .ok_or_else(|| "company_identity_incomplete".to_string())?,
+                    )?;
+                    let gaps = if ensure_movement_window_within_books(
+                        &first.iso().replace('-', ""),
+                        &books_from,
+                    )
                     .is_err()
-                {
-                    all_not_established(NotEstablished::WindowPrecedesBooksFrom)
-                } else {
-                    let mut reads = Vec::with_capacity(3);
-                    for date in read_dates(first, last)? {
-                        let (ledgers, ledger_evidence) =
-                            self.read_movement_ledgers(&identity, date).await?;
-                        evidence = combine_evidence(evidence.clone(), ledger_evidence);
-                        reads.push(LedgerRead::of(&ledgers, &file.bank_ledger)?);
-                    }
-                    let [at_first, after_last, at_first_again]: [LedgerRead; 3] = reads
-                        .try_into()
-                        .map_err(|_| "ledger_snapshot_drifted".to_string())?;
-                    gaps(
-                        stage,
-                        &file,
-                        &Observed {
+                    {
+                        all_not_established(NotEstablished::WindowPrecedesBooksFrom)
+                    } else {
+                        let partly_posted = stage == Stage::BeforeBuild
+                            && file.rows_without_voucher == 0
+                            && self.import_journal_holds_rows_of(guid, &document["vouchers"])?;
+                        let mut reads = Vec::with_capacity(3);
+                        for date in read_dates(first, last)? {
+                            let (ledgers, ledger_evidence) =
+                                self.read_movement_ledgers(&identity, date).await?;
+                            evidence = combine_evidence(evidence.clone(), ledger_evidence);
+                            reads.push(LedgerRead::of(&ledgers, &file.bank_ledger)?);
+                        }
+                        let [at_first, after_last, at_first_again]: [LedgerRead; 3] = reads
+                            .try_into()
+                            .map_err(|_| "ledger_snapshot_drifted".to_string())?;
+                        let observed = Observed {
                             at_first,
                             after_last,
                             at_first_again,
-                        },
-                    )?
-                };
+                        };
+                        gaps(stage, &file, &observed, partly_posted)?
+                    };
+                    (Some((first, last)), gaps)
+                }
+            };
+            // Complete only when every figure was established.
+            let evidence = match [&gaps.opening, &gaps.closing, &gaps.change]
+                .into_iter()
+                .find_map(Figure::reason)
+            {
+                None => evidence.clone(),
+                Some(reason) => Evidence {
+                    state: "partial",
+                    reason_code: Some(reason.code().to_string()),
+                    ..evidence.clone()
+                },
+            };
             Ok(ToolOutcome {
                 payload: json!({
                     "company": company_json(&company, std::slice::from_ref(&company)),
-                    "result": result_json(stage, Some((first, last)), &gaps),
+                    "result": result_json(stage, window, file.rows_without_voucher, &gaps),
                 }),
-                evidence: judged(evidence.clone(), &gaps),
+                evidence,
                 company_guid: Some(guid.to_string()),
                 truncated: false,
             })

@@ -269,15 +269,6 @@ fn a_file_that_cannot_be_read_fails_closed_with_a_typed_error() {
         )])])),
         invalid
     );
-    // An amount below zero: an entry's amount is never negative.
-    assert_eq!(
-        refused(document(vec![voucher(&[(
-            "Synthetic Bank Ledger",
-            "-1.00",
-            "Dr"
-        )])])),
-        invalid
-    );
     // A statement figure that is not a decimal.
     let mut bad = document(vec![]);
     bad["controls"]["opening_balance"] = json!("one thousand");

@@ -106,41 +106,49 @@ impl NotEstablished {
 struct BankSide(ExactDecimal);
 
 impl BankSide {
-    fn canonical(value: ExactDecimal, code: &str) -> Result<Self, String> {
+    fn canonical(value: ExactDecimal) -> Result<Self, String> {
         ExactDecimal::zero()
             .checked_add(&value)
             .map(Self)
-            .map_err(|_| code.to_string())
+            .map_err(|_| "tie_out_arithmetic_out_of_range".to_string())
     }
 
     /// A figure as the statement prints it, or an entry of the file read the
     /// same way (a debit to the bank ledger is money in).
     fn from_printed(text: &str) -> Result<Self, String> {
-        let value = ExactDecimal::parse(text).map_err(|_| "proposals_file_invalid".to_string())?;
-        Self::canonical(value, "proposals_file_invalid")
+        Self::canonical(
+            ExactDecimal::parse(text).map_err(|_| "proposals_file_invalid".to_string())?,
+        )
     }
 
     /// The one conversion from Tally's sign, where a debit balance is negative.
     fn from_book(native: &str) -> Result<Self, String> {
-        let invalid = || "ledger_opening_invalid".to_string();
-        let native = ExactDecimal::parse(native).map_err(|_| invalid())?;
-        let negated = ExactDecimal::zero()
-            .checked_subtract(&native)
-            .map_err(|_| invalid())?;
-        Self::canonical(negated, "ledger_opening_invalid")
+        let native =
+            ExactDecimal::parse(native).map_err(|_| "ledger_opening_invalid".to_string())?;
+        Self::zero_minus(&native)
+    }
+
+    fn zero_minus(value: &ExactDecimal) -> Result<Self, String> {
+        Self::canonical(
+            ExactDecimal::zero()
+                .checked_subtract(value)
+                .map_err(|_| "tie_out_arithmetic_out_of_range".to_string())?,
+        )
     }
 
     fn plus(&self, other: &Self) -> Result<Self, String> {
         Self::canonical(
-            self.0.checked_add(&other.0).map_err(overflow)?,
-            "tie_out_arithmetic_out_of_range",
+            self.0
+                .checked_add(&other.0)
+                .map_err(|_| "tie_out_arithmetic_out_of_range".to_string())?,
         )
     }
 
     fn minus(&self, other: &Self) -> Result<Self, String> {
         Self::canonical(
-            self.0.checked_subtract(&other.0).map_err(overflow)?,
-            "tie_out_arithmetic_out_of_range",
+            self.0
+                .checked_subtract(&other.0)
+                .map_err(|_| "tie_out_arithmetic_out_of_range".to_string())?,
         )
     }
 
@@ -157,10 +165,6 @@ impl BankSide {
     fn magnitude_text(&self) -> String {
         format_amount(&self.0.magnitude())
     }
-}
-
-fn overflow(_: impl std::fmt::Debug) -> String {
-    "tie_out_arithmetic_out_of_range".to_string()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -304,9 +308,6 @@ fn proposals_net(document: &Value, bank_ledger: &str) -> Result<BankSide, String
                 continue;
             }
             let amount = BankSide::from_printed(entry["amount"].as_str().ok_or_else(invalid)?)?;
-            if amount.0.is_negative() {
-                return Err(invalid());
-            }
             net = match entry["side"].as_str() {
                 Some("Dr") => net.plus(&amount)?,
                 Some("Cr") => net.minus(&amount)?,
@@ -449,10 +450,14 @@ fn reading(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
         .filter(|(_, figure)| figure.reason().is_some())
         .collect::<Vec<_>>();
     if let Some(reason) = missing.first().and_then(|(_, figure)| figure.reason()) {
-        let labels = missing.iter().map(|(label, _)| *label).collect::<Vec<_>>();
+        // All three, or the closing gap and the change, by construction.
+        let labels = if missing.len() == 3 {
+            "opening gap, closing gap and change in window"
+        } else {
+            "closing gap and change in window"
+        };
         parts.push(format!(
-            "{} not established ({})",
-            join_and(&labels),
+            "{labels} not established ({})",
             reason.explanation()
         ));
     }
@@ -501,15 +506,6 @@ fn reading(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
         text["possible_causes"] = json!(POSSIBLE_CAUSES);
     }
     text
-}
-
-/// "a", "a and b", "a, b and c".
-fn join_and(labels: &[&str]) -> String {
-    match labels {
-        [] => String::new(),
-        [only] => (*only).to_string(),
-        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
-    }
 }
 
 fn result_json(

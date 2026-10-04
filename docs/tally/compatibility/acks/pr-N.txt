@@ -1,0 +1,7 @@
+src-tauri/crates/bridge-bank-statement/src/proposals.rs
+src-tauri/src/agent.rs
+src-tauri/src/agent_bank_statement.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_import.rs
+src-tauri/src/agent_tests.rs
+reviewer: <github-login>

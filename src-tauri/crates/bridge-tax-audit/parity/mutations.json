@@ -4412,8 +4412,8 @@
   "by": "reviewer-opus",
   "what": "a statement row dated outside its period is read",
   "file": "src/documents.rs",
-  "from": "if row.txn_date < start || row.txn_date > end {",
-  "to": "if false && (row.txn_date < start || row.txn_date > end) {"
+  "from": ".position(|r| !(start <= r.txn_date && r.txn_date <= end))",
+  "to": ".position(|r| false && !(start <= r.txn_date && r.txn_date <= end))"
  },
  {
   "id": "E2A-22",
@@ -4484,24 +4484,24 @@
   "by": "reviewer-opus",
   "what": "the charge pass runs over every unmatched statement row, splits included",
   "file": "src/bank_reconciliation.rs",
-  "from": "    for si in statement_order(stmt, remaining_stmt.clone()) {\n        let narration",
-  "to": "    for si in statement_order(stmt, unmatched_stmt.iter().copied()) {\n        let narration"
+  "from": "        for si in statement_order(stmt, remaining_stmt.clone()) {\n            let narration",
+  "to": "        for si in statement_order(stmt, unmatched_stmt.iter().copied()) {\n            let narration"
  },
  {
   "id": "E2A-31",
   "by": "reviewer-opus",
   "what": "the forward split pass runs in books index order",
   "file": "src/bank_reconciliation.rs",
-  "from": "    for bi in books_order(&book_rows, remaining_books.clone()) {\n        let b = &book_rows[bi];\n        let mut pool",
-  "to": "    for bi in remaining_books.clone() {\n        let b = &book_rows[bi];\n        let mut pool"
+  "from": "        books_order(&book_rows, remaining_books.clone())\n    } else {",
+  "to": "        remaining_books.iter().copied().collect()\n    } else {"
  },
  {
   "id": "E2A-32",
   "by": "reviewer-opus",
   "what": "the reverse split pass runs in statement index order",
   "file": "src/bank_reconciliation.rs",
-  "from": "    for si in statement_order(stmt, remaining_stmt.clone()) {\n        let s = &stmt[si];",
-  "to": "    for si in remaining_stmt.clone() {\n        let s = &stmt[si];"
+  "from": "        statement_order(stmt, remaining_stmt.clone())\n    } else {",
+  "to": "        remaining_stmt.iter().copied().collect()\n    } else {"
  },
  {
   "id": "E2A-33",
@@ -4516,8 +4516,8 @@
   "by": "reviewer-opus",
   "what": "a row dated before the period is read",
   "file": "src/documents.rs",
-  "from": "if row.txn_date < start || row.txn_date > end {",
-  "to": "if row.txn_date > end {"
+  "from": ".position(|r| !(start <= r.txn_date && r.txn_date <= end))",
+  "to": ".position(|r| r.txn_date > end)"
  },
  {
   "id": "E2A-35",
@@ -4622,6 +4622,270 @@
   "file": "src/bank_reconciliation.rs",
   "from": "            split_groups_rev.push(si);\n            remaining_stmt.remove(&si);",
   "to": "            split_groups_rev.push(si);"
+ },
+ {
+  "id": "E2A-48",
+  "by": "author",
+  "what": "the statement's sum against its declared closing is not checked",
+  "file": "src/bank_reconciliation.rs",
+  "from": "let mut tie_diffs = vec![arith_diff];",
+  "to": "let mut tie_diffs = vec![0];"
+ },
+ {
+  "id": "E2A-49",
+  "by": "author",
+  "what": "the first row's balance is not checked against the declared opening",
+  "file": "src/bank_reconciliation.rs",
+  "from": "        stmt_facts.push((\"statement_first_row_tie_diff_paise\".to_string(), id));\n        tie_diffs.push(d);",
+  "to": "        stmt_facts.push((\"statement_first_row_tie_diff_paise\".to_string(), id));"
+ },
+ {
+  "id": "E2A-50",
+  "by": "author",
+  "what": "the last row's balance is not checked against the declared closing",
+  "file": "src/bank_reconciliation.rs",
+  "from": "        stmt_facts.push((\"statement_last_row_tie_diff_paise\".to_string(), id));\n        tie_diffs.push(d);",
+  "to": "        stmt_facts.push((\"statement_last_row_tie_diff_paise\".to_string(), id));"
+ },
+ {
+  "id": "E2A-51",
+  "by": "author",
+  "what": "a break in the running balance does not mark the statement",
+  "file": "src/bank_reconciliation.rs",
+  "from": "let mut adds_up = breaks == 0;",
+  "to": "let mut adds_up = true;"
+ },
+ {
+  "id": "E2A-52",
+  "by": "author",
+  "what": "a statement check exactly Re 1 off marks the statement",
+  "file": "src/bank_reconciliation.rs",
+  "from": "adds_up &= d.checked_abs().ok_or_else(|| overflow(TEST_ID))? <= TOL_PAISE;",
+  "to": "adds_up &= d.checked_abs().ok_or_else(|| overflow(TEST_ID))? < TOL_PAISE;"
+ },
+ {
+  "id": "E2A-53",
+  "by": "author",
+  "what": "a running-balance step exactly Re 1 off is counted as a break",
+  "file": "src/bank_reconciliation.rs",
+  "from": "if distance(add(before, signed(pair[1])?)?, after)? > TOL_PAISE {",
+  "to": "if distance(add(before, signed(pair[1])?)?, after)? >= TOL_PAISE {"
+ },
+ {
+  "id": "E2A-54",
+  "by": "author",
+  "what": "the first row's tie leaves out that row's own movement",
+  "file": "src/bank_reconciliation.rs",
+  "from": "add(statement.opening_balance_paise, signed(first)?)?,",
+  "to": "add(statement.opening_balance_paise, 0)?,"
+ },
+ {
+  "id": "E2A-55",
+  "by": "author",
+  "what": "the arithmetic reads the closing as declared plus the rows",
+  "file": "src/bank_reconciliation.rs",
+  "from": "        add(statement.opening_balance_paise, stmt_net)?,\n        statement.closing_balance_paise,",
+  "to": "        statement.opening_balance_paise,\n        statement.closing_balance_paise,"
+ },
+ {
+  "id": "E2A-56",
+  "by": "author",
+  "what": "part-settlements are searched on a statement that does not add up",
+  "file": "src/bank_reconciliation.rs",
+  "from": "let searched_books = if adds_up {",
+  "to": "let searched_books = if true {"
+ },
+ {
+  "id": "E2A-57",
+  "by": "author",
+  "what": "statement-side part-settlements are searched on a statement that does not add up",
+  "file": "src/bank_reconciliation.rs",
+  "from": "let searched_stmt = if adds_up {",
+  "to": "let searched_stmt = if true {"
+ },
+ {
+  "id": "E2A-58",
+  "by": "author",
+  "what": "unmatched rows are explained on a statement that does not add up",
+  "file": "src/bank_reconciliation.rs",
+  "from": "    if !adds_up {\n        // Nothing unmatched is explained",
+  "to": "    if false {\n        // Nothing unmatched is explained"
+ },
+ {
+  "id": "E2A-59",
+  "by": "author",
+  "what": "the statement_does_not_add_up finding is not raised",
+  "file": "src/bank_reconciliation.rs",
+  "from": "    if !adds_up {\n        let mut evidence",
+  "to": "    if false {\n        let mut evidence"
+ },
+ {
+  "id": "E2A-60",
+  "by": "author",
+  "what": "only the books rows are cited on the statement_does_not_add_up finding",
+  "file": "src/bank_reconciliation.rs",
+  "from": "        for &i in &stmt_by_reason[REASON_NOT_COMPUTED] {",
+  "to": "        for &i in &Vec::<usize>::new() {"
+ },
+ {
+  "id": "E2A-61",
+  "by": "author",
+  "what": "the not-computed reason takes the earlier, shorter name",
+  "file": "src/bank_reconciliation.rs",
+  "from": "const REASON_NOT_COMPUTED: &str = \"not_computed_statement_does_not_add_up\";",
+  "to": "const REASON_NOT_COMPUTED: &str = \"not_computed\";"
+ },
+ {
+  "id": "E2A-62",
+  "by": "author",
+  "what": "the finding's limit vouches for every matched pair (the wording the reference withdrew)",
+  "file": "src/bank_reconciliation.rs",
+  "from": "Matched entries \\\n                 are paired by amount and date only: with a row dropped, a same-amount entry may \\\n                 be paired with the wrong row.",
+  "to": "Matched entries \\\n                 stand."
+ },
+ {
+  "id": "E2A-63",
+  "by": "author",
+  "what": "the refused result's limit says the statement could not be read as a whole (the wording the reference withdrew)",
+  "file": "src/bank_reconciliation.rs",
+  "from": "computed from a statement refused when it was read (the reason is shown).",
+  "to": "computed from a statement that could not be read as a whole."
+ },
+ {
+  "id": "E2A-64",
+  "by": "author",
+  "what": "the refused result names no reason figure on its finding",
+  "file": "src/bank_reconciliation.rs",
+  "from": "        facts: vec![(\"reason\".to_string(), f)],",
+  "to": "        facts: vec![],"
+ },
+ {
+  "id": "E2A-65",
+  "by": "author",
+  "what": "a date that steps back is read whatever the running balance",
+  "file": "src/documents.rs",
+  "from": "    check_order(&rows)?;\n",
+  "to": "\n"
+ },
+ {
+  "id": "E2A-66",
+  "by": "author",
+  "what": "a date on the same day as the row above counts as a step back",
+  "file": "src/documents.rs",
+  "from": "let Some(back) = (1..rows.len()).find(|&i| rows[i].txn_date < rows[i - 1].txn_date) else {",
+  "to": "let Some(back) = (1..rows.len()).find(|&i| rows[i].txn_date <= rows[i - 1].txn_date) else {"
+ },
+ {
+  "id": "E2A-67",
+  "by": "author",
+  "what": "a row with no balance is read as a zero balance by the order check",
+  "file": "src/documents.rs",
+  "from": "            None => return Err(refused(None)),",
+  "to": "            None => balances.push(0),"
+ },
+ {
+  "id": "E2A-68",
+  "by": "author",
+  "what": "the order chain refuses a step exactly Re 1 off",
+  "file": "src/documents.rs",
+  "from": "if (balances[i - 1] + moved - balances[i]).abs() > BALANCE_TOL_PAISE {",
+  "to": "if (balances[i - 1] + moved - balances[i]).abs() >= BALANCE_TOL_PAISE {"
+ },
+ {
+  "id": "E2A-69",
+  "by": "author",
+  "what": "the order reason names the back-step, not where the chain first breaks",
+  "file": "src/documents.rs",
+  "from": "            first_break: first_break.cloned(),",
+  "to": "            first_break: first_break.map(|_| rows[back].txn_date.clone()),"
+ },
+ {
+  "id": "E2A-70",
+  "by": "author",
+  "what": "the period end is exclusive",
+  "file": "src/documents.rs",
+  "from": ".position(|r| !(start <= r.txn_date && r.txn_date <= end))",
+  "to": ".position(|r| !(start <= r.txn_date && r.txn_date < end))"
+ },
+ {
+  "id": "E2A-71",
+  "by": "author",
+  "what": "the period start is exclusive",
+  "file": "src/documents.rs",
+  "from": ".position(|r| !(start <= r.txn_date && r.txn_date <= end))",
+  "to": ".position(|r| !(start < r.txn_date && r.txn_date <= end))"
+ },
+ {
+  "id": "E2A-72",
+  "by": "author",
+  "what": "the order is checked before the period",
+  "file": "src/documents.rs",
+  "from": "    // The reference reader's refusals, in its order.\n    if let Some(i) = rows",
+  "to": "    // The reference reader's refusals, in its order.\n    check_order(&rows)?;\n    if let Some(i) = rows"
+ },
+ {
+  "id": "E2A-73",
+  "by": "author",
+  "what": "the balances are checked before the order",
+  "file": "src/documents.rs",
+  "from": "    check_order(&rows)?;\n    let opening_balance_paise =\n        declared_balance(v, \"opening_balance_paise\", BalanceField::Opening)?;\n    let closing_balance_paise =\n        declared_balance(v, \"closing_balance_paise\", BalanceField::Closing)?;",
+  "to": "    let opening_balance_paise =\n        declared_balance(v, \"opening_balance_paise\", BalanceField::Opening)?;\n    let closing_balance_paise =\n        declared_balance(v, \"closing_balance_paise\", BalanceField::Closing)?;\n    check_order(&rows)?;"
+ },
+ {
+  "id": "E2A-74",
+  "by": "author",
+  "what": "the closing balance is checked before the opening",
+  "file": "src/documents.rs",
+  "from": "    let opening_balance_paise =\n        declared_balance(v, \"opening_balance_paise\", BalanceField::Opening)?;\n    let closing_balance_paise =\n        declared_balance(v, \"closing_balance_paise\", BalanceField::Closing)?;",
+  "to": "    let closing_balance_paise =\n        declared_balance(v, \"closing_balance_paise\", BalanceField::Closing)?;\n    let opening_balance_paise =\n        declared_balance(v, \"opening_balance_paise\", BalanceField::Opening)?;"
+ },
+ {
+  "id": "E2A-75",
+  "by": "author",
+  "what": "a null declared balance is malformed, not missing",
+  "file": "src/documents.rs",
+  "from": "        None | Some(Value::Null) => Err(AuditError::StatementRefused(",
+  "to": "        None => Err(AuditError::StatementRefused("
+ },
+ {
+  "id": "E2A-76",
+  "by": "author",
+  "what": "a date's day is written without its leading zero",
+  "file": "src/documents.rs",
+  "from": "format!(\"{}-{}-{}\", &s[6..8], MONTHS[month - 1], &s[0..4])",
+  "to": "format!(\"{}-{}-{}\", s[6..8].trim_start_matches('0'), MONTHS[month - 1], &s[0..4])"
+ },
+ {
+  "id": "E2A-77",
+  "by": "author",
+  "what": "a date's month is named one month late",
+  "file": "src/documents.rs",
+  "from": "format!(\"{}-{}-{}\", &s[6..8], MONTHS[month - 1], &s[0..4])",
+  "to": "format!(\"{}-{}-{}\", &s[6..8], MONTHS[month % 12], &s[0..4])"
+ },
+ {
+  "id": "E2A-78",
+  "by": "author",
+  "what": "the order reason with no balance says the rows carry none (one row is enough)",
+  "file": "src/documents.rs",
+  "from": "None => \"a row carries no running balance to show that order is the bank's\"",
+  "to": "None => \"the rows carry no running balance to show that order is the bank's\""
+ },
+ {
+  "id": "E2A-79",
+  "by": "author",
+  "what": "the registry's refused result drops the reader's reason",
+  "file": "src/lib.rs",
+  "from": "            let result = bank_reconciliation::refused(rules, reason)?;",
+  "to": "            let result = bank_reconciliation::refused(rules, \"\")?;"
+ },
+ {
+  "id": "E2A-80",
+  "by": "author",
+  "what": "the registry does not pass the refused-statement reason to bank_reconciliation",
+  "file": "src/registry.rs",
+  "from": "c.bank_statement_refused.as_deref(),\n            )\n        },\n    },\n    PortedTest {\n        id: \"book_keeping_quality\",",
+  "to": "None,\n            )\n        },\n    },\n    PortedTest {\n        id: \"book_keeping_quality\","
  },
  {
   "id": "E2B2-01",
@@ -7380,8 +7644,8 @@
   "by": "author",
   "what": "the registry does not pass the caller's refused-statement reason",
   "file": "src/registry.rs",
-  "from": "c.bank_statement_refused.as_deref(),",
-  "to": "None,"
+  "from": "c.bank_statement_refused.as_deref(),\n                &c.traces.ais,",
+  "to": "None,\n                &c.traces.ais,"
  },
  {
   "id": "CP-01",

@@ -30,6 +30,12 @@ pub enum AuditError {
     /// refused rather than the process ended.
     #[error("figure id {0} would repeat")]
     DuplicateFigureId(String),
+    /// The reference's bank-statement reader refuses this statement (no declared opening or closing
+    /// balance, a row outside its own period, or a date that steps back in an order its running
+    /// balance does not confirm). Not a malformed document: `bank_reconciliation::refused` reports
+    /// it, with [`crate::documents::StatementRefusal::reason`].
+    #[error("{0}")]
+    StatementRefused(crate::documents::StatementRefusal),
     #[error("{path}: {source}")]
     Io {
         path: String,

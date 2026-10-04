@@ -1419,20 +1419,38 @@ pub fn cash_book_integrity_on(
 /// parity dump. Refuses with `AuditError::Config` without a statement (the reference runs this
 /// test only when the engagement has one) or without `[roles].bank_reconciliation_ledger` (the
 /// reference's `require` raises). The statement's own rows feed BANK-1, as the reference sets
-/// `eng.bank` to them.
+/// `eng.bank` to them. `statement_refused` is the reader's reason when the engagement's statement
+/// was supplied but refused (then `statement` is `None`): the result is
+/// [`bank_reconciliation::refused`], as the reference's pack gives it, and BANK-1 has no rows.
 pub fn bank_reconciliation_on(
     engagement: &Engagement,
     book: &book::Book,
     rules: &Rules,
     statement: Option<&documents::BankStatementDoc>,
+    statement_refused: Option<&str>,
 ) -> Result<serde_json::Value> {
-    let statement = statement.ok_or_else(|| {
-        AuditError::Config(format!(
-            "{}: no bank statement was supplied (the reference runs this test only when the \
-             engagement has one)",
-            bank_reconciliation::TEST_ID
-        ))
-    })?;
+    let statement = match (statement, statement_refused) {
+        (Some(statement), None) => statement,
+        (None, Some(reason)) => {
+            engagement.bind(book)?;
+            let result = bank_reconciliation::refused(rules, reason)?;
+            let module_check = bank_reconciliation::check_invariants(&[], &result)?;
+            return canonical::canonical_test_result(book, &result, Some(module_check));
+        }
+        (Some(_), Some(_)) => {
+            return Err(AuditError::Config(format!(
+                "{}: a bank statement was supplied and also refused",
+                bank_reconciliation::TEST_ID
+            )))
+        }
+        (None, None) => {
+            return Err(AuditError::Config(format!(
+                "{}: no bank statement was supplied (the reference runs this test only when the \
+                 engagement has one)",
+                bank_reconciliation::TEST_ID
+            )))
+        }
+    };
     let (bound, _report) = engagement.bind(book)?;
     let ledger = bound.bank_reconciliation_ledger.as_deref().ok_or_else(|| {
         AuditError::Config(

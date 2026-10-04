@@ -99,6 +99,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "purchase_register",
         "read_evidence",
         "sales_register",
+        "statement_tie_out",
         "stock_summary",
         "tally_status",
         "trial_balance",

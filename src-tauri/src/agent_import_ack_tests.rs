@@ -1385,7 +1385,8 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
         result["unverified_vouchers"],
         json!([{"bridge_txn_id":"D3-003","status":"posted_not_effective","marker":"narration_tag",
             "reason":"voucher_cancelled","diffs":[],"voucher_number":"3",
-            "guid":"17a10910-773c-42c6-bd66-7bba9a392536-00000550","master_id":"1360","alter_id":1685}]),
+            "guid":"17a10910-773c-42c6-bd66-7bba9a392536-00000550","master_id":"1360","alter_id":1685,
+            "effective_copies_observed":{"count":0,"entries":[],"attribution":"not_established"}}]),
         "{verified}"
     );
     assert_eq!(
@@ -1412,6 +1413,146 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
     // Every request Bridge sent is the one the capture answered.
     let requests = sent(simulator);
     let expected = d3_batch_requests();
+    assert_eq!(requests.len(), expected.len(), "{requests:?}");
+    for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
+        match expected {
+            None => assert_eq!(request.method, "GET", "request {index}"),
+            Some(sha256) => assert_eq!(request.request_body_sha256, sha256, "request {index}"),
+        }
+    }
+}
+
+/// The batch of the L1 capture (#806): 50 Journals posted to the same lab
+/// company as D3, after which a person cancelled L1A-050 (voucher 352) at
+/// Tally's screen and entered its content again by hand as voucher 353
+/// (`L1_REENTRY_CAPTURE_PROVENANCE.md`).
+const L1_BATCH: &str = "bridge-4e4af679-b48b-48ac-b9ca-71f3ea6a507d";
+
+/// A server holding the L1 batch's journal and saved file as written, with
+/// the journal's origin (the capture proxy's) moved to the simulator.
+fn l1_server(simulator: &SequenceSimulator, directory: &std::path::Path) -> Server {
+    let server = server_at(simulator.address(), directory);
+    let origin =
+        super::super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    fs::write(
+        directory.join("agent-import-ledger.jsonl"),
+        include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-journal.jsonl"
+        )
+        .replace("http://127.0.0.1:9102", &origin),
+    )
+    .unwrap();
+    fs::write(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{L1_BATCH}.xml")),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-import.xml"
+        ),
+    )
+    .unwrap();
+    server
+}
+
+/// The sha256 of each request the L1 capture carried, in order; its extent
+/// and high-water requests are D3's, its census and verification reads its own.
+fn l1_requests() -> Vec<Option<&'static str>> {
+    "SEESESEHSHSEECSCSEEVSVSEEVSVSE"
+        .chars()
+        .map(|step| match step {
+            'S' => None,
+            'E' => Some("9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8"),
+            'H' => Some("0930288f6eb531926d018cc4762288084831b8fad16a554e48fafbd694e245c2"),
+            'C' => Some("e58e009cb88cb483f89723370fcf89fb0de3aff7db29d1bccb41757826c3dc86"),
+            _ => Some("0fe49c89693f59aa011a488f86c2beb97b8f24a87cf32c2aa448e4c51f205418"),
+        })
+        .collect()
+}
+
+/// A cancelled batch voucher whose content a person entered again by hand is
+/// still `posted_not_effective`, and now names the effective copy it was
+/// re-entered as, without attributing it (#806): 352 stays not effective, 353
+/// is listed under `effective_copies_observed` with `attribution`
+/// `not_established`, and no verdict changes. Every Tally response is
+/// captured, and every request sent equals the captured one.
+#[tokio::test]
+async fn a_cancelled_voucher_entered_again_by_hand_is_reported_not_attributed() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-company-extent.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-company-high-water.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-voucher-census.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-import-verification.utf16le.xml"
+        ),
+    ])))
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = l1_server(&simulator, directory.path());
+    let verified = server
+        .call_tool(
+            "verify_import",
+            json!({"company_guid":D3_GUID,"batch_id":L1_BATCH}),
+        )
+        .await;
+    let result = &verified["structuredContent"]["result"];
+    // The verdict is the one the capture's proof recorded, unchanged.
+    assert_eq!(result["counts"]["posted_verified"], 49, "{verified}");
+    assert_eq!(result["counts"]["posted_not_effective"], 1, "{verified}");
+    assert_eq!(result["counts"]["posted_divergent"], 0, "{verified}");
+    assert_eq!(result["counts"]["not_found"], 0, "{verified}");
+    assert_eq!(
+        result["counts"]["matching_content_observed"], 0,
+        "{verified}"
+    );
+    assert_eq!(
+        result["counts"]["cancelled_with_effective_copy"], 1,
+        "{verified}"
+    );
+    assert_eq!(
+        result["verification_status"], "verification_incomplete",
+        "{verified}"
+    );
+    assert_eq!(
+        result["dispatch"]["state"], "reconciliation_required",
+        "{verified}"
+    );
+    assert_eq!(
+        result["unverified_vouchers"],
+        json!([{"bridge_txn_id":"L1A-050","status":"posted_not_effective","marker":"narration_tag",
+            "reason":"voucher_cancelled","diffs":[],"voucher_number":"352",
+            "guid":"17a10910-773c-42c6-bd66-7bba9a392536-000006b7","master_id":"1719","alter_id":1789,
+            "effective_copies_observed":{"count":1,"attribution":"not_established","entries":[
+                {"guid":"17a10910-773c-42c6-bd66-7bba9a392536-000006b8","master_id":"1720",
+                 "alter_id":1790,"voucher_number":"353","before_pre_import_mark":false}]}}]),
+        "{verified}"
+    );
+    let markdown = fs::read_to_string(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{L1_BATCH}.proof.md")),
+    )
+    .unwrap();
+    assert!(
+        markdown
+            .contains("Readback counts: matching 49, divergent 0, not effective 1, not found 0"),
+        "{markdown}"
+    );
+    assert!(
+        markdown.contains(
+            "- Cancelled vouchers with an effective copy (report only, not attributed): 1\n"
+        ),
+        "{markdown}"
+    );
+    let requests = sent(simulator);
+    let expected = l1_requests();
     assert_eq!(requests.len(), expected.len(), "{requests:?}");
     for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
         match expected {

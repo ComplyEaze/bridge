@@ -2277,6 +2277,96 @@ mod boundary_tests;
 #[path = "agent_import_multiplicity_tests.rs"]
 mod multiplicity_tests;
 
+/// The L1 capture's batch and verification rows (#806): L1A-050 was
+/// cancelled (voucher 352) and its content entered again by hand (353).
+fn l1_reentry_line_and_rows() -> (ImportLedgerLine, Vec<ReadVoucher>) {
+    let journal = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-journal.jsonl"
+    );
+    let line = serde_json::from_str(journal.lines().next().expect("the built batch")).unwrap();
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-import-verification.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let rows = parse_import_vouchers(&xml, "17a10910-773c-42c6-bd66-7bba9a392536")
+        .unwrap()
+        .rows;
+    (line, rows)
+}
+
+/// Only effective, unmarked rows that no batch voucher took are copies of a
+/// cancelled voucher (#806), and at most five are listed while the count stays
+/// exact. Each variant is the captured re-entry, 353, under another identity.
+#[test]
+fn only_effective_unmarked_rows_count_as_copies_of_a_cancelled_voucher() {
+    let (line, rows) = l1_reentry_line_and_rows();
+    let re_entry = rows
+        .iter()
+        .find(|row| row.alter_id == Some(1790))
+        .expect("the captured re-entry")
+        .clone();
+    let variant = |at: u64, change: fn(&mut ReadVoucher)| {
+        let mut row = re_entry.clone();
+        row.alter_id = Some(at);
+        row.master_id = Some(at.to_string());
+        row.guid = Some(format!("17a10910-773c-42c6-bd66-7bba9a392536-{at:08x}"));
+        row.remote_id = row.guid.clone();
+        change(&mut row);
+        row
+    };
+    let cancelled_item = |rows: &[ReadVoucher]| {
+        let verified = verify_observed_batch(&line, rows).unwrap();
+        let item = verified["vouchers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["bridge_txn_id"] == "L1A-050")
+            .unwrap()
+            .clone();
+        assert_eq!(item["status"], "posted_not_effective");
+        (
+            item,
+            verified["counts"]["cancelled_with_effective_copy"].clone(),
+        )
+    };
+    let (item, count) = cancelled_item(&rows);
+    assert_eq!(item["effective_copies_observed"]["count"], 1);
+    assert_eq!(count, 1);
+    for change in [
+        (|row: &mut ReadVoucher| {
+            row.narration =
+                Some("manual re-entry [BRIDGE:00000000-0000-4000-8000-000000000806]".into());
+        }) as fn(&mut ReadVoucher),
+        |row| row.cancelled = Some(true),
+        |row| row.optional = Some(true),
+    ] {
+        let mut more = rows.clone();
+        more.push(variant(3000, change));
+        let (item, count) = cancelled_item(&more);
+        assert_eq!(item["effective_copies_observed"]["count"], 1, "{item}");
+        assert_eq!(count, 1);
+    }
+    let mut many = rows.clone();
+    many.extend((3001..=3006).map(|at| variant(at, |_| {})));
+    let (item, count) = cancelled_item(&many);
+    let copies = &item["effective_copies_observed"];
+    assert_eq!(copies["count"], 7, "{item}");
+    assert_eq!(count, 1);
+    let alter_ids = copies["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["alter_id"].as_u64().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(alter_ids, [1790, 3001, 3002, 3003, 3004], "{item}");
+}
+
 fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Result<Value, String> {
     verify_batch(
         line,

@@ -140,6 +140,22 @@ impl VerificationCandidates {
     }
 }
 
+/// The fingerprint a batch voucher is matched by: its date, type and entries.
+/// `voucher` must carry canonical amounts, as `verify_batch`'s comparison copy
+/// does. One function, so the copy search for a cancelled voucher (#806) and
+/// the matching use the same key.
+pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFingerprint {
+    (
+        normalized_date(&voucher.date).ok(),
+        Some(voucher.voucher_type.as_str().to_string()),
+        expected_entry_fingerprint(voucher),
+    )
+}
+
+/// At most this many effective copies of one cancelled voucher are listed;
+/// the count is exact (#806).
+const MAX_EFFECTIVE_COPIES_LISTED: usize = 5;
+
 pub(super) fn observed_fingerprint(voucher: &ReadVoucher) -> VerificationFingerprint {
     (
         voucher.date.clone(),
@@ -202,13 +218,7 @@ pub(super) fn verify_batch(
     let expected_fingerprints = line
         .vouchers
         .iter()
-        .map(|voucher| {
-            (
-                normalized_date(&voucher.date).ok(),
-                Some(voucher.voucher_type.as_str().to_string()),
-                expected_entry_fingerprint(voucher),
-            )
-        })
+        .map(expected_fingerprint)
         .collect::<Vec<VerificationFingerprint>>();
     let observed_fingerprints = observed
         .iter()
@@ -291,6 +301,7 @@ pub(super) fn verify_batch(
         ("not_found", 0),
         ("not_attributable", 0),
         ("duplicate_fingerprint", 0),
+        ("cancelled_with_effective_copy", 0),
     ]);
     for (((expected, expected_key), marker_identity), bound) in line
         .vouchers
@@ -417,6 +428,57 @@ pub(super) fn verify_batch(
             ambiguous_within_batch.push(expected.bridge_txn_id.clone());
         }
         rows.push(value);
+    }
+    // A cancelled batch voucher whose content was entered again (#806): the
+    // effective rows carrying its fingerprint that no voucher of this batch
+    // took and that carry no marker, so a person entered them, not a build.
+    // Report-only: nothing is attributed through such a copy, since identical
+    // content can be a genuine second transaction, and no verdict changes.
+    // Each voucher pushed exactly one row above, in order.
+    for (row, expected_key) in rows.iter_mut().zip(&expected_fingerprints) {
+        if row["status"] != "posted_not_effective" || row["reason"] != "voucher_cancelled" {
+            continue;
+        }
+        let mut copies = fallback
+            .get(expected_key)
+            .map(|group| {
+                group
+                    .remaining
+                    .iter()
+                    .copied()
+                    .filter(|&index| {
+                        observed_tags[index].is_none()
+                            && observed[index].cancelled != Some(true)
+                            && observed[index].optional != Some(true)
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        copies.sort_by_key(|&index| observed[index].alter_id);
+        if !copies.is_empty() {
+            counts
+                .entry("cancelled_with_effective_copy")
+                .and_modify(|count| *count += 1);
+        }
+        let entries = copies
+            .iter()
+            .take(MAX_EFFECTIVE_COPIES_LISTED)
+            .map(|&index| {
+                let copy = &observed[index];
+                let before_pre_import_mark = line
+                    .pre_import_mark
+                    .value
+                    .zip(copy.alter_id)
+                    .map(|(mark, alter_id)| alter_id <= mark);
+                json!({"guid":copy.guid,"master_id":copy.master_id,"alter_id":copy.alter_id,"voucher_number":copy.voucher_number,"before_pre_import_mark":before_pre_import_mark})
+            })
+            .collect::<Vec<_>>();
+        let mut observed_copies =
+            json!({"count":copies.len(),"entries":entries,"attribution":"not_established"});
+        if expected_fingerprint_counts[expected_key] > 1 {
+            observed_copies["ambiguous_within_batch"] = Value::Bool(true);
+        }
+        row["effective_copies_observed"] = observed_copies;
     }
     let (batch_duplicates, unrelated_duplicates_in_window) = batch_duplicate_sets(
         observed,
@@ -1069,7 +1131,7 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
     if let Some(code) = proof["error"]["code"].as_str() {
         output.push_str(&format!("- Error: `{code}`\n"));
     }
-    output.push_str(&format!("\n- Company: {}\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Duplicates in this batch: {}\n- Unrelated duplicates in window: {}\n\n| Transaction | Readback status |\n| --- | --- |\n", markdown_code(proof["company"]["name"].as_str().unwrap_or("unknown")), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["duplicates"].as_array().map_or(0, Vec::len), proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len)));
+    output.push_str(&format!("\n- Company: {}\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Duplicates in this batch: {}\n- Unrelated duplicates in window: {}\n- Cancelled vouchers with an effective copy (report only, not attributed): {}\n\n| Transaction | Readback status |\n| --- | --- |\n", markdown_code(proof["company"]["name"].as_str().unwrap_or("unknown")), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["duplicates"].as_array().map_or(0, Vec::len), proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len), proof["counts"]["cancelled_with_effective_copy"].as_u64().unwrap_or(0)));
     for row in proof["vouchers"].as_array().into_iter().flatten() {
         output.push_str(&format!(
             "| {} | {} |\n",

@@ -8,6 +8,12 @@ import test from "node:test";
 // A line that is not a comment and holds the word "Bridge" must have it as "ComplyEaze Bridge",
 // so a new message in one of these files cannot bring the short name back.
 const SOURCES = [
+  "src/AllClientsScreen.tsx",
+  "src/LedgerEntriesScreen.tsx",
+  "src/MirrorProofScreen.tsx",
+  "src/OutstandingsEvidencePanel.tsx",
+  "src/OutstandingsScreen.tsx",
+  "src/SourceDraftScreen.tsx",
   "src/outstandings-copy.ts",
   "src/tally-capability-evidence.tsx",
   "src/tally-company-selection.ts",

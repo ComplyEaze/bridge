@@ -480,6 +480,7 @@ jobs:
           --wait-seconds ${{ steps.native-tests.outcome == 'failure' && '30' || '0' }}
       - name: Retain minimized macOS test crash stacks
         if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-crash-stacks-macos
@@ -579,6 +580,7 @@ jobs:
 
       - name: Retain native compiler timings
         if: ${{ always() }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-compiler-timings-${{ matrix.os }}
@@ -775,6 +777,7 @@ jobs:
           df -h . > package-diagnostics/disk-space.txt 2>&1
       - name: Retain macOS package diagnostics
         if: ${{ always() && runner.os == 'macOS' && (steps.macos-bundle.outcome == 'success' || steps.macos-bundle.outcome == 'failure') }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: macos-package-diagnostics
@@ -862,6 +865,7 @@ jobs:
           JS
       - name: Upload package compiler cache statistics
         if: ${{ always() && steps.package-sccache-start.outcome == 'success' }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-compiler-cache-${{ matrix.os }}

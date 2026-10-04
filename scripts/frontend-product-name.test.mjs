@@ -6,9 +6,9 @@ import test from "node:test";
 
 // The text these files show names the product in full, never by its bare short name (#1168).
 // A line that is not a comment and holds the word "Bridge" must have it as "ComplyEaze Bridge",
-// so a new message in one of these files cannot bring the short name back. A comment is a line
-// starting with a comment marker, or any line inside a block comment that spans several lines,
-// such as a multi-line JSX comment.
+// so a new message in one of these files cannot bring the short name back. Comments are left out
+// as `bareBridges` below describes: commented spans are dropped from each line, on one line or
+// across several, and whatever follows a `*/` on the same line is still checked.
 const SOURCES = [
   "src/AllClientsScreen.tsx",
   "src/ErrorBoundary.tsx",
@@ -85,4 +85,6 @@ test("text after a comment closes is checked, and text inside one is not", () =>
   ]);
   assert.deepEqual(bareBridges("// Bridge\n * Bridge\n<span>ComplyEaze Bridge</span>"), []);
   assert.deepEqual(bareBridges("<p>Bridge</p>"), [{ line: 1, text: "<p>Bridge</p>" }]);
+  // Only a doc-comment continuation (`* ` with its space) is a comment line; `*Bridge` is not.
+  assert.deepEqual(bareBridges("*Bridge"), [{ line: 1, text: "*Bridge" }]);
 });

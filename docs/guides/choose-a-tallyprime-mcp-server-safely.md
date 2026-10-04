@@ -44,10 +44,10 @@ yourself. This page does not rank products.
 
 Tally Solutions offers its own TallyPrime MCP plug-in for Claude Desktop. Its
 help pages (last updated 18 September 2026, read on 4 October 2026) list 28
-tools, all for reading your books, and a setup that updates your TallyPrime
-licence through Tally.NET, installs Node.js and has you edit Claude Desktop's
-configuration file. Put the ten questions to it as well; Tally's pages are the
-place to check what it needs and whether it can change your books. ComplyEaze
+tools, all for reading your books, and a setup that has you refresh your
+licence in TallyPrime with your Tally.NET ID, installs Node.js and has you edit
+Claude Desktop's configuration file. Put the ten questions to it as well;
+Tally's pages are the place to check what it needs. ComplyEaze
 Bridge is not a product of Tally Solutions, we have not run the two side by
 side, and this page does not rank them. If you only want to ask questions of
 your books, check whether the plug-in covers what you need first.
@@ -59,7 +59,7 @@ What ComplyEaze Bridge adds, so you can judge whether you need it:
   Receipt and Contra vouchers as a file you import in TallyPrime yourself. It
   checks your ledger names against the book first, and after you import it can
   read the batch back from TallyPrime. TallyPrime's own bank statement import
-  takes CSV or Excel files from the bank's portal, not PDF (Tally's help page
+  takes statement files such as CSV or Excel from the bank's portal, not PDF (Tally's help page
   "Bank statement", read on 4 October 2026), so if your client already sends
   one of those, TallyPrime's own import may be all you need. The whole path,
   from the PDF to the batch read back, has not yet been recorded end to end
@@ -72,7 +72,8 @@ What ComplyEaze Bridge adds, so you can judge whether you need it:
   [README](../../README.md#what-has-been-run-against-a-real-tallyprime).
 
 Where it is behind: three banks, where TallyPrime's own import lists many more
-(its help page "Bank statement"); no TallyPrime bank reconciliation; not yet
+(its help page "Bank statement"); no reconciling of a bank statement inside
+TallyPrime; no stock quantities (the plug-in has an inventory group); not yet
 code-signed; and a short list of runs against a real TallyPrime. The published
 latest release has not yet been installed in Claude Desktop by us; the README
 lists each run.

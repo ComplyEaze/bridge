@@ -266,6 +266,7 @@ jobs:
       - run: node scripts/check-gh-api-pagination.mjs
       - run: node --test scripts/prune-package-compiler-cache.test.mjs
       - run: node --test scripts/master-push-reuse.test.mjs scripts/master-push-scope.test.mjs
+      - run: node --test scripts/check-ci-workflow-consistency.mutation.mjs
       # A committed merge-conflict marker passes every other check and ships as text.
       - run: node scripts/check-conflict-markers.mjs
       - run: node --test scripts/check-conflict-markers.test.mjs

@@ -583,19 +583,25 @@ function jobThrough(source, job, head) {
   const start = lines.findIndex((line) => line.replace(/\r$/, "") === `  ${job}:`);
   const step = lines.findIndex((line, index) => index > start && line.replace(/\r$/, "") === head);
   if (start === -1 || step === -1) return "";
-  let end = step + 1;
-  while (end < lines.length && !/^ {0,6}\S/.test(lines[end])) end += 1;
-  while (end > step + 1 && lines[end - 1].replace(/\r$/, "") === "") end -= 1;
-  return lines.slice(start, end).join("\n");
+  return lines.slice(start, stepEnd(lines, step + 1)).join("\n");
+}
+
+// A step ends at the next line that is not blank, not a comment and is indented six spaces or less.
+// A comment line never ends a step, whatever its indentation: YAML ignores a comment's indentation, so
+// the keys after it still belong to the step and are part of its pinned text. Blank lines and comments
+// indented six spaces or less just before the next step are that step's, not this one's.
+function stepEnd(lines, from) {
+  let end = from;
+  while (end < lines.length && !/^ {0,6}[^\s#]/.test(lines[end])) end += 1;
+  while (end > from && /^ {0,6}(?:#.*)?$/.test(lines[end - 1].replace(/\r$/, ""))) end -= 1;
+  return end;
 }
 
 function stepBlock(job, head) {
   const lines = job.split("\n");
   const starts = lines.flatMap((line, index) => (line === head ? [index] : []));
   if (starts.length !== 1) return undefined;
-  let end = starts[0] + 1;
-  while (end < lines.length && !/^ {0,6}\S/.test(lines[end])) end += 1;
-  return lines.slice(starts[0], end).join("\n").trimEnd();
+  return lines.slice(starts[0], stepEnd(lines, starts[0] + 1)).join("\n").trimEnd();
 }
 
 function escapeRegex(value) {

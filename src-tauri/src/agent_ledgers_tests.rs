@@ -2793,6 +2793,39 @@ mod through_the_tool {
         }
     }
 
+    /// A ledger export refused for one row names whose fault it was (#718,
+    /// slice 2): a row repeating a field is `native_collection_row_unusable`, and
+    /// a response that ends inside a row is `native_collection_malformed_response`.
+    /// Each is the captured basic export with one change made here; before
+    /// slice 2 both carried no cause.
+    #[tokio::test]
+    async fn a_ledger_export_refused_for_one_row_names_its_cause() {
+        let captured = period_opening();
+        let parent = r#"<PARENT TYPE="String">Bridge Nested Debtors WR4</PARENT>"#;
+        assert_eq!(captured.matches(parent).count(), 1);
+        let opening = captured.find("<OPENINGBALANCE").expect("a row's opening");
+        for (body, cause) in [
+            (
+                captured.replacen(parent, &format!("{parent}{parent}"), 1),
+                "native_collection_row_unusable",
+            ),
+            (
+                captured[..opening].to_owned(),
+                "native_collection_malformed_response",
+            ),
+        ] {
+            assert_ne!(body, captured, "{cause}");
+            let (response, _) = call(
+                basic_plans_reading(body, None),
+                json!({"company_guid":GUID}),
+            )
+            .await;
+            let error = refusal(&response);
+            assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+            assert_eq!(error["cause"], cause, "{response}");
+        }
+    }
+
     /// As `basic_plans`, with the ledger export given and, when `groups` is
     /// supplied, the paired group collection a `group` filter adds inside the
     /// same extent and identity bracket.

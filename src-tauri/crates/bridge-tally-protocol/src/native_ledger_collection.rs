@@ -369,7 +369,20 @@ fn parse_native_ledger_collection_with_evidence<T>(
                         identities: identities_for_row,
                         alter_id,
                         response_company_guid,
-                    } = parse_row(&mut reader, &element)?;
+                    } = parse_row(&mut reader, &element).map_err(|error| {
+                        // A row failure the row parser already typed keeps its own class
+                        // (a foreign-currency opening is `foreign_currency_ledger_balance`,
+                        // #675); every other one is classed as the row's or the response's
+                        // fault (#718).
+                        if error
+                            .chain()
+                            .any(|cause| cause.is::<NativeLedgerAmountError>())
+                        {
+                            error
+                        } else {
+                            crate::NativeCollectionError::from_row(&error).into()
+                        }
+                    })?;
                     if matches!(
                         company_binding,
                         NativeLedgerCollectionCompanyBinding::ResponseGuid
@@ -385,7 +398,7 @@ fn parse_native_ledger_collection_with_evidence<T>(
                     let guid = identities_for_row
                         .guid
                         .as_deref()
-                        .ok_or_else(|| anyhow::anyhow!("native ledger row omitted GUID"))?;
+                        .ok_or(crate::NativeCollectionError::RowUnusable)?;
                     if native_ledger_guid_has_company_prefix(guid, expected_company_guid) {
                         company_guid_prefix_match_count = company_guid_prefix_match_count
                             .checked_add(1)
@@ -426,7 +439,7 @@ fn parse_native_ledger_collection_with_evidence<T>(
                 } else if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
                     && name == b"LEDGER"
                 {
-                    anyhow::bail!("native ledger collection contained an empty ledger row");
+                    return Err(crate::NativeCollectionError::RowUnusable.into());
                 }
             }
             Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())
@@ -466,8 +479,8 @@ fn parse_native_ledger_collection_with_evidence<T>(
         })
         .collect::<Vec<_>>();
     duplicate_identities.sort_by(|left, right| left.identity_sha256.cmp(&right.identity_sha256));
-    let source_record_count = u64::try_from(records.len())
-        .map_err(|_| anyhow::anyhow!("native ledger collection exceeded supported record count"))?;
+    let source_record_count =
+        u64::try_from(records.len()).map_err(|_| crate::NativeCollectionError::BoundsViolation)?;
     Ok(ParsedExport {
         records,
         evidence: ExportEvidence {
@@ -917,7 +930,7 @@ fn parse_native_ledger_collection_row_with_master_fields(
             Event::Text(text) if !text.decode()?.trim().is_empty() => {
                 anyhow::bail!("native ledger row contained unexpected text");
             }
-            Event::Eof => anyhow::bail!("native ledger row ended before LEDGER closed"),
+            Event::Eof => return Err(crate::RowCutOff.into()),
             _ => {}
         }
     }
@@ -1004,7 +1017,7 @@ fn read_gst_registration_entry(
                 }
             }
             Event::End(end) if end.name().as_ref() == list_name.as_slice() => break,
-            Event::Eof => anyhow::bail!("native ledger registration entry was not closed"),
+            Event::Eof => return Err(crate::RowCutOff.into()),
             _ => {}
         }
     }
@@ -1061,7 +1074,7 @@ fn read_scalar_rejecting_nested_markup(
                     }
                     break;
                 }
-                Event::Eof => anyhow::bail!("party/ledger master field ended before it closed"),
+                Event::Eof => return Err(crate::RowCutOff.into()),
                 _ => {}
             }
         }
@@ -1167,7 +1180,7 @@ fn read_flattened_optional_text(
                     flush_flattened_part(&mut current, &mut parts);
                     nested_depth = nested_depth.saturating_sub(1);
                 }
-                Event::Eof => anyhow::bail!("party/ledger master field ended before it closed"),
+                Event::Eof => return Err(crate::RowCutOff.into()),
                 _ => {}
             }
         }

@@ -18,7 +18,7 @@ test("new native and sweep boundaries have operator-readable reasons", () => {
       "20260822",
       "20260731",
     ),
-    "Tally refused the requested as-of date (20260822) and returned overdue days as of 20260731, so Bridge withheld the totals",
+    "Tally refused the requested as-of date (20260822) and returned overdue days as of 20260731, so ComplyEaze Bridge withheld the totals",
   );
   assert.match(outstandingsPartialReason("native_overdue_crosscheck_mismatch"), /overdue-day cross-check/i);
   assert.match(
@@ -268,7 +268,7 @@ test("a path that can prove the unallocated balance says so instead of disclaimi
   // The voucher scan derives bills from vouchers and genuinely cannot
   // establish the unallocated remainder, so its disclaimer is honest. The
   // native bills path recovers that figure exactly from the party ledgers, so
-  // repeating "Bridge does not show an On Account amount" there would be false
+  // repeating "ComplyEaze Bridge does not show an On Account amount" there would be false
   // while a screen right above it displays exactly that amount.
   const known = outstandingsAgeingDisclosure(true, true);
   assert.match(known, /shown as Unallocated above/i);

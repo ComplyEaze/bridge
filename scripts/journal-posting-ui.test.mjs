@@ -20,7 +20,7 @@ test("Journal review is reachable from Overview without becoming a top-level nav
   assert.match(discoveryNotice, /aria-describedby=\{shellNavigationDescription\}/);
   assert.doesNotMatch(app, /Bridge only reads from Tally/);
   assert.match(app, /posting a Journal always requires your explicit approval/);
-  const navStart = app.indexOf('<nav aria-label="Bridge navigation">');
+  const navStart = app.indexOf('<nav aria-label="ComplyEaze Bridge navigation">');
   const navEnd = app.indexOf("</nav>", navStart);
   assert.ok(navStart >= 0 && navEnd > navStart, "the actual Bridge navigation must exist");
   const nav = app.slice(navStart, navEnd);
@@ -41,7 +41,7 @@ test("Journal review uses the bounded native commands and preserves reconciliati
   assert.match(screen, /uncertainAttempt/);
   assert.match(screen, /setUncertainAttempt\(true\)/);
   assert.match(screen, /requestedConfig = reviewConfig \?\? config/);
-  assert.match(screen, /Review the approval dialog; Bridge then checks and posts this saved batch/);
+  assert.match(screen, /Review the approval dialog; ComplyEaze Bridge then checks and posts this saved batch/);
   assert.match(screen, /journalState\.canReconcile/);
   assert.doesNotMatch(screen, /setReview\(\(current\).*dispatched/);
   assert.match(screen, /Reconcile original batch/);

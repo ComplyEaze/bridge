@@ -67,10 +67,10 @@ export function LedgerEntriesScreen({ config, company, locked, onReadActivity }:
       if (version === requestVersion.current && submittedScope === latestScope.current) setLoading(false);
     }
   }
-  if (!company) return <section className="panel wide"><h2>Select a verified Tally company</h2><p>Ledger investigation is available after Bridge has observed the company name, number, GUID, and books-from date.</p></section>;
+  if (!company) return <section className="panel wide"><h2>Select a verified Tally company</h2><p>Ledger investigation is available after ComplyEaze Bridge has observed the company name, number, GUID, and books-from date.</p></section>;
   const result = response?.result;
   return <section className="panel wide ledger-investigation">
-    <div className="panel-heading"><div><h2>Investigate ledger entries</h2><p>Choose one ledger and a date range. Bridge shows vouchers observed for this selected window before filtering. Each next page makes a new observation; Bridge does not combine pages from different observations.</p></div></div>
+    <div className="panel-heading"><div><h2>Investigate ledger entries</h2><p>Choose one ledger and a date range. ComplyEaze Bridge shows vouchers observed for this selected window before filtering. Each next page makes a new observation; ComplyEaze Bridge does not combine pages from different observations.</p></div></div>
     <form className="ledger-investigation-form" onSubmit={(event) => { event.preventDefault(); void investigate(); }}>
       <label>Ledger<input required value={ledger} onChange={(event) => setLedger(event.target.value)} placeholder="Exact ledger name" disabled={loading || locked} /></label>
       <label>From<input required type="date" value={from} onChange={(event) => setFrom(event.target.value)} disabled={loading || locked} /></label>
@@ -83,7 +83,7 @@ export function LedgerEntriesScreen({ config, company, locked, onReadActivity }:
       <p className="ledger-investigation-scope" role="status">{result.total === 0 ? "This observation contained no matching vouchers; it does not establish source completeness." : `${result.total} matching voucher${result.total === 1 ? "" : "s"} observed in this response.`}{response?.evidence.state === "partial" ? ` Source evidence is partial${response.evidence.reason_code ? ` (${response.evidence.reason_code})` : ""}.` : ""}</p>
       {result.total > 0 && result.items.length === 0 && <p>This observation has no entries at this offset. Start again from the first entries.</p>}
       {result.items.length > 0 && <div className="ledger-entry-list">{result.items.map((voucher, index) => <details key={voucher.guid ?? `${voucher.date}-${voucher.voucher_number ?? index}`}><summary><span>{formatDate(voucher.date)}</span><strong>{voucher.voucher_type}{voucher.voucher_number ? ` · ${voucher.voucher_number}` : ""}</strong><span>{voucher.party ?? "No party"}</span></summary><div className="ledger-entry-detail">{voucher.narration && <p>{voucher.narration}</p>}<p className="ledger-entry-lines-heading">Voucher entries and counterpart lines</p><dl>{voucher.amounts.map((entry, entryIndex) => <div key={`${entry.ledger}-${entryIndex}`}><dt>{entry.ledger}</dt><dd>{entry.amount} · {entrySide(entry)}{entry.polarity_disagrees_with_amount && <span className="ledger-entry-note" title="Tally's ISDEEMEDPOSITIVE flag disagrees with the amount's sign on this entry. The amount is authoritative."> · flag disagrees</span>}</dd></div>)}</dl>{(voucher.cancelled || voucher.optional) && <p>Accounting state: {[voucher.cancelled && "cancelled", voucher.optional && "optional"].filter(Boolean).join(" and ")}.</p>}</div></details>)}</div>}
-      {response?.truncated && <p className="ledger-investigation-scope">This observation is display-bounded. “Show next entries” makes a new read of the same selected window; Bridge does not combine pages from different observations.</p>}
+      {response?.truncated && <p className="ledger-investigation-scope">This observation is display-bounded. “Show next entries” makes a new read of the same selected window; ComplyEaze Bridge does not combine pages from different observations.</p>}
       {result.total > 0 && result.items.length === 0 && <button type="button" className="secondary-action" disabled={loading || locked} onClick={() => void investigate()}>Show first entries</button>}
       {result.items.length > 0 && result.offset + result.items.length < result.total && <button type="button" className="secondary-action" disabled={loading || locked} onClick={() => void investigate(result.offset + result.items.length)}>Show next entries</button>}
     </>}
@@ -93,5 +93,5 @@ function formatDate(value: string) { return value.length === 8 ? `${value.slice(
 function formatDateInput(value?: string) { return value || "unavailable"; }
 function formatObservedAt(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "an unavailable time" : date.toLocaleString(); }
 function operatorMessage(cause: unknown) {
-  return formatCommandErrorMessage(cause, "Bridge could not complete this ledger investigation.");
+  return formatCommandErrorMessage(cause, "ComplyEaze Bridge could not complete this ledger investigation.");
 }

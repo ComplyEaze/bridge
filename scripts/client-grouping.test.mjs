@@ -34,7 +34,7 @@ function createGroupLabelSaveHarness(initialPersisted) {
       fail() {
         if (!isLatestClientGroupLabelSave(state.sequence, companyGuid, stamp)) return;
         state.labels = rollbackFailedClientGroupLabel(state.labels, companyGuid, attemptedLabel, state.persisted);
-        state.error = "Bridge could not save this group label. The previous label was restored; your figures are unchanged.";
+        state.error = "ComplyEaze Bridge could not save this group label. The previous label was restored; your figures are unchanged.";
       },
     };
   }
@@ -222,7 +222,7 @@ test("client amount views fail visibly instead of coercing or flipping amounts",
 
   assert.match(allClients, /Amount unavailable/);
   assert.doesNotMatch(allClients, /Math\.abs/);
-  assert.match(outstandings, /Bridge could not read an outstandings amount/);
+  assert.match(outstandings, /ComplyEaze Bridge could not read an outstandings amount/);
   assert.doesNotMatch(outstandings, /Math\.abs/);
 });
 

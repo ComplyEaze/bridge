@@ -81,11 +81,11 @@ function actionErrorOf(action: JournalActionResponse | null) {
   if (result.attempt_recorded !== false) return result.error.message ?? null;
   switch (actionErrorCodeOf(action)) {
     case "import_approval_timed_out":
-      return "The approval dialog expired before Bridge could post this Journal. Choose Post Journal to review it again.";
+      return "The approval dialog expired before ComplyEaze Bridge could post this Journal. Choose Post Journal to review it again.";
     case "import_approval_declined":
       return "The Journal was not posted because approval was declined. Choose Post Journal to try again.";
     case "import_approval_unavailable":
-      return "Bridge could not open the approval dialog, so the Journal was not posted. Choose Post Journal to try again.";
+      return "ComplyEaze Bridge could not open the approval dialog, so the Journal was not posted. Choose Post Journal to try again.";
     default:
       return result.error.message ?? null;
   }
@@ -198,8 +198,8 @@ export function JournalPostingScreen({
     <section className="panel wide journal-review" aria-labelledby="journal-review-heading" aria-busy={action !== null}>
       <div className="panel-heading">
         <div>
-          <h2 id="journal-review-heading">Review a Bridge Journal</h2>
-          <p className="panel-description">Choose the original XML file Bridge generated. Bridge checks it against the saved local batch before showing one Journal for review.</p>
+          <h2 id="journal-review-heading">Review a ComplyEaze Bridge Journal</h2>
+          <p className="panel-description">Choose the original XML file ComplyEaze Bridge generated. ComplyEaze Bridge checks it against the saved local batch before showing one Journal for review.</p>
         </div>
         <FileText size={24} aria-hidden="true" />
       </div>
@@ -248,7 +248,7 @@ export function JournalPostingScreen({
                 <>
                   <div>
                     <dt>Received response evidence</dt>
-                    <dd>Tally&apos;s response is retained for reconciliation; Bridge only confirms posting after a matching Journal readback.</dd>
+                    <dd>Tally&apos;s response is retained for reconciliation; ComplyEaze Bridge only confirms posting after a matching Journal readback.</dd>
                   </div>
                   <div><dt>Response bytes</dt><dd>{dispatchResponse.bytes}</dd></div>
                   <div><dt>Request digest</dt><dd><code>{dispatchResponse.request_sha256}</code></dd></div>
@@ -270,11 +270,11 @@ export function JournalPostingScreen({
               )}
             </dl>
           </details>
-          {verified && <p className="journal-status" role="status"><FileCheck2 size={18} aria-hidden="true" /> Bridge confirmed the original Journal and its saved batch.</p>}
-          {reconciliationRequired && !verified && <p className="journal-status journal-status-warning" role="alert">The original batch needs reconciliation. Bridge will use this same review and will not rebuild or resend it.</p>}
+          {verified && <p className="journal-status" role="status"><FileCheck2 size={18} aria-hidden="true" /> ComplyEaze Bridge confirmed the original Journal and its saved batch.</p>}
+          {reconciliationRequired && !verified && <p className="journal-status journal-status-warning" role="alert">The original batch needs reconciliation. ComplyEaze Bridge will use this same review and will not rebuild or resend it.</p>}
           {actionErrorOf(actionResult) && <p className="journal-status journal-status-warning" role="alert">{actionErrorOf(actionResult)}</p>}
           {postingBlocked && journalState.canPost && <p className="journal-status journal-status-warning" role="status">Finish or reconcile the snapshot before posting this Journal.</p>}
-          {!postingBlocked && !verified && !reconciliationRequired && <p className="journal-action-note">Review the approval dialog; Bridge then checks and posts this saved batch.</p>}
+          {!postingBlocked && !verified && !reconciliationRequired && <p className="journal-action-note">Review the approval dialog; ComplyEaze Bridge then checks and posts this saved batch.</p>}
           <div className="journal-actions">
             {journalState.canReconcile ? (
               <button className="primary" type="button" onClick={() => void runAction("reconcile")} disabled={action !== null || !lifecycleAdmissionReady || lifecycleInteractionBlocked}>

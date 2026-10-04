@@ -329,26 +329,32 @@ fn parse_native_ledger_collection_with_evidence<T>(
 
     loop {
         let record_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
+        match reader
+            .read_event()
+            .map_err(|_| crate::NativeCollectionError::MalformedResponse)?
+        {
             Event::Start(element) => {
                 let name = element.name().as_ref().to_ascii_uppercase();
                 if path.is_empty() && name != b"ENVELOPE" {
-                    anyhow::bail!("native ledger collection root was not ENVELOPE");
+                    return Err(crate::NativeCollectionError::MalformedResponse.into());
                 }
                 if path.is_empty() {
                     envelope_seen = true;
                 }
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     if std::mem::replace(&mut status_seen, true) {
-                        anyhow::bail!("native ledger collection carried a second STATUS");
+                        return Err(crate::NativeCollectionError::MalformedResponse.into());
                     }
                     // An empty STATUS is no answer (bridge#717, #863): the
                     // envelope's end refuses it, so a response cut off after
                     // it still ends as unterminated.
-                    match read_optional_text(&mut reader, element.name())?.as_deref() {
+                    match read_optional_text(&mut reader, element.name())
+                        .map_err(|_| crate::NativeCollectionError::MalformedResponse)?
+                        .as_deref()
+                    {
                         None => {}
                         Some("1") => status_answered = true,
-                        Some(_) => anyhow::bail!("native ledger collection did not report success"),
+                        Some(_) => return Err(crate::NativeCollectionError::NotSuccess.into()),
                     }
                     continue;
                 }
@@ -363,38 +369,44 @@ fn parse_native_ledger_collection_with_evidence<T>(
                         identities: identities_for_row,
                         alter_id,
                         response_company_guid,
-                    } = parse_row(&mut reader, &element)?;
+                    } = parse_row(&mut reader, &element).map_err(|error| {
+                        // A row failure the row parser already typed keeps its own class
+                        // (a foreign-currency opening is `foreign_currency_ledger_balance`,
+                        // #675); every other one is classed as the row's or the response's
+                        // fault (#718).
+                        if error
+                            .chain()
+                            .any(|cause| cause.is::<NativeLedgerAmountError>())
+                        {
+                            error
+                        } else {
+                            crate::NativeCollectionError::from_row(&error).into()
+                        }
+                    })?;
                     if matches!(
                         company_binding,
                         NativeLedgerCollectionCompanyBinding::ResponseGuid
                     ) {
-                        let response_company_guid = response_company_guid.ok_or_else(|| {
-                            anyhow::anyhow!(
-                                "native ledger collection omitted response company GUID"
-                            )
-                        })?;
+                        let response_company_guid = response_company_guid
+                            .ok_or(crate::NativeCollectionError::CompanyIdentityMismatch)?;
                         if !response_company_guid.eq_ignore_ascii_case(expected_company_guid) {
-                            anyhow::bail!(
-                                "native ledger collection did not confirm the selected company"
+                            return Err(
+                                crate::NativeCollectionError::CompanyIdentityMismatch.into()
                             );
                         }
                     }
                     let guid = identities_for_row
                         .guid
                         .as_deref()
-                        .ok_or_else(|| anyhow::anyhow!("native ledger row omitted GUID"))?;
+                        .ok_or(crate::NativeCollectionError::RowUnusable)?;
                     if native_ledger_guid_has_company_prefix(guid, expected_company_guid) {
                         company_guid_prefix_match_count = company_guid_prefix_match_count
                             .checked_add(1)
-                            .ok_or_else(|| {
-                                anyhow::anyhow!("native ledger prefix count overflow")
-                            })?;
+                            .ok_or(crate::NativeCollectionError::BoundsViolation)?;
                     } else {
                         company_guid_prefix_mismatch_count = company_guid_prefix_mismatch_count
                             .checked_add(1)
-                            .ok_or_else(|| {
-                                anyhow::anyhow!("native ledger prefix count overflow")
-                            })?;
+                            .ok_or(crate::NativeCollectionError::BoundsViolation)?;
                     }
                     record_identities_from_values("LEDGER", &identities_for_row, &mut identities)?;
                     let record_end = reader.buffer_position() as usize;
@@ -419,7 +431,7 @@ fn parse_native_ledger_collection_with_evidence<T>(
                 // A self-closing STATUS is no answer, and is still a STATUS.
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     if std::mem::replace(&mut status_seen, true) {
-                        anyhow::bail!("native ledger collection carried a second STATUS");
+                        return Err(crate::NativeCollectionError::MalformedResponse.into());
                     }
                 } else if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION"
                 {
@@ -427,19 +439,20 @@ fn parse_native_ledger_collection_with_evidence<T>(
                 } else if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
                     && name == b"LEDGER"
                 {
-                    anyhow::bail!("native ledger collection contained an empty ledger row");
+                    return Err(crate::NativeCollectionError::RowUnusable.into());
                 }
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())?,
+            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())
+                .map_err(|_| crate::NativeCollectionError::MalformedResponse)?,
             Event::Eof => break,
             _ => {}
         }
     }
     if !path.is_empty() {
-        anyhow::bail!("native ledger collection ended before its root closed");
+        return Err(crate::NativeCollectionError::MalformedResponse.into());
     }
     if !envelope_seen {
-        anyhow::bail!("native ledger collection had no ENVELOPE");
+        return Err(crate::NativeCollectionError::MalformedResponse.into());
     }
     // A complete envelope with no STATUS, an empty one or a self-closing one is
     // no answer, typed so a caller can tell it from Tally's failure answer
@@ -448,14 +461,14 @@ fn parse_native_ledger_collection_with_evidence<T>(
         return Err(crate::NativeCollectionError::StatusAbsent.into());
     }
     if !collection_seen {
-        anyhow::bail!("native ledger collection omitted BODY/DATA/COLLECTION");
+        return Err(crate::NativeCollectionError::MalformedResponse.into());
     }
     if matches!(
         company_binding,
         NativeLedgerCollectionCompanyBinding::RowGuidPrefix
     ) && company_guid_prefix_match_count == 0
     {
-        anyhow::bail!("native ledger collection did not bind to the requested company");
+        return Err(crate::NativeCollectionError::CompanyIdentityMismatch.into());
     }
     let mut duplicate_identities = identities
         .into_iter()
@@ -466,8 +479,8 @@ fn parse_native_ledger_collection_with_evidence<T>(
         })
         .collect::<Vec<_>>();
     duplicate_identities.sort_by(|left, right| left.identity_sha256.cmp(&right.identity_sha256));
-    let source_record_count = u64::try_from(records.len())
-        .map_err(|_| anyhow::anyhow!("native ledger collection exceeded supported record count"))?;
+    let source_record_count =
+        u64::try_from(records.len()).map_err(|_| crate::NativeCollectionError::BoundsViolation)?;
     Ok(ParsedExport {
         records,
         evidence: ExportEvidence {
@@ -917,7 +930,7 @@ fn parse_native_ledger_collection_row_with_master_fields(
             Event::Text(text) if !text.decode()?.trim().is_empty() => {
                 anyhow::bail!("native ledger row contained unexpected text");
             }
-            Event::Eof => anyhow::bail!("native ledger row ended before LEDGER closed"),
+            Event::Eof => return Err(crate::RowCutOff.into()),
             _ => {}
         }
     }
@@ -1004,7 +1017,7 @@ fn read_gst_registration_entry(
                 }
             }
             Event::End(end) if end.name().as_ref() == list_name.as_slice() => break,
-            Event::Eof => anyhow::bail!("native ledger registration entry was not closed"),
+            Event::Eof => return Err(crate::RowCutOff.into()),
             _ => {}
         }
     }
@@ -1061,7 +1074,7 @@ fn read_scalar_rejecting_nested_markup(
                     }
                     break;
                 }
-                Event::Eof => anyhow::bail!("party/ledger master field ended before it closed"),
+                Event::Eof => return Err(crate::RowCutOff.into()),
                 _ => {}
             }
         }
@@ -1167,7 +1180,7 @@ fn read_flattened_optional_text(
                     flush_flattened_part(&mut current, &mut parts);
                     nested_depth = nested_depth.saturating_sub(1);
                 }
-                Event::Eof => anyhow::bail!("party/ledger master field ended before it closed"),
+                Event::Eof => return Err(crate::RowCutOff.into()),
                 _ => {}
             }
         }

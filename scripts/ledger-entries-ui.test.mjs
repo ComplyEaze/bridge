@@ -12,7 +12,7 @@ test("ledger investigation remains an explicit, bounded Overview action", async 
   assert.match(app, /type View = .*"ledger_entries"/);
   assert.match(app, /onClick=\{\(\) => setView\("ledger_entries"\)\}/);
   assert.match(app, /<LedgerEntriesScreen[\s\S]*?onReadActivity=\{changeChildTallyReadActivity\}/);
-  assert.doesNotMatch(app.slice(app.indexOf('<nav aria-label="Bridge navigation">'), app.indexOf("</nav>")), /Investigate ledger/);
+  assert.doesNotMatch(app.slice(app.indexOf('<nav aria-label="ComplyEaze Bridge navigation">'), app.indexOf("</nav>")), /Investigate ledger/);
   assert.match(screen, /config\.host, config\.port, company\.name, company\.guid, company\.company_number, company\.books_from_yyyymmdd, company\.canonical_origin, ledger, from, to/);
   assert.match(screen, /return \(\) => \{ requestVersion\.current \+= 1; \};/);
   assert.match(screen, /submittedScope === latestScope\.current/);

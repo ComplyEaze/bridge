@@ -118,8 +118,8 @@ neither is ported, as neither is in `da9e2d3d`.
 - `edge-books/loans_interest_s194a_bounds.json` (a firm with no TDS; s.194A threshold Rs 10,000): a listed
   pair crediting and reversing one amount, on two vouchers or on one voucher beside a non-interest line,
   leaves the threshold open where the net reading did not; the least exactly at the threshold is not over
-  it; listed lines all credits keep the earlier wording; over the threshold in every reading, the s.194A
-  finding stays; listed lines all credits, or all reversals, keep the earlier wording. LOAN-2 fires on each
+  it; over the threshold in every reading, the s.194A finding stays; listed lines all credits, or all
+  reversals, keep the earlier wording. LOAN-2 fires on each
   listed voucher whose interest lines do not net to nil, as in the Phase A books (the reference's own check,
   unchanged).
 - Produced at `da9e2d3d` (5 Oct 2026) from an archive of its `tae/` and `selftest/` only, by the

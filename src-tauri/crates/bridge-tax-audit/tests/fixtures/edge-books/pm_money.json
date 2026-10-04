@@ -1,0 +1,470 @@
+{
+ "comment": "party_monthly's money reason (owner ruling 7b, as the reference applies it at da9e2d3d), every voucher in the books and the Trial Balance tying in every block. Indirect expenses: a supplier paid in cash with rent credited on the cash's side (a credit line read by its side); a receipt net of bank charges from two customers (several parties); a receipt net of charges that also pays a supplier, so the bank nets to the other side but one bank line is on the charges' side (gross, not net); a round-off on a receipt (a stated limit); a round-off on a cash sales invoice, the customer's though cash is on its side (invoice-class); rent with the bank on the supplier's side, the supplier's; rent reversed to a supplier beside a nil bank line, the supplier's (a nil line is on neither side). Sales and purchases: a journal sale beside a cash line on the sales' side, and a payment with purchases credited beside the bank, each the party's (the money reason is for the expense blocks only). Direct expenses: three receipts net of collection charges, two identical (one GUID, number, date and lines) and one with no GUID, each counted and cited, and a supplier paid with freight on its side and no GUID (not on the other side, with the expense example).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-pm_money-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-pm_money-001"
+  },
+  {
+   "name": "Cust A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-pm_money-002"
+  },
+  {
+   "name": "Cust B",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-pm_money-003"
+  },
+  {
+   "name": "Supp L",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-pm_money-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-pm_money-005"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-pm_money-006"
+  },
+  {
+   "name": "Freight",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-pm_money-007"
+  },
+  {
+   "name": "Collection Charges",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-pm_money-008"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-pm_money-009"
+  },
+  {
+   "name": "Bank Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-pm_money-010"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-pm_money-011"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 2376960,
+   "credit": 1960000,
+   "closing": 416960
+  },
+  {
+   "ledger": "Bank Charges",
+   "opening": 0,
+   "debit": 20000,
+   "credit": 0,
+   "closing": 20000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 1000000,
+   "closing": -950000
+  },
+  {
+   "ledger": "Collection Charges",
+   "opening": 0,
+   "debit": 3000,
+   "credit": 0,
+   "closing": 3000
+  },
+  {
+   "ledger": "Cust A",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 1900000,
+   "closing": -900000
+  },
+  {
+   "ledger": "Cust B",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 500000,
+   "closing": -450000
+  },
+  {
+   "ledger": "Freight",
+   "opening": 0,
+   "debit": 20000,
+   "credit": 0,
+   "closing": 20000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000,
+   "closing": -10000
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 110000,
+   "closing": 90000
+  },
+  {
+   "ledger": "Round Off",
+   "opening": 0,
+   "debit": 80,
+   "credit": 0,
+   "closing": 80
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1000040,
+   "closing": -1000040
+  },
+  {
+   "ledger": "Supp L",
+   "opening": 0,
+   "debit": 2810000,
+   "credit": 50000,
+   "closing": 2760000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "m01",
+   "date": "2025-04-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supp L",
+     1000000
+    ],
+    [
+     "Cash",
+     -900000
+    ],
+    [
+     "Rent",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "m02",
+   "date": "2025-05-15",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank",
+     990000
+    ],
+    [
+     "Bank Charges",
+     10000
+    ],
+    [
+     "Cust A",
+     -600000
+    ],
+    [
+     "Cust B",
+     -400000
+    ]
+   ]
+  },
+  {
+   "guid": "m03",
+   "date": "2025-06-15",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank",
+     990000
+    ],
+    [
+     "Bank Charges",
+     10000
+    ],
+    [
+     "Cust A",
+     -1000000
+    ],
+    [
+     "Supp L",
+     1200000
+    ],
+    [
+     "Bank",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "m04",
+   "date": "2025-07-15",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank",
+     99960
+    ],
+    [
+     "Round Off",
+     40
+    ],
+    [
+     "Cust B",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "m05",
+   "date": "2025-08-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Cust A",
+     1000000
+    ],
+    [
+     "Sales",
+     -900000
+    ],
+    [
+     "Cash",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "m06",
+   "date": "2025-08-20",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supp L",
+     100000
+    ],
+    [
+     "Bank",
+     -90000
+    ],
+    [
+     "Purchases",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "dup",
+   "date": "2025-09-10",
+   "base_type": "Receipt",
+   "number": "R-1",
+   "lines": [
+    [
+     "Bank",
+     99000
+    ],
+    [
+     "Collection Charges",
+     1000
+    ],
+    [
+     "Cust A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "dup",
+   "date": "2025-09-10",
+   "base_type": "Receipt",
+   "number": "R-1",
+   "lines": [
+    [
+     "Bank",
+     99000
+    ],
+    [
+     "Collection Charges",
+     1000
+    ],
+    [
+     "Cust A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-09-12",
+   "base_type": "Receipt",
+   "number": "R-3",
+   "lines": [
+    [
+     "Bank",
+     99000
+    ],
+    [
+     "Collection Charges",
+     1000
+    ],
+    [
+     "Cust A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-09-13",
+   "base_type": "Payment",
+   "number": "P-4",
+   "lines": [
+    [
+     "Supp L",
+     500000
+    ],
+    [
+     "Freight",
+     20000
+    ],
+    [
+     "Bank",
+     -520000
+    ]
+   ]
+  },
+  {
+   "guid": "m11",
+   "date": "2025-10-10",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Cash",
+     50000
+    ],
+    [
+     "Cust B",
+     50000
+    ],
+    [
+     "Round Off",
+     40
+    ],
+    [
+     "Sales",
+     -100040
+    ]
+   ]
+  },
+  {
+   "guid": "m12",
+   "date": "2025-11-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent",
+     200000
+    ],
+    [
+     "Supp L",
+     -50000
+    ],
+    [
+     "Bank",
+     -150000
+    ]
+   ]
+  },
+  {
+   "guid": "m13",
+   "date": "2025-12-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Supp L",
+     10000
+    ],
+    [
+     "Rent",
+     -10000
+    ],
+    [
+     "Bank",
+     0
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank"
+ ],
+ "tests": [
+  "party_monthly"
+ ]
+}

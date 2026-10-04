@@ -72,8 +72,8 @@ for `cash_payments_40a3`: `loan_ledgers` and `round_off_ledgers` (default []); f
 for `stock`: `stock_items` ({name: {base_unit?, guid?, opening_qty?, opening_value?, closing_qty?,
 closing_value?}}, default {}), `stock_opening` and `stock_closing` ({as_of, rows: {name: {qty?, value?,
 rate?}}}), each quantity a number, each value or rate integer paise, absent or null meaning None, and
-`is_integrated` (true, false, or absent/null for unknown); and for `party_monthly`: `cash`, `bank` and
-`period` as above, and `top_n` (a non-negative integer, default the module's PARTY_TOP_N; Python would slice
+`is_integrated` (true, false, or absent/null for unknown); and for `party_monthly`: `cash`, `bank` (both also
+passed to the module invariant, as the reference's pack passes them) and `period` as above, and `top_n` (a non-negative integer, default the module's PARTY_TOP_N; Python would slice
 a negative one from the end, which the Rust `usize` cannot express, so both sides refuse it).
 """
 from __future__ import annotations
@@ -372,7 +372,10 @@ def main() -> int:
         "partners_40b_194t": lambda: (partners_40b_194t, partners_40b_194t.run(
             eng, rules, {k: dict(v) for k, v in spec.get("partners", {}).items()}, spec.get("deed"),
             tds_ledgers=frozenset(spec.get("tds_payable_ledgers", [])))),
-        "party_monthly": lambda: (party_monthly, party_monthly.run(
+        # As tae/pack.py: PWM-2 takes the cash and bank ledgers run() takes, so they are bound here.
+        "party_monthly": lambda: (SimpleNamespace(TEST_ID=party_monthly.TEST_ID, check_invariants=lambda e, res:
+                                                  party_monthly.check_invariants(e, res, cash, bank)),
+                                  party_monthly.run(
             eng, rules, cash, bank,
             top_n=typed(spec, "top_n", lambda x: integer(x) and x >= 0, "a non-negative integer",
                         absent=party_monthly.PARTY_TOP_N, nullable=False))),

@@ -122,7 +122,7 @@
         {
           "kind": "row",
           "id": "indirect_expenses:not_attributed",
-          "label": "Not attributed: no party on the other side"
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -225,6 +225,14 @@
       ]
     },
     {
+      "id": "party_monthly.indirect_expenses_not_attributed_other_side_vouchers",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "64887344a8e46d8b",
+      "definition_text": "Indirect Expenses: vouchers in the row 'Not attributed to a party' for this reason (see the finding citing them).",
+      "evidence": []
+    },
+    {
       "id": "party_monthly.indirect_expenses_sep_45f857c2",
       "value": 800000,
       "unit": "paise",
@@ -323,7 +331,7 @@
         {
           "kind": "row",
           "id": "indirect_expenses:not_attributed",
-          "label": "Not attributed: no party on the other side"
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -365,7 +373,7 @@
         {
           "kind": "row",
           "id": "indirect_expenses:not_attributed",
-          "label": "Not attributed: no party on the other side"
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -744,7 +752,7 @@
       "facts": [
         {
           "name": "vouchers",
-          "figure_id": "party_monthly.indirect_expenses_vouchers_6c8f7958"
+          "figure_id": "party_monthly.indirect_expenses_not_attributed_other_side_vouchers"
         }
       ],
       "evidence": [
@@ -756,9 +764,9 @@
       ],
       "title_sha256_16": "1febfc0e0d1d54c2",
       "title_text": "'Indirect Expenses' amounts on vouchers whose party ledger is not on the other side are not attributed to a party",
-      "limits_sha256_16": "98d0078e0520da7e",
+      "limits_sha256_16": "a7ebb5d750b24a11",
       "limits_text": [
-        "On each voucher cited (none of them a sales, purchase, credit or debit note voucher) a party ledger is present, but none is on the other side from the 'Indirect Expenses' lines, so those lines are not that party's: for example bank charges or rent in the same payment as a supplier. They are shown in the row 'Not attributed: no party on the other side', not under any party, and are in the block's total."
+        "On each voucher cited (none of them a sales, purchase, credit or debit note voucher) a party ledger is present, but none is on the other side from the 'Indirect Expenses' lines, so those lines are not that party's: for example rent paid in the same payment as a supplier. They are shown in the row 'Not attributed to a party', not under any party, and are in the block's Total row."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []

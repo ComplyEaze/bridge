@@ -1,0 +1,7 @@
+.github/workflows/ci.yml
+.github/workflows/dependency-security-scheduled.yml
+.github/workflows/dependency-security.yml
+package.json
+pnpm-lock.yaml
+scripts/check-ci-workflow-consistency.mjs
+reviewer: lamemustafa

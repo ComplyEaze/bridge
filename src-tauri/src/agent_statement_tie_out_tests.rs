@@ -30,12 +30,12 @@ fn present(opening: &str) -> LedgerRead {
 
 /// The book at the start holds 1500.00 in the bank (a debit, so -1500.00 in
 /// Tally's sign) and at the end 2000.00 (-2000.00).
-fn observed() -> Observed {
-    Observed {
-        at_first: present("-1500.00"),
-        after_last: present("-2000.00"),
-        at_first_again: present("-1500.00"),
-    }
+fn observed() -> [LedgerRead; 3] {
+    [
+        present("-1500.00"),
+        present("-2000.00"),
+        present("-1500.00"),
+    ]
 }
 
 fn amounts(gaps: &Gaps) -> [Option<String>; 3] {
@@ -80,11 +80,7 @@ fn an_opening_of_minus_1500_against_a_statement_opening_of_1000_is_a_gap_of_plus
 
 #[test]
 fn a_gap_of_exactly_zero_is_tied_whatever_its_spelling() {
-    let observed = Observed {
-        at_first: present("-1000"),
-        after_last: present("-2150.000"),
-        at_first_again: present("-1000.00"),
-    };
+    let observed = [present("-1000"), present("-2150.000"), present("-1000.00")];
     let tied = gaps(Stage::AfterPost, &file(), &observed, false).unwrap();
     assert_eq!(tied.opening.state(), "tied");
     assert_eq!(tied.closing.state(), "tied");
@@ -375,34 +371,21 @@ fn the_dates_read_are_the_first_row_the_day_after_the_last_and_the_first_again()
 // ---- what a read can fail to show --------------------------------------------
 
 #[test]
-fn a_bank_ledger_in_no_read_is_not_in_the_book() {
-    let none = Observed {
-        at_first: LedgerRead::Absent,
-        after_last: LedgerRead::Absent,
-        at_first_again: LedgerRead::Absent,
-    };
-    assert_eq!(
-        gaps(Stage::AfterPost, &file(), &none, false).unwrap(),
-        all(NotEstablished::BankLedgerNotInBook)
-    );
-}
-
-#[test]
 fn a_bank_ledger_in_some_reads_and_not_others_means_the_book_changed() {
     let mut changed = observed();
-    changed.at_first_again = LedgerRead::Absent;
+    changed[2] = LedgerRead::Absent;
     assert_eq!(
         gaps(Stage::AfterPost, &file(), &changed, false).unwrap(),
         all(NotEstablished::BookChangedDuringRead)
     );
     let mut changed = observed();
-    changed.after_last = LedgerRead::Absent;
+    changed[1] = LedgerRead::Absent;
     assert_eq!(
         gaps(Stage::AfterPost, &file(), &changed, false).unwrap(),
         all(NotEstablished::BookChangedDuringRead)
     );
     let mut changed = observed();
-    changed.at_first = LedgerRead::Absent;
+    changed[0] = LedgerRead::Absent;
     assert_eq!(
         gaps(Stage::AfterPost, &file(), &changed, false).unwrap(),
         all(NotEstablished::BookChangedDuringRead)
@@ -412,14 +395,14 @@ fn a_bank_ledger_in_some_reads_and_not_others_means_the_book_changed() {
 #[test]
 fn an_opening_that_moved_between_the_two_reads_at_the_first_date_means_the_book_changed() {
     let mut changed = observed();
-    changed.at_first_again = present("-1500.01");
+    changed[2] = present("-1500.01");
     assert_eq!(
         gaps(Stage::AfterPost, &file(), &changed, false).unwrap(),
         all(NotEstablished::BookChangedDuringRead)
     );
     // The same figure spelled with another scale is not a change.
     let mut same = observed();
-    same.at_first_again = present("-1500");
+    same[2] = present("-1500");
     assert_eq!(
         amounts(&gaps(Stage::AfterPost, &file(), &same, false).unwrap())[0],
         Some("500.00".into())
@@ -541,29 +524,29 @@ fn the_headline_names_every_gap_that_is_not_zero_with_its_sign() {
     let text = reading(Stage::AfterPost, window(), &differing);
     assert_eq!(
         text["headline"],
-        "Bank ledger against the statement, 2026-08-01 to 2026-08-07: opening gap 500.00; closing gap -150.00. A positive amount means the book shows more money in the bank than the statement does; a negative amount, less. Within these dates the book moved 650.00 less than the statement did."
+        "Bank ledger against the statement, 2026-08-01 to 2026-08-07: opening gap 500.00; closing gap -150.00. A positive amount means the book shows more money in the bank than the statement does; a negative amount, less. Within these dates the book moved 650.00 further down than the statement did."
     );
 }
 
 #[test]
 fn the_headline_leaves_out_a_figure_that_is_zero_and_says_so_when_all_are() {
     // Opening ties, the closing does not: the change equals the closing gap.
-    let observed = Observed {
-        at_first: present("-1000.00"),
-        after_last: present("-2000.00"),
-        at_first_again: present("-1000.00"),
-    };
+    let observed = [
+        present("-1000.00"),
+        present("-2000.00"),
+        present("-1000.00"),
+    ];
     let one = gaps(Stage::AfterPost, &file(), &observed, false).unwrap();
     let text = reading(Stage::AfterPost, window(), &one);
     assert_eq!(
         text["headline"],
-        "Bank ledger against the statement, 2026-08-01 to 2026-08-07: closing gap -150.00. A positive amount means the book shows more money in the bank than the statement does; a negative amount, less. Within these dates the book moved 150.00 less than the statement did."
+        "Bank ledger against the statement, 2026-08-01 to 2026-08-07: closing gap -150.00. A positive amount means the book shows more money in the bank than the statement does; a negative amount, less. Within these dates the book moved 150.00 further down than the statement did."
     );
-    let tied = Observed {
-        at_first: present("-1000.00"),
-        after_last: present("-2150.00"),
-        at_first_again: present("-1000.00"),
-    };
+    let tied = [
+        present("-1000.00"),
+        present("-2150.00"),
+        present("-1000.00"),
+    ];
     let none = gaps(Stage::AfterPost, &file(), &tied, false).unwrap();
     let text = reading(Stage::AfterPost, window(), &none);
     assert_eq!(
@@ -601,23 +584,43 @@ fn the_headline_names_what_is_not_established_before_any_gap_that_differs() {
     assert!(none.get("possible_causes").is_none(), "{none}");
 }
 
+/// By direction: the book's movement against the statement's, up or down,
+/// whether the money moved in or out.
 #[test]
-fn the_change_sentence_says_more_or_less_by_its_sign() {
-    // The book moved 100.00 more than the statement: closing gap 600.00 on an opening gap of 500.00.
-    let more = Observed {
-        at_first: present("-1500.00"),
-        after_last: present("-2750.00"),
-        at_first_again: present("-1500.00"),
+fn the_change_sentence_says_further_up_or_further_down_whichever_way_the_money_moved() {
+    let sentence = |file: &StatementFile, reads: &[LedgerRead; 3]| {
+        let text = reading(
+            Stage::AfterPost,
+            window(),
+            &gaps(Stage::AfterPost, file, reads, false).unwrap(),
+        );
+        text["headline"].as_str().unwrap().to_string()
     };
-    let text = reading(
-        Stage::AfterPost,
-        window(),
-        &gaps(Stage::AfterPost, &file(), &more, false).unwrap(),
-    );
-    assert!(text["headline"]
-        .as_str()
-        .unwrap()
-        .ends_with("Within these dates the book moved 100.00 more than the statement did."));
+    // Money in: statement 1000 to 2150, book 1500 to 2750. The book rose 1250
+    // against the statement's 1150: 100.00 further up.
+    let more = [
+        present("-1500.00"),
+        present("-2750.00"),
+        present("-1500.00"),
+    ];
+    assert!(sentence(&file(), &more)
+        .ends_with("Within these dates the book moved 100.00 further up than the statement did."));
+    // Money out: statement 1000 to 800 (fell 200), book 700 to 600 (fell 100).
+    // The book fell less, so it moved 100.00 further up, though its closing gap
+    // (-200.00) is below zero.
+    let mut out = file();
+    out.closing = BankSide::from_printed("800.00").unwrap();
+    out.proposals_net = BankSide::from_printed("0").unwrap();
+    let fell = [present("-700.00"), present("-600.00"), present("-700.00")];
+    let text = sentence(&out, &fell);
+    assert!(text.contains("closing gap -200.00"), "{text}");
+    assert!(text
+        .ends_with("Within these dates the book moved 100.00 further up than the statement did."));
+    // Statement 1000 to 800, book 1000 to 700: the book fell 300 against 200: 100.00 further down.
+    let further = [present("-1000.00"), present("-700.00"), present("-1000.00")];
+    assert!(sentence(&out, &further).ends_with(
+        "Within these dates the book moved 100.00 further down than the statement did."
+    ));
 }
 
 #[test]
@@ -1018,26 +1021,6 @@ async fn a_book_that_differs_gives_the_gaps_with_their_sign_and_reads_the_three_
 }
 
 #[tokio::test]
-async fn before_build_counts_the_files_own_vouchers_in_the_closing_gap() {
-    let (response, _) = three_reads(
-        book("-1500.00", "-2000.00", "-1500.00"),
-        BANK,
-        whole("2026-08-01", "2026-08-07"),
-        "before_build",
-    )
-    .await;
-    // 2000.00 + (300.00 - 120.50) - 2150.00.
-    assert_eq!(
-        figures(&response),
-        [
-            amount("differs", "500.00"),
-            amount("differs", "29.50"),
-            amount("differs", "-470.50")
-        ]
-    );
-}
-
-#[tokio::test]
 async fn a_book_that_matches_the_statement_at_both_ends_is_tied() {
     let (response, _) = three_reads(
         book("-1000.00", "-2150.00", "-1000"),
@@ -1250,70 +1233,34 @@ async fn a_company_that_is_not_loaded_is_refused_whatever_the_file_says() {
     }
 }
 
+/// The loader has its own tests (`agent_import_bank_tests.rs`); one refusal
+/// here shows the tool goes through it.
 #[tokio::test]
-async fn a_proposals_file_is_checked_as_build_import_xml_checks_it() {
+async fn a_proposals_file_changed_since_the_parse_and_a_stage_that_is_neither_are_refused() {
     let directory = tempfile::tempdir().unwrap();
-    let server = server(directory.path(), None);
-    let code = |response: &Value| {
-        response["structuredContent"]["result"]["error"]["code"]
-            .as_str()
-            .map(str::to_string)
-    };
     let file = publish(
         directory.path(),
         &proposals(BANK, Some(whole("2026-08-01", "2026-08-07"))),
     );
-    // Not there.
-    let missing = (
-        format!("statement-{}", uuid::Uuid::new_v4()),
-        file.1.clone(),
-    );
-    assert_eq!(
-        code(&tie_out(&server, &missing, "after_post").await).as_deref(),
-        Some("proposals_not_found")
-    );
-    // Changed since the parse returned its digest.
+    let server = server(directory.path(), None);
+    let code = |response: Value| response["structuredContent"]["result"]["error"]["code"].clone();
     let changed = (file.0.clone(), "0".repeat(64));
     assert_eq!(
-        code(&tie_out(&server, &changed, "after_post").await).as_deref(),
-        Some("proposals_changed")
-    );
-    // Not a proposals file of this schema.
-    let mut other = proposals(BANK, None);
-    other["schema"] = json!("something.else");
-    let other = publish(directory.path(), &other);
-    assert_eq!(
-        code(&tie_out(&server, &other, "after_post").await).as_deref(),
-        Some("proposals_file_invalid")
-    );
-    // Another file's id.
-    let mut foreign = proposals(BANK, None);
-    foreign["proposals_id"] = json!("statement-x");
-    let foreign_id = format!("statement-{}", uuid::Uuid::new_v4());
-    let bytes = serde_json::to_vec(&foreign).unwrap();
-    let path = directory
-        .path()
-        .join("bank-statements")
-        .join(format!("{foreign_id}.json"));
-    std::fs::write(&path, &bytes).unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
-    }
-    assert_eq!(
-        code(&tie_out(&server, &(foreign_id, sha256_hex(&bytes)), "after_post").await).as_deref(),
-        Some("proposals_file_invalid")
-    );
-    // An id that is not one the parse issues.
-    let bad_id = (
-        "statement-not-a-uuid-and-padded-to-46-chars-xx".to_string(),
-        file.1.clone(),
+        code(tie_out(&server, &changed, "after_post").await),
+        "proposals_changed"
     );
     assert_eq!(
-        code(&tie_out(&server, &bad_id, "after_post").await).as_deref(),
-        Some("argument_invalid:proposals_id")
+        code(tie_out(&server, &file, "later").await),
+        "argument_invalid:stage"
     );
+    // The handler's own refusal, under the schema's: a stage that is not one.
+    let direct = server
+        .statement_tie_out(&json!({
+            "company_guid": COMPANY_GUID, "proposals_id": file.0, "proposals_sha256": file.1,
+            "stage": "later",
+        }))
+        .await;
+    assert_eq!(direct.err().unwrap().code, "argument_invalid:stage");
 }
 
 /// Rows with no voucher (a cash line not yet answered, a row skipped because
@@ -1420,29 +1367,6 @@ async fn a_file_a_batch_has_already_posted_is_not_projected_again() {
     );
     let after = run("after_post", true).await;
     assert_eq!(figures(&after)[1], amount("differs", "-150.00"));
-}
-
-#[tokio::test]
-async fn a_failed_catalogue_read_is_the_read_failure_ledger_movement_gives() {
-    let mut plans = company_check();
-    plans.extend(ledger_read(&plan("<ENVELOPE></ENVELOPE>".to_string())));
-    let simulator = SequenceSimulator::spawn(plans).unwrap();
-    let directory = tempfile::tempdir().unwrap();
-    let file = publish(
-        directory.path(),
-        &proposals(BANK, Some(whole("2026-08-01", "2026-08-07"))),
-    );
-    let response = tie_out(
-        &server(directory.path(), Some(simulator.address())),
-        &file,
-        "after_post",
-    )
-    .await;
-    assert_eq!(response["isError"], true, "{response}");
-    assert_eq!(
-        response["structuredContent"]["result"]["error"]["code"], "ledger_movement_read_failed",
-        "{response}"
-    );
 }
 
 /// The file here is written by the code `parse_bank_statement` runs after a

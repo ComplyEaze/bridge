@@ -1142,7 +1142,10 @@ licence mode has been qualified.
 A read-only check of the bank ledger against a statement `parse_bank_statement`
 has parsed, for use before `build_import_xml` (`stage` `before_build`) and
 after a post or an import by hand (`stage` `after_post`). It writes nothing to
-Tally, never posts and never blocks a post.
+Tally and never posts. Its check of the import journal takes the shared
+import-admission lock for a moment, so a build or post at the same time can be
+refused as lock-busy, and it can be refused by theirs; nothing waits, so nothing
+deadlocks.
 
 - **Whole statements only.** The parse records the statement's own first and
   last row dates in an optional `window` of the proposals file (`first_row_date`,

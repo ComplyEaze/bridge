@@ -1,61 +1,24 @@
-//! `statement_tie_out`: does the bank ledger in Tally stand where the bank
+//! `statement_tie_out`: does the bank ledger in Tally stand where a parsed bank
 //! statement says it stood at the start and at the end of the statement's own
-//! dates?
-//!
-//! Read-only. It writes nothing to Tally, never posts and never blocks a post.
-//! It reads the proposals file `parse_bank_statement` wrote and the book's
-//! ledger list at three dates, and returns three gaps, the dates and a fixed
-//! reading.
-//!
-//! **Whole statements only.** A statement narrowed with from/to would need the
-//! running balance at its edges, which the result of `parse_bank_statement`
-//! deliberately never carries. On a whole statement the two edge figures are
-//! the opening and closing balances the caller supplied. A narrowed file is
-//! `not_established`.
-//!
-//! **What the result reveals.** The book's own opening and closing are not
-//! returned, but a gap plus the statement balance the caller supplied gives
-//! the book's balance, so they are derivable. The result also carries the
-//! company block, the stage and the reading.
-//!
-//! **The file is not bound to a company.** It names a bank ledger, not the
-//! company it was parsed for; the caller must pass the company the statement
-//! belongs to.
-//!
-//! **The sign is a type.** Tally holds a debit (asset) balance as a negative
-//! number; a statement prints money in the account as positive. [`BankSide`]
-//! is the statement's sign, and [`BankSide::from_book`] is the one place a
-//! Tally figure is converted into it.
+//! dates? Read-only: it writes nothing to Tally and never posts. Its journal
+//! check takes the shared import-admission lock for a moment, so a build or post
+//! at the same time can be refused as lock-busy, and it can be refused by theirs;
+//! nothing waits, so nothing deadlocks. Whole statements only. See
+//! `docs/agent/README.md` ("Statement tie-out").
 use super::*;
 use bridge_bank_statement::date::Date;
 use bridge_bank_statement::proposals::format_amount;
 use bridge_tally_core::{ExactDecimal, TallyDate};
 
 /// Whether this file's own vouchers are counted into the closing figure.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 enum Stage {
     /// Before the file is built and imported: the closing figure is the book
     /// plus what this file's vouchers would add to the bank ledger.
     BeforeBuild,
     /// After an import, by anyone: the closing figure is the book as it stands.
     AfterPost,
-}
-
-impl Stage {
-    fn parse(text: &str) -> Result<Self, String> {
-        match text {
-            "before_build" => Ok(Self::BeforeBuild),
-            "after_post" => Ok(Self::AfterPost),
-            _ => Err("argument_invalid:stage".to_string()),
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::BeforeBuild => "before_build",
-            Self::AfterPost => "after_post",
-        }
-    }
 }
 
 /// Why a figure is not established. Each is a typed result, not an error.
@@ -125,13 +88,9 @@ impl BankSide {
     fn from_book(native: &str) -> Result<Self, String> {
         let native =
             ExactDecimal::parse(native).map_err(|_| "ledger_opening_invalid".to_string())?;
-        Self::zero_minus(&native)
-    }
-
-    fn zero_minus(value: &ExactDecimal) -> Result<Self, String> {
         Self::canonical(
             ExactDecimal::zero()
-                .checked_subtract(value)
+                .checked_subtract(&native)
                 .map_err(|_| "tie_out_arithmetic_out_of_range".to_string())?,
         )
     }
@@ -327,7 +286,9 @@ enum LedgerRead {
 
 impl LedgerRead {
     /// By exact name. A name that appears twice in one catalogue is not a book
-    /// this check can read, and a row without an opening is not read as zero.
+    /// this check can read, and a row without an opening is not read as zero
+    /// (`ledger_opening_missing` is the typed error for a malformed read; the
+    /// native reader already refuses such a row).
     fn of(ledgers: &[TallyLedger], name: &str) -> Result<Self, String> {
         let mut found = ledgers.iter().filter(|ledger| ledger.name == name);
         match (found.next(), found.next()) {
@@ -341,12 +302,6 @@ impl LedgerRead {
             _ => Err("ledger_name_duplicated_in_catalogue".to_string()),
         }
     }
-}
-
-struct Observed {
-    at_first: LedgerRead,
-    after_last: LedgerRead,
-    at_first_again: LedgerRead,
 }
 
 /// The catalogue dates a tie-out reads: the first row's date, the day after
@@ -368,18 +323,14 @@ fn read_dates(first: Date, last: Date) -> Result<[TallyDate; 3], String> {
 fn gaps(
     stage: Stage,
     file: &StatementFile,
-    observed: &Observed,
+    reads: &[LedgerRead; 3],
     partly_posted: bool,
 ) -> Result<Gaps, String> {
-    let (start, end) = match (
-        &observed.at_first,
-        &observed.after_last,
-        &observed.at_first_again,
-    ) {
-        (LedgerRead::Absent, LedgerRead::Absent, LedgerRead::Absent) => {
+    let (start, end) = match reads {
+        [LedgerRead::Absent, LedgerRead::Absent, LedgerRead::Absent] => {
             return Ok(all_not_established(NotEstablished::BankLedgerNotInBook))
         }
-        (LedgerRead::Present(start), LedgerRead::Present(end), LedgerRead::Present(again))
+        [LedgerRead::Present(start), LedgerRead::Present(end), LedgerRead::Present(again)]
             if start == again =>
         {
             (start, end)
@@ -451,13 +402,11 @@ fn reading(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
         .collect::<Vec<_>>();
     if let Some(reason) = missing.first().and_then(|(_, figure)| figure.reason()) {
         // All three, or the closing gap and the change, by construction.
-        let labels = if missing.len() == 3 {
-            "opening gap, closing gap and change in window"
-        } else {
-            "closing gap and change in window"
-        };
+        let names = missing.iter().map(|(label, _)| *label).collect::<Vec<_>>();
+        let (last, rest) = names.split_last().expect("one at least");
         parts.push(format!(
-            "{labels} not established ({})",
+            "{} and {last} not established ({})",
+            rest.join(", "),
             reason.explanation()
         ));
     }
@@ -479,21 +428,17 @@ fn reading(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
         headline.push(' ');
         headline.push_str(SIGN_SENTENCE);
     }
-    let mut changed = false;
-    if let Figure::Gap(change) = &gaps.change {
-        if !change.is_zero() {
-            changed = true;
-            headline.push_str(&format!(
-                " Within these dates the book moved {} {} the statement did.",
-                change.magnitude_text(),
-                if change.0.is_negative() {
-                    "less than"
-                } else {
-                    "more than"
-                },
-            ));
-        }
-    }
+    // By direction, so it reads right whether the money moved in or out: the
+    // book's movement against the statement's.
+    let moved = match &gaps.change {
+        Figure::Gap(change) if !change.is_zero() => Some(format!(
+            " Within these dates the book moved {} further {} than the statement did.",
+            change.magnitude_text(),
+            if change.0.is_negative() { "down" } else { "up" },
+        )),
+        _ => None,
+    };
+    headline.push_str(moved.as_deref().unwrap_or_default());
     let mut text = json!({
         "headline": headline,
         "stage": match stage {
@@ -502,7 +447,7 @@ fn reading(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
         },
         "scope": SCOPE,
     });
-    if differs || changed {
+    if differs || moved.is_some() {
         text["possible_causes"] = json!(POSSIBLE_CAUSES);
     }
     text
@@ -522,7 +467,7 @@ fn result_json(
         })
     };
     json!({
-        "stage": stage.as_str(),
+        "stage": stage,
         "window": window.map(|(first, last)| json!({
             "first_row_date": first.iso(),
             "last_row_date": last.iso(),
@@ -539,7 +484,8 @@ fn result_json(
 impl Server {
     pub(super) async fn statement_tie_out(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
         let guid = required_string(args, "company_guid")?;
-        let stage = Stage::parse(required_string(args, "stage")?)?;
+        let stage = serde_json::from_value(args["stage"].clone())
+            .map_err(|_| "argument_invalid:stage".to_string())?;
         let document = bank_statement::load_proposals(
             &self.settings.data_dir,
             args.get("proposals_id")
@@ -570,22 +516,15 @@ impl Server {
                         let partly_posted = stage == Stage::BeforeBuild
                             && file.rows_without_voucher == 0
                             && self.import_journal_holds_rows_of(guid, &document["vouchers"])?;
-                        let mut reads = Vec::with_capacity(3);
-                        for date in read_dates(first, last)? {
+                        let mut reads =
+                            [LedgerRead::Absent, LedgerRead::Absent, LedgerRead::Absent];
+                        for (read, date) in reads.iter_mut().zip(read_dates(first, last)?) {
                             let (ledgers, ledger_evidence) =
                                 self.read_movement_ledgers(&identity, date).await?;
                             evidence = combine_evidence(evidence.clone(), ledger_evidence);
-                            reads.push(LedgerRead::of(&ledgers, &file.bank_ledger)?);
+                            *read = LedgerRead::of(&ledgers, &file.bank_ledger)?;
                         }
-                        let [at_first, after_last, at_first_again]: [LedgerRead; 3] = reads
-                            .try_into()
-                            .map_err(|_| "ledger_snapshot_drifted".to_string())?;
-                        let observed = Observed {
-                            at_first,
-                            after_last,
-                            at_first_again,
-                        };
-                        gaps(stage, &file, &observed, partly_posted)?
+                        gaps(stage, &file, &reads, partly_posted)?
                     };
                     (Some((first, last)), gaps)
                 }

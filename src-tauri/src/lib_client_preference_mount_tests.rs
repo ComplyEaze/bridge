@@ -3,6 +3,11 @@
 /// function name, so a command added anywhere in it is covered (#839). The one command that may
 /// open the mirror, the label-migration planner, lives in its own module, which is checked to be
 /// where the mirror is taken.
+///
+/// This is still a check on the file's text (#1188's review): it finds the mirror or the keychain
+/// named in `all_clients.rs`, not a command there that reaches them through a helper defined
+/// elsewhere, such as a call into `migration::…` or a `db` function that opens the mirror. The
+/// module boundary makes that less likely; it does not rule it out.
 #[test]
 fn client_preference_commands_are_mirror_and_keychain_free() {
     let commands = include_str!("commands/all_clients.rs");

@@ -63,6 +63,19 @@ test("compressed artefacts, missing paths and empty scans are refused, never pas
   assert.throws(() => markedFiles([]), /no files given/);
 });
 
+test("an archive inside a scanned directory is refused, not scanned as compressed bytes", () => {
+  const directory = scratch();
+  const bundle = join(directory, "bundle");
+  mkdirSync(join(bundle, "nested"), { recursive: true });
+  binary(join(bundle, "bridge"), false);
+  // Its bytes stand for an archive's: the marker inside an archive is compressed, so
+  // reading them raw would pass it.
+  binary(join(bundle, "nested", "inner.zip"), false);
+  assert.throws(() => markedFiles([bundle]), { code: "compressed_artefact" });
+  assert.throws(() => assertNoTestSeam([bundle]), { code: "compressed_artefact" });
+  assert.throws(() => markedFiles([join(bundle, "nested", "inner.zip")]), { code: "compressed_artefact" });
+});
+
 test("the bundle hook scans the executables of the profile tauri built", () => {
   const root = scratch();
   const release = join(root, "src-tauri", "target", "release");

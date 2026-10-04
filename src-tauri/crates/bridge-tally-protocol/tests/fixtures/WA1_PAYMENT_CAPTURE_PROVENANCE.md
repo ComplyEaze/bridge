@@ -33,14 +33,14 @@ post dialog for the same voucher (#730), on a readback whose debit carries trail
   is written by the test itself; the live post had none.
 - **Encoding:** the four responses are **BOM-less UTF-16LE**, exactly as received.
 
-| file (in `agent/`) | bytes | sha256 |
+| file | bytes | sha256 |
 |---|---|---|
-| `wa1-payment-company-extent.utf16le.xml` | 7234 | `85b04c5cd61dffdf0506466074f9b77a4ceb3aa109ecbf4ed9204ceff8b6ceb7` |
-| `wa1-payment-company-high-water.utf16le.xml` | 4826 | `b01141df3ee02fcbbf6a43e667ca6b1c3bafbde0d4063432737a5de410a128ee` |
-| `wa1-payment-voucher-census.utf16le.xml` | 5468 | `d92b4aff960009b5f42d4ba77512894989efee1a77ff50afe50b8362b3dd7be7` |
-| `wa1-payment-import-verification.utf16le.xml` | 8064 | `98ab2bef4b3d7e49bb5b3af755ccc5ca5b0119296032d09a383d5d8954e612cd` |
-| `wa1-payment-journal.jsonl` | 2742 | `2f979b1fa4335ab97744d609eb79a57a0de69a68e5795517f04014a3858b3136` |
-| `wa1-payment-import.xml` | 1037 | `0c2ee2981538ea3725583b197e8c2bea007bec264d1e96d61916b08ddf65f1f3` |
+| `agent/wa1-payment-company-extent.utf16le.xml` | 7234 | `85b04c5cd61dffdf0506466074f9b77a4ceb3aa109ecbf4ed9204ceff8b6ceb7` |
+| `agent/wa1-payment-company-high-water.utf16le.xml` | 4826 | `b01141df3ee02fcbbf6a43e667ca6b1c3bafbde0d4063432737a5de410a128ee` |
+| `agent/wa1-payment-voucher-census.utf16le.xml` | 5468 | `d92b4aff960009b5f42d4ba77512894989efee1a77ff50afe50b8362b3dd7be7` |
+| `agent/wa1-payment-import-verification.utf16le.xml` | 8064 | `98ab2bef4b3d7e49bb5b3af755ccc5ca5b0119296032d09a383d5d8954e612cd` |
+| `agent/wa1-payment-journal.jsonl` | 2742 | `2f979b1fa4335ab97744d609eb79a57a0de69a68e5795517f04014a3858b3136` |
+| `agent/wa1-payment-import.xml` | 1037 | `0c2ee2981538ea3725583b197e8c2bea007bec264d1e96d61916b08ddf65f1f3` |
 
 ## What it establishes
 

@@ -80,6 +80,13 @@ const fixtureDirectories = [
   "tools/bridge-tally-compatibility/tests/fixtures",
 ];
 
+// A row or sidecar documents exactly the file at the path it resolves to, from
+// the Markdown file or sidecar that holds it (#838): a bare name means the file
+// beside that record, never a file of that name elsewhere under the root. The
+// one exemption keeps today's basename matching until its rows are converted,
+// and is removed then; nothing under it is edited by this gate's change.
+const BASENAME_ROWS_EXEMPT = new Set(["src-tauri/crates/bridge-tax-audit/tests/fixtures"]);
+
 // Diagnostics are bounded for the same reason every other gate in this repo
 // bounds them: a tree with many undocumented fixtures must still produce
 // output a reviewer can read.
@@ -120,7 +127,9 @@ function walkFiles(directory, visited = new Set()) {
 //   | `name.ext` | 1,170 | `<64 lowercase-or-uppercase hex chars>` |
 // Byte counts may carry thousands separators (`7,114`) or not (`1170`); both
 // forms appear in the existing files.
-const TABLE_ROW = /\|\s*`([^`]+)`\s*\|\s*([\d,]+)\s*\|\s*`([0-9a-fA-F]{64})`\s*\|/g;
+// Anchored to the start of a table row (#838): unanchored, the pattern also
+// matched the middle of a wider table, reading a request hash as a fixture name.
+const TABLE_ROW = /^ {0,3}\|\s*`([^`]+)`\s*\|\s*([\d,]+)\s*\|\s*`([0-9a-fA-F]{64})`\s*\|/gm;
 
 // A path in prose: two or more path segments joined by `/`, as in
 // `./generators/build_reopen.py` or `scripts/fixtures/sbi-bbox-capture.xml`.
@@ -145,6 +154,7 @@ for (const fixtureDirectory of fixtureDirectories) {
   }
 
   const markdownFiles = allPaths.filter((path) => extname(path).toLowerCase() === ".md");
+  const basenameRows = BASENAME_ROWS_EXEMPT.has(fixtureDirectory);
 
   // A JSON provenance record: an object carrying a `source` string. Anything
   // else with a .json extension is an ordinary fixture and still needs its own
@@ -199,7 +209,7 @@ for (const fixtureDirectory of fixtureDirectories) {
     for (const match of text.matchAll(TABLE_ROW)) {
       const [, name, bytesText, sha256] = match;
       const bytes = Number(bytesText.replaceAll(",", ""));
-      if (name.includes("/")) {
+      if (name.includes("/") || !basenameRows) {
         const target = relative(repositoryRoot, resolve(dirname(markdownPath), name));
         if (!declaredByPath.has(target)) declaredByPath.set(target, []);
         declaredByPath.get(target).push({
@@ -267,15 +277,21 @@ for (const fixtureDirectory of fixtureDirectories) {
             : null;
       if (!declaredSha) continue;
       const name = path.split("/").pop();
-      if (!declaredHashes.has(name)) declaredHashes.set(name, []);
-      declaredHashes.get(name).push({
+      const declaration = {
         // Absent rather than inferred. Falling back to the file's own size
         // compares it against itself, which can never fail -- a declared
         // invariant degraded into a restatement of whatever is on disk.
         bytes: typeof record.fixture_bytes === "number" ? record.fixture_bytes : null,
         sha256: declaredSha.toLowerCase(),
         sourceFile: relative(repositoryRoot, recordPath),
-      });
+      };
+      // The fixtures a sidecar names share its stem in its own directory, so
+      // its declaration is keyed by that exact path (#838).
+      const [declared, key] = basenameRows
+        ? [declaredHashes, name]
+        : [declaredByPath, relative(repositoryRoot, path)];
+      if (!declared.has(key)) declared.set(key, []);
+      declared.get(key).push(declaration);
     }
   }
 

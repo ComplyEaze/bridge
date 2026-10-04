@@ -145,7 +145,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "c4e222f36a280af5e6c583b0733249241598228345fce561349d930130f0e46b"],
+  ], "956e3337285aaa4880e97ac8cc4f0ee88889f90512143f45885e2e1e0126a533"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -156,7 +156,7 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "a48822efae37ae58e5cd8431d3a00860edb3d461c4b47b1d11d761fe828d17dc"],
+  ], "11471d580af5f7bbe5af1a6a080f97de8c946504de6e3772a3a2461fae4879c0"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",

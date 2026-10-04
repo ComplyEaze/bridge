@@ -44,18 +44,32 @@ export function filesUnder(path) {
   return readdirSync(path).flatMap((entry) => filesUnder(join(path, entry)));
 }
 
-/** The files among `paths` that hold the marker. Refuses compressed archives. */
+/** Throws, with code `compressed_artefact`, if `path` names a compressed archive. */
+function refuseCompressed(path) {
+  if (COMPRESSED.test(path)) {
+    throw Object.assign(
+      new Error(`${path} is compressed: scan the executables it was built from instead`),
+      { code: "compressed_artefact" },
+    );
+  }
+}
+
+/**
+ * The files among `paths` that hold the marker. Refuses compressed archives, both
+ * as arguments and wherever a walked directory holds one: an archive's bytes are
+ * compressed, so a clean scan of one inside a directory proves no more than a clean
+ * scan of one given directly (#839).
+ */
 export function markedFiles(paths) {
   if (paths.length === 0) throw new Error("no files given to scan");
   const files = [];
   for (const path of paths) {
-    if (COMPRESSED.test(path)) {
-      throw new Error(`${path} is compressed: scan the executables it was built from instead`);
-    }
+    refuseCompressed(path);
     if (!existsSync(path)) throw new Error(`${path} does not exist`);
     files.push(...filesUnder(path));
   }
   if (files.length === 0) throw new Error(`no regular files under ${paths.join(", ")}`);
+  files.forEach(refuseCompressed);
   return files.filter(holdsMarker);
 }
 

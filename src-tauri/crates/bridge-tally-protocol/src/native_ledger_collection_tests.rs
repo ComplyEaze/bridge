@@ -360,6 +360,40 @@ fn a_ledger_row_refused_is_typed_by_class() {
     );
 }
 
+/// A response that ends inside a row's field is the response's fault, whichever
+/// reader holds that field (#718, from #1184's review): the scalar reader
+/// (`TAXTYPE`), the flattened reader (`EMAIL`) and the GST registration entry
+/// reader (`LEDGSTREGDETAILS.LIST`, cut between its children so the entry's own
+/// loop meets the end) each mark it with `RowCutOff`.
+#[test]
+fn a_response_cut_inside_any_ledger_field_is_malformed() {
+    use crate::NativeCollectionError as Class;
+    for (extra, cut_after) in [
+        ("<TAXTYPE>GST</TAXTYPE>", "<TAXTYPE>GS"),
+        ("<EMAIL>accounts@example.invalid</EMAIL>", "<EMAIL>accounts"),
+        (
+            "<LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM></LEDGSTREGDETAILS.LIST>",
+            "<LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM>",
+        ),
+    ] {
+        let xml = master_response_with_extra(Some(EXPECTED_COMPANY_GUID), extra);
+        let cut = &xml[..xml.find(cut_after).expect("the field") + cut_after.len()];
+        assert_eq!(
+            parse_native_party_ledger_master_records_with_evidence(cut, EXPECTED_COMPANY_GUID)
+                .expect_err("a cut response is refused")
+                .downcast_ref::<Class>()
+                .copied(),
+            Some(Class::MalformedResponse),
+            "{cut_after}"
+        );
+        assert!(
+            parse_native_party_ledger_master_records_with_evidence(&xml, EXPECTED_COMPANY_GUID)
+                .is_ok(),
+            "the whole response reads: {extra}"
+        );
+    }
+}
+
 #[test]
 fn a_ledger_collection_refused_as_a_whole_is_typed_by_class() {
     use crate::NativeCollectionError as Class;

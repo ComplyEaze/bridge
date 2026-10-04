@@ -42,7 +42,7 @@ code for #806 is not part of this change; the capture comes first.
 | `agent/l1-reentry-journal.jsonl` | 18034 | `43410a22735001b5d0f585899a097020da9cd5ef22629c36d0e80e510e9a87da` |
 | `agent/l1-reentry-import.xml` | 31152 | `0c37efaca462e617b0c430a8a442fe24f651e14307abe15a8574a2fea3780cfd` |
 
-The four distinct request bodies, by sha256 (the requests themselves are not committed):
+The four distinct request bodies, by sha256, from the capture proxy's index (neither the requests nor the index are committed, so these cannot be re-checked from this tree):
 
 | request | sha256 |
 |---|---|
@@ -64,7 +64,7 @@ The four distinct request bodies, by sha256 (the requests themselves are not com
   pre-import mark of 1,738. Its entries are `Test Expense B` −50.00 with `ISDEEMEDPOSITIVE` Yes and
   `Cash` 50.00 with `ISDEEMEDPOSITIVE` No: the ledgers, amounts and signs the build wrote for
   voucher 352.
-- The proof Bridge produced from these bytes (the saved proof of that run) counts
+- The proof Bridge produced from these bytes (the saved proof of that run, not committed, so this bullet is from that file and not re-checkable from this tree) counts
   `posted_verified` 49 and `posted_not_effective` 1, with `verification_status` `verification_incomplete` and both `duplicates` and
   `unrelated_duplicates_in_window` empty; the proof names no voucher 353.
 

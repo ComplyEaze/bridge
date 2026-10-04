@@ -35,7 +35,7 @@ fn a_paired_report_response_marker_does_not_change_the_command_code() {
     }
 }
 
-use super::all_clients::{
+use super::all_clients::migration::{
     load_client_group_labels_for_migration, prepare_client_group_label_migration_from_labels,
     ClientGroupLabelMigrationPreparationError,
 };
@@ -849,11 +849,15 @@ fn party_master_export_withholds_and_names_the_ledgers_it_would_leave_out() {
 /// these files cannot bring the short name back.
 #[test]
 fn desktop_messages_name_the_product_in_full() {
-    const SOURCES: [(&str, &str); 6] = [
+    const SOURCES: [(&str, &str); 7] = [
         ("commands.rs", include_str!("commands.rs")),
         (
             "commands/all_clients.rs",
             include_str!("commands/all_clients.rs"),
+        ),
+        (
+            "commands/all_clients/migration.rs",
+            include_str!("commands/all_clients/migration.rs"),
         ),
         (
             "commands_trial_balance.rs",

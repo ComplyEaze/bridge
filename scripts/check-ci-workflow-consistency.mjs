@@ -139,7 +139,16 @@ if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
 // even a whitespace or CRLF change trips it). Change a step and its copy, or a job and its digest, together
 // and deliberately; the failure prints the new digest for a reviewed change.
 const releaseWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/release-mcpb-preview.yml"), "utf8");
-jobIds(releaseWorkflow);
+// The release workflow's jobs are pinned by name: a job block is read up to the next `  name:` line, so an
+// unexpected job key would cut the previous job's block short.
+if (jobIds(releaseWorkflow).join(",") !== "release-admission,package,attest,publish-preview") {
+  failures.push("release-mcpb-preview.yml must have exactly the jobs release-admission, package, attest and publish-preview");
+}
+// Line-based readers split on \n (and \r\n); a lone \r, U+0085, U+2028 or U+2029 is a line break to other
+// YAML readers but not to them, so neither workflow may contain one.
+for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
+  if (/\r(?!\n)|[\u0085\u2028\u2029]/.test(source)) failures.push(`${name} must use only \\n or \\r\\n line breaks`);
+}
 for (const [source, job, expected, digest] of [
   [workflow, "native", [
     "      - name: Prove the approval-seam scan sees a test build",
@@ -169,6 +178,10 @@ for (const [source, job, expected, digest] of [
   }
   const actual = sha256(jobThrough(source, job, expected[0]));
   if (actual !== digest) failures.push(`${job} changed before "${expected[0].trim()}"; its digest is now ${actual}`);
+  // The digest covers the job only up to the pinned step. A job-level key (container, env, services,
+  // defaults, ...) written after the steps is outside it, so `steps:` must be the job's last key.
+  const jobKeys = jobBlock(source, job).split("\n").filter((line) => /^ {4}[^ \t#-]/.test(line));
+  if (jobKeys.at(-1)?.trimEnd() !== "    steps:") failures.push(`${job}: \`steps:\` must be the job's last key; a job-level key after the steps is outside its pinned text`);
 }
 // Each workflow's header (triggers, permissions, concurrency, env, defaults) applies to every job;
 // jobIds refuses a workflow-level key after the jobs map, so the header is all of them.
@@ -583,19 +596,25 @@ function jobThrough(source, job, head) {
   const start = lines.findIndex((line) => line.replace(/\r$/, "") === `  ${job}:`);
   const step = lines.findIndex((line, index) => index > start && line.replace(/\r$/, "") === head);
   if (start === -1 || step === -1) return "";
-  let end = step + 1;
-  while (end < lines.length && !/^ {0,6}\S/.test(lines[end])) end += 1;
-  while (end > step + 1 && lines[end - 1].replace(/\r$/, "") === "") end -= 1;
-  return lines.slice(start, end).join("\n");
+  return lines.slice(start, stepEnd(lines, step + 1)).join("\n");
+}
+
+// A step ends at the next line that is not blank, not a comment and is indented six spaces or less.
+// A comment line never ends a step, whatever its indentation: YAML ignores a comment's indentation, so
+// the keys after it still belong to the step and are part of its pinned text. Blank lines and comments
+// indented six spaces or less just before the next step are that step's, not this one's.
+function stepEnd(lines, from) {
+  let end = from;
+  while (end < lines.length && !/^ {0,6}[^\s#]/.test(lines[end])) end += 1;
+  while (end > from && /^ {0,6}(?:#.*)?$/.test(lines[end - 1].replace(/\r$/, ""))) end -= 1;
+  return end;
 }
 
 function stepBlock(job, head) {
   const lines = job.split("\n");
   const starts = lines.flatMap((line, index) => (line === head ? [index] : []));
   if (starts.length !== 1) return undefined;
-  let end = starts[0] + 1;
-  while (end < lines.length && !/^ {0,6}\S/.test(lines[end])) end += 1;
-  return lines.slice(starts[0], end).join("\n").trimEnd();
+  return lines.slice(starts[0], stepEnd(lines, starts[0] + 1)).join("\n").trimEnd();
 }
 
 function escapeRegex(value) {

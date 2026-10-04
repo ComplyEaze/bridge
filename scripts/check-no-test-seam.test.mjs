@@ -76,6 +76,15 @@ test("an archive inside a scanned directory is refused, not scanned as compresse
   assert.throws(() => markedFiles([join(bundle, "nested", "inner.zip")]), { code: "compressed_artefact" });
 });
 
+test("an archive that is the first file a scanned directory yields is refused too", () => {
+  // Every walked file is checked, not every one after the first (#1177's review): a
+  // directory holding only an archive makes the archive the first file the walk yields.
+  const directory = join(scratch(), "only-an-archive");
+  mkdirSync(directory);
+  binary(join(directory, "a.zip"), false);
+  assert.throws(() => markedFiles([directory]), { code: "compressed_artefact" });
+});
+
 test("the bundle hook scans the executables of the profile tauri built", () => {
   const root = scratch();
   const release = join(root, "src-tauri", "target", "release");

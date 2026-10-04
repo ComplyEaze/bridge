@@ -156,7 +156,7 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
             commands::all_clients::load_client_group_labels,
             commands::all_clients::save_client_group_label,
             commands::all_clients::replace_client_group_labels,
-            commands::all_clients::prepare_client_group_label_migration,
+            commands::all_clients::migration::prepare_client_group_label_migration,
             commands::all_clients::load_client_sort_preference,
             commands::all_clients::save_client_sort_preference,
             commands::detect_tally_base_currency,

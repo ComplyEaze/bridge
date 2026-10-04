@@ -68,10 +68,10 @@ use outstandings::*;
 mod movement;
 #[path = "agent_register.rs"]
 mod register;
-#[path = "agent_statements.rs"]
-mod statements;
 #[path = "agent_statement_tie_out.rs"]
 mod statement_tie_out;
+#[path = "agent_statements.rs"]
+mod statements;
 #[path = "agent_trial_balance.rs"]
 mod trial_balance;
 #[cfg(test)]

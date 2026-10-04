@@ -74,9 +74,8 @@ What ComplyEaze Bridge adds, so you can judge whether you need it:
 Where it is behind: three banks, where TallyPrime's own import lists many more
 (its help page "Bank statement"); no reconciling of a bank statement inside
 TallyPrime; no stock quantities (the plug-in has an inventory group); not yet
-code-signed; and a short list of runs against a real TallyPrime. The published
-latest release has not yet been installed in Claude Desktop by us; the README
-lists each run.
+code-signed; and a short list of runs against a real TallyPrime (the README
+lists each run).
 
 ## How ComplyEaze Bridge answers them
 

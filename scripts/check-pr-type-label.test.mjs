@@ -36,7 +36,10 @@ test("the workflow runs on pull_request with the label names passed by environme
   assert.deepEqual(Object.keys(flow.on), ["pull_request", "merge_group"], "not pull_request_target");
   assert.deepEqual(flow.on.pull_request.types, ["opened", "reopened", "synchronize", "labeled", "unlabeled"]);
   assert.deepEqual(flow.permissions, { contents: "read" });
+  // No run may be cancelled: a cancelled "Type label" run stays beside the success and blocks the required check.
+  assert.deepEqual(flow.concurrency, { group: "pr-labels-${{ github.event.pull_request.number || github.run_id }}", "cancel-in-progress": false, queue: "max" });
   const job = flow.jobs["type-label"];
+  assert.equal(job.concurrency, undefined, "a job-level group could cancel a run again");
   assert.equal(job.if, "github.event.pull_request.user.login != 'dependabot[bot]'");
   const check = job.steps.find((s) => s.name === "Require exactly one type label");
   assert.equal(check.run, "node scripts/check-pr-type-label.mjs");

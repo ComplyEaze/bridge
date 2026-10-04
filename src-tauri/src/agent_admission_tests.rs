@@ -734,7 +734,7 @@ fn every_parameter_of_every_tool_is_described() {
         .expect("read_evidence");
     assert_eq!(
         read_evidence["inputSchema"]["properties"]["limit"]["description"],
-        "How many of the newest in-memory records to return: default 20, at most 256."
+        "How many of the newest in-memory records to return: default 20, at most 256 (or the configured row limit, BRIDGE_AGENT_MAX_ROWS, if lower, which can cap the default too)."
     );
     for tool in tools {
         let name = tool["name"].as_str().expect("tool name");

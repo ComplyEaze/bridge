@@ -647,9 +647,9 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
     }
     // A catalogue scorer read "shows the receipts, read from its local log" beside "each call
     // appends receipt lines to the local log" as a write contradicting readOnlyHint: the log
-    // tool says the read changes nothing and that the one write is this call's own receipt.
-    assert!(egress.contains("Reading the log changes nothing in it; this call's own receipt is added after the read, like every call's."), "{egress}");
-    assert!(evidence.contains("It reads memory only; this call's own record is added to memory after the read, and its receipt goes to the local log, like every call's."), "{evidence}");
+    // tool says the read changes nothing and that the one write is this call's own receipt lines.
+    assert!(egress.contains("Reading the log changes nothing in it; this call's own receipt lines are added after the read, like every call's."), "{egress}");
+    assert!(evidence.contains("It reads memory only; this call's own record is added to memory after the read, and its receipt lines go to the local log, like every call's."), "{evidence}");
     let bound = format!("at most {MAX_EVIDENCE_RECORDS}");
     for (name, description) in [("read_evidence", &evidence), ("egress_log", &egress)] {
         assert!(
@@ -668,5 +668,34 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
             limit.contains(&bound),
             "{name}: limit names its bound ({bound}): {limit:?}"
         );
+        // The configured row limit is applied after the default, so it can cap the default 20.
+        assert!(
+            limit.contains("or the configured row limit, BRIDGE_AGENT_MAX_ROWS, if lower, which can cap the default too"),
+            "{name}: limit names the configured cap: {limit:?}"
+        );
+        assert!(
+            limit.contains("default 20, at most 256"),
+            "{name}: limit text names its default and bound: {limit:?}"
+        );
+        assert_eq!(
+            tool["inputSchema"]["properties"]["limit"]["default"],
+            json!(20),
+            "{name}"
+        );
+        if name == "egress_log" {
+            // The tail counts log lines, and a stdio call writes two of them.
+            assert!(
+                limit.contains(
+                    "most recent receipt lines to return (each completed call writes two)"
+                ),
+                "{name}: limit counts lines, not calls: {limit:?}"
+            );
+            assert!(
+                limit.contains(
+                    "fewer when the newest receipt lines do not fit in the log read's size bound"
+                ),
+                "{name}: limit names the size bound: {limit:?}"
+            );
+        }
     }
 }

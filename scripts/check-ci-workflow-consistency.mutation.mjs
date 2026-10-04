@@ -80,3 +80,34 @@ for (const [file, job, head] of PINNED) {
     });
   }
 }
+
+// native-legacy is pinned whole, and the cache inputs it shares with native must stay equal: a difference
+// in them is a cold build on every run, which no test failure would show.
+const inLegacyJob = (change) => (text) => {
+  const start = text.indexOf("  native-legacy:\n");
+  const end = text.indexOf("  bundle-smoke:\n    name: Bundle smoke");
+  assert.ok(start !== -1 && end > start, "native-legacy block exists");
+  return text.slice(0, start) + change(text.slice(start, end)) + text.slice(end);
+};
+const GUARD = "      - name: Guard legacy feature test filter scope\n";
+const CHANGED = "native-legacy changed; its digest is now";
+const LEGACY_CASES = [
+  ["a step-level `if` written as the first key of a step", inLegacyJob((job) => job.replace(GUARD, "      - if: false\n        name: Guard legacy feature test filter scope\n")), CHANGED],
+  ["a step-level `if` with a space before the colon", inLegacyJob((job) => job.replace(`${GUARD}        shell: bash\n`, `${GUARD}        if : false\n        shell: bash\n`)), CHANGED],
+  ["a test command that can no longer fail", inLegacyJob((job) => job.replace("binary(unit_a_live)'\n          cargo nextest run", "binary(unit_a_live)' || true\n          cargo nextest run")), CHANGED],
+  ["a step removed", inLegacyJob((job) => job.replace(/      - name: Lint legacy voucher-scan and calibration harness features\n[\s\S]*$/, "")), CHANGED],
+  ["a cache save", inLegacyJob((job) => job.replace("save-if: false", "save-if: true")), CHANGED],
+  ["a changed timeout", inLegacyJob((job) => job.replace("timeout-minutes: 50", "timeout-minutes: 5")), CHANGED],
+  ["a different shared key", inLegacyJob((job) => job.replace("setup-windows-native/action.yml", "setup-windows-native/other.yml")), "must restore native's Windows dependency cache"],
+  ["narrower cache workspaces", inLegacyJob((job) => job.replace("            tools -> target\n", "")), "must share this cache input: workspaces: |"],
+  ["a dropped hashed env var list", inLegacyJob((job) => job.replace("env-vars: ImageOS ImageVersion OPENSSL LIBCLANG", "env-vars: ImageOS")), "must share this cache input: ImageOS ImageVersion OPENSSL LIBCLANG"],
+  ["a dropped CARGO_PROFILE variable", inLegacyJob((job) => job.replace("      CARGO_PROFILE_TEST_DEBUG: '0'\n", "")), "must share this cache input: CARGO_PROFILE_DEV_DEBUG: '0'"],
+  ["a changed CARGO_PROFILE variable in native", (text) => text.replace("      CARGO_PROFILE_TEST_DEBUG: '0'\n    # A cold Windows native build", "      CARGO_PROFILE_TEST_DEBUG: '1'\n    # A cold Windows native build"), "must share this cache input: CARGO_PROFILE_DEV_DEBUG: '0'"],
+  ["narrower cache workspaces in native", (text) => text.replace("            tools -> target\n          # Separate the Windows", "          # Separate the Windows"), "must share this cache input: workspaces: |"],
+  ["a different env-var list in native", (text) => text.replace("'ImageOS ImageVersion OPENSSL LIBCLANG' || ''", "'ImageOS ImageVersion OPENSSL' || ''"), "must share this cache input: ImageOS ImageVersion OPENSSL LIBCLANG"],
+];
+for (const [name, change, message] of LEGACY_CASES) {
+  test(`native-legacy: ${name} is refused`, () => {
+    refused(withChange(".github/workflows/ci.yml", change), message);
+  });
+}

@@ -1,0 +1,151 @@
+{
+ "comment": "counter_cheques_40a3, vouchers that share a GUID: two with a blank GUID told apart by their numbers, and one GUID on two days. Each figure's evidence cites every one of them, as the reference's set of refs keyed by GUID and label does (#1134's item 4).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Direct Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "ccs-cash"
+  },
+  {
+   "name": "Bank1",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ccs-bank1"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "ccs-wages"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank1",
+     -1500000
+    ]
+   ],
+   "narration": "Paid to self",
+   "number": "1"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-11",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1200000
+    ],
+    [
+     "Bank1",
+     -1200000
+    ]
+   ],
+   "narration": "Paid to self",
+   "number": "2"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     500000
+    ],
+    [
+     "Bank1",
+     -500000
+    ]
+   ],
+   "narration": "Paid to self",
+   "number": "3"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     400000
+    ],
+    [
+     "Bank1",
+     -400000
+    ]
+   ],
+   "narration": "Paid to self",
+   "number": "4"
+  },
+  {
+   "guid": "dup",
+   "date": "2025-06-13",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1100000
+    ],
+    [
+     "Bank1",
+     -1100000
+    ]
+   ],
+   "narration": "Paid to self",
+   "number": "5"
+  },
+  {
+   "guid": "dup",
+   "date": "2025-06-14",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     300000
+    ],
+    [
+     "Bank1",
+     -300000
+    ]
+   ],
+   "narration": "Paid to self",
+   "number": "6"
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank1"
+ ],
+ "counter_cheque_terms": [
+  "self"
+ ],
+ "tests": [
+  "counter_cheques_40a3"
+ ]
+}

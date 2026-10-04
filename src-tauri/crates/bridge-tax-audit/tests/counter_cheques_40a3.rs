@@ -81,9 +81,11 @@ fn the_terms_book_golden_holds_the_scenario_it_was_written_for() {
     let g = common::golden_named("edge.cc_terms.counter_cheques_40a3");
     assert_eq!(g["figures"].as_array().unwrap().len(), 26);
     assert_eq!(g["findings"].as_array().unwrap().len(), 7);
-    // Seven terms from eight entries: the repeat collapses, the empty term counts.
-    assert_eq!(figure(&g, "configured_terms_count"), 7);
-    // 14 matched lines; a payment of exactly the limit is under and one paisa more is over.
+    // Eight terms from nine entries: the repeat collapses, the empty term counts.
+    assert_eq!(figure(&g, "configured_terms_count"), 8);
+    // 14 matched lines (the term holding U+019B matches nothing: only Rust's own upper-casing would
+    // turn it into the narration's U+A7DC); a payment of exactly the limit is under and one paisa
+    // more is over.
     assert_eq!(figure(&g, "matched_expenditure_count"), 14);
     assert_eq!(figure(&g, "over_limit_count"), 7);
     assert_eq!(figure(&g, "over_limit_total"), 9_200_001);
@@ -226,4 +228,66 @@ fn ccq_3_fires_on_a_voucher_both_s40a3_tests_report_and_only_then() {
     f.evidence = vec![EvidenceRef::new("ledger", "v2")];
     cash2.findings = vec![f];
     assert!(check_invariants(&mine, Some(&cash2)).is_empty());
+}
+
+fn without(mut r: TestResult, name: &str) -> TestResult {
+    let id = format!("{TEST_ID}.{name}");
+    r.figures.retain(|f| f.id != id);
+    r
+}
+
+fn with_value(mut r: TestResult, name: &str, value: Value) -> TestResult {
+    let id = format!("{TEST_ID}.{name}");
+    r.figures.iter_mut().find(|f| f.id == id).unwrap().value = value;
+    r
+}
+
+fn consistent() -> TestResult {
+    result_with(
+        500,
+        2,
+        &[200, 300],
+        vec![finding("a", "v1"), finding("b", "v2")],
+    )
+}
+
+/// #1121: a result that has lost the figure an invariant checks fails that invariant; it is not
+/// reported as holding.
+#[test]
+fn ccq_1_and_ccq_2_fire_when_the_figure_they_check_is_absent() {
+    assert_eq!(
+        check_invariants(&without(consistent(), "over_limit_total"), None),
+        vec!["CCQ-1: over_limit_total figure absent or not an integer"]
+    );
+    assert_eq!(
+        check_invariants(&without(consistent(), "over_limit_count"), None),
+        vec!["CCQ-2: over_limit_count figure absent or not an integer"]
+    );
+}
+
+#[test]
+fn a_total_or_count_that_is_not_an_integer_is_a_violation() {
+    for value in [Value::Text("500".to_string()), Value::Undefined] {
+        assert_eq!(
+            check_invariants(
+                &with_value(consistent(), "over_limit_total", value.clone()),
+                None
+            ),
+            vec!["CCQ-1: over_limit_total figure absent or not an integer"]
+        );
+        assert_eq!(
+            check_invariants(&with_value(consistent(), "over_limit_count", value), None),
+            vec!["CCQ-2: over_limit_count figure absent or not an integer"]
+        );
+    }
+}
+
+/// A row amount that is not an integer is a violation of its own, not a zero in the sum.
+#[test]
+fn a_row_amount_that_is_not_an_integer_is_a_violation_not_a_zero() {
+    let r = with_value(consistent(), "row_amount_0", Value::Text("200".to_string()));
+    assert_eq!(
+        check_invariants(&r, None),
+        vec!["CCQ-1: 1 row_amount_* figure(s) not an integer"]
+    );
 }

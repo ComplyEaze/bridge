@@ -765,15 +765,17 @@ mod tests {
             .starts_with("Presumptive-taxation history supplied for AY unspecified: opted under s.44AD: \"it's\" "));
         assert!(history_definition("opted_44ad = \"no\"\n").contains("opted under s.44AD: 'no' "));
         let h = history("opted_44ad = 1.5\n");
-        assert!(run(
-            &rules(),
-            "firm",
-            &turnover(None),
-            &cash(None, None),
-            Some(&h),
-            Some(DeductorActivity::Business)
-        )
-        .is_err());
+        assert!(matches!(
+            run(
+                &rules(),
+                "firm",
+                &turnover(None),
+                &cash(None, None),
+                Some(&h),
+                Some(DeductorActivity::Business)
+            ),
+            Err(AuditError::Config(_))
+        ));
     }
 
     #[test]
@@ -857,15 +859,17 @@ mod tests {
         assert!(matches!(err, AuditError::Config(_)), "{err:?}");
         // A million lakh or more would print in exponent form under Python's `:g`: refused too.
         rules.profession_gross_receipts_paise = Some(10_000_000 * 1_000_000);
-        assert!(run(
-            &rules,
-            "individual",
-            &turnover(Some(2_000_000_000)),
-            &cash(Some(0), Some(0)),
-            None,
-            Some(DeductorActivity::Profession),
-        )
-        .is_err());
+        assert!(matches!(
+            run(
+                &rules,
+                "individual",
+                &turnover(Some(2_000_000_000)),
+                &cash(Some(0), Some(0)),
+                None,
+                Some(DeductorActivity::Profession),
+            ),
+            Err(AuditError::Config(_))
+        ));
         rules.profession_gross_receipts_paise = Some(10_000_000 * 999_999);
         assert!(run(
             &rules,

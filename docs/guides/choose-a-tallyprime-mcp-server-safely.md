@@ -49,8 +49,8 @@ and this page does not rank them.
 
 | Job | Tally Solutions | ComplyEaze Bridge |
 | --- | --- | --- |
-| Ask Claude about a client's books | TallyPrime MCP plug-in for Claude Desktop: 28 tools in six groups for viewing company, master, accounting, inventory, outstanding and transaction data (Tally's help pages, last updated 18 September 2026) | Read tools for companies, the trial balance, outstandings with ageing, vouchers, ledger movement, the purchase and sales registers and stock values; it changes nothing in TallyPrime unless you turn posting on |
-| Bank statements | TallyPrime's Bank Statement import, in the formats Tally lists for each bank (Tally's list of supported banks) | Reads a client's statement in a supported layout (the README lists them) into Payment, Receipt and Contra vouchers as a file you import yourself, and can read the batch back; the whole path has not yet been recorded end to end against TallyPrime |
+| Ask Claude about a client's books | TallyPrime MCP plug-in for Claude Desktop: 28 tools in six groups for viewing company, master, accounting, inventory, outstanding and transaction data ([Tally's tools page](https://help.tallysolutions.com/tallyprime-mcp-tools/), last updated 18 September 2026) | Read tools for companies, the trial balance, outstandings with ageing, vouchers, ledger movement, the purchase and sales registers and stock values; it changes nothing in TallyPrime unless you turn posting on |
+| Bank statements | TallyPrime's Bank Statement import, in the formats Tally lists for each bank ([Tally's list of supported banks](https://help.tallysolutions.com/list-of-banks-supported-by-tallyprime-for-e-payments-auto-brs-and-cheque-formats/)) | Reads a client's statement in a supported layout (the README lists them) into Payment, Receipt and Contra vouchers as a file you import yourself, and can read the batch back; the whole path has not yet been recorded end to end against TallyPrime |
 
 Where ComplyEaze Bridge is behind: three banks' statement layouts; no stock quantities; not yet
 code-signed; and a short list of runs against a real TallyPrime (the README

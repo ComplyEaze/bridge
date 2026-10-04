@@ -42,13 +42,15 @@ yourself. This page does not rank products.
 
 ## Tally's own plug-in, and what ComplyEaze Bridge adds
 
-Tally Solutions offers its own TallyPrime MCP plug-in for Claude Desktop. Put
-the ten questions to it as well: Tally's help pages (they ask you to sign in)
-are the place to check what it covers, what it needs and whether it can change
-your books. ComplyEaze Bridge is not a product of Tally Solutions, has not been
-compared with the plug-in side by side, and this page does not rank the two.
-If you only want to ask questions of your books, check whether the plug-in
-covers what you need first.
+Tally Solutions offers its own TallyPrime MCP plug-in for Claude Desktop. Its
+help pages (last updated 18 September 2026, read on 4 October 2026) list 28
+tools, all for reading your books, and a setup that updates your TallyPrime
+licence through Tally.NET, installs Node.js and has you edit Claude Desktop's
+configuration file. Put the ten questions to it as well; Tally's pages are the
+place to check what it needs and whether it can change your books. ComplyEaze
+Bridge is not a product of Tally Solutions, we have not run the two side by
+side, and this page does not rank them. If you only want to ask questions of
+your books, check whether the plug-in covers what you need first.
 
 What ComplyEaze Bridge adds, so you can judge whether you need it:
 
@@ -62,9 +64,10 @@ What ComplyEaze Bridge adds, so you can judge whether you need it:
   one of those, TallyPrime's own import may be all you need. The whole path,
   from the PDF to the batch read back, has not yet been recorded end to end
   against TallyPrime.
-- **Its own install.** One extension file in Claude Desktop. It connects to
-  TallyPrime through TallyPrime's own HTTP gateway on your computer, so it does
-  not need a Tally plug-in. Most recorded runs used licensed TallyPrime Silver
+- **Its own install.** One extension file in Claude Desktop, with no Node.js
+  and no configuration file to edit. It connects to TallyPrime through
+  TallyPrime's own HTTP gateway on your computer, so it does not need a Tally
+  plug-in. Most recorded runs used licensed TallyPrime Silver
   and Gold 7.1; see the
   [README](../../README.md#what-has-been-run-against-a-real-tallyprime).
 

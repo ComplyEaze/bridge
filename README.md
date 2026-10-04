@@ -23,8 +23,9 @@ checks your ledger names against the book, and prepares the vouchers as a file
 you import yourself; after you import it, it can read the batch back. It adds a
 PDF bank statement step: TallyPrime's own bank statement import takes CSV or
 Excel files from the bank's portal, not PDF. Tally Solutions also offers its own
-TallyPrime MCP plug-in for Claude Desktop, described on Tally's help pages;
-ComplyEaze Bridge is not a product of Tally Solutions.
+TallyPrime MCP plug-in for Claude Desktop; its help pages (read on 4 October
+2026) list 28 tools, all for reading your books. ComplyEaze Bridge is not a
+product of Tally Solutions.
 
 **Current release:**
 <!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,

@@ -26,7 +26,7 @@ test("Tally nav keeps setup explicit while Overview remains reachable", async ()
     readFile(new URL("../src/OutstandingsScreen.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/TallyReadinessFlow.tsx", import.meta.url), "utf8"),
   ]);
-  const nav = frontend.slice(frontend.indexOf('<nav aria-label="Bridge navigation">'), frontend.indexOf("</nav>"));
+  const nav = frontend.slice(frontend.indexOf('<nav aria-label="ComplyEaze Bridge navigation">'), frontend.indexOf("</nav>"));
 
   assert.match(nav, /<Cable size=\{18\} \/> Overview/);
   assert.match(nav, /<Building2 size=\{18\} \/> Companies/);
@@ -207,7 +207,7 @@ test("party ledger export disables the concurrent outstandings refresh through t
   assert.match(outstandings, /onClick=\{onChangeSetup\} disabled=\{liveReadNavigationLocked\}/);
   const switcherManage = switcher.slice(switcher.indexOf('onManageTally();') - 180, switcher.indexOf('onManageTally();') + 80);
   assert.match(switcherManage, /disabled=\{selectionLocked\}/);
-  const nav = frontend.slice(frontend.indexOf('<nav aria-label="Bridge navigation">'), frontend.indexOf("</nav>"));
+  const nav = frontend.slice(frontend.indexOf('<nav aria-label="ComplyEaze Bridge navigation">'), frontend.indexOf("</nav>"));
   assert.match(frontend, /const shellNavigationLocked = childTallyReadCount > 0 \|\| journalActionBusy \|\| sourceDraftBusy;/);
   assert.match(nav, /<button aria-current=\{view === "settings" \? "page" : undefined\}[\s\S]*?disabled=\{shellNavigationLocked \|\| snapshotPostingBlocked\}/);
 });

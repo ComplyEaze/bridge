@@ -810,7 +810,7 @@ function App() {
       setReviewId(null);
       setReviewCommitmentSha256(null);
       if (saved.review_cleanup_warning) {
-        setCompanyError("The reviewed setup was saved, but its one-time in-memory review token could not be cleaned up. Restart Bridge before probing or saving another scope.");
+        setCompanyError("The reviewed setup was saved, but its one-time in-memory review token could not be cleaned up. Restart ComplyEaze Bridge before probing or saving another scope.");
       }
       void refreshPersistedCompanyProfiles();
     } catch (error) {
@@ -863,7 +863,7 @@ function App() {
       setReviewId(null);
       setReviewCommitmentSha256(null);
       if (result.review_cleanup_warning) {
-        setCompanyError("The local fixture enrollment was saved, but its one-time in-memory review token could not be cleaned up. Restart Bridge before probing or enrolling another fixture.");
+        setCompanyError("The local fixture enrollment was saved, but its one-time in-memory review token could not be cleaned up. Restart ComplyEaze Bridge before probing or enrolling another fixture.");
       }
     } catch (error) {
       if (resultsVersion === tallyResultsVersion.current) setCompanyError(toOperatorError(error));
@@ -907,7 +907,7 @@ function App() {
     } catch {
       const current = companies.find((candidate) => tallyCompanyKey(candidate) === selectedCompany);
       if (current?.mirror_company_id === mirrorCompanyId) {
-        setFixtureStatusError("Bridge could not read the local fixture state. Retry before changing this local gate.");
+        setFixtureStatusError("ComplyEaze Bridge could not read the local fixture state. Retry before changing this local gate.");
       }
     }
   }
@@ -1240,7 +1240,7 @@ function App() {
         if (!cancelled) setFixtureStatus(status);
       })
       .catch(() => {
-        if (!cancelled) setFixtureStatusError("Bridge could not read the local fixture state. Retry before changing this local gate.");
+        if (!cancelled) setFixtureStatusError("ComplyEaze Bridge could not read the local fixture state. Retry before changing this local gate.");
       });
     return () => {
       cancelled = true;
@@ -1325,11 +1325,11 @@ function App() {
         <div className="brand">
           <ShieldCheck size={24} />
           <div>
-            <strong>Bridge</strong>
+            <strong>ComplyEaze Bridge</strong>
             <span>Local Tally connector</span>
           </div>
         </div>
-        <nav aria-label="Bridge navigation">
+        <nav aria-label="ComplyEaze Bridge navigation">
           <button
             aria-current={view === "outstandings" ? "page" : undefined}
             className={view === "outstandings" ? "active" : ""}
@@ -1365,10 +1365,10 @@ function App() {
           <p className="future-sections-note" id="source-draft-busy-note" role="status">A local draft file action is in progress. Wait for it to finish before leaving.</p>
         )}
         {journalActionBusy && (
-          <p className="future-sections-note" id="journal-action-busy-note" role="status">A Journal action is still in progress. Wait for Bridge to finish before leaving this review.</p>
+          <p className="future-sections-note" id="journal-action-busy-note" role="status">A Journal action is still in progress. Wait for ComplyEaze Bridge to finish before leaving this review.</p>
         )}
         {!sourceDraftLifecycleReady && sourceDraftLifecycleProtectionError && (
-          <p className="future-sections-note" id="native-lifecycle-protection-note" role="status">Native close protection is unavailable. Reopen Bridge before preparing a source draft or reviewing a Journal.</p>
+          <p className="future-sections-note" id="native-lifecycle-protection-note" role="status">Native close protection is unavailable. Reopen ComplyEaze Bridge before preparing a source draft or reviewing a Journal.</p>
         )}
       </aside>
 
@@ -1802,7 +1802,7 @@ function App() {
               <section className="setup-company" id="company-profile" aria-labelledby="company-profile-heading">
                 <div>
                   <h2 id="company-profile-heading">Choose a company</h2>
-                  <p>Choose the company that is open in Tally. Bridge reads for setup and review; posting a Journal always requires your explicit approval.</p>
+                  <p>Choose the company that is open in Tally. ComplyEaze Bridge reads for setup and review; posting a Journal always requires your explicit approval.</p>
                 </div>
                 {companyError && <TallyErrorNotice message={companyError} />}
                 {currentProbeCompanyList.length > 0 ? (
@@ -1851,7 +1851,7 @@ function App() {
                 ) : (
                   <div className="setup-empty-state">
                     <Building2 size={28} />
-                    <p>{untrustedDiscoveryError ? "Bridge could not list companies from Tally." : "No companies were found."}</p>
+                    <p>{untrustedDiscoveryError ? "ComplyEaze Bridge could not list companies from Tally." : "No companies were found."}</p>
                     <button className="secondary-action" type="button" onClick={() => void discoverUntrustedCompanies()} disabled={savedCompanySelectionLocked}>
                       {tallyAction === "discover" ? "Checking Tally…" : "Find companies"}
                     </button>
@@ -1868,7 +1868,7 @@ function App() {
                 {currentProbeCompanyList.length > 0 && otherOpenCompanies.length > 0 && (
                   <div className="company-more">
                     <h3>Other companies open in Tally</h3>
-                    <p>Bridge verifies a company&rsquo;s identity when you choose it.</p>
+                    <p>ComplyEaze Bridge verifies a company&rsquo;s identity when you choose it.</p>
                     <div className="company-options" role="list" aria-label="Other companies open in Tally">
                       {otherOpenCompanies.slice(0, TABLE_PREVIEW_LIMIT).map((company, index) => (
                         <button
@@ -2167,7 +2167,7 @@ function formatConnectionError(code?: string): string {
     request_cancelled: "The read-only endpoint request was cancelled.",
     endpoint_queue_deadline_exceeded: "The local endpoint queue deadline was exceeded.",
     endpoint_circuit_open: "The local endpoint circuit is temporarily open.",
-    response_size_limit_exceeded: "The endpoint response exceeded Bridge's safety limit.",
+    response_size_limit_exceeded: "The endpoint response exceeded ComplyEaze Bridge's safety limit.",
     response_encoding_invalid: "The endpoint response encoding was invalid.",
     endpoint_unreachable: "The local Tally endpoint is unreachable.",
   };

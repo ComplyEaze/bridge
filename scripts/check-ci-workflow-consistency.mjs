@@ -182,7 +182,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "8993c8d177634ccdcfc407c78e29a0ea9079c3de2dd85c48db3c8a415f8b628f"],
+  ], "4a9face473d014c09afb50f1cd1ec95e5a0dd2e8d56f7a12237f09499c27c57e"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -193,7 +193,7 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "11471d580af5f7bbe5af1a6a080f97de8c946504de6e3772a3a2461fae4879c0"],
+  ], "bdd80e3bf24c8f565e9f34c266bcc6db7a12708b1555109c7ec1c0d4de01ad8c"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
@@ -241,8 +241,77 @@ if (reuseScriptDigest !== "17b3627cbe5d369e2e53e8fff0fc09e4ccce2d471817ba96cfec4
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
+// `continue-on-error` is refused everywhere (a failure would report success) except on these four
+// diagnostics-only artifact uploads. Each runs under `always()`, has no `id`, and nothing in this
+// repository downloads or reads its outcome; a GitHub service timeout in one of them (a merge-queue
+// entry was dropped on 3 Oct 2026 by `CreateArtifact ETIMEDOUT`) is not a failure of the code under
+// test. Left out on purpose: the qualification-smoke receipt, the failed-run executable evidence and
+// the unsigned bundle upload, whose absence or failure must stay visible. Each allowed step is pinned
+// whole (its job, its text and the upload action's SHA), so the flag cannot move to another step or
+// take an expression, and the count and exact line are checked below.
+const diagnosticUploads = [
+  ["native", [
+    "      - name: Retain minimized macOS test crash stacks",
+    "        if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: native-crash-stacks-macos",
+    "          path: ${{ runner.temp }}/bridge-native-crashes.json",
+    "          if-no-files-found: error",
+    "          retention-days: 7",
+  ]],
+  ["native", [
+    "      - name: Retain native compiler timings",
+    "        if: ${{ always() }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: native-compiler-timings-${{ matrix.os }}",
+    "          path: src-tauri/target/cargo-timings/*.html",
+    "          if-no-files-found: warn",
+    "          retention-days: 7",
+  ]],
+  ["bundle-smoke", [
+    "      - name: Retain macOS package diagnostics",
+    "        if: ${{ always() && runner.os == 'macOS' && (steps.macos-bundle.outcome == 'success' || steps.macos-bundle.outcome == 'failure') }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: macos-package-diagnostics",
+    "          path: |",
+    "            package-diagnostics/**",
+    "            src-tauri/target/release/bundle/dmg/bundle_dmg.sh",
+    "            src-tauri/target/cargo-timings/*.html",
+    "          if-no-files-found: warn",
+    "          retention-days: 7",
+  ]],
+  ["bundle-smoke", [
+    "      - name: Upload package compiler cache statistics",
+    "        if: ${{ always() && steps.package-sccache-start.outcome == 'success' }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: package-compiler-cache-${{ matrix.os }}",
+    "          path: package-compiler-cache.json",
+    "          if-no-files-found: error",
+    "          retention-days: 7",
+  ]],
+];
+for (const [job, lines] of diagnosticUploads) {
+  if (stepBlock(jobBlock(workflow, job), lines[0]) !== lines.join("\n")) {
+    failures.push(`${job}: diagnostics-only upload "${lines[0].trim()}" changed shape; review it and update diagnosticUploads`);
+  }
+}
+const flagLines = workflow.split("\n").filter((line) => line.includes("continue-on-error"));
+if (flagLines.length !== diagnosticUploads.length || flagLines.some((line) => line.replace(/\r$/, "") !== "        continue-on-error: true")) {
+  failures.push("ci.yml must not use continue-on-error except the one exact line in each pinned diagnostics-only upload: a failure would report success");
+}
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
-  if (source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);
+  if (name !== "ci.yml" && source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);
+  // A quoted key can spell a refused key with an escape, which the text rule above cannot read; refuse
+  // one at the start of a line. (Other YAML spellings of a key are not covered by this line.)
+  if (/^\s*(?:-\s+)?["'][^"'\n]*["']\s*:/m.test(source)) failures.push(`${name} must not start a line with a quoted mapping key: the continue-on-error rule reads keys as plain text`);
   // A step without its own `shell:` runs under the workflow's or job's defaults.
   if (/^\s*defaults\s*:/m.test(source)) failures.push(`${name} must not set defaults: they change how unpinned-shell steps run`);
 }

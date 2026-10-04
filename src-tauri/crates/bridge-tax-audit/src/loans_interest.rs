@@ -470,10 +470,19 @@ fn compute_loan_rows<'a>(
             rows.interest.push((at, loan_amt));
             continue;
         }
+        // A TDS journal is Loan Dr [/ other loans Dr] / TDS Payable Cr. Another loan on the
+        // opposite side makes it a transfer between loans, a row on each
+        // (bridge#803: read as TDS, both rows were lost). The sign product is taken on signs, so
+        // it cannot overflow.
+        let opposite_loan = v.lines.iter().any(|l| {
+            ledgers.other_loans.contains(l.ledger.as_str())
+                && i128::from(l.amount_paise).signum() * loan_amt.signum() < 0
+        });
         if others.iter().any(|o| ledgers.tds.contains(*o))
             && others
                 .iter()
                 .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))
+            && !opposite_loan
         {
             continue; // a TDS journal: neither taken nor repaid
         }
@@ -522,12 +531,20 @@ struct WalkedRow<'a> {
     prior_outstanding_net: i128,
     after_outstanding_net: i128,
     prior_breach_net: i128,
+    after_breach: i128,
+    /// bridge#802: a principal repayment on or after the date of the first interest credited to
+    /// the loan comes before this row in the walk, so it may have paid that interest first.
+    repaid_since_interest: bool,
 }
 
 /// The reference's `compute_running_balance_rows`: taken, repaid and interest rows walked together
 /// in (date, GUID) order, three ways: floored at the opening (the walk every figure reads); floored
 /// before every taken row as well (the fresh-loan reading); and from the opening as the books show
-/// it (the netting reading).
+/// it (the netting reading). Each row also carries `repaid_since_interest` (bridge#802, the
+/// reference's closing form): whether a principal repayment on or after the date of the first
+/// interest credited to the loan comes before it in this walk. Such a repayment may have paid that
+/// interest first, which the books do not record; `run` then reads a taken row also on the breach
+/// balance, an upper bound on the principal still owed.
 fn compute_running_balance_rows<'a>(
     pop: &[&'a Voucher],
     rows: &LoanRows<'a>,
@@ -561,6 +578,12 @@ fn compute_running_balance_rows<'a>(
     let mut breach = principal;
     let (mut principal_w2, mut breach_w2) = (principal, breach);
     let (mut principal_net, mut breach_net) = (opening_outstanding, opening_outstanding);
+    let first_interest = combined
+        .iter()
+        .filter(|row| row.4 && row.3 == "taken")
+        .map(|row| &pop[row.0].date)
+        .min();
+    let mut repaid_since_interest = false;
     let mut out = Vec::new();
     for (at, amount, m, direction, is_interest) in combined {
         let (principal_prior, breach_prior) = (principal, breach);
@@ -597,7 +620,12 @@ fn compute_running_balance_rows<'a>(
             prior_outstanding_net: principal_prior_net,
             after_outstanding_net: principal_net,
             prior_breach_net: breach_prior_net,
+            after_breach: breach,
+            repaid_since_interest,
         });
+        if direction == "repaid" && first_interest.is_some_and(|d| pop[at].date >= *d) {
+            repaid_since_interest = true;
+        }
     }
     out
 }
@@ -819,6 +847,104 @@ though the figures counting such entries may cite it."
         .chain(extra_limit.map(str::to_string))
         .collect(),
         ask_client: vec![REFUND_OR_LOAN_ASK.to_string()],
+    });
+    Ok(())
+}
+
+// bridge#802, in the reference's closing form: a loan taken, after a repayment made once interest
+// had been credited, that reaches the limit on the breach balance but not on the walked principal.
+const INTEREST_FIRST_TEXT: &str = "The principal balance this test walks on this loan ledger is \
+principal only: a repayment made after interest was credited to the loan is read as paying \
+principal. If it paid that interest first, more principal was still owed before this entry -- at \
+most the principal plus the interest credited and not yet paid, and the books do not record which. \
+That upper bound leaves out journals against ledgers configured as TDS payable, so it may \
+overstate.";
+const INTEREST_FIRST_ASK: &str = "How each repayment on this loan before this entry was applied \
+(to the interest credited or to principal), and the principal outstanding with the lender before \
+this entry.";
+
+/// bridge#802: listed as not computed, as R2's record is: outside `clause31/`, no `amount` fact,
+/// never summed, and a s.269SS tag only as "possible". It states no balance: the upper bound may
+/// overstate.
+#[allow(clippy::too_many_arguments)]
+fn interest_first_record(
+    r: &mut TestResult,
+    loan_ledger: &str,
+    lender: &str,
+    h: &str,
+    row: &WalkedRow,
+    clause: &str,
+    verdict_p: (bool, bool),
+    verdict_b: (bool, bool),
+    extra_limit: Option<&str>,
+) -> Result<()> {
+    let state = |(reportable, flagged): (bool, bool)| {
+        if flagged {
+            "reportable and flagged under s.269SS"
+        } else if reportable {
+            "reportable, not flagged"
+        } else {
+            "not reportable"
+        }
+    };
+    let v = row.voucher;
+    let vh = hash8(&v.guid);
+    let rid = format!("taken_{h}_{vh}");
+    let f_amt = r.fig(
+        &format!("not_computed_entry_amount_{rid}"),
+        paise(row.amount)?,
+        Unit::Paise,
+        &format!(
+            "Loan taken on voucher (tag {vh}) against loan ledger (tag {h}): the entry's own \
+amount. Its reportability is not computed, so it is in no reportable total."
+        ),
+        vec![voucher_ref(v)],
+    )?;
+    let f_mode = r.fig(
+        &format!("not_computed_entry_mode_{rid}"),
+        text(row.mode),
+        Unit::Text,
+        "Mode of this taken entry, read from its counter-line ledger group(s), as for every entry.",
+        Vec::new(),
+    )?;
+    let possible = verdict_p.1 || verdict_b.1;
+    let mut clauses = vec![clause.to_string()];
+    if possible {
+        clauses.push("s.269SS".to_string());
+    }
+    r.findings.push(Finding {
+        id: format!("{TEST_ID}/not_computed/interest_first_{rid}"),
+        clauses,
+        title: format!(
+            "Loan taken against {lender} ({} mode): not computed -- it may cross the limit if an \
+earlier repayment paid the interest credited first, which the books do not show{}",
+            row.mode,
+            if possible { " (possible s.269SS)" } else { "" }
+        ),
+        facts: vec![
+            ("entry_amount".to_string(), f_amt),
+            ("mode".to_string(), f_mode),
+        ],
+        evidence: vec![voucher_ref(v), EvidenceRef::new("ledger", loan_ledger)],
+        confidence: Confidence::JudgementRequired,
+        limits: vec![
+            format!(
+                "{INTEREST_FIRST_TEXT} This loan taken is {} on the walked principal and {} on \
+that upper bound, so neither is chosen: it is in no reportable total and not in the s.269SS/269T \
+flag count. Entries dated the same day are walked in voucher-id order, which the books do not \
+record.",
+                state(verdict_p),
+                state(verdict_b)
+            ),
+            "The questions this test asks on a computed entry (the lender's charge, a returned \
+debit, a repeated narration, the mode read from the ledger group) are not asked on this record, \
+though the figures counting such entries may cite it."
+                .to_string(),
+        ]
+        .into_iter()
+        .chain(extra_limit.map(str::to_string))
+        .collect(),
+        ask_client: vec![INTEREST_FIRST_ASK.to_string()],
     });
     Ok(())
 }
@@ -1364,9 +1490,9 @@ statutory dues classified as TDS payable, on every voucher that posts to the loa
         )?;
         // (c) of #779 Phase A: a listed voucher carrying the loan's interest ledger or a TDS ledger
         // leaves its interest out of interest_total and its TDS in tds_on_loan. The threshold is
-        // open only where the interest crosses it with that interest and not without (or the
-        // reverse); coverage only where TDS is seen on the loan -- with none, coverage is "none" in
-        // every reading (a certain default stays).
+        // open where the interest crosses it in some reading of those interest lines and not in
+        // others (below); coverage only where TDS is seen on the loan -- with none, coverage is
+        // "none" in every reading (a certain default stays).
         let listed_194a: Vec<&Voucher> = listed
             .iter()
             .copied()
@@ -1376,10 +1502,21 @@ statutory dues classified as TDS payable, on every voucher that posts to the loa
                 })
             })
             .collect();
-        let interest_listed: i128 = listed_194a.iter().map(|v| net_on(v, ils)).sum();
+        // The threshold is read line by line (6c2d6be2): the least interest is the total with every
+        // listed reversal line, the most the total with every listed credit line, so a listed pair
+        // netting to nil still spans both.
+        let listed_lines: Vec<i128> = listed_194a
+            .iter()
+            .flat_map(|v| v.lines.iter())
+            .filter(|l| ils.contains(&l.ledger))
+            .map(|l| i128::from(l.amount_paise))
+            .collect();
+        let interest_listed: i128 = listed_lines.iter().sum();
+        let interest_least = interest_total + listed_lines.iter().filter(|x| **x < 0).sum::<i128>();
+        let interest_most = interest_total + listed_lines.iter().filter(|x| **x > 0).sum::<i128>();
         let over_without = interest_total > threshold_194a;
-        let over_with = interest_total + interest_listed > threshold_194a;
-        let threshold_open = !listed_194a.is_empty() && over_without != over_with;
+        let threshold_open = !listed_194a.is_empty()
+            && (interest_least > threshold_194a) != (interest_most > threshold_194a);
         let coverage_open = !listed_194a.is_empty() && tds_on_loan != 0;
         let s194a_open = threshold_open || (coverage_open && over_without);
         let ev_listed_194a = voucher_refs(listed_194a.iter().copied());
@@ -1978,10 +2115,17 @@ in no clause 21(b) item from this test.",
                                 "The interest crosses the s.194A threshold ({}) {}, so whether it \
 crosses is not computed.",
                                 rupees(threshold_194a),
-                                if over_with {
-                                    "with that interest and not without it"
+                                if interest_least == interest_total {
+                                    "with that interest and not without it".to_string()
+                                } else if interest_most == interest_total {
+                                    "without that interest and not with it".to_string()
                                 } else {
-                                    "without that interest and not with it"
+                                    format!(
+                                        "in some readings of the interest lines on those vouchers \
+and not in others (from {} to {})",
+                                        rupees(interest_least),
+                                        rupees(interest_most)
+                                    )
                                 }
                             )
                         } else {
@@ -2412,6 +2556,28 @@ fn clause31_row(r: &mut TestResult, c: &RowContext, row: &WalkedRow, n: &mut Cou
             (!c.not_compared.is_empty()).then_some(c.not_compared),
         );
     }
+    if taken && row.repaid_since_interest {
+        // bridge#802, closing form: the same test on the breach balance, an upper bound on the
+        // principal still owed if earlier repayments paid interest first; listed only where it
+        // alone reaches the limit.
+        let verdict_p = verdict(prior, after, row.prior_breach);
+        let verdict_b = verdict(prior, row.after_breach, row.prior_breach);
+        if verdict_b.0 && !verdict_p.0 {
+            n.possible_count += usize::from(verdict_b.1);
+            n.listed_taken += 1;
+            return interest_first_record(
+                r,
+                c.loan_ledger,
+                c.lender,
+                c.h,
+                row,
+                clause,
+                verdict_p,
+                verdict_b,
+                (!c.not_compared.is_empty()).then_some(c.not_compared),
+            );
+        }
+    }
     let flag_undetermined = verdict_net.1 != verdict_w2.1;
     n.possible_count += usize::from(flag_undetermined);
     n.flag_not_computed_count += usize::from(flag_undetermined);
@@ -2739,9 +2905,10 @@ interest credited and not yet paid, or the repayment itself reaches the s.269SS/
             count(TEST_ID, listed)?,
             Unit::Count,
             "Taken/repaid entries listed as not computed -- because the two walks of the \
-principal balance disagree on their reportability, or because a voucher listed as both crediting \
-and debiting their loan comes on or before their date and their own amount is less than the limit: \
-in no reportable total and not in the flag count.",
+principal balance disagree on their reportability, or a loan taken may be reportable if earlier \
+repayments paid interest first (bridge#802), or because a voucher listed as both crediting and \
+debiting their loan comes on or before their date and their own amount is less than the limit: in \
+no reportable total and not in the flag count.",
             Vec::new(),
         )?;
     }
@@ -2762,8 +2929,9 @@ and not in the flag count (#779).",
             count(TEST_ID, n.possible_count)?,
             Unit::Count,
             "Entries and vouchers whose s.269SS/269T flag is not computed and may apply: rows the \
-two walks of the balance disagree on, which the second would flag; entries in cash, journal or \
-other mode dated on or after a voucher listed as both crediting and debiting their loan; and such \
+two walks of the balance disagree on, which the second would flag; loans taken that may cross the \
+limit if earlier repayments paid interest first (bridge#802); entries in cash, journal or other \
+mode dated on or after a voucher listed as both crediting and debiting their loan; and such \
 vouchers whose other lines include a ledger that is not a bank account. Listed as questions or \
 noted on the row, never in the flag count.",
             Vec::new(),

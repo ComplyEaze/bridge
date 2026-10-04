@@ -1,5 +1,5 @@
 {
- "comment": "counter_cheques_40a3, vouchers that share a GUID: two with a blank GUID told apart by their numbers, and one GUID on two days. Each figure's evidence cites every one of them, as the reference's set of refs keyed by GUID and label does (#1134's item 4).",
+ "comment": "counter_cheques_40a3, vouchers that share a GUID: four with a blank GUID told apart by their numbers (two on different days, two on one day), and one GUID on two days. Each figure's evidence cites every one of them, as the reference's set of refs keyed by GUID and label does (#1134's item 4).",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",

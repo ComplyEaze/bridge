@@ -1,5 +1,5 @@
 {
- "comment": "loans_interest, the s.194A threshold read on per-line bounds of the listed interest, a firm with no TDS: a listed pair crediting and reversing one amount, on two vouchers (Split Loan) or on one beside a non-interest line (One Loan), spans the threshold though it nets to nil, so whether the interest crosses it is not computed; the least exactly at the threshold is not over it (Edge Loan); listed lines all credits keep the earlier wording (Credit Loan); over the threshold in every reading, the s.194A finding stays (Both Loan).",
+ "comment": "loans_interest, the s.194A threshold read on per-line bounds of the listed interest, a firm with no TDS: a listed pair crediting and reversing one amount, on two vouchers (Split Loan) or on one beside a non-interest line (One Loan), spans the threshold though it nets to nil, so whether the interest crosses it is not computed; the least exactly at the threshold is not over it (Edge Loan); listed lines all credits keep the earlier wording (Credit Loan), and so do lines all reversals (Reverse Loan); over the threshold in every reading, the s.194A finding stays (Both Loan).",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -88,7 +88,7 @@
    "guid": "edge-loans_interest_s194a_bounds-009"
   },
   {
-   "name": "Both Loan",
+   "name": "Reverse Loan",
    "chain": [
     "Unsecured Loans",
     "Loans (Liability)"
@@ -96,20 +96,35 @@
    "guid": "edge-loans_interest_s194a_bounds-010"
   },
   {
-   "name": "Interest Both",
+   "name": "Interest Reverse",
    "chain": [
     "Indirect Expenses"
    ],
    "guid": "edge-loans_interest_s194a_bounds-011"
+  },
+  {
+   "name": "Both Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-012"
+  },
+  {
+   "name": "Interest Both",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-013"
   }
  ],
  "tb": [
   {
    "ledger": "Bank A",
    "opening": 0,
-   "debit": 3010000,
+   "debit": 3510000,
    "credit": 3500000,
-   "closing": -490000
+   "closing": 10000
   },
   {
    "ledger": "Both Loan",
@@ -168,6 +183,13 @@
    "closing": 1200000
   },
   {
+   "ledger": "Interest Reverse",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 500000,
+   "closing": 700000
+  },
+  {
    "ledger": "Interest Split",
    "opening": 0,
    "debit": 2200000,
@@ -176,6 +198,13 @@
   },
   {
    "ledger": "One Loan",
+   "opening": -10000000,
+   "debit": 50000,
+   "credit": 1250000,
+   "closing": -11200000
+  },
+  {
+   "ledger": "Reverse Loan",
    "opening": -10000000,
    "debit": 50000,
    "credit": 1250000,
@@ -397,6 +426,44 @@
    ]
   },
   {
+   "guid": "n01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Reverse",
+     1200000
+    ],
+    [
+     "Reverse Loan",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "n02",
+   "date": "2025-10-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Reverse Loan",
+     50000
+    ],
+    [
+     "Reverse Loan",
+     -50000
+    ],
+    [
+     "Interest Reverse",
+     -500000
+    ],
+    [
+     "Bank A",
+     500000
+    ]
+   ]
+  },
+  {
    "guid": "d01",
    "date": "2025-05-01",
    "base_type": "Journal",
@@ -488,6 +555,11 @@
    "lender": "Invented Credit Lender",
    "lender_type": "person",
    "interest_ledger": "Interest Credit"
+  },
+  "Reverse Loan": {
+   "lender": "Invented Reverse Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Reverse"
   },
   "Both Loan": {
    "lender": "Invented Both Lender",

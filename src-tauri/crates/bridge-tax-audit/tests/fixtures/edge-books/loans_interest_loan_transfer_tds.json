@@ -1,5 +1,5 @@
 {
- "comment": "loans_interest, bridge#803, a firm: a journal moving a loan to another lender's loan with TDS on it is a repayment of one loan and a loan taken on the other, not a TDS journal (From Loan, To Loan); a TDS journal on one loan stays neither taken nor repaid (Journal Loan).",
+ "comment": "loans_interest, bridge#803, a firm: a journal moving a loan to another lender's loan with TDS on it is a repayment of one loan and a loan taken on the other, not a TDS journal (From Loan, To Loan); a TDS journal on one loan stays neither taken nor repaid (Journal Loan), also beside a nil line on another loan.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -85,16 +85,16 @@
   {
    "ledger": "Journal Loan",
    "opening": -5000000,
-   "debit": 120000,
+   "debit": 240000,
    "credit": 0,
-   "closing": -4880000
+   "closing": -4760000
   },
   {
    "ledger": "TDS Payable",
    "opening": 0,
    "debit": 0,
-   "credit": 240000,
-   "closing": -240000
+   "credit": 360000,
+   "closing": -360000
   },
   {
    "ledger": "To Loan",
@@ -138,6 +138,25 @@
      -120000
     ]
    ]
+  },
+  {
+   "guid": "j02",
+   "date": "2025-09-02",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Journal Loan",
+     120000
+    ],
+    [
+     "TDS Payable",
+     -120000
+    ],
+    [
+     "From Loan",
+     0
+    ]
+   ]
   }
  ],
  "tests": [
@@ -156,7 +175,7 @@
    "lender_type": "person"
   },
   "To Loan": {
-   "lender": "Invented Transfer Lender",
+   "lender": "Invented Receiving Lender",
    "lender_type": "person"
   },
   "Journal Loan": {

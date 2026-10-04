@@ -479,8 +479,8 @@
           "label": "Journal t01 on 2025-09-01"
         }
       ],
-      "title_sha256_16": "7e964527ee5a49ec",
-      "title_text": "Loan taken against Invented Transfer Lender (journal mode, code J) -- at or over the s.269SS/269T running-balance limit",
+      "title_sha256_16": "eb3b3b60ec0aa48b",
+      "title_text": "Loan taken against Invented Receiving Lender (journal mode, code J) -- at or over the s.269SS/269T running-balance limit",
       "limits_sha256_16": "9c250b539888ad7b",
       "limits_text": [
         "Books only: confirm the lender's identity (name, address, PAN) for Form 3CD Clause 31, and whether this lender is excepted from s.269SS/269T beyond the lender types the rules already except (Government, a notified corporation, or another body notified under the Explanation).",
@@ -490,39 +490,6 @@
       "ask_client_sha256_16": "8c22e5a927638b0c",
       "ask_client_text": [
         "Confirm lender identity (name, address, PAN) for Clause 31."
-      ]
-    },
-    {
-      "id": "loans_interest/per_lender/025b8dc8",
-      "clauses": [
-        "3CD-31(a)",
-        "3CD-31(c)",
-        "s.194A"
-      ],
-      "confidence": "judgement_required",
-      "facts": [],
-      "evidence": [
-        {
-          "kind": "ledger",
-          "id": "From Loan",
-          "label": ""
-        },
-        {
-          "kind": "ledger",
-          "id": "To Loan",
-          "label": ""
-        }
-      ],
-      "title_sha256_16": "612eabc239e00e33",
-      "title_text": "One lender on more than one loan ledger: the limits are tested per ledger, not per lender",
-      "limits_sha256_16": "15f61a0c6b7ee0a7",
-      "limits_text": [
-        "This lender is configured on 2 loan ledgers (tags 025b8dc8, 2abfdce8). Clause 31 reportability, the s.269SS/269T test and the s.194A threshold are tested here ledger by ledger, while the law looks at the lender as a whole: an entry or interest that crosses a limit only on the lender's aggregate is not listed. The CA determines.",
-        "Lenders are matched by the configured lender name only, compared without case or surrounding spaces: the same person configured under two different names is not caught, and two people under one name are grouped. The CA confirms the lender list."
-      ],
-      "ask_client_sha256_16": "a1a6477673cb6c2e",
-      "ask_client_text": [
-        "Which loan ledgers are with the same person."
       ]
     }
   ],
@@ -557,5 +524,11 @@
   "module_invariants_evaluated": [
     "loans_interest.check_invariants"
   ],
-  "module_invariant_violations": []
+  "module_invariant_violations": [
+    {
+      "invariant": "loans_interest.check_invariants",
+      "subject": "loans_interest",
+      "detail": "LOAN-1: Journal Loan (tag a3f1ba0c) expected FY movement 120000p (= -taken 0p + repaid 0p - interest 0p + TDS 120000p) does not tie the TB movement 240000p (opening -5000000p, closing -4760000p); difference -120000p -- a voucher on this loan ledger was likely dropped from or wrongly added to the population."
+    }
+  ]
 }

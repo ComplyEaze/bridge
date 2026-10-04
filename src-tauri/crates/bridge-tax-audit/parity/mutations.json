@@ -3442,10 +3442,10 @@
  {
   "id": "LR-45",
   "by": "author",
-  "what": "the threshold is open whenever the interest crosses it with the listed interest",
+  "what": "the threshold is open whenever the most interest crosses it",
   "file": "src/loans_interest.rs",
-  "from": "        let threshold_open = !listed_194a.is_empty() && over_without != over_with;",
-  "to": "        let threshold_open = !listed_194a.is_empty() && over_with;"
+  "from": "(interest_least > threshold_194a) != (interest_most > threshold_194a)",
+  "to": "interest_most > threshold_194a"
  },
  {
   "id": "LR-46",
@@ -3498,10 +3498,10 @@
  {
   "id": "LR-52",
   "by": "author",
-  "what": "the open threshold's direction is read from the interest without the listed interest",
+  "what": "listed lines all reversals get the mixed-lines wording",
   "file": "src/loans_interest.rs",
-  "from": "                                if over_with {",
-  "to": "                                if over_without {"
+  "from": "} else if interest_most == interest_total {",
+  "to": "} else if false {"
  },
  {
   "id": "LR-53",
@@ -8390,5 +8390,29 @@
   "file": "src/loans_interest.rs",
   "from": "if interest_least == interest_total {",
   "to": "if interest_least != interest_total {"
+ },
+ {
+  "id": "LR-78",
+  "by": "author",
+  "what": "a loan taken, not only a repayment, marks the rows after it as made once interest was credited",
+  "file": "src/loans_interest.rs",
+  "from": "if direction == \"repaid\" && first_interest.is_some_and(",
+  "to": "if first_interest.is_some_and("
+ },
+ {
+  "id": "LR-79",
+  "by": "author",
+  "what": "the first interest date is read from every taken row, not only interest credited",
+  "file": "src/loans_interest.rs",
+  "from": ".filter(|row| row.4 && row.3 == \"taken\")",
+  "to": ".filter(|row| row.3 == \"taken\")"
+ },
+ {
+  "id": "LR-80",
+  "by": "author",
+  "what": "a nil line on another loan counts as the opposite side",
+  "file": "src/loans_interest.rs",
+  "from": "&& i128::from(l.amount_paise).signum() * loan_amt.signum() < 0",
+  "to": "&& i128::from(l.amount_paise).signum() * loan_amt.signum() <= 0"
  }
 ]

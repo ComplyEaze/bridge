@@ -1,5 +1,5 @@
 {
- "comment": "loans_interest, bridge#802, a firm: a loan taken in cash after a repayment made once interest was credited, under the limit on the walked principal and over it on principal plus the interest not yet paid, is listed as not computed (First Loan; Same Loan, interest and repayment on one day). Controls: no interest (Plain Loan), interest credited only after the repayment (Late Loan), the principal alone over the limit (Over Loan), and the First shape taken by bank (Bank Loan, listed but not a possible s.269SS), and an interest reversal before any interest is credited, which does not count as interest credited (Reversed Loan).",
+ "comment": "loans_interest, bridge#802, a firm: a loan taken in cash after a repayment made once interest was credited, under the limit on the walked principal and over it on principal plus the interest not yet paid, is listed as not computed (First Loan; Same Loan, interest and repayment on one day). Controls: no interest (Plain Loan), interest credited only after the repayment (Late Loan), the principal alone over the limit (Over Loan), and the First shape taken by bank (Bank Loan, listed but not a possible s.269SS), and an interest reversal before any interest is credited, which does not count as interest credited (Reversed Loan); loans taken after interest with no repayment (Taken Loan); a repayment before the first interest credited (Before Loan); the principal walk going below zero, where the later cash loan is R2's two-walks record, checked before this one (Walks Loan); and a repayment whose GUID sorts before the interest credit on the same day, listed (Order Loan).",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -124,15 +124,75 @@
     "Indirect Expenses"
    ],
    "guid": "edge-loans_interest_interest_first-014"
+  },
+  {
+   "name": "Taken Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-015"
+  },
+  {
+   "name": "Interest Taken",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_interest_first-016"
+  },
+  {
+   "name": "Before Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-017"
+  },
+  {
+   "name": "Interest Before",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_interest_first-018"
+  },
+  {
+   "name": "Walks Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-019"
+  },
+  {
+   "name": "Interest Walks",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_interest_first-020"
+  },
+  {
+   "name": "Order Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-021"
+  },
+  {
+   "name": "Interest Order",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_interest_first-022"
   }
  ],
  "tb": [
   {
    "ledger": "Bank A",
    "opening": 0,
-   "debit": 1600000,
-   "credit": 19000000,
-   "closing": -17400000
+   "debit": 2700000,
+   "credit": 26100000,
+   "closing": -23400000
   },
   {
    "ledger": "Bank Loan",
@@ -142,11 +202,18 @@
    "closing": -2100000
   },
   {
+   "ledger": "Before Loan",
+   "opening": -3000000,
+   "debit": 3100000,
+   "credit": 2200000,
+   "closing": -2100000
+  },
+  {
    "ledger": "Cash",
    "opening": 0,
-   "debit": 9600000,
+   "debit": 15700000,
    "credit": 0,
-   "closing": 9600000
+   "closing": 15700000
   },
   {
    "ledger": "First Loan",
@@ -163,6 +230,13 @@
    "closing": 500000
   },
   {
+   "ledger": "Interest Before",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
    "ledger": "Interest First",
    "opening": 0,
    "debit": 500000,
@@ -171,6 +245,13 @@
   },
   {
    "ledger": "Interest Late",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Interest Order",
    "opening": 0,
    "debit": 500000,
    "credit": 0,
@@ -198,7 +279,28 @@
    "closing": 500000
   },
   {
+   "ledger": "Interest Taken",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Interest Walks",
+   "opening": 0,
+   "debit": 1500000,
+   "credit": 0,
+   "closing": 1500000
+  },
+  {
    "ledger": "Late Loan",
+   "opening": -3000000,
+   "debit": 3000000,
+   "credit": 2100000,
+   "closing": -2100000
+  },
+  {
+   "ledger": "Order Loan",
    "opening": -3000000,
    "debit": 3000000,
    "credit": 2100000,
@@ -231,6 +333,20 @@
    "debit": 3000000,
    "credit": 2100000,
    "closing": -2100000
+  },
+  {
+   "ledger": "Taken Loan",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2300000,
+   "closing": -2300000
+  },
+  {
+   "ledger": "Walks Loan",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 3600000,
+   "closing": -2600000
   }
  ],
  "vouchers": [
@@ -548,6 +664,216 @@
      -1600000
     ]
    ]
+  },
+  {
+   "guid": "g01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Taken",
+     500000
+    ],
+    [
+     "Taken Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2025-07-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     1000000
+    ],
+    [
+     "Taken Loan",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "g03",
+   "date": "2025-07-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     800000
+    ],
+    [
+     "Taken Loan",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "w01",
+   "date": "2025-05-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     100000
+    ],
+    [
+     "Before Loan",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "w02",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Before Loan",
+     3100000
+    ],
+    [
+     "Bank A",
+     -3100000
+    ]
+   ]
+  },
+  {
+   "guid": "w03",
+   "date": "2025-07-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Before",
+     500000
+    ],
+    [
+     "Before Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "w04",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1600000
+    ],
+    [
+     "Before Loan",
+     -1600000
+    ]
+   ]
+  },
+  {
+   "guid": "x01",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Walks",
+     1500000
+    ],
+    [
+     "Walks Loan",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "x02",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Walks Loan",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "x03",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1500000
+    ],
+    [
+     "Walks Loan",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "x04",
+   "date": "2025-07-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     600000
+    ],
+    [
+     "Walks Loan",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "q02",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Order",
+     500000
+    ],
+    [
+     "Order Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "q01",
+   "date": "2025-06-30",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Order Loan",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "q03",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1600000
+    ],
+    [
+     "Order Loan",
+     -1600000
+    ]
+   ]
   }
  ],
  "tests": [
@@ -594,6 +920,26 @@
    "lender": "Invented Reversed Lender",
    "lender_type": "person",
    "interest_ledger": "Interest Reversed"
+  },
+  "Taken Loan": {
+   "lender": "Invented Taken Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Taken"
+  },
+  "Before Loan": {
+   "lender": "Invented Before Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Before"
+  },
+  "Walks Loan": {
+   "lender": "Invented Walks Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Walks"
+  },
+  "Order Loan": {
+   "lender": "Invented Order Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Order"
   }
  }
 }

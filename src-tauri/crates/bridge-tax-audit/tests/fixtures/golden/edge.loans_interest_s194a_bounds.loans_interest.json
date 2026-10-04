@@ -40,6 +40,25 @@
       ]
     },
     {
+      "id": "loans_interest.clause31_not_computed_credits_5e00ff96",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "b4f5fad3d8e8aa25",
+      "definition_text": "The credit sides of the vouchers listed as both crediting and debiting loan ledger (tag 5e00ff96), summed: in the loan's credits before any filter, in no reportable total.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d02",
+          "label": "Journal d02 on 2025-10-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "d03",
+          "label": "Journal d03 on 2025-10-07"
+        }
+      ]
+    },
+    {
       "id": "loans_interest.clause31_not_computed_credits_a8924818",
       "value": 50000,
       "unit": "paise",
@@ -55,20 +74,15 @@
     },
     {
       "id": "loans_interest.clause31_not_computed_credits_c507abe3",
-      "value": 100000,
+      "value": 50000,
       "unit": "paise",
       "definition_sha256_16": "d5ebedf48bbc276f",
       "definition_text": "The credit sides of the vouchers listed as both crediting and debiting loan ledger (tag c507abe3), summed: in the loan's credits before any filter, in no reportable total.",
       "evidence": [
         {
           "kind": "voucher",
-          "id": "d02",
-          "label": "Journal d02 on 2025-10-06"
-        },
-        {
-          "kind": "voucher",
-          "id": "d03",
-          "label": "Journal d03 on 2025-10-07"
+          "id": "n02",
+          "label": "Journal n02 on 2025-10-06"
         }
       ]
     },
@@ -125,6 +139,25 @@
       ]
     },
     {
+      "id": "loans_interest.clause31_not_computed_debits_5e00ff96",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "874b8dab291f344e",
+      "definition_text": "The debit sides of the vouchers listed as both crediting and debiting loan ledger (tag 5e00ff96), summed: in the loan's debits before any filter, in no reportable total.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d02",
+          "label": "Journal d02 on 2025-10-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "d03",
+          "label": "Journal d03 on 2025-10-07"
+        }
+      ]
+    },
+    {
       "id": "loans_interest.clause31_not_computed_debits_a8924818",
       "value": 50000,
       "unit": "paise",
@@ -140,20 +173,15 @@
     },
     {
       "id": "loans_interest.clause31_not_computed_debits_c507abe3",
-      "value": 100000,
+      "value": 50000,
       "unit": "paise",
       "definition_sha256_16": "7feedf6335241f30",
       "definition_text": "The debit sides of the vouchers listed as both crediting and debiting loan ledger (tag c507abe3), summed: in the loan's debits before any filter, in no reportable total.",
       "evidence": [
         {
           "kind": "voucher",
-          "id": "d02",
-          "label": "Journal d02 on 2025-10-06"
-        },
-        {
-          "kind": "voucher",
-          "id": "d03",
-          "label": "Journal d03 on 2025-10-07"
+          "id": "n02",
+          "label": "Journal n02 on 2025-10-06"
         }
       ]
     },
@@ -201,6 +229,14 @@
       "evidence": []
     },
     {
+      "id": "loans_interest.clause31_repaid_total_5e00ff96",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "7a1144d9dc947c87",
+      "definition_text": "Debits to loan ledger (tag 5e00ff96) other than its interest journals -- amount repaid in the year, before any Clause 31/s.269T lender-exemption or mode filter. It includes the debit side of each voucher listed as both crediting and debiting the loan.",
+      "evidence": []
+    },
+    {
       "id": "loans_interest.clause31_repaid_total_a8924818",
       "value": 50000,
       "unit": "paise",
@@ -210,7 +246,7 @@
     },
     {
       "id": "loans_interest.clause31_repaid_total_c507abe3",
-      "value": 100000,
+      "value": 50000,
       "unit": "paise",
       "definition_sha256_16": "0a71c42c9d47655f",
       "definition_text": "Debits to loan ledger (tag c507abe3) other than its interest journals -- amount repaid in the year, before any Clause 31/s.269T lender-exemption or mode filter. It includes the debit side of each voucher listed as both crediting and debiting the loan.",
@@ -249,6 +285,14 @@
       "evidence": []
     },
     {
+      "id": "loans_interest.clause31_taken_total_5e00ff96",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "1dd7d62a959c8362",
+      "definition_text": "Credits to loan ledger (tag 5e00ff96) other than its interest journals -- amount taken/accepted in the year, before any Clause 31/s.269SS lender-exemption or mode filter. It includes the credit side of each voucher listed as both crediting and debiting the loan.",
+      "evidence": []
+    },
+    {
       "id": "loans_interest.clause31_taken_total_a8924818",
       "value": 50000,
       "unit": "paise",
@@ -258,7 +302,7 @@
     },
     {
       "id": "loans_interest.clause31_taken_total_c507abe3",
-      "value": 100000,
+      "value": 50000,
       "unit": "paise",
       "definition_sha256_16": "65b456603d193690",
       "definition_text": "Credits to loan ledger (tag c507abe3) other than its interest journals -- amount taken/accepted in the year, before any Clause 31/s.269SS lender-exemption or mode filter. It includes the credit side of each voucher listed as both crediting and debiting the loan.",
@@ -274,7 +318,7 @@
     },
     {
       "id": "loans_interest.clause31_two_sided_listed_count",
-      "value": 8,
+      "value": 9,
       "unit": "count",
       "definition_sha256_16": "408e04b6de7b742c",
       "definition_text": "Vouchers listed as both crediting and debiting a loan ledger, counted once per loan ledger they are listed on, as the books hold them: not divided into entries, in no reportable total and not in the flag count (#779).",
@@ -305,6 +349,14 @@
       "evidence": []
     },
     {
+      "id": "loans_interest.interest_ledger_5e00ff96",
+      "value": "Interest Both",
+      "unit": "text",
+      "definition_sha256_16": "94b143b4827fdf74",
+      "definition_text": "The configured interest ledger name(s) for loan ledger (tag 5e00ff96), one per line, or '' if the loan is interest-free -- this test's own consistency checks read them back to check each voucher on this loan and its interest ledger(s) independently of the test's own bucketing.",
+      "evidence": []
+    },
+    {
       "id": "loans_interest.interest_ledger_a8924818",
       "value": "Interest Credit",
       "unit": "text",
@@ -314,7 +366,7 @@
     },
     {
       "id": "loans_interest.interest_ledger_c507abe3",
-      "value": "Interest Both",
+      "value": "Interest Reverse",
       "unit": "text",
       "definition_sha256_16": "9587574e6c2c338a",
       "definition_text": "The configured interest ledger name(s) for loan ledger (tag c507abe3), one per line, or '' if the loan is interest-free -- this test's own consistency checks read them back to check each voucher on this loan and its interest ledger(s) independently of the test's own bucketing.",
@@ -362,6 +414,25 @@
       ]
     },
     {
+      "id": "loans_interest.interest_on_listed_vouchers_5e00ff96",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3102ec8a91b0b849",
+      "definition_text": "The lines on loan ledger (tag 5e00ff96)'s interest ledger(s) in the vouchers listed as both crediting and debiting the loan, summed (debits positive): shown beside the interest total, never added to it.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d02",
+          "label": "Journal d02 on 2025-10-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "d03",
+          "label": "Journal d03 on 2025-10-07"
+        }
+      ]
+    },
+    {
       "id": "loans_interest.interest_on_listed_vouchers_a8924818",
       "value": 500000,
       "unit": "paise",
@@ -377,20 +448,15 @@
     },
     {
       "id": "loans_interest.interest_on_listed_vouchers_c507abe3",
-      "value": 0,
+      "value": -500000,
       "unit": "paise",
       "definition_sha256_16": "9648c40ce35d0761",
       "definition_text": "The lines on loan ledger (tag c507abe3)'s interest ledger(s) in the vouchers listed as both crediting and debiting the loan, summed (debits positive): shown beside the interest total, never added to it.",
       "evidence": [
         {
           "kind": "voucher",
-          "id": "d02",
-          "label": "Journal d02 on 2025-10-06"
-        },
-        {
-          "kind": "voucher",
-          "id": "d03",
-          "label": "Journal d03 on 2025-10-07"
+          "id": "n02",
+          "label": "Journal n02 on 2025-10-06"
         }
       ]
     },
@@ -442,6 +508,20 @@
       ]
     },
     {
+      "id": "loans_interest.interest_total_5e00ff96",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "6b41e1feeb6d32da",
+      "definition_text": "Interest paid/credited on loan ledger (tag 5e00ff96): sum of every voucher whose only other lines are its configured interest ledger(s) and any ledger in the client's statutory dues classified as TDS payable, counted before that TDS.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d01",
+          "label": "Journal d01 on 2025-05-01"
+        }
+      ]
+    },
+    {
       "id": "loans_interest.interest_total_a8924818",
       "value": 800000,
       "unit": "paise",
@@ -457,15 +537,15 @@
     },
     {
       "id": "loans_interest.interest_total_c507abe3",
-      "value": 3000000,
+      "value": 1200000,
       "unit": "paise",
       "definition_sha256_16": "7a2541137095c47f",
       "definition_text": "Interest paid/credited on loan ledger (tag c507abe3): sum of every voucher whose only other lines are its configured interest ledger(s) and any ledger in the client's statutory dues classified as TDS payable, counted before that TDS.",
       "evidence": [
         {
           "kind": "voucher",
-          "id": "d01",
-          "label": "Journal d01 on 2025-05-01"
+          "id": "n01",
+          "label": "Journal n01 on 2025-05-01"
         }
       ]
     },
@@ -497,6 +577,14 @@
       "unit": "text",
       "definition_sha256_16": "31990d5a089ef07b",
       "definition_text": "Lender type for loan ledger (tag 217ce9ad) from the client's list of loans, classified by the loan ledger this interest pairs with -- never by a word in the ledger name.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.lender_type_5e00ff96",
+      "value": "person",
+      "unit": "text",
+      "definition_sha256_16": "d08c24be7cc9a958",
+      "definition_text": "Lender type for loan ledger (tag 5e00ff96) from the client's list of loans, classified by the loan ledger this interest pairs with -- never by a word in the ledger name.",
       "evidence": []
     },
     {
@@ -581,6 +669,25 @@
       ]
     },
     {
+      "id": "loans_interest.max_outstanding_not_computed_5e00ff96",
+      "value": "not computed: a voucher both credits and debits this loan ledger, and this test does not divide it into entries, so the balance from its date on is not known",
+      "unit": "text",
+      "definition_sha256_16": "6fdc1266b267ff76",
+      "definition_text": "The running maximum of the outstanding balance on loan ledger (tag 5e00ff96) -- the utility's MaxAmtOsAccPy column -- is not computed on a loan with a voucher listed as both crediting and debiting it (#779).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d02",
+          "label": "Journal d02 on 2025-10-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "d03",
+          "label": "Journal d03 on 2025-10-07"
+        }
+      ]
+    },
+    {
       "id": "loans_interest.max_outstanding_not_computed_a8924818",
       "value": "not computed: a voucher both credits and debits this loan ledger, and this test does not divide it into entries, so the balance from its date on is not known",
       "unit": "text",
@@ -603,13 +710,8 @@
       "evidence": [
         {
           "kind": "voucher",
-          "id": "d02",
-          "label": "Journal d02 on 2025-10-06"
-        },
-        {
-          "kind": "voucher",
-          "id": "d03",
-          "label": "Journal d03 on 2025-10-07"
+          "id": "n02",
+          "label": "Journal n02 on 2025-10-06"
         }
       ]
     },
@@ -646,6 +748,14 @@
       "unit": "text",
       "definition_sha256_16": "4d6022501e100138",
       "definition_text": "Whether the TDS on loan ledger (tag 217ce9ad) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.s194a_tds_coverage_5e00ff96",
+      "value": "none",
+      "unit": "text",
+      "definition_sha256_16": "4872ed2a1a7c8e87",
+      "definition_text": "Whether the TDS on loan ledger (tag 5e00ff96) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
@@ -689,6 +799,14 @@
       "evidence": []
     },
     {
+      "id": "loans_interest.s194a_tds_covering_5e00ff96",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "0726209719f4b7e6",
+      "definition_text": "The TDS on loan ledger (tag 5e00ff96) that covers its interest: each deduction counts only against interest credited on or before its own date, up to the s.194A rate on that interest.",
+      "evidence": []
+    },
+    {
       "id": "loans_interest.s194a_tds_covering_a8924818",
       "value": 0,
       "unit": "paise",
@@ -729,6 +847,14 @@
       "evidence": []
     },
     {
+      "id": "loans_interest.s194a_tds_expected_5e00ff96",
+      "value": 300000,
+      "unit": "paise",
+      "definition_sha256_16": "a09e768b08172540",
+      "definition_text": "TDS at the s.194A rate (1000 basis points) on loan ledger (tag 5e00ff96)'s interest.",
+      "evidence": []
+    },
+    {
       "id": "loans_interest.s194a_tds_expected_a8924818",
       "value": 80000,
       "unit": "paise",
@@ -738,7 +864,7 @@
     },
     {
       "id": "loans_interest.s194a_tds_expected_c507abe3",
-      "value": 300000,
+      "value": 120000,
       "unit": "paise",
       "definition_sha256_16": "29528d737cfd6c25",
       "definition_text": "TDS at the s.194A rate (1000 basis points) on loan ledger (tag c507abe3)'s interest.",
@@ -764,13 +890,13 @@
       "id": "loans_interest.s269ss_269t_flag_count",
       "value": 0,
       "unit": "count",
-      "definition_sha256_16": "6bd071e9817df821",
-      "definition_text": "Reportable taken/repaid rows in cash/journal/other mode at or over the s.269SS/269T limit (₹20,000). 8 voucher(s) listed as both crediting and debiting a loan are not counted.",
+      "definition_sha256_16": "75e78d4d85299f96",
+      "definition_text": "Reportable taken/repaid rows in cash/journal/other mode at or over the s.269SS/269T limit (₹20,000). 9 voucher(s) listed as both crediting and debiting a loan are not counted.",
       "evidence": []
     },
     {
       "id": "loans_interest.s269ss_269t_possible_not_computed_count",
-      "value": 8,
+      "value": 9,
       "unit": "count",
       "definition_sha256_16": "24ccc6f18401a5bf",
       "definition_text": "Entries and vouchers whose s.269SS/269T flag is not computed and may apply: rows the two walks of the balance disagree on, which the second would flag; loans taken that may cross the limit if earlier repayments paid interest first (bridge#802); entries in cash, journal or other mode dated on or after a voucher listed as both crediting and debiting their loan; and such vouchers whose other lines include a ledger that is not a bank account. Listed as questions or noted on the row, never in the flag count.",
@@ -790,6 +916,14 @@
       "unit": "paise",
       "definition_sha256_16": "9b96b8e7398215d9",
       "definition_text": "TDS deducted on loan ledger (tag 217ce9ad): the lines on ledgers in the client's statutory dues classified as TDS payable, on every voucher that posts to the loan.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.tds_on_loan_5e00ff96",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3e47db561d19ca32",
+      "definition_text": "TDS deducted on loan ledger (tag 5e00ff96): the lines on ledgers in the client's statutory dues classified as TDS payable, on every voucher that posts to the loan.",
       "evidence": []
     },
     {
@@ -839,6 +973,20 @@
       ]
     },
     {
+      "id": "loans_interest.two_sided_bank_credits_5e00ff96_989a92e2",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "5e7fd74aa37af98f",
+      "definition_text": "This voucher's (tag 989a92e2) credits on ledgers other than loan ledger (tag 5e00ff96) read as bank (from the ledger's group or the client's configuration), summed.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d02",
+          "label": "Journal d02 on 2025-10-06"
+        }
+      ]
+    },
+    {
       "id": "loans_interest.two_sided_bank_credits_a8924818_eeb1906c",
       "value": 500000,
       "unit": "paise",
@@ -849,20 +997,6 @@
           "kind": "voucher",
           "id": "k02",
           "label": "Journal k02 on 2025-10-06"
-        }
-      ]
-    },
-    {
-      "id": "loans_interest.two_sided_bank_credits_c507abe3_989a92e2",
-      "value": 1000000,
-      "unit": "paise",
-      "definition_sha256_16": "e2bf6924de3de02b",
-      "definition_text": "This voucher's (tag 989a92e2) credits on ledgers other than loan ledger (tag c507abe3) read as bank (from the ledger's group or the client's configuration), summed.",
-      "evidence": [
-        {
-          "kind": "voucher",
-          "id": "d02",
-          "label": "Journal d02 on 2025-10-06"
         }
       ]
     },
@@ -909,16 +1043,30 @@
       ]
     },
     {
-      "id": "loans_interest.two_sided_bank_debits_c507abe3_20a473cd",
+      "id": "loans_interest.two_sided_bank_debits_5e00ff96_20a473cd",
       "value": 1000000,
       "unit": "paise",
-      "definition_sha256_16": "a2c5014100ff3444",
-      "definition_text": "This voucher's (tag 20a473cd) debits on ledgers other than loan ledger (tag c507abe3) read as bank (from the ledger's group or the client's configuration), summed.",
+      "definition_sha256_16": "d8786294d69251c1",
+      "definition_text": "This voucher's (tag 20a473cd) debits on ledgers other than loan ledger (tag 5e00ff96) read as bank (from the ledger's group or the client's configuration), summed.",
       "evidence": [
         {
           "kind": "voucher",
           "id": "d03",
           "label": "Journal d03 on 2025-10-07"
+        }
+      ]
+    },
+    {
+      "id": "loans_interest.two_sided_bank_debits_c507abe3_ce314b84",
+      "value": 500000,
+      "unit": "paise",
+      "definition_sha256_16": "f4e4dbfb8f2b0bdc",
+      "definition_text": "This voucher's (tag ce314b84) debits on ledgers other than loan ledger (tag c507abe3) read as bank (from the ledger's group or the client's configuration), summed.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "n02",
+          "label": "Journal n02 on 2025-10-06"
         }
       ]
     },
@@ -993,6 +1141,34 @@
       ]
     },
     {
+      "id": "loans_interest.two_sided_gross_credit_5e00ff96_20a473cd",
+      "value": 50000,
+      "unit": "paise",
+      "definition_sha256_16": "57f2e54b3817cb3a",
+      "definition_text": "The credit lines on loan ledger (tag 5e00ff96) in this voucher (tag 20a473cd), summed: the voucher also debits the loan.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d03",
+          "label": "Journal d03 on 2025-10-07"
+        }
+      ]
+    },
+    {
+      "id": "loans_interest.two_sided_gross_credit_5e00ff96_989a92e2",
+      "value": 50000,
+      "unit": "paise",
+      "definition_sha256_16": "a8a610511304d091",
+      "definition_text": "The credit lines on loan ledger (tag 5e00ff96) in this voucher (tag 989a92e2), summed: the voucher also debits the loan.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d02",
+          "label": "Journal d02 on 2025-10-06"
+        }
+      ]
+    },
+    {
       "id": "loans_interest.two_sided_gross_credit_a8924818_eeb1906c",
       "value": 50000,
       "unit": "paise",
@@ -1007,30 +1183,16 @@
       ]
     },
     {
-      "id": "loans_interest.two_sided_gross_credit_c507abe3_20a473cd",
+      "id": "loans_interest.two_sided_gross_credit_c507abe3_ce314b84",
       "value": 50000,
       "unit": "paise",
-      "definition_sha256_16": "26fef61a143ea548",
-      "definition_text": "The credit lines on loan ledger (tag c507abe3) in this voucher (tag 20a473cd), summed: the voucher also debits the loan.",
+      "definition_sha256_16": "4a96d01759428d6c",
+      "definition_text": "The credit lines on loan ledger (tag c507abe3) in this voucher (tag ce314b84), summed: the voucher also debits the loan.",
       "evidence": [
         {
           "kind": "voucher",
-          "id": "d03",
-          "label": "Journal d03 on 2025-10-07"
-        }
-      ]
-    },
-    {
-      "id": "loans_interest.two_sided_gross_credit_c507abe3_989a92e2",
-      "value": 50000,
-      "unit": "paise",
-      "definition_sha256_16": "9b01555eb28f6493",
-      "definition_text": "The credit lines on loan ledger (tag c507abe3) in this voucher (tag 989a92e2), summed: the voucher also debits the loan.",
-      "evidence": [
-        {
-          "kind": "voucher",
-          "id": "d02",
-          "label": "Journal d02 on 2025-10-06"
+          "id": "n02",
+          "label": "Journal n02 on 2025-10-06"
         }
       ]
     },
@@ -1105,6 +1267,34 @@
       ]
     },
     {
+      "id": "loans_interest.two_sided_gross_debit_5e00ff96_20a473cd",
+      "value": 50000,
+      "unit": "paise",
+      "definition_sha256_16": "27feeb1a1bec8a15",
+      "definition_text": "The debit lines on loan ledger (tag 5e00ff96) in this voucher (tag 20a473cd), summed: the voucher also credits the loan.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d03",
+          "label": "Journal d03 on 2025-10-07"
+        }
+      ]
+    },
+    {
+      "id": "loans_interest.two_sided_gross_debit_5e00ff96_989a92e2",
+      "value": 50000,
+      "unit": "paise",
+      "definition_sha256_16": "6c2c3038bfa6a3a8",
+      "definition_text": "The debit lines on loan ledger (tag 5e00ff96) in this voucher (tag 989a92e2), summed: the voucher also credits the loan.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d02",
+          "label": "Journal d02 on 2025-10-06"
+        }
+      ]
+    },
+    {
       "id": "loans_interest.two_sided_gross_debit_a8924818_eeb1906c",
       "value": 50000,
       "unit": "paise",
@@ -1119,30 +1309,16 @@
       ]
     },
     {
-      "id": "loans_interest.two_sided_gross_debit_c507abe3_20a473cd",
+      "id": "loans_interest.two_sided_gross_debit_c507abe3_ce314b84",
       "value": 50000,
       "unit": "paise",
-      "definition_sha256_16": "ed5844c9c52e39d5",
-      "definition_text": "The debit lines on loan ledger (tag c507abe3) in this voucher (tag 20a473cd), summed: the voucher also credits the loan.",
+      "definition_sha256_16": "e880f034219ac088",
+      "definition_text": "The debit lines on loan ledger (tag c507abe3) in this voucher (tag ce314b84), summed: the voucher also credits the loan.",
       "evidence": [
         {
           "kind": "voucher",
-          "id": "d03",
-          "label": "Journal d03 on 2025-10-07"
-        }
-      ]
-    },
-    {
-      "id": "loans_interest.two_sided_gross_debit_c507abe3_989a92e2",
-      "value": 50000,
-      "unit": "paise",
-      "definition_sha256_16": "603163bb3dc91db7",
-      "definition_text": "The debit lines on loan ledger (tag c507abe3) in this voucher (tag 989a92e2), summed: the voucher also credits the loan.",
-      "evidence": [
-        {
-          "kind": "voucher",
-          "id": "d02",
-          "label": "Journal d02 on 2025-10-06"
+          "id": "n02",
+          "label": "Journal n02 on 2025-10-06"
         }
       ]
     },
@@ -1203,16 +1379,30 @@
       ]
     },
     {
-      "id": "loans_interest.two_sided_interest_credits_c507abe3_20a473cd",
+      "id": "loans_interest.two_sided_interest_credits_5e00ff96_20a473cd",
       "value": 1000000,
       "unit": "paise",
-      "definition_sha256_16": "b70c355a2a72ae94",
-      "definition_text": "This voucher's (tag 20a473cd) credits on ledgers other than loan ledger (tag c507abe3) read as interest (from the ledger's group or the client's configuration), summed.",
+      "definition_sha256_16": "a706c863446d705a",
+      "definition_text": "This voucher's (tag 20a473cd) credits on ledgers other than loan ledger (tag 5e00ff96) read as interest (from the ledger's group or the client's configuration), summed.",
       "evidence": [
         {
           "kind": "voucher",
           "id": "d03",
           "label": "Journal d03 on 2025-10-07"
+        }
+      ]
+    },
+    {
+      "id": "loans_interest.two_sided_interest_credits_c507abe3_ce314b84",
+      "value": 500000,
+      "unit": "paise",
+      "definition_sha256_16": "88b1a6f9f781ab49",
+      "definition_text": "This voucher's (tag ce314b84) credits on ledgers other than loan ledger (tag c507abe3) read as interest (from the ledger's group or the client's configuration), summed.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "n02",
+          "label": "Journal n02 on 2025-10-06"
         }
       ]
     },
@@ -1259,6 +1449,20 @@
       ]
     },
     {
+      "id": "loans_interest.two_sided_interest_debits_5e00ff96_989a92e2",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "31f8ede247786ded",
+      "definition_text": "This voucher's (tag 989a92e2) debits on ledgers other than loan ledger (tag 5e00ff96) read as interest (from the ledger's group or the client's configuration), summed.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d02",
+          "label": "Journal d02 on 2025-10-06"
+        }
+      ]
+    },
+    {
       "id": "loans_interest.two_sided_interest_debits_a8924818_eeb1906c",
       "value": 500000,
       "unit": "paise",
@@ -1269,20 +1473,6 @@
           "kind": "voucher",
           "id": "k02",
           "label": "Journal k02 on 2025-10-06"
-        }
-      ]
-    },
-    {
-      "id": "loans_interest.two_sided_interest_debits_c507abe3_989a92e2",
-      "value": 1000000,
-      "unit": "paise",
-      "definition_sha256_16": "3201e9e3e2165568",
-      "definition_text": "This voucher's (tag 989a92e2) debits on ledgers other than loan ledger (tag c507abe3) read as interest (from the ledger's group or the client's configuration), summed.",
-      "evidence": [
-        {
-          "kind": "voucher",
-          "id": "d02",
-          "label": "Journal d02 on 2025-10-06"
         }
       ]
     },
@@ -1458,6 +1648,57 @@
       "ask_client_sha256_16": "b2ab959dbd519072",
       "ask_client_text": [
         "The interest credited to Invented Credit Lender for the year, the TDS deducted on it under s.194A, and the challans showing it was deposited."
+      ]
+    },
+    {
+      "id": "loans_interest/not_computed/s194a_c507abe3",
+      "clauses": [
+        "s.194A",
+        "3CD-21(b)",
+        "3CD-34(a)",
+        "3CD-34(c)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "interest_on_listed_vouchers",
+          "figure_id": "loans_interest.interest_on_listed_vouchers_c507abe3"
+        },
+        {
+          "name": "interest_total",
+          "figure_id": "loans_interest.interest_total_c507abe3"
+        },
+        {
+          "name": "lender_type",
+          "figure_id": "loans_interest.lender_type_c507abe3"
+        },
+        {
+          "name": "tds_on_loan",
+          "figure_id": "loans_interest.tds_on_loan_c507abe3"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Reverse Loan",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "n02",
+          "label": "Journal n02 on 2025-10-06"
+        }
+      ],
+      "title_sha256_16": "c2da53bc936172a5",
+      "title_text": "Interest to Invented Reverse Lender: whether it crosses the s.194A threshold is not computed -- a voucher that both credits and debits the loan carries interest",
+      "limits_sha256_16": "4de0b58a87fc40f2",
+      "limits_text": [
+        "1 voucher(s) both credit and debit this loan and carry its interest ledger or a TDS ledger; this test lists each as the books hold it and does not divide it into entries. Their interest (−₹5,000) is shown beside the interest total, not in it; any TDS on them is in the TDS seen on the loan, unless the voucher also posts to another configured loan. The interest crosses the s.194A threshold (₹10,000) without that interest and not with it, so whether it crosses is not computed. This loan is in no clause 21(b) item from this test.",
+        "s.40(a)(ia) disallows 30% of the interest on a TDS default; the second proviso removes this if the lender's Form 26A (Rule 31ACB) shows the interest was returned as income."
+      ],
+      "ask_client_sha256_16": "5072f44ba508df21",
+      "ask_client_text": [
+        "The interest credited to Invented Reverse Lender for the year, the TDS deducted on it under s.194A, and the challans showing it was deposited."
       ]
     },
     {
@@ -1681,6 +1922,109 @@
       ]
     },
     {
+      "id": "loans_interest/not_computed/two_sided_5e00ff96_20a473cd",
+      "clauses": [
+        "3CD-31(a)",
+        "3CD-31(c)",
+        "s.269T"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "bank_debits",
+          "figure_id": "loans_interest.two_sided_bank_debits_5e00ff96_20a473cd"
+        },
+        {
+          "name": "gross_credit",
+          "figure_id": "loans_interest.two_sided_gross_credit_5e00ff96_20a473cd"
+        },
+        {
+          "name": "gross_debit",
+          "figure_id": "loans_interest.two_sided_gross_debit_5e00ff96_20a473cd"
+        },
+        {
+          "name": "interest_credits",
+          "figure_id": "loans_interest.two_sided_interest_credits_5e00ff96_20a473cd"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Both Loan",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "d03",
+          "label": "Journal d03 on 2025-10-07"
+        }
+      ],
+      "title_sha256_16": "893460b9f8ef57dc",
+      "title_text": "Loan ledger both credited and debited in one voucher: listed as the books hold it, not divided into entries by this test (Invented Both Lender) (possible s.269SS/269T)",
+      "limits_sha256_16": "86375e37612033c6",
+      "limits_text": [
+        "This voucher credits the loan ₹500 and debits it ₹500. This test does not yet divide a voucher with both sides on one loan into its entries, so it lists it as the books hold it: in no reportable total and not in the s.269SS/269T flag count. Both sides stay in the loan's credits and debits before any filter.",
+        "Possible s.269T: the voucher's other credit lines include a ledger that is not a bank account (cash, a journal or another ledger). Whether a limit is breached is not computed; this is not in the s.269SS/269T flag count.",
+        "It was not compared with this loan's other entries for reversal pairs or repeated narrations."
+      ],
+      "ask_client_sha256_16": "dfa5f4d5329e0989",
+      "ask_client_text": [
+        "Entry by entry, what was taken from the lender, repaid to it, credited as interest or a charge, and withheld as TDS in this voucher, and by what mode (cash, bank, adjustment)? If part of it corrects another part, which?"
+      ]
+    },
+    {
+      "id": "loans_interest/not_computed/two_sided_5e00ff96_989a92e2",
+      "clauses": [
+        "3CD-31(a)",
+        "3CD-31(c)",
+        "s.269SS"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "bank_credits",
+          "figure_id": "loans_interest.two_sided_bank_credits_5e00ff96_989a92e2"
+        },
+        {
+          "name": "gross_credit",
+          "figure_id": "loans_interest.two_sided_gross_credit_5e00ff96_989a92e2"
+        },
+        {
+          "name": "gross_debit",
+          "figure_id": "loans_interest.two_sided_gross_debit_5e00ff96_989a92e2"
+        },
+        {
+          "name": "interest_debits",
+          "figure_id": "loans_interest.two_sided_interest_debits_5e00ff96_989a92e2"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Both Loan",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "d02",
+          "label": "Journal d02 on 2025-10-06"
+        }
+      ],
+      "title_sha256_16": "893460b9f8ef57dc",
+      "title_text": "Loan ledger both credited and debited in one voucher: listed as the books hold it, not divided into entries by this test (Invented Both Lender) (possible s.269SS/269T)",
+      "limits_sha256_16": "94b110b003eebf1c",
+      "limits_text": [
+        "This voucher credits the loan ₹500 and debits it ₹500. This test does not yet divide a voucher with both sides on one loan into its entries, so it lists it as the books hold it: in no reportable total and not in the s.269SS/269T flag count. Both sides stay in the loan's credits and debits before any filter.",
+        "Every entry on this loan dated on or after this voucher is tested on its own amount only: its reportability by the running balance is not computed, and neither is the loan's maximum balance.",
+        "Possible s.269SS: the voucher's other debit lines include a ledger that is not a bank account (cash, a journal or another ledger). Whether a limit is breached is not computed; this is not in the s.269SS/269T flag count.",
+        "It was not compared with this loan's other entries for reversal pairs or repeated narrations."
+      ],
+      "ask_client_sha256_16": "dfa5f4d5329e0989",
+      "ask_client_text": [
+        "Entry by entry, what was taken from the lender, repaid to it, credited as interest or a charge, and withheld as TDS in this voucher, and by what mode (cash, bank, adjustment)? If part of it corrects another part, which?"
+      ]
+    },
+    {
       "id": "loans_interest/not_computed/two_sided_a8924818_eeb1906c",
       "clauses": [
         "3CD-31(a)",
@@ -1733,7 +2077,7 @@
       ]
     },
     {
-      "id": "loans_interest/not_computed/two_sided_c507abe3_20a473cd",
+      "id": "loans_interest/not_computed/two_sided_c507abe3_ce314b84",
       "clauses": [
         "3CD-31(a)",
         "3CD-31(c)",
@@ -1743,91 +2087,40 @@
       "facts": [
         {
           "name": "bank_debits",
-          "figure_id": "loans_interest.two_sided_bank_debits_c507abe3_20a473cd"
+          "figure_id": "loans_interest.two_sided_bank_debits_c507abe3_ce314b84"
         },
         {
           "name": "gross_credit",
-          "figure_id": "loans_interest.two_sided_gross_credit_c507abe3_20a473cd"
+          "figure_id": "loans_interest.two_sided_gross_credit_c507abe3_ce314b84"
         },
         {
           "name": "gross_debit",
-          "figure_id": "loans_interest.two_sided_gross_debit_c507abe3_20a473cd"
+          "figure_id": "loans_interest.two_sided_gross_debit_c507abe3_ce314b84"
         },
         {
           "name": "interest_credits",
-          "figure_id": "loans_interest.two_sided_interest_credits_c507abe3_20a473cd"
+          "figure_id": "loans_interest.two_sided_interest_credits_c507abe3_ce314b84"
         }
       ],
       "evidence": [
         {
           "kind": "ledger",
-          "id": "Both Loan",
+          "id": "Reverse Loan",
           "label": ""
         },
         {
           "kind": "voucher",
-          "id": "d03",
-          "label": "Journal d03 on 2025-10-07"
+          "id": "n02",
+          "label": "Journal n02 on 2025-10-06"
         }
       ],
-      "title_sha256_16": "893460b9f8ef57dc",
-      "title_text": "Loan ledger both credited and debited in one voucher: listed as the books hold it, not divided into entries by this test (Invented Both Lender) (possible s.269SS/269T)",
-      "limits_sha256_16": "86375e37612033c6",
-      "limits_text": [
-        "This voucher credits the loan ₹500 and debits it ₹500. This test does not yet divide a voucher with both sides on one loan into its entries, so it lists it as the books hold it: in no reportable total and not in the s.269SS/269T flag count. Both sides stay in the loan's credits and debits before any filter.",
-        "Possible s.269T: the voucher's other credit lines include a ledger that is not a bank account (cash, a journal or another ledger). Whether a limit is breached is not computed; this is not in the s.269SS/269T flag count.",
-        "It was not compared with this loan's other entries for reversal pairs or repeated narrations."
-      ],
-      "ask_client_sha256_16": "dfa5f4d5329e0989",
-      "ask_client_text": [
-        "Entry by entry, what was taken from the lender, repaid to it, credited as interest or a charge, and withheld as TDS in this voucher, and by what mode (cash, bank, adjustment)? If part of it corrects another part, which?"
-      ]
-    },
-    {
-      "id": "loans_interest/not_computed/two_sided_c507abe3_989a92e2",
-      "clauses": [
-        "3CD-31(a)",
-        "3CD-31(c)",
-        "s.269SS"
-      ],
-      "confidence": "judgement_required",
-      "facts": [
-        {
-          "name": "bank_credits",
-          "figure_id": "loans_interest.two_sided_bank_credits_c507abe3_989a92e2"
-        },
-        {
-          "name": "gross_credit",
-          "figure_id": "loans_interest.two_sided_gross_credit_c507abe3_989a92e2"
-        },
-        {
-          "name": "gross_debit",
-          "figure_id": "loans_interest.two_sided_gross_debit_c507abe3_989a92e2"
-        },
-        {
-          "name": "interest_debits",
-          "figure_id": "loans_interest.two_sided_interest_debits_c507abe3_989a92e2"
-        }
-      ],
-      "evidence": [
-        {
-          "kind": "ledger",
-          "id": "Both Loan",
-          "label": ""
-        },
-        {
-          "kind": "voucher",
-          "id": "d02",
-          "label": "Journal d02 on 2025-10-06"
-        }
-      ],
-      "title_sha256_16": "893460b9f8ef57dc",
-      "title_text": "Loan ledger both credited and debited in one voucher: listed as the books hold it, not divided into entries by this test (Invented Both Lender) (possible s.269SS/269T)",
-      "limits_sha256_16": "94b110b003eebf1c",
+      "title_sha256_16": "d244404393d017b1",
+      "title_text": "Loan ledger both credited and debited in one voucher: listed as the books hold it, not divided into entries by this test (Invented Reverse Lender) (possible s.269SS/269T)",
+      "limits_sha256_16": "7496dcf4f80d0e11",
       "limits_text": [
         "This voucher credits the loan ₹500 and debits it ₹500. This test does not yet divide a voucher with both sides on one loan into its entries, so it lists it as the books hold it: in no reportable total and not in the s.269SS/269T flag count. Both sides stay in the loan's credits and debits before any filter.",
         "Every entry on this loan dated on or after this voucher is tested on its own amount only: its reportability by the running balance is not computed, and neither is the loan's maximum balance.",
-        "Possible s.269SS: the voucher's other debit lines include a ledger that is not a bank account (cash, a journal or another ledger). Whether a limit is breached is not computed; this is not in the s.269SS/269T flag count.",
+        "Possible s.269T: the voucher's other credit lines include a ledger that is not a bank account (cash, a journal or another ledger). Whether a limit is breached is not computed; this is not in the s.269SS/269T flag count.",
         "It was not compared with this loan's other entries for reversal pairs or repeated narrations."
       ],
       "ask_client_sha256_16": "dfa5f4d5329e0989",
@@ -1939,7 +2232,7 @@
       ]
     },
     {
-      "id": "loans_interest/s194a/c507abe3",
+      "id": "loans_interest/s194a/5e00ff96",
       "clauses": [
         "s.194A",
         "3CD-21(b)",
@@ -1950,15 +2243,15 @@
       "facts": [
         {
           "name": "interest",
-          "figure_id": "loans_interest.interest_total_c507abe3"
+          "figure_id": "loans_interest.interest_total_5e00ff96"
         },
         {
           "name": "interest_on_listed_vouchers",
-          "figure_id": "loans_interest.interest_on_listed_vouchers_c507abe3"
+          "figure_id": "loans_interest.interest_on_listed_vouchers_5e00ff96"
         },
         {
           "name": "lender_type",
-          "figure_id": "loans_interest.lender_type_c507abe3"
+          "figure_id": "loans_interest.lender_type_5e00ff96"
         }
       ],
       "evidence": [
@@ -2002,12 +2295,12 @@
     {
       "invariant": "POP-3",
       "subject": "closing_paise",
-      "detail": "TB closing_paise sums to -50000000 paise"
+      "detail": "TB closing_paise sums to -60000000 paise"
     },
     {
       "invariant": "POP-3",
       "subject": "opening_paise",
-      "detail": "TB opening_paise sums to -50000000 paise"
+      "detail": "TB opening_paise sums to -60000000 paise"
     }
   ],
   "result_invariants_evaluated": [
@@ -2033,12 +2326,12 @@
     {
       "invariant": "loans_interest.check_invariants",
       "subject": "loans_interest",
-      "detail": "LOAN-2: voucher Journal d02 on 2025-10-06 (guid d02) posts 1000000p to interest ledger 'Interest Both' and a line to loan ledger 'Both Loan' (tag c507abe3), but that interest is in no interest_total_c507abe3: the voucher both credits and debits the loan and is listed as not computed, so its interest is shown beside interest_total_c507abe3, not in it (#779)."
+      "detail": "LOAN-2: voucher Journal d02 on 2025-10-06 (guid d02) posts 1000000p to interest ledger 'Interest Both' and a line to loan ledger 'Both Loan' (tag 5e00ff96), but that interest is in no interest_total_5e00ff96: the voucher both credits and debits the loan and is listed as not computed, so its interest is shown beside interest_total_5e00ff96, not in it (#779)."
     },
     {
       "invariant": "loans_interest.check_invariants",
       "subject": "loans_interest",
-      "detail": "LOAN-2: voucher Journal d03 on 2025-10-07 (guid d03) posts -1000000p to interest ledger 'Interest Both' and a line to loan ledger 'Both Loan' (tag c507abe3), but that interest is in no interest_total_c507abe3: the voucher both credits and debits the loan and is listed as not computed, so its interest is shown beside interest_total_c507abe3, not in it (#779)."
+      "detail": "LOAN-2: voucher Journal d03 on 2025-10-07 (guid d03) posts -1000000p to interest ledger 'Interest Both' and a line to loan ledger 'Both Loan' (tag 5e00ff96), but that interest is in no interest_total_5e00ff96: the voucher both credits and debits the loan and is listed as not computed, so its interest is shown beside interest_total_5e00ff96, not in it (#779)."
     },
     {
       "invariant": "loans_interest.check_invariants",
@@ -2054,6 +2347,11 @@
       "invariant": "loans_interest.check_invariants",
       "subject": "loans_interest",
       "detail": "LOAN-2: voucher Journal k02 on 2025-10-06 (guid k02) posts 500000p to interest ledger 'Interest Credit' and a line to loan ledger 'Credit Loan' (tag a8924818), but that interest is in no interest_total_a8924818: the voucher both credits and debits the loan and is listed as not computed, so its interest is shown beside interest_total_a8924818, not in it (#779)."
+    },
+    {
+      "invariant": "loans_interest.check_invariants",
+      "subject": "loans_interest",
+      "detail": "LOAN-2: voucher Journal n02 on 2025-10-06 (guid n02) posts -500000p to interest ledger 'Interest Reverse' and a line to loan ledger 'Reverse Loan' (tag c507abe3), but that interest is in no interest_total_c507abe3: the voucher both credits and debits the loan and is listed as not computed, so its interest is shown beside interest_total_c507abe3, not in it (#779)."
     }
   ]
 }

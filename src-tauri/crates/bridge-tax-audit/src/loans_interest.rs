@@ -470,8 +470,8 @@ fn compute_loan_rows<'a>(
             rows.interest.push((at, loan_amt));
             continue;
         }
-        // A TDS journal (Loan Dr [/ other loans Dr] / TDS Payable Cr): neither taken nor repaid.
-        // Another loan on the opposite side makes it a transfer between loans, a row on each
+        // A TDS journal is Loan Dr [/ other loans Dr] / TDS Payable Cr. Another loan on the
+        // opposite side makes it a transfer between loans, a row on each
         // (bridge#803: read as TDS, both rows were lost). The sign product is taken on signs, so
         // it cannot overflow.
         let opposite_loan = v.lines.iter().any(|l| {
@@ -484,7 +484,7 @@ fn compute_loan_rows<'a>(
                 .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))
             && !opposite_loan
         {
-            continue;
+            continue; // a TDS journal: neither taken nor repaid
         }
         let m = mode(&others, &v.base_type, cash, bank);
         let non_tds: Vec<&str> = others

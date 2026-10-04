@@ -1634,7 +1634,10 @@ Per tool:
   3. (if not served from a held read) a runtime read
      (`src-tauri/src/agent_ledgers.rs`, `src-tauri/src/tally/runtime.rs`).
   - With `fields=basic` the runtime read is the currency masters, the ledger
-    export, and (if a `group` filter is given) the group collection.
+    export, and (if a `group` filter is given) the group collection. It is
+    sent once, as `ledger_movement`'s catalogue is: a read that outlived its
+    deadline is not sent again, and the call refuses as `ledger_export_invalid`
+    with the cause `request_deadline_exceeded`.
   - With `fields=compliance` it is the base-currency read, folded with a
     source read (`fetch_agent_party_ledger_masters_with_evidence`). The source
     read is the opening probe, then one commitment over the master, balance

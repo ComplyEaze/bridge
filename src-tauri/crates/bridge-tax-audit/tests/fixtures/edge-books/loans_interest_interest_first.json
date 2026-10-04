@@ -479,8 +479,7 @@
   },
   "Plain Loan": {
    "lender": "Invented Plain Lender",
-   "lender_type": "person",
-   "interest_ledger": null
+   "lender_type": "person"
   },
   "Late Loan": {
    "lender": "Invented Late Lender",

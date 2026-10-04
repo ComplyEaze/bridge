@@ -874,7 +874,10 @@ fn check(name: &str) {
                         s["bank_statement_refused"].as_str().map(str::to_string),
                     ),
                     v => match bank_statement_from_json(v) {
-                        Ok(statement) => (Some(statement), None),
+                        Ok(statement) => (
+                            Some(statement),
+                            s["bank_statement_refused"].as_str().map(str::to_string),
+                        ),
                         Err(AuditError::StatementRefused(refusal)) => {
                             assert!(
                                 s["bank_statement_refused"].is_null(),

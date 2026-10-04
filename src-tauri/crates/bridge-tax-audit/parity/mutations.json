@@ -8678,5 +8678,21 @@
   "file": "src/loans_interest.rs",
   "from": "&& i128::from(l.amount_paise).signum() * loan_amt.signum() < 0",
   "to": "&& i128::from(l.amount_paise).signum() * loan_amt.signum() <= 0"
+ },
+ {
+  "id": "E2A-81",
+  "by": "author",
+  "what": "a step back is read whatever the running balance shows (the chain is never checked)",
+  "file": "src/documents.rs",
+  "from": "return Err(refused(Some(&rows[i].txn_date)));",
+  "to": "return Ok(());"
+ },
+ {
+  "id": "E2A-82",
+  "by": "author",
+  "what": "only the statement rows are cited on the statement_does_not_add_up finding",
+  "file": "src/bank_reconciliation.rs",
+  "from": "let mut evidence: Vec<EvidenceRef> = books_by_reason[REASON_NOT_COMPUTED]",
+  "to": "let mut evidence: Vec<EvidenceRef> = Vec::<usize>::new()"
  }
 ]

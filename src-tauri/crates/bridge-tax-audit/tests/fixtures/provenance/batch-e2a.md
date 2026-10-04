@@ -61,6 +61,8 @@ in the extraction's shape), as the pack does, so a statement it refuses gives th
 changes `bankrec_paths`: its rows step back (03 Mar after 07 Mar) and one row carries no balance, so its golden is now
 the refused result, and its comment now says so. Its earlier paths move to `bankrec_adds_up`.
 
+One known divergence, failing closed: a statement whose period starts after it ends is a malformed document here (`period.start is after period.end`), checked before any refusal. The reference reads it, and refuses it as a row outside its period when it has rows. Neither emitter writes such a period.
+
 - `golden/synthetic.bank_reconciliation.json`, `golden/edge.bankrec_big_pool.bank_reconciliation.json`
   (regenerated): both statements add up, so the new figures are added and nothing else changes; `bankrec_big_pool`'s
   rows step back with an intact running balance and are read.
@@ -97,7 +99,7 @@ the reader step (no statement there is refused). The books are written as data b
 | `bankrec_no_balance.json` | 2,090 | `814d22455c310b6920f81b8cd6fef45d7dab4404ecbebf7b1ad6ef5f00a113c2` | `edge-books/bankrec_no_balance.json` |
 | `bankrec_order_break.json` | 3,209 | `ab22fba1ec40f577eb7523c9a8b902280c200b07fb5a2e64da2f77cd3756b902` | `edge-books/bankrec_order_break.json` |
 | `bankrec_outside_period.json` | 3,028 | `6908b5153e6201fa4787038b95cb1abb8cb7dad5130a665fb483a8353bea5989` | `edge-books/bankrec_outside_period.json` |
-| `bankrec_paths.json` | 6,995 | `e92bdc0b800871049000c01370f6eae6ace98fd5884c022c079c1dbac01ce915` | `edge-books/bankrec_paths.json` |
+| `bankrec_paths.json` | 7,010 | `cac969fe0255f0623379a53a4e3bc4b778682f08a97b6ac8955d6250a76568be` | `edge-books/bankrec_paths.json` |
 | `bankrec_sum_off.json` | 2,617 | `cb5dce496a71a2bfbcf9746b153a75218cb0d2cf35d0331f2a9b92a212d55aea` | `edge-books/bankrec_sum_off.json` |
 | `edge.bankrec_adds_up.bank_reconciliation.json` | 23,392 | `8d0770569642070b816b501e3ce2a9f1c026a83c47b235e0176bc37979ebb252` | `golden/edge.bankrec_adds_up.bank_reconciliation.json` |
 | `edge.bankrec_big_pool.bank_reconciliation.json` | 22,269 | `47e5e90f1069d2ff7cfa2675e01b169e2cfa4eee68557035c7263fc9ab138fdf` | `golden/edge.bankrec_big_pool.bank_reconciliation.json` |

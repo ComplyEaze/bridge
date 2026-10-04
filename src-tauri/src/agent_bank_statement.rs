@@ -26,8 +26,9 @@
 //! **No identity is minted.** Proposals carry `bridge_txn_id` labels and no
 //! REMOTEID or XML. `build_import_xml` builds from the file when given its
 //! `proposals_id` and the `sha256` this tool returned
-//! ([`resolve_import_arguments`]); the file's vouchers then pass the same
-//! admission as inline vouchers, so nothing here decides what is admitted.
+//! ([`load_proposals`], through [`resolve_import_arguments`]); the file's
+//! vouchers then pass the same admission as inline vouchers, so nothing here
+//! decides what is admitted.
 
 use super::*;
 use crate::local_files::local_disk_path::LocalDiskPath;
@@ -668,37 +669,20 @@ pub(super) fn bounded(rows: Vec<Value>, budget: &mut usize) -> (Vec<Value>, usiz
     (kept, omitted)
 }
 
-/// `build_import_xml`'s arguments with a proposals file resolved into
-/// `vouchers`, or the arguments unchanged when none is named.
+/// A proposals file this tool published, read and checked, for every caller that
+/// reads one (`build_import_xml` and `statement_tie_out`).
 ///
-/// The file must be one this tool published: named by a well-formed
-/// `proposals_id`, under the data directory's `bank-statements/`, a regular
-/// file owned by this user with a single link, carrying the declared schema
-/// and its own id, and hashing to `proposals_sha256` — the digest the parse
-/// returned. A file edited or replaced since is refused rather than built, so
-/// the batch is exactly what the summary described.
-pub(super) fn resolve_import_arguments(
+/// It is named by a well-formed `proposals_id`, under the data directory's
+/// `bank-statements/`, a regular file owned by this user with a single link,
+/// carrying the declared schema and its own id, and hashing to
+/// `proposals_sha256` -- the digest the parse returned. A file edited or
+/// replaced since is refused (`proposals_changed`), so what a caller reads is
+/// exactly what the summary described.
+pub(super) fn load_proposals(
     data_dir: &Path,
-    args: &Value,
-) -> Result<ResolvedImport, String> {
-    let Some(object) = args.as_object() else {
-        return Err("argument_schema_invalid".into());
-    };
-    let Some(proposals_id) = object.get("proposals_id") else {
-        if object.contains_key("proposals_sha256") {
-            return Err("proposals_id_required".into());
-        }
-        if !object.contains_key("vouchers") {
-            return Err("vouchers_required".into());
-        }
-        return Ok(ResolvedImport {
-            args: args.clone(),
-            cash_ledgers: Vec::new(),
-        });
-    };
-    if object.contains_key("vouchers") {
-        return Err("proposals_id_with_vouchers".into());
-    }
+    proposals_id: &Value,
+    proposals_sha256: Option<&Value>,
+) -> Result<Value, String> {
     let proposals_id = proposals_id
         .as_str()
         .filter(|id| {
@@ -706,8 +690,7 @@ pub(super) fn resolve_import_arguments(
                 .is_some_and(catalog::is_uuid_v4_lowercase)
         })
         .ok_or_else(|| "argument_invalid:proposals_id".to_string())?;
-    let expected_sha256 = object
-        .get("proposals_sha256")
+    let expected_sha256 = proposals_sha256
         .ok_or_else(|| "proposals_sha256_required".to_string())?
         .as_str()
         .filter(|digest| {
@@ -742,6 +725,37 @@ pub(super) fn resolve_import_arguments(
     if document["schema"] != PROPOSALS_SCHEMA || document["proposals_id"] != proposals_id {
         return Err("proposals_file_invalid".into());
     }
+    Ok(document)
+}
+
+/// `build_import_xml`'s arguments with a proposals file resolved into
+/// `vouchers`, or the arguments unchanged when none is named.
+///
+/// The file must be one [`load_proposals`] admits, so the batch is exactly what
+/// the parse's summary described.
+pub(super) fn resolve_import_arguments(
+    data_dir: &Path,
+    args: &Value,
+) -> Result<ResolvedImport, String> {
+    let Some(object) = args.as_object() else {
+        return Err("argument_schema_invalid".into());
+    };
+    let Some(proposals_id) = object.get("proposals_id") else {
+        if object.contains_key("proposals_sha256") {
+            return Err("proposals_id_required".into());
+        }
+        if !object.contains_key("vouchers") {
+            return Err("vouchers_required".into());
+        }
+        return Ok(ResolvedImport {
+            args: args.clone(),
+            cash_ledgers: Vec::new(),
+        });
+    };
+    if object.contains_key("vouchers") {
+        return Err("proposals_id_with_vouchers".into());
+    }
+    let document = load_proposals(data_dir, proposals_id, object.get("proposals_sha256"))?;
     let vouchers = document
         .get("vouchers")
         .filter(|vouchers| vouchers.is_array())

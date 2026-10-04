@@ -109,7 +109,7 @@ export function companyDiscoveryPrompt(
     return {
       companyCount,
       heading: `${companyCount} ${companyLabel} discovered`,
-      detail: "Bridge identified the current Tally company list. Choose one explicitly before reading or saving any company-scoped data.",
+      detail: "ComplyEaze Bridge identified the current Tally company list. Choose one explicitly before reading or saving any company-scoped data.",
       actionLabel: "Choose company",
     };
   }
@@ -121,7 +121,7 @@ export function companyDiscoveryPrompt(
   return {
     companyCount,
     heading: `${companyCount} ${companyLabel} listed for verification`,
-    detail: "Tally returned a compatibility company listing. Verify the intended company before Bridge treats its identity as evidence or enables company-scoped reads.",
+    detail: "Tally returned a compatibility company listing. Verify the intended company before ComplyEaze Bridge treats its identity as evidence or enables company-scoped reads.",
     actionLabel: "Verify company",
   };
 }

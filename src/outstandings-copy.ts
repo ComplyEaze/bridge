@@ -14,27 +14,27 @@ export function outstandingsPartialReason(
 ) {
   if (value === "native_outstandings_as_of_refused") {
     if (requestedAsOf && tallyAsOf) {
-      return `Tally refused the requested as-of date (${requestedAsOf}) and returned overdue days as of ${tallyAsOf}, so Bridge withheld the totals`;
+      return `Tally refused the requested as-of date (${requestedAsOf}) and returned overdue days as of ${tallyAsOf}, so ComplyEaze Bridge withheld the totals`;
     }
-    return "Tally did not use the requested as-of date, so Bridge withheld the totals";
+    return "Tally did not use the requested as-of date, so ComplyEaze Bridge withheld the totals";
   }
   if (value === "native_overdue_crosscheck_mismatch") {
-    return "Tally's overdue-day cross-check disagreed with the bill due dates, so Bridge withheld the totals";
+    return "Tally's overdue-day cross-check disagreed with the bill due dates, so ComplyEaze Bridge withheld the totals";
   }
   if (value === "native_outstandings_as_of_unconfirmed_without_bill_references") {
-    return "Tally returned no bill references while the ledger still carried a balance, so Bridge could not confirm the requested as-of date and withheld the totals";
+    return "Tally returned no bill references while the ledger still carried a balance, so ComplyEaze Bridge could not confirm the requested as-of date and withheld the totals";
   }
   if (value === "native_outstandings_as_of_unconfirmed_without_effective_date_evidence") {
-    return "Tally returned no overdue-day evidence that identifies the report's effective date, so Bridge withheld the totals";
+    return "Tally returned no overdue-day evidence that identifies the report's effective date, so ComplyEaze Bridge withheld the totals";
   }
   if (value === "company_currency_probe_failed") {
-    return "Bridge could not verify this company's base currency";
+    return "ComplyEaze Bridge could not verify this company's base currency";
   }
   if (value === "company_base_currency_not_inr") {
     return "this company's verified base currency is not INR";
   }
   if (value === "company_base_currency_undetermined") {
-    return "Tally defines more than one currency for this company, and Bridge could not tell from Tally which one is its base currency, so it does not read outstandings for it";
+    return "Tally defines more than one currency for this company, and ComplyEaze Bridge could not tell from Tally which one is its base currency, so it does not read outstandings for it";
   }
   if (value === "company_outstandings_read_failed") {
     return "this company read failed while the remaining companies continued";
@@ -47,7 +47,7 @@ export function outstandingsPartialReason(
   if (value === "ledger_currency_base_unmatched") {
     return foreignCurrencyLedgerName
       ? `Tally keeps ledger ${foreignCurrencyLedgerName} in a currency other than this company's base currency`
-      : "Bridge could not match this company's ledgers to its base currency";
+      : "ComplyEaze Bridge could not match this company's ledgers to its base currency";
   }
   if (value === "ledger_currency_unobserved") {
     return "Tally did not report the currency of every ledger in this multi-currency company";
@@ -62,22 +62,22 @@ export function outstandingsPartialReason(
     return "a segment reached the safety deadline; Tally may need a restart before another sync";
   }
   if (value === "segment_response_size_limit_exceeded") {
-    return "a wildcard segment exceeded Bridge's response safety bound";
+    return "a wildcard segment exceeded ComplyEaze Bridge's response safety bound";
   }
   if (value === "outstandings_segment_sizing_uncalibrated") {
-    return "Bridge has no approved production segment size yet; no voucher read was sent";
+    return "ComplyEaze Bridge has no approved production segment size yet; no voucher read was sent";
   }
   if (value === "outstandings_segment_plan_exceeds_budget") {
-    return "this book needs more read segments than Bridge can safely verify in one sync; no voucher scan started";
+    return "this book needs more read segments than ComplyEaze Bridge can safely verify in one sync; no voucher scan started";
   }
   if (value === "company_voucher_alter_id_high_water_missing") {
-    return "Tally did not return the voucher limit Bridge needs to prove complete coverage";
+    return "Tally did not return the voucher limit ComplyEaze Bridge needs to prove complete coverage";
   }
   if (value === "ledger_opening_bills_not_covered") {
-    return "Bridge found bill-wise opening balances that the voucher scan cannot verify, so totals stay withheld";
+    return "ComplyEaze Bridge found bill-wise opening balances that the voucher scan cannot verify, so totals stay withheld";
   }
   if (value === "unallocated_direct_postings_not_covered") {
-    return "Bridge cannot yet prove balances posted without a bill reference, so totals stay withheld before any voucher read";
+    return "ComplyEaze Bridge cannot yet prove balances posted without a bill reference, so totals stay withheld before any voucher read";
   }
   if (value === "whole_book_false_empty") {
     return "Tally reported existing vouchers but the complete tiled date scan returned no rows";
@@ -140,7 +140,7 @@ export function outstandingsPartialState(
     ].filter((sentence): sentence is string => sentence !== null);
     return {
       title: "Outstandings totals withheld on the desktop",
-      message: `${named.length ? named.join(". ") : outstandingsPartialReason(reasonCode)}. Bridge left those ledgers out of the figures, with their bills, and shows no totals here, because figures without them would not describe the whole book. The agent connection (MCP outstandings) reports the plain base-currency ledgers only, labelled as such.`,
+      message: `${named.length ? named.join(". ") : outstandingsPartialReason(reasonCode)}. ComplyEaze Bridge left those ledgers out of the figures, with their bills, and shows no totals here, because figures without them would not describe the whole book. The agent connection (MCP outstandings) reports the plain base-currency ledgers only, labelled as such.`,
       retryable: false,
       tallyReadAttempted: true,
     };
@@ -167,7 +167,7 @@ export function outstandingsPartialState(
   if (reasonCode === "outstandings_segment_sizing_uncalibrated") {
     return {
       title: "Outstandings aren’t available yet",
-      message: "Bridge isn’t ready to calculate this report safely. It didn’t read anything from Tally or calculate totals. Changing Tally settings won’t resolve this.",
+      message: "ComplyEaze Bridge isn’t ready to calculate this report safely. It didn’t read anything from Tally or calculate totals. Changing Tally settings won’t resolve this.",
       retryable: false,
       tallyReadAttempted: false,
     };
@@ -175,7 +175,7 @@ export function outstandingsPartialState(
   if (reasonCode === "unallocated_direct_postings_not_covered") {
     return {
       title: "Outstandings are not available for this company",
-      message: "Bridge cannot yet verify balances posted without a bill reference. It did not calculate totals. Changing Tally settings won’t resolve this.",
+      message: "ComplyEaze Bridge cannot yet verify balances posted without a bill reference. It did not calculate totals. Changing Tally settings won’t resolve this.",
       retryable: false,
       tallyReadAttempted: false,
     };
@@ -183,7 +183,7 @@ export function outstandingsPartialState(
   if (reasonCode === "ledger_opening_bills_not_covered") {
     return {
       title: "Outstandings are not available for this company",
-      message: "Bridge completed a coverage check, but bill-wise opening balances fall outside the current read scope. It did not calculate totals. Repeating the same scan won't resolve this.",
+      message: "ComplyEaze Bridge completed a coverage check, but bill-wise opening balances fall outside the current read scope. It did not calculate totals. Repeating the same scan won't resolve this.",
       retryable: false,
       tallyReadAttempted: true,
     };
@@ -194,7 +194,7 @@ export function outstandingsPartialState(
   ) {
     return {
       title: "Outstandings are not available for this company",
-      message: `${outstandingsPartialReason(reasonCode, requestedAsOf, tallyAsOf, foreignCurrencyLedgerName)}. Bridge withheld the totals rather than count amounts in another currency as rupees.`,
+      message: `${outstandingsPartialReason(reasonCode, requestedAsOf, tallyAsOf, foreignCurrencyLedgerName)}. ComplyEaze Bridge withheld the totals rather than count amounts in another currency as rupees.`,
       retryable: false,
       tallyReadAttempted: true,
     };
@@ -202,14 +202,14 @@ export function outstandingsPartialState(
   if (reasonCode === "company_foreign_currency_ledger_balance") {
     return {
       title: "Outstandings are not available for this company",
-      message: `${outstandingsPartialReason(reasonCode, requestedAsOf, tallyAsOf, foreignCurrencyLedgerName)}. Bridge withheld the totals rather than guessing a base-currency amount.`,
+      message: `${outstandingsPartialReason(reasonCode, requestedAsOf, tallyAsOf, foreignCurrencyLedgerName)}. ComplyEaze Bridge withheld the totals rather than guessing a base-currency amount.`,
       retryable: false,
       tallyReadAttempted: true,
     };
   }
   return {
     title: "Partial result withheld",
-    message: `Bridge could not prove every requested segment complete (${outstandingsPartialReason(reasonCode)}). No totals were calculated.`,
+    message: `ComplyEaze Bridge could not prove every requested segment complete (${outstandingsPartialReason(reasonCode)}). No totals were calculated.`,
     retryable: true,
     tallyReadAttempted: true,
   };
@@ -233,7 +233,7 @@ export function workingPaperUnavailableState(
   if (reasonCode === "working_paper_resource_limit") {
     return {
       title: "Excel working paper unavailable",
-      message: "The outstandings report is complete, but it exceeds Bridge’s safe export limits for the working paper and party statements. The CSV export remains available.",
+      message: "The outstandings report is complete, but it exceeds ComplyEaze Bridge’s safe export limits for the working paper and party statements. The CSV export remains available.",
     };
   }
   if (reasonCode === "working_paper_complete_source_unavailable") {
@@ -245,12 +245,12 @@ export function workingPaperUnavailableState(
   if (reasonCode === "working_paper_export_store_unavailable") {
     return {
       title: "Excel working paper not prepared",
-      message: "The outstandings report is complete, but Bridge could not protect its one-use working-paper snapshot. Refresh outstandings to try again; the other report exports remain available.",
+      message: "The outstandings report is complete, but ComplyEaze Bridge could not protect its one-use working-paper snapshot. Refresh outstandings to try again; the other report exports remain available.",
     };
   }
   return {
     title: "Excel working paper unavailable",
-    message: "The outstandings report is complete, but Bridge could not prepare its working-paper export. The other report exports remain available.",
+    message: "The outstandings report is complete, but ComplyEaze Bridge could not prepare its working-paper export. The other report exports remain available.",
   };
 }
 
@@ -265,5 +265,5 @@ export function outstandingsAgeingDisclosure(
     // than "cannot be proven".
     return "Receivable includes entries with no bill reference. Tally gives them no bill and no age, so they are excluded from these buckets and shown as Unallocated above.";
   }
-  return "Receivable includes On Account entries that are excluded from these buckets. Tally gives them no bill reference or age. Bridge does not show an On Account amount because this voucher read cannot prove the full unallocated balance.";
+  return "Receivable includes On Account entries that are excluded from these buckets. Tally gives them no bill reference or age. ComplyEaze Bridge does not show an On Account amount because this voucher read cannot prove the full unallocated balance.";
 }

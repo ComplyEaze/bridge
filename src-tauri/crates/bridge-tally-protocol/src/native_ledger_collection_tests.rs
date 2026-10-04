@@ -309,6 +309,57 @@ fn a_ledger_collection_status_is_one_failure_or_absent_and_its_shape_is_checked(
 /// whose rows carries the requested company's GUID prefix, and a party-master
 /// collection whose response company GUID is absent or another company's, did
 /// not bind to the company.
+/// A row the ledger parser refuses is typed by whose fault it is (#718, slice
+/// 2): what the row holds is `RowUnusable`; a response that ends inside a row
+/// is `MalformedResponse`, the response's fault, not the row's.
+#[test]
+fn a_ledger_row_refused_is_typed_by_class() {
+    use crate::NativeCollectionError as Class;
+    let source = |xml: &str| {
+        parse_native_ledger_source_records_with_evidence(xml, EXPECTED_COMPANY_GUID)
+            .expect_err("the ledger collection is refused")
+            .downcast_ref::<Class>()
+            .copied()
+    };
+    let xml = master_response(None);
+    let guid = format!("<GUID>{EXPECTED_COMPANY_GUID}-00000001</GUID>");
+    let parent = "<PARENT>Sundry Debtors</PARENT>";
+    assert_eq!(source(&xml.replace(&guid, "")), Some(Class::RowUnusable));
+    assert_eq!(
+        source(&xml.replace(parent, &format!("{parent}{parent}"))),
+        Some(Class::RowUnusable)
+    );
+    let row_start = xml.find("<LEDGER ").expect("the row");
+    let row_end = xml.find("</LEDGER>").expect("the row's end") + "</LEDGER>".len();
+    assert_eq!(
+        source(&format!(
+            "{}<LEDGER NAME=\"Empty\"/>{}",
+            &xml[..row_start],
+            &xml[row_end..]
+        )),
+        Some(Class::RowUnusable)
+    );
+    let cut = &xml[..xml.find("<OPENINGBALANCE>").expect("the opening")];
+    assert_eq!(source(cut), Some(Class::MalformedResponse));
+    assert_eq!(
+        parse_native_party_ledger_master_records_with_evidence(
+            &master_response_with_extra(
+                Some(EXPECTED_COMPANY_GUID),
+                "<EMAIL>a</EMAIL><EMAIL>b</EMAIL>"
+            ),
+            EXPECTED_COMPANY_GUID
+        )
+        .expect_err("a repeated party field is refused")
+        .downcast_ref::<Class>()
+        .copied(),
+        Some(Class::RowUnusable)
+    );
+    assert!(
+        parse_native_ledger_source_records_with_evidence(&xml, EXPECTED_COMPANY_GUID).is_ok(),
+        "the control reads"
+    );
+}
+
 #[test]
 fn a_ledger_collection_refused_as_a_whole_is_typed_by_class() {
     use crate::NativeCollectionError as Class;

@@ -1,0 +1,8 @@
+scripts/tally-error-copy.test.mjs
+src/AllClientsScreen.tsx
+src/LedgerEntriesScreen.tsx
+src/MirrorProofScreen.tsx
+src/OutstandingsEvidencePanel.tsx
+src/OutstandingsScreen.tsx
+src/SourceDraftScreen.tsx
+reviewer: lamemustafa

@@ -726,6 +726,7 @@ impl Server {
             // collection, so a Journal-only batch keeps the request sequence its
             // own qualification was measured on.
             let mut group_evidence = None;
+            let mut statement_suspense_warning = false;
             if renders_bank_shape(&payload.vouchers) || !resolved.cash_ledgers.is_empty() {
                 let (groups, evidence) = self.read_group_collection(&identity, &company.name).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence.clone());
@@ -766,6 +767,27 @@ impl Server {
                         company_guid: Some(payload.company_guid),
                         truncated: false,
                     });
+                }
+                if let Some(ledgers) = &resolved.statement_ledgers {
+                    let findings = statement_ledger_findings(ledgers, &observed);
+                    if findings.bank_in_cash_in_hand {
+                        return Ok(ToolOutcome {
+                            payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
+                                "state":"refused", "reason":"statement_bank_ledger_not_a_bank",
+                                "refused_ledgers":[{
+                                    "ledger": party_name(ledgers.bank_ledger.as_str()),
+                                    "requires": "bank",
+                                    "reserved_group": "Cash-in-Hand",
+                                }],
+                                "group_evidence_sha256":evidence.response_sha256,
+                                "next_step":"No file was written. The bank ledger this statement was parsed for is under Cash-in-Hand, and a statement belongs to a bank account. Parse the statement again with the ledger of the bank account that issued it, which must be under Bank Accounts or Bank OD A/c."
+                            }}),
+                            evidence: accumulated.clone(),
+                            company_guid: Some(payload.company_guid),
+                            truncated: false,
+                        });
+                    }
+                    statement_suspense_warning = findings.suspense_outside_suspense;
                 }
                 group_evidence = Some(evidence);
             }
@@ -997,6 +1019,11 @@ impl Server {
                     voucher.voucher_type.bank_shape().is_some() && voucher.entries.len() > 2
                 }),
             );
+            if statement_suspense_warning {
+                if let Some(list) = warnings.as_array_mut() {
+                    list.push(json!(SUSPENSE_OUTSIDE_GROUP_WARNING));
+                }
+            }
             let next_step = match &amendment {
                 Some(_) => {
                     if let Some(list) = warnings.as_array_mut() {
@@ -2663,6 +2690,26 @@ impl CashBankRefusals {
         self.legs > 0
     }
 }
+
+/// What a statement file's two ledgers are in this book's groups.
+struct StatementLedgerFindings {
+    /// Refused: a statement belongs to a bank account.
+    bank_in_cash_in_hand: bool,
+    /// Warned, not refused: some books keep a bank suspense ledger elsewhere.
+    suspense_outside_suspense: bool,
+}
+
+fn statement_ledger_findings(
+    ledgers: &super::bank_statement::StatementLedgers,
+    observed: &ObservedMasters,
+) -> StatementLedgerFindings {
+    StatementLedgerFindings {
+        bank_in_cash_in_hand: observed.classify(&ledgers.bank_ledger).is_cash_in_hand(),
+        suspense_outside_suspense: !observed.classify(&ledgers.suspense_ledger).is_suspense(),
+    }
+}
+
+const SUSPENSE_OUTSIDE_GROUP_WARNING: &str = "suspense_ledger_outside_suspense_group: the suspense ledger this statement was parsed for is not under the reserved Suspense A/c group in this book. The lines it receives are tagged in their narration and counted in suspense_lines, but a review that reads the Suspense A/c group will not see them. Some books keep a bank suspense ledger elsewhere on purpose; check that this is the one intended.";
 
 fn cash_bank_refusals(
     payload: &ImportPayload,

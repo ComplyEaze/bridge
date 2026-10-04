@@ -621,6 +621,14 @@ pub(super) struct AnsweredCashLedger {
 pub(super) struct ResolvedImport {
     pub(super) args: Value,
     pub(super) cash_ledgers: Vec<AnsweredCashLedger>,
+    /// The two ledgers the parse was given, when the file names both.
+    pub(super) statement_ledgers: Option<StatementLedgers>,
+}
+
+/// The bank and suspense ledgers a proposals file was parsed for.
+pub(super) struct StatementLedgers {
+    pub(super) bank_ledger: String,
+    pub(super) suspense_ledger: String,
 }
 
 /// The voucher type and side an answer puts its named ledger on, for an
@@ -683,6 +691,7 @@ pub(super) fn resolve_import_arguments(
         return Ok(ResolvedImport {
             args: args.clone(),
             cash_ledgers: Vec::new(),
+            statement_ledgers: None,
         });
     };
     if object.contains_key("vouchers") {
@@ -791,6 +800,14 @@ pub(super) fn resolve_import_arguments(
         }
         cash_ledgers.push(need);
     }
+    // A file that names neither ledger is not held to a rule about them.
+    let statement_ledgers = document["bank_ledger"]
+        .as_str()
+        .zip(document["suspense_ledger"].as_str())
+        .map(|(bank_ledger, suspense_ledger)| StatementLedgers {
+            bank_ledger: bank_ledger.to_string(),
+            suspense_ledger: suspense_ledger.to_string(),
+        });
     let mut resolved = object.clone();
     resolved.remove("proposals_id");
     resolved.remove("proposals_sha256");
@@ -798,6 +815,7 @@ pub(super) fn resolve_import_arguments(
     Ok(ResolvedImport {
         args: Value::Object(resolved),
         cash_ledgers,
+        statement_ledgers,
     })
 }
 

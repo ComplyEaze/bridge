@@ -2509,3 +2509,211 @@ async fn a_proposals_build_counts_its_suspense_lines_and_never_lists_them() {
         );
     }
 }
+
+// ---- the two ledgers a statement file was parsed for --------------------------
+
+fn statement_ledgers(
+    bank: &str,
+    suspense: &str,
+) -> super::super::super::bank_statement::StatementLedgers {
+    super::super::super::bank_statement::StatementLedgers {
+        bank_ledger: bank.to_string(),
+        suspense_ledger: suspense.to_string(),
+    }
+}
+
+/// A statement belongs to a bank account: a bank ledger that reaches
+/// Cash-in-Hand is refused, a real bank ledger and an unknown name are not.
+/// (An unknown name is the vouchers' own admission to refuse, not this rule's.)
+#[test]
+fn a_statements_bank_ledger_in_cash_in_hand_is_found_and_a_bank_is_not() {
+    let mut ledgers = captured_demo_ledger_parents();
+    ledgers.push(("Bank Suspense".into(), Some("Suspense A/c".into())));
+    ledgers.push(("Parking".into(), Some("Current Assets".into())));
+    let masters = observed(&ledgers, captured_demo_groups());
+    let bank_in_cash = |bank: &str| {
+        statement_ledger_findings(&statement_ledgers(bank, "Bank Suspense"), &masters)
+            .bank_in_cash_in_hand
+    };
+    assert!(bank_in_cash("Cash"));
+    assert!(!bank_in_cash("HDFC Bank Current Account"));
+    assert!(!bank_in_cash("ICICI Bank CA 4471"));
+    assert!(!bank_in_cash("A Ledger The Book Lacks"));
+    assert!(
+        !bank_in_cash("Gujarat Poly Industries"),
+        "a party is not Cash-in-Hand either"
+    );
+}
+
+#[test]
+fn a_statements_suspense_ledger_outside_suspense_a_c_is_found_and_one_inside_is_not() {
+    let mut ledgers = captured_demo_ledger_parents();
+    ledgers.push(("Bank Suspense".into(), Some("Suspense A/c".into())));
+    ledgers.push(("Parking".into(), Some("Current Assets".into())));
+    let masters = observed(&ledgers, captured_demo_groups());
+    let outside = |suspense: &str| {
+        statement_ledger_findings(
+            &statement_ledgers("HDFC Bank Current Account", suspense),
+            &masters,
+        )
+        .suspense_outside_suspense
+    };
+    assert!(!outside("Bank Suspense"));
+    assert!(outside("Parking"));
+    assert!(outside("Gujarat Poly Industries"));
+    // Not in the book at all: it does not reach Suspense A/c either.
+    assert!(outside("A Ledger The Book Lacks"));
+}
+
+/// Publish `vouchers` as a proposals file for a parse of `bank_ledger` with
+/// `suspense_ledger`, returning build_import_xml's arguments.
+fn statement_proposals(
+    directory: &std::path::Path,
+    vouchers: Value,
+    bank_ledger: &str,
+    suspense_ledger: &str,
+) -> Value {
+    let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+    let document = json!({
+        "schema": "bridge.bank_statement.proposals.v1",
+        "proposals_id": proposals_id,
+        "bank_ledger": bank_ledger,
+        "suspense_ledger": suspense_ledger,
+        "vouchers": vouchers,
+        "records": [],
+    });
+    let bytes = serde_json::to_vec_pretty(&document).unwrap();
+    let statements = directory.join("bank-statements");
+    std::fs::create_dir_all(&statements).unwrap();
+    std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+    json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)})
+}
+
+/// The build plans with the captured catalogue and group reads rewritten in
+/// memory, so one ledger sits under another group. This exercises Bridge's own
+/// rule and is no evidence of what Tally does.
+fn bank_plans_moving(ledger: &str, from: &str, to: &str, take: Option<usize>) -> Vec<ScenarioPlan> {
+    let plans = bank_build_plans();
+    let plans = &plans[..take.unwrap_or(plans.len())];
+    plans
+        .iter()
+        .cloned()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                if body.contains(&format!("<LEDGER NAME=\"{ledger}\"")) {
+                    let moved = body.replace(
+                        &format!("<PARENT TYPE=\"String\">{from}</PARENT>"),
+                        &format!("<PARENT TYPE=\"String\">{to}</PARENT>"),
+                    );
+                    assert_ne!(&moved, body, "the rewrite must apply");
+                    plan.fixture = Fixture::SyntheticXml(moved);
+                }
+            }
+            plan
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_statement_whose_bank_ledger_is_cash_in_hand_is_refused_before_any_file_is_written() {
+    // Cash is the captured book's own Cash-in-Hand ledger.
+    let simulator = SequenceSimulator::spawn(bank_build_plans()[..18].to_vec()).expect("plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let vouchers = serde_json::to_value(captured_bank_payload().vouchers).unwrap();
+    let args = statement_proposals(directory.path(), vouchers, "Cash", "Suspense");
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "statement_bank_ledger_not_a_bank");
+    let refused = result["refused_ledgers"].as_array().unwrap();
+    assert_eq!(refused.len(), 1);
+    assert_eq!(refused[0]["requires"], "bank");
+    assert_eq!(refused[0]["reserved_group"], "Cash-in-Hand");
+    assert!(!directory.path().join("imports").exists());
+    assert_eq!(simulator.finish().expect("requests").len(), 18);
+}
+
+/// The same file, with the book's Cash ledger moved under Bank Accounts for
+/// this test only, builds: the refusal is the group, not the name. Its suspense
+/// ledger is outside Suspense A/c, so the build warns and still writes.
+#[tokio::test]
+async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a_warning() {
+    let warnings_of = |response: &Value| {
+        response["structuredContent"]["result"]["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|warning| warning.as_str().map(str::to_string))
+            .collect::<Vec<_>>()
+    };
+    let vouchers = serde_json::to_value(captured_bank_payload().vouchers).unwrap();
+    // Cash under Bank Accounts; "WR2 Sales" (the suspense ledger named here) stays under Sales Accounts.
+    let simulator = SequenceSimulator::spawn(bank_plans_moving(
+        "Cash",
+        "Cash-in-Hand",
+        "Bank Accounts",
+        None,
+    ))
+    .expect("plan");
+    let directory = tempfile::tempdir().unwrap();
+    let args = statement_proposals(directory.path(), vouchers.clone(), "Cash", "WR2 Sales");
+    let response = bank_server(directory.path(), simulator.address().port())
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 2, "{response}");
+    let named = warnings_of(&response)
+        .into_iter()
+        .filter(|warning| warning.starts_with("suspense_ledger_outside_suspense_group:"))
+        .collect::<Vec<_>>();
+    assert_eq!(named.len(), 1, "{response}");
+    assert!(directory
+        .path()
+        .join("imports")
+        .join(format!("{}.xml", result["batch_id"].as_str().unwrap()))
+        .exists());
+    assert_eq!(simulator.finish().expect("requests").len(), 44);
+
+    // The suspense ledger under Suspense A/c: the same build, no such warning.
+    let simulator = SequenceSimulator::spawn({
+        let mut plans = bank_plans_moving("Cash", "Cash-in-Hand", "Bank Accounts", None);
+        plans = plans
+            .into_iter()
+            .map(|mut plan| {
+                if let Fixture::SyntheticXml(body) = &plan.fixture {
+                    if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                        plan.fixture = Fixture::SyntheticXml(body.replace(
+                            "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
+                            "<PARENT TYPE=\"String\">Suspense A/c</PARENT>",
+                        ));
+                    }
+                }
+                plan
+            })
+            .collect();
+        plans
+    })
+    .expect("plan");
+    let directory = tempfile::tempdir().unwrap();
+    let args = statement_proposals(directory.path(), vouchers, "Cash", "WR2 Sales");
+    let response = bank_server(directory.path(), simulator.address().port())
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    assert_eq!(
+        response["structuredContent"]["result"]["voucher_count"], 2,
+        "{response}"
+    );
+    assert!(
+        warnings_of(&response)
+            .iter()
+            .all(|warning| !warning.starts_with("suspense_ledger_outside_suspense_group")),
+        "{response}"
+    );
+    assert_eq!(simulator.finish().expect("requests").len(), 44);
+}

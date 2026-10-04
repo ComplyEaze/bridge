@@ -175,13 +175,13 @@ impl CashAnswer {
     pub fn not_built(self) -> Option<&'static str> {
         match self {
             Self::PaidToSomeone => Some(
-                "cash paid straight to someone needs a cash Payment to that person as well, which Bridge does not build yet; record it by hand, or answer dont_know so it posts to suspense for the CA",
+                "cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; record it by hand, or answer dont_know so it posts to suspense for the CA",
             ),
             Self::OwnCashBox => Some(
-                "a deposit from the cash box is a Contra that can drive the cash book negative, and Bridge cannot yet check the cash book's balance first; record it by hand, or answer dont_know so it posts to suspense for the CA",
+                "a deposit from the cash box is a Contra that can drive the cash book negative, and ComplyEaze Bridge cannot yet check the cash book's balance first; record it by hand, or answer dont_know so it posts to suspense for the CA",
             ),
             Self::UnbookedCashSales => Some(
-                "record those cash sales or collections in Tally first; the deposit itself is then a Contra from the cash box, which Bridge does not build yet",
+                "record those cash sales or collections in Tally first; the deposit itself is then a Contra from the cash box, which ComplyEaze Bridge does not build yet",
             ),
             _ => None,
         }

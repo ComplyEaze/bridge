@@ -671,6 +671,38 @@ fn the_cost_of_sales_heading_passes_only_at_exactly_the_derived_cost_of_sales() 
     );
 }
 
+/// A heading that reads zero or empty is compared like any other line (#1070):
+/// over a non-zero derived cost of sales it refuses, naming the heading, and
+/// over a zero one it ties. Before, the no-amount arm let it pass whatever the
+/// cost of sales was.
+#[test]
+fn a_zero_or_empty_cost_of_sales_heading_is_compared_with_the_cost_of_sales() {
+    let expected = Established::NotEstablished {
+        reason: NotEstablishedReason::TallyProfitAndLossDiffers,
+        lines: vec!["Cost of Sales :".to_string()],
+    };
+    for (sub, main) in [("", "0.00"), ("0.00", "0.00"), ("", "")] {
+        let derived = reads_lab_with_profit_and_loss(&[
+            ("Cost of Sales :", sub, main),
+            ("Purchase Accounts", "-4250.00", ""),
+        ]);
+        assert_eq!(derived.gross_result, expected, "{sub:?} {main:?}");
+        assert_eq!(derived.net_result, expected, "{sub:?} {main:?}");
+    }
+    // Known lab has no Purchase Accounts or Direct Expenses: its cost of
+    // sales is zero, so a zero or empty heading ties.
+    for (sub, main) in [("", "0.00"), ("0.00", "0.00"), ("", "")] {
+        let derived = derive_with_profit_and_loss(
+            known_lab(),
+            &profit_and_loss(&[
+                ("Cost of Sales :", sub, main),
+                ("Sales Accounts", "", "4027.00"),
+            ]),
+        );
+        assert_established(&derived.net_result, "4027.00");
+    }
+}
+
 fn statuses(tie: &TieOut) -> Vec<(&str, TieStatus)> {
     tie.lines
         .iter()

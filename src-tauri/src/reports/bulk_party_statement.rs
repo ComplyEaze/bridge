@@ -246,7 +246,9 @@ where
     } = request;
     let destination = destination.path();
     if !destination.is_dir() {
-        return Err("Bridge could not use that statement destination folder.".to_string());
+        return Err(
+            "ComplyEaze Bridge could not use that statement destination folder.".to_string(),
+        );
     }
 
     let parties = statement_parties(open_bills, unallocated_by_party);
@@ -320,8 +322,9 @@ where
         written: &written,
         failures: &failures,
     };
-    let manifest_bytes = serde_json::to_vec_pretty(&manifest)
-        .map_err(|error| format!("Bridge could not build the statement manifest: {error}"))?;
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest).map_err(|error| {
+        format!("ComplyEaze Bridge could not build the statement manifest: {error}")
+    })?;
     let manifest_path = write_unique_file(
         destination,
         &format!("statement-manifest-{as_of_yyyymmdd}"),
@@ -345,21 +348,24 @@ fn statement_directional_totals(statement: &PartyStatement) -> Result<(String, S
             ExposureDirection::Receivable => &mut receivable,
             ExposureDirection::Payable => &mut payable,
         };
-        *total = total
-            .checked_add(&bill.amount)
-            .map_err(|_| "Bridge could not total a statement direction exactly.".to_string())?;
+        *total = total.checked_add(&bill.amount).map_err(|_| {
+            "ComplyEaze Bridge could not total a statement direction exactly.".to_string()
+        })?;
     }
     if !statement.unallocated.is_zero() {
         let total = match statement.unallocated_direction {
             Some(ExposureDirection::Receivable) => &mut receivable,
             Some(ExposureDirection::Payable) => &mut payable,
             None => {
-                return Err("Bridge found an unallocated amount without a direction.".to_string())
+                return Err(
+                    "ComplyEaze Bridge found an unallocated amount without a direction."
+                        .to_string(),
+                )
             }
         };
-        *total = total
-            .checked_add(&statement.unallocated)
-            .map_err(|_| "Bridge could not total a statement direction exactly.".to_string())?;
+        *total = total.checked_add(&statement.unallocated).map_err(|_| {
+            "ComplyEaze Bridge could not total a statement direction exactly.".to_string()
+        })?;
     }
     Ok((
         receivable.as_str().to_string(),
@@ -430,7 +436,7 @@ fn write_unique_file(
     bytes: &[u8],
 ) -> Result<PathBuf, String> {
     if Path::new(stem).components().count() != 1 {
-        return Err("Bridge could not build a safe statement filename.".to_string());
+        return Err("ComplyEaze Bridge could not build a safe statement filename.".to_string());
     }
     for sequence in 1..=10_000_u32 {
         let suffix = if sequence == 1 {
@@ -462,7 +468,10 @@ fn write_unique_file(
         }
         return Ok(path);
     }
-    Err("Bridge could not find an unused statement filename after 10,000 attempts.".to_string())
+    Err(
+        "ComplyEaze Bridge could not find an unused statement filename after 10,000 attempts."
+            .to_string(),
+    )
 }
 
 /// The hidden name a statement is written under before it is renamed into
@@ -498,12 +507,14 @@ fn unwritable_destination_reason(path: &Path, error: &std::io::Error) -> String 
     tracing::warn!(path = %path.display(), %error, "statement file write failed");
     match error.kind() {
         std::io::ErrorKind::PermissionDenied => {
-            "Bridge does not have permission to write to the selected folder.".to_string()
+            "ComplyEaze Bridge does not have permission to write to the selected folder."
+                .to_string()
         }
         std::io::ErrorKind::NotFound => {
-            "Bridge could not find the selected folder any more.".to_string()
+            "ComplyEaze Bridge could not find the selected folder any more.".to_string()
         }
-        _ => "Bridge could not write the statement file to the selected folder.".to_string(),
+        _ => "ComplyEaze Bridge could not write the statement file to the selected folder."
+            .to_string(),
     }
 }
 
@@ -511,7 +522,7 @@ fn file_name(path: &Path) -> Result<String, String> {
     path.file_name()
         .and_then(|name| name.to_str())
         .map(str::to_owned)
-        .ok_or_else(|| "Bridge could not represent the statement filename.".to_string())
+        .ok_or_else(|| "ComplyEaze Bridge could not represent the statement filename.".to_string())
 }
 
 #[cfg(test)]

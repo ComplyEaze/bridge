@@ -25,7 +25,7 @@ function visibleText(html) {
 }
 
 test("the site has the pages this test expects, so none is checked by accident or skipped", () => {
-  assert.deepEqual(pages, ["changelog.template.html", "download.html", "faq.html", "index.html", "legal.template.html", "releases.html"]);
+  assert.deepEqual(pages, ["blog-bank-statement-ledger-names.html", "blog-ten-questions.html", "blog-where-does-client-data-go.html", "blog-who-approves-a-post.html", "blog.html", "capabilities.html", "changelog.template.html", "download.html", "faq.html", "index.html", "legal.template.html", "releases.html", "security.html"]);
 });
 
 test("every page carries the same header and footer, apart from which link is the current page", () => {
@@ -99,7 +99,7 @@ test("nothing on the site points at the roadmap or the comparison, which ship se
 
 test("page text keeps to the wording rules", () => {
   // scripts and stylesheets draw words too (the 3D pages, the header switch, CSS content)
-  for (const name of [...pages, "download.js", "faq.js", "releases.js", "release-source.mjs", "chrome.js", "app.js", "scene.js", "chrome.css", "home.css", "pages.css"]) {
+  for (const name of [...pages, "download.js", "faq.js", "releases.js", "release-source.mjs", "chrome.js", "app.js", "scene.js", "chrome.css", "home.css", "pages.css", "blog.css"]) {
     const raw = read(name);
     // in a script or stylesheet the words are in the code, not in its comments
     const text = name.endsWith(".html") ? visibleText(raw) : raw.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
@@ -143,7 +143,7 @@ test("no file that ships carries an internal working label", () => {
 });
 
 // What a search engine or an AI assistant reads about the site without running its script.
-const indexed = ["index.html", "download.html", "faq.html", "releases.html"];
+const indexed = ["index.html", "download.html", "faq.html", "capabilities.html", "releases.html", "security.html", ...pages.filter((name) => name.startsWith("blog"))];
 const metaContent = (html, property) => html.match(new RegExp(`<meta property="${property}" content="([^"]*)" />`))?.[1];
 
 test("each indexed page names its own address, and its social card repeats the page's own title and description", () => {
@@ -453,4 +453,39 @@ test("every page names the publisher with the statement of limited liability, re
   assert.ok(section1.includes(`SPMS Comply Eaze Solutions LLP, ${registered}, LLP identification number`), "section 1 of the Privacy Policy no longer states that the LLP is registered with limited liability");
   const line = `Published by SPMS Comply Eaze Solutions LLP, ${registered}, LLP identification number ${llpin[1]}. Registered office: ${office[1]}.`;
   for (const page of pages) assert.ok(faqText(read(page)).includes(line), `${page}: the footer does not carry: ${line}`);
+});
+
+test("the Atom feed is complete, and has one entry for each blog post, pointing at the post's own address", () => {
+  const origin = "https://bridge.complyeaze.com";
+  const rfc3339 = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z";
+  const time = (text) => {
+    const when = new Date(text);
+    assert.ok(!Number.isNaN(when.getTime()) && when.toISOString().replace(".000", "") === text, `${text} is not a real time`);
+    return when.getTime();
+  };
+  const posts = pages.filter((name) => name.startsWith("blog-"));
+  assert.ok(posts.length >= 1, "the blog has at least one post");
+  const feed = read("feed.xml");
+  const entries = [...feed.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map((match) => match[1]);
+  assert.equal(entries.length, posts.length, "the feed has one entry per post page");
+  const own = feed.replace(/<entry>[\s\S]*?<\/entry>/g, "");
+  assert.match(own, /^<\?xml version="1\.0" encoding="utf-8"\?>\n<feed xmlns="http:\/\/www\.w3\.org\/2005\/Atom">/, "the feed has no Atom namespace");
+  assert.ok(own.includes(`<link rel="self" type="application/atom+xml" href="${origin}/feed.xml" />`), "the feed's self link is not its own address");
+  assert.ok(own.includes(`<id>${origin}/blog.html</id>`), "the feed has no id");
+  for (const tag of ["title", "author"]) assert.match(own, new RegExp(`<${tag}>[\\s\\S]+?</${tag}>`), `the feed has no ${tag}`);
+  const [, feedUpdated] = own.match(new RegExp(`<updated>(${rfc3339})</updated>`)) ?? [];
+  assert.ok(feedUpdated, "the feed itself has no RFC 3339 update time");
+  const newest = Math.max(...entries.map((entry) => time(entry.match(new RegExp(`<updated>(${rfc3339})</updated>`))?.[1] ?? "")));
+  assert.ok(time(feedUpdated) >= newest, "the feed says it was updated before its newest entry");
+  for (const post of posts) {
+    const address = `${origin}/${post}`;
+    const entry = entries.find((text) => new RegExp(`<id>${address.replaceAll(".", "\\.")}</id>`).test(text));
+    assert.ok(entry, `${post} has no feed entry with its address as the id`);
+    for (const tag of ["title", "summary"]) assert.match(entry, new RegExp(`<${tag}>[^<]+</${tag}>`), `${post}: the feed entry has no ${tag}`);
+    for (const tag of ["published", "updated"]) assert.match(entry, new RegExp(`<${tag}>${rfc3339}</${tag}>`), `${post}: the feed entry has no ${tag} time`);
+    assert.ok(entry.includes(`<link rel="alternate" type="text/html" href="${address}" />`), `${post}: the feed entry does not link to the page`);
+  }
+  // the feed carries words too, so it keeps to the same wording rules as a page
+  for (const banned of [/\bfree\b/i, /\boffline\b/i, /nothing leaves/i, /\bpreviews?\b/i, /[™®]|&trade;|&reg;/]) assert.doesNotMatch(feed, banned, `feed.xml says ${banned}`);
+  assert.doesNotMatch(feed, /(?<!ComplyEaze )\bBridge\b/, "feed.xml names the product as a bare Bridge");
 });

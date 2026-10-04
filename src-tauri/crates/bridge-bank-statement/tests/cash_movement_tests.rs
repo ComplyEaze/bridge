@@ -567,3 +567,36 @@ fn each_question_offers_every_answer_of_its_direction_and_none_other() {
     assert_eq!(taken.last(), Some(&CashAnswer::DontKnow));
     assert_eq!(given.last(), Some(&CashAnswer::DontKnow));
 }
+
+/// The three answers ComplyEaze Bridge cannot build yet, each with its whole
+/// reason, which reaches the assistant beside the answer and in the
+/// `cash_answer_not_built` refusal (#962). Every reason any answer of either
+/// movement gives names the product in full, never by its bare short name.
+#[test]
+fn every_not_built_reason_names_the_product_in_full() {
+    assert_eq!(
+        CashAnswer::PaidToSomeone.not_built(),
+        Some("cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; record it by hand, or answer dont_know so it posts to suspense for the CA")
+    );
+    assert_eq!(
+        CashAnswer::OwnCashBox.not_built(),
+        Some("a deposit from the cash box is a Contra that can drive the cash book negative, and ComplyEaze Bridge cannot yet check the cash book's balance first; record it by hand, or answer dont_know so it posts to suspense for the CA")
+    );
+    assert_eq!(
+        CashAnswer::UnbookedCashSales.not_built(),
+        Some("record those cash sales or collections in Tally first; the deposit itself is then a Contra from the cash box, which ComplyEaze Bridge does not build yet")
+    );
+    for movement in [CashMovement::Withdrawal, CashMovement::Deposit] {
+        for answer in movement.question().1 {
+            let Some(reason) = answer.not_built() else {
+                continue;
+            };
+            for (at, _) in reason.match_indices("Bridge") {
+                assert!(
+                    reason[..at].ends_with("ComplyEaze "),
+                    "{answer:?} names a bare Bridge: {reason}"
+                );
+            }
+        }
+    }
+}

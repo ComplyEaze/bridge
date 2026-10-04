@@ -63,9 +63,9 @@ impl SnapshotCoordinator {
         let endpoint_lease = crate::endpoint_coordination::acquire_snapshot(connector.endpoint())
             .map_err(|error| match error.as_str() {
                 "import_admission_busy" => {
-                    "Another Bridge snapshot or Journal posting is using this Tally endpoint. Wait for it to finish."
+                    "Another ComplyEaze Bridge snapshot or Journal posting is using this Tally endpoint. Wait for it to finish."
                 }
-                _ => "Bridge could not coordinate access to this Tally endpoint. The snapshot was not started.",
+                _ => "ComplyEaze Bridge could not coordinate access to this Tally endpoint. The snapshot was not started.",
             })?;
         let cancellation = Arc::new(AtomicCancellation::default());
         let terminal = Arc::new(Mutex::new(None));

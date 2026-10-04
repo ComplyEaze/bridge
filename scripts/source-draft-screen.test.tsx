@@ -1091,7 +1091,7 @@ test("a refused apply clears a current-session label the same read disproved", a
     .mockResolvedValueOnce(boundA)
     .mockRejectedValueOnce({
       code: "source_draft_catalogue_target_changed",
-      message: "The selected existing ledger changed before Bridge could apply it.",
+      message: "The selected existing ledger changed before ComplyEaze Bridge could apply it.",
       remediation: "Load existing ledgers again and make a fresh selection.",
       current_catalog_bindings: [],
     });
@@ -1105,7 +1105,7 @@ test("a refused apply clears a current-session label the same read disproved", a
 
   await act(async () => button(host, "#2").click());
   await act(async () => setValue(host.querySelector<HTMLSelectElement>("#source-draft-2-entry-0-ledger")!, "Target A"));
-  expect(host.textContent).toContain("The selected existing ledger changed before Bridge could apply it.");
+  expect(host.textContent).toContain("The selected existing ledger changed before ComplyEaze Bridge could apply it.");
 
   await act(async () => button(host, "#1").click());
   expect(host.textContent).not.toContain("This current-session target was re-read and bound.");

@@ -1659,11 +1659,25 @@ fn the_agent_preview_says_when_the_post_happens() {
             );
         }
         // A native post adds no marker to the narration (#864), so the
-        // dialog must not claim one.
+        // dialog must not claim one. Every line about narrations, apart from
+        // the narration shown as a value, is one of these whole sentences, so
+        // any added claim about them fails here, whatever its wording.
         assert!(text.contains(
             "Ledgers checked by identity against the build; narrations sent as prepared, nothing added."
         ));
         assert!(!text.contains("batch reference"), "{text}");
+        for line in text.lines() {
+            if line.to_lowercase().contains("narration") && !line.starts_with("Narration: ") {
+                assert!(
+                    [
+                        "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
+                        "Not shown here: each voucher's own date, narration and reference.",
+                    ]
+                    .contains(&line),
+                    "an unexpected line about narrations: {line:?}"
+                );
+            }
+        }
         assert!(text.contains(
             "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes."
         ));

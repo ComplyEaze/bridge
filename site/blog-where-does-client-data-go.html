@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Where your client’s data goes when Claude reads Tally: ComplyEaze Bridge</title>
+<meta name="description" content="When you ask Claude about a client’s books, what Claude reads goes to Anthropic. That can be party names, narrations, GSTINs and amounts. A setting can shorten the names. Nothing hides the amounts." />
+<link rel="canonical" href="https://bridge.complyeaze.com/blog-where-does-client-data-go.html" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="ComplyEaze Bridge" />
+<meta property="og:locale" content="en_IN" />
+<meta property="og:title" content="Where your client’s data goes when Claude reads Tally: ComplyEaze Bridge" />
+<meta property="og:description" content="When you ask Claude about a client’s books, what Claude reads goes to Anthropic. That can be party names, narrations, GSTINs and amounts. A setting can shorten the names. Nothing hides the amounts." />
+<meta property="og:url" content="https://bridge.complyeaze.com/blog-where-does-client-data-go.html" />
+<link rel="alternate" type="application/atom+xml" title="ComplyEaze Bridge blog" href="feed.xml" />
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
+<script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
+<link rel="preload" href="fonts/bricolage-wght-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="chrome.css" />
+<link rel="stylesheet" href="pages.css" />
+<link rel="stylesheet" href="blog.css" />
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body class="ce-page ce-page--plain">
+<a class="ce-skip-link" href="#main">Skip to content</a>
+<div class="ce-header__sentinel" id="ceHeaderSentinel" aria-hidden="true"></div>
+<header class="ce-header" id="ceHeader">
+  <div class="ce-header__inner">
+    <a class="ce-brand" href="./" aria-label="ComplyEaze Bridge, home">
+      <svg class="ce-logo" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg>
+    </a>
+    <div class="ce-header__right">
+      <nav class="ce-nav" id="ceNav" aria-label="Primary">
+        <a class="ce-nav__download" href="./download.html">Download</a>
+        <a href="./faq.html">Questions</a>
+        <a href="./releases.html">Releases</a>
+        <a href="./changelog.html">Changelog</a>
+        <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <div class="ce-header__actions">
+        <a class="ce-star" id="ceStar" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer" aria-label="ComplyEaze Bridge on GitHub">
+          <svg class="ce-star__icon" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 .8l2.1 4.4 4.8.6-3.5 3.4.9 4.8L8 11.6l-4.3 2.4.9-4.8L1.1 5.8l4.8-.6z" /></svg>
+          <span class="ce-star__count" id="ceStarCount" aria-hidden="true"></span>
+        </a>
+        <a class="btn btn-primary ce-cta" href="./download.html">Download</a>
+        <button class="ce-menu-toggle" id="ceMenuToggle" type="button" aria-expanded="false" aria-controls="ceNav">
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="visually-hidden">Menu</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+<main id="main" class="blog">
+<header class="ph blog-shell">
+<div class="ph__grid">
+<div>
+<nav aria-label="Breadcrumb">
+<p class="crumb"><a href="./blog.html">Blog</a> &nbsp;/&nbsp; For CAs</p></nav>
+<h1>Where your client’s data goes when Claude reads Tally</h1>
+<p class="ph__dek">When you ask Claude about a client’s books, what Claude reads goes to Anthropic. That can be party names, narrations, GSTINs and amounts. A setting can shorten the names. Nothing hides the amounts.</p>
+<p class="ph__meta"><span class="m">Tapish Khandelwal</span><span class="sep">·</span><span class="m">3 October 2026</span><span class="sep">·</span><span class="m">For release 0.4.1</span><span class="sep">·</span><span class="m">7 min read</span></p></div>
+<figure class="ph__art"><svg class="art" viewBox="0 0 400 300" role="img" aria-label="Drawing: a slip lifts off an open ledger and leaves along a dotted line; on the slip, with the mask_parties setting on, a made-up party name is shortened to Ne…ds and the rupee amount is unchanged." xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="ch"><rect width="400" height="300"/></clipPath></defs><g clip-path="url(#ch)"><rect width="400" height="300" fill="var(--art-a)"/><g fill="none" stroke="var(--art-ink)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M30 246 L180 258 L330 246 L324 266 L180 278 L36 266 Z" fill="var(--art-cloth)"/><path d="M36 244 C82 224 136 224 180 244 L180 132 C136 112 82 112 36 132 Z" fill="var(--art-paper)"/><path d="M180 244 C224 224 278 224 324 244 L324 132 C278 112 224 112 180 132 Z" fill="var(--art-paper)"/><path d="M180 270 C176 284 166 292 150 296 M180 270 C186 286 198 292 214 294" stroke-width="2.6" stroke="var(--art-cloth)"/><path d="M58 150 C90 140 126 140 160 150 M58 172 C90 162 126 162 160 172 M58 194 C90 184 126 184 160 194 M58 216 C84 208 110 208 132 214" stroke-width="1.9" /><path d="M200 150 C232 140 268 140 302 150 M200 172 C220 166 238 164 254 166" stroke-width="1.9" /><path d="M250 176 C276 150 300 116 328 92" stroke-width="3" stroke-dasharray="1 10"/><g transform="translate(-44 16) rotate(-8 330 70)"><rect x="250" y="20" width="150" height="104" rx="6" fill="#fff"/><text x="264" y="16" font-family="Geist Variable, sans-serif" font-weight="600" font-size="11" fill="var(--art-ink)" stroke="none" opacity=".7">with mask_parties on</text><text x="264" y="46" font-family="Geist Variable, sans-serif" font-weight="500" font-size="13" fill="var(--art-ink)" stroke="none" opacity=".55">Nevrika Agro Foods</text><path d="M262 42 L384 42" stroke-width="1.6" opacity=".7"/><text x="264" y="72" font-family="Bricolage Grotesque Variable, sans-serif" font-weight="700" font-size="20" fill="var(--art-ink)" stroke="none">Ne…ds</text><text x="264" y="106" font-family="Bricolage Grotesque Variable, sans-serif" font-weight="700" font-size="23" fill="var(--art-cloth)" stroke="none">₹1,24,600</text></g></g></g></svg>
+<figcaption>The name and amount on the slip are made up, from the site’s synthetic demo book.</figcaption></figure></div></header>
+<div class="blog-shell">
+<div class="pb">
+<article class="prose">
+<p class="lede">Say you type “What did Nevrika Agro Foods pay us in March?” in Claude Desktop, with ComplyEaze Bridge installed. Six things happen. In the sixth, the answer from your client’s books leaves your computer for your AI provider, as part of the conversation.</p>
+<div class="status status--list">
+<p><b>Release 0.4.2 is out.</b> This post describes release 0.4.1. If you install 0.4.2:</p>
+<ul>
+<li>Remove the older extension in Claude Desktop first: 0.4.2 installs beside an older one instead of replacing it (seen with 0.4.1 on a Mac and expected for earlier versions; not tried on Windows). Keep ComplyEaze Bridge’s data folder, which both versions use.</li>
+<li>Enter your settings again, including the Terms setting, which every tool needs. Posting starts off, and Response redaction starts at none, so set it again if you had shortened or masked names.</li>
+<li>Its posts no longer tag the narration, and it matches a posted voucher another way. Check what it posted with <code>verify_import</code>, never <code>voucher_presence</code>, before entering anything again by hand. The one-voucher post the extension makes has not been run live with this matching. From the first post 0.4.2 sends to Tally, even one Tally refuses or never answers, do not run 0.4.1 or earlier on that computer: they stop preparing, posting and checking vouchers.</li>
+<li>If you asked 0.4.1 or earlier to read a ledger, such as its movement or vouchers, by a name that differed from its spelling by a symbol, an accent or words run together, the figures may be for a different ledger with the same letters and digits. Ask again with 0.4.2.</li></ul>
+<p>The <a href="./changelog.html">changelog</a> has the rest.</p></div>
+<p>ComplyEaze Bridge is an open-source extension for Claude Desktop that lets Claude read the TallyPrime books open on your own computer, so you can ask questions of them in plain words. What it reads, and its limits, are in the notes at the end.</p>
+<h2 id="follow">Follow one question</h2>
+<figure class="fig fig--wide fig--hero">
+<div class="fig__panel">
+<p class="fig__hint">Point at, or tab to, a step to see it in the picture.</p><svg class="only-wide journey" viewBox="0 0 900 430" role="img" aria-label="Diagram: inside a dashed outline marked your computer, Claude Desktop calls ComplyEaze Bridge, which asks TallyPrime; the answer comes back to Claude Desktop and a line goes into a log. One arrow, step 6, crosses the outline to your AI provider with the answer; your question also goes to the provider, as part of the conversation." xmlns="http://www.w3.org/2000/svg"><defs><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0 0 L10 5 L0 10 z"/></marker><marker id="aow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-arrow--out" d="M0 0 L10 5 L0 10 z"/></marker></defs><rect class="d-bound" x="14" y="44" width="612" height="370" rx="18"/><text class="d-k" x="34" y="72">Your computer</text><rect class="d-node" x="40" y="150" width="160" height="104" rx="10"/><path class="d-icon" transform="translate(56 166)" d="M0 0 h22 a4 4 0 0 1 4 4 v12 a4 4 0 0 1 -4 4 h-12 l-6 5 v-5 h-4 a4 4 0 0 1 -4 -4 v-12 a4 4 0 0 1 4 -4 z"/><text class="d-t" x="56" y="220">Claude Desktop</text><text class="d-s" x="56" y="238">where you ask</text><rect class="d-node" x="250" y="150" width="160" height="104" rx="10"/><path class="d-icon" transform="translate(266 166)" d="M4 10 h8 M4 16 h8 M12 6 v14 h6 a7 7 0 0 0 0 -14 z M25 13 h6"/><text class="d-t" x="266" y="220">ComplyEaze Bridge</text><text class="d-s" x="266" y="238">runs here</text><rect class="d-node" x="460" y="150" width="150" height="104" rx="10"/><path class="d-icon" transform="translate(476 166)" d="M2 2 h16 a2 2 0 0 1 2 2 v20 h-16 a2 2 0 0 1 -2 -2 z M6 2 v22 M20 6 h4 v5 h-4 M20 13 h4 v5 h-4"/><text class="d-t" x="476" y="220">TallyPrime</text><text class="d-s" x="476" y="238">your client’s books</text><path class="d-icon" transform="translate(317 318)" d="M0 0 h18 l8 8 v26 h-26 z M18 0 v8 h8 M5 15 h16 M5 21 h16 M5 27 h10"/><text class="d-s" x="352" y="340">the log</text><g class="st st1"><text class="d-k" x="120" y="350" text-anchor="middle">You</text><line class="d-ln" x1="120" y1="332" x2="120" y2="258" marker-end="url(#ahw)"/><circle class="d-badge" cx="120" cy="296" r="12"/><text class="d-bt" x="120" y="300" text-anchor="middle">1</text></g><g class="st st2"><line class="d-ln" x1="200" y1="184" x2="248" y2="184" marker-end="url(#ahw)"/><circle class="d-badge" cx="225" cy="184" r="12"/><text class="d-bt" x="225" y="188" text-anchor="middle">2</text></g><g class="st st3"><line class="d-ln" x1="410" y1="184" x2="458" y2="184" marker-end="url(#ahw)"/><circle class="d-badge" cx="435" cy="184" r="12"/><text class="d-bt" x="435" y="188" text-anchor="middle">3</text></g><g class="st st4"><line class="d-ln" x1="460" y1="226" x2="412" y2="226" marker-end="url(#ahw)"/><line class="d-ln" x1="330" y1="254" x2="330" y2="312" stroke-dasharray="3 4" marker-end="url(#ahw)"/><circle class="d-badge" cx="435" cy="226" r="12"/><text class="d-bt" x="435" y="230" text-anchor="middle">4</text></g><g class="st st5"><line class="d-ln" x1="250" y1="226" x2="202" y2="226" marker-end="url(#ahw)"/><circle class="d-badge" cx="225" cy="226" r="12"/><text class="d-bt" x="225" y="230" text-anchor="middle">5</text></g><g class="st st6"><path class="d-ln d-ln--out" d="M120 150 V112 H690 V150" marker-end="url(#aow)"/><circle class="d-badge d-badge--out" cx="626" cy="112" r="12"/><text class="d-bt" x="626" y="116" text-anchor="middle">6</text><text class="d-k" x="420" y="102" text-anchor="middle" style="fill:var(--b-out)">the conversation leaves: your question (step 1), then the answer (step 6)</text></g><path class="d-cloud" d="M690 228 h138 a32 32 0 0 0 4 -63 a42 42 0 0 0 -78 -14 a30 30 0 0 0 -56 14 a32 32 0 0 0 -8 63 z"/><text class="d-t" x="760" y="252" text-anchor="middle">Your AI provider</text><text class="d-s" x="760" y="270" text-anchor="middle">Anthropic, for Claude</text></svg><svg class="only-phone journey" viewBox="0 0 360 648" role="img" aria-label="Diagram: inside a dashed outline marked your computer, Claude Desktop calls ComplyEaze Bridge, which asks TallyPrime; the answer comes back to Claude Desktop and a line goes into a log. One arrow, step 6, crosses the outline to your AI provider with the answer; your question also goes to the provider, as part of the conversation." xmlns="http://www.w3.org/2000/svg"><defs><marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-arrow" d="M0 0 L10 5 L0 10 z"/></marker><marker id="aop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-arrow--out" d="M0 0 L10 5 L0 10 z"/></marker></defs><rect class="d-bound" x="8" y="40" width="286" height="430" rx="16"/><text class="d-k" x="24" y="456">Your computer</text><rect class="d-node" x="28" y="106" width="200" height="76" rx="10"/><path class="d-icon" transform="translate(186 118)" d="M0 0 h22 a4 4 0 0 1 4 4 v12 a4 4 0 0 1 -4 4 h-12 l-6 5 v-5 h-4 a4 4 0 0 1 -4 -4 v-12 a4 4 0 0 1 4 -4 z"/><text class="d-t" x="44" y="148">Claude Desktop</text><text class="d-s" x="44" y="166">where you ask</text><rect class="d-node" x="28" y="236" width="200" height="76" rx="10"/><path class="d-icon" transform="translate(186 248)" d="M4 10 h8 M4 16 h8 M12 6 v14 h6 a7 7 0 0 0 0 -14 z M25 13 h6"/><text class="d-t" x="44" y="278">ComplyEaze Bridge</text><text class="d-s" x="44" y="296">runs here</text><rect class="d-node" x="28" y="366" width="200" height="76" rx="10"/><path class="d-icon" transform="translate(186 378)" d="M2 2 h16 a2 2 0 0 1 2 2 v20 h-16 a2 2 0 0 1 -2 -2 z M6 2 v22 M20 6 h4 v5 h-4 M20 13 h4 v5 h-4"/><text class="d-t" x="44" y="408">TallyPrime</text><text class="d-s" x="44" y="426">your client’s books</text><path class="d-icon" transform="translate(248 252)" d="M0 0 h18 l8 8 v26 h-26 z M18 0 v8 h8 M5 15 h16 M5 21 h16 M5 27 h10"/><text class="d-s" x="261" y="304" text-anchor="middle">log</text><g class="st st1"><text class="d-k" x="110" y="66" text-anchor="middle">You</text><line class="d-ln" x1="110" y1="74" x2="110" y2="104" marker-end="url(#ahp)"/><circle class="d-badge" cx="140" cy="88" r="12"/><text class="d-bt" x="140" y="92" text-anchor="middle">1</text></g><g class="st st2"><line class="d-ln" x1="80" y1="182" x2="80" y2="234" marker-end="url(#ahp)"/><circle class="d-badge" cx="80" cy="208" r="12"/><text class="d-bt" x="80" y="212" text-anchor="middle">2</text></g><g class="st st3"><line class="d-ln" x1="80" y1="312" x2="80" y2="364" marker-end="url(#ahp)"/><circle class="d-badge" cx="80" cy="338" r="12"/><text class="d-bt" x="80" y="342" text-anchor="middle">3</text></g><g class="st st4"><line class="d-ln" x1="170" y1="366" x2="170" y2="314" marker-end="url(#ahp)"/><line class="d-ln" x1="228" y1="268" x2="244" y2="268" stroke-dasharray="3 3" marker-end="url(#ahp)"/><circle class="d-badge" cx="170" cy="340" r="12"/><text class="d-bt" x="170" y="344" text-anchor="middle">4</text></g><g class="st st5"><line class="d-ln" x1="170" y1="236" x2="170" y2="184" marker-end="url(#ahp)"/><circle class="d-badge" cx="170" cy="210" r="12"/><text class="d-bt" x="170" y="214" text-anchor="middle">5</text></g><g class="st st6"><path class="d-ln d-ln--out" d="M228 130 H330 V520 H262" marker-end="url(#aop)"/><circle class="d-badge d-badge--out" cx="330" cy="300" r="12"/><text class="d-bt" x="330" y="304" text-anchor="middle">6</text></g><path class="d-cloud" d="M110 560 h120 a28 28 0 0 0 4 -55 a36 36 0 0 0 -68 -12 a26 26 0 0 0 -48 12 a28 28 0 0 0 -8 55 z"/><text class="d-t" x="172" y="584" text-anchor="middle">Your AI provider</text><text class="d-s" x="172" y="602" text-anchor="middle">Anthropic, for Claude</text></svg>
+<ol class="steps">
+<li class="" data-s="1" tabindex="0">You ask Claude Desktop. Your question goes to your provider as part of the conversation.</li>
+<li class="" data-s="2" tabindex="0">Claude calls a tool in ComplyEaze Bridge, which runs on your computer.</li>
+<li class="" data-s="3" tabindex="0">The tool asks TallyPrime through Tally’s own connection, at an address that means “this computer”.</li>
+<li class="" data-s="4" tabindex="0">Tally answers, and a line goes into a log on your computer.</li>
+<li class="" data-s="5" tabindex="0">The answer goes to Claude Desktop. It holds the party’s name and the amount.</li>
+<li class="out" data-s="6" tabindex="0">Claude Desktop sends it to your AI provider, as part of the conversation. This is where what it read from the books leaves the computer.</li></ol></div></figure>
+<p>We know of one other route: a flaw in releases 0.3.0 and 0.4.0 that could send your Windows network sign-in response to another computer. No Tally data is sent. Release 0.4.1 refuses network paths, but a drive letter mapped to a network share, a link or junction partway along a path, and on a Mac a mounted network volume can still pass; the notes at the end say more. We have captured no network traffic, so there may be other routes.</p>
+<p>ComplyEaze Bridge cannot be pointed at a Tally on another machine, and it cannot tell whether you have forwarded Tally’s address on this computer elsewhere, so do not forward it across the internet.</p>
+<h2 id="us">Does any of it reach us?</h2>
+<p>We do not receive your Tally data through ComplyEaze Bridge, and our Privacy Policy says so. We looked for an upload in the code and found none. We read release 0.4.0 and checked the 0.4.1 changes to network destinations. That was reading the source. We have not measured the running program, and nobody outside has audited it.</p>
+<h2 id="provider">What your provider can receive</h2>
+<p>Depending on what Claude asks for, what reaches your provider can include:</p>
+<ul class="manifest">
+<li>company, ledger and party names</li>
+<li>vouchers with dates, amounts, narrations and GSTINs</li>
+<li>outstanding bills</li>
+<li>the trial balance and other statements</li>
+<li>PAN, bank account numbers and contact details, when it asks for them</li>
+<li>the contents of a bank-statement PDF you ask it to read</li>
+<li>file locations that usually include your computer user name</li></ul>
+<p>Whether your provider keeps this, trains on it or processes it elsewhere depends on the provider, your plan and your settings. We do not know yours.</p>
+<div class="asks">
+<p class="asks__h">Ask your provider three things</p>
+<ol>
+<li>Is it kept?</li>
+<li>Is it used for training?</li>
+<li>Where is it processed?</li></ol>
+<p class="asks__f">For Claude, start with Anthropic’s Privacy Policy (anthropic.com/legal/privacy). It does not apply to content Anthropic processes on behalf of customers of its business offerings, such as Enterprise accounts.</p></div>
+<h2 id="masking">Party and ledger names can be shortened; amounts cannot</h2>
+<p>ComplyEaze Bridge has one masking setting, “Response redaction”. It can shorten party and ledger names to their first two and last two characters, or it can remove narrations, but not both. Neither makes the data anonymous. Amounts, company names, GSTINs and PAN numbers are never masked. Out of the box, nothing is masked.</p>
+<figure class="fig fig--hero">
+<div class="mask" role="group" aria-labelledby="mk-label">
+<p class="mask__q" id="mk-label">Change the setting and see a simplified view of what your AI provider receives. A Receipt from the site’s synthetic demo book; the narration was added for this example.</p>
+<input type="radio" name="mk" id="mk-off" checked>
+<input type="radio" name="mk" id="mk-names">
+<input type="radio" name="mk" id="mk-narr">
+<div class="mask__seg"><label for="mk-off">Off, as installed<code>none</code></label><label for="mk-names">Shorten names<code>mask_parties</code></label><label for="mk-narr">Remove narrations<code>drop_narration</code></label></div>
+<div class="vch">
+<div class="vch__head"><span>A simplified view of the answer your AI provider receives</span><span>Receipt · 12 March 2026</span></div>
+<dl>
+<div><dt>Company</dt><dd>Demo Traders Pvt Ltd (synthetic)<span class="nm">never masked</span></dd></div>
+<div><dt>Party</dt><dd><span class="v-full">Nevrika Agro Foods</span><span class="v-mask chg">Ne…ds</span></dd></div>
+<div><dt>Ledger lines</dt><dd class="lines"><span>Dr <span class="v-full">Example Bank Ltd</span><span class="v-mask chg">Ex…td</span></span><span class="amt">₹1,24,600.00<span class="nm">never masked</span></span><span>Cr <span class="v-full">Nevrika Agro Foods</span><span class="v-mask chg">Ne…ds</span></span><span class="amt">₹1,24,600.00<span class="nm">never masked</span></span></dd></div>
+<div class="row-narr"><dt>Narration</dt><dd><span class="v-text">Received from Nevrika Agro Foods against bill 112</span><span class="v-gone chg">removed from the answer</span><span class="n-names">A name written inside a narration is not shortened.</span></dd></div>
+</dl>
+</div>
+<div class="mask__note">
+<p class="s-off">Out of the box, nothing is masked.</p>
+<p class="s-names">Party and ledger names are shortened to their first two and last two characters, by the extension’s own rule; a name of four characters or fewer becomes “…”. The data is not anonymous.</p>
+<p class="s-narr">Narrations are removed, but names stay in full. You cannot choose both.</p></div>
+<p class="mask__cfg">“Response redaction” is a text field in the extension’s settings: you type one of the three values shown under the buttons exactly, and any other value stops the extension from starting.</p>
+<p class="legend"><span class="lg-chg"><span class="sw sw--chg"></span>Changed by the setting.</span> Not masked by either setting, including amounts, company names, GSTINs, PAN numbers, references and contact details.</p>
+</div></figure>
+<p>It shortens names only in what ComplyEaze Bridge returns. A name you type, or that Claude asks you to type, goes to your provider in full.</p>
+<h2 id="authority">Your client’s authority</h2>
+<p>Our Terms and Privacy Policy put one more thing on you. You need each client’s authority to access their books with ComplyEaze Bridge and to share their data with your AI provider, and you must give any notice or get any consent that the law or your engagement requires. Your duties of confidentiality still apply, and so does the Digital Personal Data Protection Act, 2023, where it applies (Terms of Use, section 8).</p>
+<h2 id="stays">What stays on your computer</h2>
+<p>ComplyEaze Bridge keeps several files on your computer; three kinds matter here. One is designed to hold no amounts or names; two hold them in full. Claude Desktop may also keep its own records of conversations and results on your computer.</p>
+<figure class="fig fig--wide">
+<ul class="files">
+<li><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 11h7M9 14.5h7M9 18h4"/></svg>
+<h3>The log</h3>
+<p>Among other things: the time, the tool, Tally’s internal code for the company, and short codes (“fingerprints”) of the request and the result. Sizes can hint at a name’s length, so treat it as confidential.</p><span class="state state--fp">No amounts or names, by design</span></li>
+<li><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M8 4v16M11 9h5M11 12.5h5"/></svg>
+<h3>The import journal and import files</h3>
+<p>The vouchers it prepared or posted, what Tally read back, and review records with your computer user name.</p><span class="state state--plain">Amounts and names, unmasked</span></li>
+<li><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 9 12 4l9 5"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>
+<h3>Bank-statement proposals</h3>
+<p>Voucher proposals from bank statements, including the last four digits of the account number.</p><span class="state state--plain">Amounts and names, unmasked</span></li></ul></figure>
+<p>None of it is deleted automatically, and removing the extension may leave it behind. Do not simply delete the folder: ComplyEaze Bridge uses it to avoid sending the same batch twice, so the Privacy Policy tells you to check Tally and then archive it in an encrypted archive. Administrators and backup software on the computer may be able to read these files, and on Windows they take the folder’s normal permissions.</p>
+<h2 id="books">What it can do to your books</h2>
+<p>Reading does not write to your books. A large read can still slow Tally, sometimes until Tally is restarted, and that can affect other people on a shared Tally. Reads on very large books can fail or take longer than the assistant waits.</p>
+<figure class="fig fig--wide">
+<ol class="life">
+<li class=""><span class="dot"></span>
+<h3>Off</h3>
+<p>Posting is off in a new installation. If you upgraded, check the setting, because an earlier default may still be saved as on.</p></li>
+<li class=""><span class="dot"></span>
+<h3>Waits</h3>
+<p>When it is on, each voucher (Journal, Payment, Receipt or Contra) waits for your approval in a separate window on your computer.</p></li>
+<li class="you"><span class="dot"></span>
+<h3>You approve</h3>
+<p>An approval is used once and expires.</p></li>
+<li class=""><span class="dot"></span>
+<h3>Tally posts</h3>
+<p>The tool cannot undo a posted voucher; you correct it in Tally.</p></li>
+<li class=""><span class="dot"></span>
+<h3>Read back</h3>
+<p>After posting it reads the voucher back, and a match does not mean the entry is correct or compliant.</p></li></ol>
+<figcaption>One voucher, from off to read-back.</figcaption></figure>
+<p>No ComplyEaze Bridge tool lets the assistant approve a post, but software that can control your screen could still click the button, so do not let such software run while a posting is waiting.</p>
+<p>A post can land in the wrong place if a company or ledger is renamed, replaced or loaded in Tally at that moment, so leave companies and ledgers alone while a post is waiting. It does not create masters or post sales, purchase, tax or inventory entries.</p>
+<p>The run we recorded in the notes at the end was one run of a candidate build of 0.4.0, on one made-up company, and we have not yet run the published 0.4.1 file in Claude Desktop.</p>
+<section class="close" aria-labelledby="before">
+<h2 id="before">Using it on a client’s books: a checklist</h2>
+<div class="close__cols">
+<div>
+<h3>Before you start</h3>
+<ul>
+<li>Get each client’s authority to use it on their books and to share their data with your AI provider, and give any notice or get any consent that the law or your engagement requires.</li>
+<li>Check what your provider keeps, whether it trains on it, and where it processes it.</li>
+<li>Choose the Response redaction value: none, mask_parties or drop_narration.</li>
+<li>Take a backup, and try a test company first.</li>
+<li>Read the Terms of Use, including section 14 on liability.</li>
+<li>If you have 0.3.0 or 0.4.0, remove it and install 0.4.1 or later. If you upgraded, check the posting setting.</li>
+<li>Use a device password and full-disk encryption.</li>
+<li>Your computer may warn you when you open it: it is still being developed and not yet code-signed.</li></ul></div>
+<div>
+<div>
+<h3>While you use it</h3>
+<ul>
+<li>Check what you get in Tally before you rely on it.</li>
+<li>Before turning posting on, and regularly while it is on, keep current, tested backups.</li>
+<li>Do not forward Tally’s address across the internet.</li>
+<li>Keep statements and password files on the computer’s own disk.</li>
+<li>While a post is waiting, run no software that can control your screen, and leave companies and ledgers alone.</li></ul></div>
+<div>
+<h3>When you stop</h3>
+<ul>
+<li>Quit Claude Desktop, check Tally, then move the whole data folder into an encrypted archive (section 7 of the Privacy Policy). Do not simply delete it.</li></ul></div></div></div>
+<p>We do not promise support or updates. Nothing here is accounting, tax, audit or legal advice.</p></section>
+<details class="notes">
+<summary>
+<h2 id="notes">Notes for whoever installs it</h2><span>Network paths in 0.3.0 and 0.4.0, the run we recorded, what it reads and where it runs</span></summary>
+<h3 id="flaw">Network paths in 0.3.0 and 0.4.0, refused from 0.4.1</h3>
+<p>In releases 0.3.0 and 0.4.0 the bank-statement tool could be given a Windows network path, meaning a file on another computer. Windows then connects to that computer and may send the signed-in user’s network sign-in response to it. No Tally data is sent. It needed the assistant to be steered into giving such a path (for example by text it has read), your approval of that call or an “always allow” setting, and outbound file-sharing or WebDAV traffic to that computer.</p>
+<figure class="fig">
+<div class="paths">
+<div>
+<h4 class="no"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M6 18 18 6"/></svg>Examples refused from 0.4.1</h4>
+<ul>
+<li>A Windows network path, such as <code>\\computer\share\statement.pdf</code> (a made-up example)</li>
+<li>A long-path form, such as <code>\\?\C:\statements\statement.pdf</code>; use the plain drive path instead</li></ul></div>
+<div>
+<h4 class="yes"><svg class="" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M13 8.5 16.5 12 13 15.5"/></svg>Examples that can still pass</h4>
+<ul>
+<li>A drive letter mapped to a network share</li>
+<li>A link or junction partway along a path</li>
+<li>On a Mac, a mounted network volume</li></ul></div></div></figure>
+<p>Keep statements and password files on the computer’s own disk. If you have 0.3.0 or 0.4.0, remove it and install 0.4.1 or later. ComplyEaze Bridge does not check for updates itself, so look at the releases page now and then. The advisory is linked from our security policy.</p>
+<h3 id="run">What we have run</h3>
+<figure class="fig">
+<div class="record">
+<div class="record__head"><b>One of the runs the README lists: 1 October 2026</b><span>Our notes and screenshots; not published</span></div>
+<table>
+<tr><th scope="row">Build</th><td>A candidate build of 0.4.0</td></tr>
+<tr><th scope="row">Computer</th><td>Windows 11</td></tr>
+<tr><th scope="row">Claude account</th><td>A new account with no paid plan</td></tr>
+<tr><th scope="row">Tally</th><td>TallyPrime Silver 7.1, one made-up company</td></tr>
+<tr><th scope="row">Terms setting off</th><td>We called a tool; it refused and read nothing</td></tr>
+<tr><th scope="row">Terms setting on</th><td>Six tools answered</td></tr>
+<tr><th scope="row">One post declined</th><td>Declined in the approval window; nothing was sent to Tally</td></tr>
+<tr><th scope="row">One post approved</th><td>Tally took one Journal, and the read-back found it</td></tr></table>
+<div class="record__foot">The Terms setting is the extension’s switch for accepting the Terms of Use; until it is on, every tool refuses. It was one run, and we have not run each way of declining in the Windows approval window (we tried one) in a controlled test.</div></div></figure>
+<p>What we have not run yet includes the published 0.4.1 file in Claude Desktop, a recorded run for every read, and posting with the published package against a live TallyPrime. The README lists what we ran, on which build, and what we have not.</p>
+<h3 id="reads">What it reads, and where it runs</h3>
+<p>It reads outstanding receivables and payables with ageing, the trial balance, profit and loss, balance sheet, ledger movement, vouchers in a date window, a purchase register and closing stock. Some of these reads refuse a book rather than answer in part, and books with several currencies or many stock items have further limits. It can also check ledger names against your book and prepare Journal, Payment, Receipt and Contra vouchers as a file.</p>
+<p>We are still developing it, and it is not yet code-signed, so your computer may warn you before opening it. We publish it for Windows (x64) and Apple Silicon Macs, with TallyPrime on the same computer. On a Mac, TallyPrime runs in a Windows virtual machine, with the connection forwarded locally.</p>
+</details>
+
+<p class="endnote">ComplyEaze Bridge is not a product of, or endorsed by, Tally Solutions, Anthropic or ICAI. Email contact@complyeaze.com · <a href="./faq.html">Questions and answers</a> · <a href="./download.html">Download and release notes</a> · <a href="./terms.html">Terms of Use</a> · <a href="./privacy.html">Privacy Policy</a> · <a href="https://github.com/ComplyEaze/bridge/blob/a9d33fe7176f1c0ee17765a74b0021189c3aa09d/docs/security-and-privacy.md">Security and privacy</a> · <a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md">Security policy</a></p>
+<a class="card-link readnext" href="./blog-bank-statement-ledger-names.html">
+<div class="readnext__art" aria-hidden="true"><svg class="art" viewBox="0 0 400 300" role="img" aria-label="Drawing: a card of the ledger names in a mapping beside the book’s ledger list; one name equal to a ledger (tick), one identified by a long number (#), one close name with a question mark, one missing name crossed out." xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="crn"><rect width="400" height="300"/></clipPath></defs><g clip-path="url(#crn)"><rect width="400" height="300" fill="var(--art-c)"/><g fill="none" stroke="var(--art-ink)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="34" y="52" width="160" height="200" rx="6" fill="#fff"/><path d="M52 84 L84 84 M52 126 L84 126 M52 168 L84 168 M52 210 L84 210" stroke-width="2.4" /><path d="M88 84 L98 84 M94 79 L99 84 L94 89 M88 126 L98 126 M94 121 L99 126 L94 131 M88 168 L98 168 M94 163 L99 168 L94 173 M88 210 L98 210 M94 205 L99 210 L94 215" stroke-width="2" /><path d="M106 84 L172 84 M106 126 L172 126 M106 168 L162 168 M106 210 L166 210" stroke-width="3.2" /><rect x="238" y="64" width="128" height="160" rx="4" fill="var(--art-paper)"/><path d="M238 64 L238 224" stroke-width="10" stroke="var(--art-cloth)"/><path d="M258 102 L346 102 M258 150 L346 150" stroke-width="1.9" /><path d="M176 84 C204 84 222 98 252 102" stroke-width="2.4" stroke-dasharray="1 8"/><path d="M176 126 C206 132 222 146 252 150" stroke-width="2.4" stroke-dasharray="1 8"/><path d="M348 94 L355 104 L370 84"/><text x="352" y="160" font-family="Bricolage Grotesque Variable, sans-serif" font-weight="700" font-size="22" fill="var(--art-ink)" stroke="none">#</text><text x="172" y="176" font-family="Bricolage Grotesque Variable, sans-serif" font-weight="700" font-size="22" fill="var(--art-cloth)" stroke="none">?</text><path d="M172 204 L184 216 M184 204 L172 216" stroke="var(--art-cloth)"/></g></g></svg></div>
+<div>
+<p class="n">Read next</p>
+<h3>Bank statement to Tally vouchers: check the ledger names first</h3>
+<p>Six steps for password-protected PDF statements from SBI, HDFC and Union Bank of India, built around one check: the ledger names in your mapping against your live book.</p></div></a></article></div></div>
+</main>
+
+<footer class="ce-footer">
+  <div class="ce-footer__inner">
+    <div class="ce-footer__grid">
+      <div>
+        <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
+        <dl class="ce-footer__facts">
+          <div><dt>Tally connection</dt><dd>ComplyEaze Bridge&rsquo;s own code connects to Tally on this computer only.</dd></div>
+          <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
+          <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
+          <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>
+        </dl>
+        <p class="ce-footer__synthetic">Every book, party and amount shown on this site is from a synthetic demo book.</p>
+      </div>
+      <nav class="ce-footer__col" aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./faq.html">Questions</a></li>
+          <li><a href="./capabilities.html">Capabilities</a></li>
+          <li><a href="./releases.html">Releases</a></li>
+          <li><a href="./changelog.html">Changelog</a></li>
+          <li><a href="./blog.html">Blog</a></li>
+          <li><a href="./security.html">Security</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Project">
+        <h3>Project</h3>
+        <ul>
+          <li><a href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/issues" target="_blank" rel="noopener noreferrer">Report an issue</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="./privacy.html">Privacy Policy</a></li>
+          <li><a href="./terms.html">Terms of Use</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">Security policy</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="ce-footer__base">
+      <span>ComplyEaze Bridge is open source under the Apache License, Version 2.0.</span>
+      <span>Published by SPMS Comply Eaze Solutions LLP, a limited liability partnership registered with limited liability under the Limited Liability Partnership Act, 2008, LLP identification number ACI-9231. Registered office: S-137, 1st Floor, Sunsquare Shopping Plaza, Plot No. SPL-1/J, RIICO Chowk, Bhiwadi Ind. Area, Alwar, Bhiwadi, Tijara, Alwar 301019, Rajasthan, India.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="chrome.js" defer></script>
+</body>
+</html>

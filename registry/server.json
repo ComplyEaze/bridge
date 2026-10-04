@@ -3,7 +3,7 @@
   "name": "io.github.ComplyEaze/bridge-tally",
   "title": "ComplyEaze Bridge",
   "description": "Reads TallyPrime for your AI assistant; posts only vouchers you approve. Windows, Apple Silicon Mac.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "websiteUrl": "https://bridge.complyeaze.com",
   "repository": {
     "url": "https://github.com/ComplyEaze/bridge",
@@ -13,16 +13,16 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.4.1/bridge-tally-mcp-v0.4.1-windows-x64.mcpb",
-      "fileSha256": "152010acc3342e4e46618911cad6250e9620e62f52a3c9848f21df00ef30b08a",
+      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.4.2/bridge-tally-mcp-v0.4.2-windows-x64.mcpb",
+      "fileSha256": "dfb4603740bd900b63d39a12c486d341674445d0f4b99b7e22d5ec33138e5623",
       "transport": {
         "type": "stdio"
       }
     },
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.4.1/bridge-tally-mcp-v0.4.1-macos-arm64.mcpb",
-      "fileSha256": "59e68408e59d3a86b85be5abaa4b2e0600dbd275ff15fd575ffd242857d26ba1",
+      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.4.2/bridge-tally-mcp-v0.4.2-macos-arm64.mcpb",
+      "fileSha256": "9e37ab24d78a43b2dc75e0f967ac88e19905e17b9daece6f525c709a2d1311ed",
       "transport": {
         "type": "stdio"
       }

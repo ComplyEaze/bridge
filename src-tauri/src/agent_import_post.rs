@@ -554,8 +554,11 @@ impl Server {
             // The record's own hash only proves the record agrees with itself.
             // The file Bridge built must hold exactly the XML this record
             // renders (bridge#575). The native post below re-renders the same
-            // vouchers from the same record, differing only in a fresh private
-            // REMOTEID, so every accounting field it sends is the one checked.
+            // vouchers from the same record with two differences: a fresh
+            // private REMOTEID, and narrations without the `[BRIDGE:…]` marker
+            // this file carries (#864). A narration's text is itself checked
+            // here, so every accounting field and narration it sends is the
+            // one checked.
             if self.read_persisted_import_xml(batch_id)? != xml.as_bytes() {
                 return Err("import_batch_changed".to_string().into());
             }

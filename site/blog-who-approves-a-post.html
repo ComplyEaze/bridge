@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Who approves a post to TallyPrime, and what is still weak: ComplyEaze Bridge</title>
+<meta name="description" content="ComplyEaze Bridge is an MCP server for TallyPrime. Posting is a separate setting, off for a new install. When it is on, a native window asks a person to approve each voucher." />
+<link rel="canonical" href="https://bridge.complyeaze.com/blog-who-approves-a-post.html" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="ComplyEaze Bridge" />
+<meta property="og:locale" content="en_IN" />
+<meta property="og:title" content="Who approves a post to TallyPrime, and what is still weak: ComplyEaze Bridge" />
+<meta property="og:description" content="ComplyEaze Bridge is an MCP server for TallyPrime. Posting is a separate setting, off for a new install. When it is on, a native window asks a person to approve each voucher." />
+<meta property="og:url" content="https://bridge.complyeaze.com/blog-who-approves-a-post.html" />
+<link rel="alternate" type="application/atom+xml" title="ComplyEaze Bridge blog" href="feed.xml" />
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
+<script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
+<link rel="preload" href="fonts/bricolage-wght-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="chrome.css" />
+<link rel="stylesheet" href="pages.css" />
+<link rel="stylesheet" href="blog.css" />
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body class="ce-page ce-page--plain">
+<a class="ce-skip-link" href="#main">Skip to content</a>
+<div class="ce-header__sentinel" id="ceHeaderSentinel" aria-hidden="true"></div>
+<header class="ce-header" id="ceHeader">
+  <div class="ce-header__inner">
+    <a class="ce-brand" href="./" aria-label="ComplyEaze Bridge, home">
+      <svg class="ce-logo" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg>
+    </a>
+    <div class="ce-header__right">
+      <nav class="ce-nav" id="ceNav" aria-label="Primary">
+        <a class="ce-nav__download" href="./download.html">Download</a>
+        <a href="./faq.html">Questions</a>
+        <a href="./releases.html">Releases</a>
+        <a href="./changelog.html">Changelog</a>
+        <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <div class="ce-header__actions">
+        <a class="ce-star" id="ceStar" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer" aria-label="ComplyEaze Bridge on GitHub">
+          <svg class="ce-star__icon" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 .8l2.1 4.4 4.8.6-3.5 3.4.9 4.8L8 11.6l-4.3 2.4.9-4.8L1.1 5.8l4.8-.6z" /></svg>
+          <span class="ce-star__count" id="ceStarCount" aria-hidden="true"></span>
+        </a>
+        <a class="btn btn-primary ce-cta" href="./download.html">Download</a>
+        <button class="ce-menu-toggle" id="ceMenuToggle" type="button" aria-expanded="false" aria-controls="ceNav">
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="visually-hidden">Menu</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+<main id="main" class="blog">
+<header class="ph blog-shell">
+<div class="ph__grid">
+<div>
+<nav aria-label="Breadcrumb">
+<p class="crumb"><a href="./blog.html">Blog</a> &nbsp;/&nbsp; For developers</p></nav>
+<h1>Who approves a post to TallyPrime, and what is still weak</h1>
+<p class="ph__dek">ComplyEaze Bridge is an MCP server for TallyPrime. Posting is a separate setting, off for a new install. When it is on, a native window asks a person to approve each voucher.</p>
+<p class="ph__meta"><span class="m">Tapish Khandelwal</span><span class="sep">·</span><span class="m">3 October 2026</span><span class="sep">·</span><span class="m">For release 0.4.1</span><span class="sep">·</span><span class="m">8 min read</span></p></div>
+<figure class="ph__art"><svg class="art" viewBox="0 0 400 300" role="img" aria-label="Drawing: a Windows approval window with three buttons, the middle one marked as the default, and a mouse pointer on the first." xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="ch"><rect width="400" height="300"/></clipPath></defs><g clip-path="url(#ch)"><rect width="400" height="300" fill="var(--art-d)"/><g fill="none" stroke="var(--art-ink)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="56" y="62" width="288" height="176" rx="8" fill="#fff"/><path d="M56 96 L344 96" stroke-width="1.9" /><path d="M84 126 L270 126 M84 150 L240 150 M84 174 L200 174" stroke-width="1.9" /><rect x="150" y="196" width="56" height="28" rx="5"/><rect x="214" y="196" width="56" height="28" rx="5" fill="var(--art-cloth)"/><rect x="278" y="196" width="56" height="28" rx="5"/><path d="M186 214 L186 272 L200 258 L212 284 L222 280 L210 254 L228 254 Z" fill="#fff"/></g></g></svg></figure></div></header>
+<div class="blog-shell">
+<div class="pb">
+<article class="prose">
+<p class="lede">The weak point of any approval window is the person who clicks Yes without reading.</p>
+<div class="status status--list">
+<p><b>Release 0.4.2 is out.</b> This post describes release 0.4.1. If you install 0.4.2:</p>
+<ul>
+<li>Remove the older extension in Claude Desktop first: 0.4.2 installs beside an older one instead of replacing it (seen with 0.4.1 on a Mac and expected for earlier versions; not tried on Windows). Keep ComplyEaze Bridge’s data folder, which both versions use.</li>
+<li>Enter your settings again, including the Terms setting, which every tool needs. Posting starts off, and Response redaction starts at none, so set it again if you had shortened or masked names.</li>
+<li>Its posts no longer tag the narration, and it matches a posted voucher another way. Check what it posted with <code>verify_import</code>, never <code>voucher_presence</code>, before entering anything again by hand. The one-voucher post the extension makes has not been run live with this matching. From the first post 0.4.2 sends to Tally, even one Tally refuses or never answers, do not run 0.4.1 or earlier on that computer: they stop preparing, posting and checking vouchers.</li>
+<li>If you asked 0.4.1 or earlier to read a ledger, such as its movement or vouchers, by a name that differed from its spelling by a symbol, an accent or words run together, the figures may be for a different ledger with the same letters and digits. Ask again with 0.4.2.</li></ul>
+<p>The <a href="./changelog.html">changelog</a> has the rest.</p></div>
+<figure class="fig">
+<div class="stats">
+<div class="stat">
+<p class="stat__n">93%</p>
+<p class="stat__l">of permission prompts that Claude Code users approve</p>
+<p class="stat__s">Anthropic, “How we built Claude Code auto mode”, 25 March 2026. Anthropic ties it to approval fatigue.</p></div>
+<div class="stat">
+<p class="stat__n">About 2 in 3</p>
+<p class="stat__l">decisions right in a small browser game about spotting harmful commands, over 40,000 runs, played under artificial time pressure</p>
+<div class="range" role="img" aria-label="Missed threats by type ranged from 11.7 percent, for obviously destructive commands, to 35.0 percent, for scope violations.">
+<div class="range__track"><span class="range__bar" style="left:11.7%;width:23.3%"></span></div>
+<div class="range__axis"><span>0%</span><span>missed threats, by type</span><span>100%</span></div>
+<p class="range__lab"><b>11.7%</b> obviously destructive commands, to <b>35.0%</b> scope violations</p></div>
+<p class="stat__s">scalex.dev; its author says it is “not an academic study”.</p></div></div>
+<figcaption>Other people’s numbers about other tools.</figcaption></figure>
+<p>We have no figure for our own window. As far as we know ComplyEaze Bridge sends us nothing, so we cannot measure it in the field.</p>
+<p><b>This is what we built, and what it costs.</b></p>
+<p>ComplyEaze Bridge is an Apache-2.0 MCP server and Claude Desktop extension for TallyPrime. TallyPrime has a local XML gateway that can import vouchers, so a tool that calls it can post to someone’s books. By default the extension reads, prepares voucher files and reads bank-statement PDFs. Posting is a separate setting, off for a new install. When it is on, the assistant prepares a voucher file, calls <code>post_import</code>, and a native window on the user’s computer asks a person to approve that one voucher.</p>
+<p>Our evidence is thin. On 1 October we installed a candidate build of 0.4.0 on a Windows 11 computer, with a new Claude account that had no paid plan and TallyPrime Silver 7.1 holding one made-up company. We declined one post in the approval window, and nothing was sent. We approved another. One Journal was posted, and the read-back found it. That was one run of one candidate build. The README records what ran on other builds.</p>
+<p>What the assistant reads through ComplyEaze Bridge goes to the AI provider the user chose: company, ledger and party names, GSTINs, PAN and bank details, narrations and amounts. Claude Desktop sends it. A masking setting shortens party and ledger names or drops narrations, and nothing hides amounts. We do not receive Tally data through ComplyEaze Bridge, and our Privacy Policy says so. We found no upload in the code we read (release 0.4.0, re-read for the 0.4.1 changes to network destinations). That is our reading of the code, and we do not warrant it (Terms, section 13).</p>
+<h2 id="d1">1. With posting off, the posting tools are absent</h2>
+<figure class="fig fig--hero">
+<div class="ts" role="group" aria-labelledby="ts-h">
+<p class="ts__h" id="ts-h">Turn the setting and restart: what the model can see.</p><input type="radio" name="ts" id="ts-off" checked><input type="radio" name="ts" id="ts-on">
+<div class="mask__seg ts__seg"><label for="ts-off">Posting off<code>as installed</code></label><label for="ts-on">Posting on<code>“Allow voucher posting”</code></label></div>
+<ul class="ts__list">
+<li class="ts__read">Read and prepare tools <span>always listed in the extension</span></li>
+<li class="ts__post"><code>post_import</code> <span>tries to post one voucher after a person approves it</span></li>
+<li class="ts__post"><code>acknowledge_post_review</code> <span>records a review; writes nothing to Tally</span></li></ul>
+<p class="ts__note ts__note--off">With posting off, the two posting tools leave the tool list, and if something calls them anyway, they refuse.</p>
+<p class="ts__note ts__note--on">With posting on, the assistant prepares a voucher file, calls <code>post_import</code>, and a native window on the user’s computer asks a person to approve that one voucher.</p></div></figure>
+<p><code>acknowledge_post_review</code> writes nothing to Tally; it records a review. The model has no posting tool to try. An earlier install may have saved the setting as on, so check it after an upgrade.</p>
+<h2 id="d2">2. Approval is a window, and no ComplyEaze Bridge tool can answer it</h2>
+<p>The extension starts a second copy of itself to show a system dialog.</p>
+<figure class="fig fig--wide">
+<div class="dlg">
+<div class="dlg__frame">
+<p class="dlg__t">ComplyEaze Bridge — post this voucher?</p><pre class="dlg__body">Create ONE Receipt in &quot;Demo Traders Pvt Ltd (synthetic)&quot;
+Company GUID: 3f9a6c1e-52b7-4d08-a1e4-7b20c9d5e386
+Company number: 200417  Books from: 20250401
+Tally: http://127.0.0.1:9000
+Date: 20260312  Voucher number: Tally assigns it
+Reference: (none)
+Narration: (none)
+
+Dr 124600.00  &quot;Example Bank Ltd&quot;
+Cr 124600.00  &quot;Nevrika Agro Foods&quot;
+
+Total debit: 124600.00  Total credit: 124600.00
+Checked in Tally: every Dr ledger is bank/cash; every Cr ledger holds no money.
+Batch: bridge-8e41d2a7-0c6b-4f93-b5a8-1d7e93c04f26
+
+Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.</pre>
+<div class="win__btns"><span class="win__b">Yes</span><span class="win__b win__b--def">No</span><span class="win__b">Cancel</span></div></div>
+<div class="dlg__side">
+<p class="win__os">On macOS</p>
+<p class="dlg__mac"><b>ComplyEaze Bridge — approve one voucher</b><br>with the buttons Cancel and Post voucher (labels as the code sets them; on-screen order not shown)</p>
+<ol class="tok">
+<li><b>A fresh one-time token</b> per window; only the positive button returns it.</li>
+<li><b>Two minutes</b> without an answer, and the window closes itself.</li>
+<li><b>Held in memory, used once</b>, and dropped fifteen minutes after the click or on restart.</li></ol></div></div>
+<figcaption>On Windows, No is the default. The window text is what the release 0.4.1 code builds for one Receipt (<a href="https://github.com/ComplyEaze/bridge/blob/mcp-v0.4.1/src-tauri/src/agent_import_post.rs#L2236">agent_import_post.rs</a>, <a href="https://github.com/ComplyEaze/bridge/blob/mcp-v0.4.1/src-tauri/src/tally/approved_import.rs#L1386">approved_import.rs</a>), filled with the site’s synthetic demo voucher. It is a rendering, not a screenshot. That is how we designed it, and we do not guarantee it. Release 0.4.2 changes one line, to “Ledgers checked by identity against the build; narrations sent as prepared, nothing added.” (<a href="https://github.com/ComplyEaze/bridge/blob/mcp-v0.4.2/src-tauri/src/agent_import_post.rs#L2291">agent_import_post.rs at 0.4.2</a>).</figcaption></figure>
+<p>The descriptions of <code>post_import</code> and <code>acknowledge_post_review</code> tell the model that it cannot approve.</p>
+<div class="refuses">
+<p class="refuses__h">What the approval window shows, and what stops it opening</p>
+<ul>
+<li>Before the window opens, the approval text is refused, and nothing is posted, if the company name, voucher number, reference, narration or a ledger name contains a control character, a line or paragraph separator, or an invisible format character.</li>
+<li>It is also refused if it runs over 1,600 characters, 24 lines, or 100 characters on one line, so one voucher stays reviewable in a native window.</li>
+<li>Names and the narration appear in quotes, as written apart from an escaped quote mark or backslash. The window cannot tell whether what a narration says is true.</li>
+<li>Its last line says when the approval is spent: now, or if the assistant asks again within fifteen minutes, unless the assistant’s request is withdrawn, the post is refused, or ComplyEaze Bridge restarts.</li></ul>
+<p class="refuses__src">From <a href="https://github.com/ComplyEaze/bridge/blob/mcp-v0.4.1/src-tauri/src/agent_import_post.rs#L2236">agent_import_post.rs</a> and <a href="https://github.com/ComplyEaze/bridge/blob/mcp-v0.4.1/src-tauri/src/agent_import_approval.rs">agent_import_approval.rs</a> at release 0.4.1.</p></div>
+<p>Software that can click on the screen can press the button, and a desktop-control connector in an assistant is such software. Our Privacy Policy says not to let it run while a posting is waiting, and our Terms (9.4) say we are not responsible if software acting for a user gets around the window. The window also cannot tell whether the entry is right. It shows what will be posted. The person who approves is responsible for it (Terms 9.3), except where what is posted differs from what it showed.</p>
+<h2 id="d3">3. The Tally transport accepts a local address and nothing else</h2>
+<p>The Tally transport in our own code accepts a loopback address or <code>localhost</code>, uses no proxy, follows no redirects, and refuses anything else (<a href="https://github.com/ComplyEaze/bridge/blob/mcp-v0.4.1/src-tauri/crates/bridge-tally-transport/src/lib.rs#L871">bridge-tally-transport</a>). That costs us remote Tally and Tally Cloud Access. A local port that someone forwards sends traffic wherever it was forwarded. We have not taken a network capture of the running extension.</p>
+<div class="advisory">
+<h3>One path outside the transport, found in our own code</h3>
+<p>We found one exception ourselves, by reading the code. We published it as an advisory and fixed it in 0.4.1. In 0.3.0 and 0.4.0 the bank-statement tool opened any absolute path it was given, including a Windows network path. That is the operating system opening a file, so our transport checks did not see it. Windows may then send the signed-in user’s network sign-in response to that computer. No Tally data is sent. It needed the assistant to be steered into the path, the user’s approval of that call or an always-allow setting, and outbound file-sharing traffic to that computer. 0.4.1 refuses these forms as text before opening anything, but some forms can still pass (the security page lists them), and we have not measured the PDF library’s behaviour. We had checked our own network client. We had not checked the paths a tool opens.</p></div>
+<h2 id="d4">4. A local log of every result</h2>
+<p>Each result ComplyEaze Bridge returns, read or write, successful or refused, gets an entry in a log on the user’s computer. It holds the time, the tool, Tally’s internal code for the company, counts, sizes, and fingerprints of the request and the result. It is designed to hold no amounts or names, though sizes can hint at a name’s length. It is an ordinary local file that anyone with access to the computer could alter, so treat it as the user’s own record. A separate journal holds every batch prepared or posted, unmasked, and is how ComplyEaze Bridge refuses to send the same batch twice. Nothing is deleted automatically. The Privacy Policy (section 7) says how to archive it.</p>
+<h2 id="d5">What is still weak</h2>
+<dl class="limits">
+<div><dt>A post can land in the wrong company or ledger.</dt><dd>Tally aims an import at a company by name and cannot bind it to a company’s GUID. In its last request before the post, ComplyEaze Bridge checks that exactly one loaded company has the target’s GUID and name and that no other loaded company has the same name ignoring case and spacing. A company renamed or loaded in the moment after that check could still receive the voucher if it has the voucher’s ledgers, and a ledger renamed and replaced in that moment could receive the entry. The README lists this among the limits of posting.</dd></div>
+<div><dt>There is no undo.</dt><dd>No tool deletes or reverses a posted voucher.</dd></div>
+<div><dt>Read-back is partial.</dt><dd>It compares date, voucher type and ledger entries, not every field, and a match is no check of correctness.</dd></div>
+<div><dt>One voucher per approval.</dt><dd>A batch setting exists in the server program. The published extension does not set it.</dd></div>
+<div><dt>Tally can slow down.</dt><dd>Requests can make Tally slow or unresponsive, sometimes until it is restarted, including for other users of a shared Tally. Reads on very large books can fail or take longer than the assistant waits.</dd></div></dl>
+<p class="solo">Nobody independent has audited it.</p>
+<h2 id="d6">What we have not run</h2>
+<p>The release check confirms that each package launches, lists its tools and parses a synthetic encrypted bank statement. It does not run against TallyPrime. The README lists what we have run against a real TallyPrime, on which edition and operating system. It also lists what we have not run in a controlled test:</p>
+<ul class="notrun">
+<li>posting with a published package against a live TallyPrime</li>
+<li>each way of declining in the Windows approval window (we tried one)</li>
+<li>the tools answering through Claude Desktop on macOS after the Terms are accepted (<code>tally_status</code> and <code>list_companies</code> answered once, on a CI build of 0.4.1)</li>
+<li>posting on TallyPrime Education</li>
+<li>posting on TallyPrime Gold with its approval step recorded</li></ul>
+<p>We have also not yet run the published 0.4.1 file in Claude Desktop.</p>
+<h2 id="d7">Try it, and tell us what breaks</h2>
+<p>It is Apache-2.0. We publish it for Windows x64 and Apple Silicon Macs, and it is not yet code-signed. The download and install guide are on the Download page, and the source is at github.com/ComplyEaze/bridge. If you reproduce any of this on another TallyPrime edition, or find a problem in the approval design, open a GitHub issue. If you find a vulnerability, report it privately, as SECURITY.md explains.</p>
+<p class="endnote">Nothing here is accounting, tax, audit or legal advice. ComplyEaze Bridge is not a product of, or endorsed by, Tally Solutions, Anthropic or ICAI. Email contact@complyeaze.com · <a href="./faq.html">Questions and answers</a> · <a href="./download.html">Download and release notes</a> · <a href="https://github.com/ComplyEaze/bridge">Source on GitHub</a> · <a href="https://github.com/ComplyEaze/bridge/blob/a9d33fe7176f1c0ee17765a74b0021189c3aa09d/docs/security-and-privacy.md">Security and privacy</a> · <a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md">Security policy</a></p>
+<a class="card-link readnext" href="./blog-where-does-client-data-go.html">
+<div class="readnext__art" aria-hidden="true"><svg class="art" viewBox="0 0 400 300" role="img" aria-label="Drawing: a slip lifts off an open ledger and leaves along a dotted line; on the slip, with the mask_parties setting on, a made-up party name is shortened to Ne…ds and the rupee amount is unchanged." xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="crn"><rect width="400" height="300"/></clipPath></defs><g clip-path="url(#crn)"><rect width="400" height="300" fill="var(--art-a)"/><g fill="none" stroke="var(--art-ink)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M30 246 L180 258 L330 246 L324 266 L180 278 L36 266 Z" fill="var(--art-cloth)"/><path d="M36 244 C82 224 136 224 180 244 L180 132 C136 112 82 112 36 132 Z" fill="var(--art-paper)"/><path d="M180 244 C224 224 278 224 324 244 L324 132 C278 112 224 112 180 132 Z" fill="var(--art-paper)"/><path d="M180 270 C176 284 166 292 150 296 M180 270 C186 286 198 292 214 294" stroke-width="2.6" stroke="var(--art-cloth)"/><path d="M58 150 C90 140 126 140 160 150 M58 172 C90 162 126 162 160 172 M58 194 C90 184 126 184 160 194 M58 216 C84 208 110 208 132 214" stroke-width="1.9" /><path d="M200 150 C232 140 268 140 302 150 M200 172 C220 166 238 164 254 166" stroke-width="1.9" /><path d="M250 176 C276 150 300 116 328 92" stroke-width="3" stroke-dasharray="1 10"/><g transform="translate(-44 16) rotate(-8 330 70)"><rect x="250" y="20" width="150" height="104" rx="6" fill="#fff"/><text x="264" y="16" font-family="Geist Variable, sans-serif" font-weight="600" font-size="11" fill="var(--art-ink)" stroke="none" opacity=".7">with mask_parties on</text><text x="264" y="46" font-family="Geist Variable, sans-serif" font-weight="500" font-size="13" fill="var(--art-ink)" stroke="none" opacity=".55">Nevrika Agro Foods</text><path d="M262 42 L384 42" stroke-width="1.6" opacity=".7"/><text x="264" y="72" font-family="Bricolage Grotesque Variable, sans-serif" font-weight="700" font-size="20" fill="var(--art-ink)" stroke="none">Ne…ds</text><text x="264" y="106" font-family="Bricolage Grotesque Variable, sans-serif" font-weight="700" font-size="23" fill="var(--art-cloth)" stroke="none">₹1,24,600</text></g></g></g></svg></div>
+<div>
+<p class="n">Read next</p>
+<h3>Where your client’s data goes when Claude reads Tally</h3>
+<p>When you ask Claude about a client’s books, what Claude reads goes to Anthropic. That can be party names, narrations, GSTINs and amounts. A setting can shorten the names. Nothing hides the amounts.</p></div></a></article></div></div>
+</main>
+
+<footer class="ce-footer">
+  <div class="ce-footer__inner">
+    <div class="ce-footer__grid">
+      <div>
+        <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
+        <dl class="ce-footer__facts">
+          <div><dt>Tally connection</dt><dd>ComplyEaze Bridge&rsquo;s own code connects to Tally on this computer only.</dd></div>
+          <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
+          <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
+          <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>
+        </dl>
+        <p class="ce-footer__synthetic">Every book, party and amount shown on this site is from a synthetic demo book.</p>
+      </div>
+      <nav class="ce-footer__col" aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./faq.html">Questions</a></li>
+          <li><a href="./capabilities.html">Capabilities</a></li>
+          <li><a href="./releases.html">Releases</a></li>
+          <li><a href="./changelog.html">Changelog</a></li>
+          <li><a href="./blog.html">Blog</a></li>
+          <li><a href="./security.html">Security</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Project">
+        <h3>Project</h3>
+        <ul>
+          <li><a href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/issues" target="_blank" rel="noopener noreferrer">Report an issue</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="./privacy.html">Privacy Policy</a></li>
+          <li><a href="./terms.html">Terms of Use</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">Security policy</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="ce-footer__base">
+      <span>ComplyEaze Bridge is open source under the Apache License, Version 2.0.</span>
+      <span>Published by SPMS Comply Eaze Solutions LLP, a limited liability partnership registered with limited liability under the Limited Liability Partnership Act, 2008, LLP identification number ACI-9231. Registered office: S-137, 1st Floor, Sunsquare Shopping Plaza, Plot No. SPL-1/J, RIICO Chowk, Bhiwadi Ind. Area, Alwar, Bhiwadi, Tijara, Alwar 301019, Rajasthan, India.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="chrome.js" defer></script>
+</body>
+</html>

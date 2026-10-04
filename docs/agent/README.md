@@ -103,8 +103,8 @@ The ordinary default tools, in name order:
 - `vouchers`
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
-`local_data_report` were added in release 0.4.0; `sales_register` is in source and not
-in a published release. `local_data_report` (also
+`local_data_report` were added in release 0.4.0; `sales_register` was added in release
+0.4.2. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -192,7 +192,8 @@ count and the ledgers the read returned, that differ are refused as `ledger_coun
 slices and before the count is used, Bridge reads Tally's own count of the company's ledgers once
 (`NUMLEDGERS` of the Company object, #938) and refuses the call as `ledger_count_company_differs` if it is
 higher than the census's, or as `ledger_count_company_invalid` if that answer was damaged, named another
-company or held something other than a plain number; a count that is equal, lower or absent never admits
+company or held something other than a plain number, or as `ledger_count_company_response_too_large` if that
+answer was larger than the response limit (#1033); a count that is equal, lower or absent never admits
 or sizes anything, and the
 result of a counted read says which it was in `ledger_count_cross_check.status` (`matched`,
 `company_count_lower` or `unavailable`, the last meaning the check did not run). Equality was measured
@@ -602,7 +603,9 @@ too (#692).
   - no line of its with an amount is uncompared, except the `Cost of Sales :`
     heading, spelled exactly so, while its amount is exactly the derived
     Purchase Accounts plus Direct Expenses (the cost of sales without stock).
-    That allowance was observed once, on one book.
+    That allowance was observed once, on one book. The heading is compared
+    even when it reads zero or empty, as any line is: over a non-zero cost of
+    sales it refuses, and over a zero one it ties (#1070).
   - An Opening or Closing Stock line refuses.
 
 ### Ledger-movement opening decision
@@ -1568,10 +1571,10 @@ deletion detection is unsupported.
 ### What each tool's evidence covers
 
 What a tool's top-level `evidence.request_sha256` and `response_sha256` cover,
-read from the code tool by tool (#726). It covers every tool that reads Tally,
-`verify_import`, and the tools that read nothing from Tally; it does not cover
-`build_import_xml`, `post_import` or `acknowledge_post_review`. Each list is in
-fold order. A step
+read from the code tool by tool (#726). It covers the read tools, `verify_import`
+and the tools that read nothing from Tally; it does not cover
+`build_import_xml`, `post_import` or `acknowledge_post_review`, which also send
+requests. Each list is in fold order. A step
 marked "(if …)" is folded only when that holds. Every step after the first is
 joined with the tool-level combination, so it is hashed even when one side is
 one request. The building blocks:

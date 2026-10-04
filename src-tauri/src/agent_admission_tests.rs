@@ -641,6 +641,45 @@ fn every_list_a_new_tool_is_written_into_is_in_name_order() {
     }
 }
 
+/// About 40 bytes either side of `at`, widened to whole characters, so a
+/// failure message can quote text beside a multi-byte character (an em dash, a
+/// curly quote or ₹) instead of panicking on a character boundary.
+fn around(text: &str, at: usize) -> &str {
+    let mut start = at.saturating_sub(40);
+    while !text.is_char_boundary(start) {
+        start -= 1;
+    }
+    let mut end = (at + 40).min(text.len());
+    while !text.is_char_boundary(end) {
+        end += 1;
+    }
+    &text[start..end]
+}
+
+/// The window never splits a character, whichever side the 40 bytes land on
+/// (#1129 review).
+#[test]
+fn the_failure_window_never_splits_a_character() {
+    // Three-byte characters on both sides, shifted a byte at a time, so the
+    // 40-byte edges fall inside a character on some shifts and between two on
+    // others.
+    let mut split = 0;
+    for pad in 0..3 {
+        let text = format!(
+            "{}{}Bridge{}",
+            "x".repeat(pad),
+            "—".repeat(20),
+            "₹".repeat(20)
+        );
+        let at = text.find("Bridge").unwrap();
+        split += usize::from(!text.is_char_boundary(at - 40));
+        split += usize::from(!text.is_char_boundary(at + 40));
+        let window = around(&text, at);
+        assert!(window.contains("—Bridge₹"), "{pad}: {window:?}");
+    }
+    assert!(split > 0, "no edge fell inside a character");
+}
+
 /// Every tool description names the product in full, "ComplyEaze Bridge", never
 /// by its bare short name (#962, the guard promised in #1028). The one
 /// exception is a quoted voucher tag that `parse_bank_statement` writes into the
@@ -662,9 +701,128 @@ fn no_tool_description_names_the_product_by_its_bare_short_name() {
             assert!(
                 text[..at].ends_with("ComplyEaze "),
                 "{name} names a bare Bridge: {:?}",
-                &text[at.saturating_sub(40)..(at + 40).min(text.len())]
+                around(&text, at)
             );
         }
+    }
+}
+
+/// Every input parameter of every listed tool carries a description (#1155):
+/// a tool that gains a parameter without one fails here by name. A description
+/// a schema already wrote is kept, and a schema with no parameters gains none.
+/// Three tools are held to the parameters many tools share only:
+/// `changed_since`, registered but not listed (`tool_definitions`), and the
+/// two lab-only import tools, compiled in only with the `lab-writes` feature;
+/// their own parameters were not read for this.
+#[test]
+fn every_parameter_of_every_tool_is_described() {
+    const SHARED_PARAMETERS: [&str; 8] = [
+        "as_of",
+        "batch_id",
+        "company_guid",
+        "from",
+        "limit",
+        "offset",
+        "snapshot_id",
+        "to",
+    ];
+    let tools = registered_tool_definitions(true, true);
+    let tools = tools.as_array().expect("tools");
+    let read_evidence = tools
+        .iter()
+        .find(|tool| tool["name"] == "read_evidence")
+        .expect("read_evidence");
+    assert_eq!(
+        read_evidence["inputSchema"]["properties"]["limit"]["description"],
+        "How many of the newest in-memory records to return: default 20, at most 256."
+    );
+    for tool in tools {
+        let name = tool["name"].as_str().expect("tool name");
+        assert!(
+            !tool["inputSchema"]
+                .get("properties")
+                .is_some_and(Value::is_null),
+            "{name} gained a null properties"
+        );
+        let shared_only = matches!(
+            name,
+            "changed_since" | "lab_import_masters" | "lab_import_vouchers"
+        );
+        for (parameter, property) in tool["inputSchema"]["properties"]
+            .as_object()
+            .into_iter()
+            .flatten()
+        {
+            if shared_only && !SHARED_PARAMETERS.contains(&parameter.as_str()) {
+                continue;
+            }
+            assert!(
+                property["description"]
+                    .as_str()
+                    .is_some_and(|text| !text.trim().is_empty()),
+                "{name}.{parameter} has no description"
+            );
+        }
+    }
+}
+
+/// Where two tools are easy to confuse, each says when to use the other
+/// (#1155, item 3), in a line taken from what the other tool's own description
+/// says it is for. Each line is a whole sentence of its tool's description, and
+/// the tool it points to is in the catalogue.
+#[test]
+fn each_tool_of_a_confusable_pair_points_to_the_other() {
+    const LINES: &[(&str, &str, &str)] = &[
+        (
+            "ledger_masters",
+            "outstandings",
+            "For what parties owe or are owed now, by their open bills, use outstandings instead.",
+        ),
+        (
+            "ledger_movement",
+            "trial_balance",
+            "For every ledger's balances from Tally's own Trial Balance, without reading vouchers, use trial_balance instead.",
+        ),
+        (
+            "outstandings",
+            "ledger_masters",
+            "For a ledger's master record (its group, opening balance and, with fields=compliance, GSTIN and party details), use ledger_masters instead.",
+        ),
+        (
+            "trial_balance",
+            "ledger_movement",
+            "For one ledger's movement counted from the window's vouchers, with how many vouchers touched it, use ledger_movement instead.",
+        ),
+        (
+            "voucher_presence",
+            "vouchers",
+            "To list the vouchers of a date window, use vouchers instead.",
+        ),
+        (
+            "vouchers",
+            "voucher_presence",
+            "To ask whether vouchers you mean to post are already in the book, use voucher_presence instead.",
+        ),
+    ];
+    let tools = registered_tool_definitions(true, true);
+    let tools = tools.as_array().expect("tools");
+    let description = |name: &str| {
+        tools
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .and_then(|tool| tool["description"].as_str())
+            .unwrap_or_else(|| panic!("{name} is not in the catalogue"))
+    };
+    for (tool, other, line) in LINES {
+        let sentence = line.trim_end_matches('.');
+        assert!(
+            description(tool)
+                .split(". ")
+                .any(|part| part.trim_end_matches('.') == sentence),
+            "{tool} lacks the sentence pointing to {other}"
+        );
+        assert!(line.ends_with(&format!("use {other} instead.")), "{line}");
+        description(other);
     }
 }
 

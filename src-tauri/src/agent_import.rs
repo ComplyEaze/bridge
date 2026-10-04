@@ -69,7 +69,7 @@ use verification::{
     final_verification_status, mark_verification_names, parse_import_voucher_rows,
     parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
-    Attribution, VerificationStatus,
+    Attribution, DeltaBasis, VerificationStatus,
 };
 #[cfg(test)]
 use verification::{
@@ -1355,7 +1355,11 @@ impl Server {
                 "batch_id": line.batch_id, "batch_sha256": line.sha256,
                 "built_at": line.built_at, "verified_at": now(),
                 "dispatch_response": dispatch_response,
-                "pre_import_mark": line.pre_import_mark, "alter_id_delta": alter_id_delta(&line.pre_import_mark, &observed.rows),
+                "pre_import_mark": line.pre_import_mark,
+                "alter_id_delta": alter_id_delta(
+                    pre_post_voucher_mark.map_or(DeltaBasis::Build(&line.pre_import_mark), DeltaBasis::PrePost),
+                    &observed.rows,
+                ),
                 "counts": result["counts"], "vouchers": result["vouchers"], "duplicates": result["duplicates"],
                 "post_span_binding": with_post_span_summary(span.report),
                 "unrelated_duplicates_in_window": result["unrelated_duplicates_in_window"],
@@ -2817,7 +2821,9 @@ fn validate_import_dates_for_profile(
     Ok(())
 }
 
-/// The reserved marker this module appends to every imported narration.
+/// The reserved marker this module appends to each narration of the file
+/// `build_import_xml` writes, for a person to import by hand. A native post
+/// sends the narration without it (#864; `render_native_vouchers_xml`).
 pub(super) const NARRATION_MARKER_PREFIX: &str = "[BRIDGE:";
 
 /// Every reserved marker occurrence in a narration, in the order written.

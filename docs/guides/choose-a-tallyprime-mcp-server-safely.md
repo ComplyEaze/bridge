@@ -40,6 +40,36 @@ yourself. This page does not rank products.
     Check for an outside review, a security policy with a way to report a
     problem, and what the terms say about liability.
 
+## Tally's own plug-in, and what ComplyEaze Bridge adds
+
+Tally Solutions offers its own TallyPrime MCP plug-in for Claude Desktop. Put
+the ten questions to it as well: Tally's help pages are the place to check what
+it covers, what it needs and whether it can change your books. ComplyEaze
+Bridge is not a product of Tally Solutions, and this page does not rank the
+two. If you only want to ask questions of your books, the official plug-in may
+be all you need.
+
+What ComplyEaze Bridge adds, so you can judge whether you need it:
+
+- **A PDF bank statement step.** It reads a password-protected PDF statement
+  from State Bank of India, HDFC Bank or Union Bank of India into Payment,
+  Receipt and Contra vouchers as a file you import in TallyPrime yourself. It
+  checks your ledger names against the book first, and after you import it can
+  read the batch back from TallyPrime. TallyPrime's own bank statement import
+  takes CSV or Excel files from the bank's portal, not PDF (Tally's help page
+  "Bank statement", read on 4 October 2026), so if your client already sends
+  one of those, TallyPrime's own import may be all you need.
+- **One-file install.** One extension file in Claude Desktop, with no Node.js
+  and no configuration file to edit.
+- **No Tally plug-in.** It uses TallyPrime's own HTTP gateway on your computer.
+  It has been run on licensed TallyPrime Silver and Gold 7.1 only; see the
+  [README](../../README.md#what-has-been-run-against-a-real-tallyprime).
+
+Where it is behind: three banks, not the many TallyPrime's own import covers;
+no TallyPrime bank reconciliation; not yet code-signed; and a short list of runs against a real
+TallyPrime, with the latest release not yet run in Claude Desktop on a client's
+book (the README lists each run).
+
 ## How ComplyEaze Bridge answers them
 
 ComplyEaze Bridge is our TallyPrime MCP server for Claude Desktop. In short:

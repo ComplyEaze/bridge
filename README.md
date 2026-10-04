@@ -18,6 +18,16 @@ default, so as installed it never posts to TallyPrime: it reads from it and
 prepares files on your computer. If you turn posting on in the extension, it
 posts vouchers one at a time, after you approve each one.
 
+Tally Solutions also offers its own TallyPrime MCP plug-in for Claude Desktop,
+the official route for asking questions of your books; ComplyEaze Bridge is not
+a product of Tally Solutions. What ComplyEaze Bridge adds is the bank statement
+step: it reads a password-protected PDF statement (TallyPrime's own bank
+statement import takes CSV or Excel files from the bank's portal, not PDF),
+checks your ledger names against the book, and reads the batch back after you
+import it. It installs as one extension file in Claude Desktop, with no Node.js
+and no configuration file to edit, and it uses TallyPrime's own HTTP gateway
+rather than a Tally plug-in.
+
 **Current release:**
 <!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,
 for Windows x64 and Apple Silicon Macs. We check each release before we

@@ -2316,6 +2316,6 @@ test("a save failure with no recognizable shape keeps this screen's own fallback
   const root = await mount(host);
   await act(async () => button(host, "Choose source XML").click());
   await act(async () => button(host, "Save draft").click());
-  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Bridge could not complete that source-draft action.");
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("ComplyEaze Bridge could not complete that source-draft action.");
   root.unmount();
 });

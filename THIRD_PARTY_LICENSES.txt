@@ -5,7 +5,7 @@ The native Rust dependency inventory and full license texts are provided in
 THIRD_PARTY_LICENSES_RUST.txt. This file covers the production frontend
 dependency graph from pnpm-lock.yaml.
 
-@tauri-apps/api 2.11.1
+@tauri-apps/api 2.12.1
 ----------------------
 License: Apache-2.0 OR MIT
 Source: https://github.com/tauri-apps/tauri

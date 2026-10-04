@@ -1754,3 +1754,25 @@ fn the_window_never_reaches_the_summary() {
         assert!(!summary.contains(needle), "{needle} in {summary}");
     }
 }
+
+#[test]
+fn the_build_is_told_which_bank_and_suspense_ledgers_the_file_was_parsed_for() {
+    let directory = tempfile::tempdir().unwrap();
+    let (request, parsed) = windowed_parse(None, None);
+    let (proposals_id, digest) =
+        persist(directory.path(), &request, &parsed, &"0".repeat(64)).unwrap();
+    let build_args = |proposals_id: &str, digest: &str| json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": digest});
+    let resolved =
+        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
+    let ledgers = resolved.statement_ledgers.expect("a file names both");
+    assert_eq!(ledgers.bank_ledger, "Synthetic Bank Ledger");
+    assert_eq!(ledgers.suspense_ledger, "Suspense");
+
+    // Inline vouchers name no statement.
+    let inline = resolve_import_arguments(
+        directory.path(),
+        &json!({"company_guid": "g", "vouchers": []}),
+    )
+    .unwrap();
+    assert!(inline.statement_ledgers.is_none());
+}

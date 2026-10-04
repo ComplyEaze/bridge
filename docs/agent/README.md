@@ -1099,6 +1099,12 @@ that turns that on.
    posting) and no file is written: a hand import of that file would post the
    row again. An amendment alters vouchers in place and adds none, so it is not
    checked.
+   When the vouchers come from a `parse_bank_statement` proposals file, the build
+   also checks the two ledgers the statement was parsed for: a `bank_ledger`
+   under Cash-in-Hand is refused (`statement_bank_ledger_not_a_bank`), since a
+   statement belongs to a bank account, and a `suspense_ledger` that is not under
+   Suspense A/c builds with the warning `suspense_ledger_outside_suspense_group`.
+   A file that names neither ledger is not held to either rule.
 4. In Tally, with the intended company open, use **Gateway of Tally → Import →
    Vouchers** to import the file. Bridge does not dispatch this manual step.
    Alternatively, use the separately approved MCP voucher posting (or, for a

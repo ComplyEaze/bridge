@@ -2080,7 +2080,7 @@ fn the_adr_quotes_the_thresholds_this_module_actually_uses() {
     // the wrong rule. "Remember to update the record" is the kind of rule this
     // project prefers to replace with something that fails.
     const ADR: &str = include_str!("../../../../docs/adr/0016-master-binding-authority.md");
-    for (constant, value) in [
+    let code = [
         (
             "MIN_NUMERIC_IDENTIFIER_DIGITS",
             MIN_NUMERIC_IDENTIFIER_DIGITS,
@@ -2089,14 +2089,52 @@ fn the_adr_quotes_the_thresholds_this_module_actually_uses() {
         ("MIN_CODE_IDENTIFIER_CHARS", MIN_CODE_IDENTIFIER_CHARS),
         ("MAX_CANDIDATES_PER_ENTITY", MAX_CANDIDATES_PER_ENTITY),
         ("COMMON_TOKEN_PERCENT", COMMON_TOKEN_PERCENT),
-    ] {
-        // A percentage reads naturally as `(10%)`; both spellings count, and
-        // neither lets a changed number pass.
-        let plain = format!("`{constant}` ({value})");
-        let percent = format!("`{constant}` ({value}%)");
+        ("COMMON_TOKEN_MIN_CATALOG", COMMON_TOKEN_MIN_CATALOG),
+    ]
+    .into_iter()
+    .collect::<std::collections::BTreeMap<_, _>>();
+
+    // Every quote of the form `` `NAME` (value) ``, with any whitespace between
+    // the name and the value: the ADR wraps its lines, so a quote can span a
+    // line break (#839). A percentage reads naturally as `(10%)`; both
+    // spellings count, and neither lets a changed number pass.
+    let mut quoted = std::collections::BTreeSet::new();
+    let mut rest = ADR;
+    while let Some(open) = rest.find('`') {
+        let Some(close) = rest[open + 1..].find('`').map(|offset| open + 1 + offset) else {
+            break;
+        };
+        let name = &rest[open + 1..close];
+        let after = rest[close + 1..].trim_start();
+        rest = &rest[close + 1..];
+        let is_constant = name.contains('_')
+            && name.chars().all(|character| {
+                character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
+            });
+        let Some(value) = after
+            .strip_prefix('(')
+            .and_then(|inner| inner.split_once(')'))
+            .map(|(value, _)| value.trim_end_matches('%'))
+        else {
+            continue;
+        };
+        if !is_constant || !value.chars().all(|character| character.is_ascii_digit()) {
+            continue;
+        }
+        let in_code = code.get(name).unwrap_or_else(|| {
+            panic!("ADR 0016 quotes {name} ({value}), which this test does not check")
+        });
+        assert_eq!(
+            value,
+            in_code.to_string(),
+            "ADR 0016 quotes {name} as {value}; the code says {in_code}"
+        );
+        quoted.insert(name);
+    }
+    for name in code.keys() {
         assert!(
-            ADR.contains(&plain) || ADR.contains(&percent),
-            "ADR 0016 does not quote {constant} as {value}; it must read {plain:?}"
+            quoted.contains(name),
+            "ADR 0016 does not quote {name} with its value"
         );
     }
 }

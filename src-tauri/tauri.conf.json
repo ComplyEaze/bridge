@@ -8,7 +8,10 @@
     "devUrl": "http://127.0.0.1:5174",
     "beforeBuildCommand": "corepack pnpm run build",
     "beforeBundleCommand": "node scripts/check-no-test-seam.mjs --tauri-bundle-hook",
-    "frontendDist": "../dist"
+    "frontendDist": "../dist",
+    "windows": {
+      "staticVCRuntime": false
+    }
   },
   "app": {
     "windows": [

@@ -1108,6 +1108,8 @@ that turns that on.
    when the ledger is in the book but its group does not lead to a reserved
    group, and `suspense_ledger_not_in_book`. A file that names neither ledger is
    not held to either rule.
+   The refusal also applies when amending a batch that was built against a
+   Cash-in-Hand bank ledger: the ledger must be changed first.
 4. In Tally, with the intended company open, use **Gateway of Tally → Import →
    Vouchers** to import the file. Bridge does not dispatch this manual step.
    Alternatively, use the separately approved MCP voucher posting (or, for a

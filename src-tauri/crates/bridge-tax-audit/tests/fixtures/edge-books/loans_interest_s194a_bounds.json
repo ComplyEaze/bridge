@@ -1,0 +1,498 @@
+{
+ "comment": "loans_interest, the s.194A threshold read on per-line bounds of the listed interest, a firm with no TDS: a listed pair crediting and reversing one amount, on two vouchers (Split Loan) or on one beside a non-interest line (One Loan), spans the threshold though it nets to nil, so whether the interest crosses it is not computed; the least exactly at the threshold is not over it (Edge Loan); listed lines all credits keep the earlier wording (Credit Loan); over the threshold in every reading, the s.194A finding stays (Both Loan).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-001"
+  },
+  {
+   "name": "Split Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-002"
+  },
+  {
+   "name": "Interest Split",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-003"
+  },
+  {
+   "name": "One Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-004"
+  },
+  {
+   "name": "Interest One",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-005"
+  },
+  {
+   "name": "Edge Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-006"
+  },
+  {
+   "name": "Interest Edge",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-007"
+  },
+  {
+   "name": "Credit Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-008"
+  },
+  {
+   "name": "Interest Credit",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-009"
+  },
+  {
+   "name": "Both Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-010"
+  },
+  {
+   "name": "Interest Both",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_s194a_bounds-011"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 3010000,
+   "credit": 3500000,
+   "closing": -490000
+  },
+  {
+   "ledger": "Both Loan",
+   "opening": -10000000,
+   "debit": 100000,
+   "credit": 3100000,
+   "closing": -13000000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000,
+   "closing": -10000
+  },
+  {
+   "ledger": "Credit Loan",
+   "opening": -10000000,
+   "debit": 50000,
+   "credit": 850000,
+   "closing": -10800000
+  },
+  {
+   "ledger": "Edge Loan",
+   "opening": -10000000,
+   "debit": 100000,
+   "credit": 2100000,
+   "closing": -12000000
+  },
+  {
+   "ledger": "Interest Both",
+   "opening": 0,
+   "debit": 4000000,
+   "credit": 1000000,
+   "closing": 3000000
+  },
+  {
+   "ledger": "Interest Credit",
+   "opening": 0,
+   "debit": 1300000,
+   "credit": 0,
+   "closing": 1300000
+  },
+  {
+   "ledger": "Interest Edge",
+   "opening": 0,
+   "debit": 3000000,
+   "credit": 1000000,
+   "closing": 2000000
+  },
+  {
+   "ledger": "Interest One",
+   "opening": 0,
+   "debit": 2200000,
+   "credit": 1000000,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Interest Split",
+   "opening": 0,
+   "debit": 2200000,
+   "credit": 1000000,
+   "closing": 1200000
+  },
+  {
+   "ledger": "One Loan",
+   "opening": -10000000,
+   "debit": 50000,
+   "credit": 1250000,
+   "closing": -11200000
+  },
+  {
+   "ledger": "Split Loan",
+   "opening": -10000000,
+   "debit": 100000,
+   "credit": 1300000,
+   "closing": -11200000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "a01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Split",
+     1200000
+    ],
+    [
+     "Split Loan",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "a02",
+   "date": "2025-10-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Split Loan",
+     50000
+    ],
+    [
+     "Split Loan",
+     -50000
+    ],
+    [
+     "Interest Split",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "a03",
+   "date": "2025-10-07",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Split Loan",
+     50000
+    ],
+    [
+     "Split Loan",
+     -50000
+    ],
+    [
+     "Interest Split",
+     -1000000
+    ],
+    [
+     "Bank A",
+     1000000
+    ]
+   ]
+  },
+  {
+   "guid": "c01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest One",
+     1200000
+    ],
+    [
+     "One Loan",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "c02",
+   "date": "2025-10-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "One Loan",
+     50000
+    ],
+    [
+     "One Loan",
+     -50000
+    ],
+    [
+     "Interest One",
+     1000000
+    ],
+    [
+     "Interest One",
+     -1000000
+    ],
+    [
+     "Bank A",
+     10000
+    ],
+    [
+     "Cash",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "e01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Edge",
+     2000000
+    ],
+    [
+     "Edge Loan",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "e02",
+   "date": "2025-10-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Edge Loan",
+     50000
+    ],
+    [
+     "Edge Loan",
+     -50000
+    ],
+    [
+     "Interest Edge",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "e03",
+   "date": "2025-10-07",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Edge Loan",
+     50000
+    ],
+    [
+     "Edge Loan",
+     -50000
+    ],
+    [
+     "Interest Edge",
+     -1000000
+    ],
+    [
+     "Bank A",
+     1000000
+    ]
+   ]
+  },
+  {
+   "guid": "k01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Credit",
+     800000
+    ],
+    [
+     "Credit Loan",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "k02",
+   "date": "2025-10-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Credit Loan",
+     50000
+    ],
+    [
+     "Credit Loan",
+     -50000
+    ],
+    [
+     "Interest Credit",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "d01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Both",
+     3000000
+    ],
+    [
+     "Both Loan",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "d02",
+   "date": "2025-10-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Both Loan",
+     50000
+    ],
+    [
+     "Both Loan",
+     -50000
+    ],
+    [
+     "Interest Both",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "d03",
+   "date": "2025-10-07",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Both Loan",
+     50000
+    ],
+    [
+     "Both Loan",
+     -50000
+    ],
+    [
+     "Interest Both",
+     -1000000
+    ],
+    [
+     "Bank A",
+     1000000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Split Loan": {
+   "lender": "Invented Split Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Split"
+  },
+  "One Loan": {
+   "lender": "Invented One Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest One"
+  },
+  "Edge Loan": {
+   "lender": "Invented Edge Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Edge"
+  },
+  "Credit Loan": {
+   "lender": "Invented Credit Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Credit"
+  },
+  "Both Loan": {
+   "lender": "Invented Both Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Both"
+  }
+ }
+}

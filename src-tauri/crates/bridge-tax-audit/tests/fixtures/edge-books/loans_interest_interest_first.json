@@ -1,0 +1,506 @@
+{
+ "comment": "loans_interest, bridge#802, a firm: a loan taken in cash after a repayment made once interest was credited, under the limit on the walked principal and over it on principal plus the interest not yet paid, is listed as not computed (First Loan; Same Loan, interest and repayment on one day). Controls: no interest (Plain Loan), interest credited only after the repayment (Late Loan), the principal alone over the limit (Over Loan), and the First shape taken by bank (Bank Loan, listed but not a possible s.269SS).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_interest_first-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_interest_first-001"
+  },
+  {
+   "name": "First Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-002"
+  },
+  {
+   "name": "Interest First",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_interest_first-003"
+  },
+  {
+   "name": "Plain Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-004"
+  },
+  {
+   "name": "Late Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-005"
+  },
+  {
+   "name": "Interest Late",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_interest_first-006"
+  },
+  {
+   "name": "Same Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-007"
+  },
+  {
+   "name": "Interest Same",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_interest_first-008"
+  },
+  {
+   "name": "Over Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-009"
+  },
+  {
+   "name": "Interest Over",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_interest_first-010"
+  },
+  {
+   "name": "Bank Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_interest_first-011"
+  },
+  {
+   "name": "Interest Bank",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_interest_first-012"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 1600000,
+   "credit": 16000000,
+   "closing": -14400000
+  },
+  {
+   "ledger": "Bank Loan",
+   "opening": -3000000,
+   "debit": 3000000,
+   "credit": 2100000,
+   "closing": -2100000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 8000000,
+   "credit": 0,
+   "closing": 8000000
+  },
+  {
+   "ledger": "First Loan",
+   "opening": -3000000,
+   "debit": 3000000,
+   "credit": 2100000,
+   "closing": -2100000
+  },
+  {
+   "ledger": "Interest Bank",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Interest First",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Interest Late",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Interest Over",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Interest Same",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Late Loan",
+   "opening": -3000000,
+   "debit": 3000000,
+   "credit": 2100000,
+   "closing": -2100000
+  },
+  {
+   "ledger": "Over Loan",
+   "opening": -3000000,
+   "debit": 1000000,
+   "credit": 2100000,
+   "closing": -4100000
+  },
+  {
+   "ledger": "Plain Loan",
+   "opening": -3000000,
+   "debit": 3000000,
+   "credit": 1600000,
+   "closing": -1600000
+  },
+  {
+   "ledger": "Same Loan",
+   "opening": -3000000,
+   "debit": 3000000,
+   "credit": 2100000,
+   "closing": -2100000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "f01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest First",
+     500000
+    ],
+    [
+     "First Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "f02",
+   "date": "2025-07-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "First Loan",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "f03",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1600000
+    ],
+    [
+     "First Loan",
+     -1600000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-07-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Plain Loan",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1600000
+    ],
+    [
+     "Plain Loan",
+     -1600000
+    ]
+   ]
+  },
+  {
+   "guid": "l01",
+   "date": "2025-07-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Late Loan",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "l02",
+   "date": "2025-07-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Late",
+     500000
+    ],
+    [
+     "Late Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "l03",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1600000
+    ],
+    [
+     "Late Loan",
+     -1600000
+    ]
+   ]
+  },
+  {
+   "guid": "s01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Same",
+     500000
+    ],
+    [
+     "Same Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "s02",
+   "date": "2025-06-30",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Same Loan",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "s03",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1600000
+    ],
+    [
+     "Same Loan",
+     -1600000
+    ]
+   ]
+  },
+  {
+   "guid": "o01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Over",
+     500000
+    ],
+    [
+     "Over Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "o02",
+   "date": "2025-07-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Over Loan",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "o03",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1600000
+    ],
+    [
+     "Over Loan",
+     -1600000
+    ]
+   ]
+  },
+  {
+   "guid": "b01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Bank",
+     500000
+    ],
+    [
+     "Bank Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "b02",
+   "date": "2025-07-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Bank Loan",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "b03",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     1600000
+    ],
+    [
+     "Bank Loan",
+     -1600000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "First Loan": {
+   "lender": "Invented First Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest First"
+  },
+  "Plain Loan": {
+   "lender": "Invented Plain Lender",
+   "lender_type": "person",
+   "interest_ledger": null
+  },
+  "Late Loan": {
+   "lender": "Invented Late Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Late"
+  },
+  "Same Loan": {
+   "lender": "Invented Same Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Same"
+  },
+  "Over Loan": {
+   "lender": "Invented Over Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Over"
+  },
+  "Bank Loan": {
+   "lender": "Invented Bank Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Bank"
+  }
+ }
+}

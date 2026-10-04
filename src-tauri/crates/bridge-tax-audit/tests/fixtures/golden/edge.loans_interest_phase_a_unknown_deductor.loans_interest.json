@@ -318,8 +318,8 @@
       "id": "loans_interest.s269ss_269t_possible_not_computed_count",
       "value": 2,
       "unit": "count",
-      "definition_sha256_16": "60374b1ff54d4000",
-      "definition_text": "Entries and vouchers whose s.269SS/269T flag is not computed and may apply: rows the two walks of the balance disagree on, which the second would flag; entries in cash, journal or other mode dated on or after a voucher listed as both crediting and debiting their loan; and such vouchers whose other lines include a ledger that is not a bank account. Listed as questions or noted on the row, never in the flag count.",
+      "definition_sha256_16": "24ccc6f18401a5bf",
+      "definition_text": "Entries and vouchers whose s.269SS/269T flag is not computed and may apply: rows the two walks of the balance disagree on, which the second would flag; loans taken that may cross the limit if earlier repayments paid interest first (bridge#802); entries in cash, journal or other mode dated on or after a voucher listed as both crediting and debiting their loan; and such vouchers whose other lines include a ledger that is not a bank account. Listed as questions or noted on the row, never in the flag count.",
       "evidence": []
     },
     {

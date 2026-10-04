@@ -5,7 +5,8 @@ Every book here is invented, with round figures and plain names and PANs and GST
 compared as text is a token such as `PAN-BIGBY`. Every GSTIN has a fourteenth character other than
 `Z`, which nothing here reads, so none has a real GSTIN's shape. A GSTIN's characters 3 to 12 keep a
 PAN's or a TAN's shape where the reference derives a PAN from them or refuses to (the derivation
-cases and the TAN case). Four recorded PANs keep a PAN's shape, each one letter five times, one digit
+cases and the TAN case), or where a ledger's recorded PAN must win over its own GSTIN's segment (the case
+that a derived PAN never replaces a recorded one). Four recorded PANs keep a PAN's shape, each one letter five times, one digit
 four times and that letter again: three in `ep_gap`, each of which must equal a PAN derived from a
 GSTIN (the reference derives one only from a PAN-shaped segment), and the same derivable value in
 `ep_gap_plain`, where without the opt-in it must not join the GSTIN's ledger.

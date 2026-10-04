@@ -43,11 +43,12 @@ yourself. This page does not rank products.
 ## Tally's own plug-in, and what ComplyEaze Bridge adds
 
 Tally Solutions offers its own TallyPrime MCP plug-in for Claude Desktop. Put
-the ten questions to it as well: Tally's help pages are the place to check what
-it covers, what it needs and whether it can change your books. ComplyEaze
-Bridge is not a product of Tally Solutions, and this page does not rank the
-two. If you only want to ask questions of your books, the official plug-in may
-be all you need.
+the ten questions to it as well: Tally's help pages (they ask you to sign in)
+are the place to check what it covers, what it needs and whether it can change
+your books. ComplyEaze Bridge is not a product of Tally Solutions, has not been
+compared with the plug-in side by side, and this page does not rank the two.
+If you only want to ask questions of your books, check whether the plug-in
+covers what you need first.
 
 What ComplyEaze Bridge adds, so you can judge whether you need it:
 
@@ -58,17 +59,20 @@ What ComplyEaze Bridge adds, so you can judge whether you need it:
   read the batch back from TallyPrime. TallyPrime's own bank statement import
   takes CSV or Excel files from the bank's portal, not PDF (Tally's help page
   "Bank statement", read on 4 October 2026), so if your client already sends
-  one of those, TallyPrime's own import may be all you need.
-- **One-file install.** One extension file in Claude Desktop, with no Node.js
-  and no configuration file to edit.
-- **No Tally plug-in.** It uses TallyPrime's own HTTP gateway on your computer.
-  It has been run on licensed TallyPrime Silver and Gold 7.1 only; see the
+  one of those, TallyPrime's own import may be all you need. The whole path,
+  from the PDF to the batch read back, has not yet been recorded end to end
+  against TallyPrime.
+- **Its own install.** One extension file in Claude Desktop. It connects to
+  TallyPrime through TallyPrime's own HTTP gateway on your computer, so it does
+  not need a Tally plug-in. Most recorded runs used licensed TallyPrime Silver
+  and Gold 7.1; see the
   [README](../../README.md#what-has-been-run-against-a-real-tallyprime).
 
-Where it is behind: three banks, not the many TallyPrime's own import covers;
-no TallyPrime bank reconciliation; not yet code-signed; and a short list of runs against a real
-TallyPrime, with the latest release not yet run in Claude Desktop on a client's
-book (the README lists each run).
+Where it is behind: three banks, where TallyPrime's own import lists many more
+(its help page "Bank statement"); no TallyPrime bank reconciliation; not yet
+code-signed; and a short list of runs against a real TallyPrime. The published
+latest release has not yet been installed in Claude Desktop by us; the README
+lists each run.
 
 ## How ComplyEaze Bridge answers them
 

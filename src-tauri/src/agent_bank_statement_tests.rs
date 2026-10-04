@@ -1633,3 +1633,124 @@ async fn a_path_that_is_not_on_a_local_disk_is_refused_before_any_open() {
         }
     }
 }
+
+/// A parse of three synthetic rows printed out of date order (so the earliest
+/// and latest dates are neither the first nor the last row printed), built
+/// without a PDF, optionally through a from/to window.
+fn windowed_parse(
+    date_from: Option<Date>,
+    date_to: Option<Date>,
+) -> (OwnedRequest, ParsedStatement) {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    let upi = |date: &str, name: &str, reference: &str, dr: &str, balance: &str| {
+        let narration = format!("UPI-{name}-9@x-ABCD0001-{reference}-P");
+        Row::from_pairs([
+            ("date", date),
+            ("narr", narration.as_str()),
+            ("ref", "1"),
+            ("dr", dr),
+            ("cr", ""),
+            ("bal", balance),
+        ])
+    };
+    let rows = [
+        upi("05/08/26", "ALPHA", "111111111111", "10.00", "990.00"),
+        upi("09/08/26", "BRAVO", "222222222222", "10.00", "980.00"),
+        upi("01/08/26", "CHARLIE", "333333333333", "10.00", "970.00"),
+    ];
+    let args = json!({
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
+        "bank": "hdfc",
+        "account_label": "Synthetic CA xx4321",
+        "opening_balance": "1,000.00",
+        "closing_balance": "970.00",
+        "total_debits": "30.00",
+        "total_credits": "0.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    });
+    let request = OwnedRequest::from_args(&args).unwrap();
+    let build = build(
+        &rows,
+        Bank::Hdfc,
+        &Mapping::default(),
+        &BuildOptions {
+            bank_ledger: "Synthetic Bank Ledger",
+            suspense_ledger: "Suspense",
+            account_label: "Synthetic CA xx4321",
+            account_number: "00000000004321",
+            date_from,
+            date_to,
+            cash_answers: &request.cash_answers,
+        },
+    )
+    .unwrap();
+    let parsed = ParsedStatement {
+        account_number: "00000000004321".into(),
+        statement_rows: rows.len(),
+        closing: bridge_tally_core::ExactDecimal::parse("970.00").unwrap(),
+        totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+        check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+        counterparties: group_counterparties(&build.records).unwrap(),
+        build,
+    };
+    (request, parsed)
+}
+
+fn persisted_document(request: &OwnedRequest, parsed: &ParsedStatement) -> Value {
+    let directory = tempfile::tempdir().unwrap();
+    let (proposals_id, _) = persist(directory.path(), request, parsed, &"0".repeat(64)).unwrap();
+    let path = directory
+        .path()
+        .join(PROPOSALS_DIRECTORY)
+        .join(format!("{proposals_id}.json"));
+    serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
+}
+
+#[test]
+fn the_file_records_the_statements_own_span_and_whether_the_window_was_all_of_it() {
+    let (request, parsed) = windowed_parse(None, None);
+    let document = persisted_document(&request, &parsed);
+    assert_eq!(
+        document["window"],
+        json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-09", "whole_statement": true}),
+    );
+    assert_eq!(
+        document["schema"], PROPOSALS_SCHEMA,
+        "an optional field, not a new schema"
+    );
+
+    // A window that drops a row: the span is still the statement's own, and
+    // the window is no longer the whole of it.
+    let (request, parsed) = windowed_parse(Date::new(2026, 8, 2), None);
+    let document = persisted_document(&request, &parsed);
+    assert_eq!(
+        document["window"],
+        json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-09", "whole_statement": false}),
+    );
+}
+
+#[test]
+fn a_build_with_no_span_writes_no_window_field() {
+    let (request, mut parsed) = windowed_parse(None, None);
+    parsed.build.span = None;
+    let document = persisted_document(&request, &parsed);
+    assert!(document.get("window").is_none(), "{document}");
+}
+
+#[test]
+fn the_window_never_reaches_the_summary() {
+    let (request, parsed) = windowed_parse(None, None);
+    let summary = summary(&request, &parsed, "statement-x", "0", 200_000).to_string();
+    for needle in [
+        "\"window\"",
+        "first_row_date",
+        "last_row_date",
+        "whole_statement",
+        "2026-08-0",
+    ] {
+        assert!(!summary.contains(needle), "{needle} in {summary}");
+    }
+}

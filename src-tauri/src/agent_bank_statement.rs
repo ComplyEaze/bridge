@@ -398,7 +398,7 @@ fn persist(
     ensure_private_directory(&directory)
         .map_err(|_| "statement_proposals_directory_unavailable".to_string())?;
     let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
-    let document = json!({
+    let mut document = json!({
         "schema": PROPOSALS_SCHEMA,
         "proposals_id": proposals_id,
         "created_at": Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
@@ -416,6 +416,17 @@ fn persist(
         "vouchers": parsed.build.proposals,
         "records": parsed.build.records,
     });
+    // Optional, and not part of the schema's required shape: the loader reads
+    // fields by name, so an older binary still reads a file that carries it.
+    // The statement's own first and last row dates, and whether this parse's
+    // from/to window left any row out. None of it is returned in the summary.
+    if let Some((first, last)) = parsed.build.span {
+        document["window"] = json!({
+            "first_row_date": first.iso(),
+            "last_row_date": last.iso(),
+            "whole_statement": parsed.build.rows_outside_window == 0,
+        });
+    }
     let bytes = serde_json::to_vec_pretty(&document)
         .map_err(|_| "statement_proposals_serialization_failed".to_string())?;
     let path = directory.join(format!("{proposals_id}.json"));

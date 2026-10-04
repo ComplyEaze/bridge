@@ -45,7 +45,7 @@ yourself. This page does not rank products.
 Tally Solutions offers its own TallyPrime MCP plug-in for Claude Desktop. Its
 help pages (last updated 18 September 2026, read on 4 October 2026) list 28
 tools, all for reading your books, and a setup that has you refresh your
-licence in TallyPrime with your Tally.NET ID, installs Node.js and has you edit
+licence in TallyPrime with your Tally.NET ID, has you install Node.js and edit
 Claude Desktop's configuration file. Put the ten questions to it as well;
 Tally's pages are the place to check what it needs. ComplyEaze
 Bridge is not a product of Tally Solutions, we have not run the two side by
@@ -65,14 +65,14 @@ What ComplyEaze Bridge adds, so you can judge whether you need it:
   from the PDF to the batch read back, has not yet been recorded end to end
   against TallyPrime.
 - **Its own install.** One extension file in Claude Desktop, with no Node.js
-  and no configuration file to edit. It connects to TallyPrime through
-  TallyPrime's own HTTP gateway on your computer, so it does not need a Tally
-  plug-in. Most recorded runs used licensed TallyPrime Silver
+  and no configuration file to edit. You turn on TallyPrime's own HTTP gateway
+  (on a Mac, inside a Windows virtual machine with its port forwarded), and it
+  connects through that gateway, so it does not need a Tally plug-in. Most recorded runs used licensed TallyPrime Silver
   and Gold 7.1; see the
   [README](../../README.md#what-has-been-run-against-a-real-tallyprime).
 
 Where it is behind: three banks, where TallyPrime's own import lists many more
-(its help page "Bank statement"); no reconciling of a bank statement inside
+(Tally's list of supported banks); no reconciling of a bank statement inside
 TallyPrime; no stock quantities (the plug-in has an inventory group); not yet
 code-signed; and a short list of runs against a real TallyPrime (the README
 lists each run).

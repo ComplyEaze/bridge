@@ -15,10 +15,16 @@ updates:
       tauri-javascript:
         patterns:
           - "@tauri-apps/*"
+      # Excluded by name as well: the first run after the groups were added put @tauri-apps/api and
+      # @tauri-apps/cli in these two groups although tauri-javascript is listed first.
       frontend-production:
         dependency-type: production
+        exclude-patterns:
+          - "@tauri-apps/*"
       frontend-development:
         dependency-type: development
+        exclude-patterns:
+          - "@tauri-apps/*"
 
   - package-ecosystem: cargo
     directory: /src-tauri

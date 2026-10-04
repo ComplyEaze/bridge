@@ -111,3 +111,38 @@ for (const [name, change, message] of LEGACY_CASES) {
     refused(withChange(".github/workflows/ci.yml", change), message);
   });
 }
+
+// The digest of a pinned job covers it only up to the pinned step, so a job-level key written after the
+// steps would be outside the pinned text: `steps:` must be the job's last key.
+for (const [file, job] of PINNED) {
+  for (const [shape, inserted] of [
+    ["a job-level key", ["    container: node:22"]],
+    ["a job-level key after a comment at job-key indentation", ["    # note", "    container: node:22"]],
+    ["a quoted job-level key", ['    "container": node:22']],
+    ["a job-level key with a non-breaking space before it", ["    \u00a0container: node:22"]],
+  ]) {
+    test(`${job}: ${shape} after the job's steps is refused`, () => {
+      const result = withChange(file, (text) => {
+        const lines = text.split("\n");
+        const start = lines.findIndex((line) => line === `  ${job}:`);
+        assert.notEqual(start, -1, `${job} exists`);
+        let end = lines.findIndex((line, index) => index > start && /^  [A-Za-z0-9_-]+:\s*$/.test(line));
+        if (end === -1) end = lines.length;
+        while (end > start + 1 && lines[end - 1].trim() === "") end -= 1;
+        lines.splice(end, 0, ...inserted);
+        return lines.join("\n");
+      });
+      refused(result, `${job}: \`steps:\` must be the job's last key`);
+    });
+  }
+}
+
+test("a lone carriage return, or a Unicode line separator, in either workflow is refused", () => {
+  for (const [file, text] of [[".github/workflows/ci.yml", "\r"], [".github/workflows/ci.yml", "\u2028"], [".github/workflows/release-mcpb-preview.yml", "\u0085"]]) {
+    refused(withChange(file, (original) => `${original.trimEnd()}\n#${text}x\n`), "must use only \\n or \\r\\n line breaks");
+  }
+});
+
+test("an unexpected job in the release workflow is refused", () => {
+  refused(withChange(".github/workflows/release-mcpb-preview.yml", (text) => `${text.trimEnd()}\n  extra-job:\n    runs-on: ubuntu-latest\n`), "must have exactly the jobs release-admission, package, attest and publish-preview");
+});

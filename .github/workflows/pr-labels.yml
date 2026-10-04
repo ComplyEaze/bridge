@@ -11,9 +11,15 @@ on:
 permissions:
   contents: read
 
+# A pull request gets several events within a second (opened, then one per label). Cancelling the older
+# runs in a newer run's group meant the run that decides the required "Type label" check (the newest)
+# could itself end cancelled, which blocks the pull request until that run is re-run by hand. queue: max
+# keeps every waiting run instead of cancelling the older ones, so the burst is run in order and none of
+# it is cancelled by this group (a timeout or a manual cancel still can).
 concurrency:
   group: pr-labels-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
+  queue: max
 
 jobs:
   type-label:

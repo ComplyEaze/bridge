@@ -132,6 +132,34 @@ if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
   failures.push("seam-control must cover every platform bundle-smoke builds");
 }
 
+// native-legacy runs the legacy-feature guard, tests and lint beside native (they were native's last
+// steps). Its whole text is pinned: a changed line is a changed test or lint. It also restores native's
+// Windows dependency cache without saving it. rust-cache keys on shared-key, the workspaces, the env vars
+// it hashes and the CARGO* environment, so a difference in one of them is not a failure but a cold build
+// on every run. The shared-key expression, the workspaces, the env-var list and the two CARGO_PROFILE
+// lines are therefore required to appear in both jobs. (Other rust-cache inputs and step order are not
+// compared here; native's own digest pins its side, so changing them needs both digests edited on purpose.)
+const nativeJob = jobBlock(workflow, "native");
+const legacyJob = jobBlock(workflow, "native-legacy");
+// The block runs to the next job key, so comment lines that introduce the next job are trimmed off.
+const legacyDigest = sha256(legacyJob.replace(/(?:\n(?: {0,2}#.*)?)+$/, ""));
+if (legacyDigest !== "32585bd0ee2c51fc34de2f736facf3c3866659695e0f529ecf989a99c73a020d") {
+  failures.push(`native-legacy changed; its digest is now ${legacyDigest}`);
+}
+const cacheKey = (job) => job.match(/^          shared-key: .*?(format\('native-deps-v1-\{0\}', hashFiles\('[^']+'\)\))/m)?.[1];
+if (!cacheKey(nativeJob) || cacheKey(legacyJob) !== cacheKey(nativeJob)) {
+  failures.push("native-legacy must restore native's Windows dependency cache: its shared-key must use native's key expression");
+}
+for (const input of [
+  "          workspaces: |\n            src-tauri -> target\n            tools -> target",
+  "ImageOS ImageVersion OPENSSL LIBCLANG",
+  "      CARGO_PROFILE_DEV_DEBUG: '0'\n      CARGO_PROFILE_TEST_DEBUG: '0'",
+]) {
+  if (!nativeJob.includes(input) || !legacyJob.includes(input)) {
+    failures.push(`native-legacy and native must share this cache input: ${input.trim().split("\n")[0].trim()}`);
+  }
+}
+
 // A step that must run is pinned whole: a pinned command line alone still passes with a step-level
 // `if`, a `continue-on-error`, an `|| true`, or the command kept only in a comment. Everything that
 // runs in its job before it can also change what it sees, so each job is pinned too, by SHA-256
@@ -154,7 +182,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "956e3337285aaa4880e97ac8cc4f0ee88889f90512143f45885e2e1e0126a533"],
+  ], "8993c8d177634ccdcfc407c78e29a0ea9079c3de2dd85c48db3c8a415f8b628f"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -207,7 +235,7 @@ if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a85
 // The lookup that decides whether a master push may skip heavy jobs is pinned by its bytes: a change
 // to it is a change to what can be skipped, so it needs this file edited (and acknowledged) with it.
 const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/master-push-reuse.mjs"))).digest("hex");
-if (reuseScriptDigest !== "1cf4382fc71ab7339022544962a5ce55fd8128269fe7bf9f269b022a430d8854") {
+if (reuseScriptDigest !== "17b3627cbe5d369e2e53e8fff0fc09e4ccce2d471817ba96cfec40d19024b880") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {

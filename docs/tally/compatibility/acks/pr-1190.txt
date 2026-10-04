@@ -1,0 +1,8 @@
+scripts/ledger-entries-ui.test.mjs
+scripts/tally-setup-safety.test.mjs
+scripts/ux1-shell.test.mjs
+src/ErrorBoundary.tsx
+src/JournalPostingScreen.tsx
+src/NativeLifecycleController.tsx
+src/main.tsx
+reviewer: lamemustafa

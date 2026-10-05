@@ -7,7 +7,8 @@
 //
 // A directory is a fixture directory when either holds:
 //   - its name is `fixture` or `fixtures`: the original rule, kept as a floor
-//     so nothing it found drops out;
+//     so nothing it found drops out, a symlinked alias of a directory already
+//     walked included;
 //   - it holds a provenance note (`PROVENANCE.md`, `<stem>.PROVENANCE.md` or
 //     `<NAME>_PROVENANCE.md`), or a JSON provenance record: an object with a
 //     `source` string sharing its stem with another file there, the same
@@ -48,9 +49,12 @@ export function fixtureSignal(directory, files) {
     if (!file.endsWith(".json")) continue;
     const stem = file.slice(0, -".json".length);
     if (!files.some((other) => other !== file && other.startsWith(`${stem}.`))) continue;
+    // A read failure throws: only unparseable JSON is "not a record", so a
+    // file that could not be read never passes as "nothing found".
+    const text = readFileSync(join(directory, file), "utf8");
     let parsed;
     try {
-      parsed = JSON.parse(readFileSync(join(directory, file), "utf8"));
+      parsed = JSON.parse(text);
     } catch {
       continue;
     }
@@ -104,7 +108,10 @@ export function classifyEntry(path, entry) {
 // holds. Ignored trees such as .pnpm-store, coverage, and dist are filtered
 // out level-by-level, BEFORE their contents are ever read — so an unreadable
 // or huge directory inside an ignored tree cannot fail (or slow down) this
-// walk. Symlinked directories are followed, with a realpath-based cycle guard.
+// walk. Symlinked directories are followed, with a realpath-based cycle guard
+// that stops only the descent: a directory whose real path was already walked
+// (a symlinked alias) is still recorded, with its files, so its own name and
+// content are tested like any other.
 function discoverDirectories(root, ignored) {
   const excludedDirectoryNames = new Set([".git", "node_modules", "target"]);
   const discovered = [];
@@ -114,7 +121,7 @@ function discoverDirectories(root, ignored) {
     const candidates = [];
     for (const current of level) {
       const canonical = realpathSync(current.absolute);
-      if (visited.has(canonical)) continue;
+      const descend = !visited.has(canonical);
       visited.add(canonical);
       const files = [];
       for (const entry of readdirSync(current.absolute, { withFileTypes: true })) {
@@ -122,7 +129,7 @@ function discoverDirectories(root, ignored) {
         const entryAbsolute = join(current.absolute, entry.name);
         const kind = classifyEntry(entryAbsolute, entry);
         if (kind === "file") files.push(entry.name);
-        if (kind !== "directory") continue;
+        if (kind !== "directory" || !descend) continue;
         const entryRelative = current.relative ? `${current.relative}/${entry.name}` : entry.name;
         candidates.push({ absolute: entryAbsolute, relative: entryRelative });
       }

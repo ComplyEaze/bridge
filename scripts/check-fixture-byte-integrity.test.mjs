@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -88,6 +88,21 @@ test("a git-ignored fixture directory is outside the byte-integrity inventory", 
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
+});
+
+// The floor keeps what master's walk found: a `fixtures` directory that is a
+// symlinked alias of a directory already walked is recorded and fails, though
+// the walk does not descend into it again (#1227 review).
+test("a symlinked `fixtures` alias of a walked directory fails the gate", async () => {
+  await withDirectory("a", {}, async (directory) => {
+    await symlink(
+      join(root, "packaging"),
+      join(root, directory, "fixtures"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
+    const failure = gateFailure();
+    assert.ok(failure.includes(`${directory}/fixtures (named fixture(s))`), failure);
+  });
 });
 
 // #838: a fixture directory is found by what it holds, whatever it is named.

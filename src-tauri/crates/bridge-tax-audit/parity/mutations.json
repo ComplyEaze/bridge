@@ -9466,10 +9466,10 @@
  {
   "id": "BE-28",
   "by": "author",
-  "what": "the cash book part is listed on the bank ledger count",
+  "what": "the cash book part is listed on the bank ledger count (counted inline)",
   "file": "src/books_examined.rs",
   "from": "    if cash > 0 {",
-  "to": "    if bank > 0 {"
+  "to": "    if under(&BANK_GROUPS) > 0 {"
  },
  {
   "id": "BE-29",

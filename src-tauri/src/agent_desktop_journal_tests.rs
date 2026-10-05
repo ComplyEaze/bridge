@@ -265,7 +265,7 @@ async fn a_saved_journal_without_bill_wise_approvals_is_refused_in_plain_words()
     assert_eq!(error["code"], "import_batch_predates_bill_wise_record");
     assert_eq!(
         error["message"],
-        "This batch was built before ComplyEaze Bridge began checking ledgers that keep bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally whether its file was already imported by hand, since building it again would post it a second time. Then build the batch again and post the new batch."
+        "This batch was built before ComplyEaze Bridge began checking ledgers that keep bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally whether its file was already imported by hand, since posting the rebuilt batch would import it a second time. Then build the batch again and post the new batch."
     );
     assert_eq!(operation.result["result"]["attempt_recorded"], false);
 

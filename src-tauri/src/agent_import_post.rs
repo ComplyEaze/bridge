@@ -2130,8 +2130,8 @@ fn explain_unbound_batch(payload: &mut Value) {
         payload["result"]["error"]["message"] = json!(
             "This batch was built before ComplyEaze Bridge began checking ledgers that keep \
              bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally \
-             whether its file was already imported by hand, since building it again would post \
-             it a second time. Then build the batch again and post the new batch."
+             whether its file was already imported by hand, since posting the rebuilt batch would import it a second time. \
+             Then build the batch again and post the new batch."
         );
     }
     if payload["result"]["error"]["code"] == json!("import_batch_predates_ledger_binding")

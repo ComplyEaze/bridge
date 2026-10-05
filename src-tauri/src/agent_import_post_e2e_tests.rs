@@ -1751,8 +1751,8 @@ async fn a_batch_recorded_before_its_bill_wise_approvals_is_refused_before_any_r
         result["error"]["message"],
         "This batch was built before ComplyEaze Bridge began checking ledgers that keep \
          bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally \
-         whether its file was already imported by hand, since building it again would post \
-         it a second time. Then build the batch again and post the new batch.",
+         whether its file was already imported by hand, since posting the rebuilt batch would import it a second time. \
+         Then build the batch again and post the new batch.",
         "{response}"
     );
     assert_eq!(result["attempt_recorded"], false, "{response}");

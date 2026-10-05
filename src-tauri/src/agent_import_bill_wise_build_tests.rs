@@ -545,3 +545,25 @@ fn the_tool_text_says_what_the_digest_does_not_prove_and_where_the_gate_is() {
         assert!(description.contains(phrase), "{phrase}");
     }
 }
+
+#[tokio::test]
+async fn a_second_flag_read_that_cannot_be_established_is_refused_not_built() {
+    // The first read is clean; the second returns the book's rows with the
+    // party renamed, so a named ledger is in none of them.
+    let plans = journal_build_plans(
+        bill_wise_flag_plans(&[]),
+        flag_plans_renaming(PARTY, "Another Ledger"),
+    );
+    let simulator = SequenceSimulator::spawn(plans[..38].to_vec()).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path(), simulator.address().port(), 200_000);
+    let built = server.build_import_xml(&build_args(None)).await.unwrap();
+    let result = &built.payload["result"];
+    assert_eq!(result["state"], "refused");
+    assert_eq!(result["reason"], "bill_wise_not_established");
+    assert_eq!(result["cause"], "ledger_absent");
+    assert!(!directory.path().join("imports").exists());
+    assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+    // Through the second flag read (requests 30 to 35) and no further.
+    assert_eq!(requests_made(simulator), 36);
+}

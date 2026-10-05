@@ -31,8 +31,14 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-/// Most parent parts one bill-wise check may read. Bridge's own bound on the
-/// serial requests a build spends on it, not a measured limit.
+/// Most parent parts one bill-wise check may read: Bridge's own bound, and NOT
+/// a justified one. A build reads the flags twice (before the approval verdict
+/// and again after the catalogue and group repeats), a part is at most 16 MB
+/// (4,266 ledgers at the 3,750 bytes a ledger is estimated at), and a 22 MB
+/// ledger read of a large book took 7 to 11 s once: at that rate four parts,
+/// twice, is about 80 s, past the 45 s one call may take (`CALL_CEILING`). The
+/// time of this read on a large book was not measured, and the filtered
+/// snapshot has been read live only on small books. See the pull request.
 pub(super) const MAX_BILL_WISE_PARTS: usize = 4;
 
 /// The build argument carrying one approval per party.
@@ -86,7 +92,7 @@ impl BillWiseError {
     pub(super) fn plain(self) -> &'static str {
         match self {
             Self::BooksFromAbsent => "Tally did not give this company's books-from date, so the check could not be asked for.",
-            Self::PeriodUnsupported => "This company's books-from date is not one this licence lets ComplyEaze Bridge read on (Tally Education reads only on the 1st, 2nd or 31st of a month).",
+            Self::PeriodUnsupported => "This company's books-from date could not be used to ask for the check: it is not a valid date, or this licence does not let ComplyEaze Bridge read on it (Tally Education reads only on the 1st, 2nd or 31st of a month).",
             Self::LedgerNotInCatalogue => "A ledger in this batch is not in the company's ledger list, so it cannot be checked.",
             Self::ParentNotNameable => "A ledger in this batch sits under a group whose name ComplyEaze Bridge cannot use to read a large book part by part.",
             Self::ParentOverBudget => "A group holding one of these ledgers has more ledgers than one read can check, and this version cannot split it.",

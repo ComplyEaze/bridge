@@ -1,9 +1,9 @@
 # Install Bridge for Claude Desktop
 
-Use the Bridge install page when it is deployed. It chooses the current GitHub
-Release asset for your operating system and gives the same setup steps without
-developer configuration. This guide is the fallback when that page is
-unavailable.
+Use the [Download page](https://bridge.complyeaze.com/download.html). It chooses
+the current GitHub Release asset for your operating system and gives the same
+setup steps without developer configuration. This guide is the fallback when that
+page is unavailable.
 
 ## If a package is published
 

@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -128,6 +128,28 @@ test("a directory holding a `source` sidecar beside its file fails the gate", as
     },
   );
 });
+
+// "Nothing found" must not stand in for "could not read" (P5): an unreadable
+// JSON beside its file fails the walk instead of reading as no record. Skipped
+// where `chmod 000` does not stop a read (Windows, or running as root).
+test(
+  "an unreadable JSON beside its file fails the gate rather than reading as no record",
+  { skip: process.platform === "win32" || process.getuid?.() === 0 },
+  async () => {
+    // Unparseable, so only a read failure can make the gate fail here.
+    await withDirectory("reads", { "read.json": "{", "read.utf16le.xml": "<x/>" }, async (directory) => {
+      assert.doesNotThrow(runGate);
+      await chmod(join(root, directory, "read.json"), 0o000);
+      try {
+        const failure = gateFailure();
+        assert.match(failure, /EACCES/);
+        assert.ok(failure.includes(`${directory}/read.json`), failure);
+      } finally {
+        await chmod(join(root, directory, "read.json"), 0o644);
+      }
+    });
+  },
+);
 
 // The shape of packaging/pdfium/pdfium.lock.json: a `source` URL with no file
 // sharing its stem is not a provenance record.

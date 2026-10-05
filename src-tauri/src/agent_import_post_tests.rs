@@ -2873,6 +2873,9 @@ fn each_dialog_line_shape_is_matched_and_its_edges_hold() {
         ("Dr 5 Cr x", false),
         ("total debit:", true),
         ("Total Credit   :", true),
+        // Any whitespace between the words: a no-break space renders as the dialog's own line.
+        ("Total\u{a0}debit: 0", true),
+        ("Total  credit: 5", true),
         ("totaldebit:", false),
         ("Batch:", true),
         ("batch", false),

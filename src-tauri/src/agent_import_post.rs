@@ -2530,7 +2530,8 @@ pub(super) const VOUCHER_LINES_DO_NOT_FIT: &str =
 /// Whether `text` holds a shape a line of the batch dialog begins with, so
 /// that a wrapped tail of it could pass for one (#1063 follow-up). Matched
 /// case-insensitively anywhere: `\bdr\s+[0-9][0-9.,]*\s+cr\s+[0-9]` (a
-/// ledger line's two halves), `total (debit|credit)\s*:`, `batch\s*:` and
+/// ledger line's two halves), `total\s+(debit|credit)\s*:` (any whitespace
+/// between the words, a no-break space included), `batch\s*:` and
 /// `create\s+\d`. Written out rather than with a regex crate: `\s` is any
 /// whitespace, `\d` any Unicode decimal digit, and `\b` sees a letter, digit
 /// or `_` as a word character. A bank narration with one of `DR`/`CR` and a
@@ -2572,7 +2573,7 @@ pub(super) fn reads_like_a_dialog_line(text: &str) -> bool {
         ascii_digit(at).then_some(())
     };
     let total = |at: usize| -> Option<()> {
-        let at = literal(at, "total ")?;
+        let at = spaces(literal(at, "total")?, 1)?;
         let at = literal(at, "debit").or_else(|| literal(at, "credit"))?;
         (chars.get(spaces(at, 0)?) == Some(&':')).then_some(())
     };

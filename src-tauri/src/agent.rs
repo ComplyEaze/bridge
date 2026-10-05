@@ -1873,6 +1873,7 @@ impl Server {
                                 &mut window,
                                 &timings,
                                 read_cost::Ended::Stopped,
+                                self.settings.max_bytes,
                             );
                         }
                         error["window"] = window;

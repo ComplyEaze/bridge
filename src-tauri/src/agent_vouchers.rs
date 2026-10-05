@@ -409,7 +409,17 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         accumulate_evidence(&mut accumulated, read.all_evidence());
         // What each request of the window read cost (#595); the empty-window
         // corroboration below is a read of its own and is not counted here.
-        let window = super::read_cost::window_value(&read.timings, super::read_cost::Ended::Read);
+        let window = serde_json::to_value(&read.timings).unwrap_or(Value::Null);
+        // What that cost means for the next call goes on this page only: a later
+        // page is served from the held window in about a second and must not
+        // repeat it (#1239).
+        let mut page_window = window.clone();
+        super::read_cost::add_read_cost(
+            &mut page_window,
+            &read.timings,
+            super::read_cost::Ended::Read,
+            server.settings.max_bytes,
+        );
         let source_marks = read.witness.as_ref().map(|witness| witness.marks);
         let counted = read.counted();
         // A withheld voucher goes through every date, ledger and type check as
@@ -537,7 +547,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             items,
             offset,
             total,
-            window,
+            page_window,
         );
         if let Some(held) = &held {
             payload["result"]["snapshot"] = held.describe(false);

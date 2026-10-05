@@ -2,7 +2,7 @@
 //!
 //! The census a window read pays is set by the book's voucher mark, not by the
 //! window: a one-day read on a book with a mark near 1.03 million is 126 census
-//! reads and 169 s, and so is a one-week read's census (bridge#595). An
+//! reads and about 170 s, and a one-week read pays the same census (bridge#595). An
 //! assistant that reads a month day by day pays that census thirty times. This
 //! block tells it, from the call's own timings, what is paid on every call and
 //! how many vouchers one call can carry under the one host limit that has been
@@ -10,25 +10,57 @@
 //! changes no completeness proof.
 //!
 //! Every figure carries what it is:
-//! - `floor_seconds` is a **measured lower bound**: each census read waits 500 ms
-//!   before the next (`SHIPPED_REQUEST_SPACING`), so `reads x 0.5 s` is a floor by
-//!   construction. It is rounded down.
+//! - `floor_seconds` is a **lower bound by construction**: each census read waits
+//!   500 ms before the next (`SHIPPED_REQUEST_SPACING`), so `reads x 0.5 s` can
+//!   never be more than the wait. It is rounded down.
 //! - everything under `estimate` is **derived** from this call's own timings and
-//!   one measured constant, and rounded the cautious way.
+//!   a census row cost measured once, taken at two thirds or one and a half times it so the
+//!   advice errs toward the narrower window, and bounded by the voucher
+//!   allowance as well as the host limit.
 //! - the host limits are facts about hosts, each with its basis.
-use super::voucher_window::WindowReadTimings;
+//!
+//! The figures are for the window read alone. The call's smaller reads (company
+//! check, ledger and type lists) are not in them, and a window with no voucher is
+//! read once more, a day wider on each side, which is not counted either; `say`
+//! states that last case.
+use super::voucher_window::{
+    VoucherReadShape, WindowReadTimings, MAX_PLANNED_READS, WINDOW_READ_BUDGET_BYTES,
+};
 use serde_json::{json, Value};
 
 /// The wait between two census reads, in ms (`SHIPPED_REQUEST_SPACING`, pinned
 /// to the runtime's constant by a test that reads its source).
 const SPACING_MS: u64 = 500;
 
-/// What a census row adds to the census, in ms. Measured once, on one book
-/// (mark about 1.03M): the same census was 144.5 s for a day of 757 vouchers and
-/// 307.6 s for a week of 5,178 (bridge#595, 28 Sep 2026), which is 36.9 ms a
-/// row. Used for every book, so it over-states a small-mark book's cost, which
-/// errs toward a narrower window, never a wider one.
+/// What a census row adds to the census, in ms, measured once on one book (mark
+/// about 1.03M): the same census took about 145 s for a day of about 760
+/// vouchers and about 308 s for a week of about 5,200 (bridge#595, 28 Sep 2026,
+/// rounded), which is about 37 ms a row. One run, one host: the advice is not
+/// taken at this figure but at two thirds or one and a half times it, whichever
+/// errs toward the narrower window.
 const CENSUS_MS_PER_ROW: u64 = 37;
+
+/// Taken when the call did not fit and the advice is a smaller window: a census
+/// that shrinks less per row than measured would make a narrower window cost
+/// more than the model says, so the model assumes two thirds of the measured
+/// figure (24 ms).
+const CENSUS_MS_PER_ROW_LOW: u64 = CENSUS_MS_PER_ROW * 2 / 3;
+
+/// Taken when the call fitted and the advice is a larger window: a census that
+/// grows more per row than measured would make a wider window cost more than the
+/// model says, so the model assumes one and a half times the measured figure
+/// (55 ms).
+const CENSUS_MS_PER_ROW_HIGH: u64 = CENSUS_MS_PER_ROW * 3 / 2;
+
+/// The most vouchers one call can admit, from the planner's own limits: the
+/// reads it may dispatch, each no larger than the data budget at half the
+/// shape's default cost per voucher (a measured cost never plans below half the
+/// default). No advice is given above it.
+fn voucher_allowance() -> u64 {
+    let smallest_part = VoucherReadShape::EntryWildcard.default_wire_bytes_per_voucher() / 2;
+    (WINDOW_READ_BUDGET_BYTES / smallest_part.max(1))
+        .saturating_mul(u64::try_from(MAX_PLANNED_READS).unwrap_or(u64::MAX))
+}
 
 /// The one call limit that has been measured: Claude Desktop's chat app on
 /// macOS, bundle 2.19675.0, cancelled a silent call at 240 s (protocol reference
@@ -91,6 +123,8 @@ struct Cost {
     floor_ms: u64,
     fixed_ms: u64,
     per_voucher_ms: Option<u64>,
+    /// The census row cost the estimate assumed (see the constants).
+    census_row_ms: u64,
     fit: Fit,
 }
 
@@ -112,18 +146,23 @@ impl Cost {
             .map(|part| ms(part.ms))
             .fold(0_u64, u64::saturating_add);
         let floor_ms = census_reads.saturating_mul(SPACING_MS);
+        let total_ms = marks_ms.saturating_add(census_ms).saturating_add(parts_ms);
+        // A call that fitted is advised toward a larger window, a call that did
+        // not toward a smaller one; each takes the census row cost that makes
+        // the other side of the observed point cost more, not less.
+        let census_row_ms = if total_ms <= DESKTOP_CALL_LIMIT_MS {
+            CENSUS_MS_PER_ROW_HIGH
+        } else {
+            CENSUS_MS_PER_ROW_LOW
+        };
         // What the census paid beyond the rows it carried is paid by any
         // window; never less than the certain floor.
         let fixed_ms = census_ms
-            .saturating_sub(vouchers.saturating_mul(CENSUS_MS_PER_ROW))
+            .saturating_sub(vouchers.saturating_mul(census_row_ms))
             .max(floor_ms)
             .saturating_add(marks_ms);
-        let per_voucher_ms = (vouchers > 0).then(|| {
-            parts_ms
-                .div_ceil(vouchers)
-                .saturating_add(CENSUS_MS_PER_ROW)
-        });
-        let total_ms = marks_ms.saturating_add(census_ms).saturating_add(parts_ms);
+        let per_voucher_ms =
+            (vouchers > 0).then(|| parts_ms.div_ceil(vouchers).saturating_add(census_row_ms));
         let fit = fit_of(fixed_ms, per_voucher_ms, vouchers, total_ms);
         Self {
             census_reads,
@@ -134,6 +173,7 @@ impl Cost {
             floor_ms,
             fixed_ms,
             per_voucher_ms,
+            census_row_ms,
             fit,
         }
     }
@@ -162,10 +202,9 @@ fn fit_of(fixed_ms: u64, per_voucher_ms: Option<u64>, vouchers: u64, total_ms: u
     let Some(per_voucher_ms) = per_voucher_ms else {
         return Fit::NotEstablished;
     };
-    // At most 240,000 / 38 = 6,315 vouchers: below the 10,880 the planner's own
-    // allowance admits (a test holds that), so the allowance never needs applying
-    // here.
-    let at_most = (DESKTOP_CALL_LIMIT_MS - fixed_ms) / per_voucher_ms.max(1);
+    // Bounded by both limits: the host's, and what the planner admits in one call.
+    let at_most =
+        ((DESKTOP_CALL_LIMIT_MS - fixed_ms) / per_voucher_ms.max(1)).min(voucher_allowance());
     if total_ms <= DESKTOP_CALL_LIMIT_MS {
         // What demonstrably fitted is never advised against, however cautious
         // the model.
@@ -185,8 +224,14 @@ fn nearest_seconds(value_ms: u64) -> u64 {
 }
 
 /// The block, or `None` when the call was quick enough that nothing needs
-/// saying.
-pub(super) fn read_cost(timings: &WindowReadTimings, ended: Ended) -> Option<Value> {
+/// saying, or when it would take more than an eighth of the response budget
+/// (`max_bytes`): guidance never costs the caller a rows page or a refusal code,
+/// so at a deliberately small cap it is left out.
+pub(super) fn read_cost(
+    timings: &WindowReadTimings,
+    ended: Ended,
+    max_bytes: usize,
+) -> Option<Value> {
     let cost = Cost::of(timings);
     if !cost.notable() {
         return None;
@@ -195,7 +240,7 @@ pub(super) fn read_cost(timings: &WindowReadTimings, ended: Ended) -> Option<Val
     if let Some(at_most) = cost.fit.at_most() {
         host_240["vouchers_at_most"] = json!(at_most);
     }
-    Some(json!({
+    let block = json!({
         "ended": match ended {
             Ended::Read => "read",
             Ended::Stopped => "stopped",
@@ -212,6 +257,10 @@ pub(super) fn read_cost(timings: &WindowReadTimings, ended: Ended) -> Option<Val
         "floor_seconds": cost.floor_ms / 1000,
         "estimate": {
             "kind": "derived",
+            // The census row cost the figures below assume, in ms: one and a half
+            // times the measured one when the call fitted, two thirds when it
+            // did not.
+            "census_ms_per_row": cost.census_row_ms,
             // Paid by every call whatever its window, rounded up.
             "fixed_seconds": cost.fixed_ms.div_ceil(1000),
             "per_voucher_ms": cost.per_voucher_ms,
@@ -220,44 +269,52 @@ pub(super) fn read_cost(timings: &WindowReadTimings, ended: Ended) -> Option<Val
         "host_limits": [
             {"host": "claude_desktop_chat_macos", "seconds": 240, "basis": "measured_once_one_build"},
             {"host": "claude_desktop_chat_windows", "seconds": null, "basis": "unmeasured"},
-            {"host": "claude_code", "seconds": null, "basis": "none_by_default_user_can_set"},
+            {"host": "claude_code", "seconds": null, "basis": "not_cut_at_150s_by_default_one_earlier_60s_unexplained"},
         ],
         "say": say(&cost, ended),
-    }))
+    });
+    (block.to_string().len() <= max_bytes / 8).then_some(block)
 }
 
 /// The same block, added to a `window` value as its `read_cost` when there is
 /// one to add.
-pub(super) fn add_read_cost(window: &mut Value, timings: &WindowReadTimings, ended: Ended) {
-    if let (Some(object), Some(block)) = (window.as_object_mut(), read_cost(timings, ended)) {
+pub(super) fn add_read_cost(
+    window: &mut Value,
+    timings: &WindowReadTimings,
+    ended: Ended,
+    max_bytes: usize,
+) {
+    if let (Some(object), Some(block)) =
+        (window.as_object_mut(), read_cost(timings, ended, max_bytes))
+    {
         object.insert("read_cost".to_string(), block);
     }
-}
-
-/// `timings` as the `window` value of a result, with its read cost.
-pub(super) fn window_value(timings: &WindowReadTimings, ended: Ended) -> Value {
-    let mut window = serde_json::to_value(timings).unwrap_or(Value::Null);
-    add_read_cost(&mut window, timings, ended);
-    window
 }
 
 /// The outcome first, then what every call pays, then what one call can carry.
 /// Built from numbers and the states above, never from text of the book.
 fn say(cost: &Cost, ended: Ended) -> String {
-    let lead = match ended {
-        Ended::Read => format!(
-            "This read took {} seconds for {} vouchers.",
-            nearest_seconds(cost.total_ms()),
-            cost.vouchers
+    let lead = match (ended, cost.vouchers) {
+        (Ended::Read, vouchers) => format!(
+            "The window read took {} seconds for {vouchers} vouchers.",
+            nearest_seconds(cost.total_ms())
         ),
-        Ended::Stopped => format!(
-            "This read stopped after {} seconds with {} vouchers read.",
-            nearest_seconds(cost.total_ms()),
-            cost.vouchers
+        (Ended::Stopped, 0) => format!(
+            "The window read stopped after {} seconds, before any voucher was read.",
+            nearest_seconds(cost.total_ms())
+        ),
+        (Ended::Stopped, vouchers) => format!(
+            "The window read stopped after {} seconds with {vouchers} vouchers read and none returned.",
+            nearest_seconds(cost.total_ms())
         ),
     };
+    // A read that stopped part-way has sent only the census reads so far.
+    let at_least = match ended {
+        Ended::Read => "",
+        Ended::Stopped => "at least ",
+    };
     let fixed = format!(
-        "About {} seconds (derived) is paid on every call, however short the window, because this book needs {} census reads; at least {} of those seconds are certain.",
+        "About {} seconds (derived) is paid on every call, however short the window, because this book needs {at_least}{} census reads; at least {} of those seconds are certain (the wait between reads).",
         cost.fixed_ms.div_ceil(1000),
         cost.census_reads,
         cost.floor_ms / 1000
@@ -270,7 +327,10 @@ fn say(cost: &Cost, ended: Ended) -> String {
             "That is past 240 seconds, where Claude Desktop's chat app stops a call (measured once, on one Mac build): read about {at_most} vouchers or fewer per call (derived). For totals over a long period read trial_balance, which reads no vouchers."
         ),
         Fit::NoWindowFits => "On a host that stops a call at 240 seconds (Claude Desktop's chat app, measured once on one Mac build) no window of this book fits, because what every call pays is already that long; do not suggest one. For totals over a long period read trial_balance, which reads no vouchers.".to_string(),
-        Fit::NotEstablished => "No voucher was read, so how many one call can carry is not established.".to_string(),
+        Fit::NotEstablished => match ended {
+            Ended::Read => "No voucher was read, so how many one call can carry is not established. A window with no voucher is also read once more, a day wider on each side, to confirm it is empty; that read is not in these figures and costs about as much again (derived).".to_string(),
+            Ended::Stopped => "No voucher was read, so how many one call can carry is not established.".to_string(),
+        },
     };
     format!("{lead} {fixed} {fit}")
 }

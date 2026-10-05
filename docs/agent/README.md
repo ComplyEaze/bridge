@@ -952,37 +952,47 @@ covers only the identity and marks reads it sent.
 
 The census a window read pays follows the book's voucher mark, not the window:
 on the largest book measured (mark about 1.03 million) one day is 126 census
-reads and 169 s, and a week's census is paid the same way (bridge#595). An
-assistant that reads a month day by day pays that census once a day. When a read
-took 20 s or more, or its census is 16 reads or more (a certain 8 s), the
-`window` of the result, and of a refusal that carries one, has a `read_cost`:
+reads and about 170 s, and a week's census is paid the same way (bridge#595). An
+assistant that reads a month day by day pays that census once a day. When the
+window read took 20 s or more, or its census is 16 reads or more (a certain 8 s),
+the `window` of the result, and of a refusal that carries one, has a `read_cost`.
+It is left out when it would take more than an eighth of the response budget
+(`max_bytes`), so a small cap never loses a rows page or a refusal code to it.
 
 - `ended` (`read` or `stopped`), `census_reads`, `vouchers_read` and
-  `observed_seconds` (`marks`, `census`, `parts`, `total`) are what this call did.
-- `floor_seconds` is a **measured lower bound**: each census read waits half a
-  second before the next (the shipped request spacing), so reads times 0.5 s is a
-  floor by construction, rounded down.
-- `estimate` is **derived** (`kind`) from this call's own timings and one
-  constant measured on one book, 37 ms of census per row: `fixed_seconds` is what
-  every call pays whatever its window (rounded up), `per_voucher_ms` the cost of
-  one more voucher (null when no voucher was read), and `host_240` how a window
-  of this book sits against the one measured host limit: `window_fits`,
-  `window_too_long` (each with `vouchers_at_most`, what one call could carry),
-  `no_window_fits` (what every call pays is already that long: name no window),
-  or `not_established` (no voucher was read). The constant over-states a
-  small-mark book's cost, which only narrows the advised window.
-- `host_limits` names each host and its basis: Claude Desktop's chat app on
-  macOS stops a silent call at 240 s (measured once, one build); on Windows it is
-  unmeasured; Claude Code stops a call only at a limit the user set.
-- `say` is the same in a sentence, outcome first. When a window would not fit,
-  or none does, it also points to `trial_balance` for totals over a long period
-  (windowed trial balances read no vouchers; verified on the largest book, 0
-  differences between monthly and yearly sums). It refuses nothing and changes
-  no completeness rule; the figures are advice for the next call.
+  `observed_seconds` (`marks`, `census`, `parts`, `total`) are what the window
+  read did. They do not include the call's smaller reads (company check, ledger and
+  type lists), and a window with no voucher is read once more, a day wider on each
+  side, which is not counted either (`say` states that case).
+- `floor_seconds` is a **lower bound by construction**: each census read waits half
+  a second before the next (the shipped request spacing), so reads times 0.5 s can
+  never be more than the wait. It is rounded down.
+- `estimate` is **derived** (`kind`) from this call's own timings and one census row
+  cost measured once, on one book, at about 37 ms. The estimate takes that cost at
+  one and a half times (55 ms) when the call fitted, since the advice is then a
+  larger window, and at two thirds (24 ms) when it did not, since the advice is
+  then a smaller one; `census_ms_per_row` says which. `fixed_seconds` is what every
+  call pays whatever its window (rounded up), `per_voucher_ms` the cost of one more
+  voucher (null when no voucher was read), and `host_240` how a window of this book
+  sits against the one measured host limit: `window_fits` or `window_too_long`
+  (each with `vouchers_at_most`, what one call could carry, bounded by the planner's
+  voucher allowance as well as by the host limit), `no_window_fits` (what every call
+  pays is already that long: name no window), or `not_established` (no voucher was
+  read). Nothing advises a smaller window than one that has just fitted.
+- `host_limits` names each host and its basis: Claude Desktop's chat app on macOS
+  stops a silent call at 240 s (measured once, one build); on Windows it is
+  unmeasured; Claude Code did not cut a 150 s call under its defaults and cuts
+  where a user configured a limit, and one earlier 60 s abandon is unexplained.
+- `say` is the same in a sentence, outcome first. When a window would not fit, or
+  none does, it also points to `trial_balance` for totals over a long period
+  (windowed trial balances read no vouchers). It refuses nothing and changes no
+  completeness rule; the figures are advice for the next call.
 
-A later page served from a held window carries the first page's `window`, so its
-`read_cost` is the first page's. Other tools that read a window do not report
-this block yet.
+The block is on the first page of a read only: a later page served from a held
+window carries the window timings and no `read_cost`. The desktop screen's
+voucher list shares the read and receives the block too. Other tools that read a
+window (`ledger_movement`, `verify_import`, `voucher_presence`) do not report it
+yet, and a `vouchers` refusal raised after the whole read carries no window.
 
 ### Foreign-currency composites in `vouchers`
 

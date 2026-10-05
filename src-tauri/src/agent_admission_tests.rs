@@ -826,6 +826,31 @@ fn each_tool_of_a_confusable_pair_points_to_the_other() {
     }
 }
 
+/// The `vouchers` description says what a bill allocation carries (#945). The
+/// parser returns `bill_date` and `credit_period` on an allocation when Tally
+/// sends them (`an_allocation_carries_its_bill_date_and_typed_credit_period_from_a_live_capture`);
+/// until the description named them an assistant reading only the tool list
+/// could not know the fields exist, or that their absence means Tally did not
+/// send them. The whole sentence is pinned, as the sentences above are.
+#[test]
+fn the_vouchers_description_names_the_bill_date_and_credit_period_of_an_allocation() {
+    const SENTENCE: &str = "Each ledger entry's `bill_allocations` carries `reference`, `bill_type` and `amount`; where Tally sends them it also carries `bill_date` (YYYYMMDD, the original bill's date for an Agst Ref) and `credit_period` (a `value` and a `unit` of days, weeks or months, or `unit` `unrecognised` with its `text` when the text cannot be read); an allocation Tally sent neither for has neither";
+    let tools = registered_tool_definitions(true, true);
+    let description = tools
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|tool| tool["name"] == "vouchers")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("vouchers is in the catalogue");
+    assert!(
+        description
+            .split(". ")
+            .any(|part| part.trim_end_matches('.') == SENTENCE),
+        "the vouchers description lacks the bill allocation sentence"
+    );
+}
+
 /// The sentences an assistant relies on for safety, each pinned on its own so a
 /// shorter description cannot drop one unnoticed (#1010). Only the phrase is
 /// asserted, never a whole description, so the text around it can still be

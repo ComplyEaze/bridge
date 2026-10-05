@@ -135,7 +135,7 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
         let polls_after_cancellation = polls.get();
         // While another admission holds the journal, whether the post wrote an
         // intent cannot be read, so it is not polled at all.
-        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         assert_eq!(polls.get(), polls_after_cancellation);
         drop(admission);
         // Keep stdin active more often than the classifier retry period. This

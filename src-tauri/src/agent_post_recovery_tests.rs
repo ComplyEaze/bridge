@@ -214,7 +214,7 @@ async fn cancellation_after_durable_intent_finishes_the_original_response_once()
         );
         tokio::pin!(result);
         assert!(
-            tokio::time::timeout(std::time::Duration::from_millis(20), &mut result)
+            tokio::time::timeout(std::time::Duration::from_millis(1000), &mut result)
                 .await
                 .is_err(),
             "durable intent must drain rather than cancel the future"
@@ -312,7 +312,7 @@ async fn eof_after_durable_intent_drains_the_original_future() {
         );
         tokio::pin!(result);
         assert!(
-            tokio::time::timeout(std::time::Duration::from_millis(20), &mut result)
+            tokio::time::timeout(std::time::Duration::from_millis(1000), &mut result)
                 .await
                 .is_err(),
             "EOF must drain a durable post before returning"
@@ -355,7 +355,7 @@ async fn output_error_after_durable_intent_drains_the_original_future() {
         );
         tokio::pin!(result);
         assert!(
-            tokio::time::timeout(std::time::Duration::from_millis(20), &mut result)
+            tokio::time::timeout(std::time::Duration::from_millis(1000), &mut result)
                 .await
                 .is_err(),
             "stdio write failure must drain a durable post before returning"

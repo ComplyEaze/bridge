@@ -253,8 +253,9 @@ milliseconds the send held the endpoint's lock, so a failed read says which requ
 holds no request or response body, name or value, and no hash of either (a request names the
 company, so a hash of it would let a reader who holds a guessed name confirm it). The request's
 exact size remains, so it shows a company name's length to a reader who holds the request template.
-A request that cannot be built (over the size cap) sends nothing and leaves no record. A client's
-cancellation never drops a send in flight: a withdrawn call starts no further operation and
+A request that cannot be built (over the size cap) sends nothing and leaves no record. An
+assistant's cancellation (`notifications/cancelled`) never drops a send in flight (a desktop
+cancel can, through the read queue): a withdrawn call starts no further operation and
 finishes the one it has started (a post before its intent stops after the request in flight). Such
 a post is answered as cancelled, and that answer's receipt keeps the trail of its sends, with the
 next read the withdrawal refused as `request_cancelled`. To match a failure with

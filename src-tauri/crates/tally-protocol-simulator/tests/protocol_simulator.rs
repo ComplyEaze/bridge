@@ -354,10 +354,8 @@ fn oversized_slow_body_and_reset_before_body_are_real_http_behaviors() {
 
 #[test]
 fn cancellation_interrupts_slow_headers_without_deadlocking() {
-    let simulator = Simulator::spawn(
-        ScenarioPlan::new(Fixture::ExportStatusOne)
-            .with_delivery(Delivery::SlowHeaders(Duration::from_secs(2))),
-    )
+    let simulator = SequenceSimulator::spawn(vec![ScenarioPlan::new(Fixture::ExportStatusOne)
+        .with_delivery(Delivery::SlowHeaders(Duration::from_secs(2)))])
     .unwrap();
     let mut stream = TcpStream::connect(simulator.address()).unwrap();
     stream
@@ -366,14 +364,25 @@ fn cancellation_interrupts_slow_headers_without_deadlocking() {
     stream
         .write_all(b"POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n")
         .unwrap();
-    std::thread::sleep(Duration::from_millis(30));
+    // Cancel once the simulator has read the request, not after a fixed 30 ms: a stall
+    // before it read it let the cancel arrive first and the test passed without ever
+    // interrupting the slow-headers wait (#1255).
+    let waiting = Instant::now();
+    while simulator.received() == 0 {
+        assert!(
+            waiting.elapsed() < Duration::from_secs(5),
+            "the simulator never read the request"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
     let started = Instant::now();
     simulator.cancel();
     let mut response = Vec::new();
     stream.read_to_end(&mut response).unwrap();
     let observed = simulator.finish().unwrap();
-    assert!(observed.cancelled);
-    assert!(!observed.request_processed);
+    assert_eq!(observed.len(), 1);
+    assert!(observed[0].cancelled);
+    assert!(!observed[0].request_processed);
     assert!(response.is_empty());
     assert!(started.elapsed() < Duration::from_secs(1));
 }

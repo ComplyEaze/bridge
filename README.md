@@ -102,7 +102,9 @@ whose ledger now points to a different master.
   its last check could still receive the voucher, if it has the voucher's
   ledgers, and ComplyEaze Bridge cannot always say where it went or prevent it;
   and a ledger renamed and replaced in that same moment could receive the
-  entry, and not every such change is noticed. Read *Before you turn on
+  entry, and not every such change is noticed. The approval window covers only
+  ComplyEaze Bridge's own tools: another write-capable Tally tool in the same
+  Claude Desktop can change the books without it. Read *Before you turn on
   posting* first.
 - **Tool calls leave receipts** in a log on your computer: the company's Tally
   identifier, and a fingerprint of what was asked and of what came back,

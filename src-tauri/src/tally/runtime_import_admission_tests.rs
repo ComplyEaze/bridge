@@ -770,6 +770,16 @@ fn a_wire_refused_pre_intent_read_stays_the_wire_refusal() {
         Some(WireRefusal::Busy)
     );
     assert!(!kept.chain().any(|cause| cause.is::<Unconfirmed>()));
+    // A send the call withdrew before it started stays that withdrawal (#778).
+    let withdrawn = unconfirmed_unless_wire_refused(
+        anyhow::Error::new(TallyTransportError::SendWithdrawn),
+        Unconfirmed::CompanyScopeUnconfirmed,
+    );
+    assert_eq!(
+        withdrawn.downcast_ref::<TallyTransportError>(),
+        Some(&TallyTransportError::SendWithdrawn)
+    );
+    assert!(!withdrawn.chain().any(|cause| cause.is::<Unconfirmed>()));
     let failed = anyhow::Error::new(TallyTransportError::ConnectionFailed);
     let typed = unconfirmed_unless_wire_refused(failed, Unconfirmed::MastersUnconfirmed);
     assert!(typed.chain().any(|cause| cause.is::<Unconfirmed>()));

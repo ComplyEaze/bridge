@@ -788,12 +788,16 @@ pub(crate) fn operation_wire_budget_remaining() -> Option<std::time::Duration> {
 /// A failed pre-intent read as the typed admission refusal, with the transport
 /// failure as context (a context value is not reachable by `downcast_ref`). A
 /// wire refusal stays the error itself: it says the port was busy, with a
-/// retry time, and nothing was sent.
+/// retry time, and nothing was sent. So does a send the call withdrew before
+/// it started (#778): it names the withdrawal, and nothing was sent.
 fn unconfirmed_unless_wire_refused(
     error: anyhow::Error,
     unconfirmed: super::approved_import::ApprovedImportAdmissionError,
 ) -> anyhow::Error {
-    if crate::endpoint_wire::wire_refusal(&error).is_some() {
+    let withdrawn = error.chain().any(|cause| {
+        cause.downcast_ref::<TallyTransportError>() == Some(&TallyTransportError::SendWithdrawn)
+    });
+    if withdrawn || crate::endpoint_wire::wire_refusal(&error).is_some() {
         return error;
     }
     anyhow::Error::new(unconfirmed).context(format!("{error:#}"))
@@ -2122,6 +2126,8 @@ fn outstandings_read_failure_reason(error: &anyhow::Error) -> &'static str {
                 "segment_response_encoding_invalid"
             }
             TallyTransportError::WireRefused { refusal } => refusal.safe_code(),
+            // Only the queued post gates its sends (#778); named all the same.
+            TallyTransportError::SendWithdrawn => "request_cancelled",
         };
     }
     let deadline_exceeded = error.chain().any(|cause| {

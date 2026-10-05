@@ -414,6 +414,39 @@ fn review_refuses_selected_xml_from_a_superseded_full_record() {
     assert_eq!(review.details.narration.as_deref(), Some("Updated Journal"));
 }
 
+/// The desktop Journal review screen shows the narration the post sends
+/// (#1055, after #1223): without outer whitespace, including spaces HTML would
+/// keep such as U+00A0, and one of only spaces reads as absent, since both
+/// post an empty narration.
+#[test]
+fn review_shows_each_narration_as_the_post_sends_it() {
+    for (saved, shown) in [
+        (Some("  Rent  "), Some("Rent")),
+        (Some("\u{a0}Rent"), Some("Rent")),
+        (Some("Rent"), Some("Rent")),
+        (Some("   "), Some("")),
+        (None, None),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let (service, mut line) = service(directory.path().join("agent"));
+        line.vouchers[0].narration = saved.map(str::to_owned);
+        let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+        line.sha256 = sha256_hex(xml.as_bytes());
+        service
+            .server
+            .append_import_ledger_while_admitted(&line)
+            .unwrap();
+        let path = service
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id));
+        std::fs::write(&path, &xml).unwrap();
+        let review = service.review_selected_xml(xml.as_bytes()).unwrap();
+        assert_eq!(review.details.narration.as_deref(), shown, "{saved:?}");
+    }
+}
+
 #[test]
 fn review_refuses_fresh_numbered_journal_but_retains_dispatched_reconciliation() {
     let directory = tempfile::tempdir().unwrap();

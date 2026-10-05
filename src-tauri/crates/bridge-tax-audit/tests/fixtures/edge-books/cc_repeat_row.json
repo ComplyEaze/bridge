@@ -1,0 +1,143 @@
+{
+ "comment": "counter_cheques_40a3, over-limit lines that share a date, GUID and ledger (#1195): one voucher with two over-limit lines to one expense ledger, and two blank-GUID over-limit payments to that ledger on one day. Each such line takes its place among them as a suffix (_1, _2) in the rows' sort order, population and then line order on a tie; a unique-GUID over-limit payment on the same day, and one on another ledger of the first voucher, keep today's id. The reference used to refuse the whole test with a duplicate figure id.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Capital Account": null,
+  "Fixed Assets": null,
+  "Loans & Advances (Asset)": "Current Assets",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-cc_repeat_row-000"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-cc_repeat_row-001"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-cc_repeat_row-002"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-cc_repeat_row-003"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "g01",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "number": "1",
+   "lines": [
+    [
+     "Edge Bank",
+     -3500000
+    ],
+    [
+     "Wages",
+     1200000
+    ],
+    [
+     "Wages",
+     1300000
+    ],
+    [
+     "Rent",
+     1000001
+    ]
+   ],
+   "narration": "Paid to self"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-11",
+   "base_type": "Payment",
+   "number": "2",
+   "lines": [
+    [
+     "Edge Bank",
+     -1400000
+    ],
+    [
+     "Wages",
+     1400000
+    ]
+   ],
+   "narration": "Paid to self"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-11",
+   "base_type": "Payment",
+   "number": "3",
+   "lines": [
+    [
+     "Edge Bank",
+     -1500000
+    ],
+    [
+     "Wages",
+     1500000
+    ]
+   ],
+   "narration": "Paid to self"
+  },
+  {
+   "guid": "g04",
+   "date": "2025-06-11",
+   "base_type": "Payment",
+   "number": "4",
+   "lines": [
+    [
+     "Edge Bank",
+     -1600000
+    ],
+    [
+     "Wages",
+     1600000
+    ]
+   ],
+   "narration": "Paid to self"
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "counter_cheque_terms": [
+  "self"
+ ],
+ "tests": [
+  "counter_cheques_40a3"
+ ]
+}

@@ -1,0 +1,117 @@
+{
+ "comment": "entity_269st_gap over rows whose vouchers share a GUID (#1195): two blank-GUID cash receipts told apart by their numbers on one ledger, and a unique-GUID receipt on a second ledger carrying the same PAN, on one day; the aggregate reaches the s.269ST(a) limit and no single ledger does. The gap row cites one unlabelled ref per distinct GUID, as before: cash_payments_40a3 now keys a row's vouchers by GUID and label, and this test must not follow it into its own refs.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Capital Account": null,
+  "Fixed Assets": null,
+  "Loans & Advances (Asset)": "Current Assets",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_shared_guid_row-000"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_shared_guid_row-001"
+  },
+  {
+   "name": "Party Q",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_shared_guid_row-002",
+   "pan": "PAN-SHRD1"
+  },
+  {
+   "name": "Party R",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_shared_guid_row-003",
+   "pan": "PAN-SHRD1"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "number": "R1",
+   "lines": [
+    [
+     "Cash",
+     6000000
+    ],
+    [
+     "Party Q",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "number": "R2",
+   "lines": [
+    [
+     "Cash",
+     5000000
+    ],
+    [
+     "Party Q",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "r03",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "number": "R3",
+   "lines": [
+    [
+     "Cash",
+     10000000
+    ],
+    [
+     "Party R",
+     -10000000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "entity_269st_gap"
+ ]
+}

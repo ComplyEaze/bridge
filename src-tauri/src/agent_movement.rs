@@ -324,7 +324,7 @@ struct MovementWindowRead {
 ///
 /// A zero amount carries no direction to read, so it stays on the side the flag
 /// observed rather than having one invented for it.
-fn movement_entry_is_debit(
+pub(super) fn movement_entry_is_debit(
     amount: &bridge_tally_core::ExactDecimal,
     is_deemed_positive: bool,
 ) -> bool {

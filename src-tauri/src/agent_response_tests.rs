@@ -547,3 +547,10 @@ fn a_size_cut_outstandings_page_restates_the_bills_shown() {
     );
     assert!(response["result"].get("open_bills_shown").is_none());
 }
+
+/// A summary's receipt counts its buckets as the rows prepared (#1230); before, it read zero.
+#[test]
+fn a_summary_receipt_counts_its_buckets() {
+    let response = json!({"result": {"buckets": [{"group": "a"}, {"group": "b"}, {"group": "c"}]}});
+    assert_eq!(response_row_count(&response), Some(3));
+}

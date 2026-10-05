@@ -674,6 +674,8 @@ async fn a_multi_entry_receipt_builds_through_tools_call_and_says_it_is_unqualif
             bound("WR2 Sales", "000000d0"),
         ])
     );
+    // No answer named a cash-in-hand ledger, and the build says so (#815).
+    assert_eq!(saved.cash_in_hand_ledgers, Some(Vec::new()));
     assert_eq!(
         result["live_evidence"],
         json!([{"observation":"hand_built_gateway_readback",
@@ -1318,6 +1320,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
         voucher.voucher_number = None;
         let line = ImportLedgerLine {
             ledger_identities: None,
+            cash_in_hand_ledgers: Some(Vec::new()),
             endpoint_origin: None,
             identity_scheme: None,
             amends_batch_id: None,
@@ -1652,6 +1655,16 @@ fn a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand() {
 /// Publish a proposals file holding `vouchers` and one business-cash record
 /// naming `ledger` for `txn-001`, returning build_import_xml's arguments.
 fn business_cash_proposals(directory: &std::path::Path, vouchers: Value, ledger: &str) -> Value {
+    cash_answer_proposals(directory, vouchers, ledger, "business_cash")
+}
+
+/// `business_cash_proposals`, with the record answered `answer`.
+fn cash_answer_proposals(
+    directory: &std::path::Path,
+    vouchers: Value,
+    ledger: &str,
+    answer: &str,
+) -> Value {
     let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
     let document = json!({
         "schema": "bridge.bank_statement.proposals.v1",
@@ -1660,7 +1673,7 @@ fn business_cash_proposals(directory: &std::path::Path, vouchers: Value, ledger:
         "records": [{
             "row": 1, "disposition": {"voucher": "Contra"}, "party": "ATM CASH WITHDRAWAL",
             "ledger": ledger, "suspense": false, "bridge_txn_id": "txn-001",
-            "cash_movement": "withdrawal", "cash_answer": "business_cash"
+            "cash_movement": "withdrawal", "cash_answer": answer
         }],
     });
     let bytes = serde_json::to_vec_pretty(&document).unwrap();
@@ -1722,6 +1735,78 @@ async fn a_business_cash_answer_naming_a_bank_ledger_is_refused_at_build() {
     assert_eq!(refused[0]["first_bridge_txn_id"], "txn-001");
     assert!(!directory.path().join("imports").exists());
     assert_eq!(simulator.finish().expect("requests").len(), 18);
+}
+
+/// #815: the ledger a business-cash answer named is recorded on the batch the
+/// build writes, with its voucher, so a post can check it again before approval
+/// and in the queue. The captured catalogue's `WR2 Sales` is moved under Bank
+/// Accounts for this test only, as above, so the Contra's other leg is a bank.
+/// An owner's-use answer names no cash-in-hand ledger, so its batch records none.
+#[tokio::test]
+async fn a_cash_answer_records_only_a_cash_in_hand_ledger_on_the_built_batch() {
+    let plans = bank_build_plans()
+        .into_iter()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                    let moved = body.replace(
+                        "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
+                        "<PARENT TYPE=\"String\">Bank Accounts</PARENT>",
+                    );
+                    assert_ne!(&moved, body, "the rewrite must apply");
+                    plan.fixture = Fixture::SyntheticXml(moved);
+                }
+            }
+            plan
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let contra = json!([{"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Contra",
+        "entries":[{"ledger":"Cash","amount":"12.50","side":"Dr"},
+                   {"ledger":"WR2 Sales","amount":"12.50","side":"Cr"}]}]);
+    let args = business_cash_proposals(directory.path(), contra, "Cash");
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 1, "{response}");
+    let saved = server
+        .latest_import_snapshot(result["batch_id"].as_str().unwrap())
+        .unwrap()
+        .unwrap()
+        .batch;
+    assert_eq!(
+        serde_json::to_value(&saved.cash_in_hand_ledgers).unwrap(),
+        json!([{"bridge_txn_id":"txn-001","ledger":"Cash"}])
+    );
+
+    // The captured Payment, answered owner's use: its debtor is a named ledger
+    // the build checks, but not one that must reach Cash-in-Hand.
+    let simulator = SequenceSimulator::spawn(bank_build_plans()).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let payment = serde_json::to_value(&captured_bank_payload().vouchers[..1]).unwrap();
+    let args = cash_answer_proposals(
+        directory.path(),
+        payment,
+        "Bridge Nested Debtor WR4",
+        "owner_use",
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 1, "{response}");
+    let saved = server
+        .latest_import_snapshot(result["batch_id"].as_str().unwrap())
+        .unwrap()
+        .unwrap()
+        .batch;
+    assert_eq!(saved.cash_in_hand_ledgers, Some(Vec::new()));
 }
 
 /// The requirement binds the voucher actually built: a record naming Cash for

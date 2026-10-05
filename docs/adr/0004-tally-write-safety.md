@@ -356,6 +356,12 @@ collection: once before approval, and again after approval inside the queued
 operation, where the group read sits beside the catalogue read in the same
 identity brackets. If any leg no longer passes, the post is refused before any
 import request and before any dispatch intent (`import_bank_classification_changed`).
+A ledger a bank cash answer named as cash in hand is held to Cash-in-Hand at the
+same two points (#815): the build records it, and a post refuses with
+`cash_ledger_not_cash_in_hand` when it now reaches another group. The leg
+classification cannot see that move, since a cash ledger under Bank Accounts is
+still money. A batch recorded before that record refuses with
+`import_batch_predates_cash_ledger_record` and is rebuilt.
 The queued re-read is not the last request before the POST: the mode and
 company re-admission and the two duplicate-absence reads follow it, because
 duplicate absence stays the final source check. A regroup in Tally during those

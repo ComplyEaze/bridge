@@ -1207,7 +1207,14 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    Contra, `post_import` classifies every leg again from the ledgers' current
    parents and the group tree, before approval and again after approval inside
    the endpoint queue (before the final duplicate check and the post), and refuses with `import_bank_classification_changed` if any
-   leg changed; nothing is sent. Every post, of any type, is refused with
+   leg changed; nothing is sent. A ledger a bank cash answer named as cash in
+   hand is checked again at the same two points and refused with
+   `cash_ledger_not_cash_in_hand` (with `refused_ledgers`, as the build lists
+   them) if it no longer reaches Cash-in-Hand: under Bank Accounts, its Contra
+   would move the cash from bank to bank (#815). A batch built before ComplyEaze
+   Bridge recorded those ledgers is refused with
+   `import_batch_predates_cash_ledger_record`, before any Tally request; build it
+   again. Every post, of any type, is refused with
    `import_multi_currency_unsupported` if the company defines more than one
    currency: Bridge does not post into multi-currency books yet. This is checked
    before approval and again inside the queue. A Currency read that names no

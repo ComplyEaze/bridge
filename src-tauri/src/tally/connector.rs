@@ -785,7 +785,9 @@ fn map_transport_error(error: anyhow::Error) -> TallyError {
             // A wire-gate refusal (#697) sent nothing; its code says why.
             TallyTransportError::PolicyInvalid { .. }
             | TallyTransportError::ClientInitializationFailed
-            | TallyTransportError::WireRefused { .. } => TallyError::Unsupported {
+            | TallyTransportError::WireRefused { .. }
+            // A withdrawn send (#778) sent nothing either.
+            | TallyTransportError::SendWithdrawn => TallyError::Unsupported {
                 code: transport.safe_code().to_string(),
             },
             TallyTransportError::RequestTooLarge { .. } => {

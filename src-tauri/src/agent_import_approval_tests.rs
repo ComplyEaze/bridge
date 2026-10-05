@@ -1031,23 +1031,24 @@ async fn post_over_stdio(
 }
 
 /// A cancellation that lands inside the queue's lease operation, through the
-/// stdio path every agent post takes (#725): that operation finishes its reads,
-/// every one served in full, with no cap cutting it short, and then, finding
-/// its approval revoked, writes no intent and sends no POST. The control, the
+/// stdio path every agent post takes (#725, #778): the read in flight is
+/// served in full, no later read of the operation is started, no intent is
+/// written and no POST is sent, and the approval lapses as cancelled. Run with
+/// each of the lease's reads before the POST held in turn. The control, the
 /// same run never cancelled, posts: so the cancellation is what stopped it.
 #[tokio::test]
-async fn a_cancel_inside_the_lease_finishes_its_reads_and_posts_nothing() {
-    for cancelled in [true, false] {
+async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
+    let lease_reads = after_approval(xml(created_one())).len() - 1;
+    for held_at in (0..lease_reads).map(Some).chain([None]) {
         let mut plans = before_approval();
         let lease_start = plans.len();
         let mut lease = after_approval(xml(created_one()));
-        // The lease opens with a probe (status, company list), the company
-        // list, and the marks at binding; then the ledger catalogue's pair,
-        // bracketed by the company list. Hold its first read.
-        let held_at = 5;
-        lease[held_at] =
-            xml(catalogue()).with_delivery(Delivery::SlowHeaders(Duration::from_millis(400)));
         let post_at = lease_start + lease.len() - 1;
+        if let Some(held_at) = held_at {
+            lease[held_at] = lease[held_at]
+                .clone()
+                .with_delivery(Delivery::SlowHeaders(Duration::from_millis(300)));
+        }
         plans.extend(lease);
         let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
         let directory = tempfile::tempdir().unwrap();
@@ -1056,23 +1057,28 @@ async fn a_cancel_inside_the_lease_finishes_its_reads_and_posts_nothing() {
         let outcome = post_over_stdio(
             &server,
             &args,
-            cancelled.then_some((&simulator, lease_start + held_at)),
+            held_at.map(|held_at| (&simulator, lease_start + held_at)),
         )
         .await;
         let observed = sent(simulator);
-        if cancelled {
-            assert!(outcome.is_none(), "answered as cancelled");
-            assert_eq!(intents(directory.path()), 0);
-            assert_eq!(observed.len(), post_at, "every lease read, and no POST");
+        if let Some(held_at) = held_at {
+            assert!(outcome.is_none(), "{held_at}: answered as cancelled");
+            assert_eq!(intents(directory.path()), 0, "{held_at}");
+            assert_eq!(
+                observed.len(),
+                lease_start + held_at + 1,
+                "{held_at}: the held read is the last request, and there is no POST"
+            );
             assert!(
                 observed.iter().all(|request| request.request_processed
                     && !request.cancelled
                     && !request.client_stopped_reading_response),
-                "every started request was served in full, the held one too"
+                "{held_at}: every started request was served in full, the held one too"
             );
             assert_eq!(
                 server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
-                "request_cancelled"
+                "request_cancelled",
+                "{held_at}"
             );
         } else {
             assert!(outcome.is_some());

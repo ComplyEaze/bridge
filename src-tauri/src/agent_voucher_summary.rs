@@ -270,7 +270,8 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
 
 /// One page of buckets: from `offset`, at most `limit`, and no more than `byte_budget` bytes
 /// serialized (at least one bucket, so a page always advances). The second value is whether
-/// buckets remain after this page.
+/// buckets remain after this page. The caller passes a quarter of the response budget: the
+/// response carries the page twice (structured and text copy) and the rest of the result once.
 pub(super) fn page_buckets(
     summary: &Summary,
     offset: usize,

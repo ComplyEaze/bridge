@@ -948,6 +948,76 @@ covers only the identity and marks reads it sent.
   sent 232 requests, and a later page naming its snapshot took 1.2 s and sent 10
   requests. Before this change each later page repeated the whole read.
 
+### Search and summaries in `vouchers` (#1230)
+
+Both work on the rows `vouchers` has already read and labelled; neither sends a
+Tally request of its own, so each costs what the same `vouchers` call costs.
+
+**Search.** `voucher_number`, `reference`, `narration_contains` and `amount` keep
+the vouchers that satisfy every criterion given.
+
+- `voucher_number` and `reference` are matched whole, ignoring ASCII case and the
+  spaces around the term. Numbers repeat across voucher types, so a number can
+  match several vouchers. A voucher with no reference never matches a reference.
+- `narration_contains` is a phrase of at least three characters, matched ignoring
+  letter case, accent composition (a composed and a decomposed accent meet) and
+  runs of spaces or line breaks. Nothing else is folded: a different dash or
+  apostrophe is a different character. Where narrations are withheld from the
+  assistant (the `drop_narration` setting) the phrase is refused as
+  `search_narration_redacted`, because answering whether a phrase occurs would
+  let the assistant read the narrations back one probe at a time.
+- `amount` is an unsigned decimal above zero. It is matched, by numeric value,
+  against the absolute value of every ledger entry of a voucher, so it finds an
+  invoice total and a tax line alike. Each item carries `matched.amount_entries`,
+  the positions in its `amounts` that equalled the amount.
+- A blank or over-long term, a narration phrase under three characters and an
+  amount that is not a plain positive decimal are refused before any read
+  (`search_criterion_empty`, `search_criterion_too_long`,
+  `search_narration_too_short`, `search_amount_invalid`).
+- The search runs last, after the window is labelled and after the ledger and
+  type selectors, so a zero from a `complete` window is a checked zero. A voucher
+  withheld for a foreign-currency amount has no amounts to compare: an `amount`
+  search keeps it (listed in `withheld_vouchers`, never as an item) and the result
+  stays `partial`.
+  Every other criterion is decided on the fields a withheld voucher does carry.
+- A held window is reused only for the same search: the search is part of the
+  question a held window answers.
+
+**Summaries.** `summarise_by` (`ledger`, `month` or `voucher_type`) replaces
+`items` with `buckets`, over the same window, selectors and search. `offset` and
+`limit` page the buckets; a later page comes from the held window as a later page
+of vouchers does, including a window first read as a plain listing.
+
+- Each bucket has `group`, `vouchers` (an exact count; a voucher counts once in a
+  bucket however many of its entries fall there), `debit` (zero or negative, as
+  `ledger_movement` reports it), `credit`, `net` (debit plus credit) and
+  `voucher_refs`: up to five vouchers by date, type, number and GUID, with
+  `voucher_refs_complete` saying whether that is all of them. `vouchers` with the
+  same arguments, and the bucket's ledger or type, lists the rest.
+- A debit is an entry with a negative amount and a credit one with a positive
+  amount, the rule `ledger_movement` uses; `ISDEEMEDPOSITIVE` does not decide it.
+- A ledger bucket adds every entry on that ledger in the window. A month or type
+  bucket adds every entry of its vouchers (its debit and credit then equal), or,
+  when `ledger` is given, only that ledger's entries; `entries_counted` says which
+  (`all` or `selected_ledger`).
+- `totals` is the debit and credit the buckets add up to, `vouchers_summarised`
+  the vouchers behind them. `excluded_from_buckets` counts the vouchers left out
+  the way `ledger_movement` leaves them out: cancelled, optional, and vouchers with
+  no accounting entry (a Stock Journal). They are counted, not hidden.
+- A voucher whose entries do not sum to zero refuses the whole summary
+  (`voucher_entries_unbalanced`): a bucket built from it could not be tied out.
+- A voucher withheld for a foreign-currency amount is in no bucket; the result is
+  `partial` and `coverage` says the totals are short by those vouchers.
+- Buckets come by larger movement first (ledger, voucher type) or in calendar
+  order (month, `YYYY-MM`). A page also stops at a quarter of the response budget, with at
+  least one bucket, and `truncated` says when more remain.
+- Ledger names in `group` are masked when parties are masked.
+
+Not measured: a live Tally run of either feature (the tests read the captured
+three-voucher window and variants of it); a `reference` captured from a real
+book (the captured window carries none, so that test adds one to a captured
+voucher); a summary over a window large enough to need a census.
+
 ### Foreign-currency composites in `vouchers`
 
 A foreign amount entered on a rupee ledger can be stored by Tally as a

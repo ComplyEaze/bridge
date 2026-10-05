@@ -5251,3 +5251,17 @@ async fn a_held_ledger_window_summarises_only_that_ledgers_entries_by_month() {
     assert_eq!(result["buckets"][0]["credit"], "102.02");
     assert_eq!(one.requests(), total);
 }
+
+/// The bucket page stops at a quarter of the response budget (the response carries it twice).
+/// The captured ledger summary's buckets serialize to 482, 273, 257 and 280 bytes, so a 5,000-byte
+/// cap (1,250 for buckets) holds three and not four. Mutant killed: an unbounded budget.
+#[tokio::test]
+async fn a_bucket_page_stops_at_a_quarter_of_the_response_budget_and_says_more_remain() {
+    let mut one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    one.server.settings.max_bytes = 5_000;
+    let response = one.call(json!({"summarise_by": "ledger"})).await;
+    let result = result_of(&response);
+    assert_eq!(result["buckets"].as_array().unwrap().len(), 3, "{result}");
+    assert_eq!(result["total"], 4);
+    assert_eq!(response["structuredContent"]["truncated"], true);
+}

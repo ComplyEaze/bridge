@@ -259,7 +259,7 @@ fn render_page_body(
     };
     let summary = voucher_summary::summarise(rows, request).map_err(ToolFailure::from)?;
     let (page, truncated) =
-        voucher_summary::page_buckets(&summary, offset, limit, server.settings.max_bytes / 2);
+        voucher_summary::page_buckets(&summary, offset, limit, server.settings.max_bytes / 4);
     Ok(PageBody {
         items_key: "buckets",
         profile: "agent_vouchers_v1_summary",

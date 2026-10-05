@@ -242,3 +242,31 @@ fn a_voucher_number_and_a_reference_match_ignoring_ascii_case_only() {
         .apply(rows)
         .is_empty());
 }
+
+#[test]
+fn a_voucher_number_is_matched_whole_not_as_a_prefix() {
+    let mut rows = captured_rows();
+    rows[1]["voucher_number"] = json!("Inv-12");
+    assert!(search(json!({"voucher_number": "Inv-1"}))
+        .apply(rows.clone())
+        .is_empty());
+    assert!(search(json!({"voucher_number": "inv"}))
+        .apply(rows.clone())
+        .is_empty());
+    assert_eq!(
+        numbers(&search(json!({"voucher_number": "INV-12"})).apply(rows)),
+        ["Inv-12"]
+    );
+}
+
+#[test]
+fn an_amount_matches_by_value_not_by_the_spelling_tally_stored() {
+    let mut rows = captured_rows();
+    // Tally wrote 102.20 with its trailing zero; the search 102.2 is the same amount.
+    rows[1]["amounts"][0]["amount"] = json!("-102.20");
+    rows[1]["amounts"][1]["amount"] = json!("102.20");
+    for term in ["102.2", "102.20", "102.200"] {
+        let found = search(json!({ "amount": term })).apply(rows.clone());
+        assert_eq!(numbers(&found), ["2"], "{term}");
+    }
+}

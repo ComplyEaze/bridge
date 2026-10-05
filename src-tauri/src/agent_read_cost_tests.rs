@@ -37,8 +37,9 @@ fn timings(
     }
 }
 
-/// A weekday of about 760 vouchers on a book with a mark near 1.03 million: about
-/// 120 census reads and about 170 s (bridge#595, 28 Sep 2026; rounded).
+/// A weekday of about 760 vouchers on a book with a mark near 1.03 million: over a
+/// hundred census reads and about 170 s in all (bridge#595, 28 Sep 2026; the 120
+/// reads here are a synthetic round count, the times rounded).
 fn largest_book_day() -> WindowReadTimings {
     timings(3_400, (120, 145_000), vec![part(760, 21_000)])
 }
@@ -119,13 +120,51 @@ fn a_call_of_exactly_the_limit_fitted_and_a_millisecond_more_did_not() {
 }
 
 #[test]
-fn a_census_that_alone_passes_the_limit_is_too_long_not_a_verdict_on_the_book() {
-    // The census follows the book's mark, not the window, so a shorter window is
-    // not known to help: this says only that this window did not fit.
+fn a_window_with_no_voucher_is_never_judged_by_its_time() {
+    // It is read twice (the second read, wider, pays its own census), so its own
+    // time says nothing about a call, whichever side of 240 s it falls.
     let census_alone = timings(0, (250, 300_000), vec![]);
     assert_eq!(
         block(&census_alone)["host_240"],
-        json!({"state": "window_too_long"})
+        json!({"state": "not_established"})
+    );
+}
+
+/// The lead sentence rounds toward the verdict, so it can never say 240 seconds of
+/// a window that fitted-and-did-not or contradict the state beside it.
+#[test]
+fn the_lead_never_contradicts_the_verdict_at_the_limit() {
+    let fits = block(&timings(0, (1, 0), vec![part(100, 239_600)]));
+    assert_eq!(fits["host_240"]["state"], "window_fits");
+    assert!(
+        fits["say"]
+            .as_str()
+            .unwrap()
+            .starts_with("The window read took 239 seconds for 100 vouchers."),
+        "{fits}"
+    );
+    let over = block(&timings(0, (1, 0), vec![part(100, 240_400)]));
+    assert_eq!(over["host_240"]["state"], "window_too_long");
+    assert!(
+        over["say"]
+            .as_str()
+            .unwrap()
+            .starts_with("The window read took 241 seconds for 100 vouchers."),
+        "{over}"
+    );
+}
+
+/// One second is "1 second".
+#[test]
+fn the_floor_says_one_second_in_the_singular() {
+    let three = block(&timings(0, (3, 21_000), vec![part(1, 1)]));
+    assert_eq!(three["floor_seconds"], 1);
+    assert!(
+        three["say"]
+            .as_str()
+            .unwrap()
+            .contains("at least 1 second of this call"),
+        "{three}"
     );
 }
 
@@ -295,8 +334,14 @@ fn a_page_is_judged_by_its_smallest_form() {
 #[test]
 fn the_floor_spacing_is_the_runtimes_shipped_spacing() {
     assert_eq!(SPACING_MS, 500);
-    assert!(include_str!("tally/runtime_control.rs")
-        .contains("const SHIPPED_REQUEST_SPACING: Duration = Duration::from_millis(500);"));
+    let runtime = include_str!("tally/runtime_control.rs");
+    assert!(
+        runtime.contains("const SHIPPED_REQUEST_SPACING: Duration = Duration::from_millis(500);")
+    );
+    // The shipped build's default is that constant (tests alone use zero).
+    assert!(runtime.contains(
+        "#[cfg(not(test))]\nconst DEFAULT_REQUEST_SPACING: Duration = SHIPPED_REQUEST_SPACING;"
+    ));
 }
 
 fn server() -> (crate::agent::Server, tempfile::TempDir) {

@@ -951,8 +951,8 @@ covers only the identity and marks reads it sent.
 ### What a `vouchers` read cost (`window.read_cost`)
 
 The census a window read pays follows the book's voucher mark, not the window:
-on the largest book measured (mark about 1.03 million) one day is about 120 census
-reads and about 170 s (bridge#595). An assistant that reads a month day by day pays
+on the largest book measured (mark about 1.03 million) one day is over a hundred
+census reads and about 170 s (bridge#595). An assistant that reads a month day by day pays
 that census once a day. When the window read took 20 s or more, or its census is
 16 reads or more, the `window` of the first page of a result, and of a refusal that
 carries one, has a `read_cost`. It says only what the call itself showed; it makes
@@ -975,30 +975,37 @@ no estimate for a larger or a smaller window.
   a window with no voucher is read twice), `window_too_long` (this window did not
   fit; no number is given: the census follows the book's mark, not the window, so a
   shorter window saves only the time of its vouchers and how short is enough is not
-  established), or `not_established` (no voucher was read, or the read stopped).
+  established), or `not_established` (no voucher was read, whatever the time: such a window is read
+  twice, the second read wider and with its own census, which these figures do not
+  include; or the read stopped). A call past 240 s on Claude Desktop is cancelled and
+  its result never arrives, so `window_too_long` is seen on another host.
 - A read that **stopped** (a refusal) states the floor and no verdict: a request
   that failed or hung is not what a window costs.
 - `host_limits` names each host and its basis: Claude Desktop's chat app on macOS
   cancelled a silent 250 s call at 240 s in two runs on one build (calls between
   130 s and 240 s were not tried, and the call's other reads are not in the figures; and whether progress would extend the limit is not
   answered; protocol reference 11f); on Windows it is unmeasured; Claude Code
-  completed a 150 s call under its defaults (CLI 2.1.285 twice, the Code tab
-  2.1.284 once), and a per-server timeout a user configured cut such a call at
-  exactly 60 s and was not reset by progress (#703, 30 Sep; not yet in the protocol
-  reference); an earlier 60 s abandon is unexplained.
+  completed a 150 s call under its defaults (CLI 2.1.285: one silent run and one with
+  progress; Code tab 2.1.284: one silent run), and a 60 s per-server timeout set on a
+  scratch project cut a 150 s call at exactly 60 s and was not reset by progress (CLI,
+  one run per case; #703, 30 Sep; not yet in the protocol reference); an earlier 60 s
+  abandon is unexplained.
 - `say` is the same in a sentence, outcome first. When the window did not fit it
   also points to `trial_balance` for totals over a long period (windowed trial
   balances read no vouchers). It refuses nothing and changes no completeness rule.
 
 The block is added only when the response can carry it: three times the smallest page
 (one item) and the block, plus a kilobyte, must fit `max_bytes` (a result is carried
-twice and its text copy is escaped). A page that must be trimmed loses rows as it
-would for any field; when the block is left out the window says so
+twice and its text copy is escaped). A page that fitted whole near the cap can lose
+its last few rows to the block (it is trimmed like any field, with `truncated` and
+`next_offset`); when the window is not held (a partial window, or the desktop screen)
+the next page is then a fresh read. When the block is left out the window says so
 (`read_cost_left_out`). It is on a page read now: a later page served from a held
 window carries the window timings and no `read_cost`, and a page read afresh is read
 now. The desktop screen's voucher list shares the read and receives the
-block too. Other tools that read a window (`ledger_movement`, `verify_import`,
-`voucher_presence`) do not report it yet, and a `vouchers` refusal raised after the
+block too. `outstandings`, which also reports window timings, keeps its shape; the
+other tools that read a window (`ledger_movement`, `verify_import`,
+`voucher_presence`) do not report it yet; and a `vouchers` refusal raised after the
 whole read carries no window.
 
 ### Foreign-currency composites in `vouchers`

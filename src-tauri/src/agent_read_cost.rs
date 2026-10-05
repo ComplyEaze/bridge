@@ -1,7 +1,7 @@
 //! What a voucher window read cost, stated for the next call (bridge#1239).
 //!
 //! The census a window read pays is set by the book's voucher mark, not by the
-//! window: a one-day read on a book with a mark near 1.03 million is about 120
+//! window: a one-day read on a book with a mark near 1.03 million is over a hundred
 //! census reads and about 170 s, and an assistant that reads a month day by day pays that
 //! census thirty times. This block says, from the call's own timings alone, what
 //! the window read did, what is certain of its cost, and whether it fitted under
@@ -109,8 +109,9 @@ impl Cost {
         let fit = match ended {
             // A read that stopped has requests that failed or hung in its times.
             Ended::Stopped => Fit::NotEstablished,
-            Ended::Read if total_ms > DESKTOP_CALL_LIMIT_MS => Fit::TooLong,
+            // A window with no voucher is read twice, so neither verdict is its own.
             Ended::Read if vouchers == 0 => Fit::NotEstablished,
+            Ended::Read if total_ms > DESKTOP_CALL_LIMIT_MS => Fit::TooLong,
             Ended::Read => Fit::Fits { vouchers },
         };
         Self {
@@ -144,6 +145,26 @@ fn ms(value: u128) -> u64 {
 /// Whole seconds, rounded to the nearest (an observed figure).
 fn nearest_seconds(value_ms: u64) -> u64 {
     value_ms.saturating_add(500) / 1000
+}
+
+/// The call's total in whole seconds as the lead sentence says it: rounded toward
+/// the verdict, so that a window that fitted never reads as 240 s or more and one
+/// that did not never reads as 240 s or less.
+fn lead_seconds(cost: &Cost) -> u64 {
+    match cost.fit {
+        Fit::Fits { .. } => cost.total_ms() / 1000,
+        Fit::TooLong => cost.total_ms().div_ceil(1000),
+        Fit::NotEstablished => nearest_seconds(cost.total_ms()),
+    }
+}
+
+/// "1 second", "2 seconds".
+fn seconds(count: u64) -> String {
+    if count == 1 {
+        "1 second".to_string()
+    } else {
+        format!("{count} seconds")
+    }
 }
 
 /// The block, or `None` when the call was quick enough that nothing needs
@@ -231,8 +252,8 @@ pub(super) fn smallest_page_len(payload: &Value) -> usize {
 fn say(cost: &Cost, ended: Ended) -> String {
     let lead = match (ended, cost.vouchers) {
         (Ended::Read, vouchers) => format!(
-            "The window read took {} seconds for {vouchers} vouchers.",
-            nearest_seconds(cost.total_ms())
+            "The window read took {} for {vouchers} vouchers.",
+            seconds(lead_seconds(cost))
         ),
         (Ended::Stopped, 0) => format!(
             "The window read stopped after {} seconds, before any voucher was read.",
@@ -250,9 +271,9 @@ fn say(cost: &Cost, ended: Ended) -> String {
             ""
         };
         format!(
-            " This book's census took {at_least}{} reads, and the 0.5 second gate keeps consecutive reads that far apart, so at least {} seconds of this call went on the gaps between them (derived).",
+            " This book's census took {at_least}{} reads, and the 0.5 second gate keeps consecutive reads that far apart, so at least {} of this call went on the gaps between them (derived).",
             cost.census_reads,
-            cost.floor_ms / 1000
+            seconds(cost.floor_ms / 1000)
         )
     } else {
         String::new()

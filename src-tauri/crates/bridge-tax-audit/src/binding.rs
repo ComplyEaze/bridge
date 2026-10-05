@@ -882,8 +882,8 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
     // still a ledger the client named). Persons are visited in key order and natures in key
     // order. A person or `ledgers_by_nature` that is not a table is left as written for the test
     // to refuse (`RELATED-table-shape`); a list that is not a list of names refuses here, as every
-    // malformed name location does.
-    // PROVISIONAL: its place among the reference's LEDGER_PATHS is asked on #1148 (Q4).
+    // malformed name location does. In the reference's LEDGER_PATHS this is location 25 of 42:
+    // after the three `[partners.*]` locations and before the two `[statutory_dues]` ones.
     let mut related_persons: BTreeMap<String, toml::Value> =
         table_at(&engagement.raw_cfg, &["related_parties"])?
             .map(|t| t.iter().map(|(k, v)| (k.clone(), v.clone())).collect())

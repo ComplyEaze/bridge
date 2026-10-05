@@ -55,6 +55,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, extname, join, relative, resolve } from "node:path";
+import { BASENAME_ROWS_EXEMPT, FIXTURE_ROOTS } from "./fixture-roots.mjs";
 
 // --root lets the contract tests point this at a synthetic tree instead of
 // the real repository, the same convention check-tally-request-builder-hazards.mjs
@@ -68,27 +69,16 @@ if (rootArgument !== -1 && !process.argv[rootArgument + 1]) {
 }
 const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(process.argv[rootArgument + 1]);
 
-// Mirrors check-fixture-byte-integrity.mjs's registered directories exactly.
-// A fixture directory only ever becomes byte-integrity-covered by being added
-// there, so reusing the same list (rather than rediscovering fixture
-// directories independently) means this gate can never drift to cover a
-// directory that gate does not, or vice versa.
-const fixtureDirectories = [
-  "src-tauri/crates/bridge-bank-statement/tests/fixtures",
-  "src-tauri/crates/bridge-tax-audit/tests/fixtures",
-  "src-tauri/crates/bridge-tally-protocol/tests/fixtures",
-  "src-tauri/crates/tally-protocol-simulator/fixtures",
-  "docs/tally/compatibility/fixtures",
-  "scripts/fixtures",
-  "tools/bridge-tally-compatibility/tests/fixtures",
-];
+// The roots both fixture gates cover live only in fixture-roots.mjs (#838), so
+// this gate can never drift to cover a directory the byte-integrity gate does
+// not, or the reverse.
+const fixtureDirectories = FIXTURE_ROOTS;
 
 // A row or sidecar documents exactly the file at the path it resolves to, from
 // the Markdown file or sidecar that holds it (#838): a bare name means the file
 // beside that record, never a file of that name elsewhere under the root. The
-// one exemption keeps today's basename matching until its rows are converted,
-// and is removed then; nothing under it is edited by this gate's change.
-const BASENAME_ROWS_EXEMPT = new Set(["src-tauri/crates/bridge-tax-audit/tests/fixtures"]);
+// roots exempt from that keep basename matching (BASENAME_ROWS_EXEMPT, in
+// fixture-roots.mjs with every other root path).
 
 // Diagnostics are bounded for the same reason every other gate in this repo
 // bounds them: a tree with many undocumented fixtures must still produce

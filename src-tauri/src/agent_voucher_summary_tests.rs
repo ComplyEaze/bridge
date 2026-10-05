@@ -57,7 +57,7 @@ fn a_month_summary_adds_every_entry_of_the_vouchers_in_it() {
     assert_eq!(bucket["voucher_refs_complete"], true);
     assert_eq!(bucket["voucher_refs"].as_array().unwrap().len(), 3);
     assert_eq!(summary.vouchers_summarised, 3);
-    assert_eq!(summary.entries_counted, "all");
+    assert_eq!(summary.entries_counted, "all_entries");
     assert_eq!(
         summary.totals,
         json!({"debit": "-306.06", "credit": "306.06"})
@@ -155,7 +155,7 @@ fn a_narrowed_window_adds_only_the_selected_ledgers_entries_by_month_and_type() 
     }
     // By ledger, every ledger of the narrowed vouchers keeps its bucket.
     let by_ledger = summed(&rows, SummaryGroup::Ledger, Some("WR2 Sales"));
-    assert_eq!(by_ledger.entries_counted, "all");
+    assert_eq!(by_ledger.entries_counted, "all_entries");
     assert_eq!(by_ledger.buckets.len(), 4);
 }
 
@@ -335,4 +335,49 @@ fn only_the_three_named_groupings_are_accepted() {
             "summarise_by_invalid"
         );
     }
+}
+
+#[test]
+fn a_negative_zero_amount_adds_nothing_and_does_not_refuse_the_summary() {
+    let mut rows = captured_rows();
+    // `-0.00` parses as an amount; its magnitude keeps the sign, which once built `--0.00`.
+    rows[0]["amounts"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"ledger": "WR2 Sales", "amount": "-0.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
+    let summary = summed(&rows, SummaryGroup::Month, None);
+    assert_eq!(
+        summary.totals,
+        json!({"debit": "-306.06", "credit": "306.06"})
+    );
+    assert_eq!(summary.buckets[0]["debit"], "-306.06");
+}
+
+#[test]
+fn post_dated_vouchers_are_summed_and_counted() {
+    let mut rows = captured_rows();
+    rows[0]["post_dated"] = json!(true);
+    rows[2]["post_dated"] = json!(true);
+    rows[1]["post_dated"] = json!(false);
+    let summary = summed(&rows, SummaryGroup::Month, None);
+    assert_eq!(summary.vouchers_summarised, 3);
+    assert_eq!(summary.post_dated_included, 2);
+    assert_eq!(summary.buckets[0]["credit"], "306.06");
+    // A voucher Tally did not flag either way (the key is absent) is not counted post-dated.
+    let plain = summed(&captured_rows(), SummaryGroup::Month, None);
+    assert_eq!(plain.post_dated_included, 0);
+}
+
+#[test]
+fn every_bucket_carries_its_position_in_the_whole_ordering() {
+    let summary = summed(&captured_rows(), SummaryGroup::Ledger, None);
+    let positions = summary
+        .buckets
+        .iter()
+        .map(|bucket| bucket["position"].as_u64().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(positions, [1, 2, 3, 4]);
+    // A page keeps the whole-ordering position, not its own count.
+    let (page, _) = page_buckets(&summary, 2, 10, usize::MAX);
+    assert_eq!(page[0]["position"], 3);
 }

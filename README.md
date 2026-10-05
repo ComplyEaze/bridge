@@ -73,7 +73,7 @@ with no figures, to a log on this computer.
 | `verify_import` | Reads back a batch you imported by hand in TallyPrime | Proof files and status records on this computer |
 | `voucher_presence` | Which proposed vouchers are already in the book | Nothing |
 | `voucher_schema` | The voucher-file format, without asking TallyPrime | Nothing |
-| `vouchers` | The vouchers in a period, optionally searched by voucher number, reference, narration or amount, or summarised by ledger, month or voucher type | Nothing |
+| `vouchers` | The vouchers in a period, optionally searched by voucher number, reference, narration or amount, or summarised by ledger, month or voucher type (not yet measured against a live book) | Nothing |
 
 With posting turned on in the extension, two more appear: `post_import` posts one saved voucher after you approve it in a
 ComplyEaze Bridge window, and `acknowledge_post_review` asks you, in its own window, to record that you reviewed a posted voucher

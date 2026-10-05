@@ -18,7 +18,7 @@ pub(super) const MAX_SEARCH_TERM_CHARS: usize = 256;
 /// criterion is not constructible: [`VoucherSearch::from_args`] returns `None` instead.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct VoucherSearch {
-    /// Trimmed; compared whole, ignoring ASCII case.
+    /// Trimmed, as is the book's number; compared whole, ignoring ASCII case.
     voucher_number: Option<String>,
     /// Trimmed; compared whole, ignoring ASCII case.
     reference: Option<String>,
@@ -92,6 +92,11 @@ impl VoucherSearch {
         }))
     }
 
+    /// Whether an amount is one of the criteria (so a withheld voucher was kept unjudged).
+    pub(super) fn has_amount(&self) -> bool {
+        self.amount.is_some()
+    }
+
     /// The rows that satisfy every criterion, each carrying `matched`: which criteria held
     /// and, for an amount, the entries (by position in `amounts`) that equalled it.
     ///
@@ -112,7 +117,7 @@ impl VoucherSearch {
         let mut matched = serde_json::Map::new();
         if let Some(wanted) = &self.voucher_number {
             let number = row["voucher_number"].as_str()?;
-            if !number.eq_ignore_ascii_case(wanted) {
+            if !number.trim().eq_ignore_ascii_case(wanted) {
                 return None;
             }
             matched.insert("voucher_number".to_string(), json!(true));
@@ -132,9 +137,8 @@ impl VoucherSearch {
             matched.insert("narration".to_string(), json!(true));
         }
         if let Some(wanted) = &self.amount {
-            if row.get(WITHHELD_MARKER).is_some() {
-                matched.insert("amount_undetermined".to_string(), json!(true));
-            } else {
+            // A withheld voucher has no amounts to compare: it passes this criterion unjudged.
+            if row.get(WITHHELD_MARKER).is_none() {
                 let entries = row["amounts"]
                     .as_array()
                     .into_iter()

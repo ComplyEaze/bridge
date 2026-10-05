@@ -21,6 +21,9 @@ pub(super) struct VoucherPageKey {
     selector: Option<VoucherTypeSelector>,
     /// The search (#1230): a differently searched window is a different question.
     search: Option<VoucherSearch>,
+    /// A summary (#1230) is its own question: a listing and a summary never replace each other's
+    /// held window, so pages of one cannot be served from a read that belongs to the other.
+    summary: Option<SummaryGroup>,
 }
 
 impl VoucherPageKey {
@@ -39,7 +42,14 @@ impl VoucherPageKey {
             ledger: ledger.map(str::to_string),
             selector: selector.cloned(),
             search: search.cloned(),
+            summary: None,
         }
+    }
+
+    /// The same question asked as a summary by `group`.
+    pub(super) fn with_summary(mut self, group: Option<SummaryGroup>) -> Self {
+        self.summary = group;
+        self
     }
 }
 
@@ -227,6 +237,10 @@ pub(super) fn page_items(
         .collect()
 }
 
+/// What a summary adds up, stated in the result so a reader does not infer more. The exclusions
+/// are the same as `ledger_movement`'s; the voucher types are not told apart.
+const SUMMARY_BASIS: &str = "every voucher in the window that is not cancelled, optional or without accounting entries, as ledger_movement counts; post-dated vouchers are summed too and counted in post_dated_included; a voucher type that Tally exports with ledger entries but that does not post (a memorandum, a reversing journal, an order or a note, if the book uses them) is not told apart and is summed; not measured against a live book";
+
 /// What one page of a `vouchers` result holds: the vouchers, or with `summarise_by` the
 /// buckets (#1230), and the fields only the second carries.
 struct PageBody {
@@ -259,7 +273,7 @@ fn render_page_body(
     };
     let summary = voucher_summary::summarise(rows, request).map_err(ToolFailure::from)?;
     let (page, truncated) =
-        voucher_summary::page_buckets(&summary, offset, limit, server.settings.max_bytes / 4);
+        voucher_summary::page_buckets(&summary, offset, limit, server.settings.max_bytes / 5);
     Ok(PageBody {
         items_key: "buckets",
         profile: "agent_vouchers_v1_summary",
@@ -274,7 +288,9 @@ fn render_page_body(
             ("entries_counted", json!(summary.entries_counted)),
             ("vouchers_summarised", json!(summary.vouchers_summarised)),
             ("excluded_from_buckets", summary.excluded),
+            ("post_dated_included", json!(summary.post_dated_included)),
             ("totals", summary.totals),
+            ("basis", json!(SUMMARY_BASIS)),
         ],
     })
 }
@@ -436,6 +452,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 type_selector.as_ref(),
                 search.as_ref(),
             )
+            .with_summary(summary_group)
         });
         let mut earlier_snapshot = None;
         if let Some(key) = &page_key {
@@ -641,10 +658,15 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             payload["result"]["withheld_total"] = json!(withheld_total);
             payload["result"]["withheld_vouchers"] =
                 Value::Array(listed_withheld(&withheld, server.settings.max_bytes));
-            payload["result"]["coverage"] = json!(if summary_group.is_some() {
-                format!("buckets exclude {withheld_total} voucher(s) whose amounts Tally stored in a foreign currency, so their totals are short by those vouchers; withheld_vouchers lists them up to its bound, withheld_total counts them all, and total counts buckets")
+            let amount_note = if search.as_ref().is_some_and(VoucherSearch::has_amount) {
+                "; an amount search keeps every withheld voucher because its amounts cannot be compared, so some of them may not match"
             } else {
-                format!("items exclude {withheld_total} voucher(s) whose amounts Tally stored in a foreign currency; withheld_vouchers lists them up to its bound, withheld_total counts them all, and total counts items only")
+                ""
+            };
+            payload["result"]["coverage"] = json!(if summary_group.is_some() {
+                format!("buckets exclude {withheld_total} voucher(s) whose amounts Tally stored in a foreign currency, so their totals are short by those vouchers; withheld_vouchers lists them up to its bound, withheld_total counts them all, and total counts buckets{amount_note}")
+            } else {
+                format!("items exclude {withheld_total} voucher(s) whose amounts Tally stored in a foreign currency; withheld_vouchers lists them up to its bound, withheld_total counts them all, and total counts items only{amount_note}")
             });
         }
         Ok(ToolOutcome {

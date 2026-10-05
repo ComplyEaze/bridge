@@ -921,14 +921,15 @@ covers only the identity and marks reads it sent.
   is, but its offsets do not continue the earlier pages; start again from offset 0.
 - **What is held.** Only a `complete` window; a `partial` one (an uncounted
   small book, a withheld foreign-currency voucher) is read again by each page.
-  One window per company and question (dates, ledger, voucher-type selector),
+  One window per company and question (dates, ledger, voucher-type selector,
+  search, and listing or summary by grouping),
   for ten minutes after the read finished, within 64 MiB of its own, counted as
   the rows' JSON text, a proxy for memory (the ledger listings have another
   64 MiB); a window larger than that is not held and its
   result carries no `snapshot`. A write through this server drops the company's
   held windows. The desktop screen holds nothing. A later page is served only
   for the same question: the same dates (a date is the same question however it
-  is written, `2026-08-01` or `20260801`), the same voucher-type selector and the
+  is written, `2026-08-01` or `20260801`), the same voucher-type selector, search and grouping and the
   `ledger` argument exactly as typed on the first page; a differently spelled
   `ledger` is a different question and reads the whole window again.
 - **What a page cannot see.** A change that moves neither mark. The screen
@@ -968,7 +969,7 @@ the vouchers that satisfy every criterion given.
   let the assistant read the narrations back one probe at a time.
 - `amount` is an unsigned decimal above zero. It is matched, by numeric value,
   against the absolute value of every ledger entry of a voucher, so it finds an
-  invoice total and a tax line alike. Each item carries `matched.amount_entries`,
+  invoice total and a tax line alike (reasoned from the entry shape, not measured on an item invoice). Each item carries `matched.amount_entries`,
   the positions in its `amounts` that equalled the amount.
 - A blank or over-long term, a narration phrase under three characters and an
   amount that is not a plain positive decimal are refused before any read
@@ -981,12 +982,15 @@ the vouchers that satisfy every criterion given.
   stays `partial`.
   Every other criterion is decided on the fields a withheld voucher does carry.
 - A held window is reused only for the same search: the search is part of the
-  question a held window answers.
+  question a held window answers. `voucher_types` counts (`included`, `in_scope`)
+  are taken before the search, so with a search they do not add up to `total`.
 
 **Summaries.** `summarise_by` (`ledger`, `month` or `voucher_type`) replaces
 `items` with `buckets`, over the same window, selectors and search. `offset` and
 `limit` page the buckets; a later page comes from the held window as a later page
-of vouchers does, including a window first read as a plain listing.
+of vouchers does. A summary holds its own window (the grouping is part of the
+question), so a listing and a summary of the same window never replace or serve
+each other.
 
 - Each bucket has `group`, `vouchers` (an exact count; a voucher counts once in a
   bucket however many of its entries fall there), `debit` (zero or negative, as
@@ -995,22 +999,40 @@ of vouchers does, including a window first read as a plain listing.
   `voucher_refs_complete` saying whether that is all of them. `vouchers` with the
   same arguments, and the bucket's ledger or type, lists the rest.
 - A debit is an entry with a negative amount and a credit one with a positive
-  amount, the rule `ledger_movement` uses; `ISDEEMEDPOSITIVE` does not decide it.
-- A ledger bucket adds every entry on that ledger in the window. A month or type
-  bucket adds every entry of its vouchers (its debit and credit then equal), or,
-  when `ledger` is given, only that ledger's entries; `entries_counted` says which
-  (`all` or `selected_ledger`).
+  amount, the rule `ledger_movement` uses (the same function); `ISDEEMEDPOSITIVE`
+  decides only a zero amount, which adds nothing to either side but still counts
+  its voucher. The two reads were not run side by side on the same book.
+- A ledger bucket adds the entries on that ledger of the vouchers the window,
+  selectors and search selected: with a `ledger`, a type or a search given, a
+  counter-ledger's bucket holds only its entries on those vouchers, not that
+  ledger's whole movement (use `ledger_movement` for that). A month or type bucket
+  adds every entry of its vouchers (its debit and credit then equal), or, when
+  `ledger` is given, only that ledger's entries; `entries_counted` says which
+  (`all_entries` or `selected_ledger`).
+- Every bucket has `position`, its place in the whole ordering. Under
+  `mask_parties` several ledger labels can read alike (a short name masks to the
+  same mark) and a masked label cannot be passed back as `ledger`; `position`
+  keeps them apart and pages without a repeat. To list the vouchers of a month
+  bucket, narrow `from` and `to` to that month.
 - `totals` is the debit and credit the buckets add up to, `vouchers_summarised`
   the vouchers behind them. `excluded_from_buckets` counts the vouchers left out
   the way `ledger_movement` leaves them out: cancelled, optional, and vouchers with
-  no accounting entry (a Stock Journal). They are counted, not hidden.
+  no accounting entry (a Stock Journal). They are counted, not hidden. Post-dated
+  vouchers are summed, and `post_dated_included` counts them, so a reader can see
+  how many a report-date cut would move. A voucher type that Tally exports with
+  ledger entries but that does not post (a memorandum, a reversing journal, an
+  order or a note, if the book uses them) is not told apart and is summed; the
+  result's `basis` says so. `ledger_movement` has the same gap. Not measured live.
 - A voucher whose entries do not sum to zero refuses the whole summary
   (`voucher_entries_unbalanced`): a bucket built from it could not be tied out.
 - A voucher withheld for a foreign-currency amount is in no bucket; the result is
   `partial` and `coverage` says the totals are short by those vouchers.
 - Buckets come by larger movement first (ledger, voucher type) or in calendar
-  order (month, `YYYY-MM`). A page also stops at a quarter of the response budget, with at
-  least one bucket, and `truncated` says when more remain.
+  order (month, `YYYY-MM`). A page also stops at a fifth of the response budget
+  (the response carries it twice), with at least one bucket, and `truncated` says
+  when more remain; a page that still does not fit is refused
+  `agent_response_too_large`, so lower `limit` or raise the budget. The egress
+  receipt counts the buckets as the rows prepared.
 - Ledger names in `group` are masked when parties are masked.
 
 Not measured: a live Tally run of either feature (the tests read the captured
@@ -1029,7 +1051,7 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
   up to 100 vouchers, with an exact `withheld_total` that is the same on every
   page.
 - **The result says so.** `state` is `partial` with `reason`
-  `vouchers_withheld`, `total` counts `items` only, and `coverage` says what
+  `vouchers_withheld`, `total` counts `items` only (the buckets, under `summarise_by`), and `coverage` says what
   was left out.
 - **No amount is read from a composite.** Anything that is neither a plain
   decimal nor an exact composite still refuses the whole window. So does a

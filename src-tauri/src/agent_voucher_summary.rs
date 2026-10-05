@@ -58,9 +58,13 @@ pub(super) struct Summary {
     pub(super) excluded: Value,
     /// The debit and credit totals over the same entries the buckets add up.
     pub(super) totals: Value,
-    /// Which entries a bucket adds: `all`, or `selected_ledger` for a month or type bucket of
-    /// a window narrowed to one ledger.
+    /// Which entries a bucket adds: `all_entries` (every entry of the vouchers the window,
+    /// selectors and search selected), or `selected_ledger` for a month or type bucket of a
+    /// window narrowed to one ledger.
     pub(super) entries_counted: &'static str,
+    /// How many of the summarised vouchers Tally flagged post-dated: they are summed, not set
+    /// aside, so a reader can see how many a report-date cut would move.
+    pub(super) post_dated_included: usize,
 }
 
 struct Bucket {
@@ -100,7 +104,13 @@ fn entry_amount(entry: &Value) -> Result<EntryAmount<'_>, String> {
     )
     .map_err(|_| "voucher_amount_invalid".to_string())?;
     let deemed_positive = entry["is_deemed_positive"].as_str() == Some("Yes");
-    let magnitude = amount.magnitude().as_str().to_string();
+    // A zero amount, signed or not (`-0.00` parses), has no magnitude to carry a sign on: it
+    // adds `0` to whichever side the flag put it on.
+    let magnitude = if amount.is_zero() {
+        "0".to_string()
+    } else {
+        amount.magnitude().as_str().to_string()
+    };
     Ok(if movement_entry_is_debit(&amount, deemed_positive) {
         EntryAmount {
             ledger,
@@ -142,6 +152,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
     let (mut cancelled, mut optional, mut no_entries) = (0usize, 0usize, 0usize);
     let mut buckets: BTreeMap<String, Bucket> = BTreeMap::new();
     let mut vouchers_summarised = 0usize;
+    let mut post_dated_included = 0usize;
     let (mut total_debit, mut total_credit) = ("0".to_string(), "0".to_string());
     for row in rows {
         if row["cancelled"].as_bool() == Some(true) {
@@ -174,6 +185,9 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             return Err("voucher_entries_unbalanced".to_string());
         }
         vouchers_summarised += 1;
+        if row["post_dated"].as_bool() == Some(true) {
+            post_dated_included += 1;
+        }
         let counted = |amount: &EntryAmount<'_>| match (&request.selected_ledger, request.group) {
             (Some(selected), SummaryGroup::Month | SummaryGroup::VoucherType) => {
                 amount.ledger == selected
@@ -257,13 +271,23 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
         });
     }
     Ok(Summary {
-        buckets: shaped.into_iter().map(|(_, _, bucket)| bucket).collect(),
+        // `position` is the bucket's place in the whole ordering, so two buckets whose labels
+        // read alike under masking can still be told apart and paged without a repeat.
+        buckets: shaped
+            .into_iter()
+            .enumerate()
+            .map(|(index, (_, _, mut bucket))| {
+                bucket["position"] = json!(index + 1);
+                bucket
+            })
+            .collect(),
+        post_dated_included,
         vouchers_summarised,
         excluded: json!({"cancelled": cancelled, "optional": optional, "no_accounting_entries": no_entries}),
         totals: json!({"debit": total_debit, "credit": total_credit}),
         entries_counted: match (&request.selected_ledger, request.group) {
             (Some(_), SummaryGroup::Month | SummaryGroup::VoucherType) => "selected_ledger",
-            _ => "all",
+            _ => "all_entries",
         },
     })
 }

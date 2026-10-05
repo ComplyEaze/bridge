@@ -4817,6 +4817,12 @@ fn a_held_window_answers_one_question_only() {
         searched(json!({"amount": "5"})),
         searched(json!({"amount": "5.00"}))
     );
+    // A summary is its own question, and each grouping a different one.
+    assert_ne!(base(), base().with_summary(Some(SummaryGroup::Month)));
+    assert_ne!(
+        base().with_summary(Some(SummaryGroup::Month)),
+        base().with_summary(Some(SummaryGroup::Ledger))
+    );
     assert_ne!(
         keyed(&sales),
         keyed(&VoucherTypeSelector::Guid("Sales".to_string()))
@@ -5176,13 +5182,14 @@ async fn a_summary_of_a_search_adds_only_the_vouchers_the_search_found() {
 }
 
 #[tokio::test]
-async fn buckets_page_from_the_held_window_and_a_listing_read_can_serve_a_summary_page() {
+async fn buckets_page_from_the_held_summary_window() {
     let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
     plans.extend(marks_page_plans(counted_marks()));
     let total = plans.len();
     let one = OneServer::spawn(plans);
-    // The first call lists vouchers; the second asks for buckets of the same question.
-    let first = one.call(json!({"limit": 1})).await;
+    let first = one
+        .call(json!({"summarise_by": "ledger", "limit": 2}))
+        .await;
     assert_eq!(page_snapshot(&first)["reused"], false);
     let second = one
         .call(json!({"summarise_by": "ledger", "offset": 2, "limit": 2}))
@@ -5193,14 +5200,37 @@ async fn buckets_page_from_the_held_window_and_a_listing_read_can_serve_a_summar
     assert_eq!(bucket_names(&second).len(), 2);
     assert_eq!(second["structuredContent"]["truncated"], false);
     assert_eq!(one.requests(), total);
-    // The two buckets served are the third and fourth of the whole summary.
+    // The two buckets served are the third and fourth of the whole summary, positions included.
     let whole = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
     let all = whole.call(json!({"summarise_by": "ledger"})).await;
-    assert_eq!(bucket_names(&all)[2..], bucket_names(&second)[..]);
     assert_eq!(
         result_of(&all)["buckets"].as_array().unwrap()[2..],
         result_of(&second)["buckets"].as_array().unwrap()[..]
     );
+}
+
+/// A listing and a summary of the same question hold separate windows, so one never replaces or
+/// serves the other: pages of a listing cannot continue from a summary's read, nor the reverse.
+/// Mutant killed: leaving the grouping out of the held-window key.
+#[tokio::test]
+async fn a_listing_and_a_summary_do_not_replace_or_serve_each_other() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let listing = one.call(json!({"limit": 1})).await;
+    let listing_id = page_snapshot(&listing)["id"].as_str().unwrap().to_string();
+    // A summary read of the same window holds its own snapshot; the listing's stays held.
+    let summary = one.call(json!({"summarise_by": "month"})).await;
+    let summary_id = page_snapshot(&summary)["id"].as_str().unwrap().to_string();
+    assert_ne!(listing_id, summary_id);
+    let page = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": listing_id}))
+        .await;
+    assert_eq!(page_snapshot(&page)["id"], listing_id, "{page}");
+    assert_eq!(page_snapshot(&page)["reused"], true);
+    assert_eq!(one.requests(), total);
 }
 
 #[tokio::test]
@@ -5222,7 +5252,8 @@ async fn a_held_ledger_window_summarises_only_that_ledgers_entries_by_month() {
         Some("WR2 Sales"),
         None,
         None,
-    );
+    )
+    .with_summary(Some(SummaryGroup::Month));
     assert!(one
         .server
         .voucher_pages
@@ -5252,13 +5283,14 @@ async fn a_held_ledger_window_summarises_only_that_ledgers_entries_by_month() {
     assert_eq!(one.requests(), total);
 }
 
-/// The bucket page stops at a quarter of the response budget (the response carries it twice).
-/// The captured ledger summary's buckets serialize to 482, 273, 257 and 280 bytes, so a 5,000-byte
-/// cap (1,250 for buckets) holds three and not four. Mutant killed: an unbounded budget.
+/// The bucket page stops at a fifth of the response budget (the response carries it twice, and
+/// the text copy escapes quotes). The captured ledger summary's buckets serialize to 482, 273,
+/// 257 and 280 bytes before their position, so a 6,000-byte cap (1,200 for buckets) holds three and
+/// not four. Mutant killed: an unbounded budget.
 #[tokio::test]
-async fn a_bucket_page_stops_at_a_quarter_of_the_response_budget_and_says_more_remain() {
+async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_remain() {
     let mut one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
-    one.server.settings.max_bytes = 5_000;
+    one.server.settings.max_bytes = 6_000;
     let response = one.call(json!({"summarise_by": "ledger"})).await;
     let result = result_of(&response);
     assert_eq!(result["buckets"].as_array().unwrap().len(), 3, "{result}");

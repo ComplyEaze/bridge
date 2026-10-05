@@ -6,6 +6,11 @@
 //! folded: a different letter, a dash or an apostrophe stays different, because a
 //! wider fold would match text the book does not hold. This is a search key only;
 //! it never resolves a master and no write depends on it.
+//!
+//! It is deliberately not `master_binding`'s `comparison_key`, the one fold for deciding
+//! whether two names are the same master, voucher number or voucher type: that decision
+//! must match what Tally's own lookup treats as equal, and this one only has to let a
+//! person find text. Do not widen one to match the other; a search match is never a binding.
 use unicode_normalization::UnicodeNormalization;
 
 /// `text` composed (NFC), lower-cased, with every run of whitespace, line breaks

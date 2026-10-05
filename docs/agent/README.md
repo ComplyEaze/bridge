@@ -2000,7 +2000,11 @@ voucher's bill type is tracked in #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted
-as `posted_verified`. Verification entry differences are structured objects;
+as `posted_verified`. A batch voucher cancelled in Tally stays `posted_not_effective` and
+carries `effective_copies_observed`: the effective, unmarked vouchers no batch voucher took that
+carry its content (a `count`, up to five entries, `attribution: "not_established"`, `0` when
+there is none), with `counts.cancelled_with_effective_copy`. It reports a possible re-entry and
+attributes nothing: identical content can be a genuine second transaction. Verification entry differences are structured objects;
 duplicate metadata uses `fingerprint_sha256`. Each observed voucher can satisfy
 at most one expected transaction. Exact numeric comparison tolerates equivalent decimal spellings
 without changing the generated file or its stored hash.

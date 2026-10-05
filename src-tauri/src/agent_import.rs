@@ -73,8 +73,8 @@ use verification::{
 };
 #[cfg(test)]
 use verification::{
-    batch_duplicate_sets, duplicates, observed_fingerprint, observed_voucher_identity,
-    VERIFICATION_NAME_FIELDS,
+    batch_duplicate_sets, duplicates, expected_fingerprint, observed_fingerprint,
+    observed_voucher_identity, VERIFICATION_NAME_FIELDS,
 };
 
 struct ImportProfileObservation {

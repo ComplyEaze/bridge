@@ -457,3 +457,80 @@ test("a sidecar with no byte count is checked on its hash and says so", async ()
   assert.match(failure, /\(no byte count\)/);
   assert.match(failure, /cap\.utf16le\.xml/);
 });
+
+// #838: a row or sidecar documents exactly the file at the path it resolves
+// to. A bare name means the file beside the record, never a file of that name
+// elsewhere under the root; `bridge-tax-audit` keeps today's basename matching
+// behind a named exemption until its rows are converted.
+const PROTOCOL = "src-tauri/crates/bridge-tally-protocol/tests/fixtures";
+const TAX_AUDIT = "src-tauri/crates/bridge-tax-audit/tests/fixtures";
+
+async function rowAboveItsFixture(root, fixtureRoot) {
+  const bytes = "captured bytes\n";
+  await mkdir(join(root, fixtureRoot, "agent"), { recursive: true });
+  await writeFile(join(root, fixtureRoot, "agent", "nested.bin"), bytes);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  await writeFile(
+    join(root, fixtureRoot, "PROVENANCE.md"),
+    `| \`nested.bin\` | ${bytes.length} | \`${sha256}\` |\n`,
+  );
+}
+
+test("a bare-name row documents only the file beside its Markdown file", async () => {
+  const root = await makeTree();
+  try {
+    await rowAboveItsFixture(root, PROTOCOL);
+    const failure = runGateExpectingFailure(root);
+    assert.match(failure, new RegExp(`${PROTOCOL}/nested\\.bin: a hash row`));
+    assert.match(failure, /names no file in/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("the exempt root keeps basename matching for its rows", async () => {
+  const root = await makeTree();
+  try {
+    await rowAboveItsFixture(root, TAX_AUDIT);
+    assert.match(runGate(root), /1 captured-fixture hash\(es\) verified/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a wider table whose cells hold hashes is not read as a fixture row", async () => {
+  const root = await makeTree();
+  try {
+    const hash = "a".repeat(64);
+    await writeFile(
+      join(root, PROTOCOL, "READS.md"),
+      `| Fixture | Request SHA-256 | Bytes | Response SHA-256 |\n| --- | --- | ---: | --- |\n| \`read.xml\` | \`${hash}\` | 1,170 | \`${"b".repeat(64)}\` |\n`,
+    );
+    assert.match(runGate(root), /Fixture provenance is intact/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a sidecar's hash checks the fixture beside it, not one of the same name elsewhere", async () => {
+  const root = await makeTree();
+  try {
+    const bytes = "captured bytes";
+    await mkdir(join(root, SIDECAR_DIR), { recursive: true });
+    await writeFile(join(root, SIDECAR_DIR, "cap.utf16le.xml"), bytes);
+    await writeFile(
+      join(root, SIDECAR_DIR, "cap.json"),
+      JSON.stringify({
+        source: "Live licensed TallyPrime synthetic-company read",
+        fixture_sha256: createHash("sha256").update(bytes).digest("hex"),
+      }),
+    );
+    // Another fixture of the same name, with other bytes, documented in prose.
+    await mkdir(join(root, PROTOCOL, "other"), { recursive: true });
+    await writeFile(join(root, PROTOCOL, "other", "cap.utf16le.xml"), "other bytes");
+    await writeFile(join(root, PROTOCOL, "other", "PROVENANCE.md"), "cap.utf16le.xml: a hand capture.\n");
+    assert.match(runGate(root), /1 captured-fixture hash\(es\) verified/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

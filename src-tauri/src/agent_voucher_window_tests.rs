@@ -5162,8 +5162,8 @@ async fn a_month_summary_replaces_items_with_buckets_and_keeps_the_window_label(
         json!({"debit": "-306.06", "credit": "306.06"})
     );
     assert_eq!(result["post_dated_included"], 0);
-    // The captured vouchers carry no post-dated flag, so all three are "not reported".
-    assert_eq!(result["post_dated_unreported"], 3);
+    // The older captured window was read before the fetch list asked for the flag, so its three vouchers carry none.
+    assert_eq!(result["post_dated_flag_absent"], 3);
     assert!(result["basis"].as_str().unwrap().contains("memorandum"));
     assert_eq!(result["buckets"][0]["position"], 1);
     assert_eq!(
@@ -5196,6 +5196,7 @@ async fn buckets_page_from_the_held_summary_window() {
         .call(json!({"summarise_by": "ledger", "limit": 2}))
         .await;
     assert_eq!(page_snapshot(&first)["reused"], false);
+    assert_eq!(first["structuredContent"]["truncated"], true);
     let second = one
         .call(json!({"summarise_by": "ledger", "offset": 2, "limit": 2}))
         .await;

@@ -63,11 +63,13 @@ pub(super) struct Summary {
     /// window narrowed to one ledger.
     pub(super) entries_counted: &'static str,
     /// How many of the summarised vouchers Tally flagged post-dated (`Yes`): they are summed, not
-    /// set aside. A lower bound on what a report-date cut would move: see `post_dated_unreported`.
+    /// set aside. Together with `post_dated_flag_absent` it bounds what a report-date cut would move.
     pub(super) post_dated_included: usize,
-    /// How many of the summarised vouchers carry no post-dated flag at all (Tally omits the tag
-    /// rather than asserting `No`, so "not reported" is not "not post-dated").
-    pub(super) post_dated_unreported: usize,
+    /// How many of the summarised vouchers carry no post-dated flag at all. With the fetch list
+    /// in use Tally asserts the flag on every voucher (protocol reference 8.2c), so a non-zero
+    /// value means a source that did not report it; only then is a zero in `post_dated_included`
+    /// not proof that none are post-dated.
+    pub(super) post_dated_flag_absent: usize,
 }
 
 struct Bucket {
@@ -155,7 +157,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
     let (mut cancelled, mut optional, mut no_entries) = (0usize, 0usize, 0usize);
     let mut buckets: BTreeMap<String, Bucket> = BTreeMap::new();
     let mut vouchers_summarised = 0usize;
-    let (mut post_dated_included, mut post_dated_unreported) = (0usize, 0usize);
+    let (mut post_dated_included, mut post_dated_flag_absent) = (0usize, 0usize);
     let (mut total_debit, mut total_credit) = ("0".to_string(), "0".to_string());
     for row in rows {
         if row["cancelled"].as_bool() == Some(true) {
@@ -191,7 +193,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
         match row["post_dated"].as_bool() {
             Some(true) => post_dated_included += 1,
             Some(false) => {}
-            None => post_dated_unreported += 1,
+            None => post_dated_flag_absent += 1,
         }
         let counted = |amount: &EntryAmount<'_>| match (&request.selected_ledger, request.group) {
             (Some(selected), SummaryGroup::Month | SummaryGroup::VoucherType) => {
@@ -287,7 +289,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             })
             .collect(),
         post_dated_included,
-        post_dated_unreported,
+        post_dated_flag_absent,
         vouchers_summarised,
         excluded: json!({"cancelled": cancelled, "optional": optional, "no_accounting_entries": no_entries}),
         totals: json!({"debit": total_debit, "credit": total_credit}),

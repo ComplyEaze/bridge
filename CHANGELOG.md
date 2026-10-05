@@ -26,7 +26,7 @@ These changes are in source and not yet in a published build.
   rows the window read already holds, so they send no new request to Tally; a
   zero from a counted window is a checked zero. A narration phrase is refused
   where narrations are withheld from the assistant. A summary sums post-dated
-  vouchers (counted, and counted apart when Tally did not flag them) and any
+  vouchers (counted, with the vouchers Tally sent no flag for counted apart) and any
   non-posting voucher type a book uses, and says so in the result. Not measured
   against a live book yet (#1230).
 

@@ -1,6 +1,6 @@
 //! Search over the rows a `vouchers` window read already holds (#1230).
 //!
-//! The arguments are parsed once into a [`VoucherSearch`] before any read, so a refused
+//! The arguments are parsed once into a [`VoucherSearch`] before the window is read, so a refused
 //! search is refused before the window is read. The search then runs on the rows after the window is labelled and
 //! after every other selector, exactly as the ledger and type selectors do, so a zero from a
 //! `complete` window is a checked zero. No new Tally request is made.

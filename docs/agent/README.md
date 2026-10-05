@@ -972,9 +972,9 @@ the vouchers that satisfy every criterion given.
   invoice total and a tax line alike (reasoned from the entry shape, not measured on an item invoice). Each item carries `matched.amount_entries`,
   the positions in its `amounts` that equalled the amount.
 - A blank or over-long term, a narration phrase under three characters and an
-  amount that is not a plain positive decimal are refused before the window is read
+  amount that is not a plain positive decimal are refused before the window is read (the identity read has already happened)
   (`search_criterion_empty`, `search_criterion_too_long`,
-  `search_narration_too_short`, `search_amount_invalid`); the refusal comes before the window is read.
+  `search_narration_too_short`, `search_amount_invalid`).
 - The search runs last, after the window is labelled and after the ledger and
   type selectors, so a zero from a `complete` window is a checked zero. A voucher
   withheld for a foreign-currency amount has no amounts to compare: an `amount`
@@ -997,7 +997,7 @@ each other.
   `ledger_movement` reports it), `credit`, `net` (debit plus credit) and
   `voucher_refs`: up to five vouchers by date, type, number and GUID, with
   `voucher_refs_complete` saying whether that is all of them. `vouchers` with the
-  same arguments without `summarise_by`, narrowed with the existing selectors (a ledger, a voucher type, the month's dates; a selector the call already carries cannot be added twice), lists the rest.
+  same arguments without `summarise_by`, narrowed to the bucket, lists the rest: for a month bucket narrow `from` and `to`; for a ledger bucket pass that ledger when the call carries none; for a type bucket pass `voucher_class` (a superset when a class has child types) or the type's GUID (a type name that is also a class is refused as `voucher_type_ambiguous`).
 - A debit is an entry with a negative amount and a credit one with a positive
   amount, the rule `ledger_movement` uses (the same function); `ISDEEMEDPOSITIVE`
   decides only a zero amount, which adds nothing to either side but still counts
@@ -1019,8 +1019,9 @@ each other.
   the way `ledger_movement` leaves them out: cancelled, optional, and vouchers with
   no accounting entry (a Stock Journal). They are counted, not hidden. Post-dated
   vouchers are summed: `post_dated_included` counts those Tally flagged Yes and
-  `post_dated_unreported` those with no flag (Tally often omits the tag rather than
-  asserting No), so a zero in the first is not proof that none are post-dated. A voucher type that does not post (a
+  `post_dated_flag_absent` those with no flag at all. The read asks for the flag and
+  Tally asserted it on every voucher measured (reference 8.2c), so the second count is
+  expected to be 0; only when it is not does a zero in the first prove nothing. A voucher type that does not post (a
   memorandum, a reversing journal, a sales or purchase order, a delivery or receipt
   note), if the book uses it and Tally exports it with ledger entries, is not told
   apart and is summed; the
@@ -1036,6 +1037,8 @@ each other.
   `agent_response_too_large`, so lower `limit` or raise the budget. The egress
   receipt counts the buckets as the rows prepared.
 - Ledger names in `group` are masked when parties are masked.
+
+A summary over a `partial` window is only as complete as that window: `state` and `reason` say which, and `basis` does not repeat them.
 
 Not measured: a live Tally run of either feature (the tests read the captured
 three-voucher window and variants of it); a `reference` captured from a real

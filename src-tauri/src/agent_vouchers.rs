@@ -239,7 +239,7 @@ pub(super) fn page_items(
 
 /// What a summary adds up, stated in the result so a reader does not infer more. The exclusions
 /// are the same as `ledger_movement`'s; the voucher types are not told apart.
-const SUMMARY_BASIS: &str = "every voucher in the window that is not cancelled, optional or without accounting entries, as ledger_movement counts; post-dated vouchers are summed too: post_dated_included counts those Tally flagged Yes and post_dated_unreported those it did not flag at all (the tag is often omitted, so a zero in the first is not proof none are post-dated); a voucher type that does not post (a memorandum, a reversing journal, a sales or purchase order, a delivery or receipt note), if the book uses it and Tally exports it with ledger entries, is not told apart and is summed; not measured against a live book";
+const SUMMARY_BASIS: &str = "every voucher the window, selectors and search selected that is not cancelled, optional or without accounting entries, as ledger_movement counts (a narrowed window is not a ledger's whole movement); post-dated vouchers are summed too: post_dated_included counts those Tally flagged Yes and post_dated_flag_absent those with no flag at all (Tally asserts the flag on every voucher the current read asks for, so that is expected to be 0; only when it is not is a zero in the first no proof that none are post-dated); a voucher type that does not post (a memorandum, a reversing journal, a sales or purchase order, a delivery or receipt note), if the book uses it and Tally exports it with ledger entries, is not told apart and is summed; not measured against a live book";
 
 /// What one page of a `vouchers` result holds: the vouchers, or with `summarise_by` the
 /// buckets (#1230), and the fields only the second carries.
@@ -290,8 +290,8 @@ pub(super) fn render_page_body(
             ("excluded_from_buckets", summary.excluded),
             ("post_dated_included", json!(summary.post_dated_included)),
             (
-                "post_dated_unreported",
-                json!(summary.post_dated_unreported),
+                "post_dated_flag_absent",
+                json!(summary.post_dated_flag_absent),
             ),
             ("totals", summary.totals),
             ("basis", json!(SUMMARY_BASIS)),
@@ -426,7 +426,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
     } = scope;
     let mut accumulated = initial_evidence;
     let outcome = async {
-        // Parsed before any read, so a conflicting request costs nothing.
+        // Parsed before the window is read, so a conflicting request costs only the identity read.
         let type_selector = VoucherTypeSelector::from_args(args)?;
         let search = VoucherSearch::from_args(args, server.settings.redaction)?;
         let summary_group = SummaryGroup::from_args(args)?;

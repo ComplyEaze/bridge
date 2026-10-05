@@ -48,10 +48,10 @@
 // `AsyncReadExt::take(...)`, or the qualified form's first argument does. A
 // `take` anywhere else, in the same statement or a neighbouring one, does not
 // count. Residual, stated rather than hidden: a reader capped on an earlier
-// statement and bound to a variable is reported; ALLOWED_UNBOUNDED below is
-// the reviewed escape hatch for that.
+// statement and bound to a variable is reported; the allow-list below is the
+// reviewed escape hatch for that.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { relative, resolve } from "node:path";
@@ -75,20 +75,32 @@ const CFG_TEST = /^#\[cfg\(test\)\]\s*$/;
 const FN_LINE = /^(\s*)(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s/;
 const MOD_LINE = /^(\s*)(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{?\s*$/;
 
-// Reviewed, named exceptions — never a bare count. Each entry documents why
-// the direct-chain heuristic above cannot see that this call site is already
-// bounded, so the exception is legible on its own without re-deriving it.
-const ALLOWED_UNBOUNDED = new Set([
-  // Zip entries read from a template XLSX/PDF bundled into the binary at
-  // build time (via `include_bytes!` / the packaged app resources), not from
-  // an untrusted or attacker-sized source. Tracked as a known gap rather than
-  // silently accepted: docs/proposed-ci-gates.md's REPORTING entry for this
-  // gate lists these as the concrete class-1 findings this scan actually
-  // surfaced.
-  "src-tauri/src/reports/outstandings_working_paper_xlsx.rs",
-  "src-tauri/src/reports/trial_balance_xlsx.rs",
-  "src-tauri/src/reports/party_statement_pdf.rs",
-]);
+// Reviewed, named exceptions — never a bare count. The scanned tree's
+// ALLOWED_FILE maps each excused file's path to why the gate cannot see that
+// its reads are bounded, so each exception is legible on its own; no file
+// means no exceptions. An entry must still excuse an unbounded read: one
+// whose file no longer holds any is stale and fails the gate (#837), so an
+// exception can never quietly cover a read added after its reason went away.
+const ALLOWED_FILE = "scripts/unbounded-reads-allowed.json";
+
+function loadAllowed() {
+  const path = resolve(repositoryRoot, ALLOWED_FILE);
+  if (!existsSync(path)) return new Map();
+  const entries = JSON.parse(readFileSync(path, "utf8"));
+  if (!entries || typeof entries !== "object" || Array.isArray(entries)) {
+    throw new Error(`${ALLOWED_FILE} must be an object of path: reason`);
+  }
+  for (const [file, reason] of Object.entries(entries)) {
+    if (typeof reason !== "string" || reason.trim() === "") {
+      throw new Error(`${ALLOWED_FILE}: ${file} has no reason; every exception says why`);
+    }
+  }
+  return new Map(Object.entries(entries));
+}
+
+const ALLOWED_UNBOUNDED = loadAllowed();
+// How many unbounded reads each allowed file's entry excused in this scan.
+const excused = new Map([...ALLOWED_UNBOUNDED.keys()].map((file) => [file, 0]));
 
 function listSourceFiles() {
   const files = [];
@@ -292,10 +304,15 @@ for (const path of listSourceFiles()) {
       boundedCount += 1;
       continue;
     }
-    if (ALLOWED_UNBOUNDED.has(path)) continue;
+    if (ALLOWED_UNBOUNDED.has(path)) {
+      excused.set(path, excused.get(path) + 1);
+      continue;
+    }
     failures.push(`${path}:${index + 1}: ${lines[index].trim()}`);
   }
 }
+
+const stale = [...excused].filter(([, count]) => count === 0).map(([file]) => file);
 
 if (failures.length) {
   throw new Error(
@@ -305,8 +322,17 @@ if (failures.length) {
       "reader itself in `.take(limit + 1)` (see " +
       "src-tauri/src/agent_bank_statement.rs for the pattern — the `+ 1` lets an " +
       "over-limit input be detected rather than silently truncated), or add a " +
-      "reviewed entry to ALLOWED_UNBOUNDED in this script with the reason:\n" +
+      `reviewed entry to ${ALLOWED_FILE} with the reason:\n` +
       failures.map((line) => `  - ${line}`).join("\n"),
+  );
+}
+
+if (stale.length) {
+  throw new Error(
+    `${stale.length} stale exception(s) in ${ALLOWED_FILE}: each names a file with no ` +
+      "unbounded read left to excuse, so a new one there would pass unreported. Remove " +
+      "the entry:\n" +
+      stale.map((file) => `  - ${file}`).join("\n"),
   );
 }
 

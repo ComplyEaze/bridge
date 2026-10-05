@@ -60,10 +60,16 @@ mod bill_trail;
 mod outstandings;
 #[path = "agent_presence.rs"]
 mod presence;
+#[path = "agent_voucher_search.rs"]
+mod voucher_search;
 #[path = "agent_vouchers.rs"]
 mod vouchers;
+use voucher_search::VoucherSearch;
+#[path = "agent_voucher_summary.rs"]
+mod voucher_summary;
 #[cfg(test)]
 use outstandings::*;
+use voucher_summary::{SummaryGroup, SummaryRequest};
 #[path = "agent_movement.rs"]
 mod movement;
 #[path = "agent_register.rs"]

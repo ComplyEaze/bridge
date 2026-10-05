@@ -19,6 +19,8 @@ pub(super) struct VoucherPageKey {
     to: String,
     ledger: Option<String>,
     selector: Option<VoucherTypeSelector>,
+    /// The search (#1230): a differently searched window is a different question.
+    search: Option<VoucherSearch>,
 }
 
 impl VoucherPageKey {
@@ -28,6 +30,7 @@ impl VoucherPageKey {
         to: &str,
         ledger: Option<&str>,
         selector: Option<&VoucherTypeSelector>,
+        search: Option<&VoucherSearch>,
     ) -> Self {
         Self {
             company_guid: identity.company_guid().to_string(),
@@ -35,6 +38,7 @@ impl VoucherPageKey {
             to: to.to_string(),
             ledger: ledger.map(str::to_string),
             selector: selector.cloned(),
+            search: search.cloned(),
         }
     }
 }
@@ -57,6 +61,9 @@ pub(super) struct VoucherPageSnapshot {
     /// already redacted, so a served page names the ledger it read as the first
     /// page did (#1076).
     ledger_match: Option<Value>,
+    /// The resolved name of that ledger, unredacted: a summary of a held window adds only
+    /// that ledger's entries by month or type (#1230).
+    selected_ledger: Option<String>,
     /// Why a complete window is complete when it is more than a counted read (an
     /// empty book), so a served page says it too.
     reason: Option<&'static str>,
@@ -66,6 +73,7 @@ pub(super) struct VoucherPageSnapshot {
 }
 
 impl VoucherPageSnapshot {
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         key: VoucherPageKey,
         marks: CompanyMarks,
@@ -73,6 +81,7 @@ impl VoucherPageSnapshot {
         window: Value,
         voucher_types: Option<Value>,
         ledger_match: Option<Value>,
+        selected_ledger: Option<String>,
         reason: Option<&'static str>,
     ) -> Self {
         let bytes = rows.iter().map(|row| row.to_string().len()).sum::<usize>()
@@ -91,6 +100,7 @@ impl VoucherPageSnapshot {
             window,
             voucher_types,
             ledger_match,
+            selected_ledger,
             reason,
             read_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
             taken: std::time::Instant::now(),
@@ -217,18 +227,81 @@ pub(super) fn page_items(
         .collect()
 }
 
+/// What one page of a `vouchers` result holds: the vouchers, or with `summarise_by` the
+/// buckets (#1230), and the fields only the second carries.
+struct PageBody {
+    items_key: &'static str,
+    profile: &'static str,
+    items: Vec<Value>,
+    total: usize,
+    truncated: bool,
+    extra: Vec<(&'static str, Value)>,
+}
+
+/// The page of `rows` a request asks for, redacted and party-marked as `vouchers` always did,
+/// or the page of a summary of them. A summary sums every row of the window, whatever the page.
+fn render_page_body(
+    server: &Server,
+    rows: &[Value],
+    summary: Option<&SummaryRequest>,
+    (offset, limit): (usize, usize),
+) -> Result<PageBody, ToolFailure> {
+    let Some(request) = summary else {
+        let items = page_items(server, rows, offset, limit);
+        return Ok(PageBody {
+            items_key: "items",
+            profile: "agent_vouchers_v1_filters",
+            truncated: offset.saturating_add(items.len()) < rows.len(),
+            items,
+            total: rows.len(),
+            extra: Vec::new(),
+        });
+    };
+    let summary = voucher_summary::summarise(rows, request).map_err(ToolFailure::from)?;
+    let (page, truncated) =
+        voucher_summary::page_buckets(&summary, offset, limit, server.settings.max_bytes / 2);
+    Ok(PageBody {
+        items_key: "buckets",
+        profile: "agent_vouchers_v1_summary",
+        items: page
+            .into_iter()
+            .map(|bucket| redact_value(bucket, server.settings.redaction))
+            .collect(),
+        total: summary.buckets.len(),
+        truncated,
+        extra: vec![
+            ("summarised_by", json!(request.group.name())),
+            ("entries_counted", json!(summary.entries_counted)),
+            ("vouchers_summarised", json!(summary.vouchers_summarised)),
+            ("excluded_from_buckets", summary.excluded),
+            ("totals", summary.totals),
+        ],
+    })
+}
+
 /// What every page of a `vouchers` read carries besides its selector-specific
 /// fields, whether it was read now or served from a held window.
 fn voucher_page_payload(
     company: &TallyCompany,
     state: &str,
     reason: Option<&str>,
-    items: Vec<Value>,
+    body: PageBody,
     offset: usize,
-    total: usize,
     window: Value,
-) -> Value {
-    json!({"company": company_json(company, std::slice::from_ref(company)), "result": {"state": state, "reason": reason, "items": items, "offset": offset, "total": total, "profile": "agent_vouchers_v1_filters", "window": window}})
+) -> (Value, bool) {
+    let PageBody {
+        items_key,
+        profile,
+        items,
+        total,
+        truncated,
+        extra,
+    } = body;
+    let mut payload = json!({"company": company_json(company, std::slice::from_ref(company)), "result": {"state": state, "reason": reason, items_key: items, "offset": offset, "total": total, "profile": profile, "window": window}});
+    for (key, value) in extra {
+        payload["result"][key] = value;
+    }
+    (payload, truncated)
 }
 
 /// The authoritative selected-voucher operation shared by the MCP and the
@@ -335,6 +408,8 @@ pub(crate) async fn selected_voucher_operation_for_verified(
     let outcome = async {
         // Parsed before any read, so a conflicting request costs nothing.
         let type_selector = VoucherTypeSelector::from_args(args)?;
+        let search = VoucherSearch::from_args(args, server.settings.redaction)?;
+        let summary_group = SummaryGroup::from_args(args)?;
         // A type GUID that is not this company's cannot name any of its
         // types: refused rather than answered with an empty selection.
         if let Some(VoucherTypeSelector::Guid(type_guid)) = &type_selector {
@@ -359,6 +434,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 &to,
                 requested_ledger.as_deref(),
                 type_selector.as_ref(),
+                search.as_ref(),
             )
         });
         let mut earlier_snapshot = None;
@@ -374,6 +450,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                         snapshot_id.as_deref(),
                         &mut accumulated,
                         &guid,
+                        summary_group,
                     )
                     .await?
                 {
@@ -444,6 +521,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         // A nonempty, validated source can legitimately have no selector match.
         // Corroborate actual source emptiness before any client-side selector.
         let mut ledger_match = None;
+        let mut selected_ledger = None;
         if let Some((ledger, catalogue)) = selected_catalogue {
             let (corroboration, catalogue_evidence) =
                 server.read_ledger_catalogue(&identity, &company.name).await?;
@@ -460,6 +538,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             }
             rows = filter_voucher_rows_for_ledger(rows, ledger.name());
             ledger_match = Some(ledger.to_json(server.settings.redaction));
+            selected_ledger = Some(ledger.name().to_string());
         }
         let mut voucher_types = None;
         if let Some(selector) = &type_selector {
@@ -497,6 +576,10 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 "in_scope": selection.window_types.iter().map(WindowVoucherType::json).collect::<Vec<_>>(),
             }));
         }
+        // #1230: the search runs last, on the labelled window, so a zero is a checked zero.
+        if let Some(search) = &search {
+            rows = search.apply(rows);
+        }
         let (withheld, rows): (Vec<Value>, Vec<Value>) =
             rows.into_iter().partition(|row| row.get(WITHHELD_MARKER).is_some());
         let withheld_total = withheld.len();
@@ -510,7 +593,6 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 evidence.reason_code = Some("vouchers_withheld".to_string());
             }
         }
-        let total = rows.len();
         let rows = Arc::new(rows);
         // #485: a complete window is held, for its later pages. A partial one is
         // not: a later page of it reads afresh, as before.
@@ -523,20 +605,23 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     window.clone(),
                     voucher_types.clone(),
                     ledger_match.clone(),
+                    selected_ledger.clone(),
                     corroboration_reason,
                 ))?
             }
             _ => None,
         };
-        let items = page_items(server, &rows, offset, limit);
-        let truncated = offset.saturating_add(items.len()) < total;
-        let mut payload = voucher_page_payload(
+        let summary = summary_group.map(|group| SummaryRequest {
+            group,
+            selected_ledger: selected_ledger.clone(),
+        });
+        let body = render_page_body(server, &rows, summary.as_ref(), (offset, limit))?;
+        let (mut payload, truncated) = voucher_page_payload(
             &company,
             result_state,
             corroboration_reason,
-            items,
+            body,
             offset,
-            total,
             window,
         );
         if let Some(held) = &held {
@@ -556,9 +641,11 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             payload["result"]["withheld_total"] = json!(withheld_total);
             payload["result"]["withheld_vouchers"] =
                 Value::Array(listed_withheld(&withheld, server.settings.max_bytes));
-            payload["result"]["coverage"] = json!(format!(
-                "items exclude {withheld_total} voucher(s) whose amounts Tally stored in a foreign currency; withheld_vouchers lists them up to its bound, withheld_total counts them all, and total counts items only"
-            ));
+            payload["result"]["coverage"] = json!(if summary_group.is_some() {
+                format!("buckets exclude {withheld_total} voucher(s) whose amounts Tally stored in a foreign currency, so their totals are short by those vouchers; withheld_vouchers lists them up to its bound, withheld_total counts them all, and total counts buckets")
+            } else {
+                format!("items exclude {withheld_total} voucher(s) whose amounts Tally stored in a foreign currency; withheld_vouchers lists them up to its bound, withheld_total counts them all, and total counts items only")
+            });
         }
         Ok(ToolOutcome {
             payload,
@@ -631,6 +718,7 @@ impl Server {
         snapshot_id: Option<&str>,
         accumulated: &mut Option<Evidence>,
         guid: &str,
+        summary_group: Option<SummaryGroup>,
     ) -> Result<PageServe, ToolFailure> {
         let held = self
             .voucher_pages
@@ -666,19 +754,20 @@ impl Server {
             };
         }
         let snapshot = held;
-        let total = snapshot.rows.len();
-        let items = page_items(self, &snapshot.rows, offset, limit);
-        let truncated = offset.saturating_add(items.len()) < total;
+        let summary = summary_group.map(|group| SummaryRequest {
+            group,
+            selected_ledger: snapshot.selected_ledger.clone(),
+        });
+        let body = render_page_body(self, &snapshot.rows, summary.as_ref(), (offset, limit))?;
         if let (Some(reason), Some(evidence)) = (snapshot.reason, accumulated.as_mut()) {
             evidence.reason_code = Some(reason.to_string());
         }
-        let mut payload = voucher_page_payload(
+        let (mut payload, truncated) = voucher_page_payload(
             company,
             "complete",
             snapshot.reason,
-            items,
+            body,
             offset,
-            total,
             snapshot.window.clone(),
         );
         if let Some(voucher_types) = &snapshot.voucher_types {

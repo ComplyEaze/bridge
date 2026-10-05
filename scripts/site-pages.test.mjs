@@ -307,7 +307,7 @@ test("the Download page and the install guide each carry an at-a-glance block fo
   assert.ok(read("download.html").includes(`<h2>${heading}</h2>`), `site/download.html has no "${heading}" block`);
   assert.ok(guide.includes(`## ${heading}`), `docs/agent/INSTALL.md has no "${heading}" block`);
   for (const text of [visibleText(region(read("download.html"), 'id="at-a-glance"', "</section>")), region(guide, `## ${heading}`, "## Before you install")]) {
-    assert.match(text, /not yet been run on a real bank statement/);
+    assert.match(text, /not yet been run on a real\s+bank statement/);
   }
 });
 

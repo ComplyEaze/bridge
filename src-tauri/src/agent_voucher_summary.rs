@@ -4,7 +4,7 @@
 //! the arithmetic over the rows that survive, with no I/O. Every bucket is a plain sum of the
 //! entries of the vouchers in it, so its total can be rebuilt from the vouchers `vouchers`
 //! lists for the same arguments, and the result says which vouchers it left out and why.
-use super::movement::movement_entry_is_debit;
+use super::movement::movement_entry_effect;
 use super::*;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -109,14 +109,8 @@ fn entry_amount(entry: &Value) -> Result<EntryAmount<'_>, String> {
     )
     .map_err(|_| "voucher_amount_invalid".to_string())?;
     let deemed_positive = entry["is_deemed_positive"].as_str() == Some("Yes");
-    // A zero amount, signed or not (`-0.00` parses), has no magnitude to carry a sign on: it
-    // adds `0` to whichever side the flag put it on.
-    let magnitude = if amount.is_zero() {
-        "0".to_string()
-    } else {
-        amount.magnitude().as_str().to_string()
-    };
-    Ok(if movement_entry_is_debit(&amount, deemed_positive) {
+    let (is_debit, magnitude) = movement_entry_effect(&amount, deemed_positive);
+    Ok(if is_debit {
         EntryAmount {
             ledger,
             debit: Some(format!("-{magnitude}")),

@@ -811,9 +811,6 @@
       "path": "src-tauri/src/tally/runtime_trial_balance_tests.rs"
     },
     {
-      "path": "src-tauri/src/tally/serial_queue.rs"
-    },
-    {
       "path": "src-tauri/src/tally/standard_ledger_catalog.rs"
     },
     {

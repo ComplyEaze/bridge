@@ -53,3 +53,4 @@ reproduced every golden byte for byte.
 | `edge.rp_sum_check.related_parties_cl23.json` | 7,332 | `a0a479e7574b2459d7a065bebdc3d44488b0a34668e3da8f853066c29c1f5efb` | `goldens/edge.rp_sum_check.related_parties_cl23.json` |
 | `edge.rp_unknown_ledger.related_parties_cl23.json` | 9,031 | `6bae2276338b8adb375947a807e200d864c59cbd67a33bbfddf87236aa082ec5` | `goldens/edge.rp_unknown_ledger.related_parties_cl23.json` |
 | `edge.rp_walk.related_parties_cl23.json` | 13,349 | `c298493e495b6eacaf2202cd10377a0ccb71e825fd292cc9ab1f167b1549880b` | `goldens/edge.rp_walk.related_parties_cl23.json` |
+| `synthetic.related_parties_cl23.json` | 2,405 | `6bf0989b8f1f9a9069f2f243a192085f65148d749994cb3280ee007be935567c` | `goldens/synthetic.related_parties_cl23.json` |

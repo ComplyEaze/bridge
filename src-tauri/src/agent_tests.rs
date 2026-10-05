@@ -1052,7 +1052,7 @@ fn egress_tail_waits_for_an_exclusive_append_lock() {
         .expect("complete row");
     let reader_path = path.clone();
     let reader = std::thread::spawn(move || read_egress_tail(&reader_path, 1));
-    std::thread::sleep(std::time::Duration::from_millis(20));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     assert!(
         !reader.is_finished(),
         "tail read must wait for the writer lock"

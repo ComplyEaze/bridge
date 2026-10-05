@@ -1461,7 +1461,9 @@ classified as TDS payable, counted before that TDS."
             ev_interest.clone(),
         )?;
         // s.194A coverage, read per loan: the TDS-payable lines on every voucher that posts to the
-        // loan. A voucher that also posts to another configured loan counts for neither.
+        // loan. A voucher that also posts to another configured loan counts for neither; a nil line
+        // on the other loan is not a posting (bridge#1201; the opposite-loan test gives it no side
+        // either).
         let tds_by_voucher: Vec<(usize, i128)> = pop
             .iter()
             .enumerate()
@@ -1471,7 +1473,7 @@ classified as TDS payable, counted before that TDS."
                     && !v
                         .lines
                         .iter()
-                        .any(|l| other_loans.contains(l.ledger.as_str()))
+                        .any(|l| other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)
             })
             .map(|(at, v)| (at, -net_on(v, &tds_here)))
             .filter(|&(_, x)| x != 0)

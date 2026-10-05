@@ -409,7 +409,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         accumulate_evidence(&mut accumulated, read.all_evidence());
         // What each request of the window read cost (#595); the empty-window
         // corroboration below is a read of its own and is not counted here.
-        let window = serde_json::to_value(&read.timings).unwrap_or(Value::Null);
+        let window = super::read_cost::window_value(&read.timings, super::read_cost::Ended::Read);
         let source_marks = read.witness.as_ref().map(|witness| witness.marks);
         let counted = read.counted();
         // A withheld voucher goes through every date, ledger and type check as

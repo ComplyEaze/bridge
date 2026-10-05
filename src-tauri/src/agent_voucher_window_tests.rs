@@ -4973,3 +4973,41 @@ fn page_items_masks_the_party_names_of_every_row_it_cuts() {
         "{text}"
     );
 }
+
+// -- #1239: the read cost a `vouchers` result states -------------------------------------------------
+
+/// Eighteen census reads (a certain floor of nine seconds; the simulator takes
+/// at most 128 scripted requests) are worth a statement in the result; one is
+/// not, and a small book's result is unchanged.
+#[tokio::test]
+async fn vouchers_states_its_read_cost_from_eighteen_census_reads_and_not_from_one() {
+    let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
+    let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
+    plans.extend(paired(&mark(18 * capacity)));
+    // The first span holds the window's three vouchers; the other seventeen are empty.
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    for _ in 1..18 {
+        plans.extend(paired(&xml_plan(empty_collection())));
+    }
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    let response = call_vouchers_over(plans).await;
+    assert_eq!(response["isError"], false, "{response}");
+    let window = &response["structuredContent"]["result"]["window"];
+    assert_eq!(window["census"]["requests"], 18, "{window}");
+    let cost = &window["read_cost"];
+    assert_eq!(cost["ended"], "read", "{window}");
+    assert_eq!(cost["census_reads"], 18, "{window}");
+    assert_eq!(cost["floor_seconds"], 9, "{window}");
+    assert_eq!(cost["vouchers_read"], 3, "{window}");
+    assert_eq!(cost["estimate"]["kind"], "derived", "{window}");
+    assert_eq!(
+        cost["estimate"]["host_240"]["state"], "window_fits",
+        "{window}"
+    );
+
+    let small =
+        call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
+    let window = &small["structuredContent"]["result"]["window"];
+    assert_eq!(window["census"]["requests"], 1, "{window}");
+    assert!(window.get("read_cost").is_none(), "{window}");
+}

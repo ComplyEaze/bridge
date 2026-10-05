@@ -948,6 +948,39 @@ covers only the identity and marks reads it sent.
   sent 232 requests, and a later page naming its snapshot took 1.2 s and sent 10
   requests. Before this change each later page repeated the whole read.
 
+### What a `vouchers` read cost (`window.read_cost`)
+
+The census a window read pays follows the book's voucher mark, not the window:
+on the largest book measured (mark about 1.03 million) one day is 126 census
+reads and 169 s, and a week's census is paid the same way (bridge#595). An
+assistant that reads a month day by day pays that census once a day. When a read
+took 20 s or more, or its census is 16 reads or more (a certain 8 s), the
+`window` of the result, and of a refusal that carries one, has a `read_cost`:
+
+- `ended` (`read` or `stopped`), `census_reads`, `vouchers_read` and
+  `observed_seconds` (`marks`, `census`, `parts`, `total`) are what this call did.
+- `floor_seconds` is a **measured lower bound**: each census read waits half a
+  second before the next (the shipped request spacing), so reads times 0.5 s is a
+  floor by construction, rounded down.
+- `estimate` is **derived** (`kind`) from this call's own timings and one
+  constant measured on one book, 37 ms of census per row: `fixed_seconds` is what
+  every call pays whatever its window (rounded up), `per_voucher_ms` the cost of
+  one more voucher (null when no voucher was read), and `host_240` how a window
+  of this book sits against the one measured host limit: `window_fits`,
+  `window_too_long` (each with `vouchers_at_most`, what one call could carry),
+  `no_window_fits` (what every call pays is already that long: name no window),
+  or `not_established` (no voucher was read). The constant over-states a
+  small-mark book's cost, which only narrows the advised window.
+- `host_limits` names each host and its basis: Claude Desktop's chat app on
+  macOS stops a silent call at 240 s (measured once, one build); on Windows it is
+  unmeasured; Claude Code stops a call only at a limit the user set.
+- `say` is the same in a sentence, outcome first. It refuses nothing and changes
+  no completeness rule; the figures are advice for the next call.
+
+A later page served from a held window carries the first page's `window`, so its
+`read_cost` is the first page's. Other tools that read a window do not report
+this block yet.
+
 ### Foreign-currency composites in `vouchers`
 
 A foreign amount entered on a rupee ledger can be stored by Tally as a

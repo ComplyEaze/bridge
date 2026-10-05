@@ -24,7 +24,7 @@
     },
     {
       "id": "knock_off_candidates.t2_candidate_total_paise",
-      "value": 3360000,
+      "value": 2760000,
       "unit": "paise",
       "definition_sha256_16": "c81320270dcf7017",
       "definition_text": "Bank and cash lines of the vouchers whose narration names a party ledger not on the voucher, summed -- a candidate total, not a reportable amount.",
@@ -147,22 +147,8 @@
       ]
     },
     {
-      "id": "knock_off_candidates.t2_named_count_fb4f0576",
-      "value": 1,
-      "unit": "count",
-      "definition_sha256_16": "fff34e30b992cb20",
-      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag fb4f0576) not on the voucher; a voucher naming two parties counts in both groups.",
-      "evidence": [
-        {
-          "kind": "voucher",
-          "id": "b06",
-          "label": "Payment b06 on 2025-06-20: narration: 'Paid Kappa Traders'"
-        }
-      ]
-    },
-    {
       "id": "knock_off_candidates.t2_named_pair_count",
-      "value": 12,
+      "value": 11,
       "unit": "count",
       "definition_sha256_16": "111e114ff2a3fa53",
       "definition_text": "Voucher and named-party pairs across the groups: equal to the voucher count unless a narration names more than one party.",
@@ -178,7 +164,7 @@
     },
     {
       "id": "knock_off_candidates.t2_named_total_paise_540eda69",
-      "value": 500000,
+      "value": 300000,
       "unit": "paise",
       "definition_sha256_16": "a502d6591bc097ab",
       "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 540eda69), summed -- a candidate total, not a reportable amount.",
@@ -209,16 +195,8 @@
       "evidence": []
     },
     {
-      "id": "knock_off_candidates.t2_named_total_paise_fb4f0576",
-      "value": 400000,
-      "unit": "paise",
-      "definition_sha256_16": "6a0be32c20370fca",
-      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag fb4f0576), summed -- a candidate total, not a reportable amount.",
-      "evidence": []
-    },
-    {
       "id": "knock_off_candidates.t2_row_count",
-      "value": 11,
+      "value": 10,
       "unit": "count",
       "definition_sha256_16": "a8baff95bb52e678",
       "definition_text": "Bank or cash vouchers whose narration names, as whole words, a party ledger not on the voucher.",
@@ -247,11 +225,6 @@
           "kind": "voucher",
           "id": "b05",
           "label": "Payment b05 on 2025-06-01: booked to Office Rent; narration names Beta Stores; narration: 'Rent handed to Beta Stores'"
-        },
-        {
-          "kind": "voucher",
-          "id": "b06",
-          "label": "Payment b06 on 2025-06-20: booked to Kappa Traders; narration names Kappa-Traders; narration: 'Paid Kappa Traders'"
         },
         {
           "kind": "voucher",
@@ -304,7 +277,7 @@
         {
           "kind": "ledger",
           "id": "Alpha Traders",
-          "label": "named in 2 voucher(s), ₹5,000 (a candidate total, not a reportable amount)"
+          "label": "named in 2 voucher(s), ₹3,000 (a candidate total, not a reportable amount)"
         },
         {
           "kind": "ledger",
@@ -320,11 +293,6 @@
           "kind": "ledger",
           "id": "Gamma Supplies",
           "label": "named in 4 voucher(s), ₹20,000 (a candidate total, not a reportable amount)"
-        },
-        {
-          "kind": "ledger",
-          "id": "Kappa-Traders",
-          "label": "named in 1 voucher(s), ₹4,000 (a candidate total, not a reportable amount)"
         },
         {
           "kind": "ledger",

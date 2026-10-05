@@ -267,9 +267,9 @@ fn say(cost: &Cost, ended: Ended) -> String {
             "Claude Desktop's chat app stops a call at 240 seconds (measured once, on one Mac build): one call there can carry about {at_most} vouchers (derived), so use the widest window within that, not many short calls."
         ),
         Fit::WindowTooLong { at_most } => format!(
-            "That is past 240 seconds, where Claude Desktop's chat app stops a call (measured once, on one Mac build): read about {at_most} vouchers or fewer per call (derived)."
+            "That is past 240 seconds, where Claude Desktop's chat app stops a call (measured once, on one Mac build): read about {at_most} vouchers or fewer per call (derived). For totals over a long period read trial_balance, which reads no vouchers."
         ),
-        Fit::NoWindowFits => "On a host that stops a call at 240 seconds (Claude Desktop's chat app, measured once on one Mac build) no window of this book fits, because what every call pays is already that long; do not suggest one.".to_string(),
+        Fit::NoWindowFits => "On a host that stops a call at 240 seconds (Claude Desktop's chat app, measured once on one Mac build) no window of this book fits, because what every call pays is already that long; do not suggest one. For totals over a long period read trial_balance, which reads no vouchers.".to_string(),
         Fit::NotEstablished => "No voucher was read, so how many one call can carry is not established.".to_string(),
     };
     format!("{lead} {fixed} {fit}")

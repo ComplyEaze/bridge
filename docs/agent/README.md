@@ -974,7 +974,10 @@ took 20 s or more, or its census is 16 reads or more (a certain 8 s), the
 - `host_limits` names each host and its basis: Claude Desktop's chat app on
   macOS stops a silent call at 240 s (measured once, one build); on Windows it is
   unmeasured; Claude Code stops a call only at a limit the user set.
-- `say` is the same in a sentence, outcome first. It refuses nothing and changes
+- `say` is the same in a sentence, outcome first. When a window would not fit,
+  or none does, it also points to `trial_balance` for totals over a long period
+  (windowed trial balances read no vouchers; verified on the largest book, 0
+  differences between monthly and yearly sums). It refuses nothing and changes
   no completeness rule; the figures are advice for the next call.
 
 A later page served from a held window carries the first page's `window`, so its

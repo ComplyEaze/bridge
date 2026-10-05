@@ -208,12 +208,12 @@ fn the_sentence_leads_with_the_outcome_and_labels_what_is_derived() {
     );
     assert_eq!(
         read_cost(&largest_book_week(), Ended::Read).unwrap()["say"],
-        "This read took 440 seconds for 5178 vouchers. About 120 seconds (derived) is paid on every call, however short the window, because this book needs 126 census reads; at least 63 of those seconds are certain. That is past 240 seconds, where Claude Desktop's chat app stops a call (measured once, on one Mac build): read about 1944 vouchers or fewer per call (derived)."
+        "This read took 440 seconds for 5178 vouchers. About 120 seconds (derived) is paid on every call, however short the window, because this book needs 126 census reads; at least 63 of those seconds are certain. That is past 240 seconds, where Claude Desktop's chat app stops a call (measured once, on one Mac build): read about 1944 vouchers or fewer per call (derived). For totals over a long period read trial_balance, which reads no vouchers."
     );
     let stopped = read_cost(&timings(0, (250, 300_000), vec![]), Ended::Stopped).unwrap();
     assert_eq!(
         stopped["say"],
-        "This read stopped after 300 seconds with 0 vouchers read. About 300 seconds (derived) is paid on every call, however short the window, because this book needs 250 census reads; at least 125 of those seconds are certain. On a host that stops a call at 240 seconds (Claude Desktop's chat app, measured once on one Mac build) no window of this book fits, because what every call pays is already that long; do not suggest one."
+        "This read stopped after 300 seconds with 0 vouchers read. About 300 seconds (derived) is paid on every call, however short the window, because this book needs 250 census reads; at least 125 of those seconds are certain. On a host that stops a call at 240 seconds (Claude Desktop's chat app, measured once on one Mac build) no window of this book fits, because what every call pays is already that long; do not suggest one. For totals over a long period read trial_balance, which reads no vouchers."
     );
 }
 

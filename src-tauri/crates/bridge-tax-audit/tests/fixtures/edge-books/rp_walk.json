@@ -1,0 +1,419 @@
+{
+ "comment": "related_parties_cl23: the per-voucher walk. Person W's purchases set lists one ledger twice; a voucher on two ledgers of the set is one entry, net; a reclassification between them nets to zero and is dropped; two lines on one ledger in one voucher are one entry; cancelled, optional and post-dated vouchers on the set are excluded. Person Y's one purchase is large (beyond 32 bits). Rent has a voucher with no number (its label falls back to the GUID's last 12 characters) and a voucher type other than its base type. Person X's interest entries are 1 paisa, 4,321 paise and minus 37 paise.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Indirect Incomes": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Sundry Creditors": "Current Liabilities"
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_walk-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-rp_walk-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_walk-002"
+  },
+  {
+   "name": "Person W Purchase Returns",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-rp_walk-003"
+  },
+  {
+   "name": "Person W Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-rp_walk-004"
+  },
+  {
+   "name": "Person Y Creditor",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-rp_walk-005"
+  },
+  {
+   "name": "Person Y Imports",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-rp_walk-006"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_walk-007"
+  },
+  {
+   "name": "Walk Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_walk-008"
+  },
+  {
+   "name": "Walk Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_walk-009"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 10000000,
+   "debit": 700000,
+   "credit": 3940000,
+   "closing": 6760000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -10100000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -10100000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 100000,
+   "debit": 0,
+   "credit": 4321,
+   "closing": 95679
+  },
+  {
+   "ledger": "Person W Purchase Returns",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 1200000,
+   "closing": -900000
+  },
+  {
+   "ledger": "Person W Purchases",
+   "opening": 0,
+   "debit": 2040000,
+   "credit": 300000,
+   "closing": 1740000
+  },
+  {
+   "ledger": "Person Y Creditor",
+   "opening": 0,
+   "debit": 0,
+   "credit": 3000000000,
+   "closing": -3000000000
+  },
+  {
+   "ledger": "Person Y Imports",
+   "opening": 0,
+   "debit": 3000000000,
+   "credit": 0,
+   "closing": 3000000000
+  },
+  {
+   "ledger": "Round Off",
+   "opening": 0,
+   "debit": 37,
+   "credit": 1,
+   "closing": 36
+  },
+  {
+   "ledger": "Walk Interest",
+   "opening": 0,
+   "debit": 4322,
+   "credit": 37,
+   "closing": 4285
+  },
+  {
+   "ledger": "Walk Rent",
+   "opening": 0,
+   "debit": 2400000,
+   "credit": 0,
+   "closing": 2400000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "y01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Person Y Imports",
+     3000000000
+    ],
+    [
+     "Person Y Creditor",
+     -3000000000
+    ]
+   ]
+  },
+  {
+   "guid": "r01",
+   "date": "2025-05-20",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     700000
+    ],
+    [
+     "Person W Purchase Returns",
+     -700000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Person W Purchase Returns",
+     300000
+    ],
+    [
+     "Person W Purchases",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person W Purchases",
+     2000000
+    ],
+    [
+     "Person W Purchase Returns",
+     -500000
+    ],
+    [
+     "Bank A",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2025-08-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person W Purchases",
+     30000
+    ],
+    [
+     "Person W Purchases",
+     10000
+    ],
+    [
+     "Bank A",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "c01",
+   "date": "2025-09-01",
+   "base_type": "Payment",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Person W Purchases",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "o01",
+   "date": "2025-09-02",
+   "base_type": "Journal",
+   "status": "optional",
+   "lines": [
+    [
+     "Person W Purchases",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d01",
+   "date": "2025-09-03",
+   "base_type": "Payment",
+   "status": "postdated",
+   "lines": [
+    [
+     "Person W Purchases",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "walk-voucher-without-number",
+   "date": "2025-10-01",
+   "base_type": "Payment",
+   "number": "",
+   "lines": [
+    [
+     "Walk Rent",
+     1200000
+    ],
+    [
+     "Bank A",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "p05",
+   "date": "2025-11-01",
+   "base_type": "Payment",
+   "vtype": "Rent Payment",
+   "number": "5",
+   "lines": [
+    [
+     "Walk Rent",
+     1200000
+    ],
+    [
+     "Bank A",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "x01",
+   "date": "2025-12-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Walk Interest",
+     1
+    ],
+    [
+     "Round Off",
+     -1
+    ]
+   ]
+  },
+  {
+   "guid": "x02",
+   "date": "2025-12-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Walk Interest",
+     4321
+    ],
+    [
+     "Cash",
+     -4321
+    ]
+   ]
+  },
+  {
+   "guid": "x03",
+   "date": "2025-12-03",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Walk Interest",
+     -37
+    ],
+    [
+     "Round Off",
+     37
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "related_parties": {
+  "Person W": {
+   "relationship": "sister of a partner",
+   "ledgers_by_nature": {
+    "purchases": [
+     "Person W Purchases",
+     "Person W Purchase Returns",
+     "Person W Purchases"
+    ],
+    "rent": [
+     "Walk Rent"
+    ]
+   },
+   "payable_natures": []
+  },
+  "Person X": {
+   "relationship": "cousin of a partner",
+   "ledgers_by_nature": {
+    "interest": [
+     "Walk Interest"
+    ]
+   }
+  },
+  "Person Y": {
+   "relationship": "son of a partner",
+   "ledgers_by_nature": {
+    "purchases": [
+     "Person Y Imports"
+    ]
+   }
+  }
+ }
+}

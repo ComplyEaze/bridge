@@ -33,7 +33,7 @@
 //!   drift can judge.
 //!
 //! **Scope.** This port's registry above is a strict subset of the reference implementation's
-//! (which also binds names inside `gst_outward`, `related_parties`, and more): only the locations the ported tests actually read. A real client config's `[ledger_ids]`/
+//! (which also binds names inside `gst_outward` and more): only the locations the ported tests actually read. A real client config's `[ledger_ids]`/
 //! `[group_ids]` tables are written for the reference implementation's full pack and will
 //! typically carry many labels this port never looks at; [`BIND_ID_UNUSED`] is checked only
 //! against the locations this module reads, so this crate never refuses over a label some other,
@@ -877,6 +877,49 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         partners: partner_entries,
     };
 
+    // `[related_parties.*]`'s one name location (spec pack related_parties_cl23 §2.5): every list
+    // under each person's `ledgers_by_nature`, whatever the nature (a name the test ignores is
+    // still a ledger the client named). Persons are visited in key order and natures in key
+    // order. A person or `ledgers_by_nature` that is not a table is left as written for the test
+    // to refuse (`RELATED-table-shape`); a list that is not a list of names refuses here, as every
+    // malformed name location does.
+    // PROVISIONAL: its place among the reference's LEDGER_PATHS is asked on #1148 (Q4).
+    let mut related_persons: BTreeMap<String, toml::Value> =
+        table_at(&engagement.raw_cfg, &["related_parties"])?
+            .map(|t| t.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .unwrap_or_default();
+    for (person, entry) in &mut related_persons {
+        let Some(natures) = entry
+            .as_table_mut()
+            .and_then(|t| t.get_mut("ledgers_by_nature"))
+            .and_then(toml::Value::as_table_mut)
+        else {
+            continue;
+        };
+        for (nature, v) in natures.iter_mut() {
+            let location = format!("related_parties.{person}.ledgers_by_nature.{nature}");
+            let names: Vec<String> = v
+                .as_array()
+                .and_then(|a| a.iter().map(|x| x.as_str().map(str::to_string)).collect())
+                .ok_or_else(|| {
+                    AuditError::refused(
+                        BIND_ID_MALFORMED,
+                        format!("{location}: expected a list of names, got {v}"),
+                    )
+                })?;
+            *v = toml::Value::Array(
+                lbinder
+                    .bind_list(&names, &location)?
+                    .into_iter()
+                    .map(toml::Value::from)
+                    .collect(),
+            );
+        }
+    }
+    let related_parties = crate::RelatedPartiesConfig {
+        persons: related_persons,
+    };
+
     // The two tables `statutory_dues_43b` and `creditor_ageing_43bh` read, in the reference's
     // LEDGER_PATHS order. Only the name locations' shapes are checked here; every value is kept as
     // written and typed when its own test runs (see `CreditorAgeingConfig`).
@@ -1027,6 +1070,7 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         depreciation,
         partner_interest_ledgers,
         partners,
+        related_parties,
         creditor_groups,
         trade_creditors_source,
         creditor_ageing,
@@ -2214,6 +2258,51 @@ deductor_aliases = 5\n"
         let err = engagement_err("\n[partners.a]\ninterest_ledger = 5\n");
         assert!(matches!(err, AuditError::Config(_)));
         assert!(format!("{err}").contains("[partners].a.interest_ledger"));
+    }
+
+    #[test]
+    fn related_party_ledgers_are_bound_and_follow_a_rename_by_identity() {
+        // An unknown name refuses; a label renamed since the table was written binds to the
+        // ledger's current name; a label used only here is not unused; and every nature's list is
+        // a location, one the test ignores included.
+        let unknown = engagement(
+            "\n[related_parties.\"Person A\"]\nledgers_by_nature = { salary = [\"A Salary\"] }\n",
+        );
+        let b = book_with_interest_ledger("A salary", "", None); // case differs
+        assert_eq!(
+            unknown.bind(&b).unwrap_err().code(),
+            Some(BIND_NAME_UNKNOWN)
+        );
+        let renamed = engagement(&format!(
+            "\n[ledger_ids]\n\"Old Salary\" = {G_ROUNDOFF:?}\n\
+             \n[related_parties.\"Person A\"]\nledgers_by_nature = {{ commission = [\"Old Salary\"] }}\n"
+        ));
+        let b = book_with_interest_ledger("Person A Salary", G_ROUNDOFF, None);
+        let (bound, _) = renamed.bind(&b).unwrap();
+        assert_eq!(
+            bound.related_parties.persons["Person A"]["ledgers_by_nature"]["commission"],
+            toml::Value::Array(vec!["Person A Salary".into()])
+        );
+    }
+
+    #[test]
+    fn a_related_party_ledger_list_that_is_not_names_refuses_and_other_shapes_wait_for_the_test() {
+        let b = book_with_interest_ledger("A Salary", "", None);
+        let malformed = engagement(
+            "\n[related_parties.\"Person A\"]\nledgers_by_nature = { salary = \"A Salary\" }\n",
+        );
+        assert_eq!(
+            malformed.bind(&b).unwrap_err().code(),
+            Some(BIND_ID_MALFORMED)
+        );
+        // A person that is not a table names no location: binding passes it on as written, and
+        // related_parties_cl23 refuses it (RELATED-table-shape).
+        let not_a_table = engagement("\n[related_parties]\n\"Person A\" = \"brother\"\n");
+        let (bound, _) = not_a_table.bind(&b).unwrap();
+        assert_eq!(
+            bound.related_parties.persons["Person A"],
+            toml::Value::from("brother")
+        );
     }
 
     // The reference binds all three [partners.*] ledger locations (LEDGER_PATHS), not only the

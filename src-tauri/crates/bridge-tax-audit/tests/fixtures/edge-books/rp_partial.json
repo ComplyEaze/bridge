@@ -1,0 +1,202 @@
+{
+ "comment": "related_parties_cl23: partly configured persons. Person B has no relationship key, one nature with ledgers and one with an empty list, and a payable nature it does not configure. Person C is an empty table: still a confirmed person, so the gate is 'yes' and the count is 3. Person D's rent and other nets cancel, so the total is 0 and the findings are still raised.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Indirect Incomes": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Sundry Creditors": "Current Liabilities"
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_partial-000"
+  },
+  {
+   "name": "Beta Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_partial-001"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-rp_partial-002"
+  },
+  {
+   "name": "Delta Recovery",
+   "chain": [
+    "Indirect Incomes"
+   ],
+   "guid": "edge-rp_partial-003"
+  },
+  {
+   "name": "Delta Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_partial-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-rp_partial-005"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 2000000,
+   "debit": 12000000,
+   "credit": 3800000,
+   "closing": 10200000
+  },
+  {
+   "ledger": "Beta Rent",
+   "opening": 0,
+   "debit": 1800000,
+   "credit": 0,
+   "closing": 1800000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -2000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -2000000
+  },
+  {
+   "ledger": "Delta Recovery",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2000000,
+   "closing": -2000000
+  },
+  {
+   "ledger": "Delta Rent",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 0,
+   "closing": 2000000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000000,
+   "closing": -10000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-20",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     10000000
+    ],
+    [
+     "Sales",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-05-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Beta Rent",
+     1800000
+    ],
+    [
+     "Bank A",
+     -1800000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Delta Rent",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "r02",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     2000000
+    ],
+    [
+     "Delta Recovery",
+     -2000000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ],
+ "related_parties": {
+  "Person B": {
+   "ledgers_by_nature": {
+    "rent": [
+     "Beta Rent"
+    ],
+    "other": []
+   },
+   "payable_natures": [
+    "salary"
+   ]
+  },
+  "Person C": {},
+  "Person D": {
+   "relationship": "spouse of the proprietor",
+   "ledgers_by_nature": {
+    "rent": [
+     "Delta Rent"
+    ],
+    "other": [
+     "Delta Recovery"
+    ]
+   }
+  }
+ }
+}

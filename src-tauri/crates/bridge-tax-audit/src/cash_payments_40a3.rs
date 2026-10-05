@@ -136,10 +136,12 @@ pub(crate) fn group_for_kind(kind: &str) -> Result<&'static str> {
 
 use crate::support::{rupees, voucher_label};
 
-/// One (date, ledger) row's aggregate: cash amount and the distinct vouchers that contributed.
+/// One (date, ledger) row's aggregate: cash amount and the distinct vouchers that contributed, keyed by
+/// GUID and label as a figure's set of refs is, so two vouchers sharing a GUID in one row are both
+/// cited unless their refs are identical (#1195).
 pub(crate) struct RowAgg<'a> {
     pub(crate) paise: i64,
-    pub(crate) vouchers: BTreeMap<String, &'a Voucher>,
+    pub(crate) vouchers: BTreeMap<(String, String), &'a Voucher>,
     /// The names its vouchers print: shown with a pooling s.40A(3) row or a pooled s.269ST row
     /// with no party ledger, never used to key or attribute.
     names: PrintedNames,
@@ -156,19 +158,19 @@ impl<'a> RowAgg<'a> {
 
     fn add(&mut self, amount: i64, v: &'a Voucher) -> Result<()> {
         self.paise = self.paise.checked_add(amount).ok_or_else(overflow)?;
-        self.vouchers.insert(v.guid.clone(), v);
+        self.vouchers.insert((v.guid.clone(), voucher_label(v)), v);
         Ok(())
     }
 }
 
 pub(crate) type RowMap<'a> = BTreeMap<(TallyDate, String), RowAgg<'a>>;
 
-/// Evidence refs for one voucher map: sorted by guid, each carrying the fixed voucher label the
+/// Evidence refs for one voucher map: sorted by guid and label, each carrying the fixed voucher label the
 /// canonical serialiser compares.
-fn evidence_for_vouchers(vouchers: &BTreeMap<String, &Voucher>) -> Vec<EvidenceRef> {
+fn evidence_for_vouchers(vouchers: &BTreeMap<(String, String), &Voucher>) -> Vec<EvidenceRef> {
     vouchers
         .iter()
-        .map(|(g, v)| EvidenceRef::with_label("voucher", g, &voucher_label(v)))
+        .map(|((g, _), v)| EvidenceRef::with_label("voucher", g, &voucher_label(v)))
         .collect()
 }
 
@@ -178,7 +180,7 @@ fn evidence_for_vouchers(vouchers: &BTreeMap<String, &Voucher>) -> Vec<EvidenceR
 fn evidence_for_rows(rows: &RowMap<'_>) -> Vec<EvidenceRef> {
     let mut all: BTreeSet<(String, String)> = BTreeSet::new();
     for agg in rows.values() {
-        for (g, v) in &agg.vouchers {
+        for ((g, _), v) in &agg.vouchers {
             all.insert((g.clone(), voucher_label(v)));
         }
     }

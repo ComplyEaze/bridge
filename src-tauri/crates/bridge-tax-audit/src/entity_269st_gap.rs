@@ -81,7 +81,9 @@ pub fn run(
                 binding,
             });
         slot.paise = slot.paise.checked_add(data.paise).ok_or_else(overflow)?;
-        for (g, v) in &data.vouchers {
+        // One unlabelled ref per distinct GUID: a row's vouchers are keyed by GUID and label (#1195),
+        // and a ref with no label cannot tell two vouchers sharing a GUID apart.
+        for ((g, _), v) in &data.vouchers {
             slot.vouchers.insert(g.clone(), v);
         }
         slot.ledgers.insert(ledger_name.clone(), data.paise);

@@ -7612,8 +7612,8 @@
   "by": "author",
   "what": "a finding id ignores the voucher",
   "file": "src/counter_cheques_40a3.rs",
-  "from": "let rid = format!(\"{day}_{}\", hash8(&format!(\"{}|{tag}\", v.guid)));",
-  "to": "let rid = format!(\"{day}_{}\", hash8(&format!(\"{tag}\")));"
+  "from": "hash8(&format!(\"{}|{tag}\", v.guid))",
+  "to": "hash8(&format!(\"{tag}\"))"
  },
  {
   "id": "CQ-17",
@@ -9158,5 +9158,77 @@
   "file": "src/loans_interest.rs",
   "from": "other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
   "to": "other_loans.contains(l.ledger.as_str()) && l.amount_paise > 0)"
+ },
+ {
+  "id": "CP-48",
+  "by": "author",
+  "what": "cash_payments_40a3 keys a row's vouchers by GUID alone (the pre-#1195 row map)",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        self.vouchers.insert((v.guid.clone(), voucher_label(v)), v);",
+  "to": "        self.vouchers.insert((v.guid.clone(), String::new()), v);"
+ },
+ {
+  "id": "HV-30",
+  "by": "author",
+  "what": "high_value_register keys a row's vouchers by GUID alone (the pre-#1195 row map)",
+  "file": "src/high_value_register.rs",
+  "from": "        self.vouchers.insert((v.guid.clone(), voucher_label(v)), v);",
+  "to": "        self.vouchers.insert((v.guid.clone(), String::new()), v);"
+ },
+ {
+  "id": "HV-31",
+  "by": "author",
+  "what": "the referenced-voucher count reads the labels of the referenced vouchers' keys, not their GUIDs",
+  "file": "src/high_value_register.rs",
+  "from": "    let with_ref: BTreeSet<&String> = rows\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))",
+  "to": "    let with_ref: BTreeSet<&String> = rows\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(_, l)| l))"
+ },
+ {
+  "id": "HV-32",
+  "by": "author",
+  "what": "the all-vouchers side of the no-reference count reads labels, not GUIDs",
+  "file": "src/high_value_register.rs",
+  "from": "    let all_guids: BTreeSet<&String> = with_money_leg\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))",
+  "to": "    let all_guids: BTreeSet<&String> = with_money_leg\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(_, l)| l))"
+ },
+ {
+  "id": "EG-69",
+  "by": "author",
+  "what": "the gap row's refs are keyed by GUID and label, so two vouchers sharing a GUID are cited twice",
+  "file": "src/entity_269st_gap.rs",
+  "from": "        for ((g, _), v) in &data.vouchers {\n            slot.vouchers.insert(g.clone(), v);",
+  "to": "        for ((g, l), v) in &data.vouchers {\n            slot.vouchers.insert(format!(\"{g}|{l}\"), v);"
+ },
+ {
+  "id": "CQ-33",
+  "by": "author",
+  "what": "a repeated counter-cheque row id never takes a suffix",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "        let rid = if repeated.contains(base.as_str()) {",
+  "to": "        let rid = if false && repeated.contains(base.as_str()) {"
+ },
+ {
+  "id": "CQ-34",
+  "by": "author",
+  "what": "every counter-cheque row id takes a suffix, even a unique one",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "        let rid = if repeated.contains(base.as_str()) {",
+  "to": "        let rid = if true {"
+ },
+ {
+  "id": "CQ-35",
+  "by": "author",
+  "what": "a repeated counter-cheque row id's suffix counts from 0",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            format!(\"{base}_{k}\")",
+  "to": "            format!(\"{base}_{}\", *k - 1)"
+ },
+ {
+  "id": "CQ-36",
+  "by": "author",
+  "what": "a repeated counter-cheque row id's suffixes are given in reverse reading order",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "    for (row, base) in over.iter().zip(&base_ids) {",
+  "to": "    for (row, base) in over.iter().rev().zip(base_ids.iter().rev()) {"
  }
 ]

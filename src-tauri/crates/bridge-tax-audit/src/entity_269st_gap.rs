@@ -8,7 +8,10 @@
 //! constituent ledger did. Every finding is judgement-required: the books show that ledgers share
 //! one PAN, only the CA can confirm they are one person.
 //!
-//! A figure id carries the entity's PAN (`entity_day_total_<day>_<PAN>`), as the reference's does.
+//! A figure id carries an 8-hex tag of the entity's PAN (`entity_day_total_<day>_<tag>`), as every
+//! other per-party id does (`support::hash8` of the PAN as written, no normalisation), so the PAN
+//! never prints in an id or in an error that quotes one (bridge#1145 item 9). The PAN itself
+//! travels once, as the finding's `pan` evidence ref, as the reference's does.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -21,7 +24,7 @@ use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value}
 use crate::party_identity::{EntityBinding, PanSource, PartyIndex};
 use crate::read::iso;
 use crate::rules::Rules;
-use crate::support::count;
+use crate::support::{count, hash8};
 
 pub const TEST_ID: &str = "entity_269st_gap";
 pub const VERSION: &str = "1.0.0";
@@ -99,7 +102,7 @@ pub fn run(
         gap_total = gap_total.checked_add(slot.paise).ok_or_else(overflow)?;
         gap_rows += 1;
         let day_text = iso(day);
-        let rid = format!("{day_text}_{pan}");
+        let rid = format!("{day_text}_{}", hash8(pan));
         let ledger_count = slot.ledgers.len();
         let f_amt = r.fig(
             &format!("entity_day_total_{rid}"),
@@ -150,6 +153,7 @@ them as one person."
         }
         let mut evidence = voucher_evidence(&slot.vouchers);
         evidence.extend(slot.ledgers.keys().map(|l| EvidenceRef::new("ledger", l)));
+        evidence.push(EvidenceRef::new("pan", &binding.pan));
         r.findings.push(Finding {
             id: format!("{TEST_ID}/{rid}"),
             clauses: vec!["s.269ST(a)".to_string(), "3CD-31(ba)".to_string()],
@@ -242,12 +246,12 @@ mod tests {
             }
             r
         };
-        let day = "entity_largest_single_ledger_2025-06-01_PAN-ABCDE";
+        let day = "entity_largest_single_ledger_2025-06-01_4d8a6b4a";
         assert!(check_invariants(&result_with(&[(day, GAP_1_LIMIT_PAISE - 1)])).is_empty());
         let fired = check_invariants(&result_with(&[
             (day, GAP_1_LIMIT_PAISE),
             (
-                "entity_day_total_2025-06-01_PAN-ABCDE",
+                "entity_day_total_2025-06-01_4d8a6b4a",
                 GAP_1_LIMIT_PAISE * 3,
             ),
         ]));

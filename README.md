@@ -73,7 +73,7 @@ with no figures, to a log on this computer.
 | `verify_import` | Reads back a batch you imported by hand in TallyPrime | Proof files and status records on this computer |
 | `voucher_presence` | Which proposed vouchers are already in the book | Nothing |
 | `voucher_schema` | The voucher-file format, without asking TallyPrime | Nothing |
-| `vouchers` | The vouchers in a period | Nothing |
+| `vouchers` | The vouchers in a period, optionally searched by voucher number, reference, narration or amount, or summarised by ledger, month or voucher type (search and summaries not yet measured against a live book) | Nothing |
 
 With posting turned on in the extension, two more appear: `post_import` posts one saved voucher after you approve it in a
 ComplyEaze Bridge window, and `acknowledge_post_review` asks you, in its own window, to record that you reviewed a posted voucher
@@ -96,13 +96,15 @@ whose ledger now points to a different master.
   separate ComplyEaze Bridge window. No Bridge tool lets the assistant approve
   it, and an approval counts only when that window returns a fresh one-time
   token. After posting, the voucher is read back from Tally so you can see what
-  landed. Three known limits remain: ComplyEaze Bridge cannot undo a posted
+  landed. Four known limits remain: ComplyEaze Bridge cannot undo a posted
   voucher (you correct it in Tally); a company renamed to, or loaded under, the
   target company's name (or one differing only in case or spacing) just after
   its last check could still receive the voucher, if it has the voucher's
   ledgers, and ComplyEaze Bridge cannot always say where it went or prevent it;
-  and a ledger renamed and replaced in that same moment could receive the
-  entry, and not every such change is noticed. Read *Before you turn on
+  a ledger renamed and replaced in that same moment could receive the
+  entry, and not every such change is noticed; and the approval window covers
+  only ComplyEaze Bridge, so another Tally connector in the same Claude Desktop
+  that can change entries can do so without it. Read *Before you turn on
   posting* first.
 - **Tool calls leave receipts** in a log on your computer: the company's Tally
   identifier, and a fingerprint of what was asked and of what came back,

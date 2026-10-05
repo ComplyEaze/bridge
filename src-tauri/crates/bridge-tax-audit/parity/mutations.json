@@ -9102,5 +9102,45 @@
   "file": "src/bank_reconciliation.rs",
   "from": "let mut evidence: Vec<EvidenceRef> = books_by_reason[REASON_NOT_COMPUTED]",
   "to": "let mut evidence: Vec<EvidenceRef> = Vec::<usize>::new()"
+ },
+ {
+  "id": "EG-63",
+  "by": "author",
+  "what": "a finding and its figures are keyed by the raw PAN, not its tag",
+  "file": "src/entity_269st_gap.rs",
+  "from": "let rid = format!(\"{day_text}_{}\", hash8(pan));",
+  "to": "let rid = format!(\"{day_text}_{pan}\");"
+ },
+ {
+  "id": "EG-65",
+  "by": "author",
+  "what": "a gap finding does not cite the PAN",
+  "file": "src/entity_269st_gap.rs",
+  "from": "        evidence.push(EvidenceRef::new(\"pan\", &binding.pan));\n",
+  "to": ""
+ },
+ {
+  "id": "EG-66",
+  "by": "author",
+  "what": "the pan evidence ref carries the tag, not the PAN",
+  "file": "src/entity_269st_gap.rs",
+  "from": "EvidenceRef::new(\"pan\", &binding.pan)",
+  "to": "EvidenceRef::new(\"pan\", &hash8(&binding.pan))"
+ },
+ {
+  "id": "EG-67",
+  "by": "author",
+  "what": "the PAN is cited as a ledger name",
+  "file": "src/entity_269st_gap.rs",
+  "from": "EvidenceRef::new(\"pan\", &binding.pan)",
+  "to": "EvidenceRef::new(\"ledger\", &binding.pan)"
+ },
+ {
+  "id": "EG-68",
+  "by": "author",
+  "what": "the PAN is lower-cased before it is hashed",
+  "file": "src/entity_269st_gap.rs",
+  "from": "hash8(pan)",
+  "to": "hash8(&pan.to_lowercase())"
  }
 ]

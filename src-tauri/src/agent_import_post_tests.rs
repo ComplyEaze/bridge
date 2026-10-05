@@ -399,11 +399,14 @@ fn a_busy_readback_after_a_recorded_send_names_verify_import_never_a_rebuild() {
         error["next_step"],
         "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again."
     );
-    // Held back before any attempt was recorded: it says when to retry but
-    // offers no verify_import step.
+    // Held back before any attempt was recorded: it says when to try again,
+    // and that the person approves again, never a verify_import step (#869).
     let before =
         reconciliation_failure_payload("bridge-test", Some(false), None, "tally_endpoint_busy");
-    assert!(before["result"]["error"].get("next_step").is_none());
+    assert_eq!(
+        before["result"]["error"]["next_step"],
+        "Nothing was posted: Tally's port was busy. Call post_import with this same batch again after retry_after_s seconds, once Tally is free. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch."
+    );
     assert_eq!(
         before["result"]["error"]["retry_after_s"],
         bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
@@ -452,6 +455,22 @@ fn a_row_refusal_without_a_named_blocker_still_says_not_to_rebuild() {
     assert!(step.contains("and say which"), "{step}");
     assert!(step.contains("Never rename a statement row"), "{step}");
     assert!(error.get("blocking_batch_id").is_none());
+}
+
+/// A queued read the transport did not start because the call was withdrawn
+/// (#778) names the withdrawal, `request_cancelled`, as a call withdrawn
+/// before its operation started does, never the operation's read failure.
+#[test]
+fn a_send_withdrawn_before_the_intent_names_the_withdrawal() {
+    let withdrawn = || {
+        anyhow::Error::from(crate::tally::approved_import::PreIntentQueueRefusal {
+            source: anyhow::Error::new(bridge_tally_transport::TallyTransportError::SendWithdrawn),
+        })
+    };
+    assert_eq!(
+        ToolFailure::from_runtime("post_queue_read_failed", withdrawn()).code,
+        "request_cancelled"
+    );
 }
 
 /// A wire refusal replaces a generic failure code with the refusal's own, but

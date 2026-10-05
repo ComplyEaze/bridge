@@ -84,6 +84,42 @@ impl WireRoot {
 pub(crate) struct WireGateConfig {
     root: WireRoot,
     retry: WireRetryPolicy,
+    /// Test only: the send, counted over every client of the runtime from 0,
+    /// whose every try is refused busy (#869).
+    #[cfg(test)]
+    busy_at: Option<Arc<BusyAt>>,
+}
+
+/// Counts the sends granted so far, and refuses every try of one of them.
+#[cfg(test)]
+pub(crate) struct BusyAt {
+    send: usize,
+    granted: std::sync::atomic::AtomicUsize,
+}
+
+/// The file lock, except that every try of one chosen send is refused busy,
+/// as another process holding the lock for that whole send would.
+#[cfg(test)]
+struct BusyAtGate {
+    inner: FileWireGate,
+    busy: Arc<BusyAt>,
+}
+
+#[cfg(test)]
+impl TallyWireGate for BusyAtGate {
+    fn try_acquire(&self) -> Result<Box<dyn WireLockHeld>, WireRefusal> {
+        use std::sync::atomic::Ordering;
+        if self.busy.granted.load(Ordering::SeqCst) == self.busy.send {
+            return Err(WireRefusal::Busy);
+        }
+        let held = self.inner.try_acquire()?;
+        self.busy.granted.fetch_add(1, Ordering::SeqCst);
+        Ok(held)
+    }
+
+    fn pause(&self, delay: Duration) -> WirePause {
+        self.inner.pause(delay)
+    }
 }
 
 impl Default for WireGateConfig {
@@ -95,6 +131,8 @@ impl Default for WireGateConfig {
         Self {
             root,
             retry: WireRetryPolicy::DEFAULT,
+            #[cfg(test)]
+            busy_at: None,
         }
     }
 }
@@ -110,7 +148,28 @@ impl WireGateConfig {
     }
 
     pub(crate) fn gate_for(&self, endpoint: &TallyEndpointConfig) -> Arc<dyn TallyWireGate> {
-        Arc::new(FileWireGate::new(self.root.clone(), endpoint.clone()))
+        let file = FileWireGate::new(self.root.clone(), endpoint.clone());
+        #[cfg(test)]
+        if let Some(busy) = &self.busy_at {
+            return Arc::new(BusyAtGate {
+                inner: file,
+                busy: busy.clone(),
+            });
+        }
+        Arc::new(file)
+    }
+
+    /// Test only: refuse every try of the `send`th send busy (0-based, over
+    /// every client of the runtime), waiting at most `total` for it.
+    #[cfg(test)]
+    pub(crate) fn busy_at_send(mut self, send: usize, total: Duration) -> Self {
+        self.busy_at = Some(Arc::new(BusyAt {
+            send,
+            granted: std::sync::atomic::AtomicUsize::new(0),
+        }));
+        self.retry =
+            WireRetryPolicy::new(Duration::from_millis(1), total).expect("a test wire policy");
+        self
     }
 
     #[cfg(test)]

@@ -40,6 +40,22 @@ yourself. This page does not rank products.
     Check for an outside review, a security policy with a way to report a
     problem, and what the terms say about liability.
 
+## Tally's own tools, next to ComplyEaze Bridge
+
+Tally's own tools as described on its help site (the dates are Tally's own
+"last updated" dates), beside ComplyEaze Bridge's. ComplyEaze Bridge is not made
+by, or affiliated with, Tally Solutions, we have not run the two side by side,
+and this page does not rank them.
+
+| Job | Tally Solutions | ComplyEaze Bridge |
+| --- | --- | --- |
+| Ask Claude about a client's books | TallyPrime MCP plug-in for Claude Desktop: tools in six groups (company, master, accounting, inventory, outstanding and transaction), as described on [Tally's tools page](https://help.tallysolutions.com/tallyprime-mcp-tools/) (last updated 18 September 2026) | Read tools for companies, the trial balance, outstandings with ageing, vouchers, ledger movement, the purchase and sales registers and stock values; it changes nothing in TallyPrime unless you turn posting on |
+| Bank statements | TallyPrime's Bank Statement import, in the formats Tally lists for each bank ([Tally's list of supported banks](https://help.tallysolutions.com/list-of-banks-supported-by-tallyprime-for-e-payments-auto-brs-and-cheque-formats/)) | Reads a client's statement in a supported layout (the README lists them) into Payment, Receipt and Contra vouchers as a file you import yourself, and can read the batch back; the whole path has not yet been recorded end to end against TallyPrime |
+
+Where ComplyEaze Bridge is behind: three banks' statement layouts; no stock quantities; not yet
+code-signed; and a short list of runs against a real TallyPrime (the README
+lists each run).
+
 ## How ComplyEaze Bridge answers them
 
 ComplyEaze Bridge is our TallyPrime MCP server for Claude Desktop. In short:

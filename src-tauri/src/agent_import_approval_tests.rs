@@ -1871,6 +1871,7 @@ fn the_agent_preview_says_when_the_post_happens() {
                     [
                         "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
                         "Each voucher: type, date, amount, ledger, narration (references not shown):",
+                        "Each line ends with its narration, quoted exactly as it will be posted.",
                     ]
                     .contains(&line),
                     "an unexpected line about narrations: {line:?}"

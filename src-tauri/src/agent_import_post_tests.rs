@@ -2723,6 +2723,7 @@ fn a_small_batch_lists_each_voucher_on_one_line() {
         voucher_block(&preview),
         [
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
+            "Each line ends with its narration, quoted exactly as it will be posted.",
             "Journal 20260901  12.5  \"Expense\"  \"Synthetic test only\"",
             "Receipt 20260902  40  \"Party A\"  \"Synthetic test only\"",
             "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
@@ -2744,7 +2745,7 @@ fn a_small_batch_lists_each_voucher_on_one_line() {
     .unwrap();
     let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
     assert_eq!(
-        voucher_block(&preview)[1..3],
+        voucher_block(&preview)[2..4],
         [
             "Journal 20260901  12.5  \"Expense\" +1  \"Synthetic test only\"",
             "Receipt 20260902  40  \"Party C\" +1  \"Synthetic test only\"",
@@ -2772,7 +2773,7 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
     }
     let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
     assert_eq!(
-        voucher_block(&preview)[1..],
+        voucher_block(&preview)[2..],
         [
             "Journal 20260901  12.5  \"Expense\"  \"जुलाई का किराया ₹500\"",
             "Receipt 20260902  40  \"Party A\"  \"NEFT CR 000123456789 SYNTHETIC TRADERS R\"… (+17 characters)",
@@ -2812,6 +2813,77 @@ fn an_unsafe_narration_or_reference_leaves_the_totals_and_says_so() {
     }
 }
 
+/// A narration holding a shape a line of this dialog begins with is withheld
+/// on its voucher's line (#1063 follow-up): the dialog wraps long lines, so its
+/// tail could begin a row that passes for a real one. Only that narration is
+/// withheld; ordinary bank narrations that hold DR or CR with a number, a
+/// doctor's name or a MICR code are listed.
+#[test]
+fn a_narration_that_reads_like_a_dialog_line_is_withheld_on_its_line() {
+    let withheld =
+        "Receipt 20260902  40  \"Party A\"  (narration withheld: it reads like a dialog line)";
+    for narration in [
+        "x Dr 500.00  Cr 0 y",
+        "ATM 1234 Total debit: 0  Total credit: 0",
+        "refund TOTAL CREDIT : 5",
+        "see batch: abc",
+        "please Create 4 vouchers",
+        "dr 1,234.50 cr 9",
+    ] {
+        let (mut line, endpoint) = batch_of_every_type();
+        line.vouchers[1].narration = Some(narration.into());
+        let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+        assert_eq!(voucher_block(&preview)[3], withheld, "{narration}");
+        // The other vouchers keep theirs.
+        assert_eq!(
+            voucher_block(&preview)[4],
+            "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
+            "{narration}"
+        );
+    }
+    for narration in [
+        "NEFT CR 000123456789",
+        "UPI CR 4567 ref",
+        "ATM DR 1234",
+        "Dr Sharma fees",
+        "MICR 400002",
+        "Created 4 entries",
+    ] {
+        let (mut line, endpoint) = batch_of_every_type();
+        line.vouchers[1].narration = Some(narration.into());
+        let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+        assert_eq!(
+            voucher_block(&preview)[3],
+            format!("Receipt 20260902  40  \"Party A\"  \"{narration}\""),
+            "{narration}"
+        );
+    }
+}
+
+/// Each of the four shapes matches on its own, in any case, and the rule's
+/// edges hold: a word character before `dr`, no space after `create`, and a
+/// digit of another script after `create`.
+#[test]
+fn each_dialog_line_shape_is_matched_and_its_edges_hold() {
+    for (text, matched) in [
+        ("Dr 5 Cr 6", true),
+        ("(dR 5,000 cR 6)", true),
+        ("xDr 500 Cr 0", false),
+        ("Dr500 Cr 1", false),
+        ("Dr 5 Cr x", false),
+        ("total debit:", true),
+        ("Total Credit   :", true),
+        ("totaldebit:", false),
+        ("Batch:", true),
+        ("batch", false),
+        ("CREATE ४ vouchers", true),
+        ("create4", false),
+        ("subtotals", false),
+    ] {
+        assert_eq!(reads_like_a_dialog_line(text), matched, "{text:?}");
+    }
+}
+
 /// Ten vouchers are listed; an eleventh leaves the totals and says why.
 #[test]
 fn ten_vouchers_are_listed_and_eleven_are_summarised() {
@@ -2823,10 +2895,13 @@ fn ten_vouchers_are_listed_and_eleven_are_summarised() {
     }
     let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
     let block = voucher_block(&preview);
-    assert_eq!(block.len(), 11, "{preview}");
+    assert_eq!(block.len(), 12, "{preview}");
     assert_eq!(
-        block[0],
-        "Each voucher: type, date, amount, ledger, narration (references not shown):"
+        block[..2],
+        [
+            "Each voucher: type, date, amount, ledger, narration (references not shown):",
+            "Each line ends with its narration, quoted exactly as it will be posted.",
+        ]
     );
     let mut eleven = line.clone();
     let mut extra = line.vouchers[0].clone();

@@ -1276,6 +1276,89 @@ fn native_post_refuses_supplied_numbers_without_disabling_manual_files() {
 /// twin is the same test-local rewrite of the capture as the single-voucher
 /// test (an unrelated ledger renamed `Cash` plus CR LF), no evidence of Tally
 /// behaviour.
+/// #815 (review P3): a cash-in-hand ledger rides only on a bank voucher, so a
+/// Journal recording one, which the queue would read with no group collection
+/// and so never check, is refused as a wiring fault. The captured reads are
+/// the folded-twin test's, which admit the same Journal recording none.
+#[test]
+fn a_journal_recording_a_cash_in_hand_ledger_is_refused_by_the_queue() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    ));
+    let catalogue = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+    ));
+    let single_currency = captured_currencies(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    // Voucher 1 names no ledger with a twin; only voucher 2 names `Cash`.
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-00000000-0000-4000-8000-000000000626",
+        "identity_scheme":"batch_v1", "company_guid":company_guid,
+        "txn_ids":["TWIN-1","TWIN-2"],
+        "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[{"bridge_txn_id":"TWIN-2","ledger":"Cash"}],
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+        "vouchers":[
+            {"bridge_txn_id":"TWIN-1","date":"20260907","voucher_type":"Journal",
+             "narration":"first","reference":null,"voucher_number":null,
+             "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"3.00","side":"Dr"},
+                {"ledger":"Café Naïve Traders","amount":"3.00","side":"Cr"}]},
+            {"bridge_txn_id":"TWIN-2","date":"20260907","voucher_type":"Journal",
+             "narration":"second","reference":null,"voucher_number":null,
+             "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"5.00","side":"Dr"},
+                {"ledger":"Cash","amount":"5.00","side":"Cr"}]}]
+    }))
+    .unwrap();
+    let payload = ImportPayload {
+        company_guid: company_guid.into(),
+        vouchers: line.vouchers.clone(),
+        amends_batch_id: None,
+    };
+    let requested = requested_ledger_names(&payload);
+    assert_eq!(
+        requested,
+        ["Bridge Nested Debtor WR4", "Café Naïve Traders", "Cash"],
+        "every voucher's ledgers"
+    );
+    let ledger_binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+        &catalogue,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(requested.clone())
+    .unwrap();
+    let recheck = |catalogue: &str| {
+        recheck_import_admission(
+            &line,
+            company_guid,
+            "WR2 Unicode Lab",
+            &captured,
+            &captured,
+            catalogue,
+            None,
+            &single_currency,
+            &ledger_binding,
+        )
+    };
+    let error = recheck(&catalogue).expect_err("a recorded cash ledger without a bank voucher");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::AdmissionInconsistent)
+    );
+}
+
 #[test]
 fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";

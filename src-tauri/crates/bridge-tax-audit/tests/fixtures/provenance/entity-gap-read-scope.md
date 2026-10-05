@@ -58,15 +58,21 @@ finding:
 
 The edge books are written by hand in a small generator, as data, then read by both sides.
 
+The two `entity_269st_gap` goldens were regenerated again on 5 Oct 2026 at reference commit `17648895`
+(bridge#1145 item 9, option D). Against the 3 Oct goldens the only differences are that each id's PAN
+is now an 8-hex sha1 tag (the first 8 hex digits of the sha1 of the PAN as written), in `figures[].id`,
+`findings[].id` and `facts[].figure_id`, and that each finding gains one `pan` evidence ref whose id is
+the PAN. `ep_gap` has 15 findings and `ep_gap_plain` one; every other value is unchanged.
+
 ## Bytes
 
 | File | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
 | `synthetic.read_scope.json` | 2,532 | `8b191e04fdf6722106c6082a722cb7a2bb5e95308b2138701dc1b32f57ba26b5` | `golden/synthetic.read_scope.json` |
 | `ep_gap.json` | 18,574 | `b744e4d9bb6c7818cd9530d06639e764b6fb56d55d8a96d3c9046a61261b06d5` | `edge-books/ep_gap.json` |
-| `edge.ep_gap.entity_269st_gap.json` | 48,861 | `712811c66ee03c2da4a5c4f4d0b5091bc7ec8dee0e62f3b6c2ce4c275830f7b1` | `golden/edge.ep_gap.entity_269st_gap.json` |
+| `edge.ep_gap.entity_269st_gap.json` | 50,229 | `18a3cea4619f8ff50333e62fba62c8524f64bd146c7088c69f68f82dea3c853a` | `golden/edge.ep_gap.entity_269st_gap.json` |
 | `ep_gap_plain.json` | 5,621 | `c13e6b8778f1eaf1a6fc1588f0016d553b44a5747663f6766651b91485eaae94` | `edge-books/ep_gap_plain.json` |
-| `edge.ep_gap_plain.entity_269st_gap.json` | 5,959 | `6c81bcf8bd79e85428a492ed484fd1386cbdc08c000594c78128c1edcf3f9a39` | `golden/edge.ep_gap_plain.entity_269st_gap.json` |
+| `edge.ep_gap_plain.entity_269st_gap.json` | 6,051 | `58bbbe539b64630f173bdd930d5c5fe45925f511830b08f37861f90ffdd8fb84` | `golden/edge.ep_gap_plain.entity_269st_gap.json` |
 | `rs_unread.json` | 811 | `d717dcbaa974133eb7968eb442cf9900a7bdcb1a50f4fd9a7c27082c587ab0c5` | `edge-books/rs_unread.json` |
 | `edge.rs_unread.read_scope.json` | 1,976 | `54db49391f4e45ac8071208162926acd4d6ffe0c313d838ace457de88daf42f8` | `golden/edge.rs_unread.read_scope.json` |
 | `rs_read.json` | 813 | `e7cf8ce8546bb7f9c4681c1a1ed782a9794fdb69ebd6a3a361d0c2a68dfc75b0` | `edge-books/rs_read.json` |

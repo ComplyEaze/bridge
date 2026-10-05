@@ -459,7 +459,7 @@ const PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED: usize = 262_144;
 /// The limits a book's parent parts must fit (#679): each part's estimated
 /// master response is inside the same budget a whole read is admitted by, so
 /// the per-part ledger bound is the whole-read bound.
-fn parent_partition_limits() -> PartitionLimits {
+pub(crate) fn parent_partition_limits() -> PartitionLimits {
     PartitionLimits {
         max_ledgers_per_part: COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
             / COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,

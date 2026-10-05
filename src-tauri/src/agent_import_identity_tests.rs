@@ -2,7 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
-    let plans = qualified_import_cycle_plans()[..32].to_vec();
+    let plans = qualified_import_cycle_plans()[..44].to_vec();
     let simulator = SequenceSimulator::spawn([plans.clone(), plans].concat()).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = Server::new(crate::agent::Settings {
@@ -85,14 +85,14 @@ async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
         fs::read(directory.path().join("agent-import-ledger.jsonl")).unwrap(),
         journal
     );
-    assert_eq!(simulator.finish().unwrap().len(), 64);
+    assert_eq!(simulator.finish().unwrap().len(), 88);
 }
 
 fn legacy_record() -> Value {
     json!({
         "batch_id":"batch-render", "company_guid":GUID, "company":null,
         "txn_ids":["txn-001"], "date_from":"20260901", "date_to":"20260901",
-        "sha256":"hash", "built_at":"2026-09-07T00:00:00Z", "status":"built",
+        "sha256":"hash", "built_at":"2026-09-07T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water", "value":10, "master_value":10},
         "vouchers":[payload().vouchers.remove(0)]
     })
@@ -234,7 +234,7 @@ fn captured_namespaced_journal_is_attributed_only_to_its_recorded_batch() {
         "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],
         "date_from":"20260907", "date_to":"20260907",
         "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
-        "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water", "value":8, "master_value":219},
         "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1", "date":"20260907",
             "voucher_type":"Journal", "narration":"Bridge MCP batch namespace qualification",
@@ -294,7 +294,7 @@ fn captured_journal_and_line() -> (ImportReadSource, ImportLedgerLine) {
         "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],
         "date_from":"20260907", "date_to":"20260907",
         "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
-        "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water", "value":8, "master_value":219},
         "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1", "date":"20260907",
             "voucher_type":"Journal", "narration":"Bridge MCP batch namespace qualification",

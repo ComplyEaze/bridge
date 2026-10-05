@@ -624,6 +624,11 @@ impl Server {
             if line.cash_in_hand_ledgers.is_none() {
                 return Err(CASH_LEDGERS_NOT_RECORDED.to_string().into());
             }
+            // Nor one saved before the build recorded which bill-wise ledgers a
+            // person approved to receive entries On Account (#1234).
+            if line.on_account_approved.is_none() {
+                return Err(super::bill_wise::BILL_WISE_NOT_RECORDED.to_string().into());
+            }
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
             let redeeming = match scope {
@@ -1141,6 +1146,13 @@ impl Server {
                     )
                 }) {
                     CASH_LEDGERS_NOT_RECORDED
+                } else if error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                        Some(ApprovedImportAdmissionError::BillWiseNotRecorded)
+                    )
+                }) {
+                    super::bill_wise::BILL_WISE_NOT_RECORDED
                 } else if error.chain().any(|cause| {
                     matches!(
                         cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -1889,6 +1901,9 @@ fn recheck_import_admission(
         .cash_in_hand_ledgers
         .as_deref()
         .ok_or(ApprovedImportAdmissionError::CashLedgersNotRecorded)?;
+    if line.on_account_approved.is_none() {
+        return Err(ApprovedImportAdmissionError::BillWiseNotRecorded.into());
+    }
     let observed = parse_import_vouchers(first, company_guid).map_err(anyhow::Error::msg)?;
     let corroboration = parse_import_vouchers(second, company_guid).map_err(anyhow::Error::msg)?;
     corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)
@@ -2107,6 +2122,16 @@ fn explain_unbound_batch(payload: &mut Value) {
             "This batch was built before ComplyEaze Bridge recorded which of its ledgers must stay \
              under Cash-in-Hand, so it cannot be checked. Nothing was posted. Build the batch \
              again, then post the new batch."
+        );
+    }
+    if payload["result"]["error"]["code"] == json!(super::bill_wise::BILL_WISE_NOT_RECORDED)
+        && payload["result"]["attempt_recorded"] == json!(false)
+    {
+        payload["result"]["error"]["message"] = json!(
+            "This batch was built before ComplyEaze Bridge began checking ledgers that keep \
+             bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally \
+             whether its file was already imported by hand, since building it again would post \
+             it a second time. Then build the batch again and post the new batch."
         );
     }
     if payload["result"]["error"]["code"] == json!("import_batch_predates_ledger_binding")
@@ -2341,7 +2366,16 @@ pub(super) fn admit_saved_voucher(
     max_vouchers: usize,
 ) -> Result<(String, String), String> {
     let xml = admit_saved_voucher_integrity(line, endpoint, scope, max_vouchers)?;
-    Ok((xml, review_preview_for(line, endpoint, scope)?))
+    let preview = review_preview_for(line, endpoint, scope)?;
+    // A batch about to be posted, not one only to be reconciled: saved before
+    // the build recorded its bill-wise approvals, it is rebuilt (#1234). The
+    // integrity check above does not include this, so a dispatched batch of an
+    // older build can still be reconciled. Content refusals above win, so a
+    // rebuild is never advised for a batch that would be refused again.
+    if line.on_account_approved.is_none() {
+        return Err(super::bill_wise::BILL_WISE_NOT_RECORDED.into());
+    }
+    Ok((xml, preview))
 }
 
 /// What the approval must show about a bank voucher's legs: which side had to

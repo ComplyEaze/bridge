@@ -345,6 +345,34 @@ pub(super) fn company_currency_read(company: &str) -> ReadRequest {
     )
 }
 
+/// The ledger snapshot restricted to one parent part: the request the
+/// outstandings paths send, verbatim, read here only for each ledger's
+/// `ISBILLWISEON`.
+pub(super) fn ledger_bill_wise_read(
+    company: &str,
+    period: &bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriod,
+    part: &bridge_tally_protocol::parent_partition::ParentPart,
+) -> ReadRequest {
+    ReadRequest(
+        bridge_tally_protocol::native_outstandings::render_native_ledger_snapshot_request_for_parents(
+            company, period, part,
+        ),
+    )
+}
+
+/// The same snapshot, unfiltered: the whole book's ledgers in one request, for a
+/// book whose catalogue fits one part.
+pub(super) fn ledger_bill_wise_whole_read(
+    company: &str,
+    period: &bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriod,
+) -> ReadRequest {
+    ReadRequest(
+        bridge_tally_protocol::native_outstandings::render_native_ledger_snapshot_request(
+            company, period,
+        ),
+    )
+}
+
 pub(super) fn voucher_window_part_read(
     shape: super::voucher_window::VoucherReadShape,
     company: &str,

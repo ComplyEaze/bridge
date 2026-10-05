@@ -1,5 +1,8 @@
 //! Structural payload admission; live identity, masters and balance remain runtime checks.
-use super::{LIVE_QUALIFIED_VOUCHER_TYPES, MAX_MASTER_NAME_CHARS, MAX_TEXT_CHARS, MAX_VOUCHERS};
+use super::{
+    LIVE_QUALIFIED_VOUCHER_TYPES, MAX_MASTER_NAMES, MAX_MASTER_NAME_CHARS, MAX_TEXT_CHARS,
+    MAX_VOUCHERS,
+};
 use serde_json::{json, Value};
 
 const CONTROLS: &str = r"[\u0000-\u001F\u007F-\u009F]";
@@ -29,15 +32,16 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
         "not":{"anyOf":[{"pattern":CONTROLS},{"pattern":RESERVED_MARKER}]},
         "description":"Nonempty text without control characters. The reserved [BRIDGE: marker is forbidden in every ASCII case, including XML entity-encoded spellings."
     });
+    let ledger = json!({
+        "type":"string", "minLength":1, "maxLength":MAX_MASTER_NAME_CHARS,
+        "not":{"anyOf":[{"pattern":LEDGER_CONTROLS},{"pattern":INTERIOR_LINE_BREAK},{"pattern":BLANK_LEDGER}]},
+        "description":"The ledger's exact live name. It may end in one CR LF only when the live ledger's stored name does, as validate_masters reports it in exact_live_spelling; no other control character is accepted. A name that folds equal to another live ledger (case, spacing, dashes, slashes or quotes, a trailing line break) is refused as ledger_has_folded_twin."
+    });
     let entry = json!({
         "type":"object", "additionalProperties":false,
         "required":["ledger","amount","side"],
         "properties":{
-            "ledger":{
-                "type":"string", "minLength":1, "maxLength":MAX_MASTER_NAME_CHARS,
-                "not":{"anyOf":[{"pattern":LEDGER_CONTROLS},{"pattern":INTERIOR_LINE_BREAK},{"pattern":BLANK_LEDGER}]},
-                "description":"The ledger's exact live name. It may end in one CR LF only when the live ledger's stored name does, as validate_masters reports it in exact_live_spelling; no other control character is accepted. A name that folds equal to another live ledger (case, spacing, dashes, slashes or quotes, a trailing line break) is refused as ledger_has_folded_twin."
-            },
+            "ledger":ledger,
             "amount":{
                 "type":"string", "pattern":r"^[0-9]+\.[0-9]{2}$",
                 "maxLength":bridge_tally_core::MAX_EXACT_DECIMAL_BYTES,
@@ -87,6 +91,18 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
             "proposals_sha256":{
                 "type":"string", "minLength":64, "maxLength":64,
                 "description":"The sha256 parse_bank_statement returned for that proposals file; the build is refused if the file no longer has it."
+            },
+            super::bill_wise::APPROVALS_KEY:{
+                "type":"array", "maxItems":MAX_MASTER_NAMES,
+                "description":"One entry per bill-wise ledger the person agreed may receive this batch's entries On Account, copied from a bill_wise_party_unapproved refusal of the same batch: the ledger's exact name and its party_digest. Leave it out on the first build. A ledger that is not a bill-wise party of this batch, one named twice, or a digest that is not the batch's own is refused as on_account_approval_invalid (cause unknown_ledger, duplicate, digest_differs or malformed): nothing is accepted and dropped. The digest ties an approval to this exact batch, company and endpoint; it does not prove that a person said yes.",
+                "items":{
+                    "type":"object", "additionalProperties":false,
+                    "required":["ledger","party_digest"],
+                    "properties":{
+                        "ledger":ledger,
+                        "party_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+                    }
+                }
             },
             "vouchers":{
                 "type":"array", "minItems":1, "maxItems":MAX_VOUCHERS,

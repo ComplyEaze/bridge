@@ -507,22 +507,29 @@ fn group_read_plans() -> Vec<ScenarioPlan> {
 /// The build request sequence for a payload that carries a cash/bank voucher:
 /// the Journal cycle plus a paired group read after each catalogue read.
 fn bank_build_plans() -> Vec<ScenarioPlan> {
+    bank_build_plans_flagging(&[])
+}
+
+/// The same sequence with both bill-wise flag reads marking `bill_wise` Yes.
+pub(super) fn bank_build_plans_flagging(bill_wise: &[&str]) -> Vec<ScenarioPlan> {
     let cycle = import_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
     [
         probe.clone(),
         cycle[..10].to_vec(),
         group_read_plans(),
+        bill_wise_flag_plans(bill_wise),
         cycle[10..16].to_vec(),
         cycle[4..10].to_vec(),
         group_read_plans(),
+        bill_wise_flag_plans(bill_wise),
         build_preflight_plans(),
         probe,
     ]
     .concat()
 }
 
-fn captured_bank_payload() -> ImportPayload {
+pub(super) fn captured_bank_payload() -> ImportPayload {
     serde_json::from_value(json!({"company_guid":CAPTURED_GUID,"vouchers":[
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Payment","narration":"Settled on account",
          "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"12.50","side":"Dr"},
@@ -534,7 +541,7 @@ fn captured_bank_payload() -> ImportPayload {
     .expect("captured bank payload")
 }
 
-fn bank_server(directory: &std::path::Path, port: u16) -> Server {
+pub(super) fn bank_server(directory: &std::path::Path, port: u16) -> Server {
     Server::new(crate::agent::Settings {
         endpoint: TallyEndpointConfig {
             host: "127.0.0.1".into(),
@@ -629,7 +636,7 @@ async fn a_payment_and_receipt_batch_builds_against_the_captured_masters() {
         .contains("call verify_import right away"));
     // A cash/bank payload reads the group collection twice, exactly as it reads
     // the catalogue twice, and the whole sequence is consumed.
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(simulator.finish().expect("requests").len(), 56);
 }
 
 /// bridge#466 through the tool call, not the builder: a three-entry Receipt
@@ -699,7 +706,7 @@ async fn a_multi_entry_receipt_builds_through_tools_call_and_says_it_is_unqualif
     .expect("written import file");
     assert_eq!(xml.matches("<ALLLEDGERENTRIES.LIST>").count(), 3, "{xml}");
     assert!(xml.contains("<PARTYLEDGERNAME>Bridge Nested Debtor WR4</PARTYLEDGERNAME>"));
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(simulator.finish().expect("requests").len(), 56);
 }
 
 fn demo_batch(voucher_type: &str, dr: &str, cr: &str) -> ImportPayload {
@@ -1290,17 +1297,20 @@ async fn a_contra_leg_outside_cash_and_bank_is_refused_without_writing_a_file() 
 
 #[tokio::test]
 async fn a_journal_only_batch_reads_no_group_collection() {
-    // The Journal path keeps the exact request sequence its own qualification
-    // was measured on; nothing here widened it.
+    // A Journal-only batch reads no group collection. It does read each named
+    // ledger's bill-wise flag twice (#1234), so its request sequence is no
+    // longer the one its own qualification was measured on: the Journal
+    // fixtures' flag reads are regression doubles until a live capture
+    // replaces them.
     let simulator =
-        SequenceSimulator::spawn(qualified_import_cycle_plans()[..32].to_vec()).expect("simulator");
+        SequenceSimulator::spawn(qualified_import_cycle_plans()[..44].to_vec()).expect("simulator");
     let directory = tempfile::tempdir().unwrap();
     let server = bank_server(directory.path(), simulator.address().port());
     server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
         .await
         .unwrap();
-    assert_eq!(simulator.finish().expect("requests").len(), 32);
+    assert_eq!(simulator.finish().expect("requests").len(), 44);
 }
 
 #[tokio::test]
@@ -1321,6 +1331,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
         let line = ImportLedgerLine {
             ledger_identities: None,
             cash_in_hand_ledgers: Some(Vec::new()),
+            on_account_approved: Some(Vec::new()),
             endpoint_origin: None,
             identity_scheme: None,
             amends_batch_id: None,
@@ -1479,8 +1490,8 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
         json!({"count": 0, "purpose_not_confirmed": 0, "unidentified": 0})
     );
     // the same request sequence was consumed, so the same admission ran
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
-    assert_eq!(inline_simulator.finish().expect("requests").len(), 44);
+    assert_eq!(simulator.finish().expect("requests").len(), 56);
+    assert_eq!(inline_simulator.finish().expect("requests").len(), 56);
 
     let read = |directory: &std::path::Path, result: &Value| {
         std::fs::read_to_string(
@@ -1696,7 +1707,9 @@ async fn a_business_cash_answer_naming_a_bank_ledger_is_refused_at_build() {
         .cloned()
         .map(|mut plan| {
             if let Fixture::SyntheticXml(body) = &plan.fixture {
-                if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                if body.contains("<LEDGER NAME=\"WR2 Sales\"")
+                    && body.contains("<PARENT TYPE=\"String\">Sales Accounts</PARENT>")
+                {
                     let moved = body.replace(
                         "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
                         "<PARENT TYPE=\"String\">Bank Accounts</PARENT>",
@@ -1748,7 +1761,9 @@ async fn a_cash_answer_records_only_a_cash_in_hand_ledger_on_the_built_batch() {
         .into_iter()
         .map(|mut plan| {
             if let Fixture::SyntheticXml(body) = &plan.fixture {
-                if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                if body.contains("<LEDGER NAME=\"WR2 Sales\"")
+                    && body.contains("<PARENT TYPE=\"String\">Sales Accounts</PARENT>")
+                {
                     let moved = body.replace(
                         "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
                         "<PARENT TYPE=\"String\">Bank Accounts</PARENT>",
@@ -1842,7 +1857,9 @@ async fn a_cash_answer_naming_a_suspense_group_ledger_is_refused_at_build() {
         .cloned()
         .map(|mut plan| {
             if let Fixture::SyntheticXml(body) = &plan.fixture {
-                if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                if body.contains("<LEDGER NAME=\"WR2 Sales\"")
+                    && body.contains("<PARENT TYPE=\"String\">Sales Accounts</PARENT>")
+                {
                     let moved = body.replace(
                         "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
                         "<PARENT TYPE=\"String\">Suspense A/c</PARENT>",
@@ -2157,7 +2174,7 @@ async fn a_parsed_statement_builds_an_import_file_by_proposals_id() {
         xml.contains("UPI 612345678901 from NORTHWIND TRADERS"),
         "{xml}"
     );
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(simulator.finish().expect("requests").len(), 56);
 }
 
 #[test]
@@ -2724,7 +2741,9 @@ fn bank_plans_moving(ledger: &str, from: &str, to: &str, take: Option<usize>) ->
         .cloned()
         .map(|mut plan| {
             if let Fixture::SyntheticXml(body) = &plan.fixture {
-                if body.contains(&format!("<LEDGER NAME=\"{ledger}\"")) {
+                if body.contains(&format!("<LEDGER NAME=\"{ledger}\""))
+                    && body.contains(&format!("<PARENT TYPE=\"String\">{from}</PARENT>"))
+                {
                     let moved = body.replace(
                         &format!("<PARENT TYPE=\"String\">{from}</PARENT>"),
                         &format!("<PARENT TYPE=\"String\">{to}</PARENT>"),
@@ -2807,7 +2826,7 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
         .join("imports")
         .join(format!("{}.xml", result["batch_id"].as_str().unwrap()))
         .exists());
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(simulator.finish().expect("requests").len(), 56);
 
     // The suspense ledger under Suspense A/c: the same build, no such warning.
     let simulator = SequenceSimulator::spawn({
@@ -2840,5 +2859,5 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
         "{response}"
     );
     assert!(codes_of(&response).is_empty(), "{response}");
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(simulator.finish().expect("requests").len(), 56);
 }

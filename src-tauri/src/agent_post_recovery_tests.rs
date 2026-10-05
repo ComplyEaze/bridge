@@ -62,7 +62,7 @@ fn local_batch_at(root: &std::path::Path, port: u16) -> Server {
         "endpoint_origin":format!("http://127.0.0.1:{port}"),
         "company":{"name":"Synthetic Accounts","guid":COMPANY,"company_number":"100001","books_from":"20260401"},
         "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"a".repeat(64),"built_at":"2026-09-07T00:00:00Z","status":"built",
+        "sha256":"a".repeat(64),"built_at":"2026-09-07T00:00:00Z","status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal",
             "entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Cash","amount":"12.50","side":"Cr"}]}]

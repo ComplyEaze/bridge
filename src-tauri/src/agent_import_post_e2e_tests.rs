@@ -252,6 +252,7 @@ fn server_redacting(
 /// answer no bank cash line, so their cash-in-hand ledgers are none (#815).
 fn bind_to_captured_catalogue(line: &mut ImportLedgerLine) {
     line.cash_in_hand_ledgers = Some(Vec::new());
+    line.on_account_approved = Some(Vec::new());
     let payload = ImportPayload {
         company_guid: line.company_guid.clone(),
         vouchers: line.vouchers.clone(),
@@ -292,7 +293,7 @@ fn saved_batch_with_narration(server: &Server, narration: &str) -> (ImportLedger
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
         "txn_ids":["journal-583"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":10,"master_value":7},
         "vouchers":[{"bridge_txn_id":"journal-583","date":"20260901","voucher_type":"Journal",
             "narration":narration,"entries":[
@@ -1314,6 +1315,17 @@ fn saved_bank_batch_recording(
     voucher: Value,
     cash_in_hand: Value,
 ) -> (ImportLedgerLine, Value) {
+    saved_bank_batch_recording_all(server, voucher, cash_in_hand, json!([]))
+}
+
+/// As `saved_bank_batch_recording`, with `on_account` as the bill-wise
+/// approvals its build recorded (#1234); `null` for a record written before.
+fn saved_bank_batch_recording_all(
+    server: &Server,
+    voucher: Value,
+    cash_in_hand: Value,
+    on_account: Value,
+) -> (ImportLedgerLine, Value) {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":BANK_BATCH, "identity_scheme":"batch_v1",
@@ -1321,7 +1333,7 @@ fn saved_bank_batch_recording(
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
         "txn_ids":[voucher["bridge_txn_id"].clone()],"date_from":"20260901","date_to":"20260901",
-        "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":10,"master_value":7},
         "vouchers":[voucher]
     }))
@@ -1330,6 +1342,7 @@ fn saved_bank_batch_recording(
     line.sha256 = sha256_hex(rendered.as_bytes());
     bind_to_captured_catalogue(&mut line);
     line.cash_in_hand_ledgers = serde_json::from_value(cash_in_hand).unwrap();
+    line.on_account_approved = serde_json::from_value(on_account).unwrap();
     server.append_import_ledger(&line).unwrap();
     fs::write(
         server
@@ -1709,6 +1722,37 @@ async fn a_batch_recorded_before_its_cash_in_hand_ledgers_is_refused_before_any_
         "This batch was built before ComplyEaze Bridge recorded which of its ledgers must stay \
          under Cash-in-Hand, so it cannot be checked. Nothing was posted. Build the batch again, \
          then post the new batch.",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert!(scripted.previews().is_empty(), "approval must not be asked");
+    assert!(observed.is_empty(), "{response}");
+}
+
+/// #1234: a batch saved before the build recorded its bill-wise approvals is
+/// refused before any Tally request and must be rebuilt, as above.
+#[tokio::test]
+async fn a_batch_recorded_before_its_bill_wise_approvals_is_refused_before_any_request() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_bank_batch_recording_all(&server, contra(), json!([]), Value::Null);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_batch_predates_bill_wise_record",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["message"],
+        "This batch was built before ComplyEaze Bridge began checking ledgers that keep \
+         bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally \
+         whether its file was already imported by hand, since building it again would post \
+         it a second time. Then build the batch again and post the new batch.",
         "{response}"
     );
     assert_eq!(result["attempt_recorded"], false, "{response}");
@@ -2329,7 +2373,7 @@ fn saved_captured_line(server: &Server) -> ImportLedgerLine {
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
         "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],"date_from":"20260907","date_to":"20260907",
-        "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":7},
         "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1","date":"20260907",
             "voucher_type":"Journal","narration":"Bridge MCP batch namespace qualification",

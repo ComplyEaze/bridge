@@ -424,6 +424,9 @@
       "path": "src-tauri/src/agent_import_approval.rs"
     },
     {
+      "path": "src-tauri/src/agent_import_bill_wise.rs"
+    },
+    {
       "path": "src-tauri/src/agent_import_cash_bank.rs"
     },
     {

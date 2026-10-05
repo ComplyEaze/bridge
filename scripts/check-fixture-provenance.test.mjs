@@ -16,19 +16,13 @@ import { join } from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { FIXTURE_ROOTS } from "./fixture-roots.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const GATE = join(here, "check-fixture-provenance.mjs");
 
-const FIXTURE_DIRS = [
-  "src-tauri/crates/bridge-bank-statement/tests/fixtures",
-  "src-tauri/crates/bridge-tax-audit/tests/fixtures",
-  "src-tauri/crates/bridge-tally-protocol/tests/fixtures",
-  "src-tauri/crates/tally-protocol-simulator/fixtures",
-  "docs/tally/compatibility/fixtures",
-  "scripts/fixtures",
-  "tools/bridge-tally-compatibility/tests/fixtures",
-];
+// The same roots the gate covers (#838).
+const FIXTURE_DIRS = FIXTURE_ROOTS;
 
 async function makeTree() {
   const root = await mkdtemp(join(tmpdir(), ".fixture-provenance-"));

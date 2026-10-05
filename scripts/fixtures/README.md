@@ -52,7 +52,7 @@ qualify raw customer data.
    `--help` prints the one-liner). Everything that survives should be bank vocabulary.
 2. If a customer value survives, do not add it to `TEMPLATE`. Work out why the rule matched it.
 3. Byte integrity is enforced: `scripts/fixtures/**` is `-text` in `.gitattributes` and the
-   directory is registered in `scripts/check-fixture-byte-integrity.mjs`. Line-ending normalisation
+   directory is registered in `scripts/fixture-roots.mjs`. Line-ending normalisation
    would rewrite the geometry these fixtures exist to preserve. That is also why the sanitiser
    itself lives in `scripts/`, not here — this directory holds evidence, and a tool whose bytes are
    pinned as evidence is a category error.

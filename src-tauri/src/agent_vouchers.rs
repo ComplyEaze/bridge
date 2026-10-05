@@ -239,22 +239,22 @@ pub(super) fn page_items(
 
 /// What a summary adds up, stated in the result so a reader does not infer more. The exclusions
 /// are the same as `ledger_movement`'s; the voucher types are not told apart.
-const SUMMARY_BASIS: &str = "every voucher in the window that is not cancelled, optional or without accounting entries, as ledger_movement counts; post-dated vouchers are summed too: post_dated_included counts those Tally flagged Yes and post_dated_unreported those it did not flag at all (the tag is often omitted, so a zero in the first is not proof none are post-dated); a voucher type that Tally exports with ledger entries but that does not post (a memorandum, a reversing journal, an order or a note, if the book uses them) is not told apart and is summed; not measured against a live book";
+const SUMMARY_BASIS: &str = "every voucher in the window that is not cancelled, optional or without accounting entries, as ledger_movement counts; post-dated vouchers are summed too: post_dated_included counts those Tally flagged Yes and post_dated_unreported those it did not flag at all (the tag is often omitted, so a zero in the first is not proof none are post-dated); a voucher type that does not post (a memorandum, a reversing journal, a sales or purchase order, a delivery or receipt note), if the book uses it and Tally exports it with ledger entries, is not told apart and is summed; not measured against a live book";
 
 /// What one page of a `vouchers` result holds: the vouchers, or with `summarise_by` the
 /// buckets (#1230), and the fields only the second carries.
-struct PageBody {
+pub(super) struct PageBody {
     items_key: &'static str,
     profile: &'static str,
-    items: Vec<Value>,
-    total: usize,
-    truncated: bool,
+    pub(super) items: Vec<Value>,
+    pub(super) total: usize,
+    pub(super) truncated: bool,
     extra: Vec<(&'static str, Value)>,
 }
 
 /// The page of `rows` a request asks for, redacted and party-marked as `vouchers` always did,
 /// or the page of a summary of them. A summary sums every row of the window, whatever the page.
-fn render_page_body(
+pub(super) fn render_page_body(
     server: &Server,
     rows: &[Value],
     summary: Option<&SummaryRequest>,

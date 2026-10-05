@@ -5289,16 +5289,30 @@ async fn a_held_ledger_window_summarises_only_that_ledgers_entries_by_month() {
 }
 
 /// The bucket page stops at a fifth of the response budget (the response carries it twice, and
-/// the text copy escapes quotes). The captured ledger summary's buckets serialize to 482, 273,
-/// 257 and 280 bytes before their position, so a 6,000-byte cap (1,200 for buckets) holds three and
-/// not four. Mutant killed: an unbounded budget.
+/// the text copy escapes quotes). Through the whole tool the cap refuses first on a four-bucket
+/// fixture, so the bound is exercised on the page renderer itself: the captured ledger summary's
+/// buckets serialize to about 500, 290, 270 and 300 bytes, so a 6,000-byte cap (1,200 for
+/// buckets) holds three and not four. Mutant killed: an unbounded budget.
 #[tokio::test]
 async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_remain() {
-    let mut one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let first =
+        call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
+    let rows = page_items_of(&first);
+    let mut one = OneServer::spawn(identity_plans());
     one.server.settings.max_bytes = 6_000;
-    let response = one.call(json!({"summarise_by": "ledger"})).await;
-    let result = result_of(&response);
-    assert_eq!(result["buckets"].as_array().unwrap().len(), 3, "{result}");
-    assert_eq!(result["total"], 4);
-    assert_eq!(response["structuredContent"]["truncated"], true);
+    let request = SummaryRequest {
+        group: SummaryGroup::Ledger,
+        selected_ledger: None,
+    };
+    let body =
+        vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
+    assert_eq!(body.items.len(), 3, "{:?}", body.items);
+    assert_eq!(body.total, 4);
+    assert!(body.truncated);
+    // Under a budget that holds everything the page is whole.
+    one.server.settings.max_bytes = 200_000;
+    let whole =
+        vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
+    assert_eq!(whole.items.len(), 4);
+    assert!(!whole.truncated);
 }

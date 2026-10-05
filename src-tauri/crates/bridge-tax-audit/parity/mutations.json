@@ -9246,5 +9246,165 @@
   "file": "src/loans_interest.rs",
   "from": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise != 0)",
   "to": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise > 0)"
+ },
+ {
+  "id": "RP-01",
+  "by": "author",
+  "what": "related_parties_cl23: the gate opens only past one person",
+  "file": "src/related_parties_cl23.rs",
+  "from": "    if persons.is_empty() {",
+  "to": "    if persons.len() <= 1 {"
+ },
+ {
+  "id": "RP-02",
+  "by": "author",
+  "what": "related_parties_cl23: a nature with an empty list still gets its figures",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            if set.is_empty() {\n                continue;\n            }",
+  "to": "            if set.is_empty() && false {\n                continue;\n            }"
+ },
+ {
+  "id": "RP-03",
+  "by": "author",
+  "what": "related_parties_cl23: a voucher netting to zero on the set is still an entry",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if net != 0 {\n            entries.insert(",
+  "to": "        if true {\n            entries.insert("
+ },
+ {
+  "id": "RP-04",
+  "by": "author",
+  "what": "related_parties_cl23: a later voucher sharing a GUID does not replace the earlier entry",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            entries.insert(v.guid.as_str(), (net, v));",
+  "to": "            entries.entry(v.guid.as_str()).or_insert((net, v));"
+ },
+ {
+  "id": "RP-05",
+  "by": "author",
+  "what": "related_parties_cl23: every configured nature is a payable nature once any is",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            if !person.payable_natures.iter().any(|p| p == nature) {",
+  "to": "            if person.payable_natures.is_empty() {"
+ },
+ {
+  "id": "RP-06",
+  "by": "author",
+  "what": "related_parties_cl23: opening payable keeps the TB sign",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                    opening.checked_neg().ok_or_else(overflow)?,",
+  "to": "                    opening.checked_add(0).ok_or_else(overflow)?,"
+ },
+ {
+  "id": "RP-07",
+  "by": "author",
+  "what": "related_parties_cl23: accrued reads the debit column",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                    \"accrued\",\n                    credit,",
+  "to": "                    \"accrued\",\n                    debit,"
+ },
+ {
+  "id": "RP-08",
+  "by": "author",
+  "what": "related_parties_cl23: a finding needs a nonzero total, not a nature that moved",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if !any_nonzero {",
+  "to": "        if total == 0 {"
+ },
+ {
+  "id": "RP-09",
+  "by": "author",
+  "what": "related_parties_cl23: the total adds each nature without its sign",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            total = total.checked_add(amount).ok_or_else(overflow)?;",
+  "to": "            total = total.checked_add(amount.abs()).ok_or_else(overflow)?;"
+ },
+ {
+  "id": "RP-10",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1 fires at the tolerance",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            if excess > TOLERANCE_PAISE {",
+  "to": "            if excess >= TOLERANCE_PAISE {"
+ },
+ {
+  "id": "RP-11",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1 compares the walk with the signed TB movement",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                .and_then(|v| v.checked_sub(movement.checked_abs()?))",
+  "to": "                .and_then(|v| v.checked_sub(movement))"
+ },
+ {
+  "id": "RP-12",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 fires at the tolerance",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if gap > TOLERANCE_PAISE {",
+  "to": "        if gap >= TOLERANCE_PAISE {"
+ },
+ {
+  "id": "RP-13",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 adds the paid figure where the accrued belongs",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            .checked_add(accrued)\n            .and_then(|v| v.checked_sub(closing))",
+  "to": "            .checked_add(paid)\n            .and_then(|v| v.checked_sub(closing))"
+ },
+ {
+  "id": "RP-14",
+  "by": "author",
+  "what": "related_parties_cl23: two keys sharing a tag are not refused",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if let Some(first) = by_tag.insert(tag.clone(), key) {",
+  "to": "        if let Some(first) = by_tag.insert(tag.clone(), key).filter(|_| false) {"
+ },
+ {
+  "id": "RP-15",
+  "by": "author",
+  "what": "related_parties_cl23: a relationship that is not text is read as empty",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                .ok_or_else(|| shape_error(key, \"relationship\", \"text\"))?\n                .to_string(),",
+  "to": "                .unwrap_or_default()\n                .to_string(),"
+ },
+ {
+  "id": "RP-16",
+  "by": "author",
+  "what": "related_parties_cl23: payable natures of the wrong shape are read as none",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            Some(v) => texts(v, key, \"payable_natures\")?,",
+  "to": "            Some(_) => Vec::new(),"
+ },
+ {
+  "id": "RP-17",
+  "by": "author",
+  "what": "related_parties_cl23: an amount cites no voucher",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            evidence.extend(entries.values().map(",
+  "to": "            evidence.extend(entries.values().take(0).map("
+ },
+ {
+  "id": "RP-18",
+  "by": "author",
+  "what": "related_parties_cl23: the walk reads every voucher, not the population",
+  "file": "src/related_parties_cl23.rs",
+  "from": "    let population = book.population()?;",
+  "to": "    let population: Vec<&Voucher> = book.vouchers.iter().collect();"
+ },
+ {
+  "id": "RP-19",
+  "by": "author",
+  "what": "related_parties_cl23: a ledger list item that is not text is skipped",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            item.as_str()\n                .map(str::to_string)\n                .ok_or_else(|| shape_error(key, field, expected))",
+  "to": "            Some(item.as_str().unwrap_or_default().to_string())\n                .ok_or_else(|| shape_error(key, field, expected))"
+ },
+ {
+  "id": "RP-20",
+  "by": "author",
+  "what": "related_parties_cl23: related-party ledger names are not bound",
+  "file": "src/binding.rs",
+  "from": "            *v = toml::Value::Array(\n                lbinder\n                    .bind_list(&names, &location)?",
+  "to": "            *v = toml::Value::Array(\n                names"
  }
 ]

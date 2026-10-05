@@ -298,3 +298,24 @@ fn a_refused_vouchers_read_reports_its_cost_and_other_tools_keep_their_shape() {
     assert_eq!(window["census"]["requests"], 126, "{window}");
     assert!(window.get("read_cost").is_none(), "{window}");
 }
+
+#[test]
+fn what_every_call_pays_is_never_less_than_the_certain_floor() {
+    // 30 census reads (a certain 15 s) that took 20 s while carrying 500 rows:
+    // the rows' share (18.5 s) would leave 1.5 s, below the floor, so the floor
+    // stands.
+    let rows_heavy = timings(0, (30, 20_000), vec![part(500, 1_000)]);
+    assert_eq!(block(&rows_heavy)["estimate"]["fixed_seconds"], 15);
+}
+
+#[test]
+fn a_census_that_alone_takes_the_whole_limit_leaves_no_window() {
+    // 250 reads, 240.000 s exactly, no voucher read: what every call pays is the
+    // limit itself.
+    let stopped = timings(0, (250, 240_000), vec![]);
+    let cost = read_cost(&stopped, Ended::Stopped).expect("a block");
+    assert_eq!(
+        cost["estimate"]["host_240"],
+        json!({"state": "no_window_fits"})
+    );
+}

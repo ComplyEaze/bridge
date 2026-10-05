@@ -23,6 +23,14 @@ notarized. Each archive has a same-named `.sha256` file and
 a small provenance record on its release so an organization can identify the
 downloaded bytes and source commit.
 
+## At a glance, release 0.4.2
+
+- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range, and one ledger's movement.
+- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, values only, on small books; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, and it has not yet been run on a real bank statement.
+- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, and tax-audit flags.
+
+Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+
 ## Before you install
 
 TallyPrime's HTTP gateway is off by default, and ComplyEaze Bridge cannot reach

@@ -299,6 +299,18 @@ test("the page says which release and day it was checked against, and the struct
   assert.ok(modified >= stamp[2], `the structured copy says the page last changed on ${modified}, before it was checked on ${stamp[2]}`);
 });
 
+test("the Download page and the install guide each carry an at-a-glance block for the manifest's release, with the bank-statement limit", () => {
+  const version = JSON.parse(readFileSync(new URL("../packaging/mcpb/manifest.json", import.meta.url), "utf8")).version;
+  const guide = readFileSync(new URL("../docs/agent/INSTALL.md", import.meta.url), "utf8");
+  const heading = `At a glance, release ${version}`;
+  // a version bump fails here until the block is read again against the Questions page and its heading moved
+  assert.ok(read("download.html").includes(`<h2>${heading}</h2>`), `site/download.html has no "${heading}" block`);
+  assert.ok(guide.includes(`## ${heading}`), `docs/agent/INSTALL.md has no "${heading}" block`);
+  for (const text of [visibleText(region(read("download.html"), 'id="at-a-glance"', "</section>")), region(guide, `## ${heading}`, "## Before you install")]) {
+    assert.match(text, /not yet been run on a real bank statement/);
+  }
+});
+
 test("the list above the questions tells a person asked to try it out the four things to do first", () => {
   const html = read("faq.html");
   const list = faqText(html.match(/<section class="page-section faq-before">[\s\S]*?<\/section>/)[0]);

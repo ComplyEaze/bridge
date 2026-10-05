@@ -229,8 +229,10 @@ async fn until_received(simulator: &SequenceSimulator, count: usize) {
 /// lock never has two holders.
 #[tokio::test]
 async fn concurrent_sends_take_turns() {
+    // The first send stays in flight for 1 s, so only a stall that long can let it finish
+    // before the second one tries the lock; the 2 s retry budget covers the wait.
     let simulator = SequenceSimulator::spawn(vec![
-        xml().with_delivery(Delivery::SlowHeaders(Duration::from_millis(300))),
+        xml().with_delivery(Delivery::SlowHeaders(Duration::from_secs(1))),
         xml(),
     ])
     .unwrap();
@@ -252,6 +254,38 @@ async fn concurrent_sends_take_turns() {
     assert_eq!(record.acquisitions.load(Ordering::SeqCst), 2);
     assert!(record.pauses.load(Ordering::SeqCst) >= 1);
     assert_eq!(simulator.finish().unwrap().len(), 2);
+}
+
+/// While a send is in flight (its response headers delayed), the lock is held: each
+/// of the four send paths, watched across the whole send, so that a guard dropped
+/// before the send (a `let _ = ...` in place of a bound guard), or once the request is
+/// written but before the headers arrive, shows as 0 (#1255).
+#[tokio::test]
+async fn every_send_path_holds_the_lock_while_the_send_is_in_flight() {
+    let slow = Duration::from_millis(600);
+    let simulator = SequenceSimulator::spawn(vec![
+        xml().with_delivery(Delivery::SlowHeaders(slow)),
+        xml().with_delivery(Delivery::SlowHeaders(slow)),
+        status().with_delivery(Delivery::SlowHeaders(slow)),
+        status().with_delivery(Delivery::SlowHeaders(slow)),
+    ])
+    .unwrap();
+    let (transport, record) = gated(&simulator, quick(0));
+    let (sent, lowest) = lowest_held_while(&record, transport.post_xml("<ENVELOPE/>".into())).await;
+    sent.unwrap();
+    assert_eq!(lowest, 1, "post_xml");
+    let (sent, lowest) =
+        lowest_held_while(&record, transport.post_xml_decoded("<ENVELOPE/>".into())).await;
+    sent.unwrap();
+    assert_eq!(lowest, 1, "post_xml_decoded");
+    let (sent, lowest) = lowest_held_while(&record, transport.get_status()).await;
+    sent.unwrap();
+    assert_eq!(lowest, 1, "get_status");
+    let (sent, lowest) = lowest_held_while(&record, transport.get_status_decoded()).await;
+    sent.unwrap();
+    assert_eq!(lowest, 1, "get_status_decoded");
+    assert_eq!(record.held.load(Ordering::SeqCst), 0);
+    assert_eq!(simulator.finish().unwrap().len(), 4);
 }
 
 /// Runs `send` and watches the held count every 5 ms from the first sample
@@ -347,8 +381,8 @@ async fn a_held_lock_is_spent_on_one_send() {
 }
 
 /// A lock taken ahead of a send stays held while that send is in flight: the
-/// response is delayed, and a probe from outside sees the lock still taken, so
-/// a guard dropped before the send fails here.
+/// response is delayed and the lock is watched across the whole send, so a guard
+/// dropped before the send shows as 0.
 #[tokio::test]
 async fn a_lock_taken_ahead_of_a_send_is_held_while_that_send_is_in_flight() {
     let slow = Duration::from_millis(600);

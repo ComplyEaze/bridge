@@ -863,7 +863,7 @@ async fn a_part_queued_behind_a_clean_part_is_sent_after_it() {
 async fn a_dropped_probe_counts_as_abandoned_once_stale() {
     let lab = lab();
     let mut plans = dropped(&lab);
-    // The dropped probe's answer takes 600 ms; the probe is dropped at 300 ms.
+    // The dropped probe's answer takes 600 ms; the probe is dropped once the responder has read it.
     plans.push(status().with_delivery(Delivery::SlowHeaders(Duration::from_millis(600))));
     plans.push(status());
     let simulator = SequenceSimulator::spawn(plans).unwrap();

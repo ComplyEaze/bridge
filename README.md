@@ -187,7 +187,8 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   synthetic companies. The synthetic HDFC-format statement parsed (six rows, its
   totals matched the figures supplied); the name check found no "Suspense" ledger
   and building the file was refused, with no file written; after "Suspense" was
-  created by hand in Tally, a file of six vouchers was built. We have not imported
+  created in Tally by a separate one-ledger import, outside this tool, a file of
+  six vouchers was built. We have not imported
   that file or read it back, and no real statement has been run. The record is our
   dated notes, kept privately.
 

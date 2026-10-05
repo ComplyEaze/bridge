@@ -36,13 +36,20 @@
 //      string or XML/JSON literal — of which this codebase's parser tests
 //      have many.
 //
-// Residual, stated rather than hidden: this only recognises the *direct*
-// `.take(...)` -> `.read_to_end`/`.read_to_string` chain, matched by scanning
-// backward from the read call to the start of its statement (a line ending
-// `;`, `{`, or `}` is a boundary). A reader that was capped further back —
-// wrapped in a limiting adapter and bound to a variable on an earlier
-// statement, then read from later — is not recognised and reports a false
-// positive; ALLOWED_UNBOUNDED below is the reviewed escape hatch for that.
+// Both call forms are read (#837): the method form, `reader.read_to_end(&mut
+// buf)`, and the fully qualified form, `std::io::Read::read_to_end(&mut
+// reader, &mut buf)` (or `AsyncReadExt::`, and `read_to_string` likewise). The
+// scan reads each call in the whole source with comments and string literals
+// blanked, never line by line, so formatting cannot split a call from its
+// argument and a commented-out call is not counted.
+//
+// A call is bounded only when the reader it reads IS a `take(...)`: the method
+// form's receiver ends in `.take(...)`, `Read::take(...)` or
+// `AsyncReadExt::take(...)`, or the qualified form's first argument does. A
+// `take` anywhere else, in the same statement or a neighbouring one, does not
+// count. Residual, stated rather than hidden: a reader capped on an earlier
+// statement and bound to a variable is reported; ALLOWED_UNBOUNDED below is
+// the reviewed escape hatch for that.
 
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -57,14 +64,16 @@ if (rootArgument !== -1 && !process.argv[rootArgument + 1]) {
 const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(process.argv[rootArgument + 1]);
 
 const SOURCE_ROOTS = ["src-tauri/src", "src-tauri/crates", "tools"];
-const READ_CALL = /\.read_to_(?:end|string)\(\s*&mut\b/;
-const TAKE_CALL = /\.take\(/;
-const STATEMENT_BOUNDARY = /[;{}]\s*$/;
+// The method form; its argument must start `&mut` (see 1. above).
+const METHOD_READ = /\.\s*read_to_(?:end|string)\s*\(/g;
+// The qualified form; quick_xml's `Reader::read_to_end` is not `Read::`.
+const QUALIFIED_READ = /\b(?:Read|AsyncReadExt)\s*::\s*read_to_(?:end|string)\s*\(/g;
+// What a capped reader's expression ends in, just before its argument list.
+const TAKE_CALLEE = /(?:\.\s*take|\b(?:Read|AsyncReadExt)\s*::\s*take)\s*$/;
 const TEST_ATTRIBUTE = /^#\[(?:test|tokio::test|async_std::test|wasm_bindgen_test)\]\s*$/;
 const CFG_TEST = /^#\[cfg\(test\)\]\s*$/;
 const FN_LINE = /^(\s*)(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s/;
 const MOD_LINE = /^(\s*)(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{?\s*$/;
-const MAX_LOOKBACK = 12;
 
 // Reviewed, named exceptions — never a bare count. Each entry documents why
 // the direct-chain heuristic above cannot see that this call site is already
@@ -155,15 +164,113 @@ function testScopeMask(lines) {
   return inside;
 }
 
-function isBounded(lines, index) {
-  if (TAKE_CALL.test(lines[index])) return true;
-  let steps = 0;
-  for (let cursor = index - 1; cursor >= 0 && steps < MAX_LOOKBACK; cursor -= 1, steps += 1) {
-    const line = lines[cursor];
-    if (STATEMENT_BOUNDARY.test(line.trimEnd())) return false;
-    if (TAKE_CALL.test(line)) return true;
+// `text` with every comment and string or character literal blanked to spaces,
+// newlines kept, so offsets and line numbers still match the source.
+function maskRust(text) {
+  const out = text.split("");
+  const blank = (from, to) => {
+    for (let index = from; index < to; index += 1) if (out[index] !== "\n") out[index] = " ";
+  };
+  const isIdent = (char) => /[A-Za-z0-9_]/.test(char ?? "");
+  let index = 0;
+  while (index < text.length) {
+    const rest = text.slice(index, index + 2);
+    if (rest === "//") {
+      const end = text.indexOf("\n", index);
+      const stop = end === -1 ? text.length : end;
+      blank(index, stop);
+      index = stop;
+    } else if (rest === "/*") {
+      let depth = 0;
+      let cursor = index;
+      while (cursor < text.length) {
+        if (text.startsWith("/*", cursor)) {
+          depth += 1;
+          cursor += 2;
+        } else if (text.startsWith("*/", cursor)) {
+          depth -= 1;
+          cursor += 2;
+          if (depth === 0) break;
+        } else cursor += 1;
+      }
+      blank(index, cursor);
+      index = cursor;
+    } else if (!isIdent(text[index - 1]) && /^b?r#*"/.test(text.slice(index, index + 260))) {
+      const opening = /^b?r(#*)"/.exec(text.slice(index, index + 260));
+      const closing = `"${opening[1]}`;
+      const end = text.indexOf(closing, index + opening[0].length);
+      const stop = end === -1 ? text.length : end + closing.length;
+      blank(index, stop);
+      index = stop;
+    } else if (text[index] === '"') {
+      let cursor = index + 1;
+      while (cursor < text.length && text[cursor] !== '"') cursor += text[cursor] === "\\" ? 2 : 1;
+      blank(index, cursor + 1);
+      index = cursor + 1;
+    } else if (text[index] === "'") {
+      // A character literal, never a lifetime (`'a` has no closing quote).
+      const literal = /^'(?:[^'\\\n]|\\(?:x[0-9a-fA-F]{2}|u\{[0-9a-fA-F]{1,6}\}|.))'/.exec(
+        text.slice(index, index + 14),
+      );
+      const stop = index + (literal ? literal[0].length : 1);
+      if (literal) blank(index, stop);
+      index = stop;
+    } else index += 1;
+  }
+  return out.join("");
+}
+
+// The index of the parenthesis that closes the one opened at `open`, or -1.
+function closingParen(masked, open) {
+  let depth = 0;
+  for (let index = open; index < masked.length; index += 1) {
+    if (masked[index] === "(") depth += 1;
+    else if (masked[index] === ")" && (depth -= 1) === 0) return index;
+  }
+  return -1;
+}
+
+// Whether `expression` ends in a call to `take`: its last `(...)` is a
+// `take`'s argument list.
+function endsInTake(expression) {
+  const trimmed = expression.trimEnd();
+  if (!trimmed.endsWith(")")) return false;
+  let depth = 0;
+  for (let index = trimmed.length - 1; index >= 0; index -= 1) {
+    if (trimmed[index] === ")") depth += 1;
+    else if (trimmed[index] === "(" && (depth -= 1) === 0) {
+      return TAKE_CALLEE.test(trimmed.slice(0, index));
+    }
   }
   return false;
+}
+
+// Each read call in `masked`: its offset and whether its own reader is a take.
+function readCalls(masked) {
+  const calls = [];
+  for (const match of masked.matchAll(METHOD_READ)) {
+    const open = match.index + match[0].length - 1;
+    if (!/^\s*&\s*mut\b/.test(masked.slice(open + 1, open + 64))) continue;
+    calls.push({ offset: match.index, bounded: endsInTake(masked.slice(0, match.index)) });
+  }
+  for (const match of masked.matchAll(QUALIFIED_READ)) {
+    const open = match.index + match[0].length - 1;
+    const close = closingParen(masked, open);
+    const argumentsText = masked.slice(open + 1, close === -1 ? masked.length : close);
+    let depth = 0;
+    let comma = argumentsText.length;
+    for (let index = 0; index < argumentsText.length; index += 1) {
+      const char = argumentsText[index];
+      if ("([{".includes(char)) depth += 1;
+      else if (")]}".includes(char)) depth -= 1;
+      else if (char === "," && depth === 0) {
+        comma = index;
+        break;
+      }
+    }
+    calls.push({ offset: match.index, bounded: endsInTake(argumentsText.slice(0, comma)) });
+  }
+  return calls.sort((left, right) => left.offset - right.offset);
 }
 
 const failures = [];
@@ -177,24 +284,25 @@ for (const path of listSourceFiles()) {
   const lines = text.split("\n");
   const inTestScope = testScopeMask(lines);
 
-  lines.forEach((line, index) => {
-    if (!READ_CALL.test(line)) return;
+  for (const call of readCalls(maskRust(text))) {
+    const index = text.slice(0, call.offset).split("\n").length - 1;
     scanned += 1;
-    if (inTestScope[index]) return;
-    if (isBounded(lines, index)) {
+    if (inTestScope[index]) continue;
+    if (call.bounded) {
       boundedCount += 1;
-      return;
+      continue;
     }
-    if (ALLOWED_UNBOUNDED.has(path)) return;
-    failures.push(`${path}:${index + 1}: ${line.trim()}`);
-  });
+    if (ALLOWED_UNBOUNDED.has(path)) continue;
+    failures.push(`${path}:${index + 1}: ${lines[index].trim()}`);
+  }
 }
 
 if (failures.length) {
   throw new Error(
-    `${failures.length} unbounded Read::read_to_end/read_to_string call(s) found — each ` +
-      "reads an unbounded amount of external data into memory with no `.take(N)` cap " +
-      "in the same statement. Wrap the reader in `.take(limit + 1)` first (see " +
+    `${failures.length} unbounded Read::read_to_end/read_to_string call(s) found ` +
+      `(${scanned} scanned, ${boundedCount} bounded) — each reads an unbounded amount of ` +
+      "external data into memory through a reader that is not a `take(N)`. Wrap the " +
+      "reader itself in `.take(limit + 1)` (see " +
       "src-tauri/src/agent_bank_statement.rs for the pattern — the `+ 1` lets an " +
       "over-limit input be detected rather than silently truncated), or add a " +
       "reviewed entry to ALLOWED_UNBOUNDED in this script with the reason:\n" +

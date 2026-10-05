@@ -1030,6 +1030,48 @@ async fn read_window(
     (outcome, simulator.finish().unwrap())
 }
 
+/// #861: a window date that is not a Tally date is refused where it enters
+/// the window layer, by its typed code, before any request is sent.
+#[tokio::test]
+async fn a_window_date_that_is_not_a_tally_date_is_refused_before_any_request() {
+    for (from, to) in [
+        ("20261301", "20261302"),
+        ("20260801", "2026-08-02"),
+        ("20260229", "20260301"),
+    ] {
+        let simulator = SequenceSimulator::spawn(
+            divided_window_reads(marks_plan(3, 7))
+                .iter()
+                .flat_map(paired)
+                .collect(),
+        )
+        .unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let identity = identity();
+        let outcome = server
+            .read_voucher_window(
+                &identity,
+                identity.display_name(),
+                from,
+                to,
+                VoucherReadShape::EntryWildcard,
+                WindowPlanSource::Estimate {
+                    known_marks: Some(marks_of(3)),
+                },
+                three_a_read(),
+                |xml| parse_agent_rows(xml, GUID),
+            )
+            .await;
+        assert_eq!(
+            outcome.err().map(|failure| failure.code),
+            Some("invalid_date_range".to_string()),
+            "{from}..{to}"
+        );
+        assert_eq!(simulator.received(), 0, "{from}..{to}: nothing was sent");
+    }
+}
+
 /// The request bodies of the data POSTs among `observed`, by the six-leg pattern:
 /// only a leg at offset 1 of a paired read.
 fn assert_requests(

@@ -1,7 +1,8 @@
 # Bridge MCP
 
-For ordinary Claude Desktop installation, start with the install page when it
-is deployed, or use the [fallback installation guide](./INSTALL.md).
+For ordinary Claude Desktop installation, start with the
+[Download page](https://bridge.complyeaze.com/download.html), or use the
+[fallback installation guide](./INSTALL.md).
 The developer configuration below remains for supported client integrations.
 
 `bridge_mcp` is Bridge's newline-delimited JSON-RPC 2.0 MCP server. It uses

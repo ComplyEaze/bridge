@@ -5002,11 +5002,12 @@ async fn vouchers_states_its_read_cost_from_eighteen_census_reads_and_not_from_o
     let cost = &window["read_cost"];
     assert_eq!(cost["ended"], "read", "{window}");
     assert_eq!(cost["census_reads"], 18, "{window}");
-    assert_eq!(cost["floor_seconds"], 9, "{window}");
+    // Seventeen gaps of half a second, rounded down.
+    assert_eq!(cost["floor_seconds"], 8, "{window}");
     assert_eq!(cost["vouchers_read"], 3, "{window}");
-    assert_eq!(cost["estimate"]["kind"], "derived", "{window}");
     assert_eq!(
-        cost["estimate"]["host_240"]["state"], "window_fits",
+        cost["host_240"],
+        json!({"state": "window_fits", "vouchers_known_to_fit": 3}),
         "{window}"
     );
 
@@ -5023,7 +5024,7 @@ async fn vouchers_states_its_read_cost_from_eighteen_census_reads_and_not_from_o
 #[tokio::test]
 async fn a_later_page_does_not_repeat_the_first_pages_read_cost() {
     let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
-    // Sixteen reads: a certain floor of eight seconds, and the page's own
+    // Sixteen reads: fifteen gaps, 7.5 s, enough to speak, and the page's own
     // scripted requests still fit the simulator.
     let mut plans = census_plans_of(16);
     plans.extend(marks_page_plans(mark(16 * capacity)));
@@ -5039,4 +5040,35 @@ async fn a_later_page_does_not_repeat_the_first_pages_read_cost() {
     let window = &second["structuredContent"]["result"]["window"];
     assert_eq!(window["census"]["requests"], 16, "{window}");
     assert!(window.get("read_cost").is_none(), "{window}");
+}
+
+/// The block never costs a caller the rows of a page: at a cap the page fits in
+/// without it, the result comes back whole and without the block.
+#[tokio::test]
+async fn the_read_cost_is_left_out_where_it_would_cost_the_page_its_rows() {
+    let whole = call_vouchers_over(census_plans_of(18)).await;
+    let block_len = whole["structuredContent"]["result"]["window"]["read_cost"]
+        .to_string()
+        .len();
+    let cap = whole.to_string().len() - block_len;
+    let simulator = SequenceSimulator::spawn(census_plans_of(18)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.settings.max_bytes = cap;
+    let capped = server
+        .call_tool(
+            "vouchers",
+            json!({"company_guid": GUID, "from": "20260801", "to": "20260831"}),
+        )
+        .await;
+    simulator.finish().unwrap();
+    assert_eq!(capped["isError"], false, "{capped}");
+    let result = &capped["structuredContent"]["result"];
+    assert_eq!(
+        result["items"].as_array().map(Vec::len),
+        Some(3),
+        "{result}"
+    );
+    assert!(result["window"].get("read_cost").is_none(), "{result}");
+    assert_eq!(result["window"]["census"]["requests"], 18, "{result}");
 }

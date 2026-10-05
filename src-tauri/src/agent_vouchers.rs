@@ -410,16 +410,6 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         // What each request of the window read cost (#595); the empty-window
         // corroboration below is a read of its own and is not counted here.
         let window = serde_json::to_value(&read.timings).unwrap_or(Value::Null);
-        // What that cost means for the next call goes on this page only: a later
-        // page is served from the held window in about a second and must not
-        // repeat it (#1239).
-        let mut page_window = window.clone();
-        super::read_cost::add_read_cost(
-            &mut page_window,
-            &read.timings,
-            super::read_cost::Ended::Read,
-            server.settings.max_bytes,
-        );
         let source_marks = read.witness.as_ref().map(|witness| witness.marks);
         let counted = read.counted();
         // A withheld voucher goes through every date, ledger and type check as
@@ -547,7 +537,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             items,
             offset,
             total,
-            page_window,
+            window,
         );
         if let Some(held) = &held {
             payload["result"]["snapshot"] = held.describe(false);
@@ -570,6 +560,18 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 "items exclude {withheld_total} voucher(s) whose amounts Tally stored in a foreign currency; withheld_vouchers lists them up to its bound, withheld_total counts them all, and total counts items only"
             ));
         }
+        // What the cost means for the next call goes on this page only (a later page
+        // is served from the held window, which keeps the plain timings), and only
+        // when the whole response still fits without costing the caller its rows
+        // (#1239).
+        let payload_len = payload.to_string().len();
+        super::read_cost::add_read_cost(
+            &mut payload["result"]["window"],
+            payload_len,
+            &read.timings,
+            super::read_cost::Ended::Read,
+            server.settings.max_bytes,
+        );
         Ok(ToolOutcome {
             payload,
             evidence: accumulated.clone().expect("voucher source evidence is present after admitted read"),

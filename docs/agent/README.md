@@ -952,42 +952,28 @@ covers only the identity and marks reads it sent.
 
 The census a window read pays follows the book's voucher mark, not the window:
 on the largest book measured (mark about 1.03 million) one day is 126 census
-reads and about 170 s, and a week's census is paid the same way (bridge#595). An
-assistant that reads a month day by day pays that census once a day. When the
-window read took 20 s or more, or its census is 16 reads or more (a certain 8 s),
-the `window` of the result, and of a refusal that carries one, has a `read_cost`.
-It is left out when it would take more than a sixteenth of the response budget
-(`max_bytes`; a result is carried twice, so that is an eighth of what the host
-receives), to keep it out of a small response budget.
+reads and about 170 s (bridge#595). An assistant that reads a month day by day pays
+that census once a day. When the window read took 20 s or more, or its census is
+16 reads or more, the `window` of the first page of a result, and of a refusal that
+carries one, has a `read_cost`. It says only what the call itself showed; it makes
+no estimate for a larger or a smaller window.
 
 - `ended` (`read` or `stopped`), `census_reads`, `vouchers_read` and
   `observed_seconds` (`marks`, `census`, `parts`, `total`) are what the window
   read did. They do not include the call's smaller reads (company check, ledger and
   type lists), and a window with no voucher is read once more, a day wider on each
   side, which is not counted either (`say` states that case).
-- `floor_seconds` is a **lower bound by construction**: each census read waits half
-  a second before the next (the shipped request spacing), so reads times 0.5 s can
-  never be more than the wait. It is rounded down.
-- `estimate` is **derived** (`kind`). `fixed_seconds` is what every call pays
-  whatever its window and `per_voucher_ms` the cost of one more voucher, both from
-  this call's own timings and one census row cost, about 37 ms, measured once on one
-  book (a day of about 760 vouchers and a week of about 5,200 give the same fixed
-  cost, about 120 s). `host_240` is how a window of this book sits against the one
-  measured host limit: `window_fits` or `window_too_long`, each with
-  `vouchers_at_most` (what one call should carry; absent when even the cautious
-  figures leave room for none), `no_window_fits` (what every call pays is already
-  that long even on the most favourable figures: name no window), or
-  `not_established` (no voucher was read, or the read stopped). The advice is taken
-  with the census row cost at one and a half times the measured figure when the
-  call fitted (a larger window then costs more) and at two thirds when it did not
-  (a smaller one then costs more), against 225 s, that is 240 s less 15 s kept back
-  for the call's other reads, and never above what the planner can carry in one call
-  (5,376 vouchers). The inputs are in `host_240.basis` (`census_ms_per_row`,
-  `fixed_ms`, `per_voucher_ms`, `planning_limit_ms`), so `vouchers_at_most` is
-  `(planning_limit_ms - fixed_ms) / per_voucher_ms`. Nothing advises a smaller
-  window than one that has just fitted.
-- A read that **stopped** (a refusal) states the certain floor and no estimate: a
-  request that failed or hung is not what a window costs.
+- `floor_seconds` is **derived from the gate's rule**, not measured: the gate holds
+  each request back until half a second after the previous one ended, so a call
+  that sent N census reads waited at least (N - 1) x 0.5 s. It is rounded down.
+- `host_240` says how this window sat against the one measured host limit:
+  `window_fits` with `vouchers_known_to_fit` (what this call carried: a window of up
+  to that many vouchers is known to fit this book, and nothing larger is claimed),
+  `window_too_long` (this window did not fit; no number is given: read a shorter
+  window, how short is not established, and a smaller window has a smaller census),
+  or `not_established` (no voucher was read, or the read stopped).
+- A read that **stopped** (a refusal) states the floor and no verdict: a request
+  that failed or hung is not what a window costs.
 - `host_limits` names each host and its basis: Claude Desktop's chat app on macOS
   cancelled a silent 250 s call at 240 s in two runs on one build (calls between
   130 s and 240 s were not tried, and whether progress would extend the limit is not
@@ -995,16 +981,18 @@ receives), to keep it out of a small response budget.
   completed a 150 s call under its defaults in one run on each of two builds and
   cut at a limit a user configured (#703, 30 Sep; not yet in the protocol
   reference), and an earlier 60 s abandon is unexplained.
-- `say` is the same in a sentence, outcome first. When a window would not fit, or
-  none does, it also points to `trial_balance` for totals over a long period
-  (windowed trial balances read no vouchers). It refuses nothing and changes no
-  completeness rule; the figures are advice for the next call.
+- `say` is the same in a sentence, outcome first. When the window did not fit it
+  also points to `trial_balance` for totals over a long period (windowed trial
+  balances read no vouchers). It refuses nothing and changes no completeness rule.
 
-The block is on a page read now, not on a later page served from a held window: that
-page carries the window timings and no `read_cost`. The desktop screen's voucher
-list shares the read and receives the block too. Other tools that read a window
-(`ledger_movement`, `verify_import`, `voucher_presence`) do not report it yet, and a
-`vouchers` refusal raised after the whole read carries no window.
+The block is added only when the whole response still fits without costing the
+caller its rows (three times the payload and the block, plus a kilobyte, within
+`max_bytes`: a result is carried twice and its text copy is escaped), and only on a
+page read now: a later page served from a held window carries the window timings and
+no `read_cost`. The desktop screen's voucher list shares the read and receives the
+block too. Other tools that read a window (`ledger_movement`, `verify_import`,
+`voucher_presence`) do not report it yet, and a `vouchers` refusal raised after the
+whole read carries no window.
 
 ### Foreign-currency composites in `vouchers`
 

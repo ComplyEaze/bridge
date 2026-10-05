@@ -1,5 +1,5 @@
-//! The read-cost block (bridge#1239): the figures, the boundaries, and what each
-//! one is labelled.
+//! The read-cost block (bridge#1239): what it states, its boundaries, and where it
+//! is added.
 use super::*;
 use crate::agent::voucher_window::{PartTiming, RequestTally};
 
@@ -43,45 +43,42 @@ fn largest_book_day() -> WindowReadTimings {
     timings(3_400, (126, 145_000), vec![part(760, 21_000)])
 }
 
-/// The same book, a week of about 5,200 vouchers.
-fn largest_book_week() -> WindowReadTimings {
-    timings(3_400, (126, 308_000), vec![part(5_200, 129_000)])
+/// A window on the same book that took 440 s (synthetic figures: a long window).
+fn a_long_window() -> WindowReadTimings {
+    timings(3_000, (126, 300_000), vec![part(5_000, 137_000)])
 }
 
-/// A response budget no test here comes near.
-const AMPLE: usize = 200_000;
-
 fn block(timings: &WindowReadTimings) -> Value {
-    read_cost(timings, Ended::Read, AMPLE).expect("a block")
+    read_cost(timings, Ended::Read).expect("a block")
 }
 
 #[test]
 fn a_quick_read_on_a_small_book_says_nothing() {
     // The 29,900-mark synthetic day: 4 census reads, 7.7 s in all.
     let small = timings(1_000, (4, 5_200), vec![part(82, 1_540)]);
-    assert_eq!(read_cost(&small, Ended::Read, AMPLE), None);
+    assert_eq!(read_cost(&small, Ended::Read), None);
 }
 
 #[test]
 fn a_read_of_twenty_seconds_is_worth_a_statement_and_one_millisecond_less_is_not() {
-    // One census read keeps the floor at half a second, so only time decides.
+    // One census read leaves the floor at nothing, so only time decides.
     let at = timings(0, (1, 19_000), vec![part(1, 1_000)]);
-    assert!(read_cost(&at, Ended::Read, AMPLE).is_some());
+    assert!(read_cost(&at, Ended::Read).is_some());
     let under = timings(0, (1, 19_000), vec![part(1, 999)]);
-    assert_eq!(read_cost(&under, Ended::Read, AMPLE), None);
+    assert_eq!(read_cost(&under, Ended::Read), None);
 }
 
 #[test]
-fn a_read_stopped_early_is_worth_a_statement_from_sixteen_census_reads() {
-    // Sixteen reads: a certain floor of eight seconds, whatever the clock says.
+fn sixteen_census_reads_are_worth_a_statement_even_when_the_read_stopped() {
+    // Sixteen reads wait at least fifteen gaps of half a second: 7.5 s.
     let sixteen = timings(0, (16, 0), vec![]);
-    assert!(read_cost(&sixteen, Ended::Stopped, AMPLE).is_some());
+    assert!(read_cost(&sixteen, Ended::Stopped).is_some());
     let fifteen = timings(0, (15, 0), vec![]);
-    assert_eq!(read_cost(&fifteen, Ended::Stopped, AMPLE), None);
+    assert_eq!(read_cost(&fifteen, Ended::Stopped), None);
 }
 
 #[test]
-fn the_largest_book_day_states_its_floor_its_estimate_and_what_one_call_can_carry() {
+fn the_largest_book_day_states_what_it_did_and_that_it_fitted() {
     let cost = block(&largest_book_day());
     assert_eq!(cost["ended"], "read");
     assert_eq!(cost["census_reads"], 126);
@@ -90,153 +87,81 @@ fn the_largest_book_day_states_its_floor_its_estimate_and_what_one_call_can_carr
         cost["observed_seconds"],
         json!({"marks": 3, "census": 145, "parts": 21, "total": 169})
     );
-    // 126 reads x 0.5 s, a lower bound by construction.
-    assert_eq!(cost["floor_seconds"], 63);
-    let estimate = &cost["estimate"];
-    assert_eq!(estimate["kind"], "derived");
-    // The central model, at the measured 37 ms a census row: census 145.0 s less
-    // 760 rows (28.1 s) is 116.9 s, above the 63 s floor; plus 3.4 s of marks:
-    // 120.3 s, rounded up. One more voucher: 21 s over 760 is 27.6 ms, rounded up
-    // to 28, plus 37.
-    assert_eq!(estimate["fixed_seconds"], 121);
-    assert_eq!(estimate["per_voucher_ms"], 65);
-    // The advice: the call fitted, so the census row is taken at 55 ms: 145.0 s
-    // less 41.8 s is 103.2 s, plus 3.4 s of marks is 106.6 s; 28 + 55 = 83 ms a
-    // voucher; (225,000 - 106,600) / 83 = 1,426.
+    // 125 gaps of 0.5 s, rounded down.
+    assert_eq!(cost["floor_seconds"], 62);
     assert_eq!(
-        estimate["host_240"],
-        json!({"state": "window_fits", "vouchers_at_most": 1_426,
-               "basis": {"census_ms_per_row": 55, "fixed_ms": 106_600, "per_voucher_ms": 83, "planning_limit_ms": 225_000}})
+        cost["host_240"],
+        json!({"state": "window_fits", "vouchers_known_to_fit": 760})
     );
+    // Nothing is extrapolated from the one book: no estimate field exists.
+    assert!(cost.get("estimate").is_none(), "{cost}");
 }
 
 #[test]
-fn a_week_past_the_desktop_limit_says_so_and_names_what_would_fit() {
-    let cost = block(&largest_book_week());
+fn a_window_past_the_desktop_limit_says_so_and_names_no_number() {
+    let cost = block(&a_long_window());
     assert_eq!(cost["observed_seconds"]["total"], 440);
-    // The same book gives the same central model from the week as from the day:
-    // 308.0 s less 5,200 rows at 37 ms (192.4 s) is 115.6 s, plus 3.4 s of marks,
-    // 119.0 s (the day gave 120.3 s); 129 s over 5,200 is 24.8 ms, 25, plus 37.
-    assert_eq!(cost["estimate"]["fixed_seconds"], 119);
-    assert_eq!(cost["estimate"]["per_voucher_ms"], 62);
-    // The advice: the call did not fit, so the census row is taken at 24 ms:
-    // 308.0 s less 124.8 s is 183.2 s, plus 3.4 s is 186.6 s; 25 + 24 = 49 ms a
-    // voucher; (225,000 - 186,600) / 49 = 783.
+    assert_eq!(cost["host_240"], json!({"state": "window_too_long"}));
+}
+
+#[test]
+fn a_call_of_exactly_the_limit_fitted_and_a_millisecond_more_did_not() {
+    let at_limit = timings(0, (1, 0), vec![part(100, 240_000)]);
     assert_eq!(
-        cost["estimate"]["host_240"],
-        json!({"state": "window_too_long", "vouchers_at_most": 783,
-               "basis": {"census_ms_per_row": 24, "fixed_ms": 186_600, "per_voucher_ms": 49, "planning_limit_ms": 225_000}})
+        block(&at_limit)["host_240"],
+        json!({"state": "window_fits", "vouchers_known_to_fit": 100})
+    );
+    let over = timings(0, (1, 0), vec![part(100, 240_001)]);
+    assert_eq!(
+        block(&over)["host_240"],
+        json!({"state": "window_too_long"})
     );
 }
 
 #[test]
-fn a_book_whose_census_alone_is_past_the_limit_has_no_window_and_names_none() {
-    // 250 census reads taking 300 s and no voucher read, finished: nothing can be
-    // read per call on a host that stops at 240 s.
-    let read = timings(0, (250, 300_000), vec![]);
-    let cost = block(&read);
-    assert_eq!(cost["ended"], "read");
+fn a_census_that_alone_passes_the_limit_is_too_long_not_a_verdict_on_the_book() {
+    // A smaller window has a smaller census, so this says only that this window
+    // did not fit.
+    let census_alone = timings(0, (250, 300_000), vec![]);
     assert_eq!(
-        cost["estimate"]["host_240"],
-        json!({"state": "no_window_fits"})
+        block(&census_alone)["host_240"],
+        json!({"state": "window_too_long"})
     );
-    assert_eq!(cost["estimate"]["per_voucher_ms"], Value::Null);
 }
 
-/// A read that stopped gives the certain floor and no estimate: the time of a
-/// request that failed or hung is not what a window costs, so five census reads
-/// with 250 s of failed time never become a verdict about the book.
 #[test]
-fn a_read_that_stopped_states_no_estimate_whatever_its_times() {
+fn a_read_with_no_voucher_cannot_say_what_a_call_carries() {
+    let empty = timings(0, (21, 21_000), vec![]);
+    assert_eq!(
+        block(&empty)["host_240"],
+        json!({"state": "not_established"})
+    );
+}
+
+/// A read that stopped states the floor and no verdict: the time of a request that
+/// failed or hung is not what a window costs.
+#[test]
+fn a_read_that_stopped_states_no_verdict_whatever_its_times() {
     for stopped in [
         timings(0, (250, 300_000), vec![]),
         timings(0, (5, 250_000), vec![]),
         timings(0, (30, 25_000), vec![part(100, 1_000)]),
     ] {
-        let cost = read_cost(&stopped, Ended::Stopped, AMPLE).expect("a block");
+        let cost = read_cost(&stopped, Ended::Stopped).expect("a block");
         assert_eq!(cost["ended"], "stopped", "{cost}");
         assert_eq!(
-            cost["estimate"]["host_240"],
+            cost["host_240"],
             json!({"state": "not_established"}),
             "{cost}"
         );
-        assert_eq!(cost["estimate"]["fixed_seconds"], Value::Null, "{cost}");
-        assert_eq!(cost["estimate"]["per_voucher_ms"], Value::Null, "{cost}");
     }
 }
 
 #[test]
-fn a_call_that_does_not_fit_even_one_voucher_names_no_window() {
-    // 100 vouchers read in 20 s of parts (224 ms each with the census row at 24
-    // ms: the call did not fit). A fixed cost of 224,900 ms leaves 100 ms of the
-    // planning limit: not one voucher, and the figures cannot say how many fit.
-    let none = timings(0, (30, 224_900 + 2_400), vec![part(100, 20_000)]);
-    let cost = block(&none);
-    assert_eq!(cost["estimate"]["host_240"]["state"], "window_too_long");
-    assert!(
-        cost["estimate"]["host_240"]
-            .get("vouchers_at_most")
-            .is_none(),
-        "{cost}"
-    );
-    // A fixed cost of 224,000 ms leaves 1,000 ms: 4 vouchers at 224 ms.
-    let four = timings(0, (30, 224_000 + 2_400), vec![part(100, 20_000)]);
-    assert_eq!(block(&four)["estimate"]["host_240"]["vouchers_at_most"], 4);
-}
-
-/// What every call pays is at the planning limit or above only on the estimate
-/// most favourable to a window (the census row at 55 ms): at exactly that, no
-/// window fits; a millisecond less and what fitted is never advised against.
-#[test]
-fn no_window_fits_only_when_even_the_favourable_estimate_says_so() {
-    let at_limit = timings(0, (30, 230_500), vec![part(100, 1_000)]);
-    assert_eq!(
-        block(&at_limit)["estimate"]["host_240"],
-        json!({"state": "no_window_fits"})
-    );
-    let under = timings(0, (30, 230_499), vec![part(100, 1_000)]);
-    assert_eq!(
-        block(&under)["estimate"]["host_240"]["state"],
-        "window_fits"
-    );
-    assert_eq!(
-        block(&under)["estimate"]["host_240"]["vouchers_at_most"],
-        100
-    );
-}
-
-#[test]
-fn a_read_with_no_voucher_cannot_say_how_many_a_call_carries() {
-    // Twenty-one reads, a clean read of an empty window: the floor is long
-    // enough to speak, the rate is unknown.
-    let empty = timings(0, (21, 21_000), vec![]);
-    let cost = block(&empty);
-    assert_eq!(
-        cost["estimate"]["host_240"],
-        json!({"state": "not_established"})
-    );
-    assert_eq!(cost["estimate"]["per_voucher_ms"], Value::Null);
-}
-
-#[test]
-fn a_read_that_fitted_is_never_advised_against() {
-    // 5,000 vouchers in 100 s of parts at a 20 s fixed census: the cautious
-    // model (75 ms each) would allow 2,733, fewer than the call just carried.
-    let fitted = timings(0, (40, 20_000), vec![part(5_000, 100_000)]);
-    let host = &block(&fitted)["estimate"]["host_240"];
-    assert_eq!(host["state"], "window_fits");
-    assert_eq!(host["vouchers_at_most"], 5_000);
-    // The cautious figures themselves are shown: 20 ms + 55 ms a voucher, and the
-    // census (20 s) is all fixed cost.
-    assert_eq!(host["basis"]["per_voucher_ms"], 75);
-    assert_eq!(host["basis"]["fixed_ms"], 20_000);
-}
-
-#[test]
 fn the_floor_is_rounded_down_so_it_stays_a_lower_bound() {
-    // Three reads are 1.5 s: the floor says 1, not 2. (Slow enough to speak.)
-    let three = timings(0, (3, 21_000), vec![part(1, 1)]);
-    assert_eq!(block(&three)["floor_seconds"], 1);
+    // Four reads leave three gaps: 1.5 s, so the floor says 1, not 2.
+    let four = timings(0, (4, 21_000), vec![part(1, 1)]);
+    assert_eq!(block(&four)["floor_seconds"], 1);
 }
 
 #[test]
@@ -265,104 +190,61 @@ fn the_sentence_leads_with_the_outcome_and_labels_what_is_derived() {
     // Pinned whole: assistant-facing text changes on purpose, never by drift.
     assert_eq!(
         block(&largest_book_day())["say"],
-        "The window read took 169 seconds for 760 vouchers. About 121 seconds (derived) is paid on every call, however short the window, because this book needs 126 census reads; at least 63 of those seconds are certain (the wait between reads). Claude Desktop's chat app stops a silent call at 240 seconds (measured twice, on one Mac build): with 15 seconds kept back for the call's other reads, one call there can carry about 1426 vouchers (derived), so use the widest window within that, not many short calls."
+        "The window read took 169 seconds for 760 vouchers. This book's census took 126 reads, so at least 62 seconds of any call go on the wait between them (derived from the 0.5 second gate). Claude Desktop's chat app stops a silent call at 240 seconds (measured twice, on one Mac build); a window of up to 760 vouchers is known to fit this book, and whether a larger one does is not established."
     );
     assert_eq!(
-        block(&largest_book_week())["say"],
-        "The window read took 440 seconds for 5200 vouchers. About 119 seconds (derived) is paid on every call, however short the window, because this book needs 126 census reads; at least 63 of those seconds are certain (the wait between reads). That is past 240 seconds, where Claude Desktop's chat app stops a silent call (measured twice, on one Mac build): read about 783 vouchers or fewer per call (derived). For totals over a long period read trial_balance, which reads no vouchers."
+        block(&a_long_window())["say"],
+        "The window read took 440 seconds for 5000 vouchers. This book's census took 126 reads, so at least 62 seconds of any call go on the wait between them (derived from the 0.5 second gate). That is past 240 seconds, where Claude Desktop's chat app stops a silent call (measured twice, on one Mac build). Read a shorter window; how short is not established. For totals over a long period read trial_balance, which reads no vouchers."
     );
+    // One census read has no wait between reads to state.
     assert_eq!(
-        block(&timings(0, (250, 300_000), vec![]))["say"],
-        "The window read took 300 seconds for 0 vouchers. About 300 seconds (derived) is paid on every call, however short the window, because this book needs 250 census reads; at least 125 of those seconds are certain (the wait between reads). On a host that stops a silent call at 240 seconds (Claude Desktop's chat app, measured twice on one Mac build) no window of this book fits, because what every call pays is already that long; do not suggest one. For totals over a long period read trial_balance, which reads no vouchers."
+        block(&timings(0, (1, 25_000), vec![part(10, 1_000)]))["say"],
+        "The window read took 26 seconds for 10 vouchers. Claude Desktop's chat app stops a silent call at 240 seconds (measured twice, on one Mac build); a window of up to 10 vouchers is known to fit this book, and whether a larger one does is not established."
     );
-    let none = timings(0, (30, 224_900 + 2_400), vec![part(100, 20_000)]);
-    assert!(
-        block(&none)["say"].as_str().unwrap().ends_with(
-            "That is past 240 seconds, where Claude Desktop's chat app stops a silent call (measured twice, on one Mac build), and the figures cannot say how many vouchers a call can carry: read a shorter window, or for totals over a long period read trial_balance, which reads no vouchers."
-        ),
-        "{}", block(&none)
+    // A window with no voucher is read once more, which is not in the figures.
+    assert_eq!(
+        block(&timings(0, (21, 21_000), vec![]))["say"],
+        "The window read took 21 seconds for 0 vouchers. This book's census took 21 reads, so at least 10 seconds of any call go on the wait between them (derived from the 0.5 second gate). No voucher was read, so what a call can carry is not established. A window with no voucher is also read once more, a day wider on each side, to confirm it is empty; that read pays its own census and is not in these figures."
     );
-    let stopped = read_cost(&timings(0, (250, 300_000), vec![]), Ended::Stopped, AMPLE).unwrap();
+    let stopped = read_cost(&timings(0, (250, 300_000), vec![]), Ended::Stopped).unwrap();
     assert_eq!(
         stopped["say"],
-        "The window read stopped after 300 seconds, before any voucher was read. At least 250 census reads were sent, so at least 125 seconds is paid on every call (the wait between reads). The read stopped, so how many vouchers one call can carry is not established."
+        "The window read stopped after 300 seconds, before any voucher was read. This book's census took at least 250 reads, so at least 124 seconds of any call go on the wait between them (derived from the 0.5 second gate). The read stopped, so what a call can carry is not established."
     );
-}
-
-#[test]
-fn a_read_stopped_after_vouchers_were_read_says_none_were_returned() {
-    let stopped = read_cost(
+    let with_vouchers = read_cost(
         &timings(0, (30, 25_000), vec![part(100, 1_000)]),
         Ended::Stopped,
-        AMPLE,
     )
-    .expect("a block");
-    assert_eq!(stopped["ended"], "stopped");
-    assert_eq!(stopped["vouchers_read"], 100);
+    .unwrap();
     assert!(
-        stopped["say"].as_str().unwrap().starts_with(
+        with_vouchers["say"].as_str().unwrap().starts_with(
             "The window read stopped after 26 seconds with 100 vouchers read and none returned. "
         ),
-        "{stopped}"
+        "{with_vouchers}"
     );
 }
 
+/// The block is added only when the whole response still fits: a result is carried
+/// three times over once it is also copied, escaped, into the text content, plus a
+/// kilobyte of envelope.
 #[test]
-fn an_empty_window_says_its_second_read_is_not_counted() {
-    // Twenty-one reads and no voucher: the window is then read once more, wider.
-    let empty = timings(0, (21, 21_000), vec![]);
-    assert_eq!(
-        block(&empty)["say"],
-        "The window read took 21 seconds for 0 vouchers. About 21 seconds (derived) is paid on every call, however short the window, because this book needs 21 census reads; at least 10 of those seconds are certain (the wait between reads). No voucher was read, so how many one call can carry is not established. A window with no voucher is also read once more, a day wider on each side, to confirm it is empty; that read is not in these figures and costs about as much again (derived)."
-    );
-    // A read that stopped never reached that second read.
-    let stopped = read_cost(&empty, Ended::Stopped, AMPLE).unwrap();
-    assert!(
-        stopped["say"].as_str().unwrap().ends_with(
-            "The read stopped, so how many vouchers one call can carry is not established."
-        ),
-        "{stopped}"
-    );
-}
-
-#[test]
-fn a_call_of_exactly_the_limit_fitted_and_a_millisecond_more_did_not() {
-    // 100 vouchers in parts alone: 240,000 ms fitted (never advised against), and
-    // 240,001 ms did not, so the advice is a smaller window.
-    let at_limit = timings(0, (1, 0), vec![part(100, 240_000)]);
-    let host = &block(&at_limit)["estimate"]["host_240"];
-    assert_eq!(host["state"], "window_fits");
-    assert_eq!(host["vouchers_at_most"], 100);
-    let over = timings(0, (1, 0), vec![part(100, 240_001)]);
-    let host = &block(&over)["estimate"]["host_240"];
-    assert_eq!(host["state"], "window_too_long");
-    // fixed 500 ms (the floor), 2,401 + 24 = 2,425 ms a voucher:
-    // (225,000 - 500) / 2,425 = 92.
-    assert_eq!(host["vouchers_at_most"], 92);
-}
-
-#[test]
-fn the_block_is_left_out_past_a_sixteenth_of_the_response_budget() {
-    // A result is carried twice, so a sixteenth of the budget is an eighth of
-    // what the host receives.
+fn the_block_is_added_only_when_the_response_still_fits() {
     let day = largest_book_day();
-    let size = block(&day).to_string().len();
-    assert!(read_cost(&day, Ended::Read, size * 16).is_some());
-    assert_eq!(read_cost(&day, Ended::Read, size * 16 - 1), None);
-    assert_eq!(read_cost(&day, Ended::Stopped, 4_096), None);
-}
-
-#[test]
-fn the_window_gets_the_block_only_when_there_is_one() {
-    let mut slow = serde_json::to_value(largest_book_day()).unwrap();
-    add_read_cost(&mut slow, &largest_book_day(), Ended::Read, AMPLE);
-    assert_eq!(slow["census"]["requests"], 126);
-    assert_eq!(slow["read_cost"]["census_reads"], 126);
+    let block_len = block(&day).to_string().len();
+    let container = 5_000;
+    let needed = (container + block_len) * 3 + 1_024;
+    let window = || serde_json::to_value(&day).unwrap();
+    let mut at = window();
+    add_read_cost(&mut at, container, &day, Ended::Read, needed);
+    assert_eq!(at["read_cost"]["census_reads"], 126);
+    let mut under = window();
+    add_read_cost(&mut under, container, &day, Ended::Read, needed - 1);
+    assert!(under.get("read_cost").is_none(), "{under}");
+    // A quick call has nothing to add whatever the budget.
     let quick = timings(1_000, (4, 5_200), vec![part(82, 1_540)]);
     let mut plain = serde_json::to_value(&quick).unwrap();
-    add_read_cost(&mut plain, &quick, Ended::Read, AMPLE);
+    add_read_cost(&mut plain, 1, &quick, Ended::Read, usize::MAX);
     assert_eq!(plain, serde_json::to_value(&quick).unwrap());
-    assert!(plain.get("read_cost").is_none());
 }
 
 /// The floor is the runtime's own spacing: if that constant moves, this block's
@@ -374,31 +256,8 @@ fn the_floor_spacing_is_the_runtimes_shipped_spacing() {
         .contains("const SHIPPED_REQUEST_SPACING: Duration = Duration::from_millis(500);"));
 }
 
-#[test]
-fn the_advice_never_exceeds_the_planners_allowance() {
-    // What the first plan can carry: 16 MiB of data budget at 384 KiB a voucher
-    // is 42 vouchers a read, over 128 reads (reference 11c.3). If the planner's
-    // constants move, this must be looked at on purpose.
-    let allowance = voucher_allowance();
-    assert_eq!(allowance, 5_376);
-    // The cautious rate alone would allow far more (225,000 ms at 24 ms), so the
-    // bound is what holds here.
-    assert!(allowance < PLANNING_LIMIT_MS / CENSUS_MS_PER_ROW_LOW);
-    assert_eq!(
-        fit_of(0, 0, 5, 0, 0, DESKTOP_CALL_LIMIT_MS + 1),
-        Fit::WindowTooLong {
-            at_most: Some(allowance),
-            basis: Basis {
-                census_row_ms: CENSUS_MS_PER_ROW_LOW,
-                fixed_ms: 0,
-                per_voucher_ms: CENSUS_MS_PER_ROW_LOW,
-            },
-        }
-    );
-}
-
 fn server() -> (crate::agent::Server, tempfile::TempDir) {
-    server_with_budget(AMPLE)
+    server_with_budget(200_000)
 }
 
 fn server_with_budget(max_bytes: usize) -> (crate::agent::Server, tempfile::TempDir) {
@@ -421,7 +280,7 @@ fn server_with_budget(max_bytes: usize) -> (crate::agent::Server, tempfile::Temp
 }
 
 /// A refused `vouchers` read reports what it had cost, so the caller learns the
-/// fixed cost of the book from the failure too. The other tools that report a
+/// census cost of the book from the failure too. The other tools that report a
 /// window keep the shape they had.
 #[test]
 fn a_refused_vouchers_read_reports_its_cost_and_other_tools_keep_their_shape() {
@@ -463,24 +322,4 @@ fn a_refusal_at_a_small_cap_keeps_its_code_and_drops_the_block() {
     assert_eq!(error["code"], "voucher_window_part_not_admitted", "{error}");
     assert_eq!(error["window"]["census"]["requests"], 126, "{error}");
     assert!(error["window"].get("read_cost").is_none(), "{error}");
-}
-
-#[test]
-fn what_every_call_pays_is_never_less_than_the_certain_floor() {
-    // 30 census reads (a certain 15 s) that took 20 s while carrying 500 rows:
-    // the rows' share (27.5 s at 55 ms) would leave nothing, below the floor, so
-    // the floor stands.
-    let rows_heavy = timings(0, (30, 20_000), vec![part(500, 1_000)]);
-    assert_eq!(block(&rows_heavy)["estimate"]["fixed_seconds"], 15);
-}
-
-#[test]
-fn a_census_that_alone_takes_the_planning_limit_leaves_no_window() {
-    // 250 reads, 225.000 s exactly (the planning limit), no voucher read:
-    // what every call pays is the limit itself.
-    let read = timings(0, (250, 225_000), vec![]);
-    assert_eq!(
-        block(&read)["estimate"]["host_240"],
-        json!({"state": "no_window_fits"})
-    );
 }

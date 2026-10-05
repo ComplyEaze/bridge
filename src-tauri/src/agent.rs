@@ -1864,19 +1864,20 @@ impl Server {
                     if matches!(name, "vouchers" | "outstandings")
                         && self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET
                     {
-                        let mut window =
+                        error["window"] =
                             window_timings_within(&timings, self.settings.max_bytes / 4);
                         // Only `vouchers` says what the read cost; `outstandings`
                         // reports its timings as before (bridge#1239).
                         if name == "vouchers" {
+                            let len = error.to_string().len();
                             read_cost::add_read_cost(
-                                &mut window,
+                                &mut error["window"],
+                                len,
                                 &timings,
                                 read_cost::Ended::Stopped,
                                 self.settings.max_bytes,
                             );
                         }
-                        error["window"] = window;
                     }
                 }
                 ToolOutcome {

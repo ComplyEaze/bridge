@@ -4611,7 +4611,14 @@ async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
     let one = OneServer::spawn(plans);
     let ledger_match = json!({"ledger": "Cash", "matched": "case_or_spacing",
         "similar_ledgers": [], "similar_ledgers_total": 0});
-    let key = VoucherPageKey::new(&identity(), "20260801", "20260831", Some("cash"), None);
+    let key = VoucherPageKey::new(
+        &identity(),
+        "20260801",
+        "20260831",
+        Some("cash"),
+        None,
+        None,
+    );
     assert!(one
         .server
         .voucher_pages
@@ -4624,6 +4631,7 @@ async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
             window,
             None,
             Some(ledger_match.clone()),
+            Some("Cash".to_string()),
             None,
         ))));
     let second = one
@@ -4641,7 +4649,7 @@ async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
 fn a_held_window_is_found_by_its_own_question_only() {
     let identity = identity();
     let key = |ledger: Option<&str>, selector: Option<&VoucherTypeSelector>| {
-        VoucherPageKey::new(&identity, "20260801", "20260831", ledger, selector)
+        VoucherPageKey::new(&identity, "20260801", "20260831", ledger, selector, None)
     };
     let held = |key: VoucherPageKey| {
         Arc::new(VoucherPageSnapshot::new(
@@ -4649,6 +4657,7 @@ fn a_held_window_is_found_by_its_own_question_only() {
             marks_of(3),
             Arc::new(Vec::new()),
             Value::Null,
+            None,
             None,
             None,
             None,
@@ -4760,26 +4769,60 @@ async fn an_expired_or_oversized_window_is_not_held() {
 #[test]
 fn a_held_window_answers_one_question_only() {
     let identity = identity();
-    let base = || VoucherPageKey::new(&identity, "20260801", "20260831", None, None);
+    let base = || VoucherPageKey::new(&identity, "20260801", "20260831", None, None, None);
     assert_eq!(base(), base());
     assert_ne!(
         base(),
-        VoucherPageKey::new(&identity, "20260802", "20260831", None, None)
+        VoucherPageKey::new(&identity, "20260802", "20260831", None, None, None)
     );
     assert_ne!(
         base(),
-        VoucherPageKey::new(&identity, "20260801", "20260830", None, None)
+        VoucherPageKey::new(&identity, "20260801", "20260830", None, None, None)
     );
     assert_ne!(
         base(),
-        VoucherPageKey::new(&identity, "20260801", "20260831", Some("Cash"), None)
+        VoucherPageKey::new(&identity, "20260801", "20260831", Some("Cash"), None, None)
     );
     let sales = VoucherTypeSelector::Name("Sales".to_string());
     let purchase = VoucherTypeSelector::Name("Purchase".to_string());
-    let keyed =
-        |selector| VoucherPageKey::new(&identity, "20260801", "20260831", None, Some(selector));
+    let keyed = |selector| {
+        VoucherPageKey::new(
+            &identity,
+            "20260801",
+            "20260831",
+            None,
+            Some(selector),
+            None,
+        )
+    };
     assert_ne!(base(), keyed(&sales));
     assert_ne!(keyed(&sales), keyed(&purchase));
+    let searched = |args: Value| {
+        let search = VoucherSearch::from_args(&args, Redaction::None).unwrap();
+        VoucherPageKey::new(
+            &identity,
+            "20260801",
+            "20260831",
+            None,
+            None,
+            search.as_ref(),
+        )
+    };
+    assert_ne!(base(), searched(json!({"voucher_number": "1"})));
+    assert_ne!(
+        searched(json!({"voucher_number": "1"})),
+        searched(json!({"voucher_number": "2"}))
+    );
+    assert_eq!(
+        searched(json!({"amount": "5"})),
+        searched(json!({"amount": "5.00"}))
+    );
+    // A summary is its own question, and each grouping a different one.
+    assert_ne!(base(), base().with_summary(Some(SummaryGroup::Month)));
+    assert_ne!(
+        base().with_summary(Some(SummaryGroup::Month)),
+        base().with_summary(Some(SummaryGroup::Ledger))
+    );
     assert_ne!(
         keyed(&sales),
         keyed(&VoucherTypeSelector::Guid("Sales".to_string()))
@@ -4972,4 +5015,305 @@ fn page_items_masks_the_party_names_of_every_row_it_cuts() {
         text.contains("Lab Party 1") && text.contains("Lab Party Pvt"),
         "{text}"
     );
+}
+
+// -- #1230: search and summaries over the labelled window --
+
+fn result_of(response: &Value) -> &Value {
+    assert_ne!(response["isError"], true, "{response}");
+    &response["structuredContent"]["result"]
+}
+
+fn bucket_names(response: &Value) -> Vec<String> {
+    result_of(response)["buckets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|bucket| bucket["group"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[tokio::test]
+async fn a_voucher_number_search_returns_that_voucher_from_the_counted_window() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one.call(json!({"voucher_number": "2"})).await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["total"], 1);
+    assert_eq!(result["items"][0]["voucher_number"], "2");
+    assert_eq!(
+        result["items"][0]["matched"],
+        json!({"voucher_number": true})
+    );
+    // The whole window was read once; the search is client-side and sent nothing more.
+    one.requests();
+}
+
+#[tokio::test]
+async fn a_search_that_finds_nothing_in_a_counted_window_is_a_checked_zero() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one
+        .call(json!({"narration_contains": "no such phrase"}))
+        .await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["total"], 0);
+    assert_eq!(result["items"], json!([]));
+}
+
+#[tokio::test]
+async fn a_later_page_of_a_search_is_served_only_for_the_same_search() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(marks_page_plans(counted_marks()));
+    // The third call names the first page's snapshot with a different search: refused after the
+    // identity read alone, no marks read for a window that is not the one held.
+    plans.extend(identity_plans());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let search = json!({"narration_contains": "WR2-N", "limit": 1});
+    let first = one.call(search.clone()).await;
+    assert_eq!(result_of(&first)["total"], 3);
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(json!({"narration_contains": "WR2-N", "limit": 1, "offset": 1, "snapshot_id": id}))
+        .await;
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    assert_eq!(result_of(&second)["items"][0]["voucher_number"], "2");
+    let other = one
+        .call(json!({"narration_contains": "WR2-N6", "limit": 1, "offset": 1, "snapshot_id": id}))
+        .await;
+    let error = refusal_of(&other);
+    assert_eq!(error["code"], "listing_snapshot_changed", "{error}");
+    assert_eq!(error["cause"], "snapshot_not_held", "{error}");
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_refused_search_costs_only_the_identity_read() {
+    for (args, code) in [
+        (json!({"voucher_number": " "}), "search_criterion_empty"),
+        (
+            json!({"narration_contains": "ab"}),
+            "search_narration_too_short",
+        ),
+        (json!({"amount": "-5"}), "search_amount_invalid"),
+    ] {
+        let one = OneServer::spawn(identity_plans());
+        let response = one.call(args).await;
+        assert_eq!(refusal_of(&response)["code"], code, "{response}");
+        assert_eq!(one.requests(), 4);
+    }
+}
+
+/// The catalogue's own schema admits the three groupings and the four search criteria, and
+/// refuses a grouping it does not list, before any read.
+#[test]
+fn the_vouchers_schema_lists_the_groupings_and_the_search_criteria() {
+    let call = |extra: Value| {
+        let mut args = json!({"company_guid": GUID, "from": "20260801", "to": "20260831"});
+        for (key, value) in extra.as_object().unwrap() {
+            args[key] = value.clone();
+        }
+        validate_tool_arguments("vouchers", &args)
+    };
+    for grouping in ["ledger", "month", "voucher_type"] {
+        assert_eq!(call(json!({"summarise_by": grouping})), Ok(()));
+    }
+    assert!(call(json!({"summarise_by": "group"})).is_err());
+    for criterion in [
+        "voucher_number",
+        "reference",
+        "narration_contains",
+        "amount",
+    ] {
+        assert_eq!(call(json!({ criterion: "x1" })), Ok(()), "{criterion}");
+        assert!(call(json!({ criterion: "" })).is_err(), "{criterion}");
+        assert!(
+            call(json!({ criterion: "x".repeat(257) })).is_err(),
+            "{criterion}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_narration_search_is_refused_where_narrations_are_withheld() {
+    let one = OneServer::spawn_with(identity_plans(), Redaction::DropNarration);
+    let response = one.call(json!({"narration_contains": "WR2-N3"})).await;
+    assert_eq!(refusal_of(&response)["code"], "search_narration_redacted");
+    assert_eq!(one.requests(), 4);
+}
+
+#[tokio::test]
+async fn a_month_summary_replaces_items_with_buckets_and_keeps_the_window_label() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one.call(json!({"summarise_by": "month"})).await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["profile"], "agent_vouchers_v1_summary");
+    assert!(result.get("items").is_none(), "{result}");
+    assert_eq!(result["summarised_by"], "month");
+    assert_eq!(result["total"], 1);
+    assert_eq!(result["vouchers_summarised"], 3);
+    assert_eq!(result["buckets"][0]["group"], "2026-08");
+    assert_eq!(result["buckets"][0]["debit"], "-306.06");
+    assert_eq!(result["buckets"][0]["credit"], "306.06");
+    assert_eq!(
+        result["totals"],
+        json!({"debit": "-306.06", "credit": "306.06"})
+    );
+    assert_eq!(result["post_dated_included"], 0);
+    // The older captured window was read before the fetch list asked for the flag, so its three vouchers carry none.
+    assert_eq!(result["post_dated_flag_absent"], 3);
+    assert!(result["basis"].as_str().unwrap().contains("memorandum"));
+    assert_eq!(result["buckets"][0]["position"], 1);
+    assert_eq!(
+        result["excluded_from_buckets"],
+        json!({"cancelled": 0, "optional": 0, "no_accounting_entries": 0})
+    );
+    assert_eq!(response["structuredContent"]["truncated"], false);
+}
+
+/// Mutant killed: summing the bucket totals from a different page than the one served, or
+/// dropping `search` from the summarised rows.
+#[tokio::test]
+async fn a_summary_of_a_search_adds_only_the_vouchers_the_search_found() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one
+        .call(json!({"summarise_by": "voucher_type", "narration_contains": "WR2-N3"}))
+        .await;
+    let result = result_of(&response);
+    assert_eq!(result["vouchers_summarised"], 2, "{result}");
+    assert_eq!(result["buckets"][0]["credit"], "203.03");
+}
+
+#[tokio::test]
+async fn buckets_page_from_the_held_summary_window() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one
+        .call(json!({"summarise_by": "ledger", "limit": 2}))
+        .await;
+    assert_eq!(page_snapshot(&first)["reused"], false);
+    assert_eq!(first["structuredContent"]["truncated"], true);
+    let second = one
+        .call(json!({"summarise_by": "ledger", "offset": 2, "limit": 2}))
+        .await;
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    assert_eq!(result_of(&second)["total"], 4);
+    assert_eq!(result_of(&second)["offset"], 2);
+    assert_eq!(bucket_names(&second).len(), 2);
+    assert_eq!(second["structuredContent"]["truncated"], false);
+    assert_eq!(one.requests(), total);
+    // The two buckets served are the third and fourth of the whole summary, positions included.
+    let whole = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let all = whole.call(json!({"summarise_by": "ledger"})).await;
+    assert_eq!(
+        result_of(&all)["buckets"].as_array().unwrap()[2..],
+        result_of(&second)["buckets"].as_array().unwrap()[..]
+    );
+}
+
+/// A listing and a summary of the same question hold separate windows, so one never replaces or
+/// serves the other: pages of a listing cannot continue from a summary's read, nor the reverse.
+/// Mutant killed: leaving the grouping out of the held-window key.
+#[tokio::test]
+async fn a_listing_and_a_summary_do_not_replace_or_serve_each_other() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let listing = one.call(json!({"limit": 1})).await;
+    let listing_id = page_snapshot(&listing)["id"].as_str().unwrap().to_string();
+    // A summary read of the same window holds its own snapshot; the listing's stays held.
+    let summary = one.call(json!({"summarise_by": "month"})).await;
+    let summary_id = page_snapshot(&summary)["id"].as_str().unwrap().to_string();
+    assert_ne!(listing_id, summary_id);
+    let page = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": listing_id}))
+        .await;
+    assert_eq!(page_snapshot(&page)["id"], listing_id, "{page}");
+    assert_eq!(page_snapshot(&page)["reused"], true);
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_held_ledger_window_summarises_only_that_ledgers_entries_by_month() {
+    let first =
+        call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
+    let mut rows = page_items_of(&first);
+    rows[0]["date"] = json!("20260715");
+    rows[1]["date"] = json!("20260801");
+    rows[2]["date"] = json!("20260901");
+    let window = first["structuredContent"]["result"]["window"].clone();
+    let plans = marks_page_plans(counted_marks());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let key = VoucherPageKey::new(
+        &identity(),
+        "20260801",
+        "20260831",
+        Some("WR2 Sales"),
+        None,
+        None,
+    )
+    .with_summary(Some(SummaryGroup::Month));
+    assert!(one
+        .server
+        .voucher_pages
+        .lock()
+        .unwrap()
+        .hold(Arc::new(VoucherPageSnapshot::new(
+            key,
+            marks_of(counted_marks_vouchers()),
+            Arc::new(rows),
+            window,
+            None,
+            Some(json!({"ledger": "WR2 Sales", "matched": "exact",
+                "similar_ledgers": [], "similar_ledgers_total": 0})),
+            Some("WR2 Sales".to_string()),
+            None,
+        ))));
+    let second = one
+        .call(json!({"ledger": "WR2 Sales", "summarise_by": "month", "offset": 1, "limit": 1}))
+        .await;
+    let result = result_of(&second);
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    assert_eq!(result["entries_counted"], "selected_ledger");
+    assert_eq!(result["total"], 3);
+    assert_eq!(result["buckets"][0]["group"], "2026-08");
+    assert_eq!(result["buckets"][0]["debit"], "0");
+    assert_eq!(result["buckets"][0]["credit"], "102.02");
+    assert_eq!(one.requests(), total);
+}
+
+/// The bucket page stops at a fifth of the response budget (the response carries it twice, and
+/// the text copy escapes quotes). Through the whole tool the cap refuses first on a four-bucket
+/// fixture, so the bound is exercised on the page renderer itself: the captured ledger summary's
+/// buckets serialize to about 500, 290, 270 and 300 bytes, so a 6,000-byte cap (1,200 for
+/// buckets) holds three and not four. Mutant killed: an unbounded budget.
+#[tokio::test]
+async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_remain() {
+    let first =
+        call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
+    let rows = page_items_of(&first);
+    let mut one = OneServer::spawn(identity_plans());
+    one.server.settings.max_bytes = 6_000;
+    let request = SummaryRequest {
+        group: SummaryGroup::Ledger,
+        selected_ledger: None,
+    };
+    let body =
+        vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
+    assert_eq!(body.items.len(), 3, "{:?}", body.items);
+    assert_eq!(body.total, 4);
+    assert!(body.truncated);
+    // Under a budget that holds everything the page is whole.
+    one.server.settings.max_bytes = 200_000;
+    let whole =
+        vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
+    assert_eq!(whole.items.len(), 4);
+    assert!(!whole.truncated);
 }

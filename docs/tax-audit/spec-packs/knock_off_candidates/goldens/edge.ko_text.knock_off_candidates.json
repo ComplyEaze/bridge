@@ -1,0 +1,318 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "knock_off_candidates",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "dd6bb68919f0238a",
+  "population_note_text": "Every voucher in the books population. Party ledgers are those under Sundry Debtors, Sundry Creditors, Loans (Liability) or Loans & Advances (Asset); bank and cash, those under Bank Accounts, Bank OD A/c or Cash-in-Hand.",
+  "figures": [
+    {
+      "id": "knock_off_candidates.t1_candidate_total_paise",
+      "value": 22501,
+      "unit": "paise",
+      "definition_sha256_16": "46b0e33fa5177e15",
+      "definition_text": "Debits on party ledgers in the vouchers settling one party through another with no bank or cash line, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t1_row_count",
+      "value": 9,
+      "unit": "count",
+      "definition_sha256_16": "b662ded04a0754bb",
+      "definition_text": "Vouchers with lines on two or more distinct party ledgers and no bank or cash line.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "x01",
+          "label": "Journal x01 on 2025-04-15: Alpha Traders ₹123.45; Beta Stores −₹123.45; narration: 'Adjusted the balance of Alpha Traders against Beta Stores as agreed on the call.'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x02",
+          "label": "Journal x02 on 2025-04-02: Alpha Traders −₹0.05; Beta Stores ₹0.05; narration: 'Adjusted the balance of Alpha Traders against Beta Stores as agreed on the call…'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x03",
+          "label": "Journal x03 on 2025-04-03: Alpha Traders ₹0.50; Beta Stores −₹0.50; narration: 'Set off against Beta Stores'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x04",
+          "label": "Journal x04 on 2025-04-04: Alpha Traders ₹1; Beta Stores −₹1; narration: \"Beta Stores' dues adjusted\""
+        },
+        {
+          "kind": "voucher",
+          "id": "x05",
+          "label": "Journal x05 on 2025-04-05: Alpha Traders ₹10; Beta Stores −₹10; narration: 'Alpha\\'s \"final\" set off'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x06",
+          "label": "Journal x06 on 2025-04-06: Alpha Traders ₹20; Beta Stores −₹20; narration: 'Set\\u200boff समायोजन'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x07",
+          "label": "Journal x07 on 2025-04-07: Alpha Traders ₹30; Beta Stores −₹30; narration: 'देय राशि समायोजित की गई और शेष राशि अगले माह के बिल में ली जाएगी, कृपया पुष्टि …'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x08",
+          "label": "Journal x08 on 2025-04-08: Alpha Traders ₹40; Beta Stores −₹40; narration: 'Ref A\\\\B adjusted'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x09",
+          "label": "Adjustment Journal x09 on 2025-04-09: Alpha Traders ₹0.01; Beta Stores −₹0.01; narration: ''"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_candidate_total_paise",
+      "value": 12345,
+      "unit": "paise",
+      "definition_sha256_16": "c81320270dcf7017",
+      "definition_text": "Bank and cash lines of the vouchers whose narration names a party ledger not on the voucher, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_embedded_candidate_total_paise",
+      "value": 777,
+      "unit": "paise",
+      "definition_sha256_16": "2f59fc886c1b62be",
+      "definition_text": "Bank and cash lines of the vouchers whose narration holds a party's name only inside a longer name, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_embedded_row_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "f4bc1dfa1ae74236",
+      "definition_text": "Bank or cash vouchers whose narration holds a party ledger's name only inside a longer name (another name-like word beside it in the same part of the narration); listed apart from the others.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b02",
+          "label": "Payment b02 on 2025-04-12: booked to Office Rent; the name of Alpha Traders sits inside \"Omicron's shop Alpha Traders\""
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_47379eaa",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "4048a55e2155eb56",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 47379eaa) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b01",
+          "label": "Payment b01 on 2025-04-11: narration: 'Paid to Beta Stores; the balance of this bill is to be settled later on by Alph…'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_pair_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "111e114ff2a3fa53",
+      "definition_text": "Voucher and named-party pairs across the groups: equal to the voucher count unless a narration names more than one party.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_47379eaa",
+      "value": 12345,
+      "unit": "paise",
+      "definition_sha256_16": "ec12f3db5e18eca9",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 47379eaa), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_row_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "a8baff95bb52e678",
+      "definition_text": "Bank or cash vouchers whose narration names, as whole words, a party ledger not on the voucher.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b01",
+          "label": "Payment b01 on 2025-04-11: booked to Beta Stores; narration names Alpha Traders; narration: 'Paid to Beta Stores; the balance of this bill is to be settled later on by Alph…'"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "knock_off_candidates/t1",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "knock_off_candidates.t1_candidate_total_paise"
+        },
+        {
+          "name": "rows",
+          "figure_id": "knock_off_candidates.t1_row_count"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "x01",
+          "label": "Journal x01 on 2025-04-15: Alpha Traders ₹123.45; Beta Stores −₹123.45; narration: 'Adjusted the balance of Alpha Traders against Beta Stores as agreed on the call.'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x02",
+          "label": "Journal x02 on 2025-04-02: Alpha Traders −₹0.05; Beta Stores ₹0.05; narration: 'Adjusted the balance of Alpha Traders against Beta Stores as agreed on the call…'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x03",
+          "label": "Journal x03 on 2025-04-03: Alpha Traders ₹0.50; Beta Stores −₹0.50; narration: 'Set off against Beta Stores'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x04",
+          "label": "Journal x04 on 2025-04-04: Alpha Traders ₹1; Beta Stores −₹1; narration: \"Beta Stores' dues adjusted\""
+        },
+        {
+          "kind": "voucher",
+          "id": "x05",
+          "label": "Journal x05 on 2025-04-05: Alpha Traders ₹10; Beta Stores −₹10; narration: 'Alpha\\'s \"final\" set off'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x06",
+          "label": "Journal x06 on 2025-04-06: Alpha Traders ₹20; Beta Stores −₹20; narration: 'Set\\u200boff समायोजन'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x07",
+          "label": "Journal x07 on 2025-04-07: Alpha Traders ₹30; Beta Stores −₹30; narration: 'देय राशि समायोजित की गई और शेष राशि अगले माह के बिल में ली जाएगी, कृपया पुष्टि …'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x08",
+          "label": "Journal x08 on 2025-04-08: Alpha Traders ₹40; Beta Stores −₹40; narration: 'Ref A\\\\B adjusted'"
+        },
+        {
+          "kind": "voucher",
+          "id": "x09",
+          "label": "Adjustment Journal x09 on 2025-04-09: Alpha Traders ₹0.01; Beta Stores −₹0.01; narration: ''"
+        }
+      ],
+      "title_sha256_16": "0bc1135e5cb28eb9",
+      "title_text": "Journals settling one party through another, with no bank or cash line: listed for the CA (may bear on clauses 31 and 21(d))",
+      "limits_sha256_16": "3bfe39caea819076",
+      "limits_text": [
+        "Listed, never judged: the candidate total is a candidate total, not a reportable amount, and nothing is left out for being small or looking harmless. Whether a row is a payment under s.40A(3), a Rule 6DD case, a loan or deposit, a trade set-off, or one person under two ledgers is the CA's to determine; no clause 31 or 21(d) row is written.",
+        "Recall is not measured on real books.",
+        "Same-person set-offs, rectifications of a wrong-party posting, opening or migration entries, branch ledgers of one entity, and discount or note journals against one party are listed too."
+      ],
+      "ask_client_sha256_16": "8e21f9dff05552e8",
+      "ask_client_text": [
+        "Journal settling one party through another: whose liability, and who received the value? Is it a loan or deposit taken or repaid by journal (clause 31, codes I/J), a same-person set-off, or a correction?"
+      ]
+    },
+    {
+      "id": "knock_off_candidates/t2",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "knock_off_candidates.t2_candidate_total_paise"
+        },
+        {
+          "name": "named_pairs",
+          "figure_id": "knock_off_candidates.t2_named_pair_count"
+        },
+        {
+          "name": "rows",
+          "figure_id": "knock_off_candidates.t2_row_count"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Alpha Traders",
+          "label": "named in 1 voucher(s), ₹123.45 (a candidate total, not a reportable amount)"
+        }
+      ],
+      "title_sha256_16": "d8b00d332e376b71",
+      "title_text": "Bank or cash entries whose narration names a party other than the one booked: listed for the CA (may bear on clause 21(d) and s.68)",
+      "limits_sha256_16": "d17843ba3c36f4d6",
+      "limits_text": [
+        "Listed, never judged: the candidate total is a candidate total, not a reportable amount, and nothing is left out for being small or looking harmless. Whether a row is a payment under s.40A(3), a Rule 6DD case, a loan or deposit, a trade set-off, or one person under two ledgers is the CA's to determine; no clause 31 or 21(d) row is written.",
+        "Recall is not measured on real books.",
+        "A name is matched only whole and in full, and only when no other master shares it: a name cut short, broken up, abbreviated, or written in Hindi or Hinglish is missed, and a short or common name may be a coincidence (the proprietor, a family member, the operator)."
+      ],
+      "ask_client_sha256_16": "f934f81c9581b01c",
+      "ask_client_text": [
+        "The narration names someone other than the booked party. Who was paid (or who paid)? If an agent paid on the payee's behalf, give the agency basis."
+      ]
+    },
+    {
+      "id": "knock_off_candidates/t2_embedded",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "knock_off_candidates.t2_embedded_candidate_total_paise"
+        },
+        {
+          "name": "rows",
+          "figure_id": "knock_off_candidates.t2_embedded_row_count"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Alpha Traders",
+          "label": "inside a longer name in 1 voucher(s)"
+        },
+        {
+          "kind": "voucher",
+          "id": "b02",
+          "label": "Payment b02 on 2025-04-12: booked to Office Rent; the name of Alpha Traders sits inside \"Omicron's shop Alpha Traders\""
+        }
+      ],
+      "title_sha256_16": "01c1226717f8c3c1",
+      "title_text": "Bank or cash entries whose narration holds a party's name inside a longer name: listed apart for the CA (may bear on clause 21(d) and s.68)",
+      "limits_sha256_16": "40a6cf22081504a0",
+      "limits_text": [
+        "Listed, never judged: the candidate total is a candidate total, not a reportable amount, and nothing is left out for being small or looking harmless. Whether a row is a payment under s.40A(3), a Rule 6DD case, a loan or deposit, a trade set-off, or one person under two ledgers is the CA's to determine; no clause 31 or 21(d) row is written.",
+        "Recall is not measured on real books.",
+        "The narration's name is longer than the party's (for example a person's name before a firm's): it may be that party or another one. It is listed apart so that the CA sees the difference; nothing is refused or dropped."
+      ],
+      "ask_client_sha256_16": "f934f81c9581b01c",
+      "ask_client_text": [
+        "The narration names someone other than the booked party. Who was paid (or who paid)? If an agent paid on the payee's behalf, give the agency basis."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

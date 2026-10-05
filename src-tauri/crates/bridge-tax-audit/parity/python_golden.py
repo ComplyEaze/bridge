@@ -43,7 +43,9 @@ writes that JSON. With neither, no comparison source is supplied. `creditor_agei
 `[creditor_ageing_43bh]` table, and passes no next-year payment data, as the reference's pack runs
 it. `statutory_dues_43b` reads the optional `[statutory_dues]` table (`nature_by_ledger`,
 `salary_expense_ledgers`). `partners_40b_194t` reads the optional `[partners]` table, with its `deed`
-popped out, as the reference's `partners_config` returns it. With --read DIR, the [snapshot] table is replaced in memory by that read with
+popped out, as the reference's `partners_config` returns it. `books_examined` reads nothing beyond the
+book; the names of the documents the reference's pack loaded with the read are caller data:
+`--documents-read FILE` reads them from a JSON list of text, in the pack's order (none without it). With --read DIR, the [snapshot] table is replaced in memory by that read with
 allow_unbracketed_read = true -- the same switch the engine's own read-format parity gate applies
 -- so a legacy client config can be run against its wrapped read without editing it.
 
@@ -92,6 +94,17 @@ def _entity_269st_gap(c):
     return entity_269st_gap, entity_269st_gap.run(
         c.eng, c.rules, c.cash, c.bank, build_party_index(c.eng.book, c.cfg),
         round_off_ledgers=frozenset(round_off_ledgers))
+
+
+def _books_examined(c):
+    """As tae/pack.py calls it: the names of the documents the pack loaded, in its order, as a tuple."""
+    from tae.audit_tests import books_examined
+    docs = []
+    if c.args.documents_read:
+        docs = json.loads(Path(c.args.documents_read).read_text(encoding="utf-8"))
+        if not (isinstance(docs, list) and all(isinstance(d, str) for d in docs)):
+            c.ap.error("--documents-read: the file must hold a JSON list of text")
+    return books_examined, books_examined.run(c.eng, c.rules, tuple(docs))
 
 
 def _read_scope(c):
@@ -433,6 +446,7 @@ RUNNERS = {
     "applicability_44ab": _applicability_44ab,
     "bank_reconciliation": _bank_reconciliation,
     "book_keeping_quality": _book_keeping_quality,
+    "books_examined": _books_examined,
     "cash_44ab": _cash_44ab,
     "cash_book_integrity": _cash_book_integrity,
     "cash_payments_40a3": _cash_payments_40a3,
@@ -469,6 +483,8 @@ def main() -> int:
     ap.add_argument("--emit-turnover-inputs",
                     help="applicability_44ab: take GSTR-1 turnover from the reference's own pack and write it here")
     ap.add_argument("--report-totals", help="financial_statements: report totals JSON to use")
+    ap.add_argument("--documents-read",
+                    help="books_examined: a JSON list of the names of the documents loaded with the read")
     ap.add_argument("--traces-documents", help="tds_tcs_26as/twentysixas_receipts/high_value_register: Form 26AS/AIS/TIS rows JSON to use")
     ap.add_argument("--emit-traces-documents",
                     help="tds_tcs_26as/twentysixas_receipts: read the rows with the reference's adapters and write them "

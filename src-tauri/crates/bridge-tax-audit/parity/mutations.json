@@ -9248,6 +9248,238 @@
   "to": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise > 0)"
  },
  {
+  "id": "BE-01",
+  "by": "author",
+  "what": "the day book counts voucher types by their own name, not their base type",
+  "file": "src/books_examined.rs",
+  "from": "*counts.entry(v.base_type.as_str()).or_default() += 1;",
+  "to": "*counts.entry(v.vtype.as_str()).or_default() += 1;"
+ },
+ {
+  "id": "BE-02",
+  "by": "author",
+  "what": "the day book counts every voucher, not the books population",
+  "file": "src/books_examined.rs",
+  "from": "for v in book.population()? {",
+  "to": "for v in book.vouchers.iter() {"
+ },
+ {
+  "id": "BE-03",
+  "by": "author",
+  "what": "a type of the CA's order with no voucher is listed with 0",
+  "file": "src/books_examined.rs",
+  "from": ".filter_map(|t| counts.get(t).map(|n| format!(\"{t} {n}\")))",
+  "to": ".map(|t| format!(\"{t} {}\", counts.get(t).copied().unwrap_or(0)))"
+ },
+ {
+  "id": "BE-04",
+  "by": "author",
+  "what": "a type outside the CA's order is not listed",
+  "file": "src/books_examined.rs",
+  "from": ".filter(|(t, _)| !VOUCHER_ORDER.contains(*t))",
+  "to": ".filter(|_| false)"
+ },
+ {
+  "id": "BE-05",
+  "by": "author",
+  "what": "a type of the CA's order is listed again among the other types",
+  "file": "src/books_examined.rs",
+  "from": ".filter(|(t, _)| !VOUCHER_ORDER.contains(*t))",
+  "to": ".filter(|_| true)"
+ },
+ {
+  "id": "BE-06",
+  "by": "author",
+  "what": "every type is listed by name, without the CA's order",
+  "file": "src/books_examined.rs",
+  "from": "    let order: Vec<String> = VOUCHER_ORDER\n        .iter()\n        .filter_map(|t| counts.get(t).map(|n| format!(\"{t} {n}\")))\n        .chain(\n            counts\n                .iter()\n                .filter(|(t, _)| !VOUCHER_ORDER.contains(*t))\n                .map(|(t, n)| format!(\"{t} {n}\")),\n        )\n        .collect();",
+  "to": "    let order: Vec<String> = counts.iter().map(|(t, n)| format!(\"{t} {n}\")).collect();"
+ },
+ {
+  "id": "BE-07",
+  "by": "author",
+  "what": "a day book is listed when the books have no voucher",
+  "file": "src/books_examined.rs",
+  "from": "    if !order.is_empty() {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-08",
+  "by": "author",
+  "what": "a cash book is listed when no ledger is under Cash-in-Hand",
+  "file": "src/books_examined.rs",
+  "from": "    if cash > 0 {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-09",
+  "by": "author",
+  "what": "bank books are listed when no ledger is under a bank group",
+  "file": "src/books_examined.rs",
+  "from": "    if bank > 0 {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-10",
+  "by": "author",
+  "what": "one cash or bank ledger is made plural",
+  "file": "src/books_examined.rs",
+  "from": "if n == 1 { \"\" } else { \"s\" }",
+  "to": "\"s\""
+ },
+ {
+  "id": "BE-11",
+  "by": "author",
+  "what": "several cash or bank ledgers are made singular",
+  "file": "src/books_examined.rs",
+  "from": "if n == 1 { \"\" } else { \"s\" }",
+  "to": "\"\""
+ },
+ {
+  "id": "BE-12",
+  "by": "author",
+  "what": "a ledger under both bank groups is counted twice",
+  "file": "src/books_examined.rs",
+  "from": "let bank = under(&BANK_GROUPS);",
+  "to": "let bank = under(&BANK_GROUPS[..1]) + under(&BANK_GROUPS[1..]);"
+ },
+ {
+  "id": "BE-13",
+  "by": "author",
+  "what": "only ledgers under Bank Accounts are bank ledgers",
+  "file": "src/books_examined.rs",
+  "from": "let bank = under(&BANK_GROUPS);",
+  "to": "let bank = under(&BANK_GROUPS[..1]);"
+ },
+ {
+  "id": "BE-14",
+  "by": "author",
+  "what": "only ledgers under Bank OD A/c are bank ledgers",
+  "file": "src/books_examined.rs",
+  "from": "let bank = under(&BANK_GROUPS);",
+  "to": "let bank = under(&BANK_GROUPS[1..]);"
+ },
+ {
+  "id": "BE-15",
+  "by": "author",
+  "what": "one ledger account is made singular, as the reference does not",
+  "file": "src/books_examined.rs",
+  "from": "parts.push(format!(\"ledger ({} ledger accounts)\", book.ledgers.len()));",
+  "to": "parts.push(format!(\"ledger ({})\", plural(book.ledgers.len(), \"ledger account\")));"
+ },
+ {
+  "id": "BE-16",
+  "by": "author",
+  "what": "a Trial Balance is listed when the read has none",
+  "file": "src/books_examined.rs",
+  "from": "    if !book.tb.is_empty() {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-17",
+  "by": "author",
+  "what": "the Trial Balance is never listed",
+  "file": "src/books_examined.rs",
+  "from": "    if !book.tb.is_empty() {",
+  "to": "    if false {"
+ },
+ {
+  "id": "BE-18",
+  "by": "author",
+  "what": "no document loaded is written as an empty list",
+  "file": "src/books_examined.rs",
+  "from": "    let docs = if documents_read.is_empty() {",
+  "to": "    let docs = if false {"
+ },
+ {
+  "id": "BE-19",
+  "by": "author",
+  "what": "documents loaded are written as none",
+  "file": "src/books_examined.rs",
+  "from": "    let docs = if documents_read.is_empty() {",
+  "to": "    let docs = if true {"
+ },
+ {
+  "id": "BE-20",
+  "by": "author",
+  "what": "the documents are written in reverse of the pack's order",
+  "file": "src/books_examined.rs",
+  "from": "            .iter()\n            .map(|d| d.name())",
+  "to": "            .iter()\n            .rev()\n            .map(|d| d.name())"
+ },
+ {
+  "id": "BE-21",
+  "by": "author",
+  "what": "GSTR-1 is ordered before GSTR-2B",
+  "file": "src/books_examined.rs",
+  "from": "    Gstr2b,\n    Gstr1,\n    Form26as,",
+  "to": "    Gstr1,\n    Gstr2b,\n    Form26as,"
+ },
+ {
+  "id": "BE-22",
+  "by": "author",
+  "what": "the Profit & Loss report is named otherwise than the pack names it",
+  "file": "src/books_examined.rs",
+  "from": "Self::ProfitAndLossReport => \"Tally Profit & Loss report export\",",
+  "to": "Self::ProfitAndLossReport => \"Tally Profit and Loss report export\","
+ },
+ {
+  "id": "BE-23",
+  "by": "author",
+  "what": "a document name is matched ignoring case",
+  "file": "src/books_examined.rs",
+  "from": "Self::ALL.into_iter().find(|d| d.name() == name)",
+  "to": "Self::ALL.into_iter().find(|d| d.name().eq_ignore_ascii_case(name))"
+ },
+ {
+  "id": "BE-24",
+  "by": "author",
+  "what": "the finding is computed, not for the CA's judgement",
+  "file": "src/books_examined.rs",
+  "from": "confidence: Confidence::JudgementRequired,",
+  "to": "confidence: Confidence::NeedsDocument,"
+ },
+ {
+  "id": "BE-25",
+  "by": "author",
+  "what": "a caller's list out of the pack's order is read, reordered",
+  "file": "src/registry.rs",
+  "from": "if out.last().is_some_and(|last| *last >= d) {",
+  "to": "if out.last().is_some_and(|last| *last == d) {"
+ },
+ {
+  "id": "BE-26",
+  "by": "author",
+  "what": "a caller's list that repeats a document is read",
+  "file": "src/registry.rs",
+  "from": "if out.last().is_some_and(|last| *last >= d) {",
+  "to": "if out.last().is_some_and(|last| *last > d) {"
+ },
+ {
+  "id": "BE-27",
+  "by": "author",
+  "what": "the registry runs books_examined with no documents whatever the caller loaded",
+  "file": "src/registry.rs",
+  "from": "run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read),",
+  "to": "run_on: |_, b, r, _| crate::books_examined_on(b, r, &Default::default()),"
+ },
+ {
+  "id": "BE-28",
+  "by": "author",
+  "what": "the cash book part is listed on the bank ledger count (counted inline)",
+  "file": "src/books_examined.rs",
+  "from": "    if cash > 0 {",
+  "to": "    if under(&BANK_GROUPS) > 0 {"
+ },
+ {
+  "id": "BE-29",
+  "by": "author",
+  "what": "the bank books part is listed on the cash ledger count",
+  "file": "src/books_examined.rs",
+  "from": "    if bank > 0 {",
+  "to": "    if cash > 0 {"
+ },
+ {
   "id": "RP-01",
   "by": "author",
   "what": "related_parties_cl23: the gate opens only past one person",

@@ -1,0 +1,368 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "knock_off_candidates",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "dd6bb68919f0238a",
+  "population_note_text": "Every voucher in the books population. Party ledgers are those under Sundry Debtors, Sundry Creditors, Loans (Liability) or Loans & Advances (Asset); bank and cash, those under Bank Accounts, Bank OD A/c or Cash-in-Hand.",
+  "figures": [
+    {
+      "id": "knock_off_candidates.t1_candidate_total_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "46b0e33fa5177e15",
+      "definition_text": "Debits on party ledgers in the vouchers settling one party through another with no bank or cash line, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t1_row_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "b662ded04a0754bb",
+      "definition_text": "Vouchers with lines on two or more distinct party ledgers and no bank or cash line.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_candidate_total_paise",
+      "value": 3360000,
+      "unit": "paise",
+      "definition_sha256_16": "c81320270dcf7017",
+      "definition_text": "Bank and cash lines of the vouchers whose narration names a party ledger not on the voucher, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_embedded_candidate_total_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2f59fc886c1b62be",
+      "definition_text": "Bank and cash lines of the vouchers whose narration holds a party's name only inside a longer name, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_embedded_row_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f4bc1dfa1ae74236",
+      "definition_text": "Bank or cash vouchers whose narration holds a party ledger's name only inside a longer name (another name-like word beside it in the same part of the narration); listed apart from the others.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_03f5fa95",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "f496462acf71465a",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 03f5fa95) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b09",
+          "label": "Receipt b09 on 2025-08-05: narration: 'CAFÉ CORNER deposit'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_540eda69",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "b8ba793cb4215c22",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 540eda69) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b04",
+          "label": "Contra b04 on 2025-05-14: narration: 'Cash for Alpha Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b14",
+          "label": "Payment b14 on 2025-10-10: narration: 'for Alpha Traders, by Alpha Traders'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_8e58f74e",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "f1788f56ede07128",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 8e58f74e) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b08",
+          "label": "Payment b08 on 2025-07-21: narration: 'Paid for Unit 7 Supplies'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_bea90e0a",
+      "value": 4,
+      "unit": "count",
+      "definition_sha256_16": "f6d11cafce267cc8",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag bea90e0a) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b01",
+          "label": "Payment b01 on 2025-04-03: narration: 'NEFT/Gamma Supplies/REF 4471'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b02",
+          "label": "Payment b02 on 2025-04-17: narration: 'paid to gamma supplies for Beta Stores'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b03",
+          "label": "Receipt b03 on 2025-05-02: narration: 'Received via Gamma Supplies and Beta Stores'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b13",
+          "label": "Payment b13 on 2025-09-30: narration: 'Paid for Gamma Supplies'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_f5bc2c41",
+      "value": 3,
+      "unit": "count",
+      "definition_sha256_16": "eec0b56cb4d3b850",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag f5bc2c41) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b03",
+          "label": "Receipt b03 on 2025-05-02: narration: 'Received via Gamma Supplies and Beta Stores'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b05",
+          "label": "Payment b05 on 2025-06-01: narration: 'Rent handed to Beta Stores'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b15",
+          "label": "Payment b15 on 2025-11-11: narration: 'Rent for Beta Stores'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_fb4f0576",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "fff34e30b992cb20",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag fb4f0576) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b06",
+          "label": "Payment b06 on 2025-06-20: narration: 'Paid Kappa Traders'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_pair_count",
+      "value": 12,
+      "unit": "count",
+      "definition_sha256_16": "111e114ff2a3fa53",
+      "definition_text": "Voucher and named-party pairs across the groups: equal to the voucher count unless a narration names more than one party.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_03f5fa95",
+      "value": 60000,
+      "unit": "paise",
+      "definition_sha256_16": "25e03f1e18938bec",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 03f5fa95), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_540eda69",
+      "value": 500000,
+      "unit": "paise",
+      "definition_sha256_16": "a502d6591bc097ab",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 540eda69), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_8e58f74e",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "6c5ba14dc6fed9f7",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 8e58f74e), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_bea90e0a",
+      "value": 2000000,
+      "unit": "paise",
+      "definition_sha256_16": "2f66a9549e94defc",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag bea90e0a), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_f5bc2c41",
+      "value": 600000,
+      "unit": "paise",
+      "definition_sha256_16": "4ec5e2c170147bd9",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag f5bc2c41), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_fb4f0576",
+      "value": 400000,
+      "unit": "paise",
+      "definition_sha256_16": "6a0be32c20370fca",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag fb4f0576), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_row_count",
+      "value": 11,
+      "unit": "count",
+      "definition_sha256_16": "a8baff95bb52e678",
+      "definition_text": "Bank or cash vouchers whose narration names, as whole words, a party ledger not on the voucher.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b01",
+          "label": "Payment b01 on 2025-04-03: booked to Beta Stores; narration names Gamma Supplies; narration: 'NEFT/Gamma Supplies/REF 4471'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b02",
+          "label": "Payment b02 on 2025-04-17: booked to Beta Stores; narration names Gamma Supplies; narration: 'paid to gamma supplies for Beta Stores'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b03",
+          "label": "Receipt b03 on 2025-05-02: booked to Alpha Traders; narration names Beta Stores, Gamma Supplies; narration: 'Received via Gamma Supplies and Beta Stores'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b04",
+          "label": "Contra b04 on 2025-05-14: booked to no other ledger; narration names Alpha Traders; narration: 'Cash for Alpha Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b05",
+          "label": "Payment b05 on 2025-06-01: booked to Office Rent; narration names Beta Stores; narration: 'Rent handed to Beta Stores'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b06",
+          "label": "Payment b06 on 2025-06-20: booked to Kappa Traders; narration names Kappa-Traders; narration: 'Paid Kappa Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b08",
+          "label": "Payment b08 on 2025-07-21: booked to Beta Stores; narration names Unit 7 Supplies; narration: 'Paid for Unit 7 Supplies'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b09",
+          "label": "Receipt b09 on 2025-08-05: booked to Alpha Traders; narration names Café Corner; narration: 'CAFÉ CORNER deposit'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b13",
+          "label": "Payment b13 on 2025-09-30: booked to Beta Stores, Office Rent; narration names Gamma Supplies; narration: 'Paid for Gamma Supplies'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b14",
+          "label": "Payment b14 on 2025-10-10: booked to Office Rent; narration names Alpha Traders; narration: 'for Alpha Traders, by Alpha Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b15",
+          "label": "Payment b15 on 2025-11-11: booked to Office Rent; narration names Beta Stores; narration: 'Rent for Beta Stores'"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "knock_off_candidates/t2",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "knock_off_candidates.t2_candidate_total_paise"
+        },
+        {
+          "name": "named_pairs",
+          "figure_id": "knock_off_candidates.t2_named_pair_count"
+        },
+        {
+          "name": "rows",
+          "figure_id": "knock_off_candidates.t2_row_count"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Alpha Traders",
+          "label": "named in 2 voucher(s), ₹5,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Beta Stores",
+          "label": "named in 3 voucher(s), ₹6,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Café Corner",
+          "label": "named in 1 voucher(s), ₹600 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Gamma Supplies",
+          "label": "named in 4 voucher(s), ₹20,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Kappa-Traders",
+          "label": "named in 1 voucher(s), ₹4,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Unit 7 Supplies",
+          "label": "named in 1 voucher(s), ₹1,000 (a candidate total, not a reportable amount)"
+        }
+      ],
+      "title_sha256_16": "d8b00d332e376b71",
+      "title_text": "Bank or cash entries whose narration names a party other than the one booked: listed for the CA (may bear on clause 21(d) and s.68)",
+      "limits_sha256_16": "d17843ba3c36f4d6",
+      "limits_text": [
+        "Listed, never judged: the candidate total is a candidate total, not a reportable amount, and nothing is left out for being small or looking harmless. Whether a row is a payment under s.40A(3), a Rule 6DD case, a loan or deposit, a trade set-off, or one person under two ledgers is the CA's to determine; no clause 31 or 21(d) row is written.",
+        "Recall is not measured on real books.",
+        "A name is matched only whole and in full, and only when no other master shares it: a name cut short, broken up, abbreviated, or written in Hindi or Hinglish is missed, and a short or common name may be a coincidence (the proprietor, a family member, the operator)."
+      ],
+      "ask_client_sha256_16": "f934f81c9581b01c",
+      "ask_client_text": [
+        "The narration names someone other than the booked party. Who was paid (or who paid)? If an agent paid on the payee's behalf, give the agency basis."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

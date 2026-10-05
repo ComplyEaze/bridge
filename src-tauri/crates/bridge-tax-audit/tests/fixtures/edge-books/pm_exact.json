@@ -1,5 +1,5 @@
 {
- "comment": "party_monthly's Trial Balance matching at the reference's da9e2d3d, where a set of excluded vouchers matches only exactly. Sales: an optional and a post-dated credit note each account for the difference exactly, so both are listed with their sign (credits less debits) and none is chosen. Purchases: a one-paisa optional voucher does not explain a difference of Rs 1.01 (the one status tried, not matching). Direct expenses: two optional vouchers net to nil, so the post-dated vouchers and all of them together each match and none is named (the reference's recorded limit). Indirect expenses: post-dated, optional and cancelled vouchers tried, the optional ones a paisa off the difference, so none matches and the three are listed.",
+ "comment": "party_monthly's Trial Balance matching at the reference's da9e2d3d, where a set of excluded vouchers matches only exactly. Sales: an optional and a post-dated credit note each account for the difference exactly, so both are listed with their sign (credits less debits) and none is chosen. Purchases: a one-paisa optional voucher does not explain a difference of Rs 1.01 (the one status tried, not matching). Direct expenses: two optional vouchers net to nil, and so do two cancelled ones, so the post-dated vouchers and all of them together (the post-dated, optional and cancelled vouchers) each match and none is named (the reference's recorded limit). Indirect expenses: post-dated, optional and cancelled vouchers tried, the optional ones a paisa off the difference, so none matches and the three are listed.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -272,6 +272,38 @@
     [
      "Bank",
      -8000
+    ]
+   ]
+  },
+  {
+   "guid": "c03",
+   "date": "2025-07-03",
+   "base_type": "Payment",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Freight",
+     300
+    ],
+    [
+     "Bank",
+     -300
+    ]
+   ]
+  },
+  {
+   "guid": "c04",
+   "date": "2025-07-04",
+   "base_type": "Receipt",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Bank",
+     300
+    ],
+    [
+     "Freight",
+     -300
     ]
    ]
   },

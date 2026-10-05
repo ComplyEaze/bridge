@@ -44,8 +44,9 @@ Lane E, 2026-09-25. Every book here is invented: no fixture is a Tally read of a
 - `edge-books/pm_exact.json` (added at the same re-pin): a set of excluded vouchers matches only exactly.
   Sales: two credit-note sets each account for the difference (both listed, with the sign their amounts
   use, credits less debits). Purchases: a one-paisa optional voucher does not explain a difference of Rs
-  1.01. Direct expenses: two optional vouchers netting to nil, so the post-dated set and all of them
-  together each match and none is named (the reference's recorded limit). Indirect expenses: three
+  1.01. Direct expenses: two optional vouchers netting to nil, and two cancelled ones, so the post-dated
+  set and all of them together each match and none is named (the reference's recorded limit); the
+  all-together set names three statuses ("post-dated, optional and cancelled"). Indirect expenses: three
   statuses tried, the optional set a paisa off, so none matches and all three are listed.
 - `edge-books/pm_not_fy.json`: a calendar-year period (no month figures), a missing Direct Expenses
   group, and a Trial Balance difference no excluded voucher matches.
@@ -118,13 +119,13 @@ arguments). The books are
 | --- | ---: | --- | --- |
 | `pm_attribution.json` | 8,971 | `ef7a8b061543499edd2b033038072d83ebca889c04d6174d5abd0c77286a0b09` | `edge-books/pm_attribution.json` |
 | `pm_empty.json` | 771 | `969cbcf93f17ef083503e5084c5f8666a618b27b315103bec5ea76e69d69670c` | `edge-books/pm_empty.json` |
-| `pm_exact.json` | 5,470 | `c03095d45fcfd459233d11ce660121df9839235858182913e2ff89a6dc5e10e5` | `edge-books/pm_exact.json` |
+| `pm_exact.json` | 5,944 | `075389ad07c9a15e06eab272ef742746b5c9526aa7e1ae2459dcc9836377cc05` | `edge-books/pm_exact.json` |
 | `pm_money.json` | 8,116 | `3dc055855af40542ad6756aacd01876b275b20c498e41193999c1430bf9ef48e` | `edge-books/pm_money.json` |
 | `pm_not_fy.json` | 1,990 | `effb4bf2ebfe8b437ddd582bc3f86176e4d00afd847dddf3f88b3cc2ed321276` | `edge-books/pm_not_fy.json` |
 | `pm_paths.json` | 8,974 | `f2fca90e8226a64faf24acc22e36579f5a12fa2cbc2c65b437c2e090442e6ba5` | `edge-books/pm_paths.json` |
 | `edge.pm_attribution.party_monthly.json` | 42,260 | `74b9bce82b8cf4665b2f9ef2e03c3e583d75e0acf8fa0a7d09524b8ff6b2be8b` | `golden/edge.pm_attribution.party_monthly.json` |
 | `edge.pm_empty.party_monthly.json` | 6,715 | `406d20f5a48315ea0b10d0d3515186ec83a1ba63a9efb21a6871ef8f42410369` | `golden/edge.pm_empty.party_monthly.json` |
-| `edge.pm_exact.party_monthly.json` | 22,654 | `9b587c4299cc3cca2077bb49543f855d0e6da6744028ae122aaac68497f37a69` | `golden/edge.pm_exact.party_monthly.json` |
+| `edge.pm_exact.party_monthly.json` | 23,192 | `d7c224e69024c97381b3f5318e667c3df0a047e2dc2917dea7af7ddbe25ebe65` | `golden/edge.pm_exact.party_monthly.json` |
 | `edge.pm_money.party_monthly.json` | 30,027 | `bd5f1c0a60f9f88a32e8c02807b24274ba7863d4ee7a91b2cfef5687b0c83f65` | `golden/edge.pm_money.party_monthly.json` |
 | `edge.pm_not_fy.party_monthly.json` | 9,463 | `ff81bbd99af3a63e625b9ecd0b9b42be743ff2b9ff1e26ca87c44115c19b7f4a` | `golden/edge.pm_not_fy.party_monthly.json` |
 | `edge.pm_paths.party_monthly.json` | 44,577 | `a33211470cf9ea69b471f5571503004288c44bf38306e9323771aef8229e34b5` | `golden/edge.pm_paths.party_monthly.json` |

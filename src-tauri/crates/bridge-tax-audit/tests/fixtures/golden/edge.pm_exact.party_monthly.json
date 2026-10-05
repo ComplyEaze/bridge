@@ -88,9 +88,19 @@
       "id": "party_monthly.direct_expenses_vouchers_left_out_excluded",
       "value": 8000,
       "unit": "paise",
-      "definition_sha256_16": "117549c557e9b78a",
-      "definition_text": "Direct Expenses: amount on these ledgers (debits less credits) of all the post-dated and optional vouchers together cited, which the books leave out: one of several sets that each account for the difference exactly.",
+      "definition_sha256_16": "3f2393110a342d93",
+      "definition_text": "Direct Expenses: amount on these ledgers (debits less credits) of all the post-dated, optional and cancelled vouchers together cited, which the books leave out: one of several sets that each account for the difference exactly.",
       "evidence": [
+        {
+          "kind": "excluded_voucher",
+          "id": "c03",
+          "label": "Payment c03 on 2025-07-03"
+        },
+        {
+          "kind": "excluded_voucher",
+          "id": "c04",
+          "label": "Receipt c04 on 2025-07-04"
+        },
         {
           "kind": "excluded_voucher",
           "id": "o03",
@@ -523,6 +533,16 @@
       "evidence": [
         {
           "kind": "excluded_voucher",
+          "id": "c03",
+          "label": "Payment c03 on 2025-07-03"
+        },
+        {
+          "kind": "excluded_voucher",
+          "id": "c04",
+          "label": "Receipt c04 on 2025-07-04"
+        },
+        {
+          "kind": "excluded_voucher",
           "id": "o03",
           "label": "Payment o03 on 2025-06-03"
         },
@@ -539,9 +559,9 @@
       ],
       "title_sha256_16": "df3edcaad698b4c6",
       "title_text": "'Direct Expenses' by party differs from the Trial Balance by an amount that more than one set of excluded vouchers matches (each listed under Technical definitions)",
-      "limits_sha256_16": "fbcbed69e5c8a70e",
+      "limits_sha256_16": "8b5e2e3394892bc5",
       "limits_text": [
-        "Each of these sets, taken as a whole, accounts for the difference exactly (amounts are debits less credits on these ledgers): the post-dated vouchers (₹80); all the post-dated and optional vouchers together (₹80). The Trial Balance may include one of them; the books do not say which, so none is chosen. Smaller groups were not tried. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
+        "Each of these sets, taken as a whole, accounts for the difference exactly (amounts are debits less credits on these ledgers): the post-dated vouchers (₹80); all the post-dated, optional and cancelled vouchers together (₹80). The Trial Balance may include one of them; the books do not say which, so none is chosen. Smaller groups were not tried. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []

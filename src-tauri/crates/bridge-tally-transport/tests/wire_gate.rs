@@ -302,7 +302,9 @@ async fn lowest_held_while<T>(
         done.store(true, Ordering::SeqCst);
         sent
     };
-    let (sent, lowest) = tokio::join!(send, watch);
+    // `biased`: the send is polled first, so it has taken its lock (synchronously, before
+    // its first suspension) when the watch takes its first sample.
+    let (sent, lowest) = tokio::join!(biased; send, watch);
     (sent, lowest)
 }
 

@@ -1600,6 +1600,12 @@ fn catalogue_with_cash_under_bank() -> String {
     )
 }
 
+const CASH_MOVED_MESSAGE: &str =
+    "A ledger named as cash in hand when this batch was built (listed in \
+     error.refused_ledgers) is no longer under Cash-in-Hand: its group now reaches the reserved \
+     group shown. Nothing was posted. Put the ledger back under Cash-in-Hand, or build the batch \
+     again with the cash-in-hand ledger.";
+
 /// The refusal row for `Cash` under Bank Accounts, as the build reports it.
 fn cash_under_bank_row() -> Value {
     json!([{"ledger":"Cash","requires":"cash_in_hand","state":"cash_bank",
@@ -1631,6 +1637,7 @@ async fn a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_befor
         "{response}"
     );
     assert_eq!(error["refused_ledgers_omitted"], 0, "{response}");
+    assert_eq!(error["message"], CASH_MOVED_MESSAGE, "{response}");
     assert!(scripted.previews().is_empty(), "approval must not be asked");
     assert_eq!(observed.len(), expected, "{response}");
     assert!(!String::from_utf8(journal(directory.path()))
@@ -1669,6 +1676,7 @@ async fn a_cash_in_hand_ledger_moved_under_bank_after_approval_is_refused_in_the
         "{response}"
     );
     assert_eq!(error["refused_ledgers_omitted"], 0, "{response}");
+    assert_eq!(error["message"], CASH_MOVED_MESSAGE, "{response}");
     assert_eq!(scripted.previews().len(), 1, "approval was asked once");
     assert_eq!(observed.len(), expected, "{response}");
     assert_eq!(
@@ -1696,9 +1704,119 @@ async fn a_batch_recorded_before_its_cash_in_hand_ledgers_is_refused_before_any_
         result["error"]["code"], "import_batch_predates_cash_ledger_record",
         "{response}"
     );
+    assert_eq!(
+        result["error"]["message"],
+        "This batch was built before ComplyEaze Bridge recorded which of its ledgers must stay \
+         under Cash-in-Hand, so it cannot be checked. Nothing was posted. Build the batch again, \
+         then post the new batch.",
+        "{response}"
+    );
     assert_eq!(result["attempt_recorded"], false, "{response}");
     assert!(scripted.previews().is_empty(), "approval must not be asked");
     assert!(observed.is_empty(), "{response}");
+}
+
+/// A recorded cash ledger moved under a group that holds no money meets the
+/// bank/cash gate first: a Contra's every leg must be money, so it is refused
+/// as `import_bank_classification_changed` and never reaches the cash-in-hand
+/// recheck, whose rows therefore always name a money group (#815, review P3).
+#[tokio::test]
+async fn a_cash_in_hand_ledger_moved_out_of_money_is_refused_by_the_bank_gate_first() {
+    let moved = replaced_once(
+        &catalogue_with_sales_as_bank(),
+        ">Cash-in-Hand</PARENT>",
+        ">Sundry Debtors</PARENT>",
+    );
+    let mut plans = bank_before_approval(moved, groups());
+    plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_business_cash_contra(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let _ = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(
+        error["code"], "import_bank_classification_changed",
+        "{response}"
+    );
+    assert!(error.get("refused_ledgers").is_none(), "{response}");
+    assert!(scripted.previews().is_empty(), "approval must not be asked");
+}
+
+/// A cash-in-hand ledger rides only on a business-cash Contra. A Journal
+/// whose record names one would skip the recheck, which runs only beside the
+/// bank/cash gate, so it is refused before approval as inconsistent, after the
+/// catalogue and before the Currency read (#815, review P3).
+#[tokio::test]
+async fn a_journal_recording_a_cash_in_hand_ledger_is_refused_before_approval() {
+    let mut plans = before_approval();
+    plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let journal_voucher = json!({"bridge_txn_id":"journal-815","date":"20260901",
+        "voucher_type":"Journal","narration":"Synthetic test only","entries":[
+            {"ledger":"Bridge Nested Debtor WR4","amount":"5.00","side":"Dr"},
+            {"ledger":"Cash","amount":"5.00","side":"Cr"}]});
+    let (_, args) = saved_bank_batch_recording(
+        &server,
+        journal_voucher,
+        json!([{"bridge_txn_id":"journal-815","ledger":"Cash"}]),
+    );
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_post_admission_inconsistent",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert!(scripted.previews().is_empty(), "approval must not be asked");
+    assert_eq!(observed.len(), expected, "{response}");
+}
+
+/// Before approval the rows are bounded as the queue bounds them
+/// (`RECHECK_REFUSAL_BUDGET`), so both answers list the same rows for one
+/// regroup (#815, review P3). The record is built here with twelve ledgers
+/// the book does not hold, more than that budget lists; a build never records
+/// those, which is the only way to reach the bound with this capture.
+#[tokio::test]
+async fn the_recheck_before_approval_bounds_its_rows_as_the_queue_does() {
+    let mut plans = bank_before_approval(catalogue_with_sales_as_bank(), groups());
+    plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let contra = json!({"bridge_txn_id":"contra-815","date":"20260901","voucher_type":"Contra",
+        "narration":"Synthetic test only","entries":[
+            {"ledger":"Cash","amount":"5.00","side":"Dr"},
+            {"ledger":"WR2 Sales","amount":"5.00","side":"Cr"}]});
+    let recorded = (0..12)
+        .map(|index| json!({"bridge_txn_id":"contra-815","ledger":format!("Synthetic absent cash ledger {index:02}")}))
+        .collect::<Vec<_>>();
+    let (_, args) = saved_bank_batch_recording(&server, contra, Value::Array(recorded));
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let _ = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "cash_ledger_not_cash_in_hand", "{response}");
+    let listed = error["refused_ledgers"].as_array().unwrap().len();
+    let omitted = error["refused_ledgers_omitted"].as_u64().unwrap() as usize;
+    assert_eq!(listed + omitted, 12, "{response}");
+    // The server's own budget (200,000 bytes) would list all twelve.
+    assert!(omitted > 0, "{response}");
 }
 
 /// bridge#676: a group collection the classification cannot parse is refused

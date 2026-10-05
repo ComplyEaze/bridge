@@ -819,10 +819,12 @@ impl Server {
                 // A ledger a cash answer named as cash in hand must still be
                 // one: under Bank Accounts its Contra moves the cash bank to
                 // bank, which passes the gate above (#815).
+                // Bounded as the queue bounds them, so both answers list the
+                // same rows for one regroup.
                 if let Some(refused) = super::cash_in_hand_refusals(
                     line.cash_in_hand_ledgers.as_deref().unwrap_or_default(),
                     &observed,
-                    self.settings.max_bytes,
+                    RECHECK_REFUSAL_BUDGET,
                 ) {
                     cash_in_hand_refused = Some(refused);
                     return Err("cash_ledger_not_cash_in_hand".to_string().into());
@@ -833,6 +835,15 @@ impl Server {
                     )
                     .map_err(|error| error.to_string())?,
                 )
+            } else if line
+                .cash_in_hand_ledgers
+                .as_deref()
+                .is_some_and(|recorded| !recorded.is_empty())
+            {
+                // A cash-in-hand ledger rides only on a business-cash Contra,
+                // a bank voucher: one recorded without one would skip the
+                // check above, so the record is refused as inconsistent (#815).
+                return Err("import_post_admission_inconsistent".to_string().into());
             } else {
                 None
             };
@@ -1916,7 +1927,9 @@ fn recheck_import_admission(
     // this catalogue's parents and the group collection read beside it.
     let bank = renders_bank_shape(&line.vouchers);
     match (bank, groups) {
-        (false, None) => {}
+        // A recorded cash-in-hand ledger without a bank voucher would skip the
+        // check below, so it is refused as a wiring fault too (#815).
+        (false, None) if cash_in_hand.is_empty() => {}
         (true, Some(groups)) => {
             let groups = parse_native_group_snapshot(groups, company_guid).map_err(|error| {
                 ApprovedImportAdmissionError::GroupExportInvalid {

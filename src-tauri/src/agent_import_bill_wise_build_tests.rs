@@ -3,7 +3,9 @@
 //!
 //! The scripted flag responses are regression doubles (`bill_wise_flag_plans`):
 //! their names and parents are the live catalogue capture's and the flag column
-//! is set by each test. They prove Bridge's own rules, not what Tally answers.
+//! is set by each test. They prove Bridge's own rules, not what Tally answers;
+//! what Tally answers to the flag reads is pinned on live captures by the
+//! `live_` tests in `agent_import_bill_wise_tests.rs`.
 use super::*;
 
 const PARTY: &str = "Bridge Nested Debtor WR4";

@@ -1917,9 +1917,11 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
 ///
 /// A REGRESSION DOUBLE, not evidence (AGENTS.md P1): its ledger names and
 /// parents are the live catalogue capture's, and the flag column is set here
-/// (`bill_wise` names the ledgers marked Yes, every other No). No live
-/// snapshot answering the build's own flag request has been captured; that
-/// capture is the lab proof #1234 waits for.
+/// (`bill_wise` names the ledgers marked Yes, every other No). It exercises
+/// the build's wiring only. What Tally answers to the build's flag request is
+/// pinned separately, on captures of a live Tally, by the `live_` tests in
+/// `agent_import_bill_wise_tests.rs` and `tests/bill_wise_flags_live.rs`; this
+/// book (nine ledgers) was not part of that capture.
 fn bill_wise_flag_plans(bill_wise: &[&str]) -> Vec<ScenarioPlan> {
     let bytes = include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"

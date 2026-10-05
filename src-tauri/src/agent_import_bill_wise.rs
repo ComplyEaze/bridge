@@ -116,7 +116,9 @@ impl BillWiseError {
 
 /// The period the flag read asks for: one day, the company's `books_from`.
 /// The flag does not depend on the period; the smallest body is the cheapest
-/// read. [unverified live: the lab proof measures that it answers]
+/// read. [verified live 6 Oct 2026 on one synthetic book of 17 ledgers: the
+/// one-day answer has the same ledgers, parents and flags as the wide window
+/// (lab record); the `live_` tests pin the one-day request and its answer]
 pub(super) fn bill_wise_period(
     books_from: Option<&str>,
     profile: DateBoundaryProfile,

@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE OUTSTANDINGS LAB through the raw serial sender of a lab sitting that made reads only: no import and no write",
+  "observed_date": "2026-10-06",
+  "source_response_bytes": 17080,
+  "source_response_sha256": "2287cb7d60f71139e52fdb8fe5ae75f650dad9fff7e13930bccbbdd88c55a433",
+  "source_request_bytes": 1598,
+  "source_request_sha256": "2fa8ce92bc0e271a5f51ebec2652d33e97d6b72aff5f791b2b3d5e15230c3592",
+  "request_rendered_by": "render_native_ledger_snapshot_request_for_parents(company, period 20250401..20250401, ModeAgnostic, the one ParentPart over Sundry Creditors and Sundry Debtors from ParentPartition::plan)",
+  "fixture_bytes": 17080,
+  "fixture_sha256": "2287cb7d60f71139e52fdb8fe5ae75f650dad9fff7e13930bccbbdd88c55a433",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "11 ledgers, 10 with ISBILLWISEON Yes. The same snapshot filtered to the ledgers whose PARENT is Sundry Creditors or Sundry Debtors: the read sent for a book above one part.",
+  "provenance_limit": "One synthetic book on one build and one day. It shows how Tally answers this request for these shapes; it is not evidence about a client's book, about a book above one part, or about a ledger whose name ends in a line break (this book holds none). The request was sent twice in the sitting and both answers were byte-identical; the first of the two is the fixture.",
+  "sensitivity_review": "Synthetic BRIDGE company, synthetic ledger names and GUIDs; no client, GSTIN, address or credential.",
+  "observed_at_utc": "2026-10-05T20:39Z"
+}

@@ -1162,3 +1162,222 @@ fn two_observations_differ_only_in_the_ledgers_asked_about() {
         Some(&None)
     );
 }
+
+// ---- Slice 1 on captures of a live Tally ------------------------------------------------------------------
+//
+// The answers below were read from the synthetic company BRIDGE OUTSTANDINGS LAB (TallyPrime Silver 7.1) by the
+// requests this module chooses: the ledger catalogue (1 Oct 2026; the book is unchanged since, which the 6 Oct
+// sitting confirmed name by name), the one-day snapshot of the whole book, and the same snapshot filtered to the
+// ledgers under two parents (both 6 Oct 2026). Their provenance files give the request and response hashes. The
+// build tests elsewhere still run on regression doubles; these run this module's own decisions on what Tally
+// answered. The expected flags are the seeding of the book, not this code's output.
+
+const LIVE_COMPANY: &str = "BRIDGE OUTSTANDINGS LAB";
+const LIVE_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
+const LIVE_CATALOGUE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-ledger-catalogue.utf16le.xml"
+);
+const LIVE_WHOLE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/bill-wise-snapshot-oneday-outstandings-lab.utf16le.xml"
+);
+const LIVE_PARTS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/bill-wise-snapshot-parents-oneday-outstandings-lab.utf16le.xml"
+);
+const LIVE_CATALOGUE_PROVENANCE: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-ledger-catalogue.json"
+);
+const LIVE_WHOLE_PROVENANCE: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/bill-wise-snapshot-oneday-outstandings-lab.json"
+);
+const LIVE_PARTS_PROVENANCE: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/bill-wise-snapshot-parents-oneday-outstandings-lab.json"
+);
+const LIVE_PARTY: &str = "OL P01 Named Bills Debtor";
+const LIVE_CREDITOR: &str = "OL P06 Debit Note Creditor";
+const LIVE_BANK: &str = "OL Bank";
+
+fn live_text(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .expect("a UTF-16LE capture")
+}
+
+fn live_catalogue() -> bridge_tally_protocol::StandardLedgerCatalog {
+    crate::tally::standard_ledger_catalog::parse_standard_ledger_catalog_response(
+        &live_text(LIVE_CATALOGUE),
+        LIVE_COMPANY,
+        LIVE_GUID,
+    )
+    .expect("the live catalogue parses")
+}
+
+fn live_rows(bytes: &[u8]) -> Vec<NativeLedgerBillWiseFlag> {
+    bridge_tally_protocol::native_outstandings::parse_native_ledger_bill_wise_flags_for_company(
+        &live_text(bytes),
+        LIVE_GUID,
+    )
+    .expect("the live snapshot parses")
+}
+
+fn live_period() -> NativeLedgerSnapshotPeriod {
+    // The company's books_from, as the build derives it.
+    bill_wise_period(Some("20250401"), DateBoundaryProfile::ModeAgnostic).unwrap()
+}
+
+fn recorded_request_sha256(provenance: &str) -> String {
+    serde_json::from_str::<Value>(provenance).unwrap()["source_request_sha256"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
+fn wire_sha256(xml: &str) -> String {
+    super::super::sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
+        xml,
+    ))
+}
+
+fn live_limits_of_one_part_of_eleven() -> PartitionLimits {
+    PartitionLimits {
+        max_ledgers_per_part: 11,
+        max_parents_per_part: 200,
+        max_parts: 12,
+        max_complement_formula_bytes: 262_144,
+    }
+}
+
+#[test]
+fn live_a_book_that_fits_one_part_is_read_whole_and_the_catalogue_names_match_the_snapshot() {
+    let catalogue = live_catalogue();
+    let rows = live_rows(LIVE_WHOLE);
+    assert_eq!(catalogue.names().count(), 17);
+    assert_eq!(
+        catalogue.names().collect::<BTreeSet<_>>(),
+        rows.iter().map(|row| row.name.as_str()).collect()
+    );
+    // The catalogue and the snapshot agree on every ledger's parent, not only on its name.
+    for (name, parent) in catalogue.parents() {
+        let row = rows.iter().find(|row| row.name == name).unwrap();
+        assert_eq!(row.parent.as_deref(), parent, "{name}");
+    }
+    let named = names(&[LIVE_PARTY, LIVE_BANK]);
+    assert_eq!(
+        plan_reads(
+            catalogue.identified_parents(),
+            crate::tally::connection::parent_partition_limits(),
+            &named
+        ),
+        Ok(BillWiseReadPlan::Whole { catalogue_rows: 17 })
+    );
+    let observed = ObservedBillWise::new(
+        named.iter().copied(),
+        &[BillWiseRead {
+            scope: BillWiseScope::Whole { catalogue_rows: 17 },
+            rows: &rows,
+        }],
+    )
+    .expect("the live snapshot is the catalogue's ledgers");
+    let flags = observed.flags_of(&named);
+    assert_eq!(flags[LIVE_PARTY], Some(true));
+    assert_eq!(flags[LIVE_BANK], Some(false));
+    // A catalogue that disagrees by one ledger is a different book: the check fails closed.
+    assert_eq!(
+        ObservedBillWise::new(
+            named.iter().copied(),
+            &[BillWiseRead {
+                scope: BillWiseScope::Whole { catalogue_rows: 16 },
+                rows: &rows,
+            }],
+        ),
+        Err(BillWiseError::RowCountDiffers)
+    );
+    // A short answer is the dangerous case: 11 rows of a 17-ledger book.
+    assert_eq!(
+        ObservedBillWise::new(
+            named.iter().copied(),
+            &[BillWiseRead {
+                scope: BillWiseScope::Whole { catalogue_rows: 17 },
+                rows: &live_rows(LIVE_PARTS),
+            }],
+        ),
+        Err(BillWiseError::RowCountDiffers)
+    );
+}
+
+#[test]
+fn live_the_requests_the_build_dispatches_are_the_ones_that_were_sent() {
+    // Through the wrappers the build sends with, not the protocol renderers they call.
+    let whole = super::super::ledger_bill_wise_whole_read(LIVE_COMPANY, &live_period());
+    assert_eq!(
+        wire_sha256(whole.as_str()),
+        recorded_request_sha256(LIVE_WHOLE_PROVENANCE)
+    );
+    let catalogue = super::super::standard_ledger_catalog_read(LIVE_COMPANY).unwrap();
+    assert_eq!(
+        wire_sha256(catalogue.as_str()),
+        recorded_request_sha256(LIVE_CATALOGUE_PROVENANCE)
+    );
+}
+
+#[test]
+fn live_a_book_above_one_part_is_read_by_the_part_under_the_named_parents_and_that_part_answers_exactly(
+) {
+    let catalogue = live_catalogue();
+    // Eleven ledgers a part: the book (17) is above one part, as a large book is.
+    let named = names(&[LIVE_PARTY, LIVE_CREDITOR]);
+    let Ok(BillWiseReadPlan::Parts(parts)) = plan_reads(
+        catalogue.identified_parents(),
+        live_limits_of_one_part_of_eleven(),
+        &named,
+    ) else {
+        panic!("a book above one part is read by parts");
+    };
+    assert_eq!(parts.len(), 1, "both parents fit one part");
+    let request = super::super::ledger_bill_wise_read(LIVE_COMPANY, &live_period(), &parts[0]);
+    assert_eq!(
+        wire_sha256(request.as_str()),
+        recorded_request_sha256(LIVE_PARTS_PROVENANCE),
+        "the part's request is the one that was sent"
+    );
+    let rows = live_rows(LIVE_PARTS);
+    assert_eq!(rows.len(), 11);
+    let observed = ObservedBillWise::new(
+        named.iter().copied(),
+        &[BillWiseRead {
+            scope: BillWiseScope::Part(&parts[0]),
+            rows: &rows,
+        }],
+    )
+    .expect("the part's answer is exactly its ledgers");
+    let flags = observed.flags_of(&named);
+    assert_eq!(
+        (flags[LIVE_PARTY], flags[LIVE_CREDITOR]),
+        (Some(true), Some(true))
+    );
+    // A short answer (the first ten of the part's eleven rows) is not the part's answer either.
+    assert_eq!(
+        ObservedBillWise::new(
+            named.iter().copied(),
+            &[BillWiseRead {
+                scope: BillWiseScope::Part(&parts[0]),
+                rows: &rows[..10],
+            }],
+        ),
+        Err(BillWiseError::RowCountDiffers)
+    );
+    // The whole book's 17 rows are not this part's answer.
+    assert_eq!(
+        ObservedBillWise::new(
+            named.iter().copied(),
+            &[BillWiseRead {
+                scope: BillWiseScope::Part(&parts[0]),
+                rows: &live_rows(LIVE_WHOLE),
+            }],
+        ),
+        Err(BillWiseError::RowCountDiffers)
+    );
+}

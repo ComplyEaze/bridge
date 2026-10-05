@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE OUTSTANDINGS LAB through the raw serial sender of a lab sitting that made reads only: no import and no write",
+  "observed_date": "2026-10-06",
+  "source_response_bytes": 24422,
+  "source_response_sha256": "5eb1422862a0cc62e34a41604a523f188d99d3177f31a72fc6f1a177fd22f5cb",
+  "source_request_bytes": 1298,
+  "source_request_sha256": "aa92a362e4f37e3f6a95c767e8357d3933437b9c75599716962603557e5b4e05",
+  "request_rendered_by": "render_native_ledger_snapshot_request(company, period 20250401..20250401, ModeAgnostic)",
+  "fixture_bytes": 24422,
+  "fixture_sha256": "5eb1422862a0cc62e34a41604a523f188d99d3177f31a72fc6f1a177fd22f5cb",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "17 ledgers, 10 with ISBILLWISEON Yes. The unfiltered outstandings ledger snapshot over ONE day (the company's books_from): the read the bill-wise check of #1234 sends for a book whose catalogue fits one part.",
+  "provenance_limit": "One synthetic book on one build and one day. It shows how Tally answers this request for these shapes; it is not evidence about a client's book, about a book above one part, or about a ledger whose name ends in a line break (this book holds none). The request was sent twice in the sitting and both answers were byte-identical; the first of the two is the fixture.",
+  "sensitivity_review": "Synthetic BRIDGE company, synthetic ledger names and GUIDs; no client, GSTIN, address or credential.",
+  "observed_at_utc": "2026-10-05T20:39Z"
+}

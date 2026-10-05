@@ -128,7 +128,7 @@ rename one key in [related_parties]"
 }
 
 fn ledger_refs(set: &BTreeSet<&str>) -> Vec<EvidenceRef> {
-    set.iter().map(|n| EvidenceRef::new("ledger", *n)).collect()
+    set.iter().map(|n| EvidenceRef::new("ledger", n)).collect()
 }
 
 pub fn run(book: &Book, rules: &Rules, cfg: &RelatedPartiesConfig) -> Result<TestResult> {
@@ -355,15 +355,15 @@ the amount paid to this related person in each nature shown above."
     Ok(r)
 }
 
+/// A ledger set's entries, by voucher GUID: each voucher's net on the set, and the voucher.
+type Entries<'a> = BTreeMap<&'a str, (i64, &'a Voucher)>;
+
 /// The population walk of one ledger set (spec pack §4): each voucher's net on the set, in book
 /// order; a voucher netting to zero is no entry; a later voucher sharing a GUID replaces the
 /// earlier one's entry, unless it nets to zero. The amount is the sum of the entries' nets.
-fn walk<'a>(
-    population: &[&'a Voucher],
-    set: &BTreeSet<&str>,
-) -> Result<(i64, BTreeMap<&'a str, (i64, &'a Voucher)>)> {
+fn walk<'a>(population: &[&'a Voucher], set: &BTreeSet<&str>) -> Result<(i64, Entries<'a>)> {
     let overflow = || support::overflow(TEST_ID);
-    let mut entries: BTreeMap<&str, (i64, &Voucher)> = BTreeMap::new();
+    let mut entries: Entries = BTreeMap::new();
     for v in population {
         let mut net = 0i64;
         for line in &v.lines {

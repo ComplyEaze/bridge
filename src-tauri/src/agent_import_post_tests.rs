@@ -674,10 +674,10 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
     // lower bounds stay, because a wait can only add to elapsed time.
     async fn reads_of(
         server: &Server,
+        reads: std::sync::Arc<std::sync::Mutex<Vec<Option<Duration>>>>,
         request: crate::tally::agent_read_request::AgentReadRequest,
         call_started: Instant,
     ) -> (anyhow::Result<String>, Vec<Option<Duration>>) {
-        let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let result = MARKS_READS
             .scope(
                 std::sync::Arc::clone(&reads),
@@ -687,15 +687,34 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
         let reads = reads.lock().unwrap().clone();
         (result, reads)
     }
+    let no_reads = || std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
 
-    // Freed after the first budget, inside the second: the retry gets through.
+    // Freed once the retry has begun, not on a timer: the first read is refused
+    // for its whole budget however late it starts, and the retry then reaches a
+    // lock that is already released. A timer (budget plus 300 ms from the release
+    // task's first poll) let a first read that started more than 300 ms after
+    // that find the lock released and never retry (#1261). The wait is bounded,
+    // so a missing retry fails the asserts below rather than hanging.
     let held = hold();
-    let release = tokio::spawn(async move {
-        tokio::time::sleep(budget + Duration::from_millis(300)).await;
-        drop(held);
+    let first_reads = no_reads();
+    let release = tokio::spawn({
+        let reads = std::sync::Arc::clone(&first_reads);
+        async move {
+            for _ in 0..2000 {
+                if reads.lock().unwrap().len() >= 2 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+            // 300 ms into the retry's wait, as before: the retry must keep polling,
+            // not make one try. The wait budget is charged by pause length, so a
+            // stall cannot spend it before this fires.
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            drop(held);
+        }
     });
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
+    let (result, reads) = reads_of(&server, first_reads, request(), Instant::now()).await;
     assert!(started.elapsed() >= budget);
     assert!(!busy(&result), "the retry must reach the wire: {result:?}");
     assert_eq!(reads, [None, Some(budget)]);
@@ -704,7 +723,7 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
     // Held throughout: refused once, after both budgets, never a third read.
     let _held = hold();
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
+    let (result, reads) = reads_of(&server, no_reads(), request(), Instant::now()).await;
     assert!(busy(&result));
     assert!(started.elapsed() >= budget * 2);
     assert_eq!(reads, [None, Some(budget)], "exactly one retry");
@@ -714,7 +733,7 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
         .checked_sub(Duration::from_secs(44))
         .unwrap_or_else(Instant::now);
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), spent).await;
+    let (result, reads) = reads_of(&server, no_reads(), request(), spent).await;
     assert!(busy(&result));
     assert!(started.elapsed() >= budget);
     assert_eq!(reads, [None], "no retry");

@@ -2848,9 +2848,13 @@ fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_per
     // Guard both production renderers against restoring that dependency; this
     // request test does not simulate or qualify Tally's date behavior.
     let (from, to) = ("20260815", "20260822");
+    let typed = (
+        &crate::agent::tally_date(from),
+        &crate::agent::tally_date(to),
+    );
     let requests = [
-        render_import_verification_read("Synthetic Book", from, to),
-        super::super::render_agent_vouchers("Synthetic Book", from, to, None).unwrap(),
+        render_import_verification_read("Synthetic Book", typed.0, typed.1),
+        super::super::render_agent_vouchers("Synthetic Book", typed.0, typed.1, None).unwrap(),
     ];
     for request in requests {
         let mut reader = quick_xml::Reader::from_str(&request);

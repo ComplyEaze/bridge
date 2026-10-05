@@ -10,12 +10,14 @@ use super::*;
 
 #[test]
 fn a_window_span_counts_both_endpoints() {
-    assert_eq!(window_span_days("20260401", "20260401"), Some(1));
-    assert_eq!(window_span_days("20260401", "20260402"), Some(2));
-    assert_eq!(window_span_days("20260401", "20270331"), Some(365));
+    let span = |from: &str, to: &str| window_span_days(&tally_date(from), &tally_date(to));
+    assert_eq!(span("20260401", "20260401"), Some(1));
+    assert_eq!(span("20260401", "20260402"), Some(2));
+    assert_eq!(span("20260401", "20270331"), Some(365));
     // A leap year is counted by the calendar, not by arithmetic on months.
-    assert_eq!(window_span_days("20240101", "20241231"), Some(366));
-    assert_eq!(window_span_days("notadate", "20260401"), None);
+    assert_eq!(span("20240101", "20241231"), Some(366));
+    // A window ending before it starts has no span.
+    assert_eq!(span("20260402", "20260401"), None);
 }
 
 #[test]
@@ -49,24 +51,32 @@ fn splitting_a_verification_window_partitions_it_exactly() {
         ("20251231", "20260101"), // across a year boundary
     ] {
         let ((left_from, left_to), (right_from, right_to)) =
-            split_verification_window(from, to).expect("a multi-day window splits");
-        assert_eq!(left_from, from, "left half must start where the window did");
-        assert_eq!(right_to, to, "right half must end where the window did");
-        let day = |value: &str| chrono::NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
+            split_verification_window(&tally_date(from), &tally_date(to))
+                .expect("a multi-day window splits");
+        assert_eq!(
+            left_from.as_str(),
+            from,
+            "left half must start where the window did"
+        );
+        assert_eq!(
+            right_to.as_str(),
+            to,
+            "right half must end where the window did"
+        );
         // Contiguous, no gap and no overlap: the right half starts exactly the day
         // after the left half ends.
         assert_eq!(
-            day(&right_from),
-            day(&left_to) + chrono::Duration::days(1),
+            day(right_from.as_str()),
+            day(left_to.as_str()) + chrono::Duration::days(1),
             "{from}..{to} split with a gap or an overlap"
         );
         // And it must actually shrink, or the splitter would never terminate.
         assert!(
-            day(&left_to) < day(to),
+            day(left_to.as_str()) < day(to),
             "left half did not shrink {from}..{to}"
         );
         assert!(
-            day(&right_from) > day(from),
+            day(right_from.as_str()) > day(from),
             "right half did not shrink {from}..{to}"
         );
     }
@@ -77,11 +87,20 @@ fn a_single_day_verification_window_cannot_be_split() {
     // The recursion floor. Without it the splitter would spin on a day it cannot
     // read; with it, read_verification_window refuses rather than returning a
     // verification over an incomplete window.
-    assert_eq!(split_verification_window("20260401", "20260401"), None);
+    let split =
+        |from: &str, to: &str| split_verification_window(&tally_date(from), &tally_date(to));
+    assert_eq!(split("20260401", "20260401"), None);
     // A reversed window is refused rather than silently inverted.
-    assert_eq!(split_verification_window("20260430", "20260401"), None);
-    // An unparseable bound is refused rather than guessed at.
-    assert_eq!(split_verification_window("notadate", "20260401"), None);
+    assert_eq!(split("20260430", "20260401"), None);
+    // The last day Tally can name splits like any other window, without
+    // stepping past it.
+    assert_eq!(
+        split("99991230", "99991231"),
+        Some((
+            (tally_date("99991230"), tally_date("99991230")),
+            (tally_date("99991231"), tally_date("99991231"))
+        ))
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +280,70 @@ fn a_day_too_heavy_for_one_read_is_divided_by_alterid_not_refused() {
     assert_eq!(spans.last().unwrap().span.unwrap().through, ceiling);
 }
 
+/// #861: a planning day becomes a request's date only through `stamp`, which
+/// refuses a day no `YYYYMMDD` date can name by the code `TallyDate::next_day`
+/// uses, rather than rendering it or panicking.
+#[test]
+fn a_planning_day_is_stamped_as_a_tally_date_or_refused_as_overflow() {
+    for date in ["20260401", "20240229", "00010101", "99991231"] {
+        assert_eq!(stamp(day(date)).unwrap(), tally_date(date));
+    }
+    assert!(matches!(
+        tally_date("99991231").next_day(),
+        Err(bridge_tally_core::TallyError::InvalidData { code }) if code == TALLY_DATE_OVERFLOW
+    ));
+    for beyond in [
+        NaiveDate::from_ymd_opt(10_000, 1, 1).unwrap(),
+        NaiveDate::from_ymd_opt(0, 12, 31).unwrap(),
+        NaiveDate::from_ymd_opt(-1, 6, 15).unwrap(),
+    ] {
+        assert_eq!(
+            stamp(beyond).unwrap_err().code,
+            TALLY_DATE_OVERFLOW,
+            "{beyond}"
+        );
+    }
+}
+
+/// #861: a window ending on the last day Tally can name is planned and stamped
+/// without stepping past it, through the AlterID-span path that advances the
+/// planner to the following day. A planned read that did reach past it is
+/// refused by its typed code when the plan becomes parts, so no part, and
+/// therefore no request, exists to render.
+#[test]
+fn a_window_ending_on_the_last_tally_day_never_yields_a_part_past_it() {
+    // Capacity 10: the 25-voucher last day is read alone, in AlterID spans.
+    let census = census_of(&[("99991230", 3), ("99991231", 25)]);
+    let reads = plan_window_reads(
+        day("99991230"),
+        day("99991231"),
+        &census,
+        None,
+        40,
+        100,
+        1000,
+        8,
+    )
+    .unwrap();
+    assert_tiles(&reads, "99991230", "99991231", 40);
+    let parts = stack_of(&reads).unwrap();
+    assert_eq!(parts.len(), reads.len());
+    assert!(parts.iter().all(|part| part.to <= tally_date("99991231")));
+    let past = PlannedRead {
+        from: day("99991231"),
+        to: NaiveDate::from_ymd_opt(10_000, 1, 1).unwrap(),
+        span: None,
+        vouchers: 0,
+    };
+    assert_eq!(past.part().unwrap_err().code, TALLY_DATE_OVERFLOW);
+    let mut reaching_past = reads;
+    reaching_past.push(past);
+    assert_eq!(
+        stack_of(&reaching_past).unwrap_err().code,
+        TALLY_DATE_OVERFLOW
+    );
+}
+
 #[test]
 fn only_a_single_voucher_over_budget_is_refused() {
     let one = census_of(&[("20260401", 1)]);
@@ -434,10 +517,12 @@ fn the_conservative_defaults_stay_above_every_measured_per_voucher_cost() {
 fn a_part_tally_cannot_serve_is_halved_by_date_then_by_alterid() {
     let census = census_of(&[("20260401", 4), ("20260402", 1)]);
     let part = |from: &str, to: &str, span| WindowPart {
-        from: from.into(),
-        to: to.into(),
+        from: tally_date(from),
+        to: tally_date(to),
         span,
     };
+    let halve_part =
+        |part: &WindowPart, census, ceiling| halve_part(part, census, ceiling).unwrap();
     // A date range halves by date.
     assert_eq!(
         halve_part(&part("20260401", "20260402", None), Some(&census), 5),
@@ -601,13 +686,14 @@ fn a_relabelled_response_describes_the_vouchers_it_names() {
     assert_eq!(rows[0]["alter_id"], 7);
     assert_eq!(rows[1]["date"], "20260804");
     assert_eq!(rows[1].window_master_id(), Ok(Some(9)));
-    let census = parse_voucher_census(&xml, ("20260803", "20260804"), None).unwrap();
+    let census = parse_voucher_census(&xml, (day("20260803"), day("20260804")), None).unwrap();
     assert_eq!(census[0].guid, rows[0]["guid"].as_str().unwrap());
 }
 
 #[test]
 fn the_census_reads_a_captured_voucher_row_and_ignores_cmpinfo() {
-    let rows = parse_voucher_census(&three_vouchers(), ("20260801", "20260802"), None).unwrap();
+    let rows =
+        parse_voucher_census(&three_vouchers(), (day("20260801"), day("20260802")), None).unwrap();
     assert!(rows.iter().all(|row| !row.guid.is_empty()));
     assert_eq!(
         rows.iter()
@@ -623,7 +709,7 @@ fn the_census_reads_a_captured_voucher_row_and_ignores_cmpinfo() {
     let empty = empty_collection();
     assert!(empty.contains("<VOUCHER>0</VOUCHER>"));
     assert_eq!(
-        parse_voucher_census(&empty, ("20260801", "20260802"), None),
+        parse_voucher_census(&empty, (day("20260801"), day("20260802")), None),
         Ok(vec![])
     );
 }
@@ -632,13 +718,13 @@ fn the_census_reads_a_captured_voucher_row_and_ignores_cmpinfo() {
 fn a_census_that_does_not_describe_what_was_asked_is_refused() {
     let xml = three_vouchers();
     assert_eq!(
-        parse_voucher_census(&xml, ("20260802", "20260803"), None),
+        parse_voucher_census(&xml, (day("20260802"), day("20260803")), None),
         Err("window_not_honoured".to_string())
     );
     assert_eq!(
         parse_voucher_census(
             &xml,
-            ("20260801", "20260801"),
+            (day("20260801"), day("20260801")),
             Some(AlterIdSpan {
                 after: 1,
                 through: 3
@@ -649,17 +735,18 @@ fn a_census_that_does_not_describe_what_was_asked_is_refused() {
     let undated = xml.replacen("<DATE TYPE=\"Date\">20260801</DATE>", "", 1);
     assert_ne!(undated, xml);
     assert_eq!(
-        parse_voucher_census(&undated, ("20260801", "20260801"), None),
+        parse_voucher_census(&undated, (day("20260801"), day("20260801")), None),
         Err("agent_read_protocol_invalid".to_string())
     );
     // A census row without its GUID cannot admit the part it counts.
-    let first_guid = parse_voucher_census(&xml, ("20260801", "20260801"), None).unwrap()[0]
-        .guid
-        .clone();
+    let first_guid = parse_voucher_census(&xml, (day("20260801"), day("20260801")), None).unwrap()
+        [0]
+    .guid
+    .clone();
     let unidentified = xml.replacen(&format!("<GUID>{first_guid}</GUID>"), "", 1);
     assert_ne!(unidentified, xml);
     assert_eq!(
-        parse_voucher_census(&unidentified, ("20260801", "20260801"), None),
+        parse_voucher_census(&unidentified, (day("20260801"), day("20260801")), None),
         Err("agent_read_protocol_invalid".to_string())
     );
 }
@@ -701,7 +788,11 @@ fn an_unobservable_high_water_mark_is_not_read_as_an_empty_book() {
 
 #[test]
 fn an_undivided_read_is_byte_identical_to_the_request_before_the_bound() {
-    let (company, from, to) = ("Synthetic Book", "20260401", "20260430");
+    let (company, from, to) = (
+        "Synthetic Book",
+        &tally_date("20260401"),
+        &tally_date("20260430"),
+    );
     assert_eq!(
         VoucherReadShape::EntryWildcard
             .render(company, from, to, None)
@@ -748,8 +839,13 @@ fn an_undivided_read_is_byte_identical_to_the_request_before_the_bound() {
 
 #[test]
 fn the_census_request_is_an_admitted_light_collection_export() {
-    let dated =
-        render_agent_voucher_census("Synthetic & Book", "20260401", "20260430", None).unwrap();
+    let dated = render_agent_voucher_census(
+        "Synthetic & Book",
+        &tally_date("20260401"),
+        &tally_date("20260430"),
+        None,
+    )
+    .unwrap();
     assert!(crate::tally::agent_read_request::AgentReadRequest::parse(dated.clone()).is_ok());
     assert!(dated.contains("<FETCH>GUID,ALTERID,DATE</FETCH>"));
     assert!(dated.contains("Synthetic &amp; Book"));
@@ -757,8 +853,8 @@ fn the_census_request_is_an_admitted_light_collection_export() {
         .contains("$Date &gt;= $$Date:\"20260401\" AND $Date &lt;= $$Date:\"20260430\"</SYSTEM>"));
     let spanned = render_agent_voucher_census(
         "Synthetic & Book",
-        "20260401",
-        "20260401",
+        &tally_date("20260401"),
+        &tally_date("20260401"),
         Some(AlterIdSpan {
             after: 0,
             through: 4096,
@@ -953,8 +1049,8 @@ fn assert_requests(
 
 fn part(from: &str, to: &str, span: Option<AlterIdSpan>) -> WindowPart {
     WindowPart {
-        from: from.into(),
-        to: to.into(),
+        from: tally_date(from),
+        to: tally_date(to),
         span,
     }
 }
@@ -1127,8 +1223,8 @@ async fn an_unmeasured_book_is_planned_at_the_default_and_an_omitted_voucher_is_
         &[VoucherReadShape::EntryWildcard
             .render(
                 &company(),
-                "20260801",
-                "20260801",
+                &tally_date("20260801"),
+                &tally_date("20260801"),
                 Some(AlterIdSpan {
                     after: 0,
                     through: 1,
@@ -1191,8 +1287,20 @@ async fn a_book_whose_mark_fits_one_census_is_counted_in_one_date_census() {
         &observed,
         &[1, 7],
         &[
-            render_agent_voucher_census(&company(), "20260801", "20260801", None).unwrap(),
-            render_agent_vouchers(&company(), "20260801", "20260801", None).unwrap(),
+            render_agent_voucher_census(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260801"),
+                None,
+            )
+            .unwrap(),
+            render_agent_vouchers(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260801"),
+                None,
+            )
+            .unwrap(),
         ],
     );
 }
@@ -1226,8 +1334,8 @@ async fn a_book_one_voucher_past_one_census_is_counted_in_alterid_spans() {
         &[
             render_agent_voucher_census(
                 &company(),
-                "20260801",
-                "20260801",
+                &tally_date("20260801"),
+                &tally_date("20260801"),
                 Some(AlterIdSpan {
                     after: 0,
                     through: capacity,
@@ -1236,15 +1344,21 @@ async fn a_book_one_voucher_past_one_census_is_counted_in_alterid_spans() {
             .unwrap(),
             render_agent_voucher_census(
                 &company(),
-                "20260801",
-                "20260801",
+                &tally_date("20260801"),
+                &tally_date("20260801"),
                 Some(AlterIdSpan {
                     after: capacity,
                     through: capacity + 1,
                 }),
             )
             .unwrap(),
-            render_agent_vouchers(&company(), "20260801", "20260801", None).unwrap(),
+            render_agent_vouchers(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260801"),
+                None,
+            )
+            .unwrap(),
         ],
     );
 }
@@ -1483,7 +1597,13 @@ async fn a_census_the_transport_refuses_is_not_divided_but_refused() {
     assert_requests(
         &observed,
         &[1],
-        &[render_agent_voucher_census(&company(), "20260801", "20260802", None).unwrap()],
+        &[render_agent_voucher_census(
+            &company(),
+            &tally_date("20260801"),
+            &tally_date("20260802"),
+            None,
+        )
+        .unwrap()],
     );
 }
 #[tokio::test]
@@ -1558,13 +1678,28 @@ fn split_read_checks(
         &[1, 3, 9],
         &[
             shape
-                .render(&company(), "20260801", "20260802", None)
+                .render(
+                    &company(),
+                    &tally_date("20260801"),
+                    &tally_date("20260802"),
+                    None,
+                )
                 .unwrap(),
             shape
-                .render(&company(), "20260801", "20260801", None)
+                .render(
+                    &company(),
+                    &tally_date("20260801"),
+                    &tally_date("20260801"),
+                    None,
+                )
                 .unwrap(),
             shape
-                .render(&company(), "20260802", "20260802", None)
+                .render(
+                    &company(),
+                    &tally_date("20260802"),
+                    &tally_date("20260802"),
+                    None,
+                )
                 .unwrap(),
         ],
     );
@@ -1599,7 +1734,11 @@ async fn a_sibling_as_wide_as_a_refused_part_is_split_without_being_sent() {
         outcome.reads,
         ["20260801", "20260802", "20260803", "20260804"].map(|day| part(day, day, None))
     );
-    let render = |from, to| shape.render(&company(), from, to, None).unwrap();
+    let render = |from, to| {
+        shape
+            .render(&company(), &tally_date(from), &tally_date(to), None)
+            .unwrap()
+    };
     assert_eq!(observed.len(), 34);
     assert_requests(
         &observed,
@@ -1664,7 +1803,11 @@ async fn a_sibling_narrower_than_every_refused_part_is_read() {
             part("20260804", "20260805", None),
         ]
     );
-    let render = |from, to| shape.render(&company(), from, to, None).unwrap();
+    let render = |from, to| {
+        shape
+            .render(&company(), &tally_date(from), &tally_date(to), None)
+            .unwrap()
+    };
     assert_eq!(observed.len(), 28);
     assert_requests(
         &observed,
@@ -1756,8 +1899,20 @@ async fn a_small_book_sends_the_same_voucher_request_as_before_the_bound() {
         &[5, 11, 13],
         &[
             render_agent_company_high_water(&company()),
-            render_agent_vouchers(&company(), "20260801", "20260831", None).unwrap(),
-            render_agent_vouchers(&company(), "20260801", "20260831", None).unwrap(),
+            render_agent_vouchers(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260831"),
+                None,
+            )
+            .unwrap(),
+            render_agent_vouchers(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260831"),
+                None,
+            )
+            .unwrap(),
         ],
     );
 }
@@ -2110,8 +2265,8 @@ async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
         request_sha(
             &render_agent_voucher_census(
                 &company(),
-                "20260801",
-                "20260801",
+                &tally_date("20260801"),
+                &tally_date("20260801"),
                 Some(AlterIdSpan {
                     after: 0,
                     through: 8
@@ -2193,7 +2348,7 @@ fn a_census_row_with_alterid_zero_is_refused() {
     );
     assert_ne!(zero, three_vouchers());
     assert_eq!(
-        parse_voucher_census(&zero, ("20260801", "20260801"), None),
+        parse_voucher_census(&zero, (day("20260801"), day("20260801")), None),
         Err("agent_read_protocol_invalid".to_string())
     );
 }
@@ -2892,8 +3047,20 @@ async fn education_refuses_a_window_starting_on_an_unaccepted_day_before_sending
     );
     assert_eq!(observed.len(), 10);
     let part = [
-        render_agent_vouchers(&company(), "20260405", "20260405", None).unwrap(),
-        render_agent_vouchers_in_span(&company(), "20260405", "20260405", None).unwrap(),
+        render_agent_vouchers(
+            &company(),
+            &tally_date("20260405"),
+            &tally_date("20260405"),
+            None,
+        )
+        .unwrap(),
+        render_agent_vouchers_in_span(
+            &company(),
+            &tally_date("20260405"),
+            &tally_date("20260405"),
+            None,
+        )
+        .unwrap(),
     ];
     assert!(observed.iter().all(|request| part
         .iter()
@@ -2961,7 +3128,13 @@ async fn an_education_plan_with_an_unaccepted_part_boundary_is_refused_before_an
     assert_requests(
         &observed,
         &[1],
-        &[render_agent_voucher_census(&company(), "20260801", "20260831", None).unwrap()],
+        &[render_agent_voucher_census(
+            &company(),
+            &tally_date("20260801"),
+            &tally_date("20260831"),
+            None,
+        )
+        .unwrap()],
     );
 }
 
@@ -2982,7 +3155,11 @@ fn the_refused_education_plan_divides_on_days_education_does_not_honour() {
     )
     .unwrap();
     assert_eq!(
-        stack_of(&plan).into_iter().rev().collect::<Vec<_>>(),
+        stack_of(&plan)
+            .unwrap()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>(),
         [
             part("20260801", "20260801", None),
             part("20260802", "20260809", None),
@@ -3077,7 +3254,8 @@ fn a_part_not_admitted_names_its_cause_and_a_census_mismatch_its_counts() {
             through: 1,
         }),
     );
-    let window = (day("20260801"), day("20260802"));
+    let (from, to) = (tally_date("20260801"), tally_date("20260802"));
+    let window = (&from, &to);
     for (part, rows, expected) in [
         (&day_one, vec![], Err((PART_CENSUS_MISMATCH, Some((0, 2))))),
         (
@@ -3188,7 +3366,7 @@ async fn a_census_mismatch_reaches_the_caller_with_its_counts() {
 async fn only_a_census_with_guids_makes_a_window_counted() {
     let window = ("20260801", "20260801");
     let with_guids = WindowCensus::from_census_rows(
-        parse_voucher_census(&three_vouchers(), window, None).unwrap(),
+        parse_voucher_census(&three_vouchers(), (day(window.0), day(window.1)), None).unwrap(),
     )
     .unwrap();
     let ids_only = WindowCensus::from_rows((1..=3).map(|id| (day("20260801"), id)));
@@ -3999,8 +4177,8 @@ async fn an_audit_window_admits_its_data_against_the_census_it_read() {
 #[test]
 fn window_timings_drop_only_their_parts_when_over_the_allowance() {
     let part = PartTiming {
-        from: "20260801".into(),
-        to: "20260801".into(),
+        from: tally_date("20260801"),
+        to: tally_date("20260801"),
         after: None,
         through: None,
         served: true,
@@ -4009,8 +4187,8 @@ fn window_timings_drop_only_their_parts_when_over_the_allowance() {
         ms: 5,
     };
     let timings = WindowReadTimings {
-        from: "20260801".into(),
-        to: "20260801".into(),
+        from: tally_date("20260801"),
+        to: tally_date("20260801"),
         marks: RequestTally { requests: 1, ms: 2 },
         census: RequestTally { requests: 3, ms: 4 },
         parts: vec![part; 3],

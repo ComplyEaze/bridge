@@ -599,12 +599,14 @@ fn parse_voucher_rows(
                             Value::Bool(required_tally_bool(row.get("ISCANCELLED"))?);
                         parsed["optional"] =
                             Value::Bool(required_tally_bool(row.get("ISOPTIONAL"))?);
-                        // Unlike ISCANCELLED/ISOPTIONAL, a real capture has shown Tally
-                        // omitting ISPOSTDATED entirely rather than asserting "No" on every
-                        // voucher. required_tally_bool would refuse the whole read on that
-                        // shape; that is right for a tag known to always be present, but
-                        // wrong here; it would turn "Tally did not say" into a hard failure
-                        // instead of a legible unknown. So this field is optional like
+                        // Unlike ISCANCELLED/ISOPTIONAL, ISPOSTDATED is left out by a source
+                        // that does not report it: one old committed capture did, because it
+                        // was taken before the tag was in the fetch list and never asked for
+                        // it (protocol reference 8.2c records Tally asserting it on every
+                        // voucher once the fetch list asks). required_tally_bool would refuse
+                        // the whole read on that shape; that is right for a tag known to always
+                        // be present, but wrong here; it would turn "Tally did not say" into a
+                        // hard failure instead of a legible unknown. So this field is optional like
                         // EFFECTIVEDATE above: an absent or empty element is not observed and
                         // the key is omitted, never invented as `false`. A present value must
                         // be Yes/No: an unrecognised value refuses the read rather than

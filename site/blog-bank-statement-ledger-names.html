@@ -140,7 +140,7 @@
 <div class="lane__you"><b class="lane__who">You</b>
 <p>Look in Tally before you import again; the duplicate check has holes.</p></div>
 <div class="lane__br"><b class="lane__who">ComplyEaze Bridge</b>
-<p>Writes a voucher file on your computer and sends it nowhere.</p></div></li>
+<p>Reads the book’s ledger list again, then writes a voucher file on your computer. It posts nothing.</p></div></li>
 <li class="lane__row">
 <h3><a class="plain" href="#s5">5. Get it into Tally</a></h3>
 <div class="lane__you"><b class="lane__who">You</b>
@@ -167,7 +167,7 @@
 <p>A long number, as in the example above, counts when it is a run of eight or more digits standing alone, or a code of at least eight letters and digits with at least three digits and two letters. Dates and period labels do not count.</p>
 <p>Fix the names, then go on. The assistant can misread a name or pick a wrong ledger, so you choose the ledger and you check the choice.</p>
 <h2 id="s4">4. Prepare the file</h2>
-<p>It writes a voucher file on your computer, with Payment, Receipt or Contra vouchers. It sends it nowhere. Where the statement carries a bank reference, the tool writes it into the voucher’s narration, and the files have no separate voucher number or reference.</p>
+<p>It reads the book’s ledger list again, then writes a voucher file on your computer, with Payment, Receipt or Contra vouchers. It posts nothing. Where the statement carries a bank reference, the tool writes it into the voucher’s narration, and the files have no separate voucher number or reference.</p>
 <p>It refuses to build a row it already knows it sent or found posted. That knowledge has holes.</p>
 <figure class="fig">
 <div class="paths paths--one">
@@ -185,11 +185,18 @@
 <p>Import the file yourself. Open the right company, then Gateway of Tally, Import, Vouchers. ComplyEaze Bridge does not do this step. It can post a voucher itself, but only one per batch, so that route does not suit a statement with several rows (the limits are below).</p>
 <h2 id="s6">6. Read it back, then look in Tally</h2>
 <p>Ask Claude to read the batch back from Tally. A read-back asks Tally to show what it now holds. ComplyEaze Bridge compares the date, voucher type and entries and reports anything missing, different or duplicated. A match does not mean the entry is correct, complete or compliant, and it does not compare every field. Open Tally, check the bank ledger against the statement, and look at what went to suspense.</p>
+<h2 id="worked">One run on made-up books, as far as we have taken it</h2>
+<p>On 4 and 5 October 2026 we ran steps 1 to 4 once on a Mac. The extension was the 0.4.2 build made for the release candidate, not the published file. Tally was TallyPrime Silver 7.1 holding made-up books. The statement was the synthetic HDFC-format PDF our release check uses: six rows, no real party. Our dated notes, kept privately, are the record.</p>
+<ol>
+<li><b>Read.</b> Six rows read. The credits (110,000.00), the debits (8,800.00) and the closing balance (102,200.00) matched the figures we supplied, and the running balance was right on every row. We gave no mapping, so all six rows went to suspense.</li>
+<li><b>First book.</b> The name check found no ledger called “Suspense”, with no candidate. The bank ledger name we first typed came back close, not equal, with one candidate. Building the file was refused (<code>masters_not_exact</code>) and no file was written.</li>
+<li><b>Second book.</b> The check said the same of “Suspense”, and its one candidate for the bank ledger was “Test Bank”. “Suspense” was then created in Tally by a separate one-ledger import, outside this tool (the tool never creates ledgers), and we chose “Test Bank” ourselves; the tool did not pick it. Both names came back exact. The tool wrote a file of six vouchers, four Payments and two Receipts, with debits and credits equal at 118,800.00 and all six counterparty lines in suspense. It warned that amounts land On Account, and that the company named inside the file does not aim a hand import, because Tally posts into whichever company is current.</li></ol>
+<p>What this run does not show. We have not yet imported that file or read it back, so steps 5 and 6 are not recorded. It was one made-up statement from one bank, on one build, with the extension we installed from the release candidate. No real statement, no SBI or Union Bank of India file and no Windows run is in it, and the whole path has not been recorded end to end.</p>
 <h2 id="before">Before you try it</h2>
 <p>You need TallyPrime and Claude Desktop on the same computer, Windows (x64) or an Apple Silicon Mac (on a Mac, TallyPrime runs in a Windows virtual machine, with the connection forwarded locally). You need ComplyEaze Bridge installed, with the Terms of Use accepted in its settings, the company open in Tally, and a password-protected PDF statement from SBI, HDFC or Union Bank of India. No other bank is read.</p>
 <div class="onrecord">
 <p class="onrecord__h">What we have on record</p>
-<p>We are still developing it. It is not yet code-signed, and we have not yet run the published 0.4.1 file in Claude Desktop. Files of this shape, built by hand and not by this tool, went into TallyPrime Gold 7.1 through Gateway of Tally, Import, Vouchers on 10 September: 147 Payments, Receipts and Contras in four files, every one created, and each bank ledger’s totals matched its statement on read-back. Our README records no run of this tool itself on a real bank statement; the release check parses a synthetic one. So try it on a test company, with a backup.</p>
+<p>We are still developing it. It is not yet code-signed, and we have not yet run the published 0.4.1 file in Claude Desktop. Files of this shape, built by hand and not by this tool, went into TallyPrime Gold 7.1 through Gateway of Tally, Import, Vouchers on 10 September: 147 Payments, Receipts and Contras in four files, every one created, and each bank ledger’s totals matched its statement on read-back. Our README records no run of this tool itself on a real bank statement; the release check parses a synthetic one. On 4 and 5 October we took steps 1 to 4 once, with the 0.4.2 release candidate, on a synthetic statement and made-up books, as described above; we have not imported that file. So try it on a test company, with a backup.</p>
 <p>This post is about release 0.4.1. If you have 0.3.0 or 0.4.0, remove it and install 0.4.1 or later first, because the bank-statement tool in those had a flaw about network paths (the security page describes it).</p></div>
 <h2 id="limits">Limits to know before you rely on it</h2>
 <dl class="limits">

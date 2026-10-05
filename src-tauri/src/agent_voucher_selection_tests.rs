@@ -1182,4 +1182,8 @@ async fn an_amount_search_over_a_window_with_a_withheld_voucher_stays_partial() 
         json!({"amount_entries": [0, 1]})
     );
     assert_eq!(result["withheld_total"], 1);
+    assert!(result["coverage"]
+        .as_str()
+        .unwrap()
+        .contains("an amount search keeps every withheld voucher"));
 }

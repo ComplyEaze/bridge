@@ -5161,6 +5161,9 @@ async fn a_month_summary_replaces_items_with_buckets_and_keeps_the_window_label(
         result["totals"],
         json!({"debit": "-306.06", "credit": "306.06"})
     );
+    assert_eq!(result["post_dated_included"], 0);
+    assert!(result["basis"].as_str().unwrap().contains("memorandum"));
+    assert_eq!(result["buckets"][0]["position"], 1);
     assert_eq!(
         result["excluded_from_buckets"],
         json!({"cancelled": 0, "optional": 0, "no_accounting_entries": 0})

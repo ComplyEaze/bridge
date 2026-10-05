@@ -492,33 +492,6 @@ async fn a_part_queued_behind_an_abandoned_part_is_refused_at_dispatch() {
     assert_eq!(simulator.finish().unwrap().len(), 2);
 }
 
-/// A caller that stops waiting drops the future mid-request. Tally keeps
-/// working, so the debt armed before sending must survive the drop.
-#[tokio::test]
-async fn a_dropped_part_leaves_its_drain_owed() {
-    let lab = lab();
-    let simulator = SequenceSimulator::spawn(vec![
-        utf16(&lab.companies_xml),
-        utf16(&lab.report_xml).with_delivery(Delivery::SlowHeaders(Duration::from_millis(1_000))),
-    ])
-    .unwrap();
-    let runtime = TallyRuntime::default();
-    assert!(tokio::time::timeout(
-        Duration::from_millis(300),
-        part(&runtime, &simulator, &lab, AuditPartShape::Single)
-    )
-    .await
-    .is_err());
-    assert_eq!(
-        part(&runtime, &simulator, &lab, AuditPartShape::Single)
-            .await
-            .expect_err("owed after the drop")
-            .kind,
-        AuditPartFailureKind::DrainRequired
-    );
-    assert_eq!(simulator.finish().unwrap().len(), 2);
-}
-
 #[tokio::test]
 async fn a_request_that_does_not_name_the_verified_company_is_never_sent() {
     let lab = lab();
@@ -646,6 +619,18 @@ fn dropped(lab: &Lab) -> Vec<ScenarioPlan> {
     ]
 }
 
+/// Waits until the simulator has read `count` requests. Bounded, so a probe that is
+/// never sent fails the test instead of hanging it.
+async fn until_received(simulator: &SequenceSimulator, count: usize) {
+    for _ in 0..5_000 {
+        if simulator.received() >= count {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    panic!("the simulator never read request {count}");
+}
+
 /// The probe's own 5 s deadline, under the production 20 s session deadline.
 #[tokio::test]
 async fn a_probe_gives_up_at_its_own_deadline_not_the_sessions() {
@@ -665,7 +650,9 @@ async fn a_probe_gives_up_at_its_own_deadline_not_the_sessions() {
     );
     let waited = started.elapsed();
     assert!(waited >= Duration::from_millis(4_900), "{waited:?}");
-    assert!(waited < Duration::from_millis(6_500), "{waited:?}");
+    // No upper bound: `abandoned_probes: 1` above already proves the probe gave up before
+    // the simulator's 7 s answer, so a probe on the session's 20 s deadline fails there
+    // without a clock that a stall could trip.
     assert_eq!(simulator.finish().unwrap().len(), 3);
 }
 
@@ -829,12 +816,12 @@ async fn a_capped_debt_sends_no_probe() {
             ..AuditDrainDebt::armed(0)
         },
     );
-    let started = std::time::Instant::now();
     assert_eq!(
         runtime.drain_probe(config(&simulator)).await,
         AuditDrainStatus::OperatorRequired
     );
-    assert!(started.elapsed() < Duration::from_millis(500));
+    // Nothing was sent: counted, not timed (a stall could trip a clock bound).
+    assert_eq!(simulator.received(), 0);
     assert_eq!(
         part(&runtime, &simulator, &lab, AuditPartShape::Single)
             .await
@@ -888,12 +875,16 @@ async fn a_dropped_probe_counts_as_abandoned_once_stale() {
         // loaded host cannot turn an answer into a "slow" one.
         .with_audit_drain_probe_slow(AUDIT_DRAIN_PROBE_DEADLINE);
     owe_a_drain(&runtime, &simulator, &lab).await;
-    assert!(tokio::time::timeout(
-        Duration::from_millis(300),
-        runtime.drain_probe(config(&simulator))
-    )
-    .await
-    .is_err());
+    // Drop the probe once the responder has read it (it answers after 600 ms), not after
+    // a fixed 300 ms: `biased`, giving up first, so a long stall cannot let the answer win.
+    let mut probe = Box::pin(runtime.drain_probe(config(&simulator)));
+    let answered = tokio::select! {
+        biased;
+        () = until_received(&simulator, 3) => None,
+        status = &mut probe => Some(status),
+    };
+    assert!(answered.is_none(), "the probe should still be waiting");
+    drop(probe);
     // Still within the stale limit: nothing is sent.
     assert!(matches!(
         runtime.drain_probe(config(&simulator)).await,

@@ -1,0 +1,395 @@
+{
+ "comment": "related_parties_cl23: one person, four configured natures. salary and other are payable natures whose Trial Balance rows satisfy paid = opening payable + accrued - closing payable; rent and interest are not payable. The other set holds a ledger with no Trial Balance row, touched only by a post-dated voucher. An optional accrual on the salary set is excluded. A nature outside the fixed vocabulary (commission) and a payable nature outside it (bonus) are ignored; purchases is listed as payable but has no ledgers, so no payable figures. The salary net is negative.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Indirect Incomes": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Sundry Creditors": "Current Liabilities"
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_core-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_core-001"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-rp_core-002"
+  },
+  {
+   "name": "Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_core-003"
+  },
+  {
+   "name": "Person A Advance",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_core-004"
+  },
+  {
+   "name": "Person A Commission Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-rp_core-005"
+  },
+  {
+   "name": "Person A Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-rp_core-006"
+  },
+  {
+   "name": "Person A Loan Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_core-007"
+  },
+  {
+   "name": "Person A Salary Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-rp_core-008"
+  },
+  {
+   "name": "Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_core-009"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-rp_core-010"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Rent",
+   "opening": 0,
+   "debit": 4800000,
+   "credit": 0,
+   "closing": 4800000
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 60000000,
+   "debit": 30000000,
+   "credit": 16810000,
+   "closing": 73190000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -6990000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -6990000
+  },
+  {
+   "ledger": "Commission",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Person A Commission Payable",
+   "opening": -10000,
+   "debit": 1010000,
+   "credit": 1000000,
+   "closing": 0
+  },
+  {
+   "ledger": "Person A Loan",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 4000000,
+   "closing": -54000000
+  },
+  {
+   "ledger": "Person A Loan Interest",
+   "opening": 0,
+   "debit": 4000000,
+   "credit": 0,
+   "closing": 4000000
+  },
+  {
+   "ledger": "Person A Salary Payable",
+   "opening": -3000000,
+   "debit": 11000000,
+   "credit": 12000000,
+   "closing": -4000000
+  },
+  {
+   "ledger": "Salary",
+   "opening": 0,
+   "debit": 12000000,
+   "credit": 0,
+   "closing": 12000000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 30000000,
+   "closing": -30000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     30000000
+    ],
+    [
+     "Sales",
+     -30000000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2025-04-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Alpha Rent",
+     2400000
+    ],
+    [
+     "Bank A",
+     -2400000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Salary",
+     6000000
+    ],
+    [
+     "Person A Salary Payable",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-07-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person A Salary Payable",
+     5000000
+    ],
+    [
+     "Bank A",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2025-10-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Alpha Rent",
+     2400000
+    ],
+    [
+     "Bank A",
+     -2400000
+    ]
+   ]
+  },
+  {
+   "guid": "j02",
+   "date": "2025-12-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Salary",
+     6000000
+    ],
+    [
+     "Person A Salary Payable",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2026-01-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person A Salary Payable",
+     6000000
+    ],
+    [
+     "Bank A",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "j04",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Person A Loan Interest",
+     4000000
+    ],
+    [
+     "Person A Loan",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "j05",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Commission",
+     1000000
+    ],
+    [
+     "Person A Commission Payable",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "p05",
+   "date": "2026-03-31",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person A Commission Payable",
+     1010000
+    ],
+    [
+     "Bank A",
+     -1010000
+    ]
+   ]
+  },
+  {
+   "guid": "j03",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "status": "optional",
+   "lines": [
+    [
+     "Salary",
+     500000
+    ],
+    [
+     "Person A Salary Payable",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "p06",
+   "date": "2026-03-20",
+   "base_type": "Payment",
+   "status": "postdated",
+   "lines": [
+    [
+     "Person A Advance",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ],
+ "related_parties": {
+  "Person A": {
+   "relationship": "brother of the proprietor",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person A Salary Payable"
+    ],
+    "rent": [
+     "Alpha Rent"
+    ],
+    "interest": [
+     "Person A Loan Interest"
+    ],
+    "other": [
+     "Person A Commission Payable",
+     "Person A Advance"
+    ],
+    "commission": [
+     "Commission"
+    ]
+   },
+   "payable_natures": [
+    "salary",
+    "other",
+    "bonus",
+    "purchases"
+   ]
+  }
+ }
+}

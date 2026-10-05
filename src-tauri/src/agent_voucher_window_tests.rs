@@ -10,12 +10,14 @@ use super::*;
 
 #[test]
 fn a_window_span_counts_both_endpoints() {
-    assert_eq!(window_span_days("20260401", "20260401"), Some(1));
-    assert_eq!(window_span_days("20260401", "20260402"), Some(2));
-    assert_eq!(window_span_days("20260401", "20270331"), Some(365));
+    let span = |from: &str, to: &str| window_span_days(&tally_date(from), &tally_date(to));
+    assert_eq!(span("20260401", "20260401"), Some(1));
+    assert_eq!(span("20260401", "20260402"), Some(2));
+    assert_eq!(span("20260401", "20270331"), Some(365));
     // A leap year is counted by the calendar, not by arithmetic on months.
-    assert_eq!(window_span_days("20240101", "20241231"), Some(366));
-    assert_eq!(window_span_days("notadate", "20260401"), None);
+    assert_eq!(span("20240101", "20241231"), Some(366));
+    // A window ending before it starts has no span.
+    assert_eq!(span("20260402", "20260401"), None);
 }
 
 #[test]
@@ -49,24 +51,32 @@ fn splitting_a_verification_window_partitions_it_exactly() {
         ("20251231", "20260101"), // across a year boundary
     ] {
         let ((left_from, left_to), (right_from, right_to)) =
-            split_verification_window(from, to).expect("a multi-day window splits");
-        assert_eq!(left_from, from, "left half must start where the window did");
-        assert_eq!(right_to, to, "right half must end where the window did");
-        let day = |value: &str| chrono::NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
+            split_verification_window(&tally_date(from), &tally_date(to))
+                .expect("a multi-day window splits");
+        assert_eq!(
+            left_from.as_str(),
+            from,
+            "left half must start where the window did"
+        );
+        assert_eq!(
+            right_to.as_str(),
+            to,
+            "right half must end where the window did"
+        );
         // Contiguous, no gap and no overlap: the right half starts exactly the day
         // after the left half ends.
         assert_eq!(
-            day(&right_from),
-            day(&left_to) + chrono::Duration::days(1),
+            day(right_from.as_str()),
+            day(left_to.as_str()) + chrono::Duration::days(1),
             "{from}..{to} split with a gap or an overlap"
         );
         // And it must actually shrink, or the splitter would never terminate.
         assert!(
-            day(&left_to) < day(to),
+            day(left_to.as_str()) < day(to),
             "left half did not shrink {from}..{to}"
         );
         assert!(
-            day(&right_from) > day(from),
+            day(right_from.as_str()) > day(from),
             "right half did not shrink {from}..{to}"
         );
     }
@@ -77,11 +87,20 @@ fn a_single_day_verification_window_cannot_be_split() {
     // The recursion floor. Without it the splitter would spin on a day it cannot
     // read; with it, read_verification_window refuses rather than returning a
     // verification over an incomplete window.
-    assert_eq!(split_verification_window("20260401", "20260401"), None);
+    let split =
+        |from: &str, to: &str| split_verification_window(&tally_date(from), &tally_date(to));
+    assert_eq!(split("20260401", "20260401"), None);
     // A reversed window is refused rather than silently inverted.
-    assert_eq!(split_verification_window("20260430", "20260401"), None);
-    // An unparseable bound is refused rather than guessed at.
-    assert_eq!(split_verification_window("notadate", "20260401"), None);
+    assert_eq!(split("20260430", "20260401"), None);
+    // The last day Tally can name splits like any other window, without
+    // stepping past it.
+    assert_eq!(
+        split("99991230", "99991231"),
+        Some((
+            (tally_date("99991230"), tally_date("99991230")),
+            (tally_date("99991231"), tally_date("99991231"))
+        ))
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +280,70 @@ fn a_day_too_heavy_for_one_read_is_divided_by_alterid_not_refused() {
     assert_eq!(spans.last().unwrap().span.unwrap().through, ceiling);
 }
 
+/// #861: a planning day becomes a request's date only through `stamp`, which
+/// refuses a day no `YYYYMMDD` date can name by the code `TallyDate::next_day`
+/// uses, rather than rendering it or panicking.
+#[test]
+fn a_planning_day_is_stamped_as_a_tally_date_or_refused_as_overflow() {
+    for date in ["20260401", "20240229", "00010101", "99991231"] {
+        assert_eq!(stamp(day(date)).unwrap(), tally_date(date));
+    }
+    assert!(matches!(
+        tally_date("99991231").next_day(),
+        Err(bridge_tally_core::TallyError::InvalidData { code }) if code == TALLY_DATE_OVERFLOW
+    ));
+    for beyond in [
+        NaiveDate::from_ymd_opt(10_000, 1, 1).unwrap(),
+        NaiveDate::from_ymd_opt(0, 12, 31).unwrap(),
+        NaiveDate::from_ymd_opt(-1, 6, 15).unwrap(),
+    ] {
+        assert_eq!(
+            stamp(beyond).unwrap_err().code,
+            TALLY_DATE_OVERFLOW,
+            "{beyond}"
+        );
+    }
+}
+
+/// #861: a window ending on the last day Tally can name is planned and stamped
+/// without stepping past it, through the AlterID-span path that advances the
+/// planner to the following day. A planned read that did reach past it is
+/// refused by its typed code when the plan becomes parts, so no part, and
+/// therefore no request, exists to render.
+#[test]
+fn a_window_ending_on_the_last_tally_day_never_yields_a_part_past_it() {
+    // Capacity 10: the 25-voucher last day is read alone, in AlterID spans.
+    let census = census_of(&[("99991230", 3), ("99991231", 25)]);
+    let reads = plan_window_reads(
+        day("99991230"),
+        day("99991231"),
+        &census,
+        None,
+        40,
+        100,
+        1000,
+        8,
+    )
+    .unwrap();
+    assert_tiles(&reads, "99991230", "99991231", 40);
+    let parts = stack_of(&reads).unwrap();
+    assert_eq!(parts.len(), reads.len());
+    assert!(parts.iter().all(|part| part.to <= tally_date("99991231")));
+    let past = PlannedRead {
+        from: day("99991231"),
+        to: NaiveDate::from_ymd_opt(10_000, 1, 1).unwrap(),
+        span: None,
+        vouchers: 0,
+    };
+    assert_eq!(past.part().unwrap_err().code, TALLY_DATE_OVERFLOW);
+    let mut reaching_past = reads;
+    reaching_past.push(past);
+    assert_eq!(
+        stack_of(&reaching_past).unwrap_err().code,
+        TALLY_DATE_OVERFLOW
+    );
+}
+
 #[test]
 fn only_a_single_voucher_over_budget_is_refused() {
     let one = census_of(&[("20260401", 1)]);
@@ -434,10 +517,12 @@ fn the_conservative_defaults_stay_above_every_measured_per_voucher_cost() {
 fn a_part_tally_cannot_serve_is_halved_by_date_then_by_alterid() {
     let census = census_of(&[("20260401", 4), ("20260402", 1)]);
     let part = |from: &str, to: &str, span| WindowPart {
-        from: from.into(),
-        to: to.into(),
+        from: tally_date(from),
+        to: tally_date(to),
         span,
     };
+    let halve_part =
+        |part: &WindowPart, census, ceiling| halve_part(part, census, ceiling).unwrap();
     // A date range halves by date.
     assert_eq!(
         halve_part(&part("20260401", "20260402", None), Some(&census), 5),
@@ -601,13 +686,14 @@ fn a_relabelled_response_describes_the_vouchers_it_names() {
     assert_eq!(rows[0]["alter_id"], 7);
     assert_eq!(rows[1]["date"], "20260804");
     assert_eq!(rows[1].window_master_id(), Ok(Some(9)));
-    let census = parse_voucher_census(&xml, ("20260803", "20260804"), None).unwrap();
+    let census = parse_voucher_census(&xml, (day("20260803"), day("20260804")), None).unwrap();
     assert_eq!(census[0].guid, rows[0]["guid"].as_str().unwrap());
 }
 
 #[test]
 fn the_census_reads_a_captured_voucher_row_and_ignores_cmpinfo() {
-    let rows = parse_voucher_census(&three_vouchers(), ("20260801", "20260802"), None).unwrap();
+    let rows =
+        parse_voucher_census(&three_vouchers(), (day("20260801"), day("20260802")), None).unwrap();
     assert!(rows.iter().all(|row| !row.guid.is_empty()));
     assert_eq!(
         rows.iter()
@@ -623,7 +709,7 @@ fn the_census_reads_a_captured_voucher_row_and_ignores_cmpinfo() {
     let empty = empty_collection();
     assert!(empty.contains("<VOUCHER>0</VOUCHER>"));
     assert_eq!(
-        parse_voucher_census(&empty, ("20260801", "20260802"), None),
+        parse_voucher_census(&empty, (day("20260801"), day("20260802")), None),
         Ok(vec![])
     );
 }
@@ -632,13 +718,13 @@ fn the_census_reads_a_captured_voucher_row_and_ignores_cmpinfo() {
 fn a_census_that_does_not_describe_what_was_asked_is_refused() {
     let xml = three_vouchers();
     assert_eq!(
-        parse_voucher_census(&xml, ("20260802", "20260803"), None),
+        parse_voucher_census(&xml, (day("20260802"), day("20260803")), None),
         Err("window_not_honoured".to_string())
     );
     assert_eq!(
         parse_voucher_census(
             &xml,
-            ("20260801", "20260801"),
+            (day("20260801"), day("20260801")),
             Some(AlterIdSpan {
                 after: 1,
                 through: 3
@@ -649,17 +735,18 @@ fn a_census_that_does_not_describe_what_was_asked_is_refused() {
     let undated = xml.replacen("<DATE TYPE=\"Date\">20260801</DATE>", "", 1);
     assert_ne!(undated, xml);
     assert_eq!(
-        parse_voucher_census(&undated, ("20260801", "20260801"), None),
+        parse_voucher_census(&undated, (day("20260801"), day("20260801")), None),
         Err("agent_read_protocol_invalid".to_string())
     );
     // A census row without its GUID cannot admit the part it counts.
-    let first_guid = parse_voucher_census(&xml, ("20260801", "20260801"), None).unwrap()[0]
-        .guid
-        .clone();
+    let first_guid = parse_voucher_census(&xml, (day("20260801"), day("20260801")), None).unwrap()
+        [0]
+    .guid
+    .clone();
     let unidentified = xml.replacen(&format!("<GUID>{first_guid}</GUID>"), "", 1);
     assert_ne!(unidentified, xml);
     assert_eq!(
-        parse_voucher_census(&unidentified, ("20260801", "20260801"), None),
+        parse_voucher_census(&unidentified, (day("20260801"), day("20260801")), None),
         Err("agent_read_protocol_invalid".to_string())
     );
 }
@@ -701,7 +788,11 @@ fn an_unobservable_high_water_mark_is_not_read_as_an_empty_book() {
 
 #[test]
 fn an_undivided_read_is_byte_identical_to_the_request_before_the_bound() {
-    let (company, from, to) = ("Synthetic Book", "20260401", "20260430");
+    let (company, from, to) = (
+        "Synthetic Book",
+        &tally_date("20260401"),
+        &tally_date("20260430"),
+    );
     assert_eq!(
         VoucherReadShape::EntryWildcard
             .render(company, from, to, None)
@@ -748,8 +839,13 @@ fn an_undivided_read_is_byte_identical_to_the_request_before_the_bound() {
 
 #[test]
 fn the_census_request_is_an_admitted_light_collection_export() {
-    let dated =
-        render_agent_voucher_census("Synthetic & Book", "20260401", "20260430", None).unwrap();
+    let dated = render_agent_voucher_census(
+        "Synthetic & Book",
+        &tally_date("20260401"),
+        &tally_date("20260430"),
+        None,
+    )
+    .unwrap();
     assert!(crate::tally::agent_read_request::AgentReadRequest::parse(dated.clone()).is_ok());
     assert!(dated.contains("<FETCH>GUID,ALTERID,DATE</FETCH>"));
     assert!(dated.contains("Synthetic &amp; Book"));
@@ -757,8 +853,8 @@ fn the_census_request_is_an_admitted_light_collection_export() {
         .contains("$Date &gt;= $$Date:\"20260401\" AND $Date &lt;= $$Date:\"20260430\"</SYSTEM>"));
     let spanned = render_agent_voucher_census(
         "Synthetic & Book",
-        "20260401",
-        "20260401",
+        &tally_date("20260401"),
+        &tally_date("20260401"),
         Some(AlterIdSpan {
             after: 0,
             through: 4096,
@@ -934,6 +1030,48 @@ async fn read_window(
     (outcome, simulator.finish().unwrap())
 }
 
+/// #861: a window date that is not a Tally date is refused where it enters
+/// the window layer, by its typed code, before any request is sent.
+#[tokio::test]
+async fn a_window_date_that_is_not_a_tally_date_is_refused_before_any_request() {
+    for (from, to) in [
+        ("20261301", "20261302"),
+        ("20260801", "2026-08-02"),
+        ("20260229", "20260301"),
+    ] {
+        let simulator = SequenceSimulator::spawn(
+            divided_window_reads(marks_plan(3, 7))
+                .iter()
+                .flat_map(paired)
+                .collect(),
+        )
+        .unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let identity = identity();
+        let outcome = server
+            .read_voucher_window(
+                &identity,
+                identity.display_name(),
+                from,
+                to,
+                VoucherReadShape::EntryWildcard,
+                WindowPlanSource::Estimate {
+                    known_marks: Some(marks_of(3)),
+                },
+                three_a_read(),
+                |xml| parse_agent_rows(xml, GUID),
+            )
+            .await;
+        assert_eq!(
+            outcome.err().map(|failure| failure.code),
+            Some("invalid_date_range".to_string()),
+            "{from}..{to}"
+        );
+        assert_eq!(simulator.received(), 0, "{from}..{to}: nothing was sent");
+    }
+}
+
 /// The request bodies of the data POSTs among `observed`, by the six-leg pattern:
 /// only a leg at offset 1 of a paired read.
 fn assert_requests(
@@ -953,8 +1091,8 @@ fn assert_requests(
 
 fn part(from: &str, to: &str, span: Option<AlterIdSpan>) -> WindowPart {
     WindowPart {
-        from: from.into(),
-        to: to.into(),
+        from: tally_date(from),
+        to: tally_date(to),
         span,
     }
 }
@@ -1127,8 +1265,8 @@ async fn an_unmeasured_book_is_planned_at_the_default_and_an_omitted_voucher_is_
         &[VoucherReadShape::EntryWildcard
             .render(
                 &company(),
-                "20260801",
-                "20260801",
+                &tally_date("20260801"),
+                &tally_date("20260801"),
                 Some(AlterIdSpan {
                     after: 0,
                     through: 1,
@@ -1191,8 +1329,20 @@ async fn a_book_whose_mark_fits_one_census_is_counted_in_one_date_census() {
         &observed,
         &[1, 7],
         &[
-            render_agent_voucher_census(&company(), "20260801", "20260801", None).unwrap(),
-            render_agent_vouchers(&company(), "20260801", "20260801", None).unwrap(),
+            render_agent_voucher_census(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260801"),
+                None,
+            )
+            .unwrap(),
+            render_agent_vouchers(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260801"),
+                None,
+            )
+            .unwrap(),
         ],
     );
 }
@@ -1226,8 +1376,8 @@ async fn a_book_one_voucher_past_one_census_is_counted_in_alterid_spans() {
         &[
             render_agent_voucher_census(
                 &company(),
-                "20260801",
-                "20260801",
+                &tally_date("20260801"),
+                &tally_date("20260801"),
                 Some(AlterIdSpan {
                     after: 0,
                     through: capacity,
@@ -1236,15 +1386,21 @@ async fn a_book_one_voucher_past_one_census_is_counted_in_alterid_spans() {
             .unwrap(),
             render_agent_voucher_census(
                 &company(),
-                "20260801",
-                "20260801",
+                &tally_date("20260801"),
+                &tally_date("20260801"),
                 Some(AlterIdSpan {
                     after: capacity,
                     through: capacity + 1,
                 }),
             )
             .unwrap(),
-            render_agent_vouchers(&company(), "20260801", "20260801", None).unwrap(),
+            render_agent_vouchers(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260801"),
+                None,
+            )
+            .unwrap(),
         ],
     );
 }
@@ -1483,7 +1639,13 @@ async fn a_census_the_transport_refuses_is_not_divided_but_refused() {
     assert_requests(
         &observed,
         &[1],
-        &[render_agent_voucher_census(&company(), "20260801", "20260802", None).unwrap()],
+        &[render_agent_voucher_census(
+            &company(),
+            &tally_date("20260801"),
+            &tally_date("20260802"),
+            None,
+        )
+        .unwrap()],
     );
 }
 #[tokio::test]
@@ -1558,13 +1720,28 @@ fn split_read_checks(
         &[1, 3, 9],
         &[
             shape
-                .render(&company(), "20260801", "20260802", None)
+                .render(
+                    &company(),
+                    &tally_date("20260801"),
+                    &tally_date("20260802"),
+                    None,
+                )
                 .unwrap(),
             shape
-                .render(&company(), "20260801", "20260801", None)
+                .render(
+                    &company(),
+                    &tally_date("20260801"),
+                    &tally_date("20260801"),
+                    None,
+                )
                 .unwrap(),
             shape
-                .render(&company(), "20260802", "20260802", None)
+                .render(
+                    &company(),
+                    &tally_date("20260802"),
+                    &tally_date("20260802"),
+                    None,
+                )
                 .unwrap(),
         ],
     );
@@ -1599,7 +1776,11 @@ async fn a_sibling_as_wide_as_a_refused_part_is_split_without_being_sent() {
         outcome.reads,
         ["20260801", "20260802", "20260803", "20260804"].map(|day| part(day, day, None))
     );
-    let render = |from, to| shape.render(&company(), from, to, None).unwrap();
+    let render = |from, to| {
+        shape
+            .render(&company(), &tally_date(from), &tally_date(to), None)
+            .unwrap()
+    };
     assert_eq!(observed.len(), 34);
     assert_requests(
         &observed,
@@ -1664,7 +1845,11 @@ async fn a_sibling_narrower_than_every_refused_part_is_read() {
             part("20260804", "20260805", None),
         ]
     );
-    let render = |from, to| shape.render(&company(), from, to, None).unwrap();
+    let render = |from, to| {
+        shape
+            .render(&company(), &tally_date(from), &tally_date(to), None)
+            .unwrap()
+    };
     assert_eq!(observed.len(), 28);
     assert_requests(
         &observed,
@@ -1756,8 +1941,20 @@ async fn a_small_book_sends_the_same_voucher_request_as_before_the_bound() {
         &[5, 11, 13],
         &[
             render_agent_company_high_water(&company()),
-            render_agent_vouchers(&company(), "20260801", "20260831", None).unwrap(),
-            render_agent_vouchers(&company(), "20260801", "20260831", None).unwrap(),
+            render_agent_vouchers(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260831"),
+                None,
+            )
+            .unwrap(),
+            render_agent_vouchers(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260831"),
+                None,
+            )
+            .unwrap(),
         ],
     );
 }
@@ -2110,8 +2307,8 @@ async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
         request_sha(
             &render_agent_voucher_census(
                 &company(),
-                "20260801",
-                "20260801",
+                &tally_date("20260801"),
+                &tally_date("20260801"),
                 Some(AlterIdSpan {
                     after: 0,
                     through: 8
@@ -2193,7 +2390,7 @@ fn a_census_row_with_alterid_zero_is_refused() {
     );
     assert_ne!(zero, three_vouchers());
     assert_eq!(
-        parse_voucher_census(&zero, ("20260801", "20260801"), None),
+        parse_voucher_census(&zero, (day("20260801"), day("20260801")), None),
         Err("agent_read_protocol_invalid".to_string())
     );
 }
@@ -2892,8 +3089,20 @@ async fn education_refuses_a_window_starting_on_an_unaccepted_day_before_sending
     );
     assert_eq!(observed.len(), 10);
     let part = [
-        render_agent_vouchers(&company(), "20260405", "20260405", None).unwrap(),
-        render_agent_vouchers_in_span(&company(), "20260405", "20260405", None).unwrap(),
+        render_agent_vouchers(
+            &company(),
+            &tally_date("20260405"),
+            &tally_date("20260405"),
+            None,
+        )
+        .unwrap(),
+        render_agent_vouchers_in_span(
+            &company(),
+            &tally_date("20260405"),
+            &tally_date("20260405"),
+            None,
+        )
+        .unwrap(),
     ];
     assert!(observed.iter().all(|request| part
         .iter()
@@ -2961,7 +3170,13 @@ async fn an_education_plan_with_an_unaccepted_part_boundary_is_refused_before_an
     assert_requests(
         &observed,
         &[1],
-        &[render_agent_voucher_census(&company(), "20260801", "20260831", None).unwrap()],
+        &[render_agent_voucher_census(
+            &company(),
+            &tally_date("20260801"),
+            &tally_date("20260831"),
+            None,
+        )
+        .unwrap()],
     );
 }
 
@@ -2982,7 +3197,11 @@ fn the_refused_education_plan_divides_on_days_education_does_not_honour() {
     )
     .unwrap();
     assert_eq!(
-        stack_of(&plan).into_iter().rev().collect::<Vec<_>>(),
+        stack_of(&plan)
+            .unwrap()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>(),
         [
             part("20260801", "20260801", None),
             part("20260802", "20260809", None),
@@ -3077,7 +3296,8 @@ fn a_part_not_admitted_names_its_cause_and_a_census_mismatch_its_counts() {
             through: 1,
         }),
     );
-    let window = (day("20260801"), day("20260802"));
+    let (from, to) = (tally_date("20260801"), tally_date("20260802"));
+    let window = (&from, &to);
     for (part, rows, expected) in [
         (&day_one, vec![], Err((PART_CENSUS_MISMATCH, Some((0, 2))))),
         (
@@ -3188,7 +3408,7 @@ async fn a_census_mismatch_reaches_the_caller_with_its_counts() {
 async fn only_a_census_with_guids_makes_a_window_counted() {
     let window = ("20260801", "20260801");
     let with_guids = WindowCensus::from_census_rows(
-        parse_voucher_census(&three_vouchers(), window, None).unwrap(),
+        parse_voucher_census(&three_vouchers(), (day(window.0), day(window.1)), None).unwrap(),
     )
     .unwrap();
     let ids_only = WindowCensus::from_rows((1..=3).map(|id| (day("20260801"), id)));
@@ -3999,8 +4219,8 @@ async fn an_audit_window_admits_its_data_against_the_census_it_read() {
 #[test]
 fn window_timings_drop_only_their_parts_when_over_the_allowance() {
     let part = PartTiming {
-        from: "20260801".into(),
-        to: "20260801".into(),
+        from: tally_date("20260801"),
+        to: tally_date("20260801"),
         after: None,
         through: None,
         served: true,
@@ -4009,8 +4229,8 @@ fn window_timings_drop_only_their_parts_when_over_the_allowance() {
         ms: 5,
     };
     let timings = WindowReadTimings {
-        from: "20260801".into(),
-        to: "20260801".into(),
+        from: tally_date("20260801"),
+        to: tally_date("20260801"),
         marks: RequestTally { requests: 1, ms: 2 },
         census: RequestTally { requests: 3, ms: 4 },
         parts: vec![part; 3],
@@ -4611,7 +4831,14 @@ async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
     let one = OneServer::spawn(plans);
     let ledger_match = json!({"ledger": "Cash", "matched": "case_or_spacing",
         "similar_ledgers": [], "similar_ledgers_total": 0});
-    let key = VoucherPageKey::new(&identity(), "20260801", "20260831", Some("cash"), None);
+    let key = VoucherPageKey::new(
+        &identity(),
+        "20260801",
+        "20260831",
+        Some("cash"),
+        None,
+        None,
+    );
     assert!(one
         .server
         .voucher_pages
@@ -4624,6 +4851,7 @@ async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
             window,
             None,
             Some(ledger_match.clone()),
+            Some("Cash".to_string()),
             None,
         ))));
     let second = one
@@ -4641,7 +4869,7 @@ async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
 fn a_held_window_is_found_by_its_own_question_only() {
     let identity = identity();
     let key = |ledger: Option<&str>, selector: Option<&VoucherTypeSelector>| {
-        VoucherPageKey::new(&identity, "20260801", "20260831", ledger, selector)
+        VoucherPageKey::new(&identity, "20260801", "20260831", ledger, selector, None)
     };
     let held = |key: VoucherPageKey| {
         Arc::new(VoucherPageSnapshot::new(
@@ -4649,6 +4877,7 @@ fn a_held_window_is_found_by_its_own_question_only() {
             marks_of(3),
             Arc::new(Vec::new()),
             Value::Null,
+            None,
             None,
             None,
             None,
@@ -4760,26 +4989,60 @@ async fn an_expired_or_oversized_window_is_not_held() {
 #[test]
 fn a_held_window_answers_one_question_only() {
     let identity = identity();
-    let base = || VoucherPageKey::new(&identity, "20260801", "20260831", None, None);
+    let base = || VoucherPageKey::new(&identity, "20260801", "20260831", None, None, None);
     assert_eq!(base(), base());
     assert_ne!(
         base(),
-        VoucherPageKey::new(&identity, "20260802", "20260831", None, None)
+        VoucherPageKey::new(&identity, "20260802", "20260831", None, None, None)
     );
     assert_ne!(
         base(),
-        VoucherPageKey::new(&identity, "20260801", "20260830", None, None)
+        VoucherPageKey::new(&identity, "20260801", "20260830", None, None, None)
     );
     assert_ne!(
         base(),
-        VoucherPageKey::new(&identity, "20260801", "20260831", Some("Cash"), None)
+        VoucherPageKey::new(&identity, "20260801", "20260831", Some("Cash"), None, None)
     );
     let sales = VoucherTypeSelector::Name("Sales".to_string());
     let purchase = VoucherTypeSelector::Name("Purchase".to_string());
-    let keyed =
-        |selector| VoucherPageKey::new(&identity, "20260801", "20260831", None, Some(selector));
+    let keyed = |selector| {
+        VoucherPageKey::new(
+            &identity,
+            "20260801",
+            "20260831",
+            None,
+            Some(selector),
+            None,
+        )
+    };
     assert_ne!(base(), keyed(&sales));
     assert_ne!(keyed(&sales), keyed(&purchase));
+    let searched = |args: Value| {
+        let search = VoucherSearch::from_args(&args, Redaction::None).unwrap();
+        VoucherPageKey::new(
+            &identity,
+            "20260801",
+            "20260831",
+            None,
+            None,
+            search.as_ref(),
+        )
+    };
+    assert_ne!(base(), searched(json!({"voucher_number": "1"})));
+    assert_ne!(
+        searched(json!({"voucher_number": "1"})),
+        searched(json!({"voucher_number": "2"}))
+    );
+    assert_eq!(
+        searched(json!({"amount": "5"})),
+        searched(json!({"amount": "5.00"}))
+    );
+    // A summary is its own question, and each grouping a different one.
+    assert_ne!(base(), base().with_summary(Some(SummaryGroup::Month)));
+    assert_ne!(
+        base().with_summary(Some(SummaryGroup::Month)),
+        base().with_summary(Some(SummaryGroup::Ledger))
+    );
     assert_ne!(
         keyed(&sales),
         keyed(&VoucherTypeSelector::Guid("Sales".to_string()))
@@ -5084,4 +5347,398 @@ async fn the_read_cost_is_judged_against_the_smallest_page_and_never_causes_an_o
     assert!(window.get("read_cost").is_some(), "{window}");
     assert!(window.get("read_cost_left_out").is_none(), "{window}");
     assert_eq!(window["census"]["requests"], 18, "{window}");
+}
+
+/// #1250 with #1239: a summary page keys its rows as `buckets`, not `items`, so the
+/// block is judged against the whole summary page (conservative: a summary page is
+/// already bounded to a fifth of the budget). It carries the block when that page
+/// fits three times over with the block, and the window says when it was left out.
+#[tokio::test]
+async fn a_summary_page_is_judged_against_its_whole_payload_for_the_read_cost() {
+    let ample = OneServer::spawn(census_plans_of(18))
+        .call(json!({"summarise_by": "ledger"}))
+        .await;
+    let result = result_of(&ample);
+    assert_eq!(result["profile"], "agent_vouchers_v1_summary", "{result}");
+    assert!(result.get("items").is_none(), "{result}");
+    let buckets = result["buckets"].as_array().unwrap();
+    assert!(buckets.len() >= 3, "{result}");
+    assert_eq!(
+        result["window"]["read_cost"]["census_reads"], 18,
+        "{result}"
+    );
+    let block_len = result["window"]["read_cost"].to_string().len();
+    // The page without the block, its key and the comma beside it.
+    let page_len = ample["structuredContent"].to_string().len() - block_len - 13;
+    let others: usize = buckets[1..].iter().map(|b| b.to_string().len() + 1).sum();
+    assert!(others > 200, "{others}");
+    // A cap that would admit the block if only the first bucket counted, but not the
+    // whole page: the block is left out, said so, and the call still succeeds.
+    let cap = 3 * (page_len + block_len) + 1_024 - 3 * others / 2;
+    let mut tight = OneServer::spawn(census_plans_of(18));
+    tight.server.settings.max_bytes = cap;
+    let capped = tight.call(json!({"summarise_by": "ledger"})).await;
+    let capped_result = result_of(&capped);
+    assert_eq!(
+        capped_result["profile"], "agent_vouchers_v1_summary",
+        "{capped_result}"
+    );
+    let window = &capped_result["window"];
+    assert!(window.get("read_cost").is_none(), "{window}");
+    assert_eq!(window["read_cost_left_out"], "response_budget", "{window}");
+}
+
+// -- #1230: search and summaries over the labelled window --
+
+fn result_of(response: &Value) -> &Value {
+    assert_ne!(response["isError"], true, "{response}");
+    &response["structuredContent"]["result"]
+}
+
+fn bucket_names(response: &Value) -> Vec<String> {
+    result_of(response)["buckets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|bucket| bucket["group"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[tokio::test]
+async fn a_voucher_number_search_returns_that_voucher_from_the_counted_window() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one.call(json!({"voucher_number": "2"})).await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["total"], 1);
+    assert_eq!(result["items"][0]["voucher_number"], "2");
+    assert_eq!(
+        result["items"][0]["matched"],
+        json!({"voucher_number": true})
+    );
+    // The whole window was read once; the search is client-side and sent nothing more.
+    one.requests();
+}
+
+#[tokio::test]
+async fn a_search_that_finds_nothing_in_a_counted_window_is_a_checked_zero() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one
+        .call(json!({"narration_contains": "no such phrase"}))
+        .await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["total"], 0);
+    assert_eq!(result["items"], json!([]));
+}
+
+#[tokio::test]
+async fn a_later_page_of_a_search_is_served_only_for_the_same_search() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(marks_page_plans(counted_marks()));
+    // The third call names the first page's snapshot with a different search: refused after the
+    // identity read alone, no marks read for a window that is not the one held.
+    plans.extend(identity_plans());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let search = json!({"narration_contains": "WR2-N", "limit": 1});
+    let first = one.call(search.clone()).await;
+    assert_eq!(result_of(&first)["total"], 3);
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(json!({"narration_contains": "WR2-N", "limit": 1, "offset": 1, "snapshot_id": id}))
+        .await;
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    assert_eq!(result_of(&second)["items"][0]["voucher_number"], "2");
+    let other = one
+        .call(json!({"narration_contains": "WR2-N6", "limit": 1, "offset": 1, "snapshot_id": id}))
+        .await;
+    let error = refusal_of(&other);
+    assert_eq!(error["code"], "listing_snapshot_changed", "{error}");
+    assert_eq!(error["cause"], "snapshot_not_held", "{error}");
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_refused_search_costs_only_the_identity_read() {
+    for (args, code) in [
+        (json!({"voucher_number": " "}), "search_criterion_empty"),
+        (
+            json!({"narration_contains": "ab"}),
+            "search_narration_too_short",
+        ),
+        (json!({"amount": "-5"}), "search_amount_invalid"),
+    ] {
+        let one = OneServer::spawn(identity_plans());
+        let response = one.call(args).await;
+        assert_eq!(refusal_of(&response)["code"], code, "{response}");
+        assert_eq!(one.requests(), 4);
+    }
+}
+
+/// The catalogue's own schema admits the three groupings and the four search criteria, and
+/// refuses a grouping it does not list, before any read.
+#[test]
+fn the_vouchers_schema_lists_the_groupings_and_the_search_criteria() {
+    let call = |extra: Value| {
+        let mut args = json!({"company_guid": GUID, "from": "20260801", "to": "20260831"});
+        for (key, value) in extra.as_object().unwrap() {
+            args[key] = value.clone();
+        }
+        validate_tool_arguments("vouchers", &args)
+    };
+    for grouping in ["ledger", "month", "voucher_type"] {
+        assert_eq!(call(json!({"summarise_by": grouping})), Ok(()));
+    }
+    assert!(call(json!({"summarise_by": "group"})).is_err());
+    for criterion in [
+        "voucher_number",
+        "reference",
+        "narration_contains",
+        "amount",
+    ] {
+        assert_eq!(call(json!({ criterion: "x1" })), Ok(()), "{criterion}");
+        assert!(call(json!({ criterion: "" })).is_err(), "{criterion}");
+        assert!(
+            call(json!({ criterion: "x".repeat(257) })).is_err(),
+            "{criterion}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_narration_search_is_refused_where_narrations_are_withheld() {
+    let one = OneServer::spawn_with(identity_plans(), Redaction::DropNarration);
+    let response = one.call(json!({"narration_contains": "WR2-N3"})).await;
+    assert_eq!(refusal_of(&response)["code"], "search_narration_redacted");
+    assert_eq!(one.requests(), 4);
+}
+
+#[tokio::test]
+async fn a_month_summary_replaces_items_with_buckets_and_keeps_the_window_label() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one.call(json!({"summarise_by": "month"})).await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["profile"], "agent_vouchers_v1_summary");
+    assert!(result.get("items").is_none(), "{result}");
+    assert_eq!(result["summarised_by"], "month");
+    assert_eq!(result["total"], 1);
+    assert_eq!(result["vouchers_summarised"], 3);
+    assert_eq!(result["buckets"][0]["group"], "2026-08");
+    assert_eq!(result["buckets"][0]["debit"], "-306.06");
+    assert_eq!(result["buckets"][0]["credit"], "306.06");
+    assert_eq!(
+        result["totals"],
+        json!({"debit": "-306.06", "credit": "306.06"})
+    );
+    assert_eq!(result["post_dated_included"], 0);
+    // The older captured window was read before the fetch list asked for the flag, so its three vouchers carry none.
+    assert_eq!(result["post_dated_flag_absent"], 3);
+    assert!(result["basis"].as_str().unwrap().contains("memorandum"));
+    assert_eq!(result["buckets"][0]["position"], 1);
+    assert_eq!(
+        result["excluded_from_buckets"],
+        json!({"cancelled": 0, "optional": 0, "no_accounting_entries": 0})
+    );
+    assert_eq!(response["structuredContent"]["truncated"], false);
+}
+
+/// Mutant killed: summing the bucket totals from a different page than the one served, or
+/// dropping `search` from the summarised rows.
+#[tokio::test]
+async fn a_summary_of_a_search_adds_only_the_vouchers_the_search_found() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one
+        .call(json!({"summarise_by": "voucher_type", "narration_contains": "WR2-N3"}))
+        .await;
+    let result = result_of(&response);
+    assert_eq!(result["vouchers_summarised"], 2, "{result}");
+    assert_eq!(result["buckets"][0]["credit"], "203.03");
+}
+
+#[tokio::test]
+async fn buckets_page_from_the_held_summary_window() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one
+        .call(json!({"summarise_by": "ledger", "limit": 2}))
+        .await;
+    assert_eq!(page_snapshot(&first)["reused"], false);
+    assert_eq!(first["structuredContent"]["truncated"], true);
+    let second = one
+        .call(json!({"summarise_by": "ledger", "offset": 2, "limit": 2}))
+        .await;
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    assert_eq!(result_of(&second)["total"], 4);
+    assert_eq!(result_of(&second)["offset"], 2);
+    assert_eq!(bucket_names(&second).len(), 2);
+    assert_eq!(second["structuredContent"]["truncated"], false);
+    assert_eq!(one.requests(), total);
+    // The two buckets served are the third and fourth of the whole summary, positions included.
+    let whole = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let all = whole.call(json!({"summarise_by": "ledger"})).await;
+    assert_eq!(
+        result_of(&all)["buckets"].as_array().unwrap()[2..],
+        result_of(&second)["buckets"].as_array().unwrap()[..]
+    );
+}
+
+/// A ledger summary through the tool under `mask_parties`: every bucket label is a ledger name, so
+/// every label is masked and no real name appears anywhere in the response, while the figures, the
+/// order and each bucket's `position` stay the same as unmasked (#1250 review, P3 2). The masking
+/// of a bucket label was pinned only below the tool
+/// (`a_ledger_name_is_a_party_marked_value_so_masking_reaches_it`), so a label built without the
+/// party marker would have passed the suite. The bucket redaction in `render_page_body` is a second,
+/// redundant layer under the whole-response pass in `redact_tool_response`; this test does not tell
+/// the two apart.
+/// Mutant run and killed: neutering the `MaskParties` branch of `redact_value`. Mutant run and NOT
+/// killed (by design, the layer is redundant): removing the bucket redaction in `render_page_body`.
+/// Not run, reasoned from the code: building a bucket label without the party-name marker.
+#[tokio::test]
+async fn a_ledger_summary_masks_every_bucket_label_under_mask_parties() {
+    let plain = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let plain = plain.call(json!({"summarise_by": "ledger"})).await;
+    let masked = OneServer::spawn_with(
+        counted_vouchers_plans(three_vouchers(), three_vouchers()),
+        Redaction::MaskParties,
+    );
+    let masked = masked.call(json!({"summarise_by": "ledger"})).await;
+    let (plain_names, masked_names) = (bucket_names(&plain), bucket_names(&masked));
+    assert_eq!(plain_names.len(), 4, "{plain}");
+    assert_eq!(masked_names.len(), plain_names.len(), "{masked}");
+    let leaked = masked.to_string();
+    for (real, shown) in plain_names.iter().zip(&masked_names) {
+        assert_ne!(real, shown, "a bucket label was not masked: {masked}");
+        assert!(
+            !leaked.contains(real.as_str()),
+            "{real} appears in a masked response"
+        );
+    }
+    // Masking changes the label only: the figures, the order and each bucket's position are the same.
+    let strip = |response: &Value| -> Vec<Value> {
+        result_of(response)["buckets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|bucket| {
+                let mut bucket = bucket.clone();
+                bucket.as_object_mut().unwrap().remove("group");
+                bucket
+            })
+            .collect()
+    };
+    assert_eq!(strip(&plain), strip(&masked));
+    let positions: Vec<u64> = result_of(&masked)["buckets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|bucket| bucket["position"].as_u64().unwrap())
+        .collect();
+    assert_eq!(positions, [1, 2, 3, 4], "{masked}");
+}
+
+/// A listing and a summary of the same question hold separate windows, so one never replaces or
+/// serves the other: pages of a listing cannot continue from a summary's read, nor the reverse.
+/// Mutant killed: leaving the grouping out of the held-window key.
+#[tokio::test]
+async fn a_listing_and_a_summary_do_not_replace_or_serve_each_other() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let listing = one.call(json!({"limit": 1})).await;
+    let listing_id = page_snapshot(&listing)["id"].as_str().unwrap().to_string();
+    // A summary read of the same window holds its own snapshot; the listing's stays held.
+    let summary = one.call(json!({"summarise_by": "month"})).await;
+    let summary_id = page_snapshot(&summary)["id"].as_str().unwrap().to_string();
+    assert_ne!(listing_id, summary_id);
+    let page = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": listing_id}))
+        .await;
+    assert_eq!(page_snapshot(&page)["id"], listing_id, "{page}");
+    assert_eq!(page_snapshot(&page)["reused"], true);
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_held_ledger_window_summarises_only_that_ledgers_entries_by_month() {
+    let first =
+        call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
+    let mut rows = page_items_of(&first);
+    rows[0]["date"] = json!("20260715");
+    rows[1]["date"] = json!("20260801");
+    rows[2]["date"] = json!("20260901");
+    let window = first["structuredContent"]["result"]["window"].clone();
+    let plans = marks_page_plans(counted_marks());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let key = VoucherPageKey::new(
+        &identity(),
+        "20260801",
+        "20260831",
+        Some("WR2 Sales"),
+        None,
+        None,
+    )
+    .with_summary(Some(SummaryGroup::Month));
+    assert!(one
+        .server
+        .voucher_pages
+        .lock()
+        .unwrap()
+        .hold(Arc::new(VoucherPageSnapshot::new(
+            key,
+            marks_of(counted_marks_vouchers()),
+            Arc::new(rows),
+            window,
+            None,
+            Some(json!({"ledger": "WR2 Sales", "matched": "exact",
+                "similar_ledgers": [], "similar_ledgers_total": 0})),
+            Some("WR2 Sales".to_string()),
+            None,
+        ))));
+    let second = one
+        .call(json!({"ledger": "WR2 Sales", "summarise_by": "month", "offset": 1, "limit": 1}))
+        .await;
+    let result = result_of(&second);
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    assert_eq!(result["entries_counted"], "selected_ledger");
+    assert_eq!(result["total"], 3);
+    assert_eq!(result["buckets"][0]["group"], "2026-08");
+    assert_eq!(result["buckets"][0]["debit"], "0");
+    assert_eq!(result["buckets"][0]["credit"], "102.02");
+    assert_eq!(one.requests(), total);
+}
+
+/// The bucket page stops at a fifth of the response budget (the response carries it twice, and
+/// the text copy escapes quotes). Through the whole tool the cap refuses first on a four-bucket
+/// fixture, so the bound is exercised on the page renderer itself: the captured ledger summary's
+/// buckets serialize to about 500, 290, 270 and 300 bytes, so a 6,000-byte cap (1,200 for
+/// buckets) holds three and not four. Mutant killed: an unbounded budget.
+#[tokio::test]
+async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_remain() {
+    let first =
+        call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
+    let rows = page_items_of(&first);
+    let mut one = OneServer::spawn(identity_plans());
+    one.server.settings.max_bytes = 6_000;
+    let request = SummaryRequest {
+        group: SummaryGroup::Ledger,
+        selected_ledger: None,
+    };
+    let body =
+        vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
+    assert_eq!(body.items.len(), 3, "{:?}", body.items);
+    assert_eq!(body.total, 4);
+    assert!(body.truncated);
+    // Under a budget that holds everything the page is whole.
+    one.server.settings.max_bytes = 200_000;
+    let whole =
+        vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
+    assert_eq!(whole.items.len(), 4);
+    assert!(!whole.truncated);
 }

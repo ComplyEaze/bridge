@@ -606,7 +606,7 @@ async fn tally_requests_ignore_configured_proxy() {
     });
 
     let proxy_server = tokio::spawn(async move {
-        match tokio::time::timeout(Duration::from_millis(750), proxy_listener.accept()).await {
+        match tokio::time::timeout(Duration::from_millis(1000), proxy_listener.accept()).await {
             Ok(Ok((mut socket, _))) => {
                 let response =
                     "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
@@ -1079,7 +1079,7 @@ async fn invalid_book_extent_stops_ledger_export_without_a_date_fallback() {
                 .expect("write extent response");
         }
         assert!(
-            tokio::time::timeout(Duration::from_millis(200), listener.accept())
+            tokio::time::timeout(Duration::from_millis(1000), listener.accept())
                 .await
                 .is_err(),
             "an invalid extent must stop before any native ledger request"
@@ -1142,7 +1142,7 @@ async fn education_profile_rejects_an_unsupported_books_from_before_ledger_expor
                 .expect("write extent response");
         }
         assert!(
-            tokio::time::timeout(Duration::from_millis(200), listener.accept())
+            tokio::time::timeout(Duration::from_millis(1000), listener.accept())
                 .await
                 .is_err(),
             "an Education-invalid BOOKSFROM must stop before the native ledger request"
@@ -1343,7 +1343,7 @@ async fn non_empty_voucher_response_issues_no_extra_request() {
 
         // A non-empty response must not pay for the extent bracket: no
         // further connection should ever arrive.
-        let extra = tokio::time::timeout(Duration::from_millis(300), listener.accept()).await;
+        let extra = tokio::time::timeout(Duration::from_millis(1000), listener.accept()).await;
         assert!(
             extra.is_err(),
             "non-empty voucher fetch issued an unexpected extra request"

@@ -1047,6 +1047,22 @@ impl TallyClient {
         }
     }
 
+    /// A clone whose sends start only while `token` is not cancelled (#778):
+    /// a withdrawn call finishes the send in flight and starts no other. Each
+    /// send asks before it takes the wire lock and again once it holds it.
+    pub(crate) fn withdrawable(&self, token: tokio_util::sync::CancellationToken) -> Self {
+        struct NotWithdrawn(tokio_util::sync::CancellationToken);
+        impl bridge_tally_transport::SendAdmission for NotWithdrawn {
+            fn admits(&self) -> bool {
+                !self.0.is_cancelled()
+            }
+        }
+        Self {
+            http: self.http.with_send_admission(Arc::new(NotWithdrawn(token))),
+            ..self.clone()
+        }
+    }
+
     pub fn canonical_origin(&self) -> anyhow::Result<String> {
         canonical_loopback_origin(&self.config)
     }

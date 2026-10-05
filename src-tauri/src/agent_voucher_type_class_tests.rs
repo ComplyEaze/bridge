@@ -397,7 +397,11 @@ fn the_selectors_are_exclusive_and_the_schema_offers_only_measured_classes() {
     );
 
     // The class read is the plain read plus exactly the class COMPUTEs.
-    let (company, from, to) = ("Synthetic Book", "20250701", "20250731");
+    let (company, from, to) = (
+        "Synthetic Book",
+        &tally_date("20250701"),
+        &tally_date("20250731"),
+    );
     let plain = VoucherReadShape::EntryWildcard
         .render(company, from, to, None)
         .unwrap();
@@ -485,7 +489,12 @@ fn captured_window() -> String {
 fn the_live_capture_classes_a_renamed_type_and_its_child_from_the_request_sent() {
     // The fixture answers exactly the request this read sends.
     let request = VoucherReadShape::ClassEntryWildcard
-        .render("BRIDGE READS LAB", "20250701", "20250731", None)
+        .render(
+            "BRIDGE READS LAB",
+            &tally_date("20250701"),
+            &tally_date("20250731"),
+            None,
+        )
         .unwrap();
     assert_eq!(
         sha256_hex(request.as_bytes()),
@@ -721,7 +730,12 @@ mod through_the_tool {
         // The class request itself went to Tally, as the transport encodes
         // it: a UTF-16LE body behind a byte-order mark.
         let class_request = VoucherReadShape::ClassEntryWildcard
-            .render("BRIDGE READS LAB", "20250701", "20250731", None)
+            .render(
+                "BRIDGE READS LAB",
+                &tally_date("20250701"),
+                &tally_date("20250731"),
+                None,
+            )
             .unwrap();
         let wire = [0xFF_u8, 0xFE]
             .into_iter()

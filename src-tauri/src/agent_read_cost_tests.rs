@@ -2,11 +2,16 @@
 //! is added.
 use super::*;
 use crate::agent::voucher_window::{PartTiming, RequestTally};
+use bridge_tally_core::TallyDate;
+
+fn day() -> TallyDate {
+    TallyDate::parse("20260801").expect("a Tally date")
+}
 
 fn part(rows: usize, ms: u128) -> PartTiming {
     PartTiming {
-        from: "20260801".into(),
-        to: "20260801".into(),
+        from: day(),
+        to: day(),
         after: None,
         through: None,
         served: true,
@@ -22,8 +27,8 @@ fn timings(
     parts: Vec<PartTiming>,
 ) -> WindowReadTimings {
     WindowReadTimings {
-        from: "20260801".into(),
-        to: "20260801".into(),
+        from: day(),
+        to: day(),
         marks: RequestTally {
             requests: 1,
             ms: marks_ms,
@@ -151,6 +156,35 @@ fn the_lead_never_contradicts_the_verdict_at_the_limit() {
             .unwrap()
             .starts_with("The window read took 241 seconds for 100 vouchers."),
         "{over}"
+    );
+}
+
+/// One voucher is "1 voucher" in every sentence that counts vouchers, and a stopped
+/// read of one second is "1 second", not "1 seconds".
+#[test]
+fn a_single_voucher_and_a_single_second_are_named_in_the_singular() {
+    let one = timings(0, (16, 16_000), vec![part(1, 1_000)]);
+    let read = block(&one);
+    let say = read["say"].as_str().unwrap();
+    assert!(
+        say.starts_with("The window read took 17 seconds for 1 voucher."),
+        "{say}"
+    );
+    assert!(say.contains("This window of 1 voucher fitted"), "{say}");
+    let stopped = read_cost(&one, Ended::Stopped).unwrap();
+    assert!(
+        stopped["say"].as_str().unwrap().starts_with(
+            "The window read stopped after 17 seconds with 1 voucher read and none returned."
+        ),
+        "{stopped}"
+    );
+    let quick_stop = read_cost(&timings(0, (16, 500), vec![]), Ended::Stopped).unwrap();
+    assert!(
+        quick_stop["say"]
+            .as_str()
+            .unwrap()
+            .starts_with("The window read stopped after 1 second, before any voucher was read."),
+        "{quick_stop}"
     );
 }
 

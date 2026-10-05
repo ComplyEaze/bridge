@@ -165,13 +165,13 @@ pub fn s194n_recipient_type(entity_type: Option<&str>) -> Option<Recipient> {
     }
 }
 
-/// One row: its total and the vouchers behind it, by GUID (a repeated GUID keeps the last voucher,
-/// as the reference's dict does), and per GUID the party's share of those vouchers against their
+/// One row: its total and the vouchers behind it, by GUID and label (two vouchers sharing a GUID are
+/// both kept unless their refs are identical, #1195), and per GUID the party's share of those vouchers against their
 /// own money line in the row's mode and direction (see `parity/PORT-NOTE-HVR.md`).
 #[derive(Default)]
 pub struct Row<'a> {
     pub paise: i64,
-    pub vouchers: BTreeMap<String, &'a Voucher>,
+    pub vouchers: BTreeMap<(String, String), &'a Voucher>,
     /// GUID -> (share, line), each added per voucher as it is read, so two vouchers sharing a GUID
     /// add together and one voucher's line is never set against two vouchers' shares.
     pub lines: BTreeMap<String, (i64, i64)>,
@@ -183,7 +183,7 @@ pub struct Row<'a> {
 impl<'a> Row<'a> {
     fn add(&mut self, v: &'a Voucher, share: i64, line: i64) -> Result<()> {
         self.paise = add(self.paise, share)?;
-        self.vouchers.insert(v.guid.clone(), v);
+        self.vouchers.insert((v.guid.clone(), voucher_label(v)), v);
         let slot = self.lines.entry(v.guid.clone()).or_insert((0, 0));
         *slot = (add(slot.0, share)?, add(slot.1, line)?);
         Ok(())
@@ -363,10 +363,13 @@ fn bill_reference_rows<'a>(
         .filter(|((reference, _), _)| !reference.is_empty())
         .collect();
     let with_money_leg = mode_rows(pop, book, cash, bank, direction, |v| v.guid.clone(), x)?;
-    let with_ref: BTreeSet<&String> = rows.values().flat_map(|r| r.vouchers.keys()).collect();
+    let with_ref: BTreeSet<&String> = rows
+        .values()
+        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))
+        .collect();
     let all_guids: BTreeSet<&String> = with_money_leg
         .values()
-        .flat_map(|r| r.vouchers.keys())
+        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))
         .collect();
     let skipped = all_guids.difference(&with_ref).count();
     Ok((rows, skipped))
@@ -425,10 +428,10 @@ fn journal_transfer_rows<'a>(
     Ok(out)
 }
 
-fn voucher_evidence(vouchers: &BTreeMap<String, &Voucher>) -> Vec<EvidenceRef> {
+fn voucher_evidence(vouchers: &BTreeMap<(String, String), &Voucher>) -> Vec<EvidenceRef> {
     vouchers
         .iter()
-        .map(|(g, v)| EvidenceRef::with_label("voucher", g, &voucher_label(v)))
+        .map(|((g, _), v)| EvidenceRef::with_label("voucher", g, &voucher_label(v)))
         .collect()
 }
 
@@ -1125,7 +1128,7 @@ fn summarise<K>(
             Over::PartySideOnly => line_below += 1,
             Over::No => {}
         }
-        for (g, v) in &d.vouchers {
+        for ((g, _), v) in &d.vouchers {
             refs.insert((g.clone(), voucher_label(v)));
         }
     }

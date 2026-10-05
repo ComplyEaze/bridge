@@ -167,6 +167,15 @@ fn seconds(count: u64) -> String {
     }
 }
 
+/// "1 voucher", "3 vouchers": the count with its noun.
+fn vouchers_phrase(count: u64) -> String {
+    if count == 1 {
+        "1 voucher".to_string()
+    } else {
+        format!("{count} vouchers")
+    }
+}
+
 /// The block, or `None` when the call was quick enough that nothing needs
 /// saying.
 pub(super) fn read_cost(timings: &WindowReadTimings, ended: Ended) -> Option<Value> {
@@ -252,16 +261,18 @@ pub(super) fn smallest_page_len(payload: &Value) -> usize {
 fn say(cost: &Cost, ended: Ended) -> String {
     let lead = match (ended, cost.vouchers) {
         (Ended::Read, vouchers) => format!(
-            "The window read took {} for {vouchers} vouchers.",
-            seconds(lead_seconds(cost))
+            "The window read took {} for {}.",
+            seconds(lead_seconds(cost)),
+            vouchers_phrase(vouchers)
         ),
         (Ended::Stopped, 0) => format!(
-            "The window read stopped after {} seconds, before any voucher was read.",
-            nearest_seconds(cost.total_ms())
+            "The window read stopped after {}, before any voucher was read.",
+            seconds(nearest_seconds(cost.total_ms()))
         ),
         (Ended::Stopped, vouchers) => format!(
-            "The window read stopped after {} seconds with {vouchers} vouchers read and none returned.",
-            nearest_seconds(cost.total_ms())
+            "The window read stopped after {} with {} read and none returned.",
+            seconds(nearest_seconds(cost.total_ms())),
+            vouchers_phrase(vouchers)
         ),
     };
     let floor = if cost.census_reads > 1 {
@@ -280,7 +291,8 @@ fn say(cost: &Cost, ended: Ended) -> String {
     };
     let fit = match cost.fit {
         Fit::Fits { vouchers } => format!(
-            "This window of {vouchers} vouchers fitted inside the 240 seconds at which Claude Desktop's chat app stops a silent call (measured twice, on one Mac build; calls between 130 and 240 seconds were not tried, and the call's other reads are not in these figures). Whether a larger or a smaller window fits is not established."
+            "This window of {} fitted inside the 240 seconds at which Claude Desktop's chat app stops a silent call (measured twice, on one Mac build; calls between 130 and 240 seconds were not tried, and the call's other reads are not in these figures). Whether a larger or a smaller window fits is not established.",
+            vouchers_phrase(vouchers)
         ),
         Fit::TooLong => "That is past 240 seconds, where Claude Desktop's chat app stops a silent call (measured twice, on one Mac build). A shorter window saves the time of its vouchers but pays the same census reads, so how short is enough is not established. For totals over a long period read trial_balance, which reads no vouchers.".to_string(),
         Fit::NotEstablished => match ended {

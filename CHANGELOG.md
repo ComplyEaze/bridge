@@ -16,6 +16,20 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
+**New**
+
+- `vouchers` can now find a voucher by its number, reference, a phrase of its
+  narration or an amount (`voucher_number`, `reference`, `narration_contains`,
+  `amount`), and can add a window up by ledger, month or voucher type
+  (`summarise_by`), with debit, credit and voucher counts per bucket and the
+  cancelled, optional and entry-less vouchers counted apart. Both run on the
+  rows the window read already holds, so they send no new request to Tally; a
+  zero from a counted window is a checked zero. A narration phrase is refused
+  where narrations are withheld from the assistant. A summary sums post-dated
+  vouchers (counted, with the vouchers Tally sent no flag for counted apart) and any
+  non-posting voucher type a book uses, and says so in the result. Not measured
+  against a live book yet (#1230).
+
 **Safer or fixed**
 
 - `purchase_register` and `sales_register` now take their `state` from the rule

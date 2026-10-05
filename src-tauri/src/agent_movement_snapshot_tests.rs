@@ -86,13 +86,35 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
     let end = start + original[start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
     let mut reduced = original.to_string();
     reduced.replace_range(start..end, "");
-    for change in ["stable", "edit", "posting", "deletion", "incomplete"] {
-        let changed = change != "stable";
+    // The `stable` read's result, which the `zero` read must equal (#1251).
+    let mut stable_result = None;
+    for change in [
+        "stable",
+        "zero",
+        "edit",
+        "posting",
+        "deletion",
+        "incomplete",
+    ] {
+        let changed = !matches!(change, "stable" | "zero");
         let mut before = voucher.clone();
         let mut after = voucher.clone();
         // Inject concurrent changes into captured rows in memory. The source
         // captures stay byte-exact; no live concurrency experiment is claimed.
         match change {
+            "zero" => {
+                // One more entry on the selected ledger whose amount is `-0.00` and which Tally flags
+                // deemed-positive, in both paired reads. A zero adds nothing to either column and
+                // nothing to the voucher's balance, so the read must succeed with the same figures.
+                let zero_entry = "<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">WR2 Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">Yes</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">-0.00</AMOUNT></ALLLEDGERENTRIES.LIST>";
+                let at = original.find("</ALLLEDGERENTRIES.LIST>").unwrap()
+                    + "</ALLLEDGERENTRIES.LIST>".len();
+                let mut with_zero = original.to_string();
+                with_zero.insert_str(at, zero_entry);
+                assert_ne!(with_zero, original);
+                before.fixture = Fixture::SyntheticXml(with_zero.clone());
+                after.fixture = Fixture::SyntheticXml(with_zero);
+            }
             "edit" => {
                 let altered = original.replace("-101.01", "-201.01").replace(
                     "<AMOUNT TYPE=\"Amount\">101.01</AMOUNT>",
@@ -190,6 +212,12 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
             let ledger_match = &response["structuredContent"]["result"]["ledger_match"];
             assert_eq!(ledger_match["ledger"], "WR2 Sales", "{ledger_match}");
             assert_eq!(ledger_match["matched"], "exact", "{ledger_match}");
+            let result = response["structuredContent"]["result"].clone();
+            match change {
+                "stable" => stable_result = Some(result),
+                // A zero entry on the selected ledger changes no figure.
+                _ => assert_eq!(Some(&result), stable_result.as_ref(), "{change}"),
+            }
         }
         let observations = simulator.finish().unwrap();
         assert_eq!(

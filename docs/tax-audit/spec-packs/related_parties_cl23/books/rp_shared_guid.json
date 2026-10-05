@@ -1,0 +1,179 @@
+{
+ "comment": "related_parties_cl23: in-books vouchers that share a GUID (the book's own GUID check reports both). The walk keeps one entry per GUID: for g01 the later voucher replaces the earlier one, so the earlier 300000 paise is not counted; for g02 the later voucher nets to zero on the set, so the earlier entry stays. The population net is therefore below the Trial Balance movement.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Indirect Incomes": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Sundry Creditors": "Current Liabilities"
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_shared_guid-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-rp_shared_guid-001"
+  },
+  {
+   "name": "Gamma Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_shared_guid-002"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-rp_shared_guid-003"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 2000000,
+   "debit": 600000,
+   "credit": 1400000,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -2000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -2000000
+  },
+  {
+   "ledger": "Gamma Rent",
+   "opening": 0,
+   "debit": 1400000,
+   "credit": 0,
+   "closing": 1400000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 600000,
+   "closing": -600000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "g01",
+   "date": "2025-05-01",
+   "base_type": "Payment",
+   "number": "1",
+   "lines": [
+    [
+     "Gamma Rent",
+     300000
+    ],
+    [
+     "Bank A",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "g01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "number": "2",
+   "lines": [
+    [
+     "Gamma Rent",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "h01",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "number": "3",
+   "lines": [
+    [
+     "Gamma Rent",
+     200000
+    ],
+    [
+     "Bank A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2025-08-01",
+   "base_type": "Payment",
+   "number": "4",
+   "lines": [
+    [
+     "Gamma Rent",
+     400000
+    ],
+    [
+     "Bank A",
+     -400000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2025-09-01",
+   "base_type": "Receipt",
+   "number": "5",
+   "lines": [
+    [
+     "Bank A",
+     600000
+    ],
+    [
+     "Sales",
+     -600000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ],
+ "related_parties": {
+  "Person G": {
+   "relationship": "mother of a partner",
+   "ledgers_by_nature": {
+    "rent": [
+     "Gamma Rent"
+    ]
+   }
+  }
+ }
+}

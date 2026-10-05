@@ -1,0 +1,222 @@
+{
+ "comment": "related_parties_cl23: the population-against-Trial-Balance check. Each of the two rent ledgers' population movement is 100 paise over its Trial Balance movement, closing minus opening (within the voucher tie's tolerance, so the book's own tie is silent), but the set is 200 over and the module's check reports it. Their debit columns are left at the voucher totals, so a check reading debit minus credit instead would stay silent. The salary ledger is exactly 100 over (silent). The interest ledger's Trial Balance movement has the opposite sign to its population movement: the check compares magnitudes, so it is silent, while the voucher tie fires on that ledger and on Cash, which carries the balancing difference (Capital and Round Off also carry 100 paise of balancing each, with no voucher, silent at the tolerance).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Indirect Incomes": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Sundry Creditors": "Current Liabilities"
+ },
+ "ledgers": [
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-rp_sum_check-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_sum_check-001"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_sum_check-002"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-rp_sum_check-003"
+  },
+  {
+   "name": "Sum Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_sum_check-004"
+  },
+  {
+   "name": "Sum Rent One",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_sum_check-005"
+  },
+  {
+   "name": "Sum Rent Two",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_sum_check-006"
+  },
+  {
+   "name": "Sum Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_sum_check-007"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Capital",
+   "opening": -200000,
+   "debit": 100,
+   "credit": 0,
+   "closing": -199900
+  },
+  {
+   "ledger": "Cash",
+   "opening": 200000,
+   "debit": 0,
+   "credit": 109900,
+   "closing": 90100
+  },
+  {
+   "ledger": "Round Off",
+   "opening": 0,
+   "debit": 100,
+   "credit": 0,
+   "closing": 100
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Sum Interest",
+   "opening": 0,
+   "debit": 0,
+   "credit": 20000,
+   "closing": -20000
+  },
+  {
+   "ledger": "Sum Rent One",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 0,
+   "closing": 49900
+  },
+  {
+   "ledger": "Sum Rent Two",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 0,
+   "closing": 49900
+  },
+  {
+   "ledger": "Sum Salary",
+   "opening": 0,
+   "debit": 29900,
+   "credit": 0,
+   "closing": 29900
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "p01",
+   "date": "2025-05-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Sum Rent One",
+     50000
+    ],
+    [
+     "Cash",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Sum Rent Two",
+     50000
+    ],
+    [
+     "Cash",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Sum Salary",
+     30000
+    ],
+    [
+     "Cash",
+     -30000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Sum Interest",
+     20000
+    ],
+    [
+     "Cash",
+     -20000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [],
+ "related_parties": {
+  "Person S": {
+   "relationship": "uncle of a partner",
+   "ledgers_by_nature": {
+    "rent": [
+     "Sum Rent One",
+     "Sum Rent Two"
+    ],
+    "salary": [
+     "Sum Salary"
+    ],
+    "interest": [
+     "Sum Interest"
+    ]
+   }
+  }
+ }
+}

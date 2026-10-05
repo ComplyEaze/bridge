@@ -1,0 +1,305 @@
+{
+ "comment": "related_parties_cl23: six persons. Keys differ only in case; two keys are the same text in composed and decomposed form (each is its own person with its own tag, since the tag hashes the key's bytes as written); one key and one relationship are in Devanagari; one relationship is written decomposed. One ledger is shared by two persons, and one person names one ledger under two natures, so it counts in both and twice in the total (a negative total).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Indirect Incomes": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Sundry Creditors": "Current Liabilities"
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_many-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-rp_many-001"
+  },
+  {
+   "name": "Epsilon Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_many-002"
+  },
+  {
+   "name": "Ka Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-rp_many-003"
+  },
+  {
+   "name": "Lower Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_many-004"
+  },
+  {
+   "name": "Person a Account",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-rp_many-005"
+  },
+  {
+   "name": "Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_many-006"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-rp_many-007"
+  },
+  {
+   "name": "Shared Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_many-008"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 1000000,
+   "debit": 10000000,
+   "credit": 2500000,
+   "closing": 8500000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -1000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -1000000
+  },
+  {
+   "ledger": "Epsilon Interest",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 0,
+   "closing": 200000
+  },
+  {
+   "ledger": "Ka Purchases",
+   "opening": 0,
+   "debit": 800000,
+   "credit": 0,
+   "closing": 800000
+  },
+  {
+   "ledger": "Lower Rent",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Person a Account",
+   "opening": 0,
+   "debit": 0,
+   "credit": 300000,
+   "closing": -300000
+  },
+  {
+   "ledger": "Salary",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 0,
+   "closing": 300000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000000,
+   "closing": -10000000
+  },
+  {
+   "ledger": "Shared Rent",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-03",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     10000000
+    ],
+    [
+     "Sales",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-05-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Shared Rent",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Lower Rent",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Salary",
+     300000
+    ],
+    [
+     "Person a Account",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Epsilon Interest",
+     200000
+    ],
+    [
+     "Bank A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2025-08-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Ka Purchases",
+     800000
+    ],
+    [
+     "Bank A",
+     -800000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "related_parties": {
+  "Person B": {
+   "relationship": "brother-in-law of a partner",
+   "ledgers_by_nature": {
+    "rent": [
+     "Shared Rent"
+    ]
+   }
+  },
+  "Person a": {
+   "relationship": "niece of a partner",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person a Account"
+    ],
+    "other": [
+     "Person a Account"
+    ]
+   }
+  },
+  "person A": {
+   "relationship": "aunt of a partner",
+   "ledgers_by_nature": {
+    "rent": [
+     "Shared Rent",
+     "Lower Rent"
+    ]
+   }
+  },
+  "Pérson E": {
+   "relationship": "grandson of a partner",
+   "ledgers_by_nature": {
+    "interest": [
+     "Epsilon Interest"
+    ]
+   }
+  },
+  "Pérson E": {
+   "relationship": "fiancée of a partner",
+   "ledgers_by_nature": {
+    "interest": [
+     "Epsilon Interest"
+    ]
+   }
+  },
+  "व्यक्ति क": {
+   "relationship": "भाई",
+   "ledgers_by_nature": {
+    "purchases": [
+     "Ka Purchases"
+    ]
+   }
+  }
+ }
+}

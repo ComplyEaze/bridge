@@ -253,8 +253,9 @@ milliseconds the send held the endpoint's lock, so a failed read says which requ
 holds no request or response body, name or value, and no hash of either (a request names the
 company, so a hash of it would let a reader who holds a guessed name confirm it). The request's
 exact size remains, so it shows a company name's length to a reader who holds the request template.
-A request that cannot be built (over the size cap) sends nothing and leaves no record. A client's
-cancellation never drops a send in flight: a withdrawn call starts no further operation and
+A request that cannot be built (over the size cap) sends nothing and leaves no record. An
+assistant's cancellation (`notifications/cancelled`) never drops a send in flight (a desktop
+cancel can, through the read queue): a withdrawn call starts no further operation and
 finishes the one it has started (a post before its intent stops after the request in flight). Such
 a post is answered as cancelled, and that answer's receipt keeps the trail of its sends, with the
 next read the withdrawal refused as `request_cancelled`. To match a failure with
@@ -1034,8 +1035,10 @@ each other.
   (`voucher_entries_unbalanced`): a bucket built from it could not be tied out.
 - A voucher withheld for a foreign-currency amount is in no bucket; the result is
   `partial` and `coverage` says the totals are short by those vouchers.
-- Buckets come by larger movement first (ledger, voucher type) or in calendar
-  order (month, `YYYY-MM`). A page also stops at a fifth of the response budget
+- Buckets come by larger movement first (ledger, voucher type), buckets of equal
+  movement in the order they are first counted in the window (never by name, which
+  under `mask_parties` would show the alphabetical order of the real names), or
+  in calendar order (month, `YYYY-MM`). A page also stops at a fifth of the response budget
   (the response carries it twice), with at least one bucket, and `truncated` says
   when more remain (the next `offset` is this `offset` plus the buckets returned); a page that still does not fit is refused
   `agent_response_too_large`, so lower `limit` or raise the budget. The egress

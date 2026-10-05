@@ -1243,9 +1243,21 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              (those three may share a batch). Split the vouchers into one batch of each kind \
              and build them separately; nothing was written or sent.",
         ),
+        // A date argument a caller can correct. `TallyDate` admits years 0001
+        // to 9999, and the edge codes come from widening an empty window past
+        // either end of that (#1268).
+        "invalid_date" | "invalid_date_range" | "tally_date_overflow" | "tally_date_underflow" => {
+            Some(DATE_REMEDIATION)
+        }
         _ => None,
     }
 }
+
+/// The one next step every date refusal gives (#1268).
+const DATE_REMEDIATION: &str = "Give each date as YYYYMMDD (YYYY-MM-DD also works), a real \
+     calendar day from 0001-01-01 to 9999-12-31, with from no later than to. A window that \
+     starts on 0001-01-01 or ends on 9999-12-31 cannot be widened to look for vouchers next \
+     to it, so read one inside those days.";
 
 /// A refused argument whose fix is to send it again in the right form, not to
 /// make a different read. Seen in use: "last month" sent as `from`, and a

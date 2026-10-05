@@ -181,6 +181,13 @@ the statement, or in a neighbouring one, does not count. On the master it was
 built from, that scanned 17 call sites and reported 3 unbounded record reads,
 which #837 capped: 15 call sites scanned, 15 bounded.
 
+The three exceptions were stale by then: none of those files held a read call any
+more, so a new unbounded read in one of them would have passed unreported. Since
+#837's slice 1b, exceptions live in the scanned tree's
+`scripts/unbounded-reads-allowed.json`, as `path: reason`. The repository ships
+no such file, so it has none. The gate fails an entry with no reason, and fails
+an entry whose file no longer holds an unbounded read for it to excuse.
+
 ```yaml
       - name: Enforce read bound coverage
         run: node scripts/check-unbounded-reads.mjs
@@ -244,7 +251,7 @@ dependencies beyond Node and `git ls-files`.
 | clippy default groups | existing `-D warnings` steps, `-A clippy::pedantic` appended | BLOCKING (already is, unchanged) | 0 warnings (unchanged by this PR) |
 | clippy pedantic | `lint-pedantic-advisory` job (new) | REPORTING | 1,199 warnings (1,150 + 49) |
 | Fixture provenance | `check-fixture-provenance.mjs` | BLOCKING (wired in `tally-portable`) | 0 undocumented (51/125 backfilled) |
-| Unbounded reads | `check-unbounded-reads.mjs` | BLOCKING (wired in `workflow-consistency`) | 0 unbounded (3 reviewed exceptions) |
+| Unbounded reads | `check-unbounded-reads.mjs` | BLOCKING (wired in `workflow-consistency`) | 0 unbounded (0 reviewed exceptions) |
 | `gh api` pagination | `check-gh-api-pagination.mjs` | BLOCKING (wired in `workflow-consistency`) | clean (one listing call, paginated) |
 | File size report | `report-file-sizes.mjs` | REPORTING (never fails) | 559 files, 213,322 lines |
 

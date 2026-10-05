@@ -501,6 +501,39 @@ fn a_small_response_budget_keeps_the_refusal_code_and_drops_only_the_guidance() 
     );
 }
 
+/// Every date refusal gives the one date next step (#1268), and a real one,
+/// `from` after `to`, carries it to the caller.
+#[tokio::test]
+async fn every_date_refusal_names_the_dates_it_accepts() {
+    let sentence = "Give each date as YYYYMMDD (YYYY-MM-DD also works), a real calendar day \
+                    from 0001-01-01 to 9999-12-31, with from no later than to. A window that \
+                    starts on 0001-01-01 or ends on 9999-12-31 cannot be widened to look for \
+                    vouchers next to it, so read one inside those days.";
+    for code in [
+        "invalid_date",
+        "invalid_date_range",
+        "tally_date_overflow",
+        "tally_date_underflow",
+    ] {
+        assert_eq!(refusal_remediation(code), Some(sentence), "{code}");
+    }
+    let directory = tempfile::tempdir().expect("agent directory");
+    let server = Server::new(settings(
+        "127.0.0.1:9".parse().unwrap(),
+        directory.path().to_path_buf(),
+    ));
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({"company_guid":"00000000-0000-4000-8000-000000000001",
+                "from":"2026-09-02", "to":"2026-09-01"}),
+        )
+        .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "invalid_date_range", "{response}");
+    assert_eq!(error["remediation"], sentence, "{response}");
+}
+
 #[test]
 fn remediation_is_present_only_where_a_concrete_next_step_exists() {
     let guidance = refusal_remediation("empty_book_first_import").expect("empty book guidance");

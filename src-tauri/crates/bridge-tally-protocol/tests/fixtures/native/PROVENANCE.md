@@ -36,10 +36,11 @@ byte-level fidelity is not. Each is pending a future re-capture from live Tally.
 - `ledger_snapshot_billwise_lab.xml`
 
 Do not establish capture byte-length or SHA-256 assertions for these files until
-their live re-captures replace the normalised copies. Their integrity digests
-below pin the normalised bytes as committed, and claim nothing about the capture. The exception is
+their live re-captures replace the normalised copies. The exception is
 `bills_payable_billwise_lab_empty.xml`: its complete 23-byte content is
 independently determined and was repaired separately; it is not a re-capture.
+The integrity digests below pin these files' bytes as committed, and claim
+nothing about a capture.
 
 ## Bridge Validation Lab capture — 2026-08-17
 

@@ -44,9 +44,12 @@
 // So a JSON object carrying a `source` string is read as a provenance record
 // for itself and for the fixtures sharing its stem, on exactly the same terms
 // as Markdown: its declared `fixture_sha256` is the same hash check, and a
-// sidecar declaring none documents nothing. The effect is a stronger gate, not a
-// looser one — 28 hashes in that directory are now machine-checked that
-// previously were not read at all.
+// sidecar declaring none documents nothing. Reading sidecars made the gate
+// stronger, not looser: hashes no check had read before became checked.
+//
+// A JSON object with `source` that shares its stem with no other file
+// documents nothing but itself, and a file cannot hold its own hash. It is a
+// fixture that describes itself, so it needs its own row like any other (#838).
 
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
@@ -167,6 +170,14 @@ for (const fixtureDirectory of fixtureDirectories) {
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed) &&
         typeof parsed.source === "string" && parsed.source.trim()) {
       provenanceRecords.set(path, parsed);
+    }
+  }
+
+  // A record documenting no other file is a self-describing fixture.
+  for (const recordPath of [...provenanceRecords.keys()]) {
+    const stem = recordPath.slice(0, -".json".length);
+    if (!allPaths.some((path) => path !== recordPath && path.startsWith(`${stem}.`))) {
+      provenanceRecords.delete(recordPath);
     }
   }
 

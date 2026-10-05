@@ -348,6 +348,27 @@ test("a JSON sidecar carrying `source` but no hash documents nothing", async () 
   assert.match(runGate(root), /\(1 captured-fixture hash\(es\) verified, 0 undocumented\)/);
 });
 
+// A record that shares its stem with no other file describes only itself, as
+// the outstandings request sequences do. A file cannot hold its own hash, so
+// it is a fixture that needs a row in a note (#838).
+test("a JSON record documenting no other file is a fixture that needs its own row", async () => {
+  const root = await makeTree();
+  try {
+    const bytes = JSON.stringify({ source: "the ordered record of one call's requests" });
+    await mkdir(join(root, SIDECAR_DIR), { recursive: true });
+    await writeFile(join(root, SIDECAR_DIR, "sequence.json"), bytes);
+    assert.match(runGateExpectingFailure(root), /agent\/sequence\.json: no hash row under/);
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    await writeFile(
+      join(root, SIDECAR_DIR, "..", "SEQUENCE_PROVENANCE.md"),
+      `| \`agent/sequence.json\` | ${bytes.length} | \`${sha256}\` |\n`,
+    );
+    assert.match(runGate(root), /\(1 captured-fixture hash\(es\) verified, 0 undocumented\)/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("a sidecar declaring a fixture hash escalates to the same check a table row does", async () => {
   const root = await makeTree();
   await mkdir(join(root, SIDECAR_DIR), { recursive: true });

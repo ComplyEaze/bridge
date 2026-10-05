@@ -79,6 +79,12 @@ to its current name by identity. In the crate that step is `src/binding.rs`; the
 one the related-party port adds there, and this test needs nothing more, because it reads no ledger
 name. The `relationship` text is not bound or checked by anything: it is read as written.
 
+The position of that location in the reference's list of ledger-name locations (42 in all, in the order it
+binds them): `related_parties.<person>.ledgers_by_nature.<nature>` (a list) is number 25, after the three
+`partners.<partner>` locations (22 to 24) and before the two `statutory_dues` locations (26 and 27). In the
+crate's `src/binding.rs` that is after the block that binds the `[partners]` locations and before the block
+that binds `statutory_dues`.
+
 What this test does with a ledger that reached it unbound is shown by `sp_unknown_ledger`, which the
 real pipeline never reaches: the related-party amount still nets the set's other ledgers, the
 finding repeats that figure's evidence, the unknown ledger included, and the result-level check
@@ -343,3 +349,34 @@ compare each whole dump with its golden as the other edge books do (parity spec 
 of the harness that runs the reference, `parity/edge_golden.py`, is kept by the reference's
 maintainers, together with its runners for both tests; a porter does not write one. The goldens are
 regenerated only by the reference's maintainers.
+
+## 11. Registering the test in the crate
+
+A new registry entry needs, besides the books, a golden for the synthetic read and the two harness lines.
+
+- **The synthetic golden.** `goldens/synthetic.specified_persons_40a2b.json` is the test on the crate's synthetic
+  read (`tests/fixtures/synthetic-engagement.toml`). That engagement has no related-person table, so the gate is
+  "no": the dump has one figure (`applicable` = "no") and no finding, and its result-level and module checks are
+  empty. It goes to `tests/fixtures/golden/synthetic.specified_persons_40a2b.json`. The registry's
+  `min_figures` for this test is 1. (The related-party test's own synthetic golden is in the first pack.)
+- **The harness lines** (the reference's maintainers keep and regenerate the harness; these are the lines a port
+  adds so its own harness can name the test). In `parity/python_golden.py`, a runner and its `RUNNERS` entry
+  (the `RUNNERS` list is kept sorted by test id); the test takes the related-party result as input, so the
+  runner runs that test first, as the reference's pack does:
+
+      def _specified_persons_40a2b(c):
+          from types import SimpleNamespace
+          from tae.audit_tests import related_parties_cl23, specified_persons_40a2b
+          from tae.config import related_parties_config
+          rp = related_parties_config(c.cfg)
+          cl23 = related_parties_cl23.run(c.eng, c.rules, rp)
+          mod = SimpleNamespace(TEST_ID=specified_persons_40a2b.TEST_ID, check_invariants=lambda e, res:
+                                specified_persons_40a2b.check_invariants(e, c.rules, rp, cl23, res))
+          return mod, specified_persons_40a2b.run(c.eng, c.rules, rp, cl23)
+
+      "specified_persons_40a2b": _specified_persons_40a2b,
+
+  In `parity/edge_golden.py`, the `runners` table gets the same call with the book's `related_parties` key
+  (absent meaning `{}`: `rp = related_parties_config({"related_parties": spec.get("related_parties", {})})`).
+  A port only needs these to keep the two sides' test lists in step (the crate has tests that compare the Rust
+  registry with the harness's list); the harness is run against the reference by the reference's maintainers.

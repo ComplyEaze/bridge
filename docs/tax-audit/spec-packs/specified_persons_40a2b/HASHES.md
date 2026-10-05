@@ -75,3 +75,4 @@ directory, reproduced every golden byte for byte.
 | `edge.sp_unknown_ledger.specified_persons_40a2b.json` | 2,888 | `c229868338954d51cff60a29e191c8bbb59fe34a520c3129d4fc1d977e8412e3` | `goldens/edge.sp_unknown_ledger.specified_persons_40a2b.json` |
 | `edge.sp_zero.related_parties_cl23.json` | 13,152 | `f21e8009c06712716a79a3101ddc4d44cfc7ff1922035db74f23401099808066` | `goldens/edge.sp_zero.related_parties_cl23.json` |
 | `edge.sp_zero.specified_persons_40a2b.json` | 4,397 | `e9eaa4d8d1f36451da8223e7dcf251cabd441d42348451a21e4792db1125d5a8` | `goldens/edge.sp_zero.specified_persons_40a2b.json` |
+| `synthetic.specified_persons_40a2b.json` | 1,637 | `6dcb62b36bf84f7b037a268ffaa3ea06370a276d919096e7fe3660968f69b8c4` | `goldens/synthetic.specified_persons_40a2b.json` |

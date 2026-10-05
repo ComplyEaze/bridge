@@ -16,7 +16,8 @@ parses from the captured, synthetic-company catalogue
 the production binder, and its `evidence` digests are copied from the sidecar. Its own `provenance`
 object says the same. `src-tauri/src/source_draft/catalog_tests.rs` asserts that `targets`,
 `bindings` and `evidence` still equal the live producer's output; `scripts/source-draft-screen.test.tsx`
-serves it as a mocked backend response. No byte count or SHA-256 is declared for it.
+serves it as a mocked backend response. No capture byte count or SHA-256 is declared for it; its
+integrity digest, at the end, pins the committed bytes only.
 
 ## Re-deriving them
 
@@ -55,3 +56,16 @@ qualify raw customer data.
    would rewrite the geometry these fixtures exist to preserve. That is also why the sanitiser
    itself lives in `scripts/`, not here — this directory holds evidence, and a tool whose bytes are
    pinned as evidence is a category error.
+
+## Integrity digests
+
+Each row is the SHA-256 of the file's committed bytes, which
+`scripts/check-fixture-provenance.mjs` checks (#838). A digest pins the bytes as
+committed and claims nothing about where they came from: the Capture column
+repeats only what this note says above.
+
+| Fixture | Bytes | SHA-256 (integrity digest) | Capture |
+| --- | ---: | --- | --- |
+| `hdfc-bbox-capture.xml` | 34,113 | `ff01bde0f4330141907f2d6e9eeba8e2cf49c77c53437f3f8cdb10fc374bb6e2` | sanitised from a real statement, as above |
+| `sbi-bbox-capture.xml` | 21,091 | `615280486efa461bb15a4d0d4103fc66ea9706799171966cf739bd1447828916` | sanitised from a real statement, as above |
+| `source-draft-capture-bindings.json` | 1,936 | `8e7b43f90a93086ece50c270b9747c83ba473ee1fc4246c8d23cf160592dfe2e` | not a capture, as above |

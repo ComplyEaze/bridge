@@ -35,8 +35,9 @@ byte-level fidelity is not. Each is pending a future re-capture from live Tally.
 - `ledger_snapshot_aarav.xml`
 - `ledger_snapshot_billwise_lab.xml`
 
-Do not establish byte-length or SHA-256 assertions for these files until their
-live re-captures replace the normalised copies. The exception is
+Do not establish capture byte-length or SHA-256 assertions for these files until
+their live re-captures replace the normalised copies. Their integrity digests
+below pin the normalised bytes as committed, and claim nothing about the capture. The exception is
 `bills_payable_billwise_lab_empty.xml`: its complete 23-byte content is
 independently determined and was repaired separately; it is not a re-capture.
 
@@ -170,3 +171,30 @@ run sent, but their authorship is not recorded: no Bridge request builder
 emits the `All Masters` import or the `List of Accounts` export they contain,
 and whether their trailing newline was on the wire is unknown. They are
 documented here as named-only evidence, with no byte-exact claim.
+
+## Integrity digests
+
+Each row is the SHA-256 of the file's committed bytes, which
+`scripts/check-fixture-provenance.mjs` checks (#838). A digest pins the bytes as
+committed and claims nothing about where they came from: the Capture column
+repeats only what this note says above.
+
+| Fixture | Bytes | SHA-256 (integrity digest) | Capture |
+| --- | ---: | --- | --- |
+| `bills_payable_aarav.xml` | 4,715 | `bfebda3fa73d3f2bc6e4b007a6985b82e803a8468b51c540343b9bfa35dc130c` | not established: normalised by Git, as above |
+| `bills_receivable_aarav.xml` | 4,948 | `8ac9093aadf92ee7b5e9006260eb44e3ac546fe521aa158c40c5627697c12c5c` | not established: normalised by Git, as above |
+| `bills_receivable_ageing_lab.xml` | 1,114 | `07339796a9fc4c0eb84467262bec13a61eea0801c281dcf8878b3116d2308184` | not established: normalised by Git, as above |
+| `bills_receivable_billwise_lab.xml` | 10,644 | `a0fcd5020e38ab674b757fdfe098e009d26fca4af1b8692cd49f6840c6074d35` | not established: normalised by Git, as above |
+| `bills_receivable_unloaded_company_failure.xml` | 226 | `c07f07022c9193b4ebc09aeea1a136cf3b4022244e6d4583cb811702aee13deb` | not established: normalised by Git, as above |
+| `company_collection_live.xml` | 2,003 | `7ed31800023bc29f45d71bbb743fd77558ef656642c80c418a5a6b5eef4bfa64` | not established: normalised by Git, as above |
+| `company_extent_9000.xml` | 2,605 | `68967b5aad738f3a81011c1dcf8f7c53ef0321b1fb000c810592bb3e3575a982` | not established: normalised by Git, as above |
+| `ledger_snapshot_aarav.xml` | 39,971 | `129b632f32ced9bc160abf34bc88c87de6f93fd3b27243af0f0f88897c59fe04` | not established: normalised by Git, as above |
+| `ledger_snapshot_billwise_lab.xml` | 7,728 | `3de872e62a3d71a24170c27a3669dfa49a75e5c04f9eed98148db5af615d573d` | not established: normalised by Git, as above |
+| `bills_payable_billwise_lab_empty.xml` | 23 | `2240a70758a0d0245b359bc8c2c727335d9c73bdc0c4c88abf7982fb47cee522` | not a re-capture: content determined independently, as above |
+| `group_snapshot_aarav_with_computed_company_guid.xml` | 27,140 | `bb2c20f7d9e11634f9cf1f6429f655dc31d50b60fca72c71a6ce981c47db099c` | verbatim UTF-8 response, as above |
+| `ledgers_native_aarav.utf16le.xml` | 101,984 | `36d3fa3236cd40826ac9d54077276d7a9c75fdb47653c077a14f43c3b36aa351` | verbatim UTF-16LE response, as above |
+| `ledgers_native_wr2_core_window.utf16le.xml` | 12,648 | `64708e189f2ed6e71bf6311cee810cd15281793f77d7687f20a2910945cf3e05` | verbatim UTF-16LE response, as above |
+| `ledgers_native_bvl.utf16le.xml` | 16,806 | `ac32b3d4c8b36f342a1062e4a2b7443e85653f82cd0a6fcb978aad3edf1b8113` | verbatim UTF-16LE response, as above |
+| `master_fields_lab_partial_alter_create.request.xml` | 570 | `5d9b8483946db9b5c301bf9a588ab209a210b57b8960c8dea6f74d2df1c02958` | not established: authorship not recorded, as above |
+| `master_fields_lab_partial_alter.request.xml` | 412 | `10ca4a75802bd81ac720a028a8b09b9f7ca89897b5608275fe1b314db58f817a` | not established: authorship not recorded, as above |
+| `master_fields_lab_partial_alter_readback.request.xml` | 338 | `570fe7df1c1109be420b6cb5027670514f400402cab964aaaa6b65000c5751a2` | not established: authorship not recorded, as above |

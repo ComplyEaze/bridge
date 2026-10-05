@@ -27,8 +27,12 @@ least one golden.
 
 | Rule changed | Goldens that change |
 | --- | --- |
-| a casefold collision between two party masters no longer hides the name | `ko_t2` |
-| no casefold collision check at all | `ko_t2` |
+| a name shared by more than one master binds to the last party master (the reference before its fix) | `ko_t2` |
+| sharing counted over party masters only (a party and an expense sharing a name stays bound) | `ko_t2` |
+| every voucher sums both of its bank and cash lines (a contra counts both) | `ko_t2` |
+| a pure money transfer counts its larger side once only when it is a non-Contra voucher | `ko_t2` |
+| a shared name dropped from the index instead of being bound to no one | `ko_shared` |
+| only a Contra counts its larger side once (a transfer booked as another type counts both) | `ko_transfer` |
 | any one of 54 never-name-like words removed from the list | `ko_vocab` (and others for some words) |
 | the word `a` removed | none (a one-letter word fails the length test anyway) |
 | any one of the nine separators removed | `ko_vocab` (and others for `-`, `/`, `,`) |
@@ -77,10 +81,12 @@ into a new directory, reproduced every golden byte for byte.
 | `ko_quiet.json` | 5,641 | `ec7b1c8bf4931e0ddfec33f3fbf7ff5859e32cc3a7223c4b4cb5088bcbd26b36` | `books/ko_quiet.json` |
 | `ko_status.json` | 3,035 | `35c4ecc190c738a847b4443e000e3871e16e83793b7e7bf4cbd6e80679c18fb4` | `books/ko_status.json` |
 | `ko_t1.json` | 6,809 | `f4b9001fb4159c95535ca39af67d214b52a855d9168fdb329054b254bd5f0dd8` | `books/ko_t1.json` |
-| `ko_t2.json` | 9,336 | `9b346468e0f84fd8b08c50f72bbccb46303e96c61bcc452997c40c99a74a3bb7` | `books/ko_t2.json` |
+| `ko_t2.json` | 9,403 | `98cac365385a89943321b0b7a24eb16664ba845427bdd1986d00ebfc21fa46db` | `books/ko_t2.json` |
 | `ko_tags.json` | 4,678 | `5755e52427a9e3a6bf27801bf3d7ec39e92227da75585776d7c904128adce9f8` | `books/ko_tags.json` |
 | `ko_text.json` | 5,831 | `a7239ad59fb580a1c0514dbedb1651d09dcc556da1e8451d2555c7fbe814fb99` | `books/ko_text.json` |
 | `ko_vocab.json` | 16,700 | `ec28c7fb06dce0300e213cad4e8c484d509f5dfe507e21bac75ff4b63aa93817` | `books/ko_vocab.json` |
+| `ko_shared.json` | 2,846 | `9f37b1242c5fbbac624c835af6cd4d62102e8e87feacd4e13136397deb5f0c20` | `books/ko_shared.json` |
+| `ko_transfer.json` | 2,620 | `72ba98baa3d79606e97db46c48c66ee70ffdd0c1271fe3ded2bb361ec6ab1086` | `books/ko_transfer.json` |
 | `edge.ko_empty.knock_off_candidates.json` | 3,255 | `b8f0e7dce45acd2075c1ea5a0a9801e21ce42e0a123b9d968ecfddb1535607a1` | `goldens/edge.ko_empty.knock_off_candidates.json` |
 | `edge.ko_groups.knock_off_candidates.json` | 12,137 | `f9a5ce70c916c1a558e74420842d06d6b9495e1f5da1a1d0afaafb6fb0cf4985` | `goldens/edge.ko_groups.knock_off_candidates.json` |
 | `edge.ko_groups_off.knock_off_candidates.json` | 7,553 | `bf17ffb904d3ae2ded6219512f120eb8dd395c3918ec104f9d4c75b01ca0882a` | `goldens/edge.ko_groups_off.knock_off_candidates.json` |
@@ -88,7 +94,10 @@ into a new directory, reproduced every golden byte for byte.
 | `edge.ko_quiet.knock_off_candidates.json` | 3,255 | `b8f0e7dce45acd2075c1ea5a0a9801e21ce42e0a123b9d968ecfddb1535607a1` | `goldens/edge.ko_quiet.knock_off_candidates.json` |
 | `edge.ko_status.knock_off_candidates.json` | 5,222 | `49617a1f72e954ee289254be6a7051428f83273d1ca4efa5769ac1e376b9ef9e` | `goldens/edge.ko_status.knock_off_candidates.json` |
 | `edge.ko_t1.knock_off_candidates.json` | 7,814 | `0128b94c9f5beb7a0a322f8ae344f03f7ccf9fc577264e1f91b1a7a1a7d2b738` | `goldens/edge.ko_t1.knock_off_candidates.json` |
-| `edge.ko_t2.knock_off_candidates.json` | 14,768 | `f7ad7f17ac6e21cb3e88fe64de1848e1e798748d30963a05775c724b094f1ccf` | `goldens/edge.ko_t2.knock_off_candidates.json` |
+| `edge.ko_t2.knock_off_candidates.json` | 13,505 | `7bbee3909791a9f8606a18c6c0eb472fd3ea81f4ea0f3e9291ff47af400a8635` | `goldens/edge.ko_t2.knock_off_candidates.json` |
 | `edge.ko_tags.knock_off_candidates.json` | 12,570 | `16cff631d29e7e91c8f52b25f00224cc65841fc93fdfe413cdcff20e0c742d3b` | `goldens/edge.ko_tags.knock_off_candidates.json` |
 | `edge.ko_text.knock_off_candidates.json` | 14,392 | `5e4e6cb65155f010a491af989751e59f5c54d52a0cdca26543c62454c3a1a873` | `goldens/edge.ko_text.knock_off_candidates.json` |
 | `edge.ko_vocab.knock_off_candidates.json` | 33,299 | `efc998f0766521ee19e9082e352649d2bd235c4d00d6b4086de433cab1b2eba4` | `goldens/edge.ko_vocab.knock_off_candidates.json` |
+| `edge.ko_shared.knock_off_candidates.json` | 6,224 | `e735cdb0d08bdfe2670678e0632fea0d4725ac6fb3ff955561f3ae3171db2a1a` | `goldens/edge.ko_shared.knock_off_candidates.json` |
+| `edge.ko_transfer.knock_off_candidates.json` | 6,633 | `53d1c9197bc69edb9de37b8459c454c57f16226e2f9f2a5f3bb744b653f7dd5d` | `goldens/edge.ko_transfer.knock_off_candidates.json` |
+| `synthetic.knock_off_candidates.json` | 3,811 | `fff7236ed95a37a0d83107db0ab8e9ba5056518b14301ba0b9697ead7b2118cf` | `goldens/synthetic.knock_off_candidates.json` |

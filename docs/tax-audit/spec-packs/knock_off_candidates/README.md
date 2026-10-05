@@ -151,11 +151,14 @@ token (`ko_vocab`, README section 12).
 
 **The names that can be found.** Each party ledger, taken in code-point order of its name, gives a
 key: the tokens of its whole name, case-folded the same way but not cut into parts. A party is left
-out when its key is empty (`ko_t2`: a Devanagari name) or when another ledger master has the same
-name after `casefold()`. That other master may be a party (`ko_t2`: `Omega Mart` and `OMEGA MART`, both
-parties, so b07 names neither) or not (`ko_t2`: the party `Sigma Stores` and the expense `sigma
-stores`). When two parties have the same key, the one later in code-point order replaces the earlier
-(`ko_t2`: `Kappa-Traders` replaces `Kappa Traders`; README section 11).
+out when its key is empty (`ko_t2`: a Devanagari name). A key is **shared** when any other ledger
+master, of any group, has the same tokens in the same order, whatever its case, punctuation or
+spacing; masters are counted over every group, and a key with more than one master is bound to no
+one: the narration cannot say which master it means, so it is listed for none. That other master may
+be a party (`ko_t2`: `Omega Mart` and `OMEGA MART`, so b07 names neither; `Kappa Traders` and
+`Kappa-Traders`, so b06 is not listed) or not (`ko_t2`: the party `Sigma Stores` and the expense
+`sigma stores`). A shared key stays in the index as a name the narration holds, so a shorter name
+inside it is still dropped as nested and a neighbouring name still sits beside it; `ko_shared` pins that.
 
 **Finding them.** At every token position, every key that matches the tokens starting there, in
 full, is a found name with its span of tokens. Matching runs across parts, so a name written across
@@ -226,10 +229,11 @@ two more come for each name found plainly.
 
 Consequences the goldens show: a T1 voucher adds every positive party line, even for a party whose
 lines net to zero (`ko_t1`'s t08 adds the ₹2,000 debit line of `Alpha Traders`, whose two lines net to
-`₹0`); a contra between two bank or cash ledgers adds both lines (`ko_t2`'s b04 adds twice its
-amount); a voucher that is both a T2 and a T2 embedded row is in both totals (`ko_nested`'s n16); a T2
+`₹0`); a voucher whose every non-nil line is on a bank or cash ledger, or any Contra, moves one amount
+between money ledgers and counts the larger side of its money lines once (`ko_t2`'s b04 adds its
+amount once); every other voucher sums the absolute value of each of its bank and cash lines; a voucher that is both a T2 and a T2 embedded row is in both totals (`ko_nested`'s n16); a T2
 row naming two parties counts once in `t2_row_count` and once in each name's figures, so
-`t2_named_pair_count` exceeds `t2_row_count` (`ko_t2`: 12 and 11).
+`t2_named_pair_count` exceeds `t2_row_count` (`ko_t2`: 11 and 10).
 
 Each definition is a fixed sentence; the two per-name definitions carry the tag. Take them from the
 goldens: they are compared by hash (parity spec section 4).
@@ -427,15 +431,11 @@ book).
 Reproduce these as the goldens show them, and raise them on the pull request rather than fixing them
 in the port:
 
-- **Two parties with the same words** (`ko_t2`'s b06): `Kappa Traders` and `Kappa-Traders` have one
-  key, the later name wins it, and a payment booked to `Kappa Traders` whose narration names it is
-  listed as naming `Kappa-Traders`. `Kappa Traders` can never be found.
 - **Letters that fold to non-ASCII cut a token** (`ko_t2`'s b09 and b10, `ko_tags`' k06):
   `Café Corner` is keyed as `caf corner`, so `CAFE CORNER` misses it and `CAF CORNER` finds it
   (measured on an invented voucher; no book has it).
 - **Zero lines are on the voucher for T2 but not for T1** (`ko_t2`'s b12 against `ko_t1`'s t05), and
   not in `<ledgers>` either (`ko_vocab`'s v49).
-- **A contra counts both of its lines** in the T2 totals (`ko_t2`'s b04).
 - **The part shown for a name written across a separator** is only its first part (`ko_nested`'s
   n18, `ko_vocab`'s v43).
 - **The shared limit** says "the candidate total is a candidate total, not a reportable amount": the
@@ -452,9 +452,11 @@ read from Tally. Each book's `comment` says what it reaches, voucher by voucher.
 | `ko_empty` | No vouchers: seven zero figures, no finding; golden byte-identical to `ko_quiet`'s. |
 | `ko_t1` | T1: debtor against creditor; a ledger under a sub-group of `Loans (Liability)` against a ledger directly under `Loans & Advances (Asset)`; a credit note and a sales voucher; three parties in code-point order; a zero bank line; a party netting to zero; empty numbers with short and long GUIDs; a five-lakh amount; a cash line that blocks. |
 | `ko_text` | Label text: narrations of 80, 81 and over 80 Devanagari characters, collapsed whitespace, quotes, a zero-width space, a backslash, no narration; amounts from 1 paise; a 1-paise bank line that blocks; a name found across the cut; an inside part with a quote. All three findings. |
-| `ko_t2` | T2: names in parts and in lower case, two names in one narration, a contra with no other ledger, a cash payment, two booked ledgers, two bank ledgers, a name found twice, a digit in a name, an accented name; names not read (two parties sharing a name in different case, a party and an expense master sharing one, Devanagari, an unaccented spelling, a party on a zero line); the same-words case of README section 11. |
+| `ko_t2` | T2: names in parts and in lower case, two names in one narration, a contra with no other ledger, a cash payment, two booked ledgers, two bank ledgers, a name found twice, a digit in a name, an accented name; names not read (two parties sharing a name in different case, a party and an expense master sharing one, Devanagari, an unaccented spelling, a party on a zero line); two parties whose names differ only in punctuation (`Kappa Traders`, `Kappa-Traders`: a shared name, README section 13). |
 | `ko_nested` | Nested, overlapping and chained names; plain and inside decided by a separator, a legal suffix, a single letter, a number, a letter-and-digit word and a two-letter word; parties written back to back; plain winning over inside; one voucher in both lists; two inside parts; a name across a separator; own party skipped. |
 | `ko_vocab` | One voucher per rule: all 55 never-name-like words (two per voucher, one on the last), the nine separators and five non-separators, the token after a name spread over two parts, the sharp s in a narration and in a name, the `ﬁ` ligature, the Kelvin sign, the dotted capital I, a zero line left out of `<ledgers>`, the parts of a plain name left out, and two names sorted as written rather than as normalised. |
+| `ko_shared` | A name two masters share stays in the index: `Sigma Trading` (a creditor) and `SIGMA-TRADING` (a debtor) share their words, so the name is bound to no one, and the shorter party `Sigma` inside it is dropped as nested (s01 is not listed); s02 names only `Sigma` and is listed. |
+| `ko_transfer` | A bank-to-cash transfer booked as a Payment with no line on any other ledger counts its larger side once (t01: 500,000 paise); a Journal with the same money lines and a charge line counts both money lines (t02: 990,000 paise). |
 | `ko_groups` | `party_identity.party_groups` with a custom group under `Capital Account`, a repeated default, `Cash-in-Hand` and a name no group has: T1 through a partner's ledger; an overdraft ledger that is both party and bank; a cash ledger and a partner's ledger named as parties. |
 | `ko_groups_off` | The same book with no `party_identity` table: only the overdraft and the debtor are found, with the same tags as in `ko_groups`. |
 | `ko_tags` | Every tag shape of README section 4.7. |
@@ -471,3 +473,58 @@ The reference's side of the edge harness, `parity/edge_golden.py`, is in this re
 no runner for this test yet: the runner that produced these goldens extends it and is held by the
 reference's maintainers, outside this pack (HASHES.md says how it calls the test). A porter does not
 write one. The goldens are regenerated only by the reference's maintainers.
+
+## 13. Re-pin note: the reference's fix of two behaviours (reference commit `66e842e7`)
+
+An earlier form of this pack documented two reference behaviours as defects. The reference has since
+fixed both, and the goldens here were regenerated from it (reference commit `66e842e7`, Python 3.13, the
+pack's own books; each of the eleven goldens of the earlier pack was regenerated and compared). Exactly one golden
+changed, `ko_t2`; the other ten are byte-identical. Two books were added with their goldens, `ko_shared` and
+`ko_transfer`, one for each rule below that no earlier book pinned.
+
+- **A name two masters share is listed for none.** Before: masters were counted by their case-folded
+  name but indexed by their token tuple, so `Kappa Traders` and `Kappa-Traders` shared one key and the
+  later in code-point order won it. Now masters are counted by token tuple over every group, and a
+  tuple with more than one master is bound to no one (but stays in the index as a name the narration
+  holds). In `ko_t2` b06 is no longer listed, so `t2_row_count` is 10 (was 11), `t2_named_pair_count`
+  is 11 (was 12), the Kappa group's count and total figures are gone, and `Alpha Traders`' named total
+  is 3,000 rupees (was 5,000).
+- **A voucher's money counts once.** Before: every bank or cash line was added by absolute value, so a
+  Contra counted twice. Now a voucher whose every non-nil line is on a bank or cash ledger, or any
+  Contra, counts the larger side of its money lines once; every other voucher is as before. In `ko_t2`
+  b04 (a 2,000-rupee contra naming `Alpha Traders`) counts 2,000 (was 4,000), and
+  `t2_candidate_total_paise` is 2,760,000 (was 3,360,000: 4,000 rupees less for b06, 2,000 rupees less
+  for b04).
+- **Known limits the reference states:** a transfer between a bank and a cash ledger booked as a Payment
+  or Journal with a charge line on another ledger still counts both money lines; a name two party
+  masters share, with neither on the voucher, is listed for neither (a recall loss, as a case-only
+  duplicate always was).
+- **The two rules no earlier book pinned are now pinned** by the two new books: `ko_shared` (a shared key
+  stays in the index as a name the narration holds, rather than being dropped from it: dropping it makes `ko_shared`
+  list s01 for `Sigma`) and `ko_transfer` (a voucher booked as a type other than Contra, whose every non-nil line is
+  on a bank or cash ledger, counts its larger side once: counting only Contra that way changes `ko_transfer`). Each
+  change was applied to a copy of the reference: the new book changes and every other golden does not; on the
+  unchanged reference both new books reproduce.
+
+## 14. Registering the test in the crate
+
+A new registry entry needs, besides the books, a golden for the synthetic read and the two harness lines.
+
+- **The synthetic golden.** `goldens/synthetic.knock_off_candidates.json` is the test on the crate's synthetic
+  read (`tests/fixtures/synthetic-engagement.toml`), with no party groups configured. It has the seven figures
+  (all zero or empty counts and totals) and no finding. It goes to
+  `tests/fixtures/golden/synthetic.knock_off_candidates.json`. The registry's `min_figures` for this test is 7.
+- **The harness lines** (the reference's maintainers keep and regenerate the harness; these are the lines a port
+  adds so its own harness can name the test). In `parity/python_golden.py`, a runner and its `RUNNERS` entry
+  (the `RUNNERS` list is kept sorted by test id):
+
+      def _knock_off_candidates(c):
+          from tae.audit_tests import knock_off_candidates
+          return knock_off_candidates, knock_off_candidates.run(
+              c.eng, c.rules, tuple(c.cfg.get("party_identity", {}).get("party_groups", ())))
+
+      "knock_off_candidates": _knock_off_candidates,
+
+  In `parity/edge_golden.py`, the `runners` table gets the same call with the book's `party_identity` table
+  (`tuple(spec.get("party_identity", {}).get("party_groups", ()))`). A port only needs these to keep the two
+  sides' test lists in step (the crate has tests that compare the Rust registry with the harness's list).

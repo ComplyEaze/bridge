@@ -399,11 +399,14 @@ fn a_busy_readback_after_a_recorded_send_names_verify_import_never_a_rebuild() {
         error["next_step"],
         "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again."
     );
-    // Held back before any attempt was recorded: it says when to retry but
-    // offers no verify_import step.
+    // Held back before any attempt was recorded: it says when to try again,
+    // and that the person approves again, never a verify_import step (#869).
     let before =
         reconciliation_failure_payload("bridge-test", Some(false), None, "tally_endpoint_busy");
-    assert!(before["result"]["error"].get("next_step").is_none());
+    assert_eq!(
+        before["result"]["error"]["next_step"],
+        "Nothing was posted: Tally's port was busy. Call post_import with this same batch again after retry_after_s seconds, once Tally is free. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch."
+    );
     assert_eq!(
         before["result"]["error"]["retry_after_s"],
         bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()

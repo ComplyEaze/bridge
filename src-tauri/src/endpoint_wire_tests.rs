@@ -204,6 +204,7 @@ async fn runtime_operations_in_one_call_share_one_wait_budget() {
     let runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(WireGateConfig {
         root: WireRoot::at(root.clone()),
         retry: WireRetryPolicy::new(Duration::from_millis(50), budget).unwrap(),
+        busy_at: None,
     });
     let _other = gate(&root, &endpoint).try_acquire().unwrap();
     let busy = |result: anyhow::Result<crate::tally::ConnectionStatus>| {

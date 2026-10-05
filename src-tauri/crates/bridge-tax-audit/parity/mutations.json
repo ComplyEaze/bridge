@@ -3132,7 +3132,7 @@
   "by": "author (Lane E2)",
   "what": "TDS on a voucher that also posts to another loan is counted",
   "file": "src/loans_interest.rs",
-  "from": "                        .any(|l| other_loans.contains(l.ledger.as_str()))",
+  "from": "                        .any(|l| other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
   "to": "                        .any(|l| l.ledger.is_empty())"
  },
  {
@@ -9142,5 +9142,21 @@
   "file": "src/entity_269st_gap.rs",
   "from": "hash8(pan)",
   "to": "hash8(&pan.to_lowercase())"
+ },
+ {
+  "id": "LR-81",
+  "by": "author",
+  "what": "a nil line on another loan counts as a posting to it (the pre-#1201 coverage exclusion)",
+  "file": "src/loans_interest.rs",
+  "from": "other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
+  "to": "other_loans.contains(l.ledger.as_str()))"
+ },
+ {
+  "id": "LR-82",
+  "by": "author",
+  "what": "only a positive line on another loan stops its voucher counting for coverage",
+  "file": "src/loans_interest.rs",
+  "from": "other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
+  "to": "other_loans.contains(l.ledger.as_str()) && l.amount_paise > 0)"
  }
 ]

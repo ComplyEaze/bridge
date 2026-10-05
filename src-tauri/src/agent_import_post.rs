@@ -577,6 +577,9 @@ impl Server {
         let mut masters_verdict: Option<Value> = None;
         // The ledgers whose GUID changed since the build (#239).
         let mut ledgers_changed: Option<Vec<String>> = None;
+        // The recorded cash-in-hand ledgers no longer under Cash-in-Hand, as
+        // refusal rows, and how many were left out (#815).
+        let mut cash_in_hand_refused: Option<(Vec<Value>, usize)> = None;
         // The batch's own transaction ids found already in the book (#901).
         let mut preexisting_txn_ids: Option<Vec<String>> = None;
         let operation: Result<Step, ToolFailure> = async {
@@ -615,6 +618,11 @@ impl Server {
             // recorded its ledgers' GUIDs has nothing to check them against.
             if line.ledger_identities.is_none() {
                 return Err(BuildBindingRefusal::Unbound.code().to_string().into());
+            }
+            // Nor can a batch saved before Bridge recorded the ledgers its bank
+            // cash answers named as cash in hand: nothing to check again (#815).
+            if line.cash_in_hand_ledgers.is_none() {
+                return Err(CASH_LEDGERS_NOT_RECORDED.to_string().into());
             }
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
@@ -807,6 +815,17 @@ impl Server {
                 let observed = ObservedMasters::new(catalogue_identities.parents(), groups);
                 if cash_bank_refusals(&payload, &observed, RECHECK_REFUSAL_BUDGET).is_refused() {
                     return Err("import_bank_classification_changed".to_string().into());
+                }
+                // A ledger a cash answer named as cash in hand must still be
+                // one: under Bank Accounts its Contra moves the cash bank to
+                // bank, which passes the gate above (#815).
+                if let Some(refused) = super::cash_in_hand_refusals(
+                    line.cash_in_hand_ledgers.as_deref().unwrap_or_default(),
+                    &observed,
+                    self.settings.max_bytes,
+                ) {
+                    cash_in_hand_refused = Some(refused);
+                    return Err("cash_ledger_not_cash_in_hand".to_string().into());
                 }
                 Some(
                     crate::tally::agent_read_request::AgentReadRequest::parse(
@@ -1061,6 +1080,10 @@ impl Server {
                     .chain()
                     .find_map(|cause| cause.downcast_ref::<ApprovedImportAdmissionError>())
                     .and_then(refused_currencies);
+                cash_in_hand_refused = error
+                    .chain()
+                    .find_map(|cause| cause.downcast_ref::<ApprovedImportAdmissionError>())
+                    .and_then(refused_cash_in_hand);
                 let code = if error.chain().any(|cause| {
                     cause.is::<crate::tally::approved_import::AmbiguousImportCompany>()
                 }) {
@@ -1093,6 +1116,20 @@ impl Server {
                     )
                 }) {
                     "import_bank_classification_changed"
+                } else if error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                        Some(ApprovedImportAdmissionError::CashLedgerNotCashInHand { .. })
+                    )
+                }) {
+                    "cash_ledger_not_cash_in_hand"
+                } else if error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                        Some(ApprovedImportAdmissionError::CashLedgersNotRecorded)
+                    )
+                }) {
+                    CASH_LEDGERS_NOT_RECORDED
                 } else if error.chain().any(|cause| {
                     matches!(
                         cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -1380,6 +1417,9 @@ impl Server {
                 }
                 if let Some(currencies) = currencies_seen {
                     name_refused_currencies(&mut outcome.payload, &currencies);
+                }
+                if let Some((refused, omitted)) = cash_in_hand_refused {
+                    name_refused_cash_ledgers(&mut outcome.payload, refused, omitted);
                 }
                 // Withheld under the remediation budget, as `cause` is. That is
                 // not a guarantee against the oversize answer just above it.
@@ -1832,6 +1872,12 @@ fn recheck_import_admission(
     currencies: &str,
     ledger_binding: &bridge_tally_protocol::StandardLedgerCatalogBinding,
 ) -> anyhow::Result<()> {
+    // The ledgers the build found under Cash-in-Hand (#815): a record without
+    // them predates the field and has nothing to check again.
+    let cash_in_hand = line
+        .cash_in_hand_ledgers
+        .as_deref()
+        .ok_or(ApprovedImportAdmissionError::CashLedgersNotRecorded)?;
     let observed = parse_import_vouchers(first, company_guid).map_err(anyhow::Error::msg)?;
     let corroboration = parse_import_vouchers(second, company_guid).map_err(anyhow::Error::msg)?;
     corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)
@@ -1886,6 +1932,17 @@ fn recheck_import_admission(
             if cash_bank_refusals(&payload, &observed, RECHECK_REFUSAL_BUDGET).is_refused() {
                 return Err(ApprovedImportAdmissionError::BankClassificationChanged.into());
             }
+            // Re-parenting a cash ledger under Bank Accounts keeps every leg
+            // money, so it passes the gate above (#815).
+            if let Some((refused, omitted)) =
+                super::cash_in_hand_refusals(cash_in_hand, &observed, RECHECK_REFUSAL_BUDGET)
+            {
+                return Err(ApprovedImportAdmissionError::CashLedgerNotCashInHand {
+                    refused,
+                    omitted,
+                }
+                .into());
+            }
         }
         // A bank voucher without its group read, or a Journal with one, is a
         // wiring fault; refuse rather than post on half a check.
@@ -1919,6 +1976,36 @@ fn admit_post_currency(currencies: &str) -> Result<(), ApprovedImportAdmissionEr
         })
     } else {
         Err(ApprovedImportAdmissionError::BaseCurrencyUndetermined)
+    }
+}
+
+/// The code refusing a batch recorded before its cash-in-hand ledgers were
+/// (#815). Like a batch built before ledger binding (#239), it is rebuilt.
+const CASH_LEDGERS_NOT_RECORDED: &str = "import_batch_predates_cash_ledger_record";
+
+fn refused_cash_in_hand(refusal: &ApprovedImportAdmissionError) -> Option<(Vec<Value>, usize)> {
+    match refusal {
+        ApprovedImportAdmissionError::CashLedgerNotCashInHand { refused, omitted } => {
+            Some((refused.clone(), *omitted))
+        }
+        _ => None,
+    }
+}
+
+/// List the recorded cash-in-hand ledgers that no longer reach Cash-in-Hand, as
+/// the build's refusal lists them, and, where no attempt is recorded, say in
+/// plain words what to do (#815). The message names no ledger itself.
+fn name_refused_cash_ledgers(payload: &mut Value, refused: Vec<Value>, omitted: usize) {
+    let error = &mut payload["result"]["error"];
+    error["refused_ledgers"] = Value::Array(refused);
+    error["refused_ledgers_omitted"] = json!(omitted);
+    if payload["result"]["attempt_recorded"] == json!(false) {
+        payload["result"]["error"]["message"] = json!(
+            "A ledger named as cash in hand when this batch was built (listed in \
+             error.refused_ledgers) is no longer under Cash-in-Hand: its group now reaches the \
+             reserved group shown. Nothing was posted. Put the ledger back under Cash-in-Hand, \
+             or build the batch again with the cash-in-hand ledger."
+        );
     }
 }
 
@@ -1997,8 +2084,18 @@ fn name_changed_ledgers(payload: &mut Value, ledgers: &[String]) {
 }
 
 /// Say plainly that a batch built before ledger identities were recorded must
-/// be rebuilt, where no attempt is recorded.
+/// be rebuilt, where no attempt is recorded. So must one built before its
+/// cash-in-hand ledgers were recorded (#815).
 fn explain_unbound_batch(payload: &mut Value) {
+    if payload["result"]["error"]["code"] == json!(CASH_LEDGERS_NOT_RECORDED)
+        && payload["result"]["attempt_recorded"] == json!(false)
+    {
+        payload["result"]["error"]["message"] = json!(
+            "This batch was built before ComplyEaze Bridge recorded which of its ledgers must stay \
+             under Cash-in-Hand, so it cannot be checked. Nothing was posted. Build the batch \
+             again, then post the new batch."
+        );
+    }
     if payload["result"]["error"]["code"] == json!("import_batch_predates_ledger_binding")
         && payload["result"]["attempt_recorded"] == json!(false)
     {

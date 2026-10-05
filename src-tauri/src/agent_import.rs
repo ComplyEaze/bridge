@@ -289,6 +289,23 @@ pub(super) struct ImportLedgerLine {
     /// existed: such a batch is refused for posting and must be rebuilt.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ledger_identities: Option<Vec<BoundLedger>>,
+    /// Each ledger a bank cash answer named as cash in hand, with the voucher
+    /// it was answered for (#815). The build refused any outside Cash-in-Hand,
+    /// and a post checks each again before approval and in the queue, since a
+    /// ledger or its group can move in between. Empty when no answer named
+    /// one. Absent on records built before this field existed: such a batch is
+    /// refused for posting and must be rebuilt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cash_in_hand_ledgers: Option<Vec<CashInHandLedger>>,
+}
+
+/// A ledger a bank cash answer named as cash in hand, and the voucher built
+/// from that answer (#815).
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(super) struct CashInHandLedger {
+    bridge_txn_id: String,
+    ledger: String,
 }
 
 /// A requested name and every live ledger whose stored name folds equal to it
@@ -990,6 +1007,17 @@ impl Server {
                 pre_import_mark: mark,
                 vouchers: payload.vouchers,
                 ledger_identities: Some(build_binding),
+                cash_in_hand_ledgers: Some(
+                    resolved
+                        .cash_ledgers
+                        .iter()
+                        .filter(|need| need.cash_in_hand)
+                        .map(|need| CashInHandLedger {
+                            bridge_txn_id: need.bridge_txn_id.clone(),
+                            ledger: need.ledger.clone(),
+                        })
+                        .collect(),
+                ),
             };
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));
@@ -3182,6 +3210,27 @@ fn answered_ledger_refusals(
     let (rows, omitted) =
         super::bank_statement::bounded(refused.into_values().collect(), &mut budget);
     Some((reason, rows, omitted))
+}
+
+/// The recorded cash-in-hand ledgers that no longer reach Cash-in-Hand (#815),
+/// as the build's `cash_ledger_not_cash_in_hand` refusal reports them: one row
+/// per ledger with the reserved group it reaches, bounded by `max_bytes`, and
+/// how many rows were left out.
+fn cash_in_hand_refusals(
+    recorded: &[CashInHandLedger],
+    observed: &ObservedMasters,
+    max_bytes: usize,
+) -> Option<(Vec<Value>, usize)> {
+    let required = recorded
+        .iter()
+        .map(|need| super::bank_statement::AnsweredCashLedger {
+            bridge_txn_id: need.bridge_txn_id.clone(),
+            ledger: need.ledger.clone(),
+            cash_in_hand: true,
+        })
+        .collect::<Vec<_>>();
+    answered_ledger_refusals(&required, observed, max_bytes)
+        .map(|(_, refused, omitted)| (refused, omitted))
 }
 
 /// How many vouchers Bridge's bank import sent to suspense, by the tag it

@@ -1287,7 +1287,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         "identity_scheme":"batch_v1", "company_guid":company_guid,
         "txn_ids":["TWIN-1","TWIN-2"],
         "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
-        "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
         "vouchers":[
             {"bridge_txn_id":"TWIN-1","date":"20260907","voucher_type":"Journal",
@@ -1356,6 +1356,62 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     ));
 }
 
+/// #815: the queue refuses a record written before its cash-in-hand ledgers
+/// were, by its typed variant, before reading anything it was handed: there is
+/// nothing to check again, so the batch must be rebuilt.
+#[test]
+fn a_record_without_cash_in_hand_ledgers_is_refused_by_the_queue() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-00000000-0000-4000-8000-000000000815",
+        "identity_scheme":"batch_v1", "company_guid":company_guid,
+        "txn_ids":["contra-815"],
+        "date_from":"20260901", "date_to":"20260901", "sha256":"",
+        "built_at":"2026-10-05T00:00:00Z", "status":"built",
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+        "vouchers":[{"bridge_txn_id":"contra-815","date":"20260901","voucher_type":"Contra",
+            "entries":[{"ledger":"Cash","amount":"5.00","side":"Dr"},
+                {"ledger":"WR2 Sales","amount":"5.00","side":"Cr"}]}]
+    }))
+    .unwrap();
+    assert_eq!(line.cash_in_hand_ledgers, None);
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+    );
+    let catalogue = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let ledger_binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+        &catalogue,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(vec!["Cash".to_string(), "WR2 Sales".to_string()])
+    .unwrap();
+    // Every read it is handed is empty: the refusal comes before any of them.
+    let error = recheck_import_admission(
+        &line,
+        company_guid,
+        "WR2 Unicode Lab",
+        "",
+        "",
+        "",
+        None,
+        "",
+        &ledger_binding,
+    )
+    .expect_err("a record without the field must be refused");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::CashLedgersNotRecorded)
+    );
+}
+
 #[test]
 fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candidate() {
     let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
@@ -1374,7 +1430,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         "identity_scheme":"batch_v1", "company_guid":company_guid,
         "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],
         "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
-        "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
         "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1","date":"20260907",
             "voucher_type":"Journal","narration":"Bridge MCP batch namespace qualification",

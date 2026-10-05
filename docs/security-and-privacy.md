@@ -259,7 +259,7 @@ From 0.4.1 a clicked approval is also withdrawn when the post is refused
 before its checks begin (for example when the batch is not found or the
 journal is busy); a refusal inside the checks already withdrew it.
 
-The window belongs to ComplyEaze Bridge's own tools. Another Tally connector in
+The window covers only ComplyEaze Bridge's own tools. Another Tally connector in
 the same Claude Desktop that can change entries can do so without it.
 
 **Not measured:** what Claude Desktop itself needs when installing an extension,

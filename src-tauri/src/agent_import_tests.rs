@@ -2353,7 +2353,8 @@ fn only_effective_unmarked_rows_count_as_copies_of_a_cancelled_voucher() {
         assert_eq!(count, 1);
     }
     let mut many = rows.clone();
-    many.extend((3001..=3006).map(|at| variant(at, |_| {})));
+    // Appended out of AlterID order, so the listed five are sorted, not as found.
+    many.extend((3001..=3006).rev().map(|at| variant(at, |_| {})));
     let (item, count) = cancelled_item(&many);
     let copies = &item["effective_copies_observed"];
     assert_eq!(copies["count"], 7, "{item}");
@@ -2365,6 +2366,144 @@ fn only_effective_unmarked_rows_count_as_copies_of_a_cancelled_voucher() {
         .map(|entry| entry["alter_id"].as_u64().unwrap())
         .collect::<Vec<_>>();
     assert_eq!(alter_ids, [1790, 3001, 3002, 3003, 3004], "{item}");
+}
+
+/// A copy must carry the cancelled voucher's own content and be left over by
+/// the rest of the batch (#806, from #1221's review): a re-entry with another
+/// amount, sign, ledger or date is not one, a copy another batch voucher of
+/// the same content took is not one, and one below the pre-import mark is
+/// listed and flagged.
+#[test]
+fn a_copy_must_carry_the_cancelled_vouchers_own_content_left_unconsumed() {
+    let (line, rows) = l1_reentry_line_and_rows();
+    let re_entry = rows
+        .iter()
+        .find(|row| row.alter_id == Some(1790))
+        .expect("the captured re-entry")
+        .clone();
+    let variant = |at: u64, change: &dyn Fn(&mut ReadVoucher)| {
+        let mut row = re_entry.clone();
+        row.alter_id = Some(at);
+        // An identity no captured row holds, even where AlterID is below
+        // the captured range.
+        let id = 900_000 + at;
+        row.master_id = Some(id.to_string());
+        row.guid = Some(format!("17a10910-773c-42c6-bd66-7bba9a392536-{id:08x}"));
+        row.remote_id = row.guid.clone();
+        change(&mut row);
+        row
+    };
+    let item_of = |line: &ImportLedgerLine, rows: &[ReadVoucher], txn: &str| {
+        let verified = verify_observed_batch(line, rows).expect("verified");
+        let item = verified["vouchers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["bridge_txn_id"] == txn)
+            .unwrap()
+            .clone();
+        (item, verified["counts"].clone())
+    };
+    // Another amount, sign, ledger or date: the same voucher in every other
+    // respect, so only the fingerprint keeps it out.
+    let changes: [&dyn Fn(&mut ReadVoucher); 4] = [
+        &|row| {
+            for entry in &mut row.entries {
+                entry.amount = entry.amount.replace("50.00", "60.00");
+            }
+        },
+        &|row| {
+            for entry in &mut row.entries {
+                entry.amount = if entry.amount.starts_with('-') {
+                    entry.amount.trim_start_matches('-').to_string()
+                } else {
+                    format!("-{}", entry.amount)
+                };
+                entry.is_deemed_positive = if entry.is_deemed_positive == "Yes" {
+                    "No".into()
+                } else {
+                    "Yes".into()
+                };
+            }
+        },
+        &|row| {
+            for entry in &mut row.entries {
+                if entry.ledger == "Cash" {
+                    entry.ledger = "Petty Cash".into();
+                }
+            }
+        },
+        &|row| row.date = Some("20260618".into()),
+    ];
+    for change in changes {
+        let mut rows = rows.clone();
+        rows.retain(|row| row.alter_id != Some(1790));
+        rows.push(variant(3000, change));
+        let (item, counts) = item_of(&line, &rows, "L1A-050");
+        assert_eq!(item["effective_copies_observed"]["count"], 0, "{item}");
+        assert_eq!(counts["cancelled_with_effective_copy"], 0);
+    }
+    // Another batch voucher of the same content takes the copy first.
+    let mut twinned = line.clone();
+    let mut twin = twinned
+        .vouchers
+        .iter()
+        .find(|voucher| voucher.bridge_txn_id == "L1A-050")
+        .unwrap()
+        .clone();
+    twin.bridge_txn_id = "L1A-051".into();
+    twinned.vouchers.push(twin);
+    let (item, counts) = item_of(&twinned, &rows, "L1A-050");
+    assert_eq!(
+        item["effective_copies_observed"],
+        json!({"count":0,"entries":[],"attribution":"not_established","ambiguous_within_batch":true}),
+        "{item}"
+    );
+    assert_eq!(counts["cancelled_with_effective_copy"], 0);
+    let (took, _) = item_of(&twinned, &rows, "L1A-051");
+    assert_eq!(took["status"], "matching_content_observed", "{took}");
+    assert_eq!(
+        took["guid"],
+        "17a10910-773c-42c6-bd66-7bba9a392536-000006b8"
+    );
+    // A copy below the pre-import mark (1738) is listed and flagged.
+    let mut below = rows.clone();
+    below.push(variant(1700, &|_| {}));
+    let (item, _) = item_of(&line, &below, "L1A-050");
+    let entries = &item["effective_copies_observed"]["entries"];
+    assert_eq!(item["effective_copies_observed"]["count"], 2, "{item}");
+    assert_eq!(entries[0]["alter_id"], 1700, "{item}");
+    assert_eq!(entries[0]["before_pre_import_mark"], true, "{item}");
+    assert_eq!(entries[1]["before_pre_import_mark"], false, "{item}");
+    // A copy read with no AlterID cannot be placed against the mark. (With
+    // no mark at all nothing is attributed, so no item is cancelled.)
+    let mut no_alter_id = rows.clone();
+    no_alter_id.retain(|row| row.alter_id != Some(1790));
+    no_alter_id.push(variant(3000, &|row| row.alter_id = None));
+    let (item, _) = item_of(&line, &no_alter_id, "L1A-050");
+    assert_eq!(item["effective_copies_observed"]["count"], 1, "{item}");
+    assert_eq!(
+        item["effective_copies_observed"]["entries"][0]["before_pre_import_mark"],
+        Value::Null,
+        "{item}"
+    );
+    // An optional voucher is not cancelled: it keeps its entries and carries
+    // no copy field at all.
+    let mut optional = rows.clone();
+    let cancelled = optional
+        .iter_mut()
+        .find(|row| row.alter_id == Some(1789))
+        .unwrap();
+    cancelled.cancelled = Some(false);
+    cancelled.optional = Some(true);
+    cancelled.entries = re_entry.entries.clone();
+    let (item, _) = item_of(&line, &optional, "L1A-050");
+    assert_eq!(
+        item,
+        json!({"bridge_txn_id":"L1A-050","status":"posted_not_effective","marker":"narration_tag",
+            "reason":"voucher_optional","voucher_number":"352",
+            "guid":"17a10910-773c-42c6-bd66-7bba9a392536-000006b7","master_id":"1719","alter_id":1789})
+    );
 }
 
 fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Result<Value, String> {

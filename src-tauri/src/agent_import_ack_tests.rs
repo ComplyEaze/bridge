@@ -1409,6 +1409,17 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
         markdown.contains("| D3-003 | posted_not_effective |"),
         "{markdown}"
     );
+    // D3 has no re-entry: no cancelled voucher has a copy (#806).
+    assert_eq!(
+        result["counts"]["cancelled_with_effective_copy"], 0,
+        "{verified}"
+    );
+    assert!(
+        markdown.contains(
+            "- Cancelled vouchers with an effective copy (report only, not attributed): 0\n"
+        ),
+        "{markdown}"
+    );
 
     // Every request Bridge sent is the one the capture answered.
     let requests = sent(simulator);
@@ -1475,7 +1486,8 @@ fn l1_requests() -> Vec<Option<&'static str>> {
 /// re-entered as, without attributing it (#806): 352 stays not effective, 353
 /// is listed under `effective_copies_observed` with `attribution`
 /// `not_established`, and no verdict changes. Every Tally response is
-/// captured, and every request sent equals the captured one.
+/// captured; every request with a body equals the captured one by sha256, and
+/// each status probe is checked only as a GET.
 #[tokio::test]
 async fn a_cancelled_voucher_entered_again_by_hand_is_reported_not_attributed() {
     let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([

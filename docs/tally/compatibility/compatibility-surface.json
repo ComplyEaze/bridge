@@ -424,7 +424,8 @@
       "path": "src-tauri/src/agent_import_approval.rs"
     },
     {
-      "path": "src-tauri/src/agent_import_bill_wise.rs"
+      "path": "src-tauri/src/agent_import_bill_wise.rs",
+      "reason": "Decides whether a batch that touches a ledger kept bill by bill may be built: reads each named ledger's flag and binds an approval to one party's rows."
     },
     {
       "path": "src-tauri/src/agent_import_cash_bank.rs"

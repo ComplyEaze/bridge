@@ -1819,6 +1819,65 @@ async fn the_recheck_before_approval_bounds_its_rows_as_the_queue_does() {
     assert!(omitted > 0, "{response}");
 }
 
+/// #869: a queue read before the intent that meets a busy wire lock refuses
+/// the post as `tally_endpoint_busy`, with when to try again and what to do:
+/// nothing is recorded or sent, and the approval lapses. `lease_send` is the
+/// read's place in the lease (`after_approval`); the wire gate refuses every
+/// try of that send, as another process holding the lock for it would.
+async fn refused_busy_at_lease_send(lease_send: usize) {
+    let mut plans = before_approval();
+    let busy_send = plans.len() + lease_send;
+    plans.extend(after_approval(xml(created_one())));
+    plans.truncate(busy_send);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .busy_at_send(busy_send, std::time::Duration::from_millis(50)),
+    );
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"],
+        json!({
+            "code": "tally_endpoint_busy",
+            "message": "No posting attempt was recorded. Review the error before requesting approval again.",
+            "retry_after_s": bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs(),
+            "next_step": "Nothing was posted: Tally's port was busy. Call post_import with this same batch again after retry_after_s seconds, once Tally is free. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.",
+        }),
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert_eq!(scripted.previews().len(), 1, "approval was asked once");
+    // Every send before the busy one, and nothing after it: no POST.
+    assert_eq!(observed.len(), busy_send, "{response}");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+    assert_eq!(
+        server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "post_refused_before_intent"
+    );
+}
+
+#[tokio::test]
+async fn a_busy_wire_lock_at_the_queues_binding_marks_read_refuses_before_the_intent() {
+    refused_busy_at_lease_send(3).await;
+}
+
+#[tokio::test]
+async fn a_busy_wire_lock_at_the_queues_aim_marks_read_refuses_before_the_intent() {
+    refused_busy_at_lease_send(after_approval(xml(created_one())).len() - 2).await;
+}
+
 /// bridge#676: a group collection the classification cannot parse is refused
 /// before approval as `group_export_invalid`, and its `cause` is the group
 /// parser's own data-free code, not dropped. Nothing is read after it.

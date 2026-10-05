@@ -151,6 +151,12 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |_, b, r, _| crate::read_scope_on(b, r),
     },
     PortedTest {
+        id: "related_parties_cl23",
+        // `applicable` alone when no person is confirmed, as on the synthetic read.
+        min_figures: 1,
+        run_on: |e, b, r, _| crate::related_parties_cl23_on(e, b, r),
+    },
+    PortedTest {
         id: "stale_balances_41_1",
         min_figures: 1,
         run_on: |e, b, r, _| crate::stale_balances_41_1_on(e, b, r),

@@ -1,6 +1,6 @@
 # Fixture provenance: `related_parties_cl23` (6 Oct 2026)
 
-The ten edge books and their goldens come unchanged, byte for byte, from the spec pack
+The ten edge books, their goldens and the synthetic golden come unchanged, byte for byte, from the spec pack
 `docs/tax-audit/spec-packs/related_parties_cl23/` (#1279), whose `HASHES.md` lists the same bytes and
 SHA-256 for each file. Every book there is invented, with round figures and plain names: no book is a
 Tally read of any real assessee, and no figure comes from one.
@@ -17,6 +17,10 @@ Tally read of any real assessee, and no figure comes from one.
 - The edge books are run unbound, as every edge book is: `rp_unknown_ledger` shows the test on a name
   that has no master, which the real pipeline refuses at binding first (the pack's README, §2.5).
 
+- `golden/synthetic.related_parties_cl23.json` is the test on the crate's synthetic read, whose
+  engagement has no `[related_parties]` table: one figure (`applicable` = "no") and the
+  `not_confirmed` finding. It was added to the pack with its registration lines (#1285).
+
 ## How they were produced
 
 At the reference engine (a private repository), commit `4df1cc43`, under Python 3.13, with
@@ -28,6 +32,14 @@ per book:
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
         --with striprtf --with pdfplumber python parity/edge_golden.py ENGINE \
         tests/fixtures/edge-books/NAME.json tests/fixtures/golden
+
+The synthetic golden is the same test on the crate's synthetic engagement, through
+`parity/python_golden.py`'s runner for it:
+
+    uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
+        --with striprtf --with pdfplumber python parity/python_golden.py ENGINE \
+        tests/fixtures/synthetic-engagement.toml tests/fixtures/golden/synthetic.related_parties_cl23.json \
+        --test related_parties_cl23
 
 Running every book a second time reproduced every golden byte for byte. The goldens are regenerated
 only by the reference's maintainers.
@@ -56,3 +68,4 @@ only by the reference's maintainers.
 | `edge.rp_sum_check.related_parties_cl23.json` | 7,332 | `a0a479e7574b2459d7a065bebdc3d44488b0a34668e3da8f853066c29c1f5efb` | `golden/edge.rp_sum_check.related_parties_cl23.json` |
 | `edge.rp_unknown_ledger.related_parties_cl23.json` | 9,031 | `6bae2276338b8adb375947a807e200d864c59cbd67a33bbfddf87236aa082ec5` | `golden/edge.rp_unknown_ledger.related_parties_cl23.json` |
 | `edge.rp_walk.related_parties_cl23.json` | 13,349 | `c298493e495b6eacaf2202cd10377a0ccb71e825fd292cc9ab1f167b1549880b` | `golden/edge.rp_walk.related_parties_cl23.json` |
+| `synthetic.related_parties_cl23.json` | 2,405 | `6bf0989b8f1f9a9069f2f243a192085f65148d749994cb3280ee007be935567c` | `golden/synthetic.related_parties_cl23.json` |

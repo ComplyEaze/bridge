@@ -1615,8 +1615,6 @@ fn a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits()
     assert!(!redeem_fits_in_call(Duration::MAX, 1));
 }
 
-/// The agent's dialog says when its post happens, in both preview shapes and
-/// inside the dialog's caps; the desktop's preview does not carry it.
 /// The single-voucher dialog shows each narration exactly as the post sends
 /// it (#1055 point 5): without leading or trailing spaces, as one whole value.
 /// An absent narration stays `(none)`, and one made only of spaces is posted
@@ -1676,6 +1674,8 @@ fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
     assert!(!batch.contains("Second rent"), "{batch}");
 }
 
+/// The agent's dialog says when its post happens, in both preview shapes and
+/// inside the dialog's caps; the desktop's preview does not carry it.
 #[test]
 fn the_agent_preview_says_when_the_post_happens() {
     let directory = tempfile::tempdir().unwrap();

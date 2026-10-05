@@ -181,6 +181,16 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   refuses a call with the Terms setting off. We have not installed the
   published file in Claude Desktop, and nobody on our side has installed the
   Windows package in Claude Desktop on a Windows PC.
+- The bank-statement path through its fourth step, on a Mac, on 4 and 5 October
+  2026, with that same CI-built 0.4.2 candidate (installed on 3 October; not the
+  published file), against licensed TallyPrime Silver 7.1 holding the lab's own
+  synthetic companies. The synthetic HDFC-format statement parsed (six rows, its
+  totals matched the figures supplied); the name check found no "Suspense" ledger
+  and building the file was refused, with no file written; after "Suspense" was
+  created in Tally by a separate one-ledger import, outside this tool, a file of
+  six vouchers was built. We have not imported
+  that file or read it back, and no real statement has been run. The record is our
+  dated notes, kept privately.
 
 Not yet run by us in a controlled test: posting with a published package
 against a live TallyPrime; each way of declining in the Windows approval window

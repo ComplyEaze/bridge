@@ -665,6 +665,8 @@ fn unanswered_cause(error: &anyhow::Error) -> Option<Unanswered> {
                 | Transport::ResponseTooLarge { .. }
                 | Transport::ResponseTruncated
                 | Transport::ResponseReadFailed => None,
+                // The call was withdrawn (#778): not a Tally answer missing.
+                Transport::SendWithdrawn => None,
             };
         }
         match cause.downcast_ref::<Control>()? {
@@ -1397,10 +1399,11 @@ impl ToolFailure {
             None
         };
         // A withdrawn call names the withdrawal, whatever operation it stopped.
-        let code = if error
-            .chain()
-            .any(|cause| cause.is::<crate::tally::runtime::ToolCancelled>())
-        {
+        let code = if error.chain().any(|cause| {
+            cause.is::<crate::tally::runtime::ToolCancelled>()
+                || cause.downcast_ref::<bridge_tally_transport::TallyTransportError>()
+                    == Some(&bridge_tally_transport::TallyTransportError::SendWithdrawn)
+        }) {
             "request_cancelled"
         } else if let Some(refusal) = crate::endpoint_wire::wire_refusal(&error)
             // Never in place of an unknown post outcome: that code is what

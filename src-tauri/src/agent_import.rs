@@ -3667,11 +3667,24 @@ fn read_masters_record(path: &Path) -> Option<Value> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
         Err(_) => return unreadable(),
     };
-    let mut bytes = Vec::new();
-    if std::io::Read::read_to_end(&mut file, &mut bytes).is_err() {
+    let Some(bytes) = read_capped_record(&mut file) else {
         return unreadable();
-    }
+    };
     serde_json::from_slice(&bytes).ok().or_else(unreadable)
+}
+
+/// A persisted record read whole, or `None` when it cannot be read or is
+/// larger than `MAX_RECORD_BYTES`, the bound every persisted record has
+/// (#837). One byte past the bound is read, so a larger record is refused,
+/// never truncated.
+fn read_capped_record(file: &mut fs::File) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(
+        &mut std::io::Read::take(file, (ledger::MAX_RECORD_BYTES + 1) as u64),
+        &mut bytes,
+    )
+    .ok()?;
+    (bytes.len() <= ledger::MAX_RECORD_BYTES).then_some(bytes)
 }
 
 /// Staged under a name no other writer uses, then renamed into place, so
@@ -3829,8 +3842,7 @@ fn read_verified_baseline_for(
     let mut file =
         super::local_file::open_local_file(&verified_baseline_path(imports, batch_id), false)
             .ok()?;
-    let mut bytes = Vec::new();
-    std::io::Read::read_to_end(&mut file, &mut bytes).ok()?;
+    let bytes = read_capped_record(&mut file)?;
     serde_json::from_slice(&bytes).ok()
 }
 

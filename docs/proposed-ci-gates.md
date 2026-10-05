@@ -173,6 +173,14 @@ passed clean: 11 call sites scanned, 11 bounded, 0 unbounded, 3 reviewed
 exceptions (zip entries read from a bundled XLSX/PDF template, not untrusted
 input — named in the script's `ALLOWED_UNBOUNDED`).
 
+Since #837 it also reads the fully qualified form,
+`std::io::Read::read_to_end(&mut reader, &mut buf)` (and `AsyncReadExt::`), in
+the whole source with comments and strings blanked rather than line by line. A
+call is bounded only when its own reader is a `take(N)`; a `take` elsewhere in
+the statement, or in a neighbouring one, does not count. On the master it was
+built from, that scanned 17 call sites and reported 3 unbounded record reads,
+which #837 capped: 15 call sites scanned, 15 bounded.
+
 ```yaml
       - name: Enforce read bound coverage
         run: node scripts/check-unbounded-reads.mjs

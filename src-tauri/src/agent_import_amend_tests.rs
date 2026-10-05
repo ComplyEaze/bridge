@@ -896,6 +896,33 @@ fn a_verified_baseline_file_is_written_once_per_voucher() {
     assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
 }
 
+/// A baseline larger than `MAX_RECORD_BYTES` is no baseline, as an unreadable
+/// one is; one at the bound reads whole (#837).
+#[test]
+fn a_verified_baseline_past_the_record_bound_is_no_baseline() {
+    let directory = tempfile::tempdir().unwrap();
+    let proof =
+        json!({"vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":40}]});
+    record_verified_baseline(directory.path(), ORIGINAL, &proof).unwrap();
+    let path = verified_baseline_path(directory.path(), ORIGINAL);
+    let record = std::fs::read(&path).unwrap();
+    std::fs::write(
+        &path,
+        super::padded_record(&record, ledger::MAX_RECORD_BYTES),
+    )
+    .unwrap();
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([("txn-001".to_string(), 40)]))
+    );
+    std::fs::write(
+        &path,
+        super::padded_record(&record, ledger::MAX_RECORD_BYTES + 1),
+    )
+    .unwrap();
+    assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
+}
+
 fn baselines(pairs: &[(&str, u64)]) -> amend::VerifiedBaselines {
     amend::VerifiedBaselines(
         pairs

@@ -4188,3 +4188,37 @@ fn each_post_span_binding_state_carries_its_own_plain_summary() {
     let not_applicable = with_post_span_summary(json!({ "state": "not_applicable" }), &json!([]));
     assert_eq!(not_applicable, json!({ "state": "not_applicable" }));
 }
+
+/// `record`'s bytes padded with trailing spaces to `size`, still valid JSON: a
+/// record past the bound would parse whole if it were read uncapped (#837).
+fn padded_record(record: &[u8], size: usize) -> Vec<u8> {
+    let mut bytes = record.to_vec();
+    bytes.resize(size, b' ');
+    bytes
+}
+
+/// A masters record larger than `MAX_RECORD_BYTES` reads as a pending check,
+/// the doubt an unreadable record is, never as its content; one at the bound
+/// reads whole (#837).
+#[test]
+fn a_masters_record_past_the_record_bound_reads_as_a_pending_check() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("masters.json");
+    let record = json!({"state": "verified"});
+    let text = record.to_string();
+    std::fs::write(
+        &path,
+        padded_record(text.as_bytes(), ledger::MAX_RECORD_BYTES),
+    )
+    .unwrap();
+    assert_eq!(read_masters_record(&path), Some(record));
+    std::fs::write(
+        &path,
+        padded_record(text.as_bytes(), ledger::MAX_RECORD_BYTES + 1),
+    )
+    .unwrap();
+    assert_eq!(
+        read_masters_record(&path),
+        Some(json!({"state": MASTERS_CHECK_PENDING}))
+    );
+}

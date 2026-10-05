@@ -17,18 +17,18 @@
 // a captured-fixture's declared hash still matches its actual bytes.
 //
 // Two independent failures, so a fixture cannot pass by accident:
-//   1. undocumented  — the fixture's filename appears in no Markdown file
-//      anywhere under its fixture root. Nothing attests to what it is.
-//   2. hash mismatch — a Markdown table declares this fixture "captured"
-//      with a specific byte count and SHA-256, and the file on disk no
-//      longer matches. This is the actual swap-detection: provenance text
-//      alone is a comment nobody re-reads, but a hash is checked by machine.
+//   1. undocumented  — no record under its fixture root declares a hash for
+//      the fixture: no table row, no sidecar. Nothing pins what it is.
+//   2. hash mismatch — a record declares this fixture's byte count and
+//      SHA-256, and the file on disk no longer matches. This is the actual
+//      swap-detection: provenance text alone is a comment nobody re-reads,
+//      but a hash is checked by machine.
 //
-// This does NOT require a table entry for every fixture — the native/
-// PROVENANCE.md documents fixtures whose byte-level fidelity is explicitly
-// NOT established (Git-normalised on first commit) by naming them in prose
-// instead. That is a legitimate, weaker attestation this gate accepts: it
-// only escalates to a hash check where the document itself claims one.
+// Every fixture needs its own row (#838). A file whose capture is not
+// established still has one: the digest of its committed bytes, labelled an
+// integrity digest, beside the prose that says what it is. Prose alone (a bare
+// name, a path, or a `<stem>.PROVENANCE.md` beside it) no longer documents a
+// fixture: it pinned nothing, so a substitute passed as documented.
 //
 // Markdown is not the only shape that paper trail takes here. The agent
 // fixtures carry a JSON sidecar per capture — `<stem>.json` beside
@@ -43,10 +43,13 @@
 //
 // So a JSON object carrying a `source` string is read as a provenance record
 // for itself and for the fixtures sharing its stem, on exactly the same terms
-// as Markdown: named-only is accepted, and a declared `fixture_sha256`
-// escalates to the same hash check. The effect is a stronger gate, not a
-// looser one — 28 hashes in that directory are now machine-checked that
-// previously were not read at all.
+// as Markdown: its declared `fixture_sha256` is the same hash check, and a
+// sidecar declaring none documents nothing. Reading sidecars made the gate
+// stronger, not looser: hashes no check had read before became checked.
+//
+// A JSON object with `source` that shares its stem with no other file
+// documents nothing but itself, and a file cannot hold its own hash. It is a
+// fixture that describes itself, so it needs its own row like any other (#838).
 
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
@@ -131,10 +134,6 @@ function walkFiles(directory, visited = new Set()) {
 // matched the middle of a wider table, reading a request hash as a fixture name.
 const TABLE_ROW = /^ {0,3}\|\s*`([^`]+)`\s*\|\s*([\d,]+)\s*\|\s*`([0-9a-fA-F]{64})`\s*\|/gm;
 
-// A path in prose: two or more path segments joined by `/`, as in
-// `./generators/build_reopen.py` or `scripts/fixtures/sbi-bbox-capture.xml`.
-const PATH_MENTION = /(?<![A-Za-z0-9_.\/-])(?:\.{1,2}\/)*[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+/g;
-
 function short(value, max = 200) {
   const text = String(value);
   return text.length <= max ? text : `${text.slice(0, max)}…`;
@@ -174,19 +173,22 @@ for (const fixtureDirectory of fixtureDirectories) {
     }
   }
 
+  // A record documenting no other file is a self-describing fixture.
+  for (const recordPath of [...provenanceRecords.keys()]) {
+    const stem = recordPath.slice(0, -".json".length);
+    if (!allPaths.some((path) => path !== recordPath && path.startsWith(`${stem}.`))) {
+      provenanceRecords.delete(recordPath);
+    }
+  }
+
   const fixtureFiles = allPaths.filter(
     (path) => extname(path).toLowerCase() !== ".md" && !provenanceRecords.has(path),
   );
   // No early exit for a directory without fixtures: its Markdown can still
   // carry a path row that checks nothing, which is reported below (#759).
 
-  // Every filename this directory's own documentation names, plus every
-  // captured-fixture table row found in it. Concatenating every Markdown
-  // file under the directory (not just a file named PROVENANCE.md) matches
-  // what the convention actually does today: scripts/fixtures/README.md
-  // names its fixtures in prose rather than in a file called PROVENANCE.md,
-  // and that is a legitimate paper trail this gate accepts.
-  let documentationText = "";
+  // Every table row in any Markdown file under the directory (not just one
+  // named PROVENANCE.md): scripts/fixtures/README.md carries its rows too.
   const declaredHashes = new Map(); // basename -> [{ bytes, sha256, sourceFile }]
   // A row may name its fixture with a directory, relative to the Markdown
   // file that holds it (`agent/d3-batch-import.xml`). Such a row was once
@@ -195,17 +197,8 @@ for (const fixtureDirectory of fixtureDirectories) {
   // against exactly that file, and a row naming a file that does not exist
   // fails rather than checking nothing.
   const declaredByPath = new Map(); // repository-relative path -> declarations
-  // Every path the prose names (`./generators/x.py`, `scripts/fixtures/y.xml`),
-  // resolved against the Markdown file's directory and against the repository
-  // root. A path documents the file it names and no other.
-  const pathMentions = new Set();
   for (const markdownPath of markdownFiles) {
     const text = readFileSync(markdownPath, "utf8");
-    documentationText += `\n${text}`;
-    for (const [mention] of text.matchAll(PATH_MENTION)) {
-      pathMentions.add(relative(repositoryRoot, resolve(dirname(markdownPath), mention)));
-      pathMentions.add(relative(repositoryRoot, resolve(repositoryRoot, mention)));
-    }
     for (const match of text.matchAll(TABLE_ROW)) {
       const [, name, bytesText, sha256] = match;
       const bytes = Number(bytesText.replaceAll(",", ""));
@@ -228,36 +221,19 @@ for (const fixtureDirectory of fixtureDirectories) {
     }
   }
 
-  // `<stem>.PROVENANCE.md` documents `<stem>.*` by its own filename, which is
-  // how native-company-book-extents-with-number.PROVENANCE.md works: it
-  // records the source artifact's SHA-256 and what the capture does and does
-  // not establish, and never names the fixture file, because the pairing is
-  // the filename. Same convention as the JSON sidecar, in Markdown.
-  for (const markdownPath of markdownFiles) {
-    const name = markdownPath.split("/").pop();
-    if (!name.endsWith(".PROVENANCE.md") || name === "PROVENANCE.md") continue;
-    const stem = markdownPath.slice(0, -".PROVENANCE.md".length);
-    for (const path of allPaths) {
-      if (path !== markdownPath && path.startsWith(`${stem}.`)) {
-        documentationText += `\n${path.split("/").pop()}`;
-      }
-    }
-  }
-
-  // Same two terms as a Markdown row, from a sidecar: it names the fixtures
-  // sharing its stem, and where it declares a fixture hash that becomes a
-  // check. A sidecar with `source` but no `fixture_sha256` is the prose case.
+  // Same terms as a Markdown row, from a sidecar: where it declares a hash for
+  // the fixtures sharing its stem, that is their check. A sidecar with
+  // `source` but no hash declares nothing, so documents nothing.
   for (const [recordPath, record] of provenanceRecords) {
     const stem = recordPath.slice(0, -".json".length);
     const named = allPaths.filter(
       (path) => path !== recordPath && path.startsWith(`${stem}.`),
     );
     for (const path of named) {
-      documentationText += `\n${path.split("/").pop()}`;
       // The sidecars are not schema-consistent: twelve record the hash as
       // `fixture_sha256`, two as `sha256`, and one carries both. Reading only
       // the first spelling silently exempted the two -- they passed as
-      // "named in prose, no hash declared" while their own record held the
+      // documented with no hash checked while their own record held the
       // right hash, so a hand-authored substitute for either would have gone
       // through. That is the defect class this gate exists to catch, so both
       // spellings are read.
@@ -298,40 +274,26 @@ for (const fixtureDirectory of fixtureDirectories) {
   for (const fixturePath of fixtureFiles) {
     const relativePath = relative(repositoryRoot, fixturePath);
     const basename = relativePath.split("/").pop();
-
-    // A plain substring match with word-boundary-ish punctuation on both
-    // sides. Fixture names contain `.`, `-`, and `_`, none of which are `\w`
-    // word-boundary-safe, so this checks the character immediately outside
-    // the match is not itself part of a longer filename instead of using
-    // `\b`, which a dot or hyphen would defeat silently.
-    //
-    // A name preceded by `/` is a path: it documents the file at that path
-    // (a path row, or a path the prose names), never another file that merely
-    // shares its basename. Counting it as a bare mention let an undocumented
-    // `other/x.bin` pass as documented beside a row for `agent/x.bin` (#759).
-    const escaped = basename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const mentioned =
-      declaredByPath.has(relativePath) ||
-      pathMentions.has(relativePath) ||
-      new RegExp(`(?<![A-Za-z0-9_./-])${escaped}(?![A-Za-z0-9_.-])`).test(documentationText);
-    if (!mentioned) {
-      undocumented += 1;
-      if (failures.length < MAX_REPORTED) {
-        failures.push(
-          `${relativePath}: named in no provenance record under ` +
-            `${fixtureDirectory} — add a line saying where its bytes came from, ` +
-            "either in Markdown (see tests/fixtures/*/PROVENANCE.md) or as a " +
-            "JSON sidecar carrying `source` (see tests/fixtures/agent/*.json)",
-        );
-      }
-      continue;
-    }
-
+    // A record documents a fixture only by declaring its hash (#838): a path
+    // row, a sidecar, or, under the exempt root, a basename row.
     const declarations = [
       ...(declaredHashes.get(basename) ?? []),
       ...(declaredByPath.get(relativePath) ?? []),
     ];
-    if (!declarations.length) continue; // Named in prose only — accepted, see file banner.
+    if (!declarations.length) {
+      undocumented += 1;
+      if (failures.length < MAX_REPORTED) {
+        failures.push(
+          `${relativePath}: no hash row under ${fixtureDirectory} — add a row ` +
+            "`| `<path from the note>` | <bytes> | `<sha256>` |` beside the note " +
+            "saying where its bytes came from (see tests/fixtures/*/PROVENANCE.md), " +
+            "labelled an integrity digest where the capture is not established, " +
+            "or a JSON sidecar carrying `source` and `fixture_sha256` " +
+            "(see tests/fixtures/agent/*.json)",
+        );
+      }
+      continue;
+    }
 
     const actualBytes = readFileSync(fixturePath);
     const actualSha256 = createHash("sha256").update(actualBytes).digest("hex");

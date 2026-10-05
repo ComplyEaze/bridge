@@ -20,4 +20,18 @@ were added in `56409e62` (2026-07-16).
   `fixture_facts_are_accounting_expectations_not_xml_semantics`).
 
 Both are pinned by SHA-256 in `../compatibility-surface.json`, which the
-runners validate before use; that manifest, not this note, is the hash check.
+runners validate before use; that manifest is the runners' hash check. The
+integrity digests below are of the same committed bytes, for the fixture
+provenance gate.
+
+## Integrity digests
+
+Each row is the SHA-256 of the file's committed bytes, which
+`scripts/check-fixture-provenance.mjs` checks (#838). A digest pins the bytes as
+committed and claims nothing about where they came from: the Capture column
+repeats only what this note says above.
+
+| Fixture | Bytes | SHA-256 (integrity digest) | Capture |
+| --- | ---: | --- | --- |
+| `education-small-v1.json` | 677 | `4783d8ae7c0ce81ed63f4dbead855b81b792890f7ea2d5ab49c44b2e78366553` | not a capture: an authored manifest, as above |
+| `education-native-outstandings-v0.json` | 6,273 | `b07c10850ed2294c216687dd227b9ab3ae0a6bcc9fadf369402d4994e07b6a4d` | not a capture: an authored manifest, as above |

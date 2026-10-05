@@ -158,6 +158,11 @@ after `Enforce fixture byte integrity`:
         run: node scripts/check-fixture-provenance.mjs
 ```
 
+Since #838, every fixture needs its own hash row (or a sidecar declaring its
+hash), keyed by its path from the note that holds it. Prose alone no longer
+documents a fixture: where a capture is not established, the row carries the
+digest of the committed bytes, labelled an integrity digest.
+
 ## 4. Unbounded reads — BLOCKING (wired)
 
 `scripts/check-unbounded-reads.mjs` requires every `Read::read_to_end`/

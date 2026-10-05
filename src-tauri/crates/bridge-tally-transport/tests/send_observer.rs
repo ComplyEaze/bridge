@@ -206,9 +206,11 @@ async fn a_send_whose_future_is_dropped_is_recorded_as_abandoned() {
         }
         tokio::time::sleep(Duration::from_millis(150)).await;
     };
+    // `biased`, giving up first: if a long stall made both ready, the send must not win.
     let answered = tokio::select! {
-        sent = &mut send => Some(sent),
+        biased;
         () = gives_up => None,
+        sent = &mut send => Some(sent),
     };
     assert!(answered.is_none(), "the send should still be in flight");
     drop(send);

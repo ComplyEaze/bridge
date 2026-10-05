@@ -8,7 +8,7 @@ The developer configuration below remains for supported client integrations.
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
 parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra) is
-off by default because of the three limits under *Approved voucher posting* below;
+off by default because of the four limits under *Approved voucher posting* below;
 the **Allow voucher posting (Journal, Payment, Receipt, Contra)** setting adds it, with
 separate native approval for each new attempt. Command-line installations
 retain explicit environment switches.
@@ -921,14 +921,15 @@ covers only the identity and marks reads it sent.
   is, but its offsets do not continue the earlier pages; start again from offset 0.
 - **What is held.** Only a `complete` window; a `partial` one (an uncounted
   small book, a withheld foreign-currency voucher) is read again by each page.
-  One window per company and question (dates, ledger, voucher-type selector),
+  One window per company and question (dates, ledger, voucher-type selector,
+  search, and listing or summary by grouping),
   for ten minutes after the read finished, within 64 MiB of its own, counted as
   the rows' JSON text, a proxy for memory (the ledger listings have another
   64 MiB); a window larger than that is not held and its
   result carries no `snapshot`. A write through this server drops the company's
   held windows. The desktop screen holds nothing. A later page is served only
   for the same question: the same dates (a date is the same question however it
-  is written, `2026-08-01` or `20260801`), the same voucher-type selector and the
+  is written, `2026-08-01` or `20260801`), the same voucher-type selector, search and grouping and the
   `ledger` argument exactly as typed on the first page; a differently spelled
   `ledger` is a different question and reads the whole window again.
 - **What a page cannot see.** A change that moves neither mark. The screen
@@ -948,6 +949,102 @@ covers only the identity and marks reads it sent.
   sent 232 requests, and a later page naming its snapshot took 1.2 s and sent 10
   requests. Before this change each later page repeated the whole read.
 
+### Search and summaries in `vouchers` (#1230)
+
+Both work on the rows `vouchers` has already read and labelled; neither sends a
+Tally request of its own, so each costs what the same `vouchers` call costs.
+
+**Search.** `voucher_number`, `reference`, `narration_contains` and `amount` keep
+the vouchers that satisfy every criterion given.
+
+- `voucher_number` and `reference` are matched whole, ignoring ASCII case and the
+  spaces around the term. Numbers repeat across voucher types, so a number can
+  match several vouchers. A voucher with no reference never matches a reference.
+- `narration_contains` is a phrase of at least three characters, matched ignoring
+  letter case, accent composition (a composed and a decomposed accent meet) and
+  runs of spaces or line breaks. Nothing else is folded: a different dash or
+  apostrophe is a different character. Where narrations are withheld from the
+  assistant (the `drop_narration` setting) the phrase is refused as
+  `search_narration_redacted`, because answering whether a phrase occurs would
+  let the assistant read the narrations back one probe at a time.
+- `amount` is an unsigned decimal above zero. It is matched, by numeric value,
+  against the absolute value of every ledger entry of a voucher, so it finds an
+  invoice total and a tax line alike (reasoned from the entry shape, not measured on an item invoice). Each item carries `matched.amount_entries`,
+  the positions in its `amounts` that equalled the amount.
+- A blank or over-long term, a narration phrase under three characters and an
+  amount that is not a plain positive decimal are refused before the window is read (the identity read has already happened)
+  (`search_criterion_empty`, `search_criterion_too_long`,
+  `search_narration_too_short`, `search_amount_invalid`).
+- The search runs last, after the window is labelled and after the ledger and
+  type selectors, so a zero from a `complete` window is a checked zero. A voucher
+  withheld for a foreign-currency amount has no amounts to compare: an `amount`
+  search keeps it (listed in `withheld_vouchers`, never as an item) and the result
+  stays `partial`.
+  Every other criterion is decided on the fields a withheld voucher does carry.
+- A held window is reused only for the same search: the search is part of the
+  question a held window answers. `voucher_types` counts (`included`, `in_scope`)
+  are taken before the search, so with a search they do not add up to `total`.
+
+**Summaries.** `summarise_by` (`ledger`, `month` or `voucher_type`) replaces
+`items` with `buckets`, over the same window, selectors and search. `offset` and
+`limit` page the buckets; a later page comes from the held window as a later page
+of vouchers does. A summary holds its own window (the grouping is part of the
+question), so a listing and a summary of the same window never replace or serve
+each other.
+
+- Each bucket has `group`, `vouchers` (an exact count; a voucher counts once in a
+  bucket however many of its entries fall there), `debit` (zero or negative, as
+  `ledger_movement` reports it), `credit`, `net` (debit plus credit) and
+  `voucher_refs`: up to five vouchers by date, type, number and GUID, with
+  `voucher_refs_complete` saying whether that is all of them. `vouchers` with the
+  same arguments without `summarise_by`, narrowed to the bucket, lists the rest: for a month bucket narrow `from` and `to`; for a ledger bucket pass that ledger when the call carries none; for a type bucket pass `voucher_class` (a superset when a class has child types) or the type's GUID (a type name that is also a class is refused as `voucher_type_ambiguous`).
+- A debit is an entry with a negative amount and a credit one with a positive
+  amount, the rule `ledger_movement` uses (the same function); `ISDEEMEDPOSITIVE`
+  decides only a zero amount, which adds nothing to either side but still counts
+  its voucher. The two reads were not run side by side on the same book.
+- A ledger bucket adds the entries on that ledger of the vouchers the window,
+  selectors and search selected: with a `ledger`, a type or a search given, a
+  counter-ledger's bucket holds only its entries on those vouchers, not that
+  ledger's whole movement (use `ledger_movement` for that). A month or type bucket
+  adds every entry of its vouchers (its debit and credit then equal in size), or, when
+  `ledger` is given, only that ledger's entries; `entries_counted` says which
+  (`all_entries` or `selected_ledger`).
+- Every bucket has `position`, its place in the whole ordering. Under
+  `mask_parties` several ledger labels can read alike (a short name masks to the
+  same mark) and a masked label cannot be passed back as `ledger`; `position`
+  keeps them apart and pages without a repeat. To list the vouchers of a month
+  bucket, narrow `from` and `to` to that month.
+- `totals` is the debit and credit the buckets add up to, `vouchers_summarised`
+  the vouchers behind them. `excluded_from_buckets` counts the vouchers left out
+  the way `ledger_movement` leaves them out: cancelled, optional, and vouchers with
+  no accounting entry (a Stock Journal). They are counted, not hidden. Post-dated
+  vouchers are summed: `post_dated_included` counts those Tally flagged Yes and
+  `post_dated_flag_absent` those with no flag at all. The read asks for the flag and
+  Tally asserted it on every voucher measured (reference 8.2c), so the second count is
+  expected to be 0; only when it is not does a zero in the first prove nothing. A voucher type that does not post (a
+  memorandum, a reversing journal, a sales or purchase order, a delivery or receipt
+  note), if the book uses it and Tally exports it with ledger entries, is not told
+  apart and is summed; the
+  result's `basis` says so. `ledger_movement` has the same gap. Not measured live.
+- A voucher whose entries do not sum to zero refuses the whole summary
+  (`voucher_entries_unbalanced`): a bucket built from it could not be tied out.
+- A voucher withheld for a foreign-currency amount is in no bucket; the result is
+  `partial` and `coverage` says the totals are short by those vouchers.
+- Buckets come by larger movement first (ledger, voucher type) or in calendar
+  order (month, `YYYY-MM`). A page also stops at a fifth of the response budget
+  (the response carries it twice), with at least one bucket, and `truncated` says
+  when more remain (the next `offset` is this `offset` plus the buckets returned); a page that still does not fit is refused
+  `agent_response_too_large`, so lower `limit` or raise the budget. The egress
+  receipt counts the buckets as the rows prepared.
+- Ledger names in `group` are masked when parties are masked.
+
+A summary over a `partial` window is only as complete as that window: `state` and `reason` say which, and `basis` does not repeat them.
+
+Not measured: a live Tally run of either feature (the tests read the captured
+three-voucher window and variants of it); a `reference` captured from a real
+book (the captured window carries none, so that test adds one to a captured
+voucher); a summary over a window large enough to need a census.
+
 ### Foreign-currency composites in `vouchers`
 
 A foreign amount entered on a rupee ledger can be stored by Tally as a
@@ -959,7 +1056,7 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
   up to 100 vouchers, with an exact `withheld_total` that is the same on every
   page.
 - **The result says so.** `state` is `partial` with `reason`
-  `vouchers_withheld`, `total` counts `items` only, and `coverage` says what
+  `vouchers_withheld`, `total` counts `items` only (the buckets, under `summarise_by`), and `coverage` says what
   was left out.
 - **No amount is read from a composite.** Anything that is neither a plain
   decimal nor an exact composite still refuses the whole window. So does a
@@ -1150,8 +1247,8 @@ licence mode has been qualified.
 
 ## Approved voucher posting
 
-**Voucher posting is off by default in the MCPB extension** while three known
-limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)).
+**Voucher posting is off by default in the MCPB extension** while four known
+limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it.
 The saved batch file is now checked byte for byte against the approved record
 before posting ([#575](https://github.com/ComplyEaze/bridge/issues/575), fixed).
 **Allow voucher posting (Journal, Payment, Receipt, Contra)** turns it on for

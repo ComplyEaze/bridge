@@ -60,10 +60,16 @@ mod bill_trail;
 mod outstandings;
 #[path = "agent_presence.rs"]
 mod presence;
+#[path = "agent_voucher_search.rs"]
+mod voucher_search;
 #[path = "agent_vouchers.rs"]
 mod vouchers;
+use voucher_search::VoucherSearch;
+#[path = "agent_voucher_summary.rs"]
+mod voucher_summary;
 #[cfg(test)]
 use outstandings::*;
+use voucher_summary::{SummaryGroup, SummaryRequest};
 #[path = "agent_movement.rs"]
 mod movement;
 #[path = "agent_register.rs"]
@@ -114,7 +120,7 @@ use bridge_tally_protocol::xml_read_profiles::{
 };
 use bridge_tally_protocol::{TallyCompany, TallyLedger};
 use bridge_tally_transport::{canonical_loopback_origin, TallyEndpointConfig};
-use chrono::{DateTime, Duration, Local, NaiveDate, TimeZone};
+use chrono::{DateTime, Local, NaiveDate, TimeZone};
 use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -665,6 +671,8 @@ fn unanswered_cause(error: &anyhow::Error) -> Option<Unanswered> {
                 | Transport::ResponseTooLarge { .. }
                 | Transport::ResponseTruncated
                 | Transport::ResponseReadFailed => None,
+                // The call was withdrawn (#778): not a Tally answer missing.
+                Transport::SendWithdrawn => None,
             };
         }
         match cause.downcast_ref::<Control>()? {
@@ -1397,10 +1405,11 @@ impl ToolFailure {
             None
         };
         // A withdrawn call names the withdrawal, whatever operation it stopped.
-        let code = if error
-            .chain()
-            .any(|cause| cause.is::<crate::tally::runtime::ToolCancelled>())
-        {
+        let code = if error.chain().any(|cause| {
+            cause.is::<crate::tally::runtime::ToolCancelled>()
+                || cause.downcast_ref::<bridge_tally_transport::TallyTransportError>()
+                    == Some(&bridge_tally_transport::TallyTransportError::SendWithdrawn)
+        }) {
             "request_cancelled"
         } else if let Some(refusal) = crate::endpoint_wire::wire_refusal(&error)
             // Never in place of an unknown post outcome: that code is what
@@ -2496,17 +2505,23 @@ fn row_in_window(row: &Value, from: &str, to: &str) -> bool {
 }
 
 fn widened_window(from: &str, to: &str) -> Result<(String, String), String> {
-    let from = NaiveDate::parse_from_str(from, "%Y%m%d").map_err(|_| "invalid_date".to_string())?;
-    let to = NaiveDate::parse_from_str(to, "%Y%m%d").map_err(|_| "invalid_date".to_string())?;
+    let date = |value: &str| {
+        bridge_tally_core::TallyDate::parse(value).map_err(|_| "invalid_date".to_string())
+    };
+    // A window at either end of the calendar has no day beyond it to read. It
+    // is refused by `TallyDate`'s own code (`tally_date_overflow`,
+    // `tally_date_underflow`) rather than sent on as a date that is not eight
+    // digits (#861).
+    let step = |stepped: Result<bridge_tally_core::TallyDate, bridge_tally_core::TallyError>| {
+        match stepped {
+            Ok(date) => Ok(date.as_str().to_string()),
+            Err(bridge_tally_core::TallyError::InvalidData { code }) => Err(code),
+            Err(_) => Err("invalid_date".to_string()),
+        }
+    };
     Ok((
-        from.checked_sub_signed(Duration::days(1))
-            .ok_or_else(|| "empty_uncorroborated".to_string())?
-            .format("%Y%m%d")
-            .to_string(),
-        to.checked_add_signed(Duration::days(1))
-            .ok_or_else(|| "empty_uncorroborated".to_string())?
-            .format("%Y%m%d")
-            .to_string(),
+        step(date(from)?.previous_day())?,
+        step(date(to)?.next_day())?,
     ))
 }
 

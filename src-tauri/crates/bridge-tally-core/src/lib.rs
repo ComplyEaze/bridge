@@ -13,6 +13,7 @@ pub mod master_binding;
 mod pack_models;
 pub mod reconciliation;
 pub mod report_tie_out;
+pub mod text_search;
 pub mod transport_qualification;
 
 pub use pack_models::*;

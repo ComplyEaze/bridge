@@ -239,7 +239,7 @@ pub(super) fn page_items(
 
 /// What a summary adds up, stated in the result so a reader does not infer more. The exclusions
 /// are the same as `ledger_movement`'s; the voucher types are not told apart.
-const SUMMARY_BASIS: &str = "every voucher in the window that is not cancelled, optional or without accounting entries, as ledger_movement counts; post-dated vouchers are summed too and counted in post_dated_included; a voucher type that Tally exports with ledger entries but that does not post (a memorandum, a reversing journal, an order or a note, if the book uses them) is not told apart and is summed; not measured against a live book";
+const SUMMARY_BASIS: &str = "every voucher in the window that is not cancelled, optional or without accounting entries, as ledger_movement counts; post-dated vouchers are summed too: post_dated_included counts those Tally flagged Yes and post_dated_unreported those it did not flag at all (the tag is often omitted, so a zero in the first is not proof none are post-dated); a voucher type that Tally exports with ledger entries but that does not post (a memorandum, a reversing journal, an order or a note, if the book uses them) is not told apart and is summed; not measured against a live book";
 
 /// What one page of a `vouchers` result holds: the vouchers, or with `summarise_by` the
 /// buckets (#1230), and the fields only the second carries.
@@ -289,6 +289,10 @@ fn render_page_body(
             ("vouchers_summarised", json!(summary.vouchers_summarised)),
             ("excluded_from_buckets", summary.excluded),
             ("post_dated_included", json!(summary.post_dated_included)),
+            (
+                "post_dated_unreported",
+                json!(summary.post_dated_unreported),
+            ),
             ("totals", summary.totals),
             ("basis", json!(SUMMARY_BASIS)),
         ],

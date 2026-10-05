@@ -5162,6 +5162,8 @@ async fn a_month_summary_replaces_items_with_buckets_and_keeps_the_window_label(
         json!({"debit": "-306.06", "credit": "306.06"})
     );
     assert_eq!(result["post_dated_included"], 0);
+    // The captured vouchers carry no post-dated flag, so all three are "not reported".
+    assert_eq!(result["post_dated_unreported"], 3);
     assert!(result["basis"].as_str().unwrap().contains("memorandum"));
     assert_eq!(result["buckets"][0]["position"], 1);
     assert_eq!(

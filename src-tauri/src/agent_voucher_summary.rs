@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// How many vouchers each bucket names. The count is exact; the names are a sample that is
 /// complete only when the bucket is small, and `vouchers` with the same arguments (and the
-/// bucket's ledger, type or dates) lists the rest.
+/// bucket's ledger, type or dates, where the existing selectors allow it) lists the rest.
 pub(super) const MAX_VOUCHER_REFS_PER_BUCKET: usize = 5;
 
 /// What the buckets are grouped by.
@@ -62,9 +62,12 @@ pub(super) struct Summary {
     /// selectors and search selected), or `selected_ledger` for a month or type bucket of a
     /// window narrowed to one ledger.
     pub(super) entries_counted: &'static str,
-    /// How many of the summarised vouchers Tally flagged post-dated: they are summed, not set
-    /// aside, so a reader can see how many a report-date cut would move.
+    /// How many of the summarised vouchers Tally flagged post-dated (`Yes`): they are summed, not
+    /// set aside. A lower bound on what a report-date cut would move: see `post_dated_unreported`.
     pub(super) post_dated_included: usize,
+    /// How many of the summarised vouchers carry no post-dated flag at all (Tally omits the tag
+    /// rather than asserting `No`, so "not reported" is not "not post-dated").
+    pub(super) post_dated_unreported: usize,
 }
 
 struct Bucket {
@@ -152,7 +155,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
     let (mut cancelled, mut optional, mut no_entries) = (0usize, 0usize, 0usize);
     let mut buckets: BTreeMap<String, Bucket> = BTreeMap::new();
     let mut vouchers_summarised = 0usize;
-    let mut post_dated_included = 0usize;
+    let (mut post_dated_included, mut post_dated_unreported) = (0usize, 0usize);
     let (mut total_debit, mut total_credit) = ("0".to_string(), "0".to_string());
     for row in rows {
         if row["cancelled"].as_bool() == Some(true) {
@@ -185,8 +188,10 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             return Err("voucher_entries_unbalanced".to_string());
         }
         vouchers_summarised += 1;
-        if row["post_dated"].as_bool() == Some(true) {
-            post_dated_included += 1;
+        match row["post_dated"].as_bool() {
+            Some(true) => post_dated_included += 1,
+            Some(false) => {}
+            None => post_dated_unreported += 1,
         }
         let counted = |amount: &EntryAmount<'_>| match (&request.selected_ledger, request.group) {
             (Some(selected), SummaryGroup::Month | SummaryGroup::VoucherType) => {
@@ -282,6 +287,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             })
             .collect(),
         post_dated_included,
+        post_dated_unreported,
         vouchers_summarised,
         excluded: json!({"cancelled": cancelled, "optional": optional, "no_accounting_entries": no_entries}),
         totals: json!({"debit": total_debit, "credit": total_credit}),
@@ -294,7 +300,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
 
 /// One page of buckets: from `offset`, at most `limit`, and no more than `byte_budget` bytes
 /// serialized (at least one bucket, so a page always advances). The second value is whether
-/// buckets remain after this page. The caller passes a quarter of the response budget: the
+/// buckets remain after this page. The caller passes a fifth of the response budget: the
 /// response carries the page twice (structured and text copy) and the rest of the result once.
 pub(super) fn page_buckets(
     summary: &Summary,

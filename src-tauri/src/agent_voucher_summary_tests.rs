@@ -362,10 +362,13 @@ fn post_dated_vouchers_are_summed_and_counted() {
     let summary = summed(&rows, SummaryGroup::Month, None);
     assert_eq!(summary.vouchers_summarised, 3);
     assert_eq!(summary.post_dated_included, 2);
+    assert_eq!(summary.post_dated_unreported, 0);
     assert_eq!(summary.buckets[0]["credit"], "306.06");
-    // A voucher Tally did not flag either way (the key is absent) is not counted post-dated.
+    // The captured window carries no ISPOSTDATED at all: Tally did not say, which is not "No".
+    // Such vouchers are counted apart, never folded into a zero that reads as "none".
     let plain = summed(&captured_rows(), SummaryGroup::Month, None);
     assert_eq!(plain.post_dated_included, 0);
+    assert_eq!(plain.post_dated_unreported, 3);
 }
 
 #[test]

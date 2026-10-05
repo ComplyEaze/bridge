@@ -972,9 +972,9 @@ the vouchers that satisfy every criterion given.
   invoice total and a tax line alike (reasoned from the entry shape, not measured on an item invoice). Each item carries `matched.amount_entries`,
   the positions in its `amounts` that equalled the amount.
 - A blank or over-long term, a narration phrase under three characters and an
-  amount that is not a plain positive decimal are refused before any read
+  amount that is not a plain positive decimal are refused before the window is read
   (`search_criterion_empty`, `search_criterion_too_long`,
-  `search_narration_too_short`, `search_amount_invalid`).
+  `search_narration_too_short`, `search_amount_invalid`); the refusal comes before the window is read.
 - The search runs last, after the window is labelled and after the ledger and
   type selectors, so a zero from a `complete` window is a checked zero. A voucher
   withheld for a foreign-currency amount has no amounts to compare: an `amount`
@@ -997,7 +997,7 @@ each other.
   `ledger_movement` reports it), `credit`, `net` (debit plus credit) and
   `voucher_refs`: up to five vouchers by date, type, number and GUID, with
   `voucher_refs_complete` saying whether that is all of them. `vouchers` with the
-  same arguments, and the bucket's ledger or type, lists the rest.
+  same arguments without `summarise_by`, narrowed with the existing selectors (a ledger, a voucher type, the month's dates; a selector the call already carries cannot be added twice), lists the rest.
 - A debit is an entry with a negative amount and a credit one with a positive
   amount, the rule `ledger_movement` uses (the same function); `ISDEEMEDPOSITIVE`
   decides only a zero amount, which adds nothing to either side but still counts
@@ -1006,7 +1006,7 @@ each other.
   selectors and search selected: with a `ledger`, a type or a search given, a
   counter-ledger's bucket holds only its entries on those vouchers, not that
   ledger's whole movement (use `ledger_movement` for that). A month or type bucket
-  adds every entry of its vouchers (its debit and credit then equal), or, when
+  adds every entry of its vouchers (its debit and credit then equal in size), or, when
   `ledger` is given, only that ledger's entries; `entries_counted` says which
   (`all_entries` or `selected_ledger`).
 - Every bucket has `position`, its place in the whole ordering. Under
@@ -1018,10 +1018,12 @@ each other.
   the vouchers behind them. `excluded_from_buckets` counts the vouchers left out
   the way `ledger_movement` leaves them out: cancelled, optional, and vouchers with
   no accounting entry (a Stock Journal). They are counted, not hidden. Post-dated
-  vouchers are summed, and `post_dated_included` counts them, so a reader can see
-  how many a report-date cut would move. A voucher type that Tally exports with
-  ledger entries but that does not post (a memorandum, a reversing journal, an
-  order or a note, if the book uses them) is not told apart and is summed; the
+  vouchers are summed: `post_dated_included` counts those Tally flagged Yes and
+  `post_dated_unreported` those with no flag (Tally often omits the tag rather than
+  asserting No), so a zero in the first is not proof that none are post-dated. A voucher type that does not post (a
+  memorandum, a reversing journal, a sales or purchase order, a delivery or receipt
+  note), if the book uses it and Tally exports it with ledger entries, is not told
+  apart and is summed; the
   result's `basis` says so. `ledger_movement` has the same gap. Not measured live.
 - A voucher whose entries do not sum to zero refuses the whole summary
   (`voucher_entries_unbalanced`): a bucket built from it could not be tied out.
@@ -1030,7 +1032,7 @@ each other.
 - Buckets come by larger movement first (ledger, voucher type) or in calendar
   order (month, `YYYY-MM`). A page also stops at a fifth of the response budget
   (the response carries it twice), with at least one bucket, and `truncated` says
-  when more remain; a page that still does not fit is refused
+  when more remain (the next `offset` is this `offset` plus the buckets returned); a page that still does not fit is refused
   `agent_response_too_large`, so lower `limit` or raise the budget. The egress
   receipt counts the buckets as the rows prepared.
 - Ledger names in `group` are masked when parties are masked.

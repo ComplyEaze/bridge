@@ -3878,6 +3878,36 @@ fn the_first_verification_page_masks_ledger_names_under_mask_parties() {
     }
 }
 
+/// The first line names Tally's rejection only when Tally's own answer
+/// reported every voucher of the post as not created; a partly created batch,
+/// or a post whose vouchers were found or are not attributed, keeps the
+/// `refused` line unchanged (#1108).
+#[test]
+fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_not_created() {
+    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+    let rejected =
+        "Tally reported that this post created none of its vouchers: follow each voucher's next step.";
+    let summary = |statuses: &[&str]| {
+        let vouchers = statuses
+            .iter()
+            .map(|status| json!({ "status": status }))
+            .collect::<Vec<_>>();
+        with_post_span_summary(json!({ "state": "refused" }), &json!(vouchers))["summary"].clone()
+    };
+    assert_eq!(summary(&["tally_reported_not_created"]), rejected);
+    assert_eq!(
+        summary(&["tally_reported_not_created", "tally_reported_not_created"]),
+        rejected
+    );
+    assert_eq!(
+        summary(&["tally_reported_not_created", "posted_verified"]),
+        refused
+    );
+    assert_eq!(summary(&["sent_not_attributed"]), refused);
+    assert_eq!(summary(&["posted_verified"]), refused);
+    assert_eq!(summary(&[]), refused);
+}
+
 #[test]
 fn each_post_span_binding_state_carries_its_own_plain_summary() {
     let states = [
@@ -3890,7 +3920,7 @@ fn each_post_span_binding_state_carries_its_own_plain_summary() {
     let summaries: BTreeSet<String> = states
         .iter()
         .map(|state| {
-            let report = with_post_span_summary(json!({ "state": state }));
+            let report = with_post_span_summary(json!({ "state": state }), &json!([]));
             let summary = report["summary"].as_str().unwrap_or_default();
             assert!(!summary.is_empty(), "{state}: {report}");
             summary.to_owned()
@@ -3899,6 +3929,7 @@ fn each_post_span_binding_state_carries_its_own_plain_summary() {
     assert_eq!(summaries.len(), states.len(), "{summaries:?}");
     let unobserved = with_post_span_summary(
         json!({ "state": "unsettled", "code": span_identity::BindUnsettled::EffectiveDateNotObserved.code() }),
+        &json!([]),
     );
     let unobserved = unobserved["summary"].as_str().unwrap_or_default();
     assert!(
@@ -3906,6 +3937,6 @@ fn each_post_span_binding_state_carries_its_own_plain_summary() {
         "{unobserved}"
     );
     assert!(!summaries.contains(unobserved), "{unobserved}");
-    let not_applicable = with_post_span_summary(json!({ "state": "not_applicable" }));
+    let not_applicable = with_post_span_summary(json!({ "state": "not_applicable" }), &json!([]));
     assert_eq!(not_applicable, json!({ "state": "not_applicable" }));
 }

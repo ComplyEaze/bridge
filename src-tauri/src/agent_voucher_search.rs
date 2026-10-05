@@ -163,7 +163,7 @@ impl VoucherSearch {
 /// An amount to search for: a plain unsigned decimal above zero, in canonical form.
 fn search_amount(text: &str) -> Result<bridge_tally_core::ExactDecimal, ToolFailure> {
     let invalid = || search_failure("search_amount_invalid");
-    if text.starts_with('-') || text.starts_with('+') {
+    if text.starts_with('-') {
         return Err(invalid());
     }
     let parsed = bridge_tally_core::ExactDecimal::parse(text.to_string()).map_err(|_| invalid())?;

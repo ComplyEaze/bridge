@@ -851,6 +851,32 @@ fn the_vouchers_description_names_the_bill_date_and_credit_period_of_an_allocati
     );
 }
 
+/// The `vouchers` description says why `post_dated` can be absent (#1252). It used to say a real
+/// capture showed Tally omitting the tag, which is true only of one old capture taken before the
+/// tag was in the fetch list, so the tag was never asked for. Tally asserts it on every voucher when
+/// asked (protocol reference 8.2c); a source that does not report it leaves the key out.
+#[test]
+fn the_vouchers_description_does_not_say_a_capture_showed_post_dated_omitted() {
+    let tools = registered_tool_definitions(true, true);
+    let description = tools
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|tool| tool["name"] == "vouchers")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("vouchers is in the catalogue");
+    assert!(
+        !description.contains("a real capture has shown Tally omitting that tag"),
+        "the stale claim about the post_dated tag is back"
+    );
+    assert!(
+        description.contains(
+            "Tally asserts it on every voucher when the fetch list asks for it, and the key is left out only when a source does not report it"
+        ),
+        "the vouchers description lacks the post_dated sentence"
+    );
+}
+
 /// The sentences an assistant relies on for safety, each pinned on its own so a
 /// shorter description cannot drop one unnoticed (#1010). Only the phrase is
 /// asserted, never a whole description, so the text around it can still be

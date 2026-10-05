@@ -139,6 +139,22 @@ fn after_read_retry_budget(
     (left >= AFTER_READ_MIN_RETRY_WAIT).then(|| left.min(policy_total))
 }
 
+/// The wire wait a redeem-only pass may spend (#893): what the call's shared
+/// budget has left, cut so that the redeem measured live still fits under the
+/// call's ceiling from here. A pass with no time left waits for nothing: an
+/// admission read that meets a held lock is refused at once as
+/// `tally_endpoint_busy`, before the attempt is recorded and before anything is
+/// sent, rather than holding the call past its ceiling.
+fn redeem_pass_wire_budget(
+    elapsed: std::time::Duration,
+    shared_left: std::time::Duration,
+) -> std::time::Duration {
+    approval::CALL_CEILING
+        .saturating_sub(elapsed)
+        .saturating_sub(approval::MEASURED_REDEEM)
+        .min(shared_left)
+}
+
 /// Why the marks readback after a sent post failed: the transport's own safe
 /// code when it has one (a busy wire lock is `tally_endpoint_busy`), so a
 /// doubt says the read was held back and never that the step moved wrongly.
@@ -469,8 +485,40 @@ impl Server {
     }
 
     /// One pass of a post call: the whole post, or up to a Join that found a
-    /// click already made, which the caller then redeems in a second pass.
+    /// click already made, which the caller then redeems in a second pass. A
+    /// redeem-only pass runs on a wire-wait budget cut to what the call has
+    /// left (#893): its admission reads would otherwise wait on whatever the
+    /// call's shared budget still holds, past the call's ceiling.
     pub(in crate::agent) async fn post_import_entry(
+        &self,
+        args: &Value,
+        expected_sha256: Option<&str>,
+        scope: PostScope,
+        entry: Entry,
+    ) -> Result<Pass, ToolFailure> {
+        let Entry::RedeemOnly { call_started, .. } = &entry else {
+            return self
+                .post_import_pass(args, expected_sha256, scope, entry)
+                .await;
+        };
+        let shared_left = crate::tally::runtime::operation_wire_budget_remaining()
+            .unwrap_or_else(|| self.runtime.wire_gate_config().retry().total());
+        let elapsed = call_started.elapsed();
+        #[cfg(test)]
+        let elapsed = REDEEM_PASS_ELAPSED
+            .try_with(|scripted| *scripted)
+            .unwrap_or(elapsed);
+        let budget = redeem_pass_wire_budget(elapsed, shared_left);
+        #[cfg(test)]
+        let _ = REDEEM_WIRE_BUDGETS.try_with(|budgets| budgets.lock().unwrap().push(budget));
+        crate::tally::runtime::with_operation_wire_budget_of(
+            budget,
+            self.post_import_pass(args, expected_sha256, scope, entry),
+        )
+        .await
+    }
+
+    async fn post_import_pass(
         &self,
         args: &Value,
         expected_sha256: Option<&str>,
@@ -2005,6 +2053,12 @@ tokio::task_local! {
     /// for the first read, on the operation's own budget, and the retry's budget.
     pub(super) static MARKS_READS:
         std::sync::Arc<std::sync::Mutex<Vec<Option<std::time::Duration>>>>;
+    /// Test-only: the wire-wait budget each redeem-only pass ran on (#893).
+    pub(super) static REDEEM_WIRE_BUDGETS:
+        std::sync::Arc<std::sync::Mutex<Vec<std::time::Duration>>>;
+    /// Test-only: how far into its call a redeem-only pass takes itself to
+    /// start, so a test can reach the call's ceiling without waiting it out.
+    pub(super) static REDEEM_PASS_ELAPSED: std::time::Duration;
 }
 
 /// A fresh random REMOTEID for one native post.

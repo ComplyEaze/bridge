@@ -1,0 +1,105 @@
+{
+ "comment": "bank_reconciliation on a statement its reader refuses: it declares no opening balance (the key is absent) and no closing balance (null), and the reason names the opening, which is read first.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_no_balance-000"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_no_balance-001"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-bankrec_no_balance-002"
+  },
+  {
+   "name": "Bank Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-bankrec_no_balance-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-bankrec_no_balance-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Edge Bank",
+   "opening": 500000,
+   "debit": 1000,
+   "credit": 0,
+   "closing": 501000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "n01",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     1000
+    ],
+    [
+     "Customer A",
+     -1000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "bank_reconciliation"
+ ],
+ "bank_reconciliation_ledger": "Edge Bank",
+ "bank_statement": {
+  "doc_id": "bank:edge:no_balance",
+  "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "account_ref": "XXXXXX0009",
+  "bank": "Invented Bank",
+  "period": {
+   "start": "2025-06-01",
+   "end": "2025-06-30"
+  },
+  "closing_balance_paise": null,
+  "rows": [
+   {
+    "doc": "bank:edge:no_balance",
+    "row": 0,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-05",
+    "narration": "NEFT CUSTOMER A",
+    "debit_paise": 0,
+    "credit_paise": 1000,
+    "balance_paise": 501000
+   }
+  ]
+ }
+}

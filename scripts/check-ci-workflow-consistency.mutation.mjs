@@ -146,3 +146,63 @@ test("a lone carriage return, or a Unicode line separator, in either workflow is
 test("an unexpected job in the release workflow is refused", () => {
   refused(withChange(".github/workflows/release-mcpb-preview.yml", (text) => `${text.trimEnd()}\n  extra-job:\n    runs-on: ubuntu-latest\n`), "must have exactly the jobs release-admission, package, attest and publish-preview");
 });
+
+// `continue-on-error` is refused except on four pinned, diagnostics-only artifact uploads. Each case below
+// makes one change a weaker rule would let through; the unmodified tree has exactly four allowed flags.
+const CI_FILE = ".github/workflows/ci.yml";
+const FLAG = "        continue-on-error: true";
+const UPLOAD = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
+const TIMINGS = `${FLAG}\n        uses: ${UPLOAD} # v7.0.1\n        with:\n          name: native-compiler-timings`;
+const AFTER_NATIVE_PIN = "      - name: Test native workspace doctests\n";
+const ONLY_EXACT = "ci.yml must not use continue-on-error except the one exact line in each pinned diagnostics-only upload";
+const UPLOAD_SHAPE = "changed shape; review it and update diagnosticUploads";
+
+test("the unmodified tree has exactly four allowed flags", () => {
+  assert.equal(readFileSync(join(copy, CI_FILE), "utf8").split("\n").filter((line) => line === FLAG).length, 4);
+});
+
+for (const [name, change, messages] of [
+  ["a flag on a step that is not one of the four", (text) => text.replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}${FLAG}\n`), [ONLY_EXACT]],
+  ["a job-level flag", (text) => text.replace("  seam-control:\n", "  seam-control:\n    continue-on-error: true\n"), [ONLY_EXACT]],
+  ["a flag moved from an allowed step to another step", (text) => text.replace(TIMINGS, TIMINGS.slice(FLAG.length + 1)).replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}${FLAG}\n`), [UPLOAD_SHAPE]],
+  ["an id on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace(FLAG, `${FLAG}\n        id: timings`)), [UPLOAD_SHAPE]],
+  ["an expression instead of true on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace(FLAG, "        continue-on-error: ${{ always() }}")), [ONLY_EXACT, UPLOAD_SHAPE]],
+  ["a different upload action on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace("043fb46d", "043fb46e")), [UPLOAD_SHAPE]],
+]) {
+  test(`diagnostics uploads: ${name} is refused`, () => {
+    const result = withChange(CI_FILE, change);
+    for (const message of messages) refused(result, message);
+  });
+}
+
+test("diagnostics uploads: an allowed step moved to another job is refused although the count stays four", () => {
+  const step = [
+    "      - name: Retain native compiler timings",
+    "        if: ${{ always() }}",
+    FLAG,
+    `        uses: ${UPLOAD} # v7.0.1`,
+    "        with:",
+    "          name: native-compiler-timings-${{ matrix.os }}",
+    "          path: src-tauri/target/cargo-timings/*.html",
+    "          if-no-files-found: warn",
+    "          retention-days: 7",
+  ].join("\n");
+  const result = withChange(CI_FILE, (text) => {
+    assert.equal(text.split(step).length, 2, "the step exists once");
+    const without = text.replace(`${step}\n`, "");
+    const jobStart = without.indexOf("  seam-control:\n");
+    const jobEnd = without.indexOf("  compiler-cache-retention:\n");
+    assert.ok(jobStart !== -1 && jobEnd > jobStart, "seam-control block exists");
+    const block = without.slice(jobStart, jobEnd).trimEnd();
+    return `${without.slice(0, jobStart)}${block}\n${step}\n\n${without.slice(jobEnd)}`;
+  });
+  refused(result, UPLOAD_SHAPE);
+});
+
+test("diagnostics uploads: the flag in any other workflow is refused", () => {
+  refused(withChange(".github/workflows/release-mcpb-preview.yml", (text) => text.replace(/(\n {6}- uses: actions\/checkout)/, `\n${FLAG}$1`)), "release-mcpb-preview.yml must not use continue-on-error");
+});
+
+test("a quoted mapping key at the start of a line is refused (an escaped spelling would not contain the refused text)", () => {
+  refused(withChange(CI_FILE, (text) => text.replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}        "continue\\x2Don-error": true\n`)), "must not start a line with a quoted mapping key");
+});

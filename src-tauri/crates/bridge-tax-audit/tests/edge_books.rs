@@ -829,30 +829,64 @@ fn check(name: &str) {
             }
             "bank_reconciliation" => {
                 // The statement is caller data; its rows feed BANK-1, as the reference's pack sets
-                // `eng.bank` to them.
-                let statement = bank_statement_from_json(&s["bank_statement"]).unwrap();
-                let terms: BTreeSet<String> = strs(&s["bank_charge_terms"]).into_iter().collect();
-                let ledger = s["bank_reconciliation_ledger"].as_str().unwrap();
-                let r = bank_reconciliation::run(
-                    &book,
-                    &rules,
-                    &period(&s),
-                    &statement,
-                    ledger,
-                    &terms,
-                    bank_reconciliation::MATCH_MAX_DAYS,
-                )
-                .unwrap();
-                let c = bank_reconciliation::check_invariants(&statement.rows, &r).unwrap();
-                (r, c)
+                // `eng.bank` to them. A statement the reader refuses gives the module's refused
+                // result, with the reader's reason, and BANK-1 no rows, as the pack does.
+                match bank_statement_from_json(&s["bank_statement"]) {
+                    Ok(statement) => {
+                        let terms: BTreeSet<String> =
+                            strs(&s["bank_charge_terms"]).into_iter().collect();
+                        let ledger = s["bank_reconciliation_ledger"].as_str().unwrap();
+                        let r = bank_reconciliation::run(
+                            &book,
+                            &rules,
+                            &period(&s),
+                            &statement,
+                            ledger,
+                            &terms,
+                            bank_reconciliation::MATCH_MAX_DAYS,
+                        )
+                        .unwrap();
+                        let c = bank_reconciliation::check_invariants(&statement.rows, &r).unwrap();
+                        (r, c)
+                    }
+                    Err(AuditError::StatementRefused(refusal)) => {
+                        let r = bank_reconciliation::refused(&rules, &refusal.reason()).unwrap();
+                        let c = bank_reconciliation::check_invariants(&[], &r).unwrap();
+                        // The refused result's one figure is the reason: the registry's floor is
+                        // for a reconciliation that ran.
+                        let rust = canonical_test_result(&book, &r, Some(c)).unwrap();
+                        let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                        let diffs = compare(&golden, &rust, Some(1)).unwrap();
+                        assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                        continue;
+                    }
+                    Err(e) => panic!("{name}: the statement is malformed: {e}"),
+                }
             }
             "high_value_register" => {
                 // As `parity/edge_golden.py` runs it: the statement and the AIS rows optional, the
                 // counterparty types already merged, the recipient type from `entity_type` unless
-                // the spec names one ("unknown" meaning none).
-                let statement = match &s["bank_statement"] {
-                    Value::Null => None,
-                    v => Some(bank_statement_from_json(v).unwrap()),
+                // the spec names one ("unknown" meaning none). A statement the reader refuses is not
+                // supplied, and its reason is passed, as the pack passes it.
+                let (statement, refused) = match &s["bank_statement"] {
+                    Value::Null => (
+                        None,
+                        s["bank_statement_refused"].as_str().map(str::to_string),
+                    ),
+                    v => match bank_statement_from_json(v) {
+                        Ok(statement) => (
+                            Some(statement),
+                            s["bank_statement_refused"].as_str().map(str::to_string),
+                        ),
+                        Err(AuditError::StatementRefused(refusal)) => {
+                            assert!(
+                                s["bank_statement_refused"].is_null(),
+                                "{name}: bank_statement_refused is given and the reader refuses"
+                            );
+                            (None, Some(refusal.reason()))
+                        }
+                        Err(e) => panic!("{name}: the statement is malformed: {e}"),
+                    },
                 };
                 let docs = traces_documents_from_json(&s).unwrap();
                 let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
@@ -888,7 +922,7 @@ fn check(name: &str) {
                     s194n_recipient_type: recipient,
                     round_off_ledgers: &round_off,
                     counterparty_type_by_ledger: &types,
-                    bank_statement_refused: s["bank_statement_refused"].as_str(),
+                    bank_statement_refused: refused.as_deref(),
                 };
                 let r = high_value_register::run(&book, &rules, &inputs).unwrap();
                 // The reference module has no check_invariants: an empty evaluated list.
@@ -1404,10 +1438,11 @@ fn a_repeated_tis_category_is_refused() {
 
 /// Two matched books rows sharing a GUID would repeat `match_pair_<hash>`: the reference's `fig`
 /// raises ("duplicate figure id bank_reconciliation.match_pair_093394bf", checked on this same
-/// change to `bankrec_paths`), and the port refuses with an error rather than panicking.
+/// change to `bankrec_adds_up` at reference `da9e2d3d`), and the port refuses with an error rather
+/// than panicking.
 #[test]
 fn a_repeated_books_guid_is_refused_not_panicked() {
-    let mut s = spec("bankrec_paths");
+    let mut s = spec("bankrec_adds_up");
     for v in s["vouchers"].as_array_mut().unwrap() {
         if v["guid"] == "p07" {
             v["guid"] = Value::from("p01");

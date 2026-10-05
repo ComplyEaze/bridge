@@ -8,7 +8,7 @@
   "figures": [
     {
       "id": "bank_reconciliation.statement_refused_reason",
-      "value": "lists a transaction dated 03-Mar-2026 after one dated 07-Mar-2026, and a row carries no running balance to show that order is the bank's",
+      "value": "lists a transaction dated 31-May-2025 outside its own period, 01-Jun-2025 to 30-Jun-2025",
       "unit": "text",
       "definition_sha256_16": "b8b14014d79e1fbf",
       "definition_text": "Why the bank statement supplied was refused.",
@@ -53,22 +53,17 @@
     {
       "invariant": "POP-1",
       "subject": "Customer A",
-      "detail": "vouchers -460000 vs TB movement 0 paise"
-    },
-    {
-      "invariant": "POP-1",
-      "subject": "Supplier B",
-      "detail": "vouchers 340777 vs TB movement 0 paise"
+      "detail": "vouchers -1000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-3",
       "subject": "closing_paise",
-      "detail": "TB closing_paise sums to 1119223 paise"
+      "detail": "TB closing_paise sums to 501000 paise"
     },
     {
       "invariant": "POP-3",
       "subject": "opening_paise",
-      "detail": "TB opening_paise sums to 1000000 paise"
+      "detail": "TB opening_paise sums to 500000 paise"
     }
   ],
   "result_invariants_evaluated": [

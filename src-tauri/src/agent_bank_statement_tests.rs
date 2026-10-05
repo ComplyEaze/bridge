@@ -1633,3 +1633,72 @@ async fn a_path_that_is_not_on_a_local_disk_is_refused_before_any_open() {
         }
     }
 }
+
+#[test]
+fn the_build_is_told_which_bank_and_suspense_ledgers_the_file_was_parsed_for() {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    let directory = tempfile::tempdir().unwrap();
+    let narration = "UPI-ALPHA-9@x-ABCD0001-111111111111-P";
+    let rows = [Row::from_pairs([
+        ("date", "05/08/26"),
+        ("narr", narration),
+        ("ref", "1"),
+        ("dr", "10.00"),
+        ("cr", ""),
+        ("bal", "990.00"),
+    ])];
+    let args = json!({
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
+        "bank": "hdfc",
+        "account_label": "Synthetic CA xx4321",
+        "opening_balance": "1,000.00",
+        "closing_balance": "990.00",
+        "total_debits": "10.00",
+        "total_credits": "0.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    });
+    let request = OwnedRequest::from_args(&args).unwrap();
+    let build = build(
+        &rows,
+        Bank::Hdfc,
+        &Mapping::default(),
+        &BuildOptions {
+            bank_ledger: "Synthetic Bank Ledger",
+            suspense_ledger: "Suspense",
+            account_label: "Synthetic CA xx4321",
+            account_number: "00000000004321",
+            date_from: None,
+            date_to: None,
+            cash_answers: &request.cash_answers,
+        },
+    )
+    .unwrap();
+    let parsed = ParsedStatement {
+        account_number: "00000000004321".into(),
+        statement_rows: rows.len(),
+        closing: bridge_tally_core::ExactDecimal::parse("990.00").unwrap(),
+        totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+        check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+        counterparties: group_counterparties(&build.records).unwrap(),
+        build,
+    };
+    let (proposals_id, digest) =
+        persist(directory.path(), &request, &parsed, &"0".repeat(64)).unwrap();
+    let build_args = |proposals_id: &str, digest: &str| json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": digest});
+    let resolved =
+        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
+    let ledgers = resolved.statement_ledgers.expect("a file names both");
+    assert_eq!(ledgers.bank_ledger, "Synthetic Bank Ledger");
+    assert_eq!(ledgers.suspense_ledger, "Suspense");
+
+    // Inline vouchers name no statement.
+    let inline = resolve_import_arguments(
+        directory.path(),
+        &json!({"company_guid": "g", "vouchers": []}),
+    )
+    .unwrap();
+    assert!(inline.statement_ledgers.is_none());
+}

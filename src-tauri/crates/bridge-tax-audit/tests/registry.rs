@@ -23,6 +23,10 @@ fn caller(id: &str) -> CallerData {
                 registry::report_totals_from_json(&json("synthetic-report-totals.json")).unwrap(),
             );
         }
+        "books_examined" => {
+            c.documents_read =
+                registry::documents_read_from_json(&json("synthetic-documents-read.json")).unwrap();
+        }
         "applicability_44ab" => {
             c.turnover_inputs =
                 registry::turnover_inputs_from_json(&json("synthetic-turnover-inputs.json"))

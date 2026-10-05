@@ -32,6 +32,7 @@ pub mod bank_reconciliation;
 pub mod binding;
 pub mod book;
 pub mod book_keeping_quality;
+pub mod books_examined;
 pub mod canonical;
 pub mod cash_44ab;
 pub mod cash_book_integrity;
@@ -1537,6 +1538,17 @@ pub fn entity_269st_gap_on(
     let result = entity_269st_gap::run(book, rules, &cash, &bank, &index, &round_off_ledgers)?;
     let module_check = entity_269st_gap::check_invariants(&result);
     canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `books_examined` on a book, with the documents the caller loaded, and return its canonical
+/// parity dump. The reference module has no `check_invariants`.
+pub fn books_examined_on(
+    book: &book::Book,
+    rules: &Rules,
+    documents_read: &BTreeSet<books_examined::DocumentRead>,
+) -> Result<serde_json::Value> {
+    let result = books_examined::run(book, rules, documents_read)?;
+    canonical::canonical_test_result(book, &result, None)
 }
 
 /// Run `read_scope` on a book and return its canonical parity dump. The reference module has no

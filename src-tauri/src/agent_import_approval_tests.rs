@@ -1615,6 +1615,65 @@ fn a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits()
     assert!(!redeem_fits_in_call(Duration::MAX, 1));
 }
 
+/// The single-voucher dialog shows each narration exactly as the post sends
+/// it (#1055 point 5): without leading or trailing spaces, as one whole value.
+/// An absent narration stays `(none)`, and one made only of spaces is posted
+/// empty and shown as `""`. The batch dialog shows no narration.
+#[test]
+fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = batch_server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let (one, _) = saved_batch(&server);
+    let endpoint = server.settings.endpoint.clone();
+    let narration_line = |line: &ImportLedgerLine| {
+        agent_review_preview(line, &endpoint)
+            .unwrap()
+            .lines()
+            .find(|text| text.starts_with("Narration: "))
+            .expect("a single voucher's dialog shows its narration")
+            .to_owned()
+    };
+    let posted = |line: &ImportLedgerLine| {
+        let xml = super::super::render_native_vouchers_xml(
+            "Synthetic company",
+            line.vouchers.iter().map(|voucher| (voucher, Uuid::nil())),
+        );
+        let start = xml.find("<NARRATION>").expect("a narration element") + "<NARRATION>".len();
+        let end = xml[start..].find("</NARRATION>").unwrap() + start;
+        xml[start..end].to_owned()
+    };
+    for (saved, shown, sent) in [
+        (
+            Some("  Rent for June  "),
+            "Narration: \"Rent for June\"",
+            "Rent for June",
+        ),
+        (
+            Some("Rent for June"),
+            "Narration: \"Rent for June\"",
+            "Rent for June",
+        ),
+        (Some("   "), "Narration: \"\"", ""),
+        (None, "Narration: (none)", ""),
+    ] {
+        let mut line = one.clone();
+        line.vouchers[0].narration = saved.map(str::to_owned);
+        assert_eq!(narration_line(&line), shown, "{saved:?}");
+        assert_eq!(posted(&line), sent, "{saved:?}");
+    }
+    let mut two = one.clone();
+    let mut second = two.vouchers[0].clone();
+    second.bridge_txn_id = "journal-583-2".into();
+    second.narration = Some("  Second rent  ".into());
+    two.vouchers.push(second);
+    let batch = agent_review_preview(&two, &endpoint).unwrap();
+    assert!(
+        batch.contains("Not shown here: each voucher's own date, narration and reference."),
+        "{batch}"
+    );
+    assert!(!batch.contains("Second rent"), "{batch}");
+}
+
 /// The agent's dialog says when its post happens, in both preview shapes and
 /// inside the dialog's caps; the desktop's preview does not carry it.
 #[test]

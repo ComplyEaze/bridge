@@ -2348,7 +2348,7 @@ fn review_preview_with(
     let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}\nReference: {}\nNarration: {}\n\n{}\n\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\n\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from,
         voucher.date, voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
-        optional(&voucher.reference), optional(&voucher.narration), entries, debit.as_str(), credit.as_str(), line.batch_id);
+        optional(&voucher.reference), super::posted_narration(voucher).map(quoted).unwrap_or_else(|| "(none)".into()), entries, debit.as_str(), credit.as_str(), line.batch_id);
     let preview = std::iter::once(preview)
         .chain(footer.iter().cloned())
         .collect::<Vec<_>>()

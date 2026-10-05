@@ -3419,12 +3419,20 @@ fn render_import_envelope(company: &str, messages: &str) -> String {
     format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES></REQUESTDESC><REQUESTDATA>{messages}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>", xml_escape(company))
 }
 
+/// The narration a post sends for `voucher`, and the one its approval dialog
+/// shows (#1055 point 5): the saved text without leading or trailing spaces, so
+/// none reaches Tally and the person approves exactly the text that is sent.
+/// `None` when the voucher has no narration.
+fn posted_narration(voucher: &ImportVoucher) -> Option<&str> {
+    voucher.narration.as_deref().map(str::trim)
+}
+
 fn render_voucher_xml(
     voucher: &ImportVoucher,
     remote_id: Uuid,
     attribution: NarrationAttribution,
 ) -> String {
-    let text = voucher.narration.as_deref().unwrap_or("").trim();
+    let text = posted_narration(voucher).unwrap_or("");
     let narration = match attribution {
         NarrationAttribution::Tagged(attribution_id) => format!(
             "<NARRATION>{}</NARRATION>",

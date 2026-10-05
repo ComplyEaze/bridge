@@ -562,12 +562,13 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         }
         // What the cost means for the next call goes on this page only (a later page
         // is served from the held window, which keeps the plain timings), and only
-        // when the whole response still fits without costing the caller its rows
-        // (#1239).
-        let payload_len = payload.to_string().len();
+        // when even the smallest page still carries it; a page that must be trimmed
+        // loses rows, as for any field, and the window says when the block was left
+        // out (#1239).
+        let smallest_page = super::read_cost::smallest_page_len(&payload);
         super::read_cost::add_read_cost(
             &mut payload["result"]["window"],
-            payload_len,
+            smallest_page,
             &read.timings,
             super::read_cost::Ended::Read,
             server.settings.max_bytes,

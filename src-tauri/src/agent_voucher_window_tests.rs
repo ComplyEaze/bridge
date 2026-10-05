@@ -5007,7 +5007,7 @@ async fn vouchers_states_its_read_cost_from_eighteen_census_reads_and_not_from_o
     assert_eq!(cost["vouchers_read"], 3, "{window}");
     assert_eq!(
         cost["host_240"],
-        json!({"state": "window_fits", "vouchers_known_to_fit": 3}),
+        json!({"state": "window_fits", "vouchers_that_fitted": 3}),
         "{window}"
     );
 
@@ -5042,33 +5042,46 @@ async fn a_later_page_does_not_repeat_the_first_pages_read_cost() {
     assert!(window.get("read_cost").is_none(), "{window}");
 }
 
-/// The block never costs a caller the rows of a page: at a cap the page fits in
-/// without it, the result comes back whole and without the block.
+/// One `vouchers` call over the plans, at a response cap and with a page limit.
+async fn call_vouchers_capped(plans: Vec<ScenarioPlan>, cap: usize, limit: Option<u64>) -> Value {
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.settings.max_bytes = cap;
+    let mut args = json!({"company_guid": GUID, "from": "20260801", "to": "20260831"});
+    if let Some(limit) = limit {
+        args["limit"] = json!(limit);
+    }
+    let response = server.call_tool("vouchers", args).await;
+    simulator.finish().unwrap();
+    response
+}
+
+/// A page is judged by its smallest form (one item), not by the page as asked for:
+/// at a cap where the whole page of three vouchers would not have carried the
+/// block three times over but a one-voucher page does, the block is still there,
+/// and the call never turns into an oversize refusal.
 #[tokio::test]
-async fn the_read_cost_is_left_out_where_it_would_cost_the_page_its_rows() {
+async fn the_read_cost_is_judged_against_the_smallest_page_and_never_causes_an_oversize_refusal() {
     let whole = call_vouchers_over(census_plans_of(18)).await;
     let block_len = whole["structuredContent"]["result"]["window"]["read_cost"]
         .to_string()
         .len();
-    let cap = whole.to_string().len() - block_len;
-    let simulator = SequenceSimulator::spawn(census_plans_of(18)).unwrap();
-    let directory = tempfile::tempdir().unwrap();
-    let mut server = server_at(simulator.address(), directory.path());
-    server.settings.max_bytes = cap;
-    let capped = server
-        .call_tool(
-            "vouchers",
-            json!({"company_guid": GUID, "from": "20260801", "to": "20260831"}),
-        )
-        .await;
-    simulator.finish().unwrap();
+    let one = call_vouchers_capped(census_plans_of(18), 200_000, Some(1)).await;
+    let one_page = one["structuredContent"].to_string().len() - block_len;
+    // Exactly enough for the one-item page and the block, not for the whole page.
+    let cap = 3 * (one_page + block_len) + 1_024 + 256;
+    let capped = call_vouchers_capped(census_plans_of(18), cap, None).await;
     assert_eq!(capped["isError"], false, "{capped}");
     let result = &capped["structuredContent"]["result"];
-    assert_eq!(
-        result["items"].as_array().map(Vec::len),
-        Some(3),
+    assert!(
+        result["items"]
+            .as_array()
+            .is_some_and(|rows| !rows.is_empty()),
         "{result}"
     );
-    assert!(result["window"].get("read_cost").is_none(), "{result}");
-    assert_eq!(result["window"]["census"]["requests"], 18, "{result}");
+    let window = &result["window"];
+    assert!(window.get("read_cost").is_some(), "{window}");
+    assert!(window.get("read_cost_left_out").is_none(), "{window}");
+    assert_eq!(window["census"]["requests"], 18, "{window}");
 }

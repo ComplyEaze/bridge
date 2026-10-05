@@ -1,8 +1,8 @@
 //! What a voucher window read cost, stated for the next call (bridge#1239).
 //!
 //! The census a window read pays is set by the book's voucher mark, not by the
-//! window: a one-day read on a book with a mark near 1.03 million is 126 census
-//! reads and about 170 s, and an assistant that reads a month day by day pays that
+//! window: a one-day read on a book with a mark near 1.03 million is about 120
+//! census reads and about 170 s, and an assistant that reads a month day by day pays that
 //! census thirty times. This block says, from the call's own timings alone, what
 //! the window read did, what is certain of its cost, and whether it fitted under
 //! the one host limit that has been measured. It makes no estimate beyond what the
@@ -14,11 +14,13 @@
 //! - `observed_seconds` and the counts are what this call did.
 //! - `floor_seconds` is **derived from the gate's rule**, not measured: the gate
 //!   holds each request back until 500 ms after the previous one ended
-//!   (`SHIPPED_REQUEST_SPACING`), so a call that sent N census reads waited at
-//!   least (N - 1) x 0.5 s in all. It is rounded down.
-//! - `host_240.vouchers_known_to_fit` is what this call carried inside 240 s: a
-//!   window of up to that many vouchers is known to fit this book; nothing larger
-//!   is claimed.
+//!   (`SHIPPED_REQUEST_SPACING`), so consecutive census reads are at least 0.5 s
+//!   apart and a call that sent N of them took at least (N - 1) x 0.5 s in
+//!   gaps. It is time between reads, not time spent sleeping (the gate sleeps
+//!   only what is left of the half second after Bridge's own work). Rounded down.
+//! - `host_240.vouchers_that_fitted` is what this window carried inside 240 s. It
+//!   claims nothing about a larger or a smaller window: fewer vouchers are not
+//!   cheaper (a window with no voucher is read twice).
 //! - the host limits are facts about hosts, each with its basis.
 //!
 //! A read that stopped (a refusal) states the floor and no verdict: the time of a
@@ -153,7 +155,7 @@ pub(super) fn read_cost(timings: &WindowReadTimings, ended: Ended) -> Option<Val
     }
     let mut host_240 = json!({"state": cost.fit.state()});
     if let Fit::Fits { vouchers } = cost.fit {
-        host_240["vouchers_known_to_fit"] = json!(vouchers);
+        host_240["vouchers_that_fitted"] = json!(vouchers);
     }
     Some(json!({
         "ended": match ended {
@@ -168,23 +170,23 @@ pub(super) fn read_cost(timings: &WindowReadTimings, ended: Ended) -> Option<Val
             "parts": nearest_seconds(cost.parts_ms),
             "total": nearest_seconds(cost.total_ms()),
         },
-        // Derived from the gate's rule, rounded down.
+        // Derived from the gate's rule (the gaps between reads), rounded down.
         "floor_seconds": cost.floor_ms / 1000,
         "host_240": host_240,
         "host_limits": [
             {"host": "claude_desktop_chat_macos", "seconds": 240, "basis": "measured_twice_one_build_silent_calls"},
             {"host": "claude_desktop_chat_windows", "seconds": null, "basis": "unmeasured"},
-            {"host": "claude_code", "seconds": null, "basis": "completed_150s_by_default_one_run_per_two_builds_one_earlier_60s_unexplained"},
+            {"host": "claude_code", "seconds": null, "basis": "default_completed_150s_two_builds_configured_60s_cut_at_60s_earlier_60s_unexplained"},
         ],
         "say": say(&cost, ended),
     }))
 }
 
 /// Adds the block to a `window` value as its `read_cost` when there is one and
-/// the whole response still fits without costing a caller its rows: `container_len`
-/// is the serialized length of the payload (or refusal) the window sits in, which
-/// a result carries three times over once it is also copied, escaped, into the
-/// text content.
+/// the response can still carry it: `container_len` is the serialized length of the
+/// smallest payload (or refusal) the window sits in, which a result carries three
+/// times over once it is also copied, escaped, into the text content. When the
+/// block is dropped for want of room the window says so (`read_cost_left_out`).
 pub(super) fn add_read_cost(
     window: &mut Value,
     container_len: usize,
@@ -199,11 +201,29 @@ pub(super) fn add_read_cost(
         .saturating_add(block.to_string().len())
         .saturating_mul(3)
         .saturating_add(1_024);
-    if needed <= max_bytes {
-        if let Some(object) = window.as_object_mut() {
+    if let Some(object) = window.as_object_mut() {
+        if needed <= max_bytes {
             object.insert("read_cost".to_string(), block);
+        } else {
+            // Said, so that a caller can tell a quick call from a slow one whose
+            // block would not fit.
+            object.insert("read_cost_left_out".to_string(), json!("response_budget"));
         }
     }
+}
+
+/// The serialized length of `payload` with its `result.items` cut to the first
+/// one: what the smallest page that can still be returned would weigh. The block
+/// is judged against that, since a page that is trimmed to fit its budget gives up
+/// rows, never the block's own refusal code or its last row.
+pub(super) fn smallest_page_len(payload: &Value) -> usize {
+    let whole = payload.to_string().len();
+    let Some(items) = payload["result"]["items"].as_array() else {
+        return whole;
+    };
+    let all: usize = items.iter().map(|item| item.to_string().len() + 1).sum();
+    let first = items.first().map_or(0, |item| item.to_string().len() + 1);
+    whole.saturating_sub(all).saturating_add(first)
 }
 
 /// The outcome first, then what is certain of the cost, then whether it fitted.
@@ -230,7 +250,7 @@ fn say(cost: &Cost, ended: Ended) -> String {
             ""
         };
         format!(
-            " This book's census took {at_least}{} reads, so at least {} seconds of any call go on the wait between them (derived from the 0.5 second gate).",
+            " This book's census took {at_least}{} reads, and the 0.5 second gate keeps consecutive reads that far apart, so at least {} seconds of this call went on the gaps between them (derived).",
             cost.census_reads,
             cost.floor_ms / 1000
         )
@@ -239,9 +259,9 @@ fn say(cost: &Cost, ended: Ended) -> String {
     };
     let fit = match cost.fit {
         Fit::Fits { vouchers } => format!(
-            "Claude Desktop's chat app stops a silent call at 240 seconds (measured twice, on one Mac build); a window of up to {vouchers} vouchers is known to fit this book, and whether a larger one does is not established."
+            "This window of {vouchers} vouchers fitted inside the 240 seconds at which Claude Desktop's chat app stops a silent call (measured twice, on one Mac build; calls between 130 and 240 seconds were not tried, and the call's other reads are not in these figures). Whether a larger or a smaller window fits is not established."
         ),
-        Fit::TooLong => "That is past 240 seconds, where Claude Desktop's chat app stops a silent call (measured twice, on one Mac build). Read a shorter window; how short is not established. For totals over a long period read trial_balance, which reads no vouchers.".to_string(),
+        Fit::TooLong => "That is past 240 seconds, where Claude Desktop's chat app stops a silent call (measured twice, on one Mac build). A shorter window saves the time of its vouchers but pays the same census reads, so how short is enough is not established. For totals over a long period read trial_balance, which reads no vouchers.".to_string(),
         Fit::NotEstablished => match ended {
             Ended::Read => "No voucher was read, so what a call can carry is not established. A window with no voucher is also read once more, a day wider on each side, to confirm it is empty; that read pays its own census and is not in these figures.".to_string(),
             Ended::Stopped => "The read stopped, so what a call can carry is not established.".to_string(),

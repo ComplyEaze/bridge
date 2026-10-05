@@ -5604,8 +5604,8 @@
   "by": "author",
   "what": "several parties go to the first party",
   "file": "src/party_monthly.rs",
-  "from": "let key = if named.len() == 1 {",
-  "to": "let key = if !named.is_empty() {"
+  "from": "} else if named.len() == 1 {",
+  "to": "} else if !named.is_empty() {"
  },
  {
   "id": "E4-06",
@@ -5708,8 +5708,8 @@
   "by": "author",
   "what": "no set of excluded vouchers ever matches",
   "file": "src/party_monthly.rs",
-  "from": "if abs(s)? <= TIE_TOLERANCE_PAISE {",
-  "to": "if abs(s)? < 0 {"
+  "from": "if s == 0 {",
+  "to": "if false && s == 0 {"
  },
  {
   "id": "E4-19",
@@ -5778,10 +5778,10 @@
  {
   "id": "E4-28",
   "by": "reviewer-opus",
-  "what": "excluded vouchers matching to exactly Re 1 do not match",
+  "what": "excluded vouchers a paisa off the difference match (the match's boundary is now exact)",
   "file": "src/party_monthly.rs",
-  "from": "if abs(s)? <= TIE_TOLERANCE_PAISE {",
-  "to": "if abs(s)? < TIE_TOLERANCE_PAISE {"
+  "from": "if s == 0 {",
+  "to": "if abs(s)? <= 1 {"
  },
  {
   "id": "E4-29",
@@ -5908,16 +5908,16 @@
   "by": "author",
   "what": "a voucher with an uncounted party ledger goes to cash or bank, or no party",
   "file": "src/party_monthly.rs",
-  "from": "            } else if !on_voucher.is_empty() {",
-  "to": "            } else if false && !on_voucher.is_empty() {"
+  "from": "    } else if !on_voucher.is_empty() && named.is_empty() {",
+  "to": "    } else if false && !on_voucher.is_empty() && named.is_empty() {"
  },
  {
   "id": "E4-45",
   "by": "author",
   "what": "amounts not attributed raise no finding",
   "file": "src/party_monthly.rs",
-  "from": "        if let Some(na) = rows.get(&Key::NotAttributed) {",
-  "to": "        if let Some(na) = rows.get(&Key::NotAttributed).filter(|_| false) {"
+  "from": "            let Some(idxs) = not_attributed.get(&reason) else {",
+  "to": "            let Some(idxs) = not_attributed.get(&reason).filter(|_| false) else {"
  },
  {
   "id": "E4-46",
@@ -5940,8 +5940,8 @@
   "by": "author",
   "what": "several statuses tried and none matching are listed without 'nor'",
   "file": "src/party_monthly.rs",
-  "from": "several.join(\", nor the \")",
-  "to": "several.join(\", \")"
+  "from": "head.join(\", the \")",
+  "to": "head.join(\", \")"
  },
  {
   "id": "E4-49",
@@ -5980,8 +5980,8 @@
   "by": "author",
   "what": "PWM-2 folds the not-attributed vouchers into the rows with no party",
   "file": "src/party_monthly.rs",
-  "from": "                (0, false) => Kind::NotAttributed,",
-  "to": "                (0, false) => Kind::Unnamed,"
+  "from": "(Some(_), _) => Kind::NotAttributed,",
+  "to": "(Some(_), _) => Kind::NoParty,"
  },
  {
   "id": "E4-54",
@@ -5998,6 +5998,414 @@
   "file": "src/party_monthly.rs",
   "from": "        out.extend(compare(\n            &format!(\"the {block} not-attributed row\"),",
   "to": "        drop(compare(\n            &format!(\"the {block} not-attributed row\"),"
+ },
+ {
+  "id": "E4-56",
+  "by": "author",
+  "what": "the money reason is never given",
+  "file": "src/party_monthly.rs",
+  "from": "} else if expense && !named.is_empty() && money_on_side {",
+  "to": "} else if false && expense && !named.is_empty() && money_on_side {"
+ },
+ {
+  "id": "E4-57",
+  "by": "author",
+  "what": "the money reason reads a cash or bank line on the other side from the lines",
+  "file": "src/party_monthly.rs",
+  "from": "&& (l.amount_paise > 0) == (block_net > 0)",
+  "to": "&& (l.amount_paise > 0) != (block_net > 0)"
+ },
+ {
+  "id": "E4-58",
+  "by": "author",
+  "what": "the money reason reads bank lines only",
+  "file": "src/party_monthly.rs",
+  "from": "let money: BTreeSet<&str> = cash.iter().chain(bank).map(String::as_str).collect();",
+  "to": "let money: BTreeSet<&str> = bank.iter().chain(bank).map(String::as_str).collect();"
+ },
+ {
+  "id": "E4-59",
+  "by": "author",
+  "what": "the money reason is skipped for several parties",
+  "file": "src/party_monthly.rs",
+  "from": "} else if expense && !named.is_empty() && money_on_side {",
+  "to": "} else if expense && named.len() == 1 && money_on_side {"
+ },
+ {
+  "id": "E4-60",
+  "by": "author",
+  "what": "the money reason is given in every block, not the expense blocks only",
+  "file": "src/party_monthly.rs",
+  "from": "let (named, reason) = attribute(v, &on_voucher, &scope, &money, expense)?;",
+  "to": "let (named, reason) = attribute(v, &on_voucher, &scope, &money, true)?;"
+ },
+ {
+  "id": "E4-61",
+  "by": "author",
+  "what": "the money reason nets the cash and bank lines instead of reading each one",
+  "file": "src/party_monthly.rs",
+  "from": "    let money_on_side = v.lines.iter().any(|l| {\n        money.contains(l.ledger.as_str())\n            && l.amount_paise != 0\n            && (l.amount_paise > 0) == (block_net > 0)\n    });",
+  "to": "    let money_on_side = {\n        let m = net_on(&|n| money.contains(n))?;\n        m != 0 && (m > 0) == (block_net > 0)\n    };"
+ },
+ {
+  "id": "E4-62",
+  "by": "author",
+  "what": "a nil cash or bank line counts as on the lines' side",
+  "file": "src/party_monthly.rs",
+  "from": "            && l.amount_paise != 0\n",
+  "to": ""
+ },
+ {
+  "id": "E4-63",
+  "by": "author",
+  "what": "block lines netting to nil are given the other-side reason",
+  "file": "src/party_monthly.rs",
+  "from": "Some(Reason::Nil)",
+  "to": "Some(Reason::OtherSide)"
+ },
+ {
+  "id": "E4-64",
+  "by": "author",
+  "what": "every not-attributed voucher is cited under every reason",
+  "file": "src/party_monthly.rs",
+  "from": "not_attributed.entry(reason).or_default().push(idx);",
+  "to": "let _ = reason;\n                for each in [Reason::Nil, Reason::OtherSide, Reason::Money] {\n                    not_attributed.entry(each).or_default().push(idx);\n                }"
+ },
+ {
+  "id": "E4-65",
+  "by": "author",
+  "what": "a reason's count is the whole row's voucher count",
+  "file": "src/party_monthly.rs",
+  "from": "count(TEST_ID, idxs.len())?,",
+  "to": "count(TEST_ID, rows[&Key::NotAttributed].vouchers.len())?,"
+ },
+ {
+  "id": "E4-66",
+  "by": "author",
+  "what": "the other-side finding gives the expense example in every block",
+  "file": "src/party_monthly.rs",
+  "from": "let other_eg = if expense {",
+  "to": "let other_eg = if true {"
+ },
+ {
+  "id": "E4-67",
+  "by": "author",
+  "what": "the row keeps its old label",
+  "file": "src/party_monthly.rs",
+  "from": "const NOT_ATTRIBUTED_LABEL: &str = \"Not attributed to a party\";",
+  "to": "const NOT_ATTRIBUTED_LABEL: &str = \"Not attributed: no party on the other side\";"
+ },
+ {
+  "id": "E4-68",
+  "by": "author",
+  "what": "the money finding drops the discount example",
+  "file": "src/party_monthly.rs",
+  "from": "\", for example bank charges deducted from a customer's receipt, or a discount allowed on it\";",
+  "to": "\", for example bank charges deducted from a customer's receipt\";"
+ },
+ {
+  "id": "E4-69",
+  "by": "author",
+  "what": "the money finding drops its round-off limit",
+  "file": "src/party_monthly.rs",
+  "from": "Total row. A round-off \\\non a receipt is listed here too. This applies",
+  "to": "Total row. This applies"
+ },
+ {
+  "id": "E4-70",
+  "by": "author",
+  "what": "the money title says 'the party' only",
+  "file": "src/party_monthly.rs",
+  "from": "attributed to the party (or parties) on the other side",
+  "to": "attributed to the party on the other side"
+ },
+ {
+  "id": "E4-71",
+  "by": "author",
+  "what": "the money limit says one party ledger only",
+  "file": "src/party_monthly.rs",
+  "from": "voucher) a party ledger, or more than one, is on the other side",
+  "to": "voucher) a party ledger is on the other side"
+ },
+ {
+  "id": "E4-72",
+  "by": "author",
+  "what": "the nil finding says the lines move no amount, not no net amount",
+  "file": "src/party_monthly.rs",
+  "from": "so they move no net amount on",
+  "to": "so they move no amount on"
+ },
+ {
+  "id": "E4-73",
+  "by": "author",
+  "what": "the other-side finding says 'the block's total', not its Total row",
+  "file": "src/party_monthly.rs",
+  "from": "lines are not that party's{other_eg}. They are shown in the row '{row_word}', not under any party, \\\nand are in the block's Total row.\"",
+  "to": "lines are not that party's{other_eg}. They are shown in the row '{row_word}', not under any party, \\\nand are in the block's total.\""
+ },
+ {
+  "id": "E4-74",
+  "by": "author",
+  "what": "excluded vouchers within a rupee of the difference match again",
+  "file": "src/party_monthly.rs",
+  "from": "if s == 0 {",
+  "to": "if abs(s)? <= TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "E4-75",
+  "by": "author",
+  "what": "the one-match limit says 'matches ... to within a rupee'",
+  "file": "src/party_monthly.rs",
+  "from": "on these ledgers accounts for the \\\ndifference exactly, so",
+  "to": "on these ledgers matches the \\\ndifference to within a rupee, so"
+ },
+ {
+  "id": "E4-76",
+  "by": "author",
+  "what": "the others-tried text says 'matches it'",
+  "file": "src/party_monthly.rs",
+  "from": "accounts for it; smaller groups of them were not tried.",
+  "to": "matches it; smaller groups of them were not tried."
+ },
+ {
+  "id": "E4-77",
+  "by": "author",
+  "what": "the one-status no-match text drops 'exactly'",
+  "file": "src/party_monthly.rs",
+  "from": "do not account for it \\\nexactly; smaller",
+  "to": "do not account for it; smaller"
+ },
+ {
+  "id": "E4-78",
+  "by": "author",
+  "what": "the several-matches limit drops its sign clause",
+  "file": "src/party_monthly.rs",
+  "from": "accounts for the difference exactly \\\n(amounts are {sense} on these ledgers): {}.",
+  "to": "accounts for the difference exactly: {}."
+ },
+ {
+  "id": "E4-79",
+  "by": "author",
+  "what": "the several-matches limit states one sign for every block",
+  "file": "src/party_monthly.rs",
+  "from": "(amounts are {sense} on these ledgers)",
+  "to": "(amounts are debits less credits on these ledgers)"
+ },
+ {
+  "id": "E4-80",
+  "by": "author",
+  "what": "the several-matches limit says 'to within a rupee'",
+  "file": "src/party_monthly.rs",
+  "from": "\"Each of these sets, taken as a whole, accounts for the difference exactly \\",
+  "to": "\"Each of these sets, taken as a whole, matches the difference to within a rupee \\"
+ },
+ {
+  "id": "E4-81",
+  "by": "author",
+  "what": "the several-matches figure definition says 'match the difference'",
+  "file": "src/party_monthly.rs",
+  "from": "one of several sets that each account for the difference exactly.",
+  "to": "one of several sets that each match the difference."
+ },
+ {
+  "id": "E4-82",
+  "by": "author",
+  "what": "the no-match list drops its last 'the'",
+  "file": "src/party_monthly.rs",
+  "from": "the {} and the {last} \\",
+  "to": "the {} and {last} \\"
+ },
+ {
+  "id": "E4-83",
+  "by": "author",
+  "what": "the no-match list is the old 'Neither ... nor' text",
+  "file": "src/party_monthly.rs",
+  "from": "\"None of the sets tried accounts for it exactly: the {} and the {last} \\",
+  "to": "\"Neither the {} nor the {last} \\"
+ },
+ {
+  "id": "E4-84",
+  "by": "author",
+  "what": "PWM-2 gives block lines netting to nil the other-side reason",
+  "file": "src/party_monthly.rs",
+  "from": "Some(\"nil\")",
+  "to": "Some(\"other_side\")"
+ },
+ {
+  "id": "E4-85",
+  "by": "author",
+  "what": "PWM-2 takes no cash or bank ledger",
+  "file": "src/party_monthly.rs",
+  "from": "let money: BTreeSet<&str> = cash.union(bank).map(String::as_str).collect();",
+  "to": "let money: BTreeSet<&str> = BTreeSet::new();"
+ },
+ {
+  "id": "E4-86",
+  "by": "author",
+  "what": "PWM-2 reads the bank ledgers as the cash ones too",
+  "file": "src/party_monthly.rs",
+  "from": "let money: BTreeSet<&str> = cash.union(bank).map(String::as_str).collect();",
+  "to": "let money: BTreeSet<&str> = bank.union(bank).map(String::as_str).collect();"
+ },
+ {
+  "id": "E4-87",
+  "by": "author",
+  "what": "PWM-2 gives the money reason in every block",
+  "file": "src/party_monthly.rs",
+  "from": "} else if cash_side && matches!(block, \"direct_expenses\" | \"indirect_expenses\") {",
+  "to": "} else if cash_side {"
+ },
+ {
+  "id": "E4-88",
+  "by": "author",
+  "what": "PWM-2 nets the cash and bank lines instead of reading each one",
+  "file": "src/party_monthly.rs",
+  "from": "                .filter(|l| money.contains(l.ledger.as_str()))\n                .any(|l| i128::from(l.amount_paise.signum()) * raw.signum() > 0);",
+  "to": "                .filter(|l| money.contains(l.ledger.as_str()))\n                .map(|l| i128::from(l.amount_paise))\n                .sum::<i128>()\n                .signum()\n                * raw.signum()\n                > 0;"
+ },
+ {
+  "id": "E4-89",
+  "by": "author",
+  "what": "PWM-2 does not compare a reason's count",
+  "file": "src/party_monthly.rs",
+  "from": "if published != n {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-90",
+  "by": "author",
+  "what": "PWM-2 does not report a reason with no finding",
+  "file": "src/party_monthly.rs",
+  "from": "            let [f] = found.as_slice() else {\n                out.push(format!(",
+  "to": "            let [f] = found.as_slice() else {\n                drop(format!("
+ },
+ {
+  "id": "E4-91",
+  "by": "author",
+  "what": "PWM-2 does not report a finding for a reason with no voucher",
+  "file": "src/party_monthly.rs",
+  "from": "if !found.is_empty() {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-92",
+  "by": "author",
+  "what": "PWM-2 does not compare which vouchers a finding cites",
+  "file": "src/party_monthly.rs",
+  "from": "if cited != expected || cited.len() != f.evidence.len() {",
+  "to": "if cited.len() != f.evidence.len() {"
+ },
+ {
+  "id": "E4-93",
+  "by": "author",
+  "what": "PWM-2 ignores a cited item that is not a voucher",
+  "file": "src/party_monthly.rs",
+  "from": "if cited != expected || cited.len() != f.evidence.len() {",
+  "to": "if cited != expected {"
+ },
+ {
+  "id": "E4-94",
+  "by": "author",
+  "what": "PWM-2 compares citations as a set",
+  "file": "src/party_monthly.rs",
+  "from": "if cited != expected || cited.len() != f.evidence.len() {",
+  "to": "if cited.iter().collect::<BTreeSet<_>>() != expected.iter().collect::<BTreeSet<_>>()\n                || cited.len() != f.evidence.len()\n            {"
+ },
+ {
+  "id": "E4-95",
+  "by": "author",
+  "what": "PWM-2 compares citations by GUID only",
+  "file": "src/party_monthly.rs",
+  "from": "if cited != expected || cited.len() != f.evidence.len() {",
+  "to": "if cited.iter().map(|c| &c.0).collect::<Vec<_>>() != expected.iter().map(|c| &c.0).collect::<Vec<_>>()\n                || cited.len() != f.evidence.len()\n            {"
+ },
+ {
+  "id": "E4-96",
+  "by": "author",
+  "what": "PWM-2 does not compare a finding's facts",
+  "file": "src/party_monthly.rs",
+  "from": "if f.facts != [(\"vouchers\".to_string(), fid.clone())] {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-97",
+  "by": "author",
+  "what": "PWM-2 ignores a not-attributed finding for a block the book does not carry",
+  "file": "src/party_monthly.rs",
+  "from": "if !stray.is_empty() {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-98",
+  "by": "author",
+  "what": "PWM-2 does not compare the cash-or-bank row",
+  "file": "src/party_monthly.rs",
+  "from": "        out.extend(compare(\n            &format!(\"the {block} cash-or-bank row\"),",
+  "to": "        drop(compare(\n            &format!(\"the {block} cash-or-bank row\"),"
+ },
+ {
+  "id": "E4-99",
+  "by": "author",
+  "what": "PWM-2 does not compare the no-party row",
+  "file": "src/party_monthly.rs",
+  "from": "        out.extend(compare(\n            &format!(\"the {block} no-party row\"),",
+  "to": "        drop(compare(\n            &format!(\"the {block} no-party row\"),"
+ },
+ {
+  "id": "E4-100",
+  "by": "author",
+  "what": "the registry runs PWM-2 with the bank ledgers for cash",
+  "file": "src/lib.rs",
+  "from": "party_monthly::check_invariants(book, &bound.period, &result, &cash, &bank)?",
+  "to": "party_monthly::check_invariants(book, &bound.period, &result, &bank, &bank)?"
+ },
+ {
+  "id": "E4-101",
+  "by": "author",
+  "what": "the money reason is given with no party on the voucher",
+  "file": "src/party_monthly.rs",
+  "from": "} else if expense && !named.is_empty() && money_on_side {",
+  "to": "} else if expense && money_on_side {"
+ },
+ {
+  "id": "E4-102",
+  "by": "author",
+  "what": "block lines netting to nil are not attributed with no party on the voucher",
+  "file": "src/party_monthly.rs",
+  "from": "let reason = if !on_voucher.is_empty() && block_net == 0 {",
+  "to": "let reason = if block_net == 0 {"
+ },
+ {
+  "id": "E4-103",
+  "by": "author",
+  "what": "PWM-2 gives an invoice-class voucher a not-attributed reason",
+  "file": "src/party_monthly.rs",
+  "from": "let reason = if invoice || present.is_empty() {",
+  "to": "let reason = if present.is_empty() {"
+ },
+ {
+  "id": "E4-104",
+  "by": "author",
+  "what": "PWM-2 never gives the other-side reason",
+  "file": "src/party_monthly.rs",
+  "from": "} else if named.is_empty() {\n                Some(\"other_side\")",
+  "to": "} else if false {\n                Some(\"other_side\")"
+ },
+ {
+  "id": "E4-105",
+  "by": "author",
+  "what": "PWM-2 gives a cash-or-bank row to every block",
+  "file": "src/party_monthly.rs",
+  "from": "if matches!(block, \"sales\" | \"purchases\")",
+  "to": "if true"
+ },
+ {
+  "id": "E4-106",
+  "by": "author",
+  "what": "the money reason's scope is indirect expenses only",
+  "file": "src/party_monthly.rs",
+  "from": "let expense = block == \"direct_expenses\" || block == \"indirect_expenses\";",
+  "to": "let expense = block == \"indirect_expenses\";"
  },
  {
   "id": "TR-01",

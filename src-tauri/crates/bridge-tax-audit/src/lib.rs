@@ -1359,7 +1359,8 @@ pub fn trial_balance_on(
 
 /// Run `party_monthly` on a book and return its canonical parity dump, with the module's own
 /// PWM-1/PWM-2 check. Cash and bank are the engagement's cash and bank groups, as the reference's
-/// pack passes them; the period is the engagement's, and the top-parties cut is the module's own.
+/// pack passes them, to `run` and to the check alike; the period is the engagement's, and the
+/// top-parties cut is the module's own.
 pub fn party_monthly_on(
     engagement: &Engagement,
     book: &book::Book,
@@ -1376,7 +1377,7 @@ pub fn party_monthly_on(
         &bank,
         party_monthly::PARTY_TOP_N,
     )?;
-    let module_check = party_monthly::check_invariants(book, &bound.period, &result)?;
+    let module_check = party_monthly::check_invariants(book, &bound.period, &result, &cash, &bank)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 

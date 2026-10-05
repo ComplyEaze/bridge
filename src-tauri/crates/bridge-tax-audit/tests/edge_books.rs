@@ -940,7 +940,9 @@ fn check(name: &str) {
                 .unwrap_or(party_monthly::PARTY_TOP_N);
                 let r =
                     party_monthly::run(&book, &rules, &period(&s), &cash, &bank, top_n).unwrap();
-                let c = party_monthly::check_invariants(&book, &period(&s), &r).unwrap();
+                // PWM-2 takes the cash and bank ledgers run() takes, as the reference's pack passes them.
+                let c =
+                    party_monthly::check_invariants(&book, &period(&s), &r, &cash, &bank).unwrap();
                 (r, c)
             }
             "stock" => {
@@ -1613,18 +1615,53 @@ fn a_party_tag_equal_to_a_fixed_row_is_refused_not_panicked() {
     );
 }
 
-/// The pm_paths result, and a way to change one published figure: the PWM checks read figures
-/// back, so a changed figure is what an engine fault would look like to them.
-fn pm_paths_result() -> (Book, Window, bridge_tax_audit::findings::TestResult) {
-    let s = spec("pm_paths");
-    let (book, rules) = (build(&s), rules(&s));
-    let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
-    let r = party_monthly::run(&book, &rules, &period(&s), &set("cash"), &set("bank"), 2).unwrap();
-    let window = period(&s);
-    assert!(party_monthly::check_invariants(&book, &window, &r)
-        .unwrap()
-        .is_empty());
-    (book, window, r)
+/// A `party_monthly` result on an edge book, with what its module check takes: the PWM checks
+/// read figures and findings back, so a changed one is what an engine fault would look like to
+/// them.
+struct Pm {
+    book: Book,
+    window: Window,
+    cash: BTreeSet<String>,
+    bank: BTreeSet<String>,
+    r: bridge_tax_audit::findings::TestResult,
+}
+
+impl Pm {
+    fn on(name: &str, top_n: usize) -> Pm {
+        let s = spec(name);
+        let (book, rules) = (build(&s), rules(&s));
+        let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
+        let (window, cash, bank) = (period(&s), set("cash"), set("bank"));
+        let r = party_monthly::run(&book, &rules, &window, &cash, &bank, top_n).unwrap();
+        let pm = Pm {
+            book,
+            window,
+            cash,
+            bank,
+            r,
+        };
+        assert_eq!(pm.check(), Vec::<String>::new(), "{name} untouched");
+        pm
+    }
+
+    fn check(&self) -> Vec<String> {
+        party_monthly::check_invariants(&self.book, &self.window, &self.r, &self.cash, &self.bank)
+            .unwrap()
+    }
+
+    fn finding(&mut self, id: &str) -> &mut bridge_tax_audit::findings::Finding {
+        let id = format!("party_monthly/{id}");
+        self.r
+            .findings
+            .iter_mut()
+            .find(|f| f.id == id)
+            .unwrap_or_else(|| panic!("no finding {id}"))
+    }
+}
+
+/// The pm_paths result, at the `top_n` its book names.
+fn pm_paths_result() -> Pm {
+    Pm::on("pm_paths", 2)
 }
 
 fn nudge(r: &mut bridge_tax_audit::findings::TestResult, prefix: &str, label: &str) {
@@ -1644,9 +1681,9 @@ fn nudge(r: &mut bridge_tax_audit::findings::TestResult, prefix: &str, label: &s
 /// Both are silent on the untouched result.
 #[test]
 fn pwm_1_fires_on_a_total_or_movement_that_does_not_tie() {
-    let (book, window, mut r) = pm_paths_result();
-    nudge(&mut r, "party_monthly.sales_year_", "Total");
-    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    let mut pm = pm_paths_result();
+    nudge(&mut pm.r, "party_monthly.sales_year_", "Total");
+    let out = pm.check();
     assert!(
         out.iter()
             .any(|v| v.starts_with("PWM-1: the sales rows sum to")),
@@ -1659,14 +1696,14 @@ fn pwm_1_fires_on_a_total_or_movement_that_does_not_tie() {
         "{out:?}"
     );
 
-    let (book, window, mut r) = pm_paths_result();
-    let f = r
-        .figures
-        .iter_mut()
-        .find(|f| f.id == "party_monthly.purchases_tb_movement")
-        .unwrap();
+    let mut pm = pm_paths_result();
+    let f =
+        pm.r.figures
+            .iter_mut()
+            .find(|f| f.id == "party_monthly.purchases_tb_movement")
+            .unwrap();
     f.value = bridge_tax_audit::findings::Value::Int(0);
-    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    let out = pm.check();
     assert_eq!(
         out,
         vec!["PWM-1: purchases_tb_movement is 0p but the Trial Balance's period columns give 675000p"]
@@ -1677,32 +1714,18 @@ fn pwm_1_fires_on_a_total_or_movement_that_does_not_tie() {
 /// reported against that row, not folded into the rows with no party.
 #[test]
 fn pwm_2_checks_the_not_attributed_row_on_its_own() {
-    let s = spec("pm_attribution");
-    let (book, rules) = (build(&s), rules(&s));
-    let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
-    let window = period(&s);
-    let mut r = party_monthly::run(
-        &book,
-        &rules,
-        &window,
-        &set("cash"),
-        &set("bank"),
-        party_monthly::PARTY_TOP_N,
-    )
-    .unwrap();
-    assert!(party_monthly::check_invariants(&book, &window, &r)
-        .unwrap()
-        .is_empty());
+    let mut pm = Pm::on("pm_attribution", party_monthly::PARTY_TOP_N);
     nudge(
-        &mut r,
+        &mut pm.r,
         "party_monthly.indirect_expenses_vouchers_",
-        "Not attributed: no party on the other side",
+        "Not attributed to a party",
     );
-    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
-    assert!(
-        out.iter().any(|v| v
-            == "PWM-2: the indirect_expenses not-attributed row has 4p in vouchers but the vouchers give 3p"),
-        "{out:?}"
+    assert_eq!(
+        pm.check(),
+        vec![
+            "PWM-1: the indirect_expenses rows sum to 10p in vouchers but the total row has 9p",
+            "PWM-2: the indirect_expenses not-attributed row has 5p in vouchers but the vouchers give 4p",
+        ]
     );
 }
 
@@ -1710,17 +1733,17 @@ fn pwm_2_checks_the_not_attributed_row_on_its_own() {
 /// label does not count the parties it holds.
 #[test]
 fn pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong() {
-    let (book, window, mut r) = pm_paths_result();
-    nudge(&mut r, "party_monthly.sales_vouchers_", "Cust A");
-    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    let mut pm = pm_paths_result();
+    nudge(&mut pm.r, "party_monthly.sales_vouchers_", "Cust A");
+    let out = pm.check();
     assert!(
         out.iter().any(|v| v
             == "PWM-2: the sales row for 'Cust A' has 4p in vouchers but the vouchers give 3p"),
         "{out:?}"
     );
 
-    let (book, window, mut r) = pm_paths_result();
-    for f in &mut r.figures {
+    let mut pm = pm_paths_result();
+    for f in &mut pm.r.figures {
         if let Some(e) = f
             .evidence
             .first_mut()
@@ -1729,9 +1752,203 @@ fn pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong() {
             e.label = "Others (9 parties)".to_string();
         }
     }
-    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    let out = pm.check();
     assert_eq!(
         out,
         vec!["PWM-2: the sales Others row is labelled 'Others (9 parties)' but 2 parties are not shown by name"]
+    );
+}
+
+/// Set one published figure's value.
+fn set_figure(r: &mut bridge_tax_audit::findings::TestResult, id: &str, value: i64) {
+    let f = r
+        .figures
+        .iter_mut()
+        .find(|f| f.id == id)
+        .unwrap_or_else(|| panic!("no figure {id}"));
+    f.value = bridge_tax_audit::findings::Value::Int(value);
+}
+
+/// PWM-2 checks each not-attributed reason's count, and its finding: present exactly when the
+/// reason has vouchers, citing exactly those vouchers and nothing else, its facts pointing at that
+/// count. pm_attribution's indirect expenses carry all three reasons (nil a08, other side a01 and
+/// a04, money a06).
+#[test]
+fn pwm_2_checks_each_not_attributed_reasons_count_and_finding() {
+    let base = || Pm::on("pm_attribution", party_monthly::PARTY_TOP_N);
+
+    let mut pm = base();
+    set_figure(
+        &mut pm.r,
+        "party_monthly.indirect_expenses_not_attributed_money_vouchers",
+        2,
+    );
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: indirect_expenses_not_attributed_money_vouchers is 2 but the vouchers give 1"]
+    );
+
+    // The other-side and money findings' evidence swapped.
+    let mut pm = base();
+    let other = pm
+        .finding("not_attributed/indirect_expenses")
+        .evidence
+        .clone();
+    let money = std::mem::replace(
+        &mut pm
+            .finding("not_attributed_money/indirect_expenses")
+            .evidence,
+        other,
+    );
+    pm.finding("not_attributed/indirect_expenses").evidence = money;
+    assert_eq!(
+        pm.check(),
+        vec![
+            "PWM-2: the indirect_expenses other_side not-attributed finding cites 1 item(s) that are not the 2 voucher(s) with that reason",
+            "PWM-2: the indirect_expenses money not-attributed finding cites 2 item(s) that are not the 1 voucher(s) with that reason",
+        ]
+    );
+
+    // A cited item that is not a voucher.
+    let mut pm = base();
+    pm.finding("not_attributed_money/indirect_expenses")
+        .evidence
+        .push(bridge_tax_audit::findings::EvidenceRef::with_label(
+            "ledger", "Bank", "Bank",
+        ));
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: the indirect_expenses money not-attributed finding cites 2 item(s) that are not the 1 voucher(s) with that reason"]
+    );
+
+    // The money finding dropped, then repeated.
+    let mut pm = base();
+    pm.r.findings
+        .retain(|f| f.id != "party_monthly/not_attributed_money/indirect_expenses");
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: the indirect_expenses money not-attributed reason has 1 voucher(s) but no finding"]
+    );
+    let mut pm = base();
+    let again = pm.finding("not_attributed_money/indirect_expenses").clone();
+    pm.r.findings.push(again);
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: the indirect_expenses money not-attributed reason has 1 voucher(s) but 2 findings"]
+    );
+
+    // The nil finding's facts pointed at another reason's count instead of its own.
+    let mut pm = base();
+    let row = pm.finding("not_attributed/sales").facts.clone();
+    pm.finding("not_attributed_nil/indirect_expenses").facts = row;
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: the indirect_expenses nil not-attributed finding's facts do not point at its count"]
+    );
+
+    // A nil finding for sales, where no voucher has that reason.
+    let mut pm = base();
+    let mut extra = pm.finding("not_attributed_nil/indirect_expenses").clone();
+    extra.id = "party_monthly/not_attributed_nil/sales".to_string();
+    pm.r.findings.push(extra);
+    assert_eq!(
+        pm.check(),
+        vec![
+            "PWM-2: the sales nil not-attributed finding is present but no voucher has that reason"
+        ]
+    );
+}
+
+/// PWM-2 compares a finding's citations as a multiset of GUID and label: pm_money's direct
+/// expenses cite two identical receipts (one GUID, number and date), and a receipt and a payment
+/// with no GUID.
+#[test]
+fn pwm_2_compares_citations_by_guid_and_label_as_a_multiset() {
+    // One of the two identical receipts cited as the receipt with no GUID instead: the same set of
+    // citations, and as many of them.
+    let mut pm = Pm::on("pm_money", party_monthly::PARTY_TOP_N);
+    let f = pm.finding("not_attributed_money/direct_expenses");
+    let ids: Vec<&str> = f.evidence.iter().map(|e| e.id.as_str()).collect();
+    assert_eq!(ids, ["dup", "dup", ""]);
+    f.evidence[1] = f.evidence[2].clone();
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: the direct_expenses money not-attributed finding cites 3 item(s) that are not the 3 voucher(s) with that reason"]
+    );
+
+    // The two vouchers with no GUID swapped between the money and other-side findings: their GUIDs
+    // agree, so only the labels tell them apart.
+    let mut pm = Pm::on("pm_money", party_monthly::PARTY_TOP_N);
+    let blank = |f: &bridge_tax_audit::findings::Finding| {
+        f.evidence.iter().position(|e| e.id.is_empty()).unwrap()
+    };
+    let (i, j) = (
+        blank(pm.finding("not_attributed_money/direct_expenses")),
+        blank(pm.finding("not_attributed/direct_expenses")),
+    );
+    let receipt = pm.finding("not_attributed_money/direct_expenses").evidence[i].clone();
+    let payment = std::mem::replace(
+        &mut pm.finding("not_attributed/direct_expenses").evidence[j],
+        receipt,
+    );
+    pm.finding("not_attributed_money/direct_expenses").evidence[i] = payment;
+    assert_eq!(
+        pm.check(),
+        vec![
+            "PWM-2: the direct_expenses other_side not-attributed finding cites 1 item(s) that are not the 1 voucher(s) with that reason",
+            "PWM-2: the direct_expenses money not-attributed finding cites 3 item(s) that are not the 3 voucher(s) with that reason",
+        ]
+    );
+}
+
+/// A not-attributed finding naming a block the book does not carry is reported: pm_not_fy has no
+/// Direct Expenses group.
+#[test]
+fn pwm_2_reports_a_not_attributed_finding_for_a_block_the_book_does_not_carry() {
+    let mut pm = Pm::on("pm_not_fy", party_monthly::PARTY_TOP_N);
+    let mut stray = pm.r.findings[0].clone();
+    stray.id = "party_monthly/not_attributed/direct_expenses".to_string();
+    pm.r.findings.push(stray);
+    assert_eq!(
+        pm.check(),
+        vec!["PWM-2: a not-attributed finding names direct_expenses, a block the book does not carry: ['party_monthly/not_attributed/direct_expenses']"]
+    );
+}
+
+/// PWM-2 compares the cash-or-bank row and the no-party row each on its own: a voucher moved from
+/// one to the other keeps their sum and the total, and is still reported.
+#[test]
+fn pwm_2_checks_the_cash_or_bank_and_no_party_rows_each_on_its_own() {
+    let mut pm = pm_paths_result();
+    let count_of = |pm: &Pm, label: &str| -> (String, i64) {
+        let f = pm
+            .r
+            .figures
+            .iter()
+            .find(|f| {
+                f.id.starts_with("party_monthly.sales_vouchers_") && f.evidence[0].label == label
+            })
+            .unwrap();
+        match f.value {
+            bridge_tax_audit::findings::Value::Int(v) => (f.id.clone(), v),
+            ref other => panic!("{other:?}"),
+        }
+    };
+    let (cb_id, cb) = count_of(&pm, "Cash or bank (no party)");
+    let (np_id, np) = count_of(&pm, "No party");
+    set_figure(&mut pm.r, &cb_id, cb + 1);
+    set_figure(&mut pm.r, &np_id, np - 1);
+    assert_eq!(
+        pm.check(),
+        vec![
+            format!(
+                "PWM-2: the sales cash-or-bank row has {}p in vouchers but the vouchers give {cb}p",
+                cb + 1
+            ),
+            format!(
+                "PWM-2: the sales no-party row has {}p in vouchers but the vouchers give {np}p",
+                np - 1
+            ),
+        ]
     );
 }

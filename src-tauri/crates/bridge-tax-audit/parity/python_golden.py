@@ -416,7 +416,11 @@ def _stock(c):
 def _party_monthly(c):
     from tae.audit_tests import party_monthly
     # As tae/pack.py calls it: the cash and bank ledgers, and the module's own top-parties cut.
-    return party_monthly, party_monthly.run(c.eng, c.rules, c.cash, c.bank)
+    # PWM-2 takes the same cash and bank ledgers, as pack.py passes them (it calls this check outside
+    # its generic loop); the canonical dump calls check_invariants(eng, result), so they are bound here.
+    module = SimpleNamespace(TEST_ID=party_monthly.TEST_ID, check_invariants=lambda eng, result:
+                             party_monthly.check_invariants(eng, result, c.cash, c.bank))
+    return module, party_monthly.run(c.eng, c.rules, c.cash, c.bank)
 
 
 RUNNERS = {

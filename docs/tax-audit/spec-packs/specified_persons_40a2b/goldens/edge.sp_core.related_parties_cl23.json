@@ -1,0 +1,452 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "related_parties_cl23",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "ab3d3f4e061679c1",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). One entry = one voucher's net Dr+/Cr- line-sum on a person's nature ledger set.",
+  "figures": [
+    {
+      "id": "related_parties_cl23.amount_interest_0317eb95",
+      "value": 800000,
+      "unit": "paise",
+      "definition_sha256_16": "f437e54d28d06bdd",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 0317eb95)'s 'interest' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person A Loan Interest",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "j01",
+          "label": "Journal j01 on 2026-03-31"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_interest_9b7f1058",
+      "value": 700000,
+      "unit": "paise",
+      "definition_sha256_16": "13969405f5109003",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 9b7f1058)'s 'interest' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person B Interest",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "j02",
+          "label": "Journal j02 on 2026-03-31"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_other_0317eb95",
+      "value": -250000,
+      "unit": "paise",
+      "definition_sha256_16": "2e3ad42c1c5608a8",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 0317eb95)'s 'other' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person A Services",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "r02",
+          "label": "Receipt r02 on 2025-09-20"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_purchases_0317eb95",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "d81a38d7970c6874",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 0317eb95)'s 'purchases' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person A Purchases",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p03",
+          "label": "Payment p03 on 2025-08-14"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_rent_0317eb95",
+      "value": 2400000,
+      "unit": "paise",
+      "definition_sha256_16": "1c49df582798b269",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 0317eb95)'s 'rent' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Alpha Rent",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "sp-core-rent-p02",
+          "label": "Rent Payment ore-rent-p02 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_0317eb95",
+      "value": 1500000,
+      "unit": "paise",
+      "definition_sha256_16": "b8d466f2d42bc566",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 0317eb95)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person A Salary",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Payment p01 on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_9b7f1058",
+      "value": 1800000,
+      "unit": "paise",
+      "definition_sha256_16": "e08b7fe74ae98370",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 9b7f1058)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person B Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p05",
+          "label": "Payment p05 on 2025-11-30"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_total_0317eb95",
+      "value": 7450000,
+      "unit": "paise",
+      "definition_sha256_16": "2f4a55fc23a37817",
+      "definition_text": "Sum of amount_<nature>_0317eb95 across every nature configured for person (tag 0317eb95).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_9b7f1058",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "0edde734d7878449",
+      "definition_text": "Sum of amount_<nature>_9b7f1058 across every nature configured for person (tag 9b7f1058).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.applicable",
+      "value": "yes",
+      "unit": "text",
+      "definition_sha256_16": "9b27b7c2da441e41",
+      "definition_text": "Whether any related person has been confirmed by the client for this engagement. 'no' means none were confirmed -- never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.payable_accrued_salary_0317eb95",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "315c54952d291b96",
+      "definition_text": "TB period CREDIT movement (accrual, P&L side) on person (tag 0317eb95)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person A Salary",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_closing_salary_0317eb95",
+      "value": -1500000,
+      "unit": "paise",
+      "definition_sha256_16": "bdb60121504d1942",
+      "definition_text": "Closing payable (-TB closing_paise) on person (tag 0317eb95)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person A Salary",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_opening_salary_0317eb95",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "6dc47a2ee2603460",
+      "definition_text": "Opening payable (-TB opening_paise) on person (tag 0317eb95)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person A Salary",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_paid_salary_0317eb95",
+      "value": 1500000,
+      "unit": "paise",
+      "definition_sha256_16": "ccd45eba1ad68f7b",
+      "definition_text": "TB period DEBIT movement (amount actually paid) on person (tag 0317eb95)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person A Salary",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.related_person_count",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "8feb927f1116a35a",
+      "definition_text": "Related persons confirmed by the client for this engagement.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_0317eb95",
+      "value": "son of the proprietor",
+      "unit": "text",
+      "definition_sha256_16": "34b5064fa4f8a295",
+      "definition_text": "Relationship confirmed by the client for related person (tag 0317eb95) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_9b7f1058",
+      "value": "partner",
+      "unit": "text",
+      "definition_sha256_16": "d2cf1e93d81fe2bc",
+      "definition_text": "Relationship confirmed by the client for related person (tag 9b7f1058) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/0317eb95",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "interest",
+          "figure_id": "related_parties_cl23.amount_interest_0317eb95"
+        },
+        {
+          "name": "other",
+          "figure_id": "related_parties_cl23.amount_other_0317eb95"
+        },
+        {
+          "name": "purchases",
+          "figure_id": "related_parties_cl23.amount_purchases_0317eb95"
+        },
+        {
+          "name": "rent",
+          "figure_id": "related_parties_cl23.amount_rent_0317eb95"
+        },
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_0317eb95"
+        },
+        {
+          "name": "salary_accrued",
+          "figure_id": "related_parties_cl23.payable_accrued_salary_0317eb95"
+        },
+        {
+          "name": "salary_paid",
+          "figure_id": "related_parties_cl23.payable_paid_salary_0317eb95"
+        },
+        {
+          "name": "salary_payable_closing",
+          "figure_id": "related_parties_cl23.payable_closing_salary_0317eb95"
+        },
+        {
+          "name": "salary_payable_opening",
+          "figure_id": "related_parties_cl23.payable_opening_salary_0317eb95"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_0317eb95"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "beb395314b2a97a2",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 0317eb95) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/9b7f1058",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "interest",
+          "figure_id": "related_parties_cl23.amount_interest_9b7f1058"
+        },
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_9b7f1058"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_9b7f1058"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "08521f647c90e919",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 9b7f1058) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/clause23/0317eb95",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "interest",
+          "figure_id": "related_parties_cl23.amount_interest_0317eb95"
+        },
+        {
+          "name": "other",
+          "figure_id": "related_parties_cl23.amount_other_0317eb95"
+        },
+        {
+          "name": "purchases",
+          "figure_id": "related_parties_cl23.amount_purchases_0317eb95"
+        },
+        {
+          "name": "rent",
+          "figure_id": "related_parties_cl23.amount_rent_0317eb95"
+        },
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_0317eb95"
+        },
+        {
+          "name": "salary_accrued",
+          "figure_id": "related_parties_cl23.payable_accrued_salary_0317eb95"
+        },
+        {
+          "name": "salary_paid",
+          "figure_id": "related_parties_cl23.payable_paid_salary_0317eb95"
+        },
+        {
+          "name": "salary_payable_closing",
+          "figure_id": "related_parties_cl23.payable_closing_salary_0317eb95"
+        },
+        {
+          "name": "salary_payable_opening",
+          "figure_id": "related_parties_cl23.payable_opening_salary_0317eb95"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_0317eb95"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "63c0e4a3fe985e47",
+      "title_text": "Transactions with a related person (tag 0317eb95) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/9b7f1058",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "interest",
+          "figure_id": "related_parties_cl23.amount_interest_9b7f1058"
+        },
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_9b7f1058"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_9b7f1058"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "960c4da2175b84c0",
+      "title_text": "Transactions with a related person (tag 9b7f1058) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "related_parties_cl23.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

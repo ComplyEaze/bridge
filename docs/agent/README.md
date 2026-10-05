@@ -247,13 +247,17 @@ field are dropped; no row content, name or narration is kept.
 A call that sent requests to Tally also keeps a `request_trail` in that record (bridge#918): for
 each of the last 32 sends (the rest counted, and so are the sends that failed), its place in the
 call, its kind (`post` or `status`), the request's size, an outcome code (`answered`, the transport
-error's code, or `send_abandoned` when a cancelled call dropped it), the response's size, and the
+error's code, or `send_abandoned` when a drop inside the call stopped it in flight: the read
+queue's cancellation of a read, or the status probe's timeout), the response's size, and the
 milliseconds the send held the endpoint's lock, so a failed read says which request failed. It
 holds no request or response body, name or value, and no hash of either (a request names the
 company, so a hash of it would let a reader who holds a guessed name confirm it). The request's
 exact size remains, so it shows a company name's length to a reader who holds the request template.
-A request that cannot be built (over the size cap) sends nothing and leaves no record, and a call
-cancelled before its post was dispatched leaves no trail in its receipt. To match a failure with
+A request that cannot be built (over the size cap) sends nothing and leaves no record. A client's
+cancellation never drops a send in flight: a withdrawn call starts no further operation and
+finishes the one it has started (a post before its intent stops after the request in flight). Such
+a post is answered as cancelled, and that answer's receipt keeps the trail of its sends, with the
+next read the withdrawal refused as `request_cancelled`. To match a failure with
 `read_evidence`, use the place in the call and the receipt's time.
 After `write_all` and `flush` succeed, it appends a `stdio_write_completed` record
 with the same ID and response hash plus `bytes_written`. This confirms the local

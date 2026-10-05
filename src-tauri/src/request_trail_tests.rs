@@ -34,6 +34,27 @@ fn the_trail_keeps_the_last_sends_and_counts_the_rest() {
     assert_eq!(snapshot["failed"], 0);
 }
 
+/// At exactly the cap, every send is kept and none is counted as omitted
+/// (#944): the edge the two tests around it straddle.
+#[test]
+fn a_call_of_exactly_the_kept_sends_keeps_them_all() {
+    let trail = RequestTrail::default();
+    for index in 0..TRAIL_LAST {
+        trail.push(record("answered", index as u64));
+    }
+    let snapshot = trail.snapshot().unwrap();
+    let last = (1..=TRAIL_LAST)
+        .map(|seq| {
+            json!({"seq": seq, "kind": "post", "outcome": "answered", "held_ms": seq - 1,
+                "request_bytes": 700, "response_bytes": 1_234})
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        snapshot,
+        json!({"sent": TRAIL_LAST, "omitted": 0, "failed": 0, "last": last})
+    );
+}
+
 /// A failure older than the kept sends is no longer listed, but it is counted.
 #[test]
 fn a_failure_the_cap_dropped_is_still_counted() {

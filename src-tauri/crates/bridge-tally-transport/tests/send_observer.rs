@@ -150,19 +150,25 @@ async fn a_send_the_wire_gate_refused_is_recorded_as_refused_and_sent_nothing() 
     assert_eq!(simulator.received(), 0);
 }
 
+/// The positive control (#944) is an observed transport beside the plain one,
+/// on the same endpoint: it records its own send, a status, and nothing of the
+/// plain one's post.
 #[tokio::test]
 async fn a_transport_without_an_observer_records_nothing_and_works() {
-    let simulator = SequenceSimulator::spawn(vec![xml()]).unwrap();
-    let transport = TallyHttpTransport::new(TallyEndpointConfig {
+    let simulator = SequenceSimulator::spawn(vec![xml(), status()]).unwrap();
+    let plain = TallyHttpTransport::new(TallyEndpointConfig {
         host: simulator.address().ip().to_string(),
         port: simulator.address().port(),
     })
     .unwrap();
-    transport
-        .post_xml_decoded("<ENVELOPE/>".into())
-        .await
-        .unwrap();
-    simulator.finish().unwrap();
+    let (control, collect) = observed(&simulator, None);
+    plain.post_xml_decoded("<ENVELOPE/>".into()).await.unwrap();
+    control.get_status_decoded().await.unwrap();
+    let records = collect.0.lock().unwrap().clone();
+    assert_eq!(records.len(), 1, "{records:?}");
+    assert_eq!(records[0].kind, SendKind::Status);
+    assert_eq!(records[0].outcome, "answered");
+    assert_eq!(simulator.finish().unwrap().len(), 2);
 }
 
 #[tokio::test]

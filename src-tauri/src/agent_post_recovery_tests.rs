@@ -43,6 +43,14 @@ async fn stops<F: std::future::Future>(call: F) -> F::Output {
         .expect("a withdrawn post stops once its token is cancelled")
 }
 
+/// The post's own response, from a call that answered rather than withdrew.
+fn answered(end: ToolCallEnd) -> ToolResponse {
+    match end {
+        ToolCallEnd::Answered(response) => response,
+        ToolCallEnd::Withdrawn { .. } => panic!("the post was withdrawn, not answered"),
+    }
+}
+
 const BATCH: &str = "bridge-00000000-0000-4000-8000-000000000001";
 const COMPANY: &str = "00000000-0000-4000-8000-000000000002";
 
@@ -212,7 +220,7 @@ async fn cancellation_after_durable_intent_finishes_the_original_response_once()
             "durable intent must drain rather than cancel the future"
         );
         finish.send(()).unwrap();
-        result.await.unwrap().expect("completed original response")
+        answered(result.await.unwrap())
     };
     assert_eq!(response.value, json!({"completed":true}));
     assert_eq!(
@@ -269,7 +277,7 @@ async fn cancellation_before_durable_intent_withdraws_the_controlled_future() {
     ))
     .await
     .unwrap();
-    assert!(result.is_none());
+    assert!(matches!(result, ToolCallEnd::Withdrawn { .. }));
 }
 
 #[tokio::test]
@@ -310,7 +318,7 @@ async fn eof_after_durable_intent_drains_the_original_future() {
             "EOF must drain a durable post before returning"
         );
         finish.send(()).unwrap();
-        result.await.unwrap().expect("completed original response")
+        answered(result.await.unwrap())
     };
     assert_eq!(response.value, json!({"completed":true}),);
 }
@@ -353,7 +361,7 @@ async fn output_error_after_durable_intent_drains_the_original_future() {
             "stdio write failure must drain a durable post before returning"
         );
         finish.send(()).unwrap();
-        result.await.unwrap().expect("completed original response")
+        answered(result.await.unwrap())
     };
     assert_eq!(response.value, json!({"completed":true}),);
 }
@@ -397,22 +405,24 @@ async fn buffered_post_cancellation_removes_call_before_it_can_start() {
     let mut pending = std::collections::VecDeque::new();
     let mut output = Vec::new();
     let cancellation = tokio_util::sync::CancellationToken::new();
-    assert!(stops(await_post(
-        stand_in(cancellation.clone()),
-        PostRequest {
-            id: &json!(7),
-            args: &args(),
-            cancellation: &cancellation,
-        },
-        &server,
-        &mut BufReader::new(input.as_bytes()),
-        &mut Framer::default(),
-        &mut pending,
-        &mut output
-    ))
-    .await
-    .unwrap()
-    .is_none());
+    assert!(matches!(
+        stops(await_post(
+            stand_in(cancellation.clone()),
+            PostRequest {
+                id: &json!(7),
+                args: &args(),
+                cancellation: &cancellation,
+            },
+            &server,
+            &mut BufReader::new(input.as_bytes()),
+            &mut Framer::default(),
+            &mut pending,
+            &mut output
+        ))
+        .await
+        .unwrap(),
+        ToolCallEnd::Withdrawn { .. }
+    ));
     assert!(
         pending.is_empty(),
         "cancelled queued call must never reach the dispatch loop"

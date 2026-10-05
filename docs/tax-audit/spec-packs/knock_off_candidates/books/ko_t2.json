@@ -1,0 +1,539 @@
+{
+ "comment": "Pattern 2, bank or cash vouchers whose narration names a party not on the voucher. b01 and b02 pay Beta Stores and name Gamma Supplies (b02 also names its own party). b03 is a receipt from Alpha Traders naming Gamma Supplies and Beta Stores. b04 is a contra from Bank A to Petty Cash naming Alpha Traders (both of its lines are bank or cash). b05 is a cash payment naming Beta Stores. b06 pays Kappa Traders and names it, but Kappa-Traders has the same words and sorts later, so the narration is read as naming Kappa-Traders. b07 pays rent and names Omega Mart, a name two party masters share in different case, and Sigma Stores, a name a party and an expense master share: neither is read, so b07 is not listed. b08 names Unit 7 Supplies. b09 names Café Corner with the accent; b10 writes it without the accent and is not read. b11's narration is Devanagari only. b12 names Gamma Supplies, which has a zero-amount line on it, so it is not listed. b13 is booked to two ledgers and names Gamma Supplies. b14 names Alpha Traders twice. b15 pays from two bank ledgers and names Beta Stores.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t2-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t2-001"
+  },
+  {
+   "name": "Bank B",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t2-002"
+  },
+  {
+   "name": "Beta Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_t2-003"
+  },
+  {
+   "name": "Café Corner",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t2-004"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-ko_t2-cap-3"
+  },
+  {
+   "name": "Gamma Supplies",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_t2-006"
+  },
+  {
+   "name": "Kappa Traders",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_t2-007"
+  },
+  {
+   "name": "Kappa-Traders",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_t2-008"
+  },
+  {
+   "name": "OMEGA MART",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t2-009"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_t2-010"
+  },
+  {
+   "name": "Omega Mart",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_t2-011"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t2-012"
+  },
+  {
+   "name": "Sigma Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_t2-013"
+  },
+  {
+   "name": "Unit 7 Supplies",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_t2-014"
+  },
+  {
+   "name": "sigma stores",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_t2-015"
+  },
+  {
+   "name": "देव ट्रेडर्स",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t2-016"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 400000,
+   "closing": -400000
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 400000,
+   "credit": 2930000,
+   "closing": 47470000
+  },
+  {
+   "ledger": "Bank B",
+   "opening": 0,
+   "debit": 0,
+   "credit": 50000,
+   "closing": -50000
+  },
+  {
+   "ledger": "Beta Stores",
+   "opening": 0,
+   "debit": 1780000,
+   "credit": 0,
+   "closing": 1780000
+  },
+  {
+   "ledger": "Café Corner",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Gamma Supplies",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Kappa Traders",
+   "opening": 0,
+   "debit": 400000,
+   "credit": 0,
+   "closing": 400000
+  },
+  {
+   "ledger": "Kappa-Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "OMEGA MART",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 700000,
+   "credit": 0,
+   "closing": 700000
+  },
+  {
+   "ledger": "Omega Mart",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 100000,
+   "closing": 100000
+  },
+  {
+   "ledger": "Sigma Stores",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Unit 7 Supplies",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "sigma stores",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "देव ट्रेडर्स",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "b01",
+   "date": "2025-04-03",
+   "base_type": "Payment",
+   "narration": "NEFT/Gamma Supplies/REF 4471",
+   "lines": [
+    [
+     "Beta Stores",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "b02",
+   "date": "2025-04-17",
+   "base_type": "Payment",
+   "narration": "paid to gamma supplies for Beta Stores",
+   "lines": [
+    [
+     "Beta Stores",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "b03",
+   "date": "2025-05-02",
+   "base_type": "Receipt",
+   "narration": "Received via Gamma Supplies and Beta Stores",
+   "lines": [
+    [
+     "Bank A",
+     300000
+    ],
+    [
+     "Alpha Traders",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "b04",
+   "date": "2025-05-14",
+   "base_type": "Contra",
+   "narration": "Cash for Alpha Traders",
+   "lines": [
+    [
+     "Bank A",
+     -200000
+    ],
+    [
+     "Petty Cash",
+     200000
+    ]
+   ]
+  },
+  {
+   "guid": "b05",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Rent handed to Beta Stores",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Petty Cash",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "b06",
+   "date": "2025-06-20",
+   "base_type": "Payment",
+   "narration": "Paid Kappa Traders",
+   "lines": [
+    [
+     "Kappa Traders",
+     400000
+    ],
+    [
+     "Bank A",
+     -400000
+    ]
+   ]
+  },
+  {
+   "guid": "b07",
+   "date": "2025-07-04",
+   "base_type": "Payment",
+   "narration": "Paid OMEGA MART for Sigma Stores",
+   "lines": [
+    [
+     "Office Rent",
+     200000
+    ],
+    [
+     "Bank A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "b08",
+   "date": "2025-07-21",
+   "base_type": "Payment",
+   "narration": "Paid for Unit 7 Supplies",
+   "lines": [
+    [
+     "Beta Stores",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "b09",
+   "date": "2025-08-05",
+   "base_type": "Receipt",
+   "narration": "CAFÉ CORNER deposit",
+   "lines": [
+    [
+     "Bank A",
+     60000
+    ],
+    [
+     "Alpha Traders",
+     -60000
+    ]
+   ]
+  },
+  {
+   "guid": "b10",
+   "date": "2025-08-06",
+   "base_type": "Receipt",
+   "narration": "Cafe Corner deposit",
+   "lines": [
+    [
+     "Bank A",
+     40000
+    ],
+    [
+     "Alpha Traders",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "b11",
+   "date": "2025-08-25",
+   "base_type": "Payment",
+   "narration": "देव ट्रेडर्स",
+   "lines": [
+    [
+     "Beta Stores",
+     30000
+    ],
+    [
+     "Bank A",
+     -30000
+    ]
+   ]
+  },
+  {
+   "guid": "b12",
+   "date": "2025-09-09",
+   "base_type": "Payment",
+   "narration": "for Gamma Supplies",
+   "lines": [
+    [
+     "Beta Stores",
+     50000
+    ],
+    [
+     "Bank A",
+     -50000
+    ],
+    [
+     "Gamma Supplies",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "b13",
+   "date": "2025-09-30",
+   "base_type": "Payment",
+   "narration": "Paid for Gamma Supplies",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Beta Stores",
+     100000
+    ],
+    [
+     "Bank A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "b14",
+   "date": "2025-10-10",
+   "base_type": "Payment",
+   "narration": "for Alpha Traders, by Alpha Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "b15",
+   "date": "2025-11-11",
+   "base_type": "Payment",
+   "narration": "Rent for Beta Stores",
+   "lines": [
+    [
+     "Bank A",
+     -150000
+    ],
+    [
+     "Bank B",
+     -50000
+    ],
+    [
+     "Office Rent",
+     200000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A",
+  "Bank B"
+ ]
+}

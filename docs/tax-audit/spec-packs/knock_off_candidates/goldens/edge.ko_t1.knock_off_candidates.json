@@ -1,0 +1,187 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "knock_off_candidates",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "dd6bb68919f0238a",
+  "population_note_text": "Every voucher in the books population. Party ledgers are those under Sundry Debtors, Sundry Creditors, Loans (Liability) or Loans & Advances (Asset); bank and cash, those under Bank Accounts, Bank OD A/c or Cash-in-Hand.",
+  "figures": [
+    {
+      "id": "knock_off_candidates.t1_candidate_total_paise",
+      "value": 53700000,
+      "unit": "paise",
+      "definition_sha256_16": "46b0e33fa5177e15",
+      "definition_text": "Debits on party ledgers in the vouchers settling one party through another with no bank or cash line, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t1_row_count",
+      "value": 7,
+      "unit": "count",
+      "definition_sha256_16": "b662ded04a0754bb",
+      "definition_text": "Vouchers with lines on two or more distinct party ledgers and no bank or cash line.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "t01",
+          "label": "Journal t01 on 2025-04-15: Alpha Traders −₹12,000; Beta Stores ₹12,000; narration: 'Set off against Beta Stores dues'"
+        },
+        {
+          "kind": "voucher",
+          "id": "t02",
+          "label": "Journal t02 on 2025-05-10: Delta Loans Ltd ₹5,00,000; Staff Advance Eta −₹5,00,000; narration: ''"
+        },
+        {
+          "kind": "voucher",
+          "id": "t03",
+          "label": "Credit Note t03 on 2025-06-12: Alpha Traders −₹3,000; Theta Branch ₹3,000; narration: 'Transferred to branch'"
+        },
+        {
+          "kind": "voucher",
+          "id": "t04",
+          "label": "Journal t04 on 2025-07-08: Beta Stores −₹1,500; Zeta Agencies ₹4,000; alpha retail −₹2,000; narration: 'Three-way adjustment'"
+        },
+        {
+          "kind": "voucher",
+          "id": "t05-journal-zero-bank",
+          "label": "Journal al-zero-bank on 2025-08-19: Alpha Traders ₹6,000; Beta Stores −₹6,000; narration: 'Contra settlement'"
+        },
+        {
+          "kind": "voucher",
+          "id": "t06",
+          "label": "Sales GST t06 on 2025-09-25: Alpha Traders ₹5,000; Theta Branch ₹3,000; narration: 'Goods to two outlets'"
+        },
+        {
+          "kind": "voucher",
+          "id": "t08",
+          "label": "Journal t08 on 2025-11-14: Alpha Traders ₹0; Beta Stores ₹1,000; narration: 'Reversal and discount'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_candidate_total_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "c81320270dcf7017",
+      "definition_text": "Bank and cash lines of the vouchers whose narration names a party ledger not on the voucher, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_embedded_candidate_total_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2f59fc886c1b62be",
+      "definition_text": "Bank and cash lines of the vouchers whose narration holds a party's name only inside a longer name, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_embedded_row_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f4bc1dfa1ae74236",
+      "definition_text": "Bank or cash vouchers whose narration holds a party ledger's name only inside a longer name (another name-like word beside it in the same part of the narration); listed apart from the others.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_pair_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "111e114ff2a3fa53",
+      "definition_text": "Voucher and named-party pairs across the groups: equal to the voucher count unless a narration names more than one party.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_row_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "a8baff95bb52e678",
+      "definition_text": "Bank or cash vouchers whose narration names, as whole words, a party ledger not on the voucher.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "knock_off_candidates/t1",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "knock_off_candidates.t1_candidate_total_paise"
+        },
+        {
+          "name": "rows",
+          "figure_id": "knock_off_candidates.t1_row_count"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "t01",
+          "label": "Journal t01 on 2025-04-15: Alpha Traders −₹12,000; Beta Stores ₹12,000; narration: 'Set off against Beta Stores dues'"
+        },
+        {
+          "kind": "voucher",
+          "id": "t02",
+          "label": "Journal t02 on 2025-05-10: Delta Loans Ltd ₹5,00,000; Staff Advance Eta −₹5,00,000; narration: ''"
+        },
+        {
+          "kind": "voucher",
+          "id": "t03",
+          "label": "Credit Note t03 on 2025-06-12: Alpha Traders −₹3,000; Theta Branch ₹3,000; narration: 'Transferred to branch'"
+        },
+        {
+          "kind": "voucher",
+          "id": "t04",
+          "label": "Journal t04 on 2025-07-08: Beta Stores −₹1,500; Zeta Agencies ₹4,000; alpha retail −₹2,000; narration: 'Three-way adjustment'"
+        },
+        {
+          "kind": "voucher",
+          "id": "t05-journal-zero-bank",
+          "label": "Journal al-zero-bank on 2025-08-19: Alpha Traders ₹6,000; Beta Stores −₹6,000; narration: 'Contra settlement'"
+        },
+        {
+          "kind": "voucher",
+          "id": "t06",
+          "label": "Sales GST t06 on 2025-09-25: Alpha Traders ₹5,000; Theta Branch ₹3,000; narration: 'Goods to two outlets'"
+        },
+        {
+          "kind": "voucher",
+          "id": "t08",
+          "label": "Journal t08 on 2025-11-14: Alpha Traders ₹0; Beta Stores ₹1,000; narration: 'Reversal and discount'"
+        }
+      ],
+      "title_sha256_16": "0bc1135e5cb28eb9",
+      "title_text": "Journals settling one party through another, with no bank or cash line: listed for the CA (may bear on clauses 31 and 21(d))",
+      "limits_sha256_16": "3bfe39caea819076",
+      "limits_text": [
+        "Listed, never judged: the candidate total is a candidate total, not a reportable amount, and nothing is left out for being small or looking harmless. Whether a row is a payment under s.40A(3), a Rule 6DD case, a loan or deposit, a trade set-off, or one person under two ledgers is the CA's to determine; no clause 31 or 21(d) row is written.",
+        "Recall is not measured on real books.",
+        "Same-person set-offs, rectifications of a wrong-party posting, opening or migration entries, branch ledgers of one entity, and discount or note journals against one party are listed too."
+      ],
+      "ask_client_sha256_16": "8e21f9dff05552e8",
+      "ask_client_text": [
+        "Journal settling one party through another: whose liability, and who received the value? Is it a loan or deposit taken or repaid by journal (clause 31, codes I/J), a same-person set-off, or a correction?"
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

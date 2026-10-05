@@ -96,13 +96,15 @@ whose ledger now points to a different master.
   separate ComplyEaze Bridge window. No Bridge tool lets the assistant approve
   it, and an approval counts only when that window returns a fresh one-time
   token. After posting, the voucher is read back from Tally so you can see what
-  landed. Three known limits remain: ComplyEaze Bridge cannot undo a posted
+  landed. Four known limits remain: ComplyEaze Bridge cannot undo a posted
   voucher (you correct it in Tally); a company renamed to, or loaded under, the
   target company's name (or one differing only in case or spacing) just after
   its last check could still receive the voucher, if it has the voucher's
   ledgers, and ComplyEaze Bridge cannot always say where it went or prevent it;
-  and a ledger renamed and replaced in that same moment could receive the
-  entry, and not every such change is noticed. Read *Before you turn on
+  a ledger renamed and replaced in that same moment could receive the
+  entry, and not every such change is noticed; and the approval window covers
+  only ComplyEaze Bridge, so another Tally connector in the same Claude Desktop
+  that can change entries can do so without it. Read *Before you turn on
   posting* first.
 - **Tool calls leave receipts** in a log on your computer: the company's Tally
   identifier, and a fingerprint of what was asked and of what came back,

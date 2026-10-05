@@ -66,7 +66,7 @@ with no figures, to a log on this computer.
 | `purchase_register` | Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
 | `sales_register` | Sales and Credit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
-| `stock_summary` | The closing stock value of each item as of a date | Nothing |
+| `stock_summary` | The closing stock value of each item as of a 31 March, values only; small books only (a book with many masters of any kind is refused, and so is any other date) | Nothing |
 | `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded | Nothing |
 | `trial_balance` | The ledger-wise Trial Balance for a date range | Nothing |
 | `validate_masters` | Checks ledger names against the live book before you build an import file | Nothing |
@@ -205,7 +205,7 @@ hosted CI runners for Windows x64 and Apple Silicon Mac.
 
 ## Not in the latest release
 
-- Stock quantities, and stock reads on books with many stock items; sales,
+- Stock quantities, and stock reads on books with many masters of any kind; sales,
   purchase or tax posting; creating masters; bill-wise allocation
 - Deleting or undoing a posted voucher (correct it in Tally)
 - Reads on very large books can fail or take longer than the assistant waits

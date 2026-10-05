@@ -5223,8 +5223,9 @@ async fn buckets_page_from_the_held_summary_window() {
 /// party marker would have passed the suite. The bucket redaction in `render_page_body` is a second,
 /// redundant layer under the whole-response pass in `redact_tool_response`; this test does not tell
 /// the two apart.
-/// Mutants killed: building a ledger bucket's label without the party-name marker; dropping
-/// `MaskParties` from the redaction of the tool response (`redact_value`).
+/// Mutant run and killed: neutering the `MaskParties` branch of `redact_value`. Mutant run and NOT
+/// killed (by design, the layer is redundant): removing the bucket redaction in `render_page_body`.
+/// Not run, reasoned from the code: building a bucket label without the party-name marker.
 #[tokio::test]
 async fn a_ledger_summary_masks_every_bucket_label_under_mask_parties() {
     let plain = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));

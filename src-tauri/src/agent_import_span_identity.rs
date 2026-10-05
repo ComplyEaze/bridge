@@ -385,7 +385,7 @@ fn content_differences(voucher: &ImportVoucher, row: &ReadVoucher) -> Vec<&'stat
         }
         _ => fields.push("entries"),
     }
-    let sent_narration = voucher.narration.as_deref().unwrap_or("").trim();
+    let sent_narration = super::posted_narration(voucher).unwrap_or("");
     if row.narration.as_deref().unwrap_or("") != sent_narration {
         fields.push("narration");
     }

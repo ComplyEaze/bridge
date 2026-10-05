@@ -1668,10 +1668,23 @@ fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
     assert!(
-        batch.contains("Not shown here: each voucher's own date, narration and reference."),
+        batch
+            .lines()
+            .any(|text| text == "Not shown here: each voucher's own date, narration and reference."),
         "{batch}"
     );
     assert!(!batch.contains("Second rent"), "{batch}");
+    // Outer spaces no longer count against the dialog's 100-character line
+    // cap: an 87-character narration fills its line exactly, and two spaces
+    // each side would have put it at 104. The build's eligibility and the
+    // post read this same preview.
+    let text = "R".repeat(87);
+    let mut padded = one.clone();
+    padded.vouchers[0].narration = Some(format!("  {text}  "));
+    let preview = review_preview_for(&padded, &endpoint, PostScope::Vouchers).unwrap();
+    let shown = format!("Narration: \"{text}\"");
+    assert_eq!(shown.chars().count(), 100);
+    assert!(preview.lines().any(|line| line == shown), "{preview}");
 }
 
 /// The agent's dialog says when its post happens, in both preview shapes and

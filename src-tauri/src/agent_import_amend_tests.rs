@@ -306,6 +306,40 @@ fn a_voucher_still_as_any_build_wrote_it_is_admitted() {
     }
 }
 
+/// The amendment check expects the narration the import wrote, which has no
+/// outer whitespace (#1055): a book row carrying the trimmed text and the tag
+/// is still the version this build wrote, and is admitted.
+#[test]
+fn a_padded_saved_narration_is_compared_as_the_text_the_import_wrote() {
+    let mut original = build(ORIGINAL, None, "12.50", "20260901");
+    original.vouchers[0].narration = Some("  Paid rent\u{a0}".into());
+    original.sha256 = sha256_hex(
+        render_import_xml(
+            "Synthetic Accounts",
+            &original.vouchers,
+            original.identity_batch_id(),
+        )
+        .as_bytes(),
+    );
+    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
+    let proposal = build(AMENDMENT, None, "18.00", "20260901").vouchers;
+    let mut row = book_row(&original);
+    row.narration = Some(format!(
+        "Paid rent [BRIDGE:{}]",
+        original.attribution_tag(&original.vouchers[0])
+    ));
+    let admitted = lineage
+        .compare_and_swap(&proposal, &book(vec![row]), &verified_as_booked(&lineage))
+        .unwrap()
+        .expect("book holds the version this build wrote");
+    assert_eq!(
+        json!(admitted),
+        json!([{"bridge_txn_id":"txn-001","book_matches_batch_id":ORIGINAL,
+            "guid":format!("{GUID}-00000005"),"master_id":"5","alter_id":40,
+            "not_observed":["effective_date"]}])
+    );
+}
+
 #[test]
 fn an_edited_missing_or_cancelled_voucher_refuses_the_amendment() {
     let original = build(ORIGINAL, None, "12.50", "20260901");

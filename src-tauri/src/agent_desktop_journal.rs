@@ -139,7 +139,7 @@ impl DesktopJournalService {
         let details = DesktopJournalDetails {
             date: voucher.date.clone(),
             reference: voucher.reference.clone(),
-            narration: voucher.narration.clone(),
+            narration: super::posted_narration(voucher).map(str::to_owned),
             entries: voucher
                 .entries
                 .iter()

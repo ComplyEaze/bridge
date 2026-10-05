@@ -237,6 +237,33 @@ fn ten_captured_vouchers_bind_in_request_order() {
     assert_eq!((bound[1].master_id, bound[2].master_id), (1725, 1726));
 }
 
+/// The binding compares a read narration with the one the post sends, which
+/// has no outer whitespace (#1055): saved narrations padded with spaces and
+/// U+00A0 send the captured request byte for byte and bind exactly as the
+/// captured ones do.
+#[test]
+fn padded_saved_narrations_bind_as_the_text_the_post_sends() {
+    let mut padded = sent();
+    for voucher in &mut padded {
+        let text = voucher.narration.take().unwrap();
+        voucher.narration = Some(format!("  {text}\u{a0}"));
+    }
+    let xml = render_native_vouchers_xml(COMPANY, padded.iter().zip(captured_remote_ids()));
+    assert_eq!(xml, IMPORT.trim_end_matches('\n'));
+    let span = span();
+    let read = span_read();
+    assert_eq!(
+        bind(&span, COMPANY_GUID, &padded, &read, &BTreeSet::new()),
+        bind(&span, COMPANY_GUID, &sent(), &read, &BTreeSet::new())
+    );
+    assert_eq!(
+        bind(&span, COMPANY_GUID, &padded, &read, &BTreeSet::new())
+            .unwrap()
+            .len(),
+        10
+    );
+}
+
 #[test]
 fn a_post_span_needs_clean_counters_a_lastvchid_and_a_step_equal_to_created() {
     let before = PreMark::recorded(1795);

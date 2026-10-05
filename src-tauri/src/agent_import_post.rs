@@ -2495,11 +2495,113 @@ pub(super) const BATCH_REVIEW_MAX_CHARS: usize = 3_200;
 pub(super) const BATCH_REVIEW_MAX_LINE_CHARS: usize = 100;
 pub(super) const BATCH_REVIEW_MAX_BYTES: usize = 7_000;
 
+/// The most vouchers a batch's dialog lists one line each (#1063).
+pub(super) const BATCH_REVIEW_MAX_VOUCHER_LINES: usize = 10;
+/// The characters of a narration a voucher's line shows before it marks the
+/// cut. Characters, not graphemes: a cut can split a Devanagari conjunct, and
+/// the marker says so rather than hiding it (#1063).
+pub(super) const BATCH_REVIEW_NARRATION_CHARS: usize = 40;
+
+/// The line above a small batch's voucher lines.
+pub(super) const VOUCHER_LINES_HEADING: &str =
+    "Each voucher: type, date, amount, ledger, narration (references not shown):";
+// Each sentence that stands in for the voucher lines takes the place of the
+// line a batch showed before #1063, and is no longer than it, so the
+// totals-only text never outgrows the caps a batch passed before.
+/// A batch of more than `BATCH_REVIEW_MAX_VOUCHER_LINES` vouchers.
+pub(super) const VOUCHER_LINES_OVER_LIMIT: &str =
+    "Per-voucher lines are not shown: this batch has over 10 vouchers.";
+/// A narration or reference holds a layout or format character; the reason
+/// never echoes the text.
+pub(super) const VOUCHER_LINES_UNSAFE: &str =
+    "Per-voucher lines are not shown: a narration/reference is unsafe.";
+/// The voucher lines would break one of the dialog's caps.
+pub(super) const VOUCHER_LINES_DO_NOT_FIT: &str =
+    "Per-voucher lines are not shown: they do not fit this dialog.";
+
+/// One line per voucher of a small batch (#1063): its type and date, its
+/// value (the sum of its debits), the ledger a statement row names (a
+/// Receipt's first credit, any other type's first debit, in the batch file's
+/// order, with "+N" for the rest of that side) and its narration as posted,
+/// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` with the cut marked.
+/// `None` when a narration or reference holds a character the dialog cannot
+/// show as it is: nothing is stripped or altered.
+fn voucher_review_lines(vouchers: &[ImportVoucher]) -> Result<Option<Vec<String>>, String> {
+    let shown_text = vouchers.iter().flat_map(|voucher| {
+        super::posted_narration(voucher)
+            .into_iter()
+            .chain(voucher.reference.as_deref())
+    });
+    if shown_text.clone().any(|text| {
+        has_unsafe_review_layout_character(text) || has_unreviewable_format_character(text)
+    }) {
+        return Ok(None);
+    }
+    let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
+    let mut lines = Vec::with_capacity(vouchers.len());
+    for voucher in vouchers {
+        let mut value = ExactDecimal::zero();
+        for entry in voucher
+            .entries
+            .iter()
+            .filter(|entry| entry.side == EntrySide::Dr)
+        {
+            let amount = ExactDecimal::parse(entry.amount.clone())
+                .map_err(|_| "voucher_amount_invalid".to_string())?;
+            value = value
+                .checked_add(&amount)
+                .map_err(|_| "voucher_amount_overflow".to_string())?;
+        }
+        let side = if voucher.voucher_type == VoucherType::Receipt {
+            EntrySide::Cr
+        } else {
+            EntrySide::Dr
+        };
+        let named: Vec<&str> = voucher
+            .entries
+            .iter()
+            .filter(|entry| entry.side == side)
+            .map(|entry| entry.ledger.as_str())
+            .collect();
+        let ledger = match named.as_slice() {
+            [] => "(none)".to_string(),
+            [only] => quoted(only),
+            [first, rest @ ..] => format!("{} +{}", quoted(first), rest.len()),
+        };
+        let narration = match super::posted_narration(voucher) {
+            None => "(none)".to_string(),
+            Some(text) => {
+                let length = text.chars().count();
+                if length > BATCH_REVIEW_NARRATION_CHARS {
+                    let kept: String = text.chars().take(BATCH_REVIEW_NARRATION_CHARS).collect();
+                    format!(
+                        "{}… (+{} characters)",
+                        quoted(&kept),
+                        length - BATCH_REVIEW_NARRATION_CHARS
+                    )
+                } else {
+                    quoted(text)
+                }
+            }
+        };
+        lines.push(format!(
+            "{} {}  {}  {ledger}  {narration}",
+            voucher.voucher_type.as_str(),
+            voucher.date,
+            value.as_str(),
+        ));
+    }
+    Ok(Some(lines))
+}
+
 /// The approval text for a batch: a summary a person can read in one native
-/// dialog, never a listing. Every ledger's debit and credit totals and entry
-/// count, the totals by voucher type, the money the types themselves fix as
-/// moving in or out, and the standing cautions. Narrations and references
-/// are not shown; the amounts and ledgers are what the approval binds.
+/// dialog. Every ledger's debit and credit totals and entry count, the totals
+/// by voucher type, the money the types themselves fix as moving in or out,
+/// and the standing cautions; and for a batch of at most
+/// `BATCH_REVIEW_MAX_VOUCHER_LINES`, one line per voucher (#1063). When those
+/// lines cannot be shown, the summary says why in their place, and a batch is
+/// never refused for them. References are not shown; the amounts and ledgers
+/// are what the approval binds.
 fn batch_review_text(
     line: &ImportLedgerLine,
     company: &ImportCompanyTuple,
@@ -2559,7 +2661,7 @@ fn batch_review_text(
         dates.max().unwrap_or_default(),
     );
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
-    let mut text = vec![
+    let head = vec![
         format!(
             "Create {} vouchers in {}",
             line.vouchers.len(),
@@ -2580,9 +2682,8 @@ fn batch_review_text(
                 .join(", ")
         ),
         format!("Dates: {first} to {last}  Voucher numbers: Tally assigns them"),
-        "Not shown here: each voucher's own date, narration and reference.".into(),
-        String::new(),
     ];
+    let mut text = vec![String::new()];
     for (ledger, (dr, cr, count)) in &ledgers {
         text.push(format!(
             "Dr {}  Cr {}  {count} {}  {}",
@@ -2628,17 +2729,36 @@ fn batch_review_text(
     );
     text.push("After a timeout, reconcile this batch; do not rebuild or resend it.".into());
     text.extend(footer.iter().cloned());
-    let preview = text.join("\n");
-    if text.len() > BATCH_REVIEW_MAX_LINES
-        || preview.chars().count() > BATCH_REVIEW_MAX_CHARS
-        || preview.len() > BATCH_REVIEW_MAX_BYTES
-        || text
-            .iter()
-            .any(|line| line.chars().count() > BATCH_REVIEW_MAX_LINE_CHARS)
-    {
+    let fits = |lines: &[String]| {
+        let preview = lines.join("\n");
+        lines.len() <= BATCH_REVIEW_MAX_LINES
+            && preview.chars().count() <= BATCH_REVIEW_MAX_CHARS
+            && preview.len() <= BATCH_REVIEW_MAX_BYTES
+            && lines
+                .iter()
+                .all(|line| line.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS)
+    };
+    let whole = |middle: Vec<String>| [head.clone(), middle, text.clone()].concat();
+    let reason = if line.vouchers.len() > BATCH_REVIEW_MAX_VOUCHER_LINES {
+        VOUCHER_LINES_OVER_LIMIT
+    } else if let Some(vouchers) = voucher_review_lines(&line.vouchers)? {
+        let listed = whole(
+            std::iter::once(VOUCHER_LINES_HEADING.to_string())
+                .chain(vouchers)
+                .collect(),
+        );
+        if fits(&listed) {
+            return Ok(listed.join("\n"));
+        }
+        VOUCHER_LINES_DO_NOT_FIT
+    } else {
+        VOUCHER_LINES_UNSAFE
+    };
+    let summary = whole(vec![reason.to_string()]);
+    if !fits(&summary) {
         return Err("import_review_too_large".into());
     }
-    Ok(preview)
+    Ok(summary.join("\n"))
 }
 
 pub(super) fn has_unsafe_review_layout_character(value: &str) -> bool {

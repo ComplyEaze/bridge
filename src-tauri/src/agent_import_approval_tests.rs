@@ -1746,7 +1746,7 @@ fn a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits()
 /// The single-voucher dialog shows each narration exactly as the post sends
 /// it (#1055 point 5): without leading or trailing spaces, as one whole value.
 /// An absent narration stays `(none)`, and one made only of spaces is posted
-/// empty and shown as `""`. The batch dialog shows no narration.
+/// empty and shown as `""`. A batch's voucher lines show it the same way.
 #[test]
 fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
     let directory = tempfile::tempdir().unwrap();
@@ -1795,13 +1795,12 @@ fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
     second.narration = Some("  Second rent  ".into());
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
-    assert!(
-        batch
-            .lines()
-            .any(|text| text == "Not shown here: each voucher's own date, narration and reference."),
-        "{batch}"
-    );
-    assert!(!batch.contains("Second rent"), "{batch}");
+    for shown in [
+        "Journal 20260901  12.5  \"WR2 Sales\"  \"Synthetic test only\"",
+        "Journal 20260901  12.5  \"WR2 Sales\"  \"Second rent\"",
+    ] {
+        assert!(batch.lines().any(|text| text == shown), "{shown}\n{batch}");
+    }
     // Outer spaces no longer count against the dialog's 100-character line
     // cap: an 87-character narration fills its line exactly, and two spaces
     // each side would have put it at 104. The build's eligibility and the
@@ -1871,7 +1870,7 @@ fn the_agent_preview_says_when_the_post_happens() {
                 assert!(
                     [
                         "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
-                        "Not shown here: each voucher's own date, narration and reference.",
+                        "Each voucher: type, date, amount, ledger, narration (references not shown):",
                     ]
                     .contains(&line),
                     "an unexpected line about narrations: {line:?}"

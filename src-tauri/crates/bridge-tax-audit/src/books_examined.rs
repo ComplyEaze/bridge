@@ -7,6 +7,11 @@
 //! type, the cash and bank books by ledger count, the ledger accounts, the Trial Balance, and the
 //! documents loaded for the engagement. Books kept outside Tally and the address are not in the
 //! read, so one question asks the CA for both. It computes nothing.
+//!
+//! Not ported: the reference's `Finding` also has a `confirm` field (see `read_scope.rs`); this test sets none,
+//! so nothing is hidden from the canonical dump. The documents loaded are caller data: nothing here checks
+//! them against the documents a caller actually holds (bridge-tax-audit is not wired yet; whoever wires it
+//! derives the list from the loads, as the reference's pack does).
 
 use std::collections::{BTreeMap, BTreeSet};
 

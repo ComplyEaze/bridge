@@ -18,10 +18,14 @@ passes the documents it actually read, in its own order.
   A/c only. One Payment is counted by its base type, though its voucher type is "Rent Payment". An optional Sales
   voucher is out of the books, so Sales is not listed. There is a Trial Balance and one document.
 - `edge-books/be_plural.json`: two cash ledgers and three bank ledgers. One bank ledger is under each bank group,
-  and one has a chain through both groups, which is counted once. All eight voucher types of the CA's order appear,
+  and one has a chain through both groups, which is counted once (that chain is set by hand and contradicts the book's own groups table, where Bank OD A/c is a loans group: both sides read the stored chain). All eight voucher types of the CA's order appear,
   written in the book out of that order, each with its count. Three other types, with no ledger entries, follow
   them by name. A cancelled Sales voucher is left out. There is a Trial Balance and every document name the
   reference's pack can pass, in its order.
+- `edge-books/be_cash_only.json` and `edge-books/be_bank_only.json`: a cash ledger and no bank ledger, and a bank ledger
+  (under Bank Accounts) and no cash ledger, each beside the other group's master existing and holding nothing, one
+  Payment, a Trial Balance and no document. They show the cash book part and the bank books part each listed
+  alone, so neither part's guard can read the other's count.
 - Not reached: a voucher of unknown status. The reference refuses to form the population there and the port
   refuses with `UnknownVoucherStatus`, but an edge book cannot express that status.
 - Regression fixtures only: they prove the port and the reference agree on the same book, and nothing about
@@ -40,7 +44,7 @@ changes only `loans_interest`. From the crate directory:
         --with striprtf --with pdfplumber python parity/edge_golden.py ENGINE \
         tests/fixtures/edge-books/NAME.json tests/fixtures/golden
 
-The three books were written by a small generator, as data. Each Trial Balance is the sum of the in-books
+The five books were written by a small generator, as data. Each Trial Balance is the sum of the in-books
 vouchers' lines, so no book invariant fires. With the same extraction, `parity/edge_golden.py` (with this
 change) regenerates every edge golden already pinned byte-identical except
 `edge.loans_interest_nil_two_loans.loans_interest.json`. That golden was made at `5fcc6136`, and its difference
@@ -59,3 +63,7 @@ regenerates byte-identical.
 | `edge.be_singular.books_examined.json` | 2,737 | `c897917514d1f8b667642e107464fb59dab0260df90cb4206876248dd1647990` | `golden/edge.be_singular.books_examined.json` |
 | `be_plural.json` | 6,539 | `47b732dcd3d75cc1ec0e4bac46aba1717795e4013b70b560d6be2f7d0e3cc649` | `edge-books/be_plural.json` |
 | `edge.be_plural.books_examined.json` | 3,138 | `4238f632fab54133f6750f4906e23d5ac2bbc3155f6f2bc80b93a83f8f89ec26` | `golden/edge.be_plural.books_examined.json` |
+| `be_cash_only.json` | 1,378 | `d21c9d13c10b57c91285641e7bb84b60fc70a9bf6bb6a3e9bdd378c74783666e` | `edge-books/be_cash_only.json` |
+| `edge.be_cash_only.books_examined.json` | 2,698 | `e5fd202a40943e433c507170b3c60b794737fed863b478b09c39c2013567de7a` | `golden/edge.be_cash_only.books_examined.json` |
+| `be_bank_only.json` | 1,387 | `50244b8cc507d2355b11b8dc41fa02f72ae32f50d80b4e16ecb6c5f4d0ddf438` | `edge-books/be_bank_only.json` |
+| `edge.be_bank_only.books_examined.json` | 2,700 | `d36773c24d91d503bc475c5f77aadb2e5e4b3a530c51e8cdd48443489efa3b05` | `golden/edge.be_bank_only.books_examined.json` |

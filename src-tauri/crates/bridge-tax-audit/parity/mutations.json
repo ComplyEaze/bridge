@@ -9462,5 +9462,21 @@
   "file": "src/registry.rs",
   "from": "run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read),",
   "to": "run_on: |_, b, r, _| crate::books_examined_on(b, r, &Default::default()),"
+ },
+ {
+  "id": "BE-28",
+  "by": "author",
+  "what": "the cash book part is listed on the bank ledger count",
+  "file": "src/books_examined.rs",
+  "from": "    if cash > 0 {",
+  "to": "    if bank > 0 {"
+ },
+ {
+  "id": "BE-29",
+  "by": "author",
+  "what": "the bank books part is listed on the cash ledger count",
+  "file": "src/books_examined.rs",
+  "from": "    if bank > 0 {",
+  "to": "    if cash > 0 {"
  }
 ]

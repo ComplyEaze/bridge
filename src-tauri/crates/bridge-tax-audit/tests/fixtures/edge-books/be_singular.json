@@ -1,0 +1,134 @@
+{
+ "comment": "books_examined with one cash ledger and one bank ledger, that one under Bank OD A/c only; one Payment counted by its base type (its voucher type is Rent Payment); an optional Sales voucher, out of the books, so Sales is not listed; a Trial Balance; one document loaded.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-be_singular-000"
+  },
+  {
+   "name": "Overdraft",
+   "chain": [
+    "Bank OD A/c",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-be_singular-001"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-be_singular-002"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-be_singular-003"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-be_singular-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 500000,
+   "closing": -500000
+  },
+  {
+   "ledger": "Overdraft",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Customer A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "s01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent",
+     500000
+    ],
+    [
+     "Cash",
+     -500000
+    ]
+   ],
+   "vtype": "Rent Payment"
+  },
+  {
+   "guid": "s02",
+   "date": "2025-07-01",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Customer A",
+     1000000
+    ],
+    [
+     "Sales",
+     -1000000
+    ]
+   ],
+   "status": "optional"
+  }
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "books_examined"
+ ],
+ "documents_read": [
+  "Form 26AS"
+ ]
+}

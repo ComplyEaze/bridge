@@ -1034,8 +1034,10 @@ each other.
   (`voucher_entries_unbalanced`): a bucket built from it could not be tied out.
 - A voucher withheld for a foreign-currency amount is in no bucket; the result is
   `partial` and `coverage` says the totals are short by those vouchers.
-- Buckets come by larger movement first (ledger, voucher type) or in calendar
-  order (month, `YYYY-MM`). A page also stops at a fifth of the response budget
+- Buckets come by larger movement first (ledger, voucher type), buckets of equal
+  movement in the order they are first counted in the window (never by name, which
+  under `mask_parties` would show the alphabetical order of the real names), or
+  in calendar order (month, `YYYY-MM`). A page also stops at a fifth of the response budget
   (the response carries it twice), with at least one bucket, and `truncated` says
   when more remain (the next `offset` is this `offset` plus the buckets returned); a page that still does not fit is refused
   `agent_response_too_large`, so lower `limit` or raise the budget. The egress

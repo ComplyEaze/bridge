@@ -114,6 +114,45 @@ fn a_ledger_summary_has_one_bucket_per_ledger_with_the_larger_movement_first() {
     );
 }
 
+/// Buckets of equal movement are ordered by where they first appeared in the window, never by
+/// name (V14's review of #1250, P3 3): under `mask_parties` an order by name would show the
+/// alphabetical order of the real names in the order of tied rows.
+#[test]
+fn buckets_of_equal_movement_keep_the_windows_order_not_the_alphabetical_one() {
+    let entry = |ledger: &str, amount: &str, deemed_positive: &str| json!({"ledger": ledger, "amount": amount, "is_deemed_positive": deemed_positive});
+    let voucher = |number: &str, debit_ledger: &str, credit_ledger: &str| {
+        json!({
+            "cancelled": false, "optional": false, "post_dated": false,
+            "date": "20260801", "voucher_type": "Journal", "voucher_number": number,
+            "guid": format!("guid-{number}"),
+            "amounts": [entry(debit_ledger, "-10.00", "Yes"), entry(credit_ledger, "10.00", "No")],
+        })
+    };
+    // Four ledgers, every one moving 10.00. They appear Zulu, Mike, Alpha, Bravo: not alphabetical.
+    let rows = vec![voucher("1", "Zulu", "Mike"), voucher("2", "Alpha", "Bravo")];
+    let summary = summed(&rows, SummaryGroup::Ledger, None);
+    let names = summary
+        .buckets
+        .iter()
+        .map(|bucket| bucket["group"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        [
+            party_name_value("Zulu".to_string()),
+            party_name_value("Mike".to_string()),
+            party_name_value("Alpha".to_string()),
+            party_name_value("Bravo".to_string()),
+        ]
+    );
+    let positions = summary
+        .buckets
+        .iter()
+        .map(|bucket| bucket["position"].as_u64().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(positions, [1, 2, 3, 4]);
+}
+
 #[test]
 fn a_ledger_name_is_a_party_marked_value_so_masking_reaches_it() {
     let summary = summed(&captured_rows(), SummaryGroup::Ledger, None);

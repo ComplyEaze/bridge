@@ -73,6 +73,9 @@ pub(super) struct Summary {
 }
 
 struct Bucket {
+    /// How many buckets existed when this one was first filled: its place in the window's own
+    /// order, which breaks a tie in movement without looking at the (maskable) label.
+    first_seen: usize,
     vouchers: usize,
     debit: String,
     credit: String,
@@ -80,8 +83,9 @@ struct Bucket {
 }
 
 impl Bucket {
-    fn new() -> Self {
+    fn new(first_seen: usize) -> Self {
         Self {
+            first_seen,
             vouchers: 0,
             debit: "0".to_string(),
             credit: "0".to_string(),
@@ -210,7 +214,10 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             let key = voucher_key
                 .clone()
                 .unwrap_or_else(|| amount.ledger.to_string());
-            let bucket = buckets.entry(key.clone()).or_insert_with(Bucket::new);
+            let first_seen = buckets.len();
+            let bucket = buckets
+                .entry(key.clone())
+                .or_insert_with(|| Bucket::new(first_seen));
             if let Some(debit) = &amount.debit {
                 bucket.debit = add_decimal(&bucket.debit, debit)?;
                 total_debit = add_decimal(&total_debit, debit)?;
@@ -245,7 +252,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             };
             let refs_complete = bucket.refs.len() == bucket.vouchers;
             Ok((
-                key,
+                bucket.first_seen,
                 gross,
                 json!({
                     "group": group,
@@ -259,7 +266,9 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             ))
         })
         .collect::<Result<Vec<_>, String>>()?;
-    // Months run in calendar order; ledgers and types by the larger movement first, then name.
+    // Months run in calendar order; ledgers and types by the larger movement first, then by
+    // where the bucket first appeared in the window. Never by name: under `mask_parties` the
+    // order of tied rows would show the alphabetical order of the real names.
     if request.group != SummaryGroup::Month {
         shaped.sort_by(|left, right| {
             let by_gross = bridge_tally_core::ExactDecimal::parse(right.1.clone())

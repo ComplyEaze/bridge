@@ -851,6 +851,27 @@ fn the_vouchers_description_names_the_bill_date_and_credit_period_of_an_allocati
     );
 }
 
+/// The `vouchers` description states the order of summary buckets, including the rule for a tie
+/// in movement (#1230): first counted in the window, never by name, which under `mask_parties`
+/// would show the alphabetical order of the real names.
+#[test]
+fn the_vouchers_description_states_the_tie_rule_of_summary_buckets() {
+    let tools = registered_tool_definitions(true, true);
+    let description = tools
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|tool| tool["name"] == "vouchers")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("vouchers is in the catalogue");
+    assert!(
+        description.contains(
+            "Buckets are ordered by the larger movement first (ledger, type), ties in movement keeping the order in which the bucket was first counted in the window, or by month."
+        ),
+        "the vouchers description lacks the bucket order and its tie rule"
+    );
+}
+
 /// The sentences an assistant relies on for safety, each pinned on its own so a
 /// shorter description cannot drop one unnoticed (#1010). Only the phrase is
 /// asserted, never a whole description, so the text around it can still be

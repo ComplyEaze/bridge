@@ -19,8 +19,8 @@ prepares files on your computer. If you turn posting on in the extension, it
 posts vouchers one at a time, after you approve each one.
 
 Tally Solutions also offers its own TallyPrime MCP plug-in for Claude Desktop;
-its help pages (read on 4 October 2026) describe 28 tools for viewing company,
-master, accounting, inventory, outstanding and transaction data. ComplyEaze
+its help pages (last updated 18 September 2026) list tools in six groups:
+company, master, accounting, inventory, outstanding and transaction. ComplyEaze
 Bridge is not made by, or affiliated with, Tally Solutions, and we have not run
 the two side by side. TallyPrime also has its own Bank Statement import, which
 takes statement files in the formats Tally lists for each bank.

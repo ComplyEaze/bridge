@@ -9230,5 +9230,21 @@
   "file": "src/counter_cheques_40a3.rs",
   "from": "    for (row, base) in over.iter().zip(&base_ids) {",
   "to": "    for (row, base) in over.iter().rev().zip(base_ids.iter().rev()) {"
+ },
+ {
+  "id": "LR-83",
+  "by": "author",
+  "what": "a nil line on the loan being tested counts as a posting to it (the pre-#1259 coverage filter)",
+  "file": "src/loans_interest.rs",
+  "from": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise != 0)",
+  "to": "                        .any(|l| l.ledger == *loan_ledger)"
+ },
+ {
+  "id": "LR-84",
+  "by": "author",
+  "what": "only a positive line on the loan being tested counts as a posting to it",
+  "file": "src/loans_interest.rs",
+  "from": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise != 0)",
+  "to": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise > 0)"
  }
 ]

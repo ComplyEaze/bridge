@@ -1,5 +1,6 @@
-//! Stable tags for figure/finding/evidence ids, keyed by Tally identity (GUID) rather than
-//! ledger display name. A byte-for-byte port of the reference engine's implementation; the rule
+//! Stable tags for figure and finding ids, keyed by Tally identity (GUID) rather than
+//! ledger display name. (An evidence ref's id is the identifier of what it cites, not a tag: a
+//! `ledger` ref carries the name, §11.) A byte-for-byte port of the reference engine's implementation; the rule
 //! is written down in full in `docs/tax-audit/parity-spec-v1.md` §11 -- this module's own
 //! comments summarise it, that section is the contract.
 //!
@@ -38,7 +39,7 @@ fn normalize_guid(guid: &str) -> String {
     crate::support::py_lower(crate::support::py_strip(guid))
 }
 
-/// Short, stable, non-reversible-in-practice tag for a figure/finding/evidence id, from a Tally
+/// Short, stable, non-reversible-in-practice tag for a figure or finding id, from a Tally
 /// GUID: the first 8 hex characters of the sha1 of the normalised (`normalize_guid`) GUID. Errs
 /// when the normalised GUID is blank -- refuse, never fall back to a name hash (mirrors the
 /// reference implementation's `MissingGuid`).

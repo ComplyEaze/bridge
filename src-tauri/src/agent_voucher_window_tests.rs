@@ -4976,15 +4976,15 @@ fn page_items_masks_the_party_names_of_every_row_it_cuts() {
 
 // -- #1239: the read cost a `vouchers` result states -------------------------------------------------
 
-/// The plans of a read whose census is eighteen reads (a certain floor of nine
-/// seconds; the simulator takes at most 128 scripted requests): the first span
-/// holds the window's three vouchers, the other seventeen are empty.
-fn eighteen_census_plans() -> Vec<ScenarioPlan> {
+/// The plans of a read whose census is `reads` reads (the simulator takes at
+/// most 128 scripted requests): the first span holds the window's three
+/// vouchers, the others are empty.
+fn census_plans_of(reads: u64) -> Vec<ScenarioPlan> {
     let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
     let mut plans = identity_plans();
-    plans.extend(paired(&mark(18 * capacity)));
+    plans.extend(paired(&mark(reads * capacity)));
     plans.extend(paired(&xml_plan(three_vouchers())));
-    for _ in 1..18 {
+    for _ in 1..reads {
         plans.extend(paired(&xml_plan(empty_collection())));
     }
     plans.extend(paired(&xml_plan(three_vouchers())));
@@ -4995,7 +4995,7 @@ fn eighteen_census_plans() -> Vec<ScenarioPlan> {
 /// small book's result is unchanged.
 #[tokio::test]
 async fn vouchers_states_its_read_cost_from_eighteen_census_reads_and_not_from_one() {
-    let response = call_vouchers_over(eighteen_census_plans()).await;
+    let response = call_vouchers_over(census_plans_of(18)).await;
     assert_eq!(response["isError"], false, "{response}");
     let window = &response["structuredContent"]["result"]["window"];
     assert_eq!(window["census"]["requests"], 18, "{window}");
@@ -5023,18 +5023,20 @@ async fn vouchers_states_its_read_cost_from_eighteen_census_reads_and_not_from_o
 #[tokio::test]
 async fn a_later_page_does_not_repeat_the_first_pages_read_cost() {
     let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
-    let mut plans = eighteen_census_plans();
-    plans.extend(marks_page_plans(mark(18 * capacity)));
+    // Sixteen reads: a certain floor of eight seconds, and the page's own
+    // scripted requests still fit the simulator.
+    let mut plans = census_plans_of(16);
+    plans.extend(marks_page_plans(mark(16 * capacity)));
     let one = OneServer::spawn(plans);
     let first = one.call(json!({"limit": 1})).await;
     let window = &first["structuredContent"]["result"]["window"];
-    assert_eq!(window["read_cost"]["census_reads"], 18, "{window}");
+    assert_eq!(window["read_cost"]["census_reads"], 16, "{window}");
     let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
     let second = one
         .call(json!({"offset": 1, "limit": 1, "snapshot_id": id}))
         .await;
     assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
     let window = &second["structuredContent"]["result"]["window"];
-    assert_eq!(window["census"]["requests"], 18, "{window}");
+    assert_eq!(window["census"]["requests"], 16, "{window}");
     assert!(window.get("read_cost").is_none(), "{window}");
 }

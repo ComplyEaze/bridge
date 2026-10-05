@@ -1704,13 +1704,13 @@ fn the_whole_window_pre_post_request_is_admitted_on_the_verification_measurement
     };
     let divided = [
         crate::agent::WindowPart {
-            from: "20260801".into(),
-            to: "20260815".into(),
+            from: crate::agent::tally_date("20260801"),
+            to: crate::agent::tally_date("20260815"),
             span: None,
         },
         crate::agent::WindowPart {
-            from: "20260816".into(),
-            to: "20260831".into(),
+            from: crate::agent::tally_date("20260816"),
+            to: crate::agent::tally_date("20260831"),
             span: None,
         },
     ];

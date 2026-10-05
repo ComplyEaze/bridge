@@ -749,6 +749,12 @@ impl Server {
                 .map_err(|_| "voucher_date_invalid".to_string())?;
             let native = native_post_request(&line, remote_ids)?;
             let xml = native.xml.clone();
+            // The stored window is parsed here, where it enters a request,
+            // as the window read parses its own (#861).
+            let verification_date = |date: &str| {
+                bridge_tally_core::TallyDate::parse(date)
+                    .map_err(|_| "invalid_date_range".to_string())
+            };
             let verification_request = crate::tally::agent_read_request::AgentReadRequest::parse(
                 render_import_verification_read(
                     &line
@@ -756,8 +762,8 @@ impl Server {
                         .as_ref()
                         .ok_or_else(|| "import_post_company_missing".to_string())?
                         .name,
-                    &line.date_from,
-                    &line.date_to,
+                    &verification_date(&line.date_from)?,
+                    &verification_date(&line.date_to)?,
                 ),
             )
             .map_err(|error| error.to_string())?;

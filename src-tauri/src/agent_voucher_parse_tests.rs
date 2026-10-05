@@ -1540,7 +1540,13 @@ fn the_captured_request_is_what_vouchers_renders_today() {
         "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-composite-20260915.request.xml"
     );
     assert_eq!(
-        render_agent_vouchers("BRIDGE CORPUS FOREX", "20260915", "20260915", None).unwrap(),
+        render_agent_vouchers(
+            "BRIDGE CORPUS FOREX",
+            &tally_date("20260915"),
+            &tally_date("20260915"),
+            None
+        )
+        .unwrap(),
         request
     );
 }

@@ -321,6 +321,21 @@ test("a take in a neighbouring statement, or beside the reader, does not bound i
   ]);
 });
 
+test("a take the reader is unwrapped from does not bound it", async () => {
+  const output = await gateOn(
+    `fn read(file: std::fs::File) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    std::io::Read::read_to_end(&mut file.take(64).into_inner(), &mut output)?;
+    Ok(output)
+}
+`,
+    true,
+  );
+  assert.deepEqual(output, [
+    "src-tauri/src/example.rs:3: std::io::Read::read_to_end(&mut file.take(64).into_inner(), &mut output)?;",
+  ]);
+});
+
 test("a call in a comment or a string is not a call", async () => {
   const output = await gateOn(
     `// reader.read_to_end(&mut output) is what this avoids.

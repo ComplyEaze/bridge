@@ -31,16 +31,31 @@ const commandFailure = (label, result) => {
   return `${label} inventory command failed (${cause})${tail ? `:\n${tail}` : ""}`;
 };
 
-const runJson = (command, args, label) => {
-  const result = spawnSync(command, args, {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-    windowsHide: true,
-  });
-  if (result.error || result.status !== 0) {
-    throw new Error(commandFailure(label, result));
+// `cargo tree` downloads index entries, and a runner's network fails now and then (4 and 5 Oct 2026:
+// "curl failed ... Error in the HTTP2 framing layer"). Only such a network failure is retried, twice;
+// any other failure (a real drift, a lockfile problem) fails at once.
+const networkFailure = /download of .+ failed|curl failed|HTTP2 framing|HTTP\/2 stream|timed out|Timeout was reached|Connection (?:was )?reset|resolve host|Failed to connect|Couldn't connect|SSL connect error|Empty reply|Recv failure|Send failure|transfer closed|spurious network error|got 50[234]/i;
+const retryDelayMs = Number(process.env.INVENTORY_RETRY_DELAY_MS ?? 3000);
+const spawnCommand = (command, args, label) => {
+  for (let attempt = 1; ; attempt += 1) {
+    const result = spawnSync(command, args, {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+      windowsHide: true,
+    });
+    if (!result.error && result.status === 0) return result;
+    if (attempt === 3 || result.error || !networkFailure.test(String(result.stderr ?? ""))) {
+      throw new Error(commandFailure(label, result));
+    }
+    const cause = String(result.stderr).split(/\r?\n/).find((line) => networkFailure.test(line))?.trim().slice(0, 200);
+    console.error(`${label} inventory command hit a network failure (attempt ${attempt} of 3${cause ? `: ${cause}` : ""}); retrying`);
+    if (retryDelayMs > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, retryDelayMs * attempt);
   }
+};
+
+const runJson = (command, args, label) => {
+  const result = spawnCommand(command, args, label);
   try {
     return JSON.parse(result.stdout);
   } catch {
@@ -48,18 +63,7 @@ const runJson = (command, args, label) => {
   }
 };
 
-const runText = (command, args, label) => {
-  const result = spawnSync(command, args, {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-    windowsHide: true,
-  });
-  if (result.error || result.status !== 0) {
-    throw new Error(commandFailure(label, result));
-  }
-  return result.stdout;
-};
+const runText = (command, args, label) => spawnCommand(command, args, label).stdout;
 
 const componentPattern = /(@?[A-Za-z0-9_.+-]+(?:\/[A-Za-z0-9_.+-]+)?) (\d+\.\d+\.\d+(?:[+-][^,\s]+)?)/g;
 const reportComponents = (report, endMarker) => {

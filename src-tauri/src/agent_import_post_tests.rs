@@ -399,11 +399,14 @@ fn a_busy_readback_after_a_recorded_send_names_verify_import_never_a_rebuild() {
         error["next_step"],
         "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again."
     );
-    // Held back before any attempt was recorded: it says when to retry but
-    // offers no verify_import step.
+    // Held back before any attempt was recorded: it says when to try again,
+    // and that the person approves again, never a verify_import step (#869).
     let before =
         reconciliation_failure_payload("bridge-test", Some(false), None, "tally_endpoint_busy");
-    assert!(before["result"]["error"].get("next_step").is_none());
+    assert_eq!(
+        before["result"]["error"]["next_step"],
+        "Nothing was posted: Tally's port was busy. Call post_import with this same batch again after retry_after_s seconds, once Tally is free. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch."
+    );
     assert_eq!(
         before["result"]["error"]["retry_after_s"],
         bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
@@ -452,6 +455,22 @@ fn a_row_refusal_without_a_named_blocker_still_says_not_to_rebuild() {
     assert!(step.contains("and say which"), "{step}");
     assert!(step.contains("Never rename a statement row"), "{step}");
     assert!(error.get("blocking_batch_id").is_none());
+}
+
+/// A queued read the transport did not start because the call was withdrawn
+/// (#778) names the withdrawal, `request_cancelled`, as a call withdrawn
+/// before its operation started does, never the operation's read failure.
+#[test]
+fn a_send_withdrawn_before_the_intent_names_the_withdrawal() {
+    let withdrawn = || {
+        anyhow::Error::from(crate::tally::approved_import::PreIntentQueueRefusal {
+            source: anyhow::Error::new(bridge_tally_transport::TallyTransportError::SendWithdrawn),
+        })
+    };
+    assert_eq!(
+        ToolFailure::from_runtime("post_queue_read_failed", withdrawn()).code,
+        "request_cancelled"
+    );
 }
 
 /// A wire refusal replaces a generic failure code with the refusal's own, but
@@ -655,10 +674,10 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
     // lower bounds stay, because a wait can only add to elapsed time.
     async fn reads_of(
         server: &Server,
+        reads: std::sync::Arc<std::sync::Mutex<Vec<Option<Duration>>>>,
         request: crate::tally::agent_read_request::AgentReadRequest,
         call_started: Instant,
     ) -> (anyhow::Result<String>, Vec<Option<Duration>>) {
-        let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let result = MARKS_READS
             .scope(
                 std::sync::Arc::clone(&reads),
@@ -668,15 +687,34 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
         let reads = reads.lock().unwrap().clone();
         (result, reads)
     }
+    let no_reads = || std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
 
-    // Freed after the first budget, inside the second: the retry gets through.
+    // Freed once the retry has begun, not on a timer: the first read is refused
+    // for its whole budget however late it starts, and the retry then reaches a
+    // lock that is already released. A timer (budget plus 300 ms from the release
+    // task's first poll) let a first read that started more than 300 ms after
+    // that find the lock released and never retry (#1261). The wait is bounded,
+    // so a missing retry fails the asserts below rather than hanging.
     let held = hold();
-    let release = tokio::spawn(async move {
-        tokio::time::sleep(budget + Duration::from_millis(300)).await;
-        drop(held);
+    let first_reads = no_reads();
+    let release = tokio::spawn({
+        let reads = std::sync::Arc::clone(&first_reads);
+        async move {
+            for _ in 0..2000 {
+                if reads.lock().unwrap().len() >= 2 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+            // 300 ms into the retry's wait, as before: the retry must keep polling,
+            // not make one try. The wait budget is charged by pause length, so a
+            // stall cannot spend it before this fires.
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            drop(held);
+        }
     });
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
+    let (result, reads) = reads_of(&server, first_reads, request(), Instant::now()).await;
     assert!(started.elapsed() >= budget);
     assert!(!busy(&result), "the retry must reach the wire: {result:?}");
     assert_eq!(reads, [None, Some(budget)]);
@@ -685,7 +723,7 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
     // Held throughout: refused once, after both budgets, never a third read.
     let _held = hold();
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
+    let (result, reads) = reads_of(&server, no_reads(), request(), Instant::now()).await;
     assert!(busy(&result));
     assert!(started.elapsed() >= budget * 2);
     assert_eq!(reads, [None, Some(budget)], "exactly one retry");
@@ -695,7 +733,7 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
         .checked_sub(Duration::from_secs(44))
         .unwrap_or_else(Instant::now);
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), spent).await;
+    let (result, reads) = reads_of(&server, no_reads(), request(), spent).await;
     assert!(busy(&result));
     assert!(started.elapsed() >= budget);
     assert_eq!(reads, [None], "no retry");
@@ -1666,13 +1704,13 @@ fn the_whole_window_pre_post_request_is_admitted_on_the_verification_measurement
     };
     let divided = [
         crate::agent::WindowPart {
-            from: "20260801".into(),
-            to: "20260815".into(),
+            from: crate::agent::tally_date("20260801"),
+            to: crate::agent::tally_date("20260815"),
             span: None,
         },
         crate::agent::WindowPart {
-            from: "20260816".into(),
-            to: "20260831".into(),
+            from: crate::agent::tally_date("20260816"),
+            to: crate::agent::tally_date("20260831"),
             span: None,
         },
     ];

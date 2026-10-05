@@ -791,8 +791,11 @@ pub(super) async fn lab_read_inventory(
     args: &Value,
 ) -> Result<ToolOutcome, ToolFailure> {
     let guid = required_string(args, "company_guid")?;
-    let from = normalized_date(required_string(args, "from")?)?;
-    let to = normalized_date(required_string(args, "to")?)?;
+    let date = |key| -> Result<bridge_tally_core::TallyDate, ToolFailure> {
+        bridge_tally_core::TallyDate::parse(normalized_date(required_string(args, key)?)?)
+            .map_err(|_| "invalid_date".to_string().into())
+    };
+    let (from, to) = (date("from")?, date("to")?);
     if from > to {
         return Err("invalid_date_range".to_string().into());
     }
@@ -833,7 +836,7 @@ pub(super) async fn lab_read_inventory(
         evidence = combine_evidence(evidence.clone(), voucher_evidence);
         let rows = parse_lab_inventory_vouchers(&voucher_xml)
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
-        if !window_honoured(&rows, &from, &to) {
+        if !window_honoured(&rows, from.as_str(), to.as_str()) {
             return Err(ToolFailure::from("window_not_honoured".to_string())
                 .with_prior_evidence(evidence.clone()));
         }

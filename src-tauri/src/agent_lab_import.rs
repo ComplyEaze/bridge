@@ -1883,11 +1883,14 @@ ALLLEDGERENTRIES.BILLALLOCATIONS.BILLTYPE,ALLLEDGERENTRIES.BILLALLOCATIONS.AMOUN
 
 pub(in crate::agent) fn render_voucher_window_request(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
 ) -> Result<String, String> {
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
+    // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
+    // protect it, since Tally decodes `&quot;` before evaluating (#861).
+    let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Lab Voucher Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeLabWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"</SYSTEM><COLLECTION NAME=\"Bridge Lab Voucher Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{}</FETCH><FILTERS>BridgeLabWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str()), ACCOUNTING_VOUCHER_FETCH
@@ -2297,8 +2300,17 @@ pub(in crate::agent) async fn lab_import_vouchers(
         let start = batch_index * MAX_VOUCHER_BATCH;
         let end = (start + MAX_VOUCHER_BATCH).min(vouchers.len());
         let batch = &vouchers[start..end];
-        let from = batch.first().map(|v| v.date.clone()).unwrap_or_default();
-        let to = batch.last().map(|v| v.date.clone()).unwrap_or_default();
+        // The window's dates go into a `$$Date:"…"` literal, so a voucher
+        // date that is not a date is refused before anything is read (#861).
+        let window_date = |voucher: Option<&BookVoucher>| {
+            bridge_tally_core::TallyDate::parse(voucher.map(|v| v.date.clone()).unwrap_or_default())
+                .map_err(|_| {
+                    ToolFailure::from("invalid_date".to_string())
+                        .with_prior_evidence(evidence.clone())
+                })
+        };
+        let from = window_date(batch.first())?;
+        let to = window_date(batch.last())?;
 
         // Resume pre-check (§9.3/§12a's discipline): never blind-retry. Read
         // the window this batch would occupy and check every voucher against

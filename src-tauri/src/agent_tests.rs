@@ -59,7 +59,13 @@ fn ordinary_vouchers_reject_missing_or_empty_core_fields_before_selection() {
 #[test]
 fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
     for request in [
-        render_agent_vouchers("Book", "20260901", "20260902", None).unwrap(),
+        render_agent_vouchers(
+            "Book",
+            &tally_date("20260901"),
+            &tally_date("20260902"),
+            None,
+        )
+        .unwrap(),
         render_agent_changed_vouchers("Book", 1, 2),
     ] {
         let mut reader = quick_xml::Reader::from_str(&request);
@@ -112,7 +118,9 @@ fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
         }
     }
     // A read should fetch what it returns: ledger_movement discards allocations.
-    let movement = render_agent_movement_vouchers("Book", "20260901", "20260902").unwrap();
+    let movement =
+        render_agent_movement_vouchers("Book", &tally_date("20260901"), &tally_date("20260902"))
+            .unwrap();
     assert!(
         !movement.contains("BILLALLOCATIONS"),
         "movement must not pay the allocation payload for data MovementEntry drops"
@@ -152,8 +160,13 @@ fn settings(address: std::net::SocketAddr, data_dir: PathBuf) -> Settings {
 
 #[test]
 fn agent_voucher_profile_uses_literal_filters_and_redaction_never_reveals_party() {
-    let request = render_agent_vouchers("BRIDGE SYNTHETIC BOOK", "20260401", "20260430", Some(99))
-        .expect("safe profile");
+    let request = render_agent_vouchers(
+        "BRIDGE SYNTHETIC BOOK",
+        &tally_date("20260401"),
+        &tally_date("20260430"),
+        Some(99),
+    )
+    .expect("safe profile");
     assert!(request.contains("<FILTERS>BridgeAgentWindow</FILTERS>"));
     assert!(request.contains("$AlterID > 99"));
     assert_eq!(
@@ -214,11 +227,21 @@ fn any_redaction_drops_tally_line_error_text_but_keeps_the_count() {
 
 #[test]
 fn voucher_company_name_is_validated_and_xml_escaped_without_a_tdl_literal() {
-    let request = render_agent_vouchers("Bridge, + खर्चा", "20260901", "20260902", None)
-        .expect("company name is an XML value");
+    let request = render_agent_vouchers(
+        "Bridge, + खर्चा",
+        &tally_date("20260901"),
+        &tally_date("20260902"),
+        None,
+    )
+    .expect("company name is an XML value");
     assert!(request.contains("<SVCURRENTCOMPANY>Bridge, + खर्चा</SVCURRENTCOMPANY>"));
     assert_eq!(
-        render_agent_vouchers("invalid\ncompany", "20260901", "20260902", None),
+        render_agent_vouchers(
+            "invalid\ncompany",
+            &tally_date("20260901"),
+            &tally_date("20260902"),
+            None
+        ),
         Err("company_name_invalid".to_string())
     );
 }
@@ -275,7 +298,7 @@ fn company_name_round_trips_through_xml_parsing_across_app_crate_renderer_famili
         ),
         (
             "agent_read_profiles::render_agent_vouchers",
-            render_agent_vouchers(NAME, "20260901", "20260902", None)
+            render_agent_vouchers(NAME, &tally_date("20260901"), &tally_date("20260902"), None)
                 .expect("company name is a valid XML value"),
         ),
     ];
@@ -304,7 +327,9 @@ fn the_audit_voucher_part_is_the_agent_window_shape_with_its_own_fetch() {
             "20260331",
         ),
     ] {
-        let agent = render_agent_vouchers_in_span(company, from, to, None).unwrap();
+        let agent =
+            render_agent_vouchers_in_span(company, &tally_date(from), &tally_date(to), None)
+                .unwrap();
         let (head, rest) = agent.split_once("<FETCH>").unwrap();
         let (_, tail) = rest.split_once("</FETCH>").unwrap();
         let expected = format!("{head}<FETCH>{AUDIT_VOUCHER_FETCH}</FETCH>{tail}");
@@ -474,6 +499,39 @@ fn a_small_response_budget_keeps_the_refusal_code_and_drops_only_the_guidance() 
         error.get("remediation").is_none(),
         "guidance displaced the refusal budget: {error}"
     );
+}
+
+/// Every date refusal gives the one date next step (#1268), and a real one,
+/// `from` after `to`, carries it to the caller.
+#[tokio::test]
+async fn every_date_refusal_names_the_dates_it_accepts() {
+    let sentence = "Give each date as YYYYMMDD (YYYY-MM-DD also works), a real calendar day \
+                    from 0001-01-01 to 9999-12-31, with from no later than to. A window that \
+                    starts on 0001-01-01 or ends on 9999-12-31 cannot be widened to look for \
+                    vouchers next to it, so read one inside those days.";
+    for code in [
+        "invalid_date",
+        "invalid_date_range",
+        "tally_date_overflow",
+        "tally_date_underflow",
+    ] {
+        assert_eq!(refusal_remediation(code), Some(sentence), "{code}");
+    }
+    let directory = tempfile::tempdir().expect("agent directory");
+    let server = Server::new(settings(
+        "127.0.0.1:9".parse().unwrap(),
+        directory.path().to_path_buf(),
+    ));
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({"company_guid":"00000000-0000-4000-8000-000000000001",
+                "from":"2026-09-02", "to":"2026-09-01"}),
+        )
+        .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "invalid_date_range", "{response}");
+    assert_eq!(error["remediation"], sentence, "{response}");
 }
 
 #[test]
@@ -1052,7 +1110,7 @@ fn egress_tail_waits_for_an_exclusive_append_lock() {
         .expect("complete row");
     let reader_path = path.clone();
     let reader = std::thread::spawn(move || read_egress_tail(&reader_path, 1));
-    std::thread::sleep(std::time::Duration::from_millis(20));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     assert!(
         !reader.is_finished(),
         "tail read must wait for the writer lock"
@@ -1156,8 +1214,13 @@ fn client_side_ledger_filter_accepts_unquoted_tdl_ledger_names() {
     for ledger in ["Input CGST 9%", "=BVL Zeta Formula", "खर्चा"] {
         let resolved = resolve_ledger_name([ledger].into_iter(), ledger)
             .expect("live ledger spelling resolves");
-        let request = render_agent_vouchers("BRIDGE SYNTHETIC BOOK", "20260901", "20260902", None)
-            .expect("date-only voucher request");
+        let request = render_agent_vouchers(
+            "BRIDGE SYNTHETIC BOOK",
+            &tally_date("20260901"),
+            &tally_date("20260902"),
+            None,
+        )
+        .expect("date-only voucher request");
         assert!(!request.contains(ledger), "ledger must not enter TDL");
         let rows = filter_voucher_rows_for_ledger(
             vec![json!({"amounts":[{"ledger": ledger}]})],
@@ -1976,6 +2039,29 @@ fn voucher_window_rejects_out_of_range_rows_and_requires_a_wider_empty_check() {
     assert_eq!(
         widened_window("20260901", "20260902"),
         Ok(("20260831".to_string(), "20260903".to_string()))
+    );
+}
+
+/// #861: the empty-window check reads a day either side of the window. At
+/// either end of the calendar there is none, so it is refused by `TallyDate`'s
+/// own code rather than sent on as a date that is not eight digits.
+#[test]
+fn widening_a_window_at_the_calendar_edge_is_refused_by_its_typed_code() {
+    assert_eq!(
+        widened_window("20260901", "99991231"),
+        Err("tally_date_overflow".to_string())
+    );
+    assert_eq!(
+        widened_window("00010101", "20260902"),
+        Err("tally_date_underflow".to_string())
+    );
+    assert_eq!(
+        widened_window("2026-09-01", "20260902"),
+        Err("invalid_date".to_string())
+    );
+    assert_eq!(
+        widened_window("99991230", "99991230"),
+        Ok(("99991229".to_string(), "99991231".to_string()))
     );
 }
 

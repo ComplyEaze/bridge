@@ -336,7 +336,7 @@ figure or byte enters this repository or its CI.
 
 ## 11. Ledger tags: figure/finding ids keyed by GUID, not by name
 
-A per-ledger figure, finding or evidence id is not built from the ledger's display NAME — a
+A per-ledger figure or finding id is not built from the ledger's display NAME — a
 read-shape/serialisation artifact can re-case a name between two reads of the same unchanged
 master (`ROUND OFF` -> `Round Off`) with no edit having happened, and a name-hash id would churn
 for no reason connected to the books. Both engines derive this id from the ledger's Tally GUID
@@ -368,6 +368,29 @@ instead (the reference engine's ledger-tag module; this crate's `src/ledger_ids.
 This fallback (step 3) applies to LEDGERS only. A blank GROUP GUID still refuses (no consumer
 relying on a successful group tag over a GUID-less group has been found), and this spec does not
 extend the fallback to groups without that same measurement.
+
+**Evidence refs name what they cite.** An evidence ref's id is the identifier of the thing cited, not
+a tag. The crate emits nine kinds: `voucher` and `excluded_voucher` (the voucher's GUID),
+`document_row` (`{document id}#{row}`, a locator the extractor chose, not a name), `row` (a fixed
+locator for a computed row), `rule` (a fixed key), `config` (the configuration entry cited: a fixed
+key such as `presumptive_history`, or, for a deductor alias, the deductor's TAN), `pan` (the entity's
+PAN, as recorded, set in the engagement's party table or derived from a GSTIN; bridge#1145 item 9)
+and `ledger` and `stock_item`, whose id is the NAME as the books write it (compared
+NFC-normalised, §2.2). This section's tag rule does not apply to any of them. The reference
+engine's renderer declares the kinds whose id is a name in `NAME_KINDS` (`ledger`, `stock_item` and
+`payee_name`, a kind this crate does not yet emit) and every other kind in `NOT_NAME_KINDS`, with a
+selftest that every kind a test constructs is in exactly one list.
+
+A consumer that redacts or masks must therefore treat the id of a `ledger`, `payee_name` or
+`stock_item` ref as a name, and the id of a `pan` ref as a tax identifier; a `config` id may be a tax
+identifier (a TAN) too, so treat it as one unless the key is one the consumer knows is fixed. For any
+new kind it must settle, before using it, whether its id is a name or a tax identifier.
+
+This paragraph is about ids only. A ref's label is a compared field (§2.2) and may carry names or
+other text of its own: a `row` ref's label quotes the names its vouchers print, a `document_row`
+label may be the first characters of a statement narration or a 26AS row's TAN and section, and a
+`ledger` or `stock_item` label may repeat the name. A consumer that masks names or tax identifiers
+masks labels by their own rule.
 
 Any future change to this algorithm must be made in both engines in the same change, or parity
 between them breaks silently. §7 does not compare ids directly — a stable id is a downstream

@@ -2162,7 +2162,11 @@ async fn a_parsed_statement_builds_an_import_file_by_proposals_id() {
 
 #[test]
 fn the_verification_read_fetches_the_effective_date_and_not_the_party() {
-    let request = render_import_verification_read("Synthetic Book", "20260901", "20260901");
+    let request = render_import_verification_read(
+        "Synthetic Book",
+        &crate::agent::tally_date("20260901"),
+        &crate::agent::tally_date("20260901"),
+    );
     let fetch = request
         .split_once("<FETCH>")
         .and_then(|(_, rest)| rest.split_once("</FETCH>"))

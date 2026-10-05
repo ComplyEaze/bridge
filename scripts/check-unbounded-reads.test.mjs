@@ -198,4 +198,257 @@ test("a path under a tests/ directory is excluded regardless of content", async 
   }
 });
 
+// #837: every case below reads the gate's whole verdict, never a fragment: the
+// exact list of reported sites, or the exact summary of a passing tree.
+function reported(output) {
+  return output
+    .split("\n")
+    .filter((line) => line.startsWith("  - "))
+    .map((line) => line.slice(4));
+}
+
+function summary(scanned) {
+  return (
+    `Read bound coverage holds: ${scanned} read_to_end/read_to_string call site(s) scanned, ` +
+    `${scanned} bounded, 0 unbounded (0 reviewed exception(s)).\n`
+  );
+}
+
+async function gateOn(source, expectReported) {
+  const root = await makeRepo("src-tauri/src/example.rs", source);
+  try {
+    return expectReported ? reported(runGateExpectingFailure(root)) : runGate(root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+test("the qualified form without a take is reported", async () => {
+  const output = await gateOn(
+    `fn read(path: &std::path::Path) -> Option<Vec<u8>> {
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(&mut file, &mut bytes).ok()?;
+    Some(bytes)
+}
+
+async fn read_async(mut pipe: tokio::process::ChildStdout) -> String {
+    let mut text = String::new();
+    tokio::io::AsyncReadExt::read_to_string(&mut pipe, &mut text).await.ok();
+    text
+}
+`,
+    true,
+  );
+  assert.deepEqual(output, [
+    "src-tauri/src/example.rs:4: std::io::Read::read_to_end(&mut file, &mut bytes).ok()?;",
+    "src-tauri/src/example.rs:10: tokio::io::AsyncReadExt::read_to_string(&mut pipe, &mut text).await.ok();",
+  ]);
+});
+
+test("the qualified form whose reader is a take passes", async () => {
+  const output = await gateOn(
+    `fn read(file: std::fs::File) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(
+        &mut std::io::Read::take(file, 1024 + 1),
+        &mut bytes,
+    )
+    .ok()?;
+    Some(bytes)
+}
+
+async fn read_async(mut pipe: tokio::process::ChildStdout) -> Vec<u8> {
+    let mut answer = Vec::new();
+    tokio::io::AsyncReadExt::read_to_end(
+        &mut tokio::io::AsyncReadExt::take(&mut pipe, 128),
+        &mut answer,
+    )
+    .await
+    .ok();
+    answer
+}
+
+fn read_method(file: std::fs::File) -> Option<String> {
+    let mut text = String::new();
+    std::io::Read::read_to_string(&mut file.take(64), &mut text).ok()?;
+    Some(text)
+}
+`,
+    false,
+  );
+  assert.equal(output, summary(3));
+});
+
+test("a call split across lines is read as one call", async () => {
+  const output = await gateOn(
+    `fn read(mut reader: impl std::io::Read) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    reader
+        .read_to_end(
+            &mut output,
+        )?;
+    std::io::Read::read_to_end(
+        &mut reader,
+        &mut output,
+    )?;
+    Ok(output)
+}
+`,
+    true,
+  );
+  assert.deepEqual(output, [
+    "src-tauri/src/example.rs:4: .read_to_end(",
+    "src-tauri/src/example.rs:7: std::io::Read::read_to_end(",
+  ]);
+});
+
+test("a take in a neighbouring statement, or beside the reader, does not bound it", async () => {
+  const output = await gateOn(
+    `fn read(reader: impl std::io::Read, other: impl std::io::Read) -> std::io::Result<Vec<u8>> {
+    let mut limited = reader.take(1024 + 1);
+    let mut output = Vec::new();
+    limited.read_to_end(&mut output)?;
+    let _ = (other.take(1), std::io::Read::read_to_end(&mut limited, &mut output)?);
+    Ok(output)
+}
+`,
+    true,
+  );
+  assert.deepEqual(output, [
+    "src-tauri/src/example.rs:4: limited.read_to_end(&mut output)?;",
+    "src-tauri/src/example.rs:5: let _ = (other.take(1), std::io::Read::read_to_end(&mut limited, &mut output)?);",
+  ]);
+});
+
+test("a take the reader is unwrapped from does not bound it", async () => {
+  const output = await gateOn(
+    `fn read(file: std::fs::File) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    std::io::Read::read_to_end(&mut file.take(64).into_inner(), &mut output)?;
+    Ok(output)
+}
+`,
+    true,
+  );
+  assert.deepEqual(output, [
+    "src-tauri/src/example.rs:3: std::io::Read::read_to_end(&mut file.take(64).into_inner(), &mut output)?;",
+  ]);
+});
+
+test("a call in a comment or a string is not a call", async () => {
+  const output = await gateOn(
+    `// reader.read_to_end(&mut output) is what this avoids.
+/* std::io::Read::read_to_end(&mut file, &mut bytes) */
+fn describe() -> &'static str {
+    let _quote = '"';
+    "std::io::Read::read_to_end(&mut file, &mut bytes)"
+}
+
+fn read(reader: impl std::io::Read) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    reader.take(8).read_to_end(&mut output)?;
+    let _raw = r#"reader.read_to_end(&mut output)"#;
+    Ok(output)
+}
+`,
+    false,
+  );
+  assert.equal(output, summary(1));
+});
+
+// #837 slice 1b: the allow-list lives in the scanned tree, and an entry that no
+// longer excuses an unbounded read fails the gate.
+async function makeTree(files) {
+  const root = await mkdtemp(join(tmpdir(), ".unbounded-reads-"));
+  for (const [path, text] of Object.entries(files)) {
+    await mkdir(join(root, path.split("/").slice(0, -1).join("/")), { recursive: true });
+    await writeFile(join(root, path), text);
+  }
+  git(root, "init", "-q", ".");
+  git(root, "config", "user.email", "test@example.invalid");
+  git(root, "config", "user.name", "test");
+  git(root, "add", "-A");
+  git(root, "commit", "-qm", "seed");
+  return root;
+}
+
+async function gateOnTree(files, expectFailure) {
+  const root = await makeTree(files);
+  try {
+    return expectFailure ? runGateExpectingFailure(root) : runGate(root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+// The gate's one error line, whole.
+function errorLine(output) {
+  return output.split("\n").find((line) => line.startsWith("Error: "));
+}
+
+const ALLOW = (entries) => ({ "scripts/unbounded-reads-allowed.json": JSON.stringify(entries) });
+const UNCAPPED = `fn read(mut reader: impl std::io::Read) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    reader.read_to_end(&mut output)?;
+    Ok(output)
+}
+`;
+
+test("an allowed file's uncapped read passes, and counts as one reviewed exception", async () => {
+  const output = await gateOnTree(
+    { ...ALLOW({ "src-tauri/src/example.rs": "reads a bundled template, not outside input" }), "src-tauri/src/example.rs": UNCAPPED },
+    false,
+  );
+  assert.equal(
+    output,
+    "Read bound coverage holds: 1 read_to_end/read_to_string call site(s) scanned, " +
+      "0 bounded, 0 unbounded (1 reviewed exception(s)).\n",
+  );
+});
+
+test("an allowed file with no unbounded read left is a stale exception", async () => {
+  const output = await gateOnTree(
+    {
+      ...ALLOW({ "src-tauri/src/example.rs": "was a template read", "src-tauri/src/bounded.rs": "was a template read" }),
+      "src-tauri/src/example.rs": "fn nothing_read_here() {}\n",
+      "src-tauri/src/bounded.rs": `fn read(reader: impl std::io::Read) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    reader.take(8).read_to_end(&mut output)?;
+    Ok(output)
+}
+`,
+    },
+    true,
+  );
+  // A file with no read, and one whose only read is bounded, both excuse nothing.
+  assert.deepEqual(reported(output), ["src-tauri/src/example.rs", "src-tauri/src/bounded.rs"]);
+  assert.equal(
+    errorLine(output),
+    "Error: 2 stale exception(s) in scripts/unbounded-reads-allowed.json: each names a file " +
+      "with no unbounded read left to excuse, so a new one there would pass unreported. " +
+      "Remove the entry:",
+  );
+});
+
+test("an allowed path with no file is a stale exception", async () => {
+  const output = await gateOnTree(
+    { ...ALLOW({ "src-tauri/src/gone.rs": "was a template read" }), "src-tauri/src/example.rs": "fn f() {}\n" },
+    true,
+  );
+  assert.deepEqual(reported(output), ["src-tauri/src/gone.rs"]);
+});
+
+test("an exception with no reason is refused", async () => {
+  const output = await gateOnTree(
+    { ...ALLOW({ "src-tauri/src/example.rs": " " }), "src-tauri/src/example.rs": UNCAPPED },
+    true,
+  );
+  assert.equal(
+    errorLine(output),
+    "Error: scripts/unbounded-reads-allowed.json: src-tauri/src/example.rs has no reason; " +
+      "every exception says why",
+  );
+});
+
 console.log("\nrunning check-unbounded-reads contract tests via node:test above");

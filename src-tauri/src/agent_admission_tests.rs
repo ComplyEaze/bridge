@@ -898,6 +898,97 @@ fn the_vouchers_description_does_not_say_a_capture_showed_post_dated_omitted() {
     );
 }
 
+/// The extension's "Allow voucher posting" setting is the risk disclosure the Terms (9.2) point to:
+/// "you accept the known limits described in the extension settings", so each limit, the approval
+/// gate and the sentence that ties the setting to the Terms are pinned by a short phrase on its
+/// own (#1010), never the whole text. The setting can be shortened as long as every phrase stays
+/// or its pin changes in the same commit, where a reviewer sees it. A phrase that only means
+/// something with its neighbour ("it", "such change") is pinned together with that neighbour. A
+/// renamed key panics rather than passing silently.
+#[test]
+fn the_posting_setting_keeps_each_known_limit() {
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    let writes = manifest["user_config"]["enable_writes"]["description"]
+        .as_str()
+        .expect("the enable_writes setting has a description");
+    const LIMITS: &[(&str, &str)] = &[
+        ("Off by default", "the setting says posting is off until the person turns it on"),
+        (
+            "Leave it off unless you accept",
+            "the sentence that ties the setting to the Terms: the person accepts the limits by turning it on",
+        ),
+        (
+            "each only after you approve it in a native dialog",
+            "every post waits for the person's approval",
+        ),
+        (
+            "Tally picks the company by name",
+            "limit 1: Tally aims a post at a company by name",
+        ),
+        (
+            "could still receive the voucher",
+            "limit 1: a company renamed or opened under that name right after the check can still receive the post",
+        ),
+        (
+            "cannot always say where the voucher went",
+            "limit 1: a misdirected post may not be locatable",
+        ),
+        ("cannot prevent it", "limit 1: the misdirection cannot be prevented"),
+        (
+            "renamed and replaced in that same moment",
+            "limit 2: the premise, a ledger renamed and replaced at the moment of the post",
+        ),
+        (
+            "can receive the post instead",
+            "limit 2: a ledger renamed and replaced at that moment can receive the post",
+        ),
+        (
+            "not every such change is seen",
+            "limit 2: not every ledger change is noticed",
+        ),
+        ("There is no undo", "limit 3: no undo"),
+        (
+            "corrected by hand in Tally",
+            "limit 3: a wrong post is corrected by hand in Tally",
+        ),
+        (
+            "covers only ComplyEaze Bridge",
+            "limit 4: the approval window covers only this connector",
+        ),
+        (
+            "another Tally connector",
+            "limit 4: another Tally connector in the same Claude Desktop",
+        ),
+        (
+            "can do so without it",
+            "limit 4: that connector can change entries without the approval",
+        ),
+        (
+            "that writes nothing to Tally",
+            "recording a review in the separate dialog writes nothing to Tally",
+        ),
+        (
+            "work either way",
+            "reading, bank-statement parsing and voucher file preparation do not depend on the setting",
+        ),
+    ];
+    for (phrase, kept) in LIMITS {
+        assert!(
+            writes.contains(phrase),
+            "the posting setting lost {phrase:?}, which says: {kept}"
+        );
+    }
+    // What redaction cannot hide is part of the same disclosure.
+    let redaction = manifest["user_config"]["redaction"]["description"]
+        .as_str()
+        .expect("the redaction setting has a description");
+    assert!(
+        redaction.contains("Neither hides amounts"),
+        "the redaction setting lost its statement that amounts are not hidden"
+    );
+}
+
 /// The sentences an assistant relies on for safety, each pinned on its own so a
 /// shorter description cannot drop one unnoticed (#1010). Only the phrase is
 /// asserted, never a whole description, so the text around it can still be

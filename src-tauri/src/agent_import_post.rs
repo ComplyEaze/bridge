@@ -2505,6 +2505,14 @@ pub(super) const BATCH_REVIEW_NARRATION_CHARS: usize = 40;
 /// The line above a small batch's voucher lines.
 pub(super) const VOUCHER_LINES_HEADING: &str =
     "Each voucher: type, date, amount, ledger, narration (references not shown):";
+/// The second heading line: what the quoted text ending each line is. The
+/// dialog wraps long lines, so a narration's tail can begin a row of its own
+/// (#1063 follow-up).
+pub(super) const VOUCHER_LINES_NARRATION_HEADING: &str =
+    "Each line ends with its narration, quoted exactly as it will be posted.";
+/// What a voucher's line shows in place of a narration that reads like a line
+/// of this dialog. It echoes none of the narration.
+pub(super) const NARRATION_WITHHELD: &str = "(narration withheld: it reads like a dialog line)";
 // Each sentence that stands in for the voucher lines takes the place of the
 // line a batch showed before #1063, and is no longer than it, so the
 // totals-only text never outgrows the caps a batch passed before.
@@ -2519,11 +2527,80 @@ pub(super) const VOUCHER_LINES_UNSAFE: &str =
 pub(super) const VOUCHER_LINES_DO_NOT_FIT: &str =
     "Per-voucher lines are not shown: they do not fit this dialog.";
 
+/// Whether `text` holds a shape a line of the batch dialog begins with, so
+/// that a wrapped tail of it could pass for one (#1063 follow-up). Matched
+/// case-insensitively anywhere: `\bdr\s+[0-9][0-9.,]*\s+cr\s+[0-9]` (a
+/// ledger line's two halves), `total\s+(debit|credit)\s*:` (any whitespace
+/// between the words, a no-break space included), `batch\s*:` and
+/// `create\s+\d`. Written out rather than with a regex crate: `\s` is any
+/// whitespace, `\d` any Unicode decimal digit, and `\b` sees a letter, digit
+/// or `_` as a word character. A bank narration with one of `DR`/`CR` and a
+/// reference number ("NEFT CR 000123456789") is not such a shape.
+pub(super) fn reads_like_a_dialog_line(text: &str) -> bool {
+    use icu_properties::{props::GeneralCategory, CodePointMapData};
+    let category = CodePointMapData::<GeneralCategory>::new();
+    let chars: Vec<char> = text.chars().map(|c| c.to_ascii_lowercase()).collect();
+    let word = |c: char| c.is_alphanumeric() || c == '_';
+    let literal = |at: usize, expected: &str| -> Option<usize> {
+        let mut at = at;
+        for wanted in expected.chars() {
+            (chars.get(at) == Some(&wanted)).then_some(())?;
+            at += 1;
+        }
+        Some(at)
+    };
+    let spaces = |at: usize, least: usize| -> Option<usize> {
+        let end = at
+            + chars
+                .get(at..)
+                .unwrap_or_default()
+                .iter()
+                .take_while(|c| c.is_whitespace())
+                .count();
+        (end - at >= least).then_some(end)
+    };
+    let ascii_digit = |at: usize| chars.get(at).is_some_and(char::is_ascii_digit);
+    let ledger_line = |at: usize| -> Option<()> {
+        (at == 0 || !word(chars[at - 1])).then_some(())?;
+        let at = spaces(literal(at, "dr")?, 1)?;
+        ascii_digit(at).then_some(())?;
+        let at = at
+            + chars[at..]
+                .iter()
+                .take_while(|c| c.is_ascii_digit() || matches!(c, '.' | ','))
+                .count();
+        let at = spaces(literal(spaces(at, 1)?, "cr")?, 1)?;
+        ascii_digit(at).then_some(())
+    };
+    let total = |at: usize| -> Option<()> {
+        let at = spaces(literal(at, "total")?, 1)?;
+        let at = literal(at, "debit").or_else(|| literal(at, "credit"))?;
+        (chars.get(spaces(at, 0)?) == Some(&':')).then_some(())
+    };
+    let batch = |at: usize| -> Option<()> {
+        (chars.get(spaces(literal(at, "batch")?, 0)?) == Some(&':')).then_some(())
+    };
+    let create = |at: usize| -> Option<()> {
+        chars
+            .get(spaces(literal(at, "create")?, 1)?)
+            .is_some_and(|c| category.get(*c) == GeneralCategory::DecimalNumber)
+            .then_some(())
+    };
+    (0..chars.len()).any(|at| {
+        ledger_line(at)
+            .or_else(|| total(at))
+            .or_else(|| batch(at))
+            .or_else(|| create(at))
+            .is_some()
+    })
+}
+
 /// One line per voucher of a small batch (#1063): its type and date, its
 /// value (the sum of its debits), the ledger a statement row names (a
 /// Receipt's first credit, any other type's first debit, in the batch file's
 /// order, with "+N" for the rest of that side) and its narration as posted,
-/// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` with the cut marked.
+/// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` with the cut marked, or
+/// `NARRATION_WITHHELD` when it reads like a line of this dialog.
 /// `None` when a narration or reference holds a character the dialog cannot
 /// show as it is: nothing is stripped or altered.
 fn voucher_review_lines(vouchers: &[ImportVoucher]) -> Result<Option<Vec<String>>, String> {
@@ -2570,6 +2647,7 @@ fn voucher_review_lines(vouchers: &[ImportVoucher]) -> Result<Option<Vec<String>
         };
         let narration = match super::posted_narration(voucher) {
             None => "(none)".to_string(),
+            Some(text) if reads_like_a_dialog_line(text) => NARRATION_WITHHELD.to_string(),
             Some(text) => {
                 let length = text.chars().count();
                 if length > BATCH_REVIEW_NARRATION_CHARS {
@@ -2743,7 +2821,9 @@ fn batch_review_text(
         VOUCHER_LINES_OVER_LIMIT
     } else if let Some(vouchers) = voucher_review_lines(&line.vouchers)? {
         let listed = whole(
-            std::iter::once(VOUCHER_LINES_HEADING.to_string())
+            [VOUCHER_LINES_HEADING, VOUCHER_LINES_NARRATION_HEADING]
+                .map(str::to_string)
+                .into_iter()
                 .chain(vouchers)
                 .collect(),
         );

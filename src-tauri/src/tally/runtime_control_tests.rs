@@ -163,7 +163,11 @@ async fn transient_reads_retry_exactly_but_validation_never_retries() {
 
 #[tokio::test]
 async fn cancellation_is_terminal_and_preserves_follow_up_spacing() {
-    let spacing = Duration::from_millis(60);
+    // A spacing a stall cannot eat: the follow-up is checked against a clock started
+    // before the cancel, so no slack is needed (the quarantine starts after it), and a
+    // follow-up that skips the wait would need a stall as long as the spacing to pass
+    // (#1255).
+    let spacing = Duration::from_millis(400);
     let runtime = test_runtime(spacing, 3);
     let cancellation = CancellationToken::new();
     let cancel = cancellation.clone();
@@ -182,12 +186,12 @@ async fn cancellation_is_terminal_and_preserves_follow_up_spacing() {
         })
     };
     tokio::time::sleep(Duration::from_millis(10)).await;
+    let started = Instant::now();
     cancel.cancel();
     assert!(matches!(
         running.await.unwrap(),
         Err(ReadExecutionError::Cancelled)
     ));
-    let started = Instant::now();
     runtime
         .execute_read(
             endpoint("cancel-endpoint"),
@@ -203,7 +207,7 @@ async fn cancellation_is_terminal_and_preserves_follow_up_spacing() {
         )
         .await
         .unwrap();
-    assert!(started.elapsed() >= spacing.saturating_sub(Duration::from_millis(10)));
+    assert!(started.elapsed() >= spacing);
 }
 
 #[tokio::test]

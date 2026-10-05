@@ -3009,6 +3009,8 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::None,
+            // Left retrying: no agent tool calls this read, only tests, so the
+            // single-attempt rule for agent catalogue reads does not reach it (#937).
             ReadRetryPolicy::transient_default(),
         )
         .await
@@ -3033,7 +3035,10 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::SingleInrMaster,
-            ReadRetryPolicy::transient_default(),
+            // Sent once, as the movement catalogue is: a catalogue that outlived
+            // its deadline is abandoned, and sending it again queues more work
+            // behind a gateway still building the response (#485, #937).
+            ReadRetryPolicy::SINGLE_ATTEMPT,
         )
         .await
         .map(|read| read.listing)
@@ -3056,7 +3061,8 @@ impl TallyRuntime {
                 None,
                 true,
                 LedgerCurrencyGate::SingleInrMaster,
-                ReadRetryPolicy::transient_default(),
+                // Sent once, as above (#485, #937).
+                ReadRetryPolicy::SINGLE_ATTEMPT,
             )
             .await?;
         let Some(groups) = read.groups else {

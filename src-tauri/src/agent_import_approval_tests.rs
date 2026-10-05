@@ -8,13 +8,12 @@ use crate::agent::agent_import::approval::{
     ApprovalBinding, Begin, Joined, PostApprovals, CALL_CEILING, MAX_KEPT_REFUSALS, MEASURED_POST,
     MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
 };
-use crate::agent::agent_protocol::{run_post, Framer};
-use crate::agent::ToolResponse;
+use crate::agent::agent_protocol::{run_post, serve_stdio, Framer, ToolCallEnd};
 use crate::tally::agent_read_request::AgentReadRequest;
 use crate::tally::approved_import::{
     Answered, ApprovedImport, PendingPostApproval, UnderLockRefusal,
 };
-use tokio::io::{AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 /// Bounds a wait on an event, only so that a hang fails instead of stalling
 /// the run: nothing here is paced by it.
@@ -997,7 +996,7 @@ async fn post_over_stdio(
     server: &Server,
     args: &Value,
     cancel: Option<(&SequenceSimulator, usize)>,
-) -> Option<ToolResponse> {
+) -> ToolCallEnd {
     let (client, source) = tokio::io::duplex(1 << 16);
     let (_client_read, mut client_write) = tokio::io::split(client);
     let (source_read, mut source_write) = tokio::io::split(source);
@@ -1062,7 +1061,10 @@ async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() 
         .await;
         let observed = sent(simulator);
         if let Some(held_at) = held_at {
-            assert!(outcome.is_none(), "{held_at}: answered as cancelled");
+            assert!(
+                matches!(outcome, ToolCallEnd::Withdrawn { .. }),
+                "{held_at}: answered as cancelled"
+            );
             assert_eq!(intents(directory.path()), 0, "{held_at}");
             assert_eq!(
                 observed.len(),
@@ -1081,10 +1083,130 @@ async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() 
                 "{held_at}"
             );
         } else {
-            assert!(outcome.is_some());
+            assert!(matches!(outcome, ToolCallEnd::Answered(_)));
             assert_eq!(intents(directory.path()), 1, "the control posts");
             assert!(observed.len() > post_at);
         }
+    }
+}
+
+/// A post withdrawn inside the lease is answered as cancelled, and that
+/// answer's receipt carries the trail of the sends that did run (#944): one
+/// record per request the simulator served, in order, each answered, then the
+/// one read the withdrawal refused.
+/// Withdrawn with its input then closed (the post is finished on input's end)
+/// and with its input left open (the post is finished on its own).
+#[tokio::test]
+async fn a_withdrawn_post_s_receipt_carries_the_trail_of_the_sends_that_ran() {
+    for close_input in [true, false] {
+        let mut plans = before_approval();
+        let held = plans.len();
+        let mut lease = after_approval(xml(created_one()));
+        lease[0] = lease[0]
+            .clone()
+            .with_delivery(Delivery::SlowHeaders(Duration::from_millis(300)));
+        plans.extend(lease);
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (_, args) = saved_batch(&server);
+        let (client, source) = tokio::io::duplex(1 << 16);
+        let (client_read, mut client_write) = tokio::io::split(client);
+        let (source_read, mut source_write) = tokio::io::split(source);
+        let serve = SCRIPTED_APPROVAL.scope(
+            ScriptedApproval::approving(),
+            serve_stdio(server, BufReader::new(source_read), &mut source_write),
+        );
+        let client = async {
+            let call = json!({"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+                "params": {"name": "post_import", "arguments": args}});
+            let initialize = json!({"jsonrpc": "2.0", "id": 0, "method": "initialize",
+                "params": {"protocolVersion": "2025-06-18"}});
+            client_write
+                .write_all(format!("{initialize}\n{call}\n").as_bytes())
+                .await
+                .unwrap();
+            while simulator.received() <= held {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+            client_write.write_all(CANCEL_7).await.unwrap();
+            let mut lines = BufReader::new(client_read).lines();
+            if !close_input {
+                while let Some(line) = lines.next_line().await.unwrap() {
+                    if serde_json::from_str::<Value>(&line).unwrap()["id"] == 7 {
+                        break;
+                    }
+                }
+            }
+            client_write.shutdown().await.unwrap();
+        };
+        let (served, ()) = tokio::time::timeout(HANG_GUARD, async { tokio::join!(serve, client) })
+            .await
+            .unwrap();
+        served.unwrap();
+        let observed = sent(simulator);
+        assert_eq!(
+            observed.len(),
+            held + 1,
+            "{close_input}: the held read is the last"
+        );
+        let receipts =
+            String::from_utf8(std::fs::read(directory.path().join("agent-egress.jsonl")).unwrap())
+                .unwrap()
+                .lines()
+                .map(|line| serde_json::from_str::<Value>(line).unwrap())
+                .filter(|record| record["tool"] == "post_import")
+                .collect::<Vec<_>>();
+        assert_eq!(receipts.len(), 1, "{close_input}");
+        let receipt = &receipts[0];
+        assert_eq!(
+            receipt["error"]["code"], "request_cancelled",
+            "{close_input}"
+        );
+        // Each send, by the fields that name it: the requests the simulator
+        // served, at their places and answered, then the next read of the
+        // lease, refused by the withdrawal before it was sent (#778). Times and
+        // response sizes vary, and the refused read's size is not observable.
+        let mut expected = observed
+            .iter()
+            .enumerate()
+            .map(|(index, request)| {
+                let mut send = json!({"seq": index + 1, "outcome": "answered"});
+                if request.method == "GET" {
+                    send["kind"] = json!("status");
+                } else {
+                    send["kind"] = json!("post");
+                    send["request_bytes"] = json!(request.request_body_bytes);
+                }
+                send
+            })
+            .collect::<Vec<_>>();
+        expected.push(
+            json!({"seq": observed.len() + 1, "outcome": "request_cancelled",
+            "kind": "post"}),
+        );
+        let kept = expected.len().min(crate::request_trail::TRAIL_LAST);
+        let trail = &receipt["request_trail"];
+        assert_eq!(trail["sent"], expected.len(), "{close_input}");
+        assert_eq!(trail["omitted"], expected.len() - kept, "{close_input}");
+        assert_eq!(trail["failed"], 1, "{close_input}");
+        assert_eq!(trail["last_failed_seq"], expected.len(), "{close_input}");
+        let recorded = trail["last"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|send| {
+                let mut named = json!({"seq": send["seq"], "outcome": send["outcome"],
+                    "kind": send["kind"]});
+                if send["outcome"] == "answered" {
+                    if let Some(bytes) = send.get("request_bytes") {
+                        named["request_bytes"] = bytes.clone();
+                    }
+                }
+                named
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(recorded, expected[expected.len() - kept..], "{close_input}");
     }
 }
 

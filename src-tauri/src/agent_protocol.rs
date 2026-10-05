@@ -180,17 +180,18 @@ where
                         )
                         .await;
                         input_failed = outcome.input_failed;
-                        Some(outcome.response)
+                        ToolCallEnd::Answered(Box::new(outcome.response))
                     };
                     match response {
-                        Some(tool_response) => {
+                        ToolCallEnd::Answered(tool_response) => {
                             recovery_batch_id = tool_response.recovery_batch_id;
                             egress = Some(tool_response.egress);
                             Ok(tool_response.value)
                         }
-                        None => {
-                            let cancelled = server.finish_tool_response(name, &arguments, Utc::now(),
+                        ToolCallEnd::Withdrawn { request_trail } => {
+                            let mut cancelled = server.finish_tool_response(name, &arguments, Utc::now(),
                                 server.cancelled_import_for_response(&arguments));
+                            cancelled.egress.request_trail = request_trail;
                             recovery_batch_id = cancelled.recovery_batch_id;
                             egress = Some(cancelled.egress);
                             Ok(cancelled.value)
@@ -541,6 +542,17 @@ fn withdraw_post(server: &Server, request: &PostRequest<'_>) {
     }
 }
 
+/// How a tool call in flight ended.
+pub(in crate::agent) enum ToolCallEnd {
+    /// The call's own response, sent as it is. Boxed: it is ten times the
+    /// size of the other variant.
+    Answered(Box<ToolResponse>),
+    /// A post withdrawn before its intent (#725). The call is answered as
+    /// cancelled, and that answer's receipt carries the trail of the sends
+    /// that did run (#944).
+    Withdrawn { request_trail: Option<Value> },
+}
+
 /// Run one `post_import` call to its end while servicing input: the one path
 /// every agent post takes. It runs under its own withdrawal token (#725): a
 /// cancellation before its intent stops it before its next Tally operation,
@@ -553,7 +565,7 @@ pub(in crate::agent) async fn run_post<R, W>(
     framer: &mut Framer,
     pending: &mut std::collections::VecDeque<Frame>,
     stdout: &mut W,
-) -> Result<Option<ToolResponse>, String>
+) -> Result<ToolCallEnd, String>
 where
     R: AsyncBufRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -597,7 +609,7 @@ async fn await_post<R, W, F>(
     framer: &mut Framer,
     pending: &mut std::collections::VecDeque<Frame>,
     stdout: &mut W,
-) -> Result<Option<ToolResponse>, String>
+) -> Result<ToolCallEnd, String>
 where
     R: AsyncBufRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -618,8 +630,10 @@ where
                     // operation in flight is finished and the call answers as
                     // cancelled.
                     Ok(None) if phase == PostPhase::Withdrawing => {
-                        let _finished = future.as_mut().await;
-                        return Ok(None);
+                        let finished = future.as_mut().await;
+                        return Ok(ToolCallEnd::Withdrawn {
+                            request_trail: finished.egress.request_trail,
+                        });
                     }
                     Ok(None) => return finish_interrupted_post(
                         future.as_mut(),
@@ -667,9 +681,14 @@ where
                     PostDispatchState::AdmissionBusy => {}
                 }
             }
-            // A withdrawn post's own answer is replaced by the cancellation's.
+            // A withdrawn post's own answer is replaced by the cancellation's,
+            // which keeps only its trail.
             response = &mut future, if phase != PostPhase::Classifying => {
-                return Ok((phase != PostPhase::Withdrawing).then_some(response))
+                return Ok(if phase == PostPhase::Withdrawing {
+                    ToolCallEnd::Withdrawn { request_trail: response.egress.request_trail }
+                } else {
+                    ToolCallEnd::Answered(Box::new(response))
+                })
             }
         }
     }
@@ -884,7 +903,7 @@ async fn finish_interrupted_post<F>(
     server: &Server,
     interruption: Option<String>,
     known_dispatched: bool,
-) -> Result<Option<ToolResponse>, String>
+) -> Result<ToolCallEnd, String>
 where
     F: std::future::Future<Output = ToolResponse>,
 {
@@ -892,15 +911,17 @@ where
         // The caller may be gone, but the original execution owns the only
         // response wire. Let the ordinary response path publish it if stdout
         // remains usable; no replacement post is created.
-        return Ok(Some(future.as_mut().await));
+        return Ok(ToolCallEnd::Answered(Box::new(future.as_mut().await)));
     }
     // No intent: withdraw it, and finish the operation in flight rather than
     // abandon it. It starts no further operation and can write no intent (#725).
     withdraw_post(server, &request);
-    let _withdrawn = future.as_mut().await;
+    let withdrawn = future.as_mut().await;
     match interruption {
         Some(error) => Err(error),
-        None => Ok(None),
+        None => Ok(ToolCallEnd::Withdrawn {
+            request_trail: withdrawn.egress.request_trail,
+        }),
     }
 }
 

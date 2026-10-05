@@ -401,7 +401,10 @@ async fn a_late_response_keeps_only_its_whitelisted_error_in_the_receipt() {
 mod request_trail_receipts {
     //! #918: the receipt of a call that sent requests names each of them.
     use super::*;
-    use tally_protocol_simulator::{Fixture, ProductStatus, ScenarioPlan, SequenceSimulator};
+    use std::time::Duration;
+    use tally_protocol_simulator::{
+        Delivery, Fixture, ProductStatus, ScenarioPlan, SequenceSimulator,
+    };
 
     const COMPANY_FIXTURE: &[u8] = include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
@@ -444,9 +447,18 @@ mod request_trail_receipts {
 
     /// The receipt the call leaves, and the response text the client was given.
     async fn receipt_of(server: &Server, tool: &str, path: &Path) -> (Value, String) {
+        receipt_for(
+            server,
+            server.call_tool_response(tool, json!({})).await,
+            path,
+        )
+        .await
+    }
+
+    /// The receipt `response` leaves, and the response text the client was given.
+    async fn receipt_for(server: &Server, response: ToolResponse, path: &Path) -> (Value, String) {
         let journal = path.join("agent-egress.jsonl");
         let mut writer = Writer::new(journal.clone());
-        let response = server.call_tool_response(tool, json!({})).await;
         let text = response.value.to_string();
         finish_response(
             server,
@@ -504,6 +516,84 @@ mod request_trail_receipts {
         let line = receipt.to_string();
         assert!(!line.contains("Trading"), "{line}");
         assert!(!line.contains("Bridge"), "{line}");
+    }
+
+    /// A send's `held_ms` is the time it held the endpoint (#944): at least the
+    /// delay the simulator held its response for, and at most the whole call's
+    /// time, which contains it (a bound no loaded runner can break).
+    #[tokio::test]
+    async fn a_held_send_reports_at_least_its_hold_and_at_most_the_call() {
+        const HOLD: Duration = Duration::from_millis(300);
+        let directory = tempfile::tempdir().unwrap();
+        let simulator = SequenceSimulator::spawn(vec![
+            status_plan().with_delivery(Delivery::SlowHeaders(HOLD)),
+            company_plan(),
+        ])
+        .unwrap();
+        let server = server_at(directory.path(), &simulator);
+        let started = std::time::Instant::now();
+        let response = server.call_tool_response("tally_status", json!({})).await;
+        let call_ms = started.elapsed().as_millis();
+        let (receipt, _) = receipt_for(&server, response, directory.path()).await;
+        simulator.finish().unwrap();
+        let held = &receipt["request_trail"]["last"][0];
+        assert_eq!(held["kind"], "status", "{receipt}");
+        let held_ms = u128::from(held["held_ms"].as_u64().unwrap());
+        assert!(held_ms >= HOLD.as_millis(), "{held_ms} < {HOLD:?}");
+        assert!(held_ms <= call_ms, "{held_ms} > the call's {call_ms} ms");
+    }
+
+    /// A send the read queue drops in flight reaches the call's receipt as
+    /// `send_abandoned` (#944). The protocol drives a tool call to its end, so
+    /// an abandoned send comes from a drop inside the call: here the queue's
+    /// cancellation of the read, through the runtime's `cancel_request` (the
+    /// route a desktop cancel takes), while the simulator holds the response.
+    #[tokio::test]
+    async fn a_send_the_queue_drops_in_flight_reaches_the_receipt_as_abandoned() {
+        let directory = tempfile::tempdir().unwrap();
+        let simulator = SequenceSimulator::spawn(vec![
+            status_plan().with_delivery(Delivery::SlowHeaders(Duration::from_secs(10))),
+            company_plan(),
+        ])
+        .unwrap();
+        let server = server_at(directory.path(), &simulator);
+        let call = server.call_tool_response("tally_status", json!({}));
+        let cancel = async {
+            while simulator.received() == 0 {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+            let active = server
+                .runtime
+                .snapshots()
+                .unwrap()
+                .into_iter()
+                .flat_map(|session| session.active_request_ids)
+                .collect::<Vec<_>>();
+            assert_eq!(active.len(), 1, "{active:?}");
+            assert!(server.runtime.cancel_request(&active[0]).unwrap());
+        };
+        let (response, ()) =
+            tokio::time::timeout(Duration::from_secs(5), async { tokio::join!(call, cancel) })
+                .await
+                .expect("the cancelled read ends without waiting for the held response");
+        let (receipt, _) = receipt_for(&server, response, directory.path()).await;
+        simulator.cancel();
+        let observed = simulator.finish().unwrap();
+        // The one request the simulator received is the one the trail names.
+        assert_eq!(observed.len(), 1);
+        assert_eq!(observed[0].method, "GET");
+        let trail = &receipt["request_trail"];
+        let mut last = trail["last"].as_array().unwrap().clone();
+        assert!(last[0]["held_ms"].is_u64());
+        last[0].as_object_mut().unwrap().remove("held_ms");
+        assert_eq!(
+            *trail,
+            json!({"sent": 1, "omitted": 0, "failed": 1, "last_failed_seq": 1, "last": trail["last"]})
+        );
+        assert_eq!(
+            last,
+            vec![json!({"seq": 1, "kind": "status", "outcome": "send_abandoned"})]
+        );
     }
 
     #[tokio::test]

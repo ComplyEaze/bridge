@@ -2130,6 +2130,122 @@ async fn a_redeem_only_pass_of_the_desktop_post_is_refused_and_asks_nobody() {
     assert_eq!(intents(directory.path()), 0);
 }
 
+/// A whole post call whose Join finds the person's click and hands on a
+/// redeem-only pass (#725 slice 2.0), with another holder taking the
+/// endpoint's wire lock between the passes and a 2 s wire-wait policy (#893).
+/// `elapsed`, when given, is how far into the call the redeem pass takes
+/// itself to start. Returns the answer, the budget the pass ran on, how long
+/// the call took from the click, the batch line, the server and its data
+/// directory, which holds the approval's lapse note.
+async fn two_pass_call_with_the_wire_taken_between(
+    elapsed: Option<std::time::Duration>,
+) -> (
+    Value,
+    std::time::Duration,
+    std::time::Duration,
+    ImportLedgerLine,
+    Server,
+    tempfile::TempDir,
+) {
+    use crate::endpoint_wire::FileWireGate;
+    use bridge_tally_transport::{TallyWireGate, WireRetryPolicy};
+    use std::time::{Duration, Instant};
+    let (plans, _) = pending_then_posted_plans();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    let wire = crate::tally::TallyRuntime::default()
+        .wire_gate_config()
+        .clone()
+        .with_retry(
+            WireRetryPolicy::new(Duration::from_millis(50), Duration::from_secs(2)).unwrap(),
+        );
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(wire.clone());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
+    scripted.answer(true);
+    until_answered(&server, &line.batch_id).await;
+    let taken = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let hook: Between = {
+        let taken = std::sync::Arc::clone(&taken);
+        let gate = FileWireGate::new(wire.root().clone(), server.settings.endpoint.clone());
+        std::sync::Arc::new(move || {
+            *taken.lock().unwrap() = Some(gate.try_acquire().unwrap());
+        })
+    };
+    let budgets = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let call = REDEEM_WIRE_BUDGETS.scope(
+        std::sync::Arc::clone(&budgets),
+        BETWEEN_PASSES.scope(
+            hook,
+            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+        ),
+    );
+    let started = Instant::now();
+    let answer = match elapsed {
+        Some(elapsed) => REDEEM_PASS_ELAPSED.scope(elapsed, call).await,
+        None => call.await,
+    };
+    let took = started.elapsed();
+    drop(taken.lock().unwrap().take());
+    let _ = sent(simulator);
+    let budget = *budgets
+        .lock()
+        .unwrap()
+        .first()
+        .expect("the call reached its redeem-only pass");
+    (answer, budget, took, line, server, directory)
+}
+
+/// What a busy refusal of a redeem-only pass leaves: nothing recorded or sent,
+/// and the person's approval lapsed with a note that is not an approval, so
+/// the next call asks again (#893; the busy-lapse question is #869).
+fn assert_refused_busy_and_lapsed(answer: &Value, line: &ImportLedgerLine, server: &Server) {
+    let result = &answer["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "tally_endpoint_busy", "{answer}");
+    assert_eq!(result["attempt_recorded"], false, "{answer}");
+    assert!(!server.post_approvals.holds(&line.batch_id), "{answer}");
+    let note = server
+        .post_approvals
+        .lapse_note(&line.batch_id)
+        .expect("the approval lapsed with a note");
+    assert_eq!(note["reason"], "post_refused_before_intent", "{note}");
+    assert_eq!(note["redeemable"], false, "{note}");
+}
+
+/// A redeem-only pass that starts with no time left under the call's ceiling
+/// waits for nothing (#893): its first admission read meets the held lock and
+/// is refused at once as `tally_endpoint_busy`, before the attempt is recorded,
+/// rather than waiting on what the call's shared budget still holds.
+#[tokio::test]
+async fn a_redeem_pass_with_no_time_left_is_refused_busy_at_once() {
+    let (answer, budget, took, line, server, directory) =
+        two_pass_call_with_the_wire_taken_between(Some(std::time::Duration::from_secs(40))).await;
+    assert_eq!(budget, std::time::Duration::ZERO, "{answer}");
+    assert!(
+        took < std::time::Duration::from_secs(1),
+        "the 2 s policy budget was not waited: {took:?}"
+    );
+    assert_refused_busy_and_lapsed(&answer, &line, &server);
+    assert_eq!(intents(directory.path()), 0, "{answer}");
+}
+
+/// The control: a redeem-only pass with time left waits on what the call's
+/// shared budget has left, here the whole 2 s policy, before the same refusal.
+#[tokio::test]
+async fn a_redeem_pass_with_time_left_waits_the_shared_budget() {
+    let (answer, budget, took, line, server, directory) =
+        two_pass_call_with_the_wire_taken_between(None).await;
+    assert_eq!(budget, std::time::Duration::from_secs(2), "{answer}");
+    assert!(
+        took >= std::time::Duration::from_secs(2),
+        "the pass waited its budget: {took:?}"
+    );
+    assert_refused_busy_and_lapsed(&answer, &line, &server);
+    assert_eq!(intents(directory.path()), 0, "{answer}");
+}
+
 /// A person's click that landed while no call waited (#857): the dialog is still
 /// in the slot with its answer, and the batch is saved and journaled.
 struct Clicked {

@@ -584,6 +584,36 @@ fn the_after_read_retry_budget_keeps_the_call_under_its_ceiling() {
     assert!(approval::CALL_CEILING + Duration::from_secs(10) <= Duration::from_secs(60));
 }
 
+/// A redeem-only pass waits on the call's shared budget only as far as the
+/// redeem measured live still fits under the ceiling (#893): the budget is
+/// never more than the shared one, and a pass that starts past the point where
+/// the redeem fits waits for nothing.
+#[test]
+fn the_redeem_pass_wire_budget_keeps_the_redeem_under_the_ceiling() {
+    use std::time::Duration;
+    let shared = bridge_tally_transport::WireRetryPolicy::DEFAULT.total();
+    assert_eq!(redeem_pass_wire_budget(Duration::ZERO, shared), shared);
+    assert_eq!(
+        redeem_pass_wire_budget(Duration::from_secs(20), shared),
+        Duration::from_millis(6_910)
+    );
+    for elapsed in [Duration::from_millis(26_910), Duration::from_secs(40)] {
+        assert_eq!(redeem_pass_wire_budget(elapsed, shared), Duration::ZERO);
+    }
+    assert_eq!(
+        redeem_pass_wire_budget(Duration::ZERO, Duration::from_millis(300)),
+        Duration::from_millis(300)
+    );
+    for millis in (0..=60_000).step_by(50) {
+        let elapsed = Duration::from_millis(millis);
+        let budget = redeem_pass_wire_budget(elapsed, shared);
+        assert!(budget <= shared);
+        if budget > Duration::ZERO {
+            assert!(elapsed + budget + approval::MEASURED_REDEEM <= approval::CALL_CEILING);
+        }
+    }
+}
+
 /// A busy wire lock on the marks readback after a sent post is tried once
 /// more, on a fresh wait budget (#884): a lock freed after the first budget
 /// but within the second is not a lasting doubt. A lock that stays held is

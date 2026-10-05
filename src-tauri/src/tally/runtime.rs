@@ -773,6 +773,16 @@ pub(crate) async fn with_operation_wire_budget_of<F: Future>(
         .await
 }
 
+/// What the enclosing operation's shared wire-wait budget has left, or `None`
+/// when no runtime operation of it has drawn on one yet, so the next would
+/// start a fresh one at the policy's total (#893).
+pub(crate) fn operation_wire_budget_remaining() -> Option<std::time::Duration> {
+    OPERATION_WIRE_BUDGET
+        .try_with(|shared| shared.get().map(WireWaitBudget::remaining))
+        .ok()
+        .flatten()
+}
+
 /// A failed pre-intent read as the typed admission refusal, with the transport
 /// failure as context (a context value is not reachable by `downcast_ref`). A
 /// wire refusal stays the error itself: it says the port was busy, with a

@@ -5215,6 +5215,60 @@ async fn buckets_page_from_the_held_summary_window() {
     );
 }
 
+/// A ledger summary through the tool under `mask_parties`: every bucket label is a ledger name, so
+/// every label is masked and no real name appears anywhere in the response, while the figures, the
+/// order and each bucket's `position` stay the same as unmasked (#1250 review, P3 2). The masking
+/// of a bucket label was pinned only below the tool
+/// (`a_ledger_name_is_a_party_marked_value_so_masking_reaches_it`), so a label built without the
+/// party marker would have passed the suite. The bucket redaction in `render_page_body` is a second,
+/// redundant layer under the whole-response pass in `redact_tool_response`; this test does not tell
+/// the two apart.
+/// Mutant run and killed: neutering the `MaskParties` branch of `redact_value`. Mutant run and NOT
+/// killed (by design, the layer is redundant): removing the bucket redaction in `render_page_body`.
+/// Not run, reasoned from the code: building a bucket label without the party-name marker.
+#[tokio::test]
+async fn a_ledger_summary_masks_every_bucket_label_under_mask_parties() {
+    let plain = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let plain = plain.call(json!({"summarise_by": "ledger"})).await;
+    let masked = OneServer::spawn_with(
+        counted_vouchers_plans(three_vouchers(), three_vouchers()),
+        Redaction::MaskParties,
+    );
+    let masked = masked.call(json!({"summarise_by": "ledger"})).await;
+    let (plain_names, masked_names) = (bucket_names(&plain), bucket_names(&masked));
+    assert_eq!(plain_names.len(), 4, "{plain}");
+    assert_eq!(masked_names.len(), plain_names.len(), "{masked}");
+    let leaked = masked.to_string();
+    for (real, shown) in plain_names.iter().zip(&masked_names) {
+        assert_ne!(real, shown, "a bucket label was not masked: {masked}");
+        assert!(
+            !leaked.contains(real.as_str()),
+            "{real} appears in a masked response"
+        );
+    }
+    // Masking changes the label only: the figures, the order and each bucket's position are the same.
+    let strip = |response: &Value| -> Vec<Value> {
+        result_of(response)["buckets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|bucket| {
+                let mut bucket = bucket.clone();
+                bucket.as_object_mut().unwrap().remove("group");
+                bucket
+            })
+            .collect()
+    };
+    assert_eq!(strip(&plain), strip(&masked));
+    let positions: Vec<u64> = result_of(&masked)["buckets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|bucket| bucket["position"].as_u64().unwrap())
+        .collect();
+    assert_eq!(positions, [1, 2, 3, 4], "{masked}");
+}
+
 /// A listing and a summary of the same question hold separate windows, so one never replaces or
 /// serves the other: pages of a listing cannot continue from a summary's read, nor the reverse.
 /// Mutant killed: leaving the grouping out of the held-window key.

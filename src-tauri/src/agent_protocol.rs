@@ -180,7 +180,7 @@ where
                         )
                         .await;
                         input_failed = outcome.input_failed;
-                        ToolCallEnd::Answered(outcome.response)
+                        ToolCallEnd::Answered(Box::new(outcome.response))
                     };
                     match response {
                         ToolCallEnd::Answered(tool_response) => {
@@ -544,8 +544,9 @@ fn withdraw_post(server: &Server, request: &PostRequest<'_>) {
 
 /// How a tool call in flight ended.
 pub(in crate::agent) enum ToolCallEnd {
-    /// The call's own response, sent as it is.
-    Answered(ToolResponse),
+    /// The call's own response, sent as it is. Boxed: it is ten times the
+    /// size of the other variant.
+    Answered(Box<ToolResponse>),
     /// A post withdrawn before its intent (#725). The call is answered as
     /// cancelled, and that answer's receipt carries the trail of the sends
     /// that did run (#944).
@@ -686,7 +687,7 @@ where
                 return Ok(if phase == PostPhase::Withdrawing {
                     ToolCallEnd::Withdrawn { request_trail: response.egress.request_trail }
                 } else {
-                    ToolCallEnd::Answered(response)
+                    ToolCallEnd::Answered(Box::new(response))
                 })
             }
         }
@@ -910,7 +911,7 @@ where
         // The caller may be gone, but the original execution owns the only
         // response wire. Let the ordinary response path publish it if stdout
         // remains usable; no replacement post is created.
-        return Ok(ToolCallEnd::Answered(future.as_mut().await));
+        return Ok(ToolCallEnd::Answered(Box::new(future.as_mut().await)));
     }
     // No intent: withdraw it, and finish the operation in flight rather than
     // abandon it. It starts no further operation and can write no intent (#725).

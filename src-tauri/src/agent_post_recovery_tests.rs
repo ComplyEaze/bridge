@@ -46,7 +46,7 @@ async fn stops<F: std::future::Future>(call: F) -> F::Output {
 /// The post's own response, from a call that answered rather than withdrew.
 fn answered(end: ToolCallEnd) -> ToolResponse {
     match end {
-        ToolCallEnd::Answered(response) => response,
+        ToolCallEnd::Answered(response) => *response,
         ToolCallEnd::Withdrawn { .. } => panic!("the post was withdrawn, not answered"),
     }
 }

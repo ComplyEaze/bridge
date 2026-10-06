@@ -97,7 +97,15 @@ pub(super) fn named_ledgers(payload: &ImportPayload) -> BTreeSet<&str> {
     payload
         .vouchers
         .iter()
-        .flat_map(|voucher| voucher.entries.iter())
+        .flat_map(|voucher| {
+            // An invoice's party carries a New Ref: it is not On Account, and
+            // its bill-wise flag is read and re-read by the invoice path itself.
+            let allocated = super::invoice::new_ref_party(voucher);
+            voucher
+                .entries
+                .iter()
+                .filter(move |entry| Some(entry.ledger.as_str()) != allocated)
+        })
         .map(|entry| entry.ledger.as_str())
         .collect()
 }
@@ -128,9 +136,10 @@ pub(super) fn bill_wise_parties(
     let mut parties = BTreeMap::<&str, Vec<PartyRow>>::new();
     for voucher in vouchers {
         let mut seen = BTreeSet::new();
+        let allocated = super::invoice::new_ref_party(voucher);
         for entry in &voucher.entries {
             let ledger = entry.ledger.as_str();
-            if !observed.is_bill_wise(ledger) || !seen.insert(ledger) {
+            if Some(ledger) == allocated || !observed.is_bill_wise(ledger) || !seen.insert(ledger) {
                 continue;
             }
             parties.entry(ledger).or_default().push(PartyRow {
@@ -212,6 +221,7 @@ pub(super) fn batch_content_digest(vouchers: &[ImportVoucher]) -> [u8; 32] {
             narration,
             reference,
             voucher_number,
+            invoice,
             entries,
         } = voucher;
         encoder.field(bridge_txn_id.as_bytes());
@@ -220,6 +230,12 @@ pub(super) fn batch_content_digest(vouchers: &[ImportVoucher]) -> [u8; 32] {
         encoder.optional(narration.as_deref());
         encoder.optional(reference.as_deref());
         encoder.optional(voucher_number.as_deref());
+        // An invoice's detail is bound only when there is one, so the digest of
+        // every other voucher is the bytes it always was.
+        if let Some(detail) = invoice {
+            encoder.field(b"invoice");
+            encoder.field(serde_json::to_string(detail).unwrap_or_default().as_bytes());
+        }
         encoder.count(entries.len());
         for entry in entries {
             let ImportEntry {

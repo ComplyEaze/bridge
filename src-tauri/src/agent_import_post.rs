@@ -39,6 +39,7 @@ impl PostScope {
                     | VoucherType::Payment
                     | VoucherType::Receipt
                     | VoucherType::Contra
+                    | VoucherType::Sales
             ),
         }
     }
@@ -832,6 +833,22 @@ impl Server {
             // stale by now, so classify again before approval from this
             // catalogue's parents and a fresh group collection, and send the
             // group request with the approval so the queue re-reads both.
+            // An invoice is only the right voucher while the masters it was
+            // classified from still say the same. Read again before approval
+            // (and again after it, before dispatch); refused unless the
+            // observation equals the build's.
+            if line.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice()) {
+                let evidence = self
+                    .recheck_sales_invoice(
+                        &identity,
+                        &company.name,
+                        &line.vouchers[0],
+                        &catalogue_identities,
+                    )
+                    .await
+                    .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
+                accumulated = combine_evidence(accumulated.clone(), evidence);
+            }
             let group_collection_request = if renders_bank_shape(&payload.vouchers) {
                 let (groups, evidence) =
                     self.read_group_collection(&identity, &company.name).await?;
@@ -970,6 +987,20 @@ impl Server {
                                 }
                             }
                         }
+                    }
+                    // The dialog may have stayed open: an invoice's masters are
+                    // read once more before the approval is spent.
+                    if line.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice()) {
+                        let evidence = self
+                            .recheck_sales_invoice(
+                                &identity,
+                                &company.name,
+                                &line.vouchers[0],
+                                &catalogue_identities,
+                            )
+                            .await
+                            .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
+                        accumulated = combine_evidence(accumulated.clone(), evidence);
                     }
                     let (taken, request, native) =
                         self.post_approvals.take_for_dispatch(batch_id, &binding)?;
@@ -2349,7 +2380,9 @@ pub(super) fn native_post_request(
 }
 
 pub(super) fn require_native_numbering(voucher: &ImportVoucher) -> Result<(), String> {
-    if voucher.voucher_number.is_some() {
+    // An invoice's number is its document number. Its type's series was read
+    // as Manual by the build, which is what keeps the number (§9.8, measured).
+    if voucher.voucher_number.is_some() && !voucher.voucher_type.is_invoice() {
         return Err("import_post_numbered_journal_unsupported".into());
     }
     Ok(())
@@ -2401,6 +2434,14 @@ pub(super) fn admit_saved_voucher_integrity(
         amends_batch_id: None,
     };
     validate_payload(&payload)?;
+    // An invoice renders only from what its build observed in Tally: one saved
+    // without that is not postable, and is never rendered as an empty message.
+    if line.vouchers.iter().any(|voucher| {
+        voucher.voucher_type.is_invoice()
+            && voucher.invoice.as_ref().and_then(|detail| detail.observed.as_ref()).is_none()
+    }) {
+        return Err("import_invoice_not_observed".into());
+    }
     totals(&line.vouchers)?;
     let xml = render_import_xml(&company.name, &line.vouchers, line.identity_batch_id());
     if sha256_hex(xml.as_bytes()) != line.sha256 {
@@ -2447,6 +2488,9 @@ fn classification_review_line(voucher_type: &VoucherType) -> Option<&'static str
             Some("Checked in Tally: every Dr ledger is bank/cash; every Cr ledger holds no money.")
         }
         VoucherType::Contra => Some("Checked in Tally: every ledger is bank/cash."),
+        VoucherType::Sales => Some(
+            "Checked in Tally: Sundry Debtors customer, Sales Accounts ledger, CGST and state tax by head.",
+        ),
     }
 }
 
@@ -2507,6 +2551,9 @@ fn review_preview_with(
         return batch_review_text(line, company, &origin, &debit, &credit, footer);
     }
     let voucher = &line.vouchers[0];
+    if voucher.voucher_type.is_invoice() {
+        return invoice_review_preview(line, company, &origin, (debit.as_str(), credit.as_str()), footer);
+    }
     let mut review_text = std::iter::once(company.name.as_str())
         .chain(voucher.voucher_number.iter().map(String::as_str))
         .chain(voucher.reference.iter().map(String::as_str))
@@ -2556,6 +2603,80 @@ fn review_preview_with(
         .join("\n");
     // Native message boxes have no portable scrollable review surface. Keep this
     // first posting slice reviewable; longer batches retain the manual file path.
+    if preview.chars().count() > 1_600
+        || preview.lines().count() > 24
+        || preview.lines().any(|line| line.chars().count() > 100)
+    {
+        return Err("import_review_too_large".into());
+    }
+    Ok(preview)
+}
+
+/// The approval text of one Sales invoice: what a person must see to say yes to
+/// a GST document. The party with its GSTIN and registration, the place of
+/// supply, the invoice number (which is also the reference), the bill
+/// allocation that will be written, and every leg. Same caps and same refusals
+/// as the other single-voucher text.
+fn invoice_review_preview(
+    line: &ImportLedgerLine,
+    company: &ImportCompanyTuple,
+    origin: &str,
+    (debit, credit): (&str, &str),
+    footer: &[String],
+) -> Result<String, String> {
+    let voucher = &line.vouchers[0];
+    let detail = voucher.invoice.as_ref().ok_or("import_invoice_not_observed")?;
+    let observed = detail.observed.as_ref().ok_or("import_invoice_not_observed")?;
+    let number = voucher.voucher_number.as_deref().ok_or("import_invoice_not_observed")?;
+    let mut review_text = std::iter::once(company.name.as_str())
+        .chain(std::iter::once(number))
+        .chain(std::iter::once(detail.voucher_type_name.as_str()))
+        .chain(voucher.narration.iter().map(String::as_str))
+        .chain(voucher.entries.iter().map(|entry| entry.ledger.as_str()));
+    if review_text.clone().any(has_unsafe_review_layout_character) {
+        return Err("import_review_layout_text".into());
+    }
+    if review_text.any(has_unreviewable_format_character) {
+        return Err("import_review_format_text".into());
+    }
+    let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
+    let party = voucher
+        .entries
+        .iter()
+        .find(|entry| entry.side == EntrySide::Dr && Some(&entry.ledger) != detail.round_off_ledger.as_ref())
+        .map(|entry| entry.ledger.as_str())
+        .ok_or("import_invoice_not_observed")?;
+    let registration = match observed.party_gstin.as_deref() {
+        Some(gstin) => format!("Regular, GSTIN {gstin}"),
+        None => "Unregistered, no GSTIN".to_string(),
+    };
+    let allocation = if observed.party_bill_wise {
+        format!("New Ref {}", quoted(number))
+    } else {
+        "none (customer not bill-wise)".to_string()
+    };
+    let entries = voucher
+        .entries
+        .iter()
+        .map(|entry| {
+            format!(
+                "{} {}  {}",
+                if entry.side == EntrySide::Dr { "Dr" } else { "Cr" },
+                entry.amount,
+                quoted(&entry.ledger)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}  Number: {}  Books from: {}\nTally: {origin}\nVoucher type: {}  Date: {}  Number and reference: {}\nCustomer: {}  {registration}\nPlace of supply: {} (the company's state)  Bill allocation: {allocation}\nNarration: {}\n\n{}\n\nTotal debit: {debit}  Total credit: {credit}\nChecked in Tally: Sundry Debtors customer, Sales Accounts ledger, CGST and state tax by head.\nBatch: {}\n\nLedgers checked by identity against the build; narration sent as prepared.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+        quoted(&company.name), company.guid, company.company_number, company.books_from,
+        quoted(&detail.voucher_type_name), voucher.date, quoted(number),
+        quoted(party), observed.company_state,
+        super::posted_narration(voucher).map(quoted).unwrap_or_else(|| "(none)".into()), entries, line.batch_id);
+    let preview = std::iter::once(preview)
+        .chain(footer.iter().cloned())
+        .collect::<Vec<_>>()
+        .join("\n");
     if preview.chars().count() > 1_600
         || preview.lines().count() > 24
         || preview.lines().any(|line| line.chars().count() > 100)

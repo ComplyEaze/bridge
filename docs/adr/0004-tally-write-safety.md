@@ -611,3 +611,20 @@ is accepted, and loud.
   intent: nothing recorded or sent, and the approval withdrawn.
 - **New readback statuses:** `bound_not_in_window` and `book_rolled_back`.
   Neither is ever absence.
+
+## Amendment — owner decision, 2026-10-06: GST invoices, Sales first
+
+`post_import` may post one voucher of type **Sales**, a GST invoice, in addition to Journal, Payment, Receipt and Contra. The owner decided on 6 Oct 2026 that ComplyEaze Bridge may add posted voucher types, that invoices are wanted before every other type, and that every voucher type will be needed before 1.0. Purchase is the next type and will share the invoice core; it is not admitted by this amendment.
+
+**Every safeguard of the direct-posting amendment applies**, and a Sales invoice adds the following.
+
+- **One invoice per build and per post.** A batch of invoices, an invoice beside another type, and an amendment of an invoice are refused (`voucher_type_shapes_mixed`, `invoice_one_per_batch`, `invoice_amendment_not_supported`).
+- **Masters read at build, never named by the caller.** The voucher type is named by the caller by its display name and checked against the book: it must resolve to the Sales class through its parent chain, with exactly one number series whose method is Manual (the series-level method, not the top-level one). The customer, sales and tax legs are classified from reserved group ancestry and the duty head, never from a ledger's name. The party's bill-wise flag comes from the V2 ledger catalogue the build already reads (section 12a.15), the same answer the On Account approval gate judges; an invoice's party is written with a New Ref and is exempt from that approval, every other leg is judged as before. No ledger name reaches a TDL string literal: the number and type are matched by closed-alphabet values. The number is checked for absence in its type and financial year. The company's state is read. A New Ref is written only for a bill-wise party. A customer is registered (a valid GSTIN in force whose state is the place of supply) or positively unregistered; an answer Tally did not give is never read as unregistered.
+- **Re-read before approval and before the approval is spent.** The whole observation is read again before the dialog and again after it is answered, before the approval is spent, and a post is refused unless it equals the build's (`import_invoice_masters_changed`). It is not read under the endpoint queue's lock; this is a known gap, recorded in section 9.16 of the protocol reference and in a follow-up issue.
+- **A dialog that shows what a GST document needs:** the customer with its GSTIN and registration, the place of supply, the number (which is also the reference), the bill allocation to be written, every leg, inside the same caps.
+- **Read back as built.** The post's readback compares the standard fields and then reads the invoice back by type and number: `posted_verified` is kept only when the party, GST header, reference, every leg and the bill allocation match.
+- **The client-book rule.** The owner's rule of 5 Oct 2026 permits writes to a client book held on the lab with a grant per run and a fresh backup confirmed before any write. For this work it overrides the protocol reference's line against running the invoice procedure on a machine with a customer book loaded; the fresh backup before a client write is kept.
+
+**What it cannot send:** IGST, cess, items, credit and debit notes, a reference, new ledgers, batches of invoices, amendments, and anything a book's types, ledgers and company state do not establish.
+
+**Qualification.** The type is in the qualified list on the evidence of section 9.16 (reads of 39 hand-keyed invoices and 38 hand imports on client books). No invoice posted by Bridge has yet been read back on a book; the rehearsal on a synthetic company and the first client invoice are what close that. The PR records what is not measured.

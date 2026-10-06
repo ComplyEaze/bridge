@@ -67,16 +67,16 @@ fn ancestry_json(chain: &AncestryChain) -> Value {
 /// when they differ is unmeasured, so both are reported and a difference is
 /// flagged rather than resolved.
 #[derive(Debug, PartialEq, Eq)]
-struct PartyGstin {
-    gstin: Option<String>,
-    status: &'static str,
+pub(super) struct PartyGstin {
+    pub(super) gstin: Option<String>,
+    pub(super) status: &'static str,
     /// The in-force entry's `GSTREGISTRATIONTYPE`, so "Regular with no GSTIN"
     /// is not read as unregistered.
-    registration_type: Option<String>,
+    pub(super) registration_type: Option<String>,
     flat: Option<String>,
     /// The flat field names a GSTIN and a readable history says something
     /// else on that date: another GSTIN, or none.
-    sources_disagree: bool,
+    pub(super) sources_disagree: bool,
 }
 
 /// The row keys a [`PartyGstin`] answer is reported under.
@@ -94,7 +94,11 @@ fn party_gstin_fields(gstin: PartyGstin, as_of: &str) -> serde_json::Map<String,
     fields
 }
 
-fn party_gstin_on(flat: Option<&str>, history: &GstRegistrationHistory, as_of: &str) -> PartyGstin {
+pub(super) fn party_gstin_on(
+    flat: Option<&str>,
+    history: &GstRegistrationHistory,
+    as_of: &str,
+) -> PartyGstin {
     // `flat` is the field as returned, so an explicit `<PARTYGSTIN/>` is
     // `Some("")`: reported as read, but it names no GSTIN.
     let named = flat.filter(|value| !value.is_empty()).map(str::to_string);

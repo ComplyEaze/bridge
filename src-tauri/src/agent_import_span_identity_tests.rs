@@ -63,6 +63,7 @@ fn sent() -> Vec<ImportVoucher> {
         narration: Some(narration.into()),
         reference: None,
         voucher_number: None,
+        invoice: None,
         entries,
     };
     vec![
@@ -632,6 +633,7 @@ fn sent_journals() -> Vec<ImportVoucher> {
         narration: Some(narration.into()),
         reference: None,
         voucher_number: None,
+        invoice: None,
         entries,
     };
     vec![

@@ -8,11 +8,11 @@ fn the_admitted_schema_offers_exactly_the_qualified_voucher_types() {
     assert_eq!(
         voucher_input_schema()["properties"]["vouchers"]["items"]["properties"]["voucher_type"]
             ["enum"],
-        json!(["Journal", "Payment", "Receipt", "Contra"])
+        json!(["Journal", "Payment", "Receipt", "Contra", "Sales"])
     );
     assert_eq!(
         serde_json::to_value(LIVE_QUALIFIED_VOUCHER_TYPES).unwrap(),
-        json!(["Journal", "Payment", "Receipt", "Contra"])
+        json!(["Journal", "Payment", "Receipt", "Contra", "Sales"])
     );
 }
 
@@ -67,6 +67,7 @@ fn a_voucher_type_outside_the_qualified_list_is_refused() {
         VoucherType::Payment,
         VoucherType::Receipt,
         VoucherType::Contra,
+        VoucherType::Sales,
     ] {
         let qualified = LIVE_QUALIFIED_VOUCHER_TYPES
             .iter()

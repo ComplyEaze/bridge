@@ -350,6 +350,40 @@ pub(super) fn native_group_snapshot_read(company: &str) -> ReadRequest {
     )
 }
 
+/// The voucher types of the book, every field, for an invoice build: the named
+/// type, its parent chain to a reserved class and its series-level numbering.
+pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_voucher_types_request(company))
+}
+
+/// The vouchers of one type (by GUID) carrying one invoice number in one
+/// financial year, for the duplicate-number check.
+pub(super) fn invoice_number_read(
+    company: &str,
+    type_guid: &str,
+    number: &str,
+    window: (&str, &str),
+) -> Option<ReadRequest> {
+    agent_import::invoice::render_invoice_number_request(company, type_guid, number, window)
+        .map(ReadRequest)
+}
+
+/// A posted invoice read back by type and number, every field the build wrote.
+pub(super) fn invoice_readback_read(
+    company: &str,
+    type_guid: &str,
+    number: &str,
+    window: (&str, &str),
+) -> Option<ReadRequest> {
+    agent_import::invoice::render_invoice_readback_request(company, type_guid, number, window)
+        .map(ReadRequest)
+}
+
+/// The company's state, for an invoice build (the answer is chosen by GUID).
+pub(super) fn invoice_company_state_read(company: &str) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_company_state_request(company))
+}
+
 /// The company's Currency masters: the request the outstandings paths send,
 /// verbatim. Its response carries no company GUID, so it is bound only by the
 /// identity brackets it is read inside.

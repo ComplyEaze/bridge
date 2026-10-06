@@ -651,3 +651,25 @@ The bound GUIDs are journaled and verified first. Content and `LASTVCHID` only r
 - a `$GUID` filter without a date clause;
 - any other release or licence tier;
 - whether a restore or a data rewrite reuses AlterIDs or MasterIDs.
+
+### 9.16 A Sales invoice: what was measured, what Bridge posts, what is not established
+
+A Sales invoice is an accounting invoice: the invoice view, `LEDGERENTRIES.LIST` (never `ALLLEDGERENTRIES.LIST`, §9.12), the party leg first with a New Ref when the party is bill-wise, and credit legs for the sales ledger and the two tax heads. Its number is the document number a GSTR-1 reports.
+
+**Measured by reads (VERIFIED, 6 Oct 2026, TallyPrime 7.1 Silver, one client sample book on the lab, no write).**
+- **Hand-keyed invoices.** 39 invoices of one month, all of one user type filed under the predefined Sales type: `ISINVOICE` Yes, the voucher number equal to `REFERENCE`, `REFERENCEDATE` equal to the date, `STATENAME` and `PLACEOFSUPPLY` set, `GSTREGISTRATIONTYPE` `Unregistered/Consumer` with no `PARTYGSTIN` for an unregistered customer, the company's own GSTIN and state on the voucher, four legs (party, sales, state tax, central tax) on 36 and five on 3 (a round off on 4, an IGST leg on 1), and no bill allocation on any leg because the customers were not bill-wise.
+- **Voucher types.** A collection of the voucher types with no field list returns each type's `RESERVEDNAME` as an attribute, `PARENT`, `GUID`, a top-level `NUMBERINGMETHOD` and, inside `VOUCHERNUMBERSERIES.LIST`, the series-level method. The book held two Sales types (the predefined one, whose top level read `Automatic (Manual Override)` and whose series read `Manual`, and a user type under it whose top level read `None` and whose series read `Manual` with the series' duplicate-number guard on). The series-level method is the one that decides what an import's supplied number does (§9.8), and the existing masters read returns only the top-level one.
+- **Ledgers.** The compliance read gives each ledger's reserved group chain, duty head and the GSTIN in force on a date; it does not return `ISBILLWISEON`, which the V2 ledger catalogue (§12a.15) and a `Ledger` row return as Yes or No. Tax ledgers can be named by rate (`CGST 12%`), so only the duty head says what one is; this book spelled the state head `SGST/UTGST`. The sales ledger carried no HSN and every rate at 0, so tax was keyed as ledger legs.
+- **Hand imports on a Gold book (10 Sep 2026, 38 invoices, PARTIAL).** The same shape without `STATENAME`, `PLACEOFSUPPLY`, `PARTYGSTIN` or a reference, accepted by Tally; no read-back by Bridge was made.
+
+**What Bridge posts.** One Sales invoice per build and per post, in the shape above, with `REFERENCE` and `REFERENCEDATE` equal to the number and the date as the keyed vouchers carry them. The build reads the ledger compliance listing, the voucher types, the party's bill-wise flag from the V2 ledger catalogue (§12a.15), the number's absence in its type and financial year, and the company's state; it refuses unless the named type resolves to the Sales class through its parent chain with exactly one Manual series, the customer is registered (a valid GSTIN in force whose state is the place of supply) or positively unregistered, the supply is made in the company's state, one sales ledger and one central tax and one state-tax ledger (by duty head, equal, a slab rate of the taxable within a few paise) are named, and any round off is under one rupee. IGST, cess, items, credit and debit notes, new ledgers, a reference and amendments are refused.
+
+**Read back.** After a post, the standard window readback (date, type, number, entries, narration) is followed by a read of the invoice by type and number over its financial year, and `posted_verified` is kept only when the party, the GST header fields, the reference, every leg and the bill allocation read back as built.
+
+**Not established.**
+- Whether Tally imports this exact element set for a Sales invoice (a Purchase shape with the same header imported 21 of 21 on a client book; a Sales one has not been posted by Bridge).
+- The company-state read (a `Company` collection with `NAME`, `GUID`, `STATENAME`) and the invoice read-back fetch together on a Bridge-posted invoice.
+- How Tally's own GSTR-1 view classifies an imported invoice beside a keyed one; HSN is not carried.
+- That the invoice's masters are unchanged inside the endpoint queue after the approval: they are read again before the dialog and again before the approval is spent, not under the queue's lock.
+- How an import trips a type's duplicate-number guard.
+- Any release or licence tier other than the one measured.

@@ -149,7 +149,7 @@ pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFinge
         normalized_date(&voucher.date)
             .ok()
             .map(|date| date.as_str().to_string()),
-        Some(voucher.voucher_type.as_str().to_string()),
+        Some(voucher.filed_type_name().to_string()),
         expected_entry_fingerprint(voucher),
     )
 }
@@ -643,6 +643,29 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
     }
 }
 
+/// An invoice the standard readback matched, whose own fields did not read back
+/// as built (party, GST header, reference, allocation, or the voucher could not
+/// be read), is divergent: "posted_verified" means every field was checked.
+pub(super) fn mark_invoice_readback(result: &mut Value, bridge_txn_id: &str, differences: &[String]) {
+    if differences.is_empty() {
+        return;
+    }
+    let mut moved = 0_u64;
+    if let Some(vouchers) = result["vouchers"].as_array_mut() {
+        for voucher in vouchers {
+            if voucher["bridge_txn_id"] == bridge_txn_id && voucher["status"] == "posted_verified" {
+                voucher["status"] = json!("posted_divergent");
+                voucher["diffs"] = json!([{ "invoice_fields": differences }]);
+                voucher["next_step"] = json!(plain_next_step("posted_divergent"));
+                moved += 1;
+            }
+        }
+    }
+    let counts = &mut result["counts"];
+    counts["posted_verified"] = json!(counts["posted_verified"].as_u64().unwrap_or(0).saturating_sub(moved));
+    counts["posted_divergent"] = json!(counts["posted_divergent"].as_u64().unwrap_or(0) + moved);
+}
+
 fn mark_not_found_as(result: &mut Value, status: &str) {
     let mut moved = 0_u64;
     if let Some(vouchers) = result["vouchers"].as_array_mut() {
@@ -892,7 +915,7 @@ pub(super) fn voucher_diffs(
     {
         diffs.push(json!("effective_date"));
     }
-    if actual.voucher_type.as_deref() != Some(expected.voucher_type.as_str()) {
+    if actual.voucher_type.as_deref() != Some(expected.filed_type_name()) {
         diffs.push(json!("voucher_type"));
     }
     if expected.voucher_number.is_some()

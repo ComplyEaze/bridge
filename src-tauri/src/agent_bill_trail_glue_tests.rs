@@ -554,8 +554,8 @@ async fn a_party_typed_as_its_stored_name_is_answered_from_the_spelling_its_vouc
 
 /// #1085: when the vouchers spell a ledger differently from its own name, an
 /// answer that found no residual row may be a name Tally's outstandings
-/// reports spell otherwise, so the result says the report's spelling is not
-/// established. A ledger whose spellings agree, and an answer that did find
+/// reports spell otherwise (and so may a bill trail that names none), so the
+/// result says the report's spelling is not established. A ledger whose spellings agree, and an answer that did find
 /// its row, carry no such field. Mutant killed: dropping the spelling
 /// condition, or the state condition.
 #[tokio::test]
@@ -578,6 +578,12 @@ async fn an_empty_answer_for_a_ledger_with_two_spellings_says_the_reports_spelli
     call.party = "Cafe Traders";
     let detail = renamed(call).await;
     assert_eq!(detail["state"], "no_residual_row_for_party", "{detail}");
+    assert_eq!(detail["report_spelling"], "not_established", "{detail}");
+    // The named-bill detail of a ledger with two spellings that finds no bill: the field is there.
+    let mut call = Call::new(DetailKind::BillTrail);
+    call.party = "Cafe Traders";
+    let detail = renamed(call).await;
+    assert_eq!(detail["state"], "no_named_bill_for_party", "{detail}");
     assert_eq!(detail["report_spelling"], "not_established", "{detail}");
     // Two spellings, but the row was found: no field.
     let mut call = Call::new(DetailKind::Unadjusted);

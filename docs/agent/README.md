@@ -955,6 +955,69 @@ covers only the identity and marks reads it sent.
   sent 232 requests, and a later page naming its snapshot took 1.2 s and sent 10
   requests. Before this change each later page repeated the whole read.
 
+### What a `vouchers` read cost (`window.read_cost`)
+
+The census a window read pays follows the book's voucher mark, not the window:
+on the largest book measured (mark about 1.03 million) one day is over a hundred
+census reads and about 170 s (bridge#595). An assistant that reads a month day by day pays
+that census once a day. When the window read took 20 s or more, or its census is
+16 reads or more, the `window` of the first page of a result, and of a refusal that
+carries one, has a `read_cost`. It says only what the call itself showed; it makes
+no estimate for a larger or a smaller window.
+
+- `ended` (`read` or `stopped`), `census_reads`, `vouchers_read` and
+  `observed_seconds` (`marks`, `census`, `parts`, `total`) are what the window
+  read did. They do not include the call's smaller reads (company check, ledger and
+  type lists), and a window with no voucher is read once more, a day wider on each
+  side, which is not counted either (`say` states that case).
+- `floor_seconds` is **derived from the gate's rule**, not measured: the gate holds
+  each request back until half a second after the previous one ended, so
+  consecutive census reads are at least 0.5 s apart and a call that sent N of them
+  took at least (N - 1) x 0.5 s in gaps. It is time between reads, not time spent
+  sleeping (the gate sleeps only what is left of the half second after Bridge's own
+  work). It is rounded down.
+- `host_240` says how this window sat against the one measured host limit:
+  `window_fits` with `vouchers_that_fitted` (what this window carried; it claims
+  nothing about a larger or a smaller window, since fewer vouchers are not cheaper:
+  a window with no voucher is read twice), `window_too_long` (this window did not
+  fit; no number is given: the census follows the book's mark, not the window, so a
+  shorter window saves only the time of its vouchers and how short is enough is not
+  established), or `not_established` (no voucher was read, whatever the time: such a window is read
+  twice, the second read wider and with its own census, which these figures do not
+  include; or the read stopped). A call past 240 s on Claude Desktop is cancelled and
+  its result never arrives, so `window_too_long` is seen on another host.
+- A read that **stopped** (a refusal) states the floor and no verdict: a request
+  that failed or hung is not what a window costs.
+- `host_limits` names each host and its basis: Claude Desktop's chat app on macOS
+  cancelled a silent 250 s call at 240 s in two runs on one build (calls between
+  130 s and 240 s were not tried, and the call's other reads are not in the figures; and whether progress would extend the limit is not
+  answered; protocol reference 11f); on Windows it is unmeasured; Claude Code
+  completed a 150 s call under its defaults (CLI 2.1.285: one silent run and one with
+  progress; Code tab 2.1.284: one silent run), and a 60 s per-server timeout set on a
+  scratch project cut a 150 s call at exactly 60 s and was not reset by progress (CLI,
+  one run per case; #703, 30 Sep; not yet in the protocol reference); an earlier 60 s
+  abandon is unexplained.
+- `say` is the same in a sentence, outcome first. When the window did not fit it
+  also points to `trial_balance` for totals over a long period (windowed trial
+  balances read no vouchers). It refuses nothing and changes no completeness rule.
+
+The block is added only when the response can carry it: three times the smallest page
+(one item) and the block, plus a kilobyte, must fit `max_bytes` (a result is carried
+twice and its text copy is escaped). A page that fitted whole near the cap can lose
+its last few rows to the block (it is trimmed like any field, with `truncated` and
+`next_offset`): on a held window the rows left off come back on the next page, so
+nothing is lost there; when the window is not held (a partial window, or the desktop
+screen) the next page is a fresh read, and if the book changed meanwhile its offsets
+may not continue this page's. A `summarise_by` page has buckets, not items, and is
+judged as a whole page. When the block is left out the window says so
+(`read_cost_left_out`). It is on a page read now: a later page served from a held
+window carries the window timings and no `read_cost`, and a page read afresh is read
+now. The desktop screen's voucher list shares the read and receives the
+block too. `outstandings`, which also reports window timings, keeps its shape; the
+other tools that read a window (`ledger_movement`, `verify_import`,
+`voucher_presence`) do not report it yet; and a `vouchers` refusal raised after the
+whole read carries no window.
+
 ### Search and summaries in `vouchers` (#1230)
 
 Both work on the rows `vouchers` has already read and labelled; neither sends a

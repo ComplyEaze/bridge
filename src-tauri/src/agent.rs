@@ -95,6 +95,8 @@ use change_parse::*;
 #[path = "agent_read_profiles.rs"]
 mod read_profiles;
 use read_profiles::*;
+#[path = "agent_read_cost.rs"]
+mod read_cost;
 #[path = "agent_voucher_window.rs"]
 mod voucher_window;
 use voucher_window::*;
@@ -1885,6 +1887,18 @@ impl Server {
                     {
                         error["window"] =
                             window_timings_within(&timings, self.settings.max_bytes / 4);
+                        // Only `vouchers` says what the read cost; `outstandings`
+                        // reports its timings as before (bridge#1239).
+                        if name == "vouchers" {
+                            let len = error.to_string().len();
+                            read_cost::add_read_cost(
+                                &mut error["window"],
+                                len,
+                                &timings,
+                                read_cost::Ended::Stopped,
+                                self.settings.max_bytes,
+                            );
+                        }
                     }
                 }
                 ToolOutcome {

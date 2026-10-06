@@ -1594,6 +1594,24 @@ impl Server {
         Ok((names, evidence))
     }
 
+    /// The catalogue's ledgers as a request can reach them, for the tools that
+    /// resolve a typed ledger name (#1085). The same read as
+    /// `read_ledger_catalogue`, which keeps the row spellings alone.
+    pub(super) async fn read_resolvable_ledgers(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(Vec<super::ledger_candidates::CatalogueLedger>, Evidence), ToolFailure> {
+        let (_, catalogue, _, evidence) = self
+            .read_import_ledger_catalogue(identity, company_name)
+            .await?;
+        let ledgers = catalogue
+            .spellings()
+            .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
+            .collect();
+        Ok((ledgers, evidence))
+    }
+
     async fn read_import_ledger_catalogue(
         &self,
         identity: &super::VerifiedCompanyIdentity,

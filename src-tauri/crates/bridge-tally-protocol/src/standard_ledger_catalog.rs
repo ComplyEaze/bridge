@@ -165,7 +165,14 @@ pub struct StandardLedgerCatalog {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct StandardLedgerCatalogEntry {
+    /// The spelling of the row's `NAME` attribute: what every voucher row of
+    /// this ledger carries.
     name: String,
+    /// The ledger's own name when `LANGUAGENAME.LIST` gives a usable one that
+    /// differs from `name` (in case or symbols: 26 of 4,017 ledgers in a separate census of
+    /// 13 books, reference 9.4h, not reproducible from this repository); `None` otherwise. The identity is the GUID; neither
+    /// spelling is.
+    stored_name: Option<String>,
     guid: String,
     /// The immediate `PARENT` group Tally returned for this ledger, or `None`
     /// when it returned none. A ledger exposes no `PARENTSTRUCTURE`, so this
@@ -181,6 +188,15 @@ struct StandardLedgerCatalogEntry {
 impl StandardLedgerCatalog {
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.entries.iter().map(|entry| entry.name.as_str())
+    }
+
+    /// Each ledger's row spelling and, only when `LANGUAGENAME.LIST` gave a
+    /// different usable one, its stored name. A ledger without a stored name
+    /// is known by its row spelling alone, as before.
+    pub fn spellings(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
+        self.entries
+            .iter()
+            .map(|entry| (entry.name.as_str(), entry.stored_name.as_deref()))
     }
 
     /// Each ledger paired with the immediate parent group Tally returned for
@@ -295,6 +311,7 @@ pub fn parse_standard_ledger_catalog_with_identities(
         entries: rows
             .into_iter()
             .map(|row| StandardLedgerCatalogEntry {
+                stored_name: row.stored_name.filter(|stored| *stored != row.ledger.name),
                 name: row.ledger.name,
                 guid: row.guid,
                 parent: row
@@ -471,6 +488,7 @@ fn parse_ledger_census_row(
 
 struct StandardLedgerCatalogRow {
     ledger: TallyLedger,
+    stored_name: Option<String>,
     guid: String,
     parent_unsupported: bool,
 }
@@ -545,6 +563,7 @@ fn parse_standard_ledger_catalog_rows(
                         party_gstin: PartyLedgerMasterFieldObservation::NotObserved,
                         opening_balance: None,
                     },
+                    stored_name: observed.stored_name,
                     guid: ledger_guid,
                     parent_unsupported: observed.parent_unsupported,
                 });
@@ -570,6 +589,9 @@ struct StandardLedgerIdentityRow {
     company_name: String,
     company_guid: String,
     ledger_name: Option<String>,
+    /// The first `NAME` of the first `LANGUAGENAME.LIST`, read only when the
+    /// row's own name is wanted; see [`walk_standard_ledger_identity_child`].
+    stored_name: Option<String>,
     ledger_guid: Option<String>,
     parent: PartyLedgerMasterFieldObservation,
     parent_unsupported: bool,
@@ -593,6 +615,8 @@ fn parse_standard_ledger_identity_row(
     let mut parent = PartyLedgerMasterFieldObservation::NotObserved;
     let mut parent_seen = false;
     let mut parent_unsupported = false;
+    let mut stored_name = None;
+    let mut language_list_seen = false;
     loop {
         match reader.read_event()? {
             Event::Start(child) => {
@@ -686,6 +710,16 @@ fn parse_standard_ledger_identity_row(
                             child.name().as_ref().to_ascii_uppercase(),
                         )?;
                     }
+                    // Only the first list can name the ledger: a later list, and
+                    // every `NAME` after the first in it, is an alias.
+                    b"LANGUAGENAME.LIST" if include_ledger_name && !language_list_seen => {
+                        language_list_seen = true;
+                        stored_name = walk_standard_ledger_identity_child(
+                            reader,
+                            child.name().as_ref().to_ascii_uppercase(),
+                            true,
+                        )?;
+                    }
                     b"LANGUAGENAME.LIST" => skip_standard_ledger_identity_child(
                         reader,
                         child.name().as_ref().to_ascii_uppercase(),
@@ -731,6 +765,7 @@ fn parse_standard_ledger_identity_row(
             anyhow::anyhow!("standard ledger identity collection omitted computed company GUID")
         })?,
         ledger_name,
+        stored_name,
         ledger_guid,
         parent,
         parent_unsupported,
@@ -741,9 +776,69 @@ fn skip_standard_ledger_identity_child(
     reader: &mut Reader<&[u8]>,
     expected_name: Vec<u8>,
 ) -> anyhow::Result<()> {
+    walk_standard_ledger_identity_child(reader, expected_name, false).map(|_| ())
+}
+
+/// Walks one row child to its closing tag, as a skip does. With
+/// `capture_stored_name` it also returns the ledger's own name: the first
+/// `NAME` of the first `NAME.LIST` under `LANGUAGENAME.LIST`, read verbatim
+/// like the row's `NAME` attribute (reference 9.4h). Later names are aliases
+/// and are never identity. A first name that is empty, self-closing, not
+/// decodable or unusable as a ledger name leaves `None`, so the ledger keeps
+/// its row spelling, no alias is promoted, and the walk fails no read the skip
+/// used to pass: only the XML structure can fail it, as it could before.
+fn walk_standard_ledger_identity_child(
+    reader: &mut Reader<&[u8]>,
+    expected_name: Vec<u8>,
+    capture_stored_name: bool,
+) -> anyhow::Result<Option<String>> {
     let mut depth = 1_u32;
+    let mut stored_name = None;
+    let mut first_name_seen = false;
+    let mut in_name_list = false;
     loop {
         match reader.read_event()? {
+            Event::Start(child)
+                if capture_stored_name
+                    && depth == 2
+                    && in_name_list
+                    && !first_name_seen
+                    && child.name().as_ref().eq_ignore_ascii_case(b"NAME") =>
+            {
+                first_name_seen = true;
+                // Not `read_identifier_text`: its `?` on a bad entity would refuse the
+                // whole catalogue for a name this walk can simply leave unread.
+                let raw = reader.read_text(child.name())?;
+                stored_name = raw
+                    .decode()
+                    .ok()
+                    .and_then(|text| {
+                        quick_xml::escape::unescape(&text)
+                            .ok()
+                            .map(|v| v.into_owned())
+                    })
+                    .filter(|value| !value.trim().is_empty())
+                    .and_then(|value| observed_standard_ledger_name(&value).ok());
+            }
+            Event::Empty(child)
+                if capture_stored_name
+                    && depth == 2
+                    && in_name_list
+                    && child.name().as_ref().eq_ignore_ascii_case(b"NAME") =>
+            {
+                // An empty first name is still the first name: an alias after it is not.
+                first_name_seen = true;
+            }
+            Event::Start(child)
+                if capture_stored_name
+                    && depth == 1
+                    && child.name().as_ref().eq_ignore_ascii_case(b"NAME.LIST") =>
+            {
+                in_name_list = true;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    anyhow::anyhow!("standard ledger identity nesting exceeded limits")
+                })?;
+            }
             Event::Start(_) => {
                 depth = depth.checked_add(1).ok_or_else(|| {
                     anyhow::anyhow!("standard ledger identity nesting exceeded limits")
@@ -755,13 +850,16 @@ fn skip_standard_ledger_identity_child(
                         "standard ledger identity collection closed an unexpected field"
                     )
                 })?;
+                if depth == 1 {
+                    in_name_list = false;
+                }
                 if depth == 0 {
                     if !end.name().as_ref().eq_ignore_ascii_case(&expected_name) {
                         anyhow::bail!(
                             "standard ledger identity collection closed an unexpected field"
                         );
                     }
-                    return Ok(());
+                    return Ok(stored_name);
                 }
             }
             Event::DocType(_) | Event::PI(_) => {

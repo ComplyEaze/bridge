@@ -635,3 +635,174 @@ fn a_cut_list_keeps_its_count_as_a_floor_and_lists_the_old_match_first() {
     assert!(miss.found_is_lower_bound);
     assert_eq!(listed_names(&items)[0], "KappaZork");
 }
+
+/// Catalogue ledgers from `(row spelling, stored name)` pairs.
+fn ledgers(pairs: &[(&str, Option<&str>)]) -> Vec<CatalogueLedger> {
+    pairs
+        .iter()
+        .map(|(row, stored)| CatalogueLedger::new(row, *stored))
+        .collect()
+}
+
+fn resolved(
+    pairs: &[(&str, Option<&str>)],
+    requested: &str,
+) -> Result<(LedgerMatch, String), ToolFailure> {
+    resolve_catalogue_ledger_or_refuse(&ledgers(pairs), requested, Redaction::None)
+}
+
+/// #1085: a ledger whose row spelling and stored name differ is reached by
+/// either, exactly, and answers under its stored name with the spelling its
+/// voucher rows carry. Mutant killed: matching the row spelling alone, or the
+/// stored name alone, or answering with the row spelling.
+#[test]
+fn either_spelling_of_a_ledger_reaches_it_exactly_under_its_stored_name() {
+    let book = [("ROUND OFF", Some("Round Off")), ("Cash", None)];
+    for requested in ["ROUND OFF", "Round Off"] {
+        let (found, row) = resolved(&book, requested).unwrap();
+        assert_eq!(
+            found,
+            LedgerMatch::Exact {
+                name: "Round Off".to_string(),
+                similar: vec![]
+            },
+            "{requested}"
+        );
+        assert_eq!(row, "ROUND OFF", "{requested}");
+    }
+}
+
+/// A loose request still resolves over the names shown, and names the row
+/// spelling the filter compares. Mutant killed: the row taken from the request.
+#[test]
+fn a_loosely_spelled_request_resolves_over_the_shown_names_with_its_row() {
+    let (found, row) = resolved(
+        &[("ROUND OFF", Some("Round Off")), ("Cash", None)],
+        "round off",
+    )
+    .unwrap();
+    assert_eq!(
+        found,
+        LedgerMatch::CaseOrSpacing {
+            name: "Round Off".to_string()
+        }
+    );
+    assert_eq!(row, "ROUND OFF");
+    let (found, row) = resolved(&[("Cash", None)], "cash").unwrap();
+    assert_eq!((found.name(), row.as_str()), ("Cash", "Cash"));
+}
+
+/// A spelling that is one ledger's stored name and another's row spelling
+/// reaches both, so it asks, offering the row spellings because the two show
+/// one name; the first ledger's own row spelling still reaches only it.
+/// Mutant killed: taking the first ledger that matches.
+#[test]
+fn a_spelling_two_ledgers_answer_to_is_ambiguous_and_each_own_row_spelling_is_not() {
+    let book = [("A-B", Some("AB")), ("AB", None)];
+    let failure = resolved(&book, "AB").unwrap_err();
+    assert_eq!(failure.code, "ledger_ambiguous");
+    let items = failure.candidates.unwrap().items;
+    assert_eq!(listed_names(&items), ["A-B", "AB"]);
+    let (found, row) = resolved(&book, "A-B").unwrap();
+    assert_eq!((found.name(), row.as_str()), ("AB", "A-B"));
+}
+
+/// A loose request that lands on a name two ledgers show asks, with their row
+/// spellings. Mutant killed: picking the first ledger shown under the name.
+#[test]
+fn a_loose_request_landing_on_a_name_two_ledgers_show_is_ambiguous() {
+    let failure = resolved(&[("X-Y", Some("XY")), ("XY", None)], "xy").unwrap_err();
+    assert_eq!(failure.code, "ledger_ambiguous");
+    assert_eq!(
+        listed_names(&failure.candidates.unwrap().items),
+        ["X-Y", "XY"]
+    );
+}
+
+/// A name no ledger answers to is still refused with candidates drawn from the
+/// shown names. Mutant killed: listing row spellings the answer never shows.
+#[test]
+fn a_miss_offers_the_shown_names() {
+    let failure = resolved(
+        &[("ROUND OFF", Some("Round Off")), ("Cash", None)],
+        "Roundoff",
+    )
+    .unwrap_err();
+    assert_eq!(failure.code, "ledger_not_found");
+    assert_eq!(
+        listed_names(&failure.candidates.unwrap().items),
+        ["Round Off"]
+    );
+}
+
+/// A request typed loosely from a voucher row still resolves when the ledger's own
+/// name differs: the case-and-spaces fold covers the row spelling too, as it did
+/// before the stored name was read. Mutant killed: folding over the shown names only.
+#[test]
+fn a_loose_request_typed_from_the_row_spelling_still_resolves() {
+    let (found, row) = resolved(
+        &[("M/S AB & Co.", Some("M/s. AB & Co")), ("Cash", None)],
+        "m/s ab & co.",
+    )
+    .unwrap();
+    assert_eq!(
+        found,
+        LedgerMatch::CaseOrSpacing {
+            name: "M/s. AB & Co".to_string()
+        }
+    );
+    assert_eq!(row, "M/S AB & Co.");
+}
+
+/// Two ledgers answering to one typed spelling are offered under their shown names
+/// when those differ, with the rule that says why; the offered spelling is the one
+/// that asks again, so the other ledger is reached by a name it does not share.
+/// Mutant killed: always offering row spellings, or labelling the set `case_or_spacing_equal`.
+#[test]
+fn a_spelling_two_ledgers_answer_to_offers_shown_names_under_its_own_rule() {
+    let failure = resolved(&[("A", Some("X")), ("B", Some("A"))], "A").unwrap_err();
+    assert_eq!(failure.code, "ledger_ambiguous");
+    let items = failure.candidates.unwrap().items;
+    assert_eq!(listed_names(&items), ["A", "X"]);
+    assert!(items
+        .iter()
+        .all(|item| item["rule"] == "spelling_of_two_ledgers"));
+    // The other spelling of the first ledger reaches only it.
+    let (found, row) = resolved(&[("A", Some("X")), ("B", Some("A"))], "X").unwrap();
+    assert_eq!((found.name(), row.as_str()), ("X", "A"));
+}
+
+/// Under masking the shared-spelling and not-found refusals list nothing, and an
+/// exact spelling of a ledger with a stored name is still reached. Mutant killed:
+/// the shared-spelling refusal bypassing the masking branch.
+#[test]
+fn masking_withholds_a_shared_spelling_and_still_reaches_an_exact_one() {
+    let book = ledgers(&[
+        ("A-B", Some("AB")),
+        ("AB", None),
+        ("ROUND OFF", Some("Round Off")),
+    ]);
+    let failure =
+        resolve_catalogue_ledger_or_refuse(&book, "AB", Redaction::MaskParties).unwrap_err();
+    assert_eq!(failure.code, "ledger_ambiguous");
+    let candidates = failure.candidates.unwrap();
+    assert!(candidates.items.is_empty());
+    assert_eq!(candidates.miss.unwrap().listing, Listing::NamesMasked);
+    let (found, row) =
+        resolve_catalogue_ledger_or_refuse(&book, "ROUND OFF", Redaction::MaskParties).unwrap();
+    assert_eq!((found.name(), row.as_str()), ("Round Off", "ROUND OFF"));
+}
+
+/// The answer says how the ledger's voucher rows spell it only when that differs.
+/// Mutant killed: always, or never, adding the field.
+#[test]
+fn the_answer_names_the_row_spelling_only_when_it_differs() {
+    let book = [("ROUND OFF", Some("Round Off")), ("Cash", None)];
+    let (found, row) = resolved(&book, "Round Off").unwrap();
+    let json = ledger_match_json(&found, &row, Redaction::None);
+    assert_eq!(json["ledger_row_spelling"], "ROUND OFF");
+    let (found, row) = resolved(&book, "Cash").unwrap();
+    assert!(ledger_match_json(&found, &row, Redaction::None)
+        .get("ledger_row_spelling")
+        .is_none());
+}

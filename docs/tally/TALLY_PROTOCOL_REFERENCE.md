@@ -195,6 +195,9 @@ base revision.
 <a id="94g-a-ledger-create-on-an-existing-name-replaced-its-parent-bill-wise-flag-and-opening-balance"></a>
 
 [9.4g A ledger `Create` on an existing name replaced its parent, bill-wise flag and opening balance](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94g-a-ledger-create-on-an-existing-name-replaced-its-parent-bill-wise-flag-and-opening-balance)
+<a id="94h-a-ledgers-own-name-can-differ-in-case-or-symbols-from-its-rows-name-attribute"></a>
+
+[9.4h A ledger's own name can differ in case or symbols from its row's `NAME` attribute](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94h-a-ledgers-own-name-can-differ-in-case-or-symbols-from-its-rows-name-attribute)
 <a id="95-identity-after-write"></a>
 
 [9.5 Identity after write](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#95-identity-after-write)

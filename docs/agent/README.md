@@ -646,7 +646,14 @@ after it, before any voucher is read.
 A ledger name given to `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
 resolves only when it is spelled exactly as a ledger in the book, or when exactly one ledger differs
 from it only in ASCII case and ASCII spaces and no other ledger differs from that one only in case or
-whitespace (#1076; the case of a letter outside A-Z is not folded, reference §9.4f). Otherwise it
+whitespace (#1076; the case of a letter outside A-Z is not folded, reference §9.4f). A ledger's own name
+(the first name in its `LANGUAGENAME.LIST`) can differ in case or symbols from the spelling its vouchers carry (26 of 4,017
+ledgers in a separate census of 13 books, not reproducible from this repository); for `vouchers` and the
+`outstandings` party detail either spelling is exact, a spelling that is two ledgers' is `ledger_ambiguous`,
+and `ledger_match` shows the ledger's own name (with `ledger_row_spelling` when its vouchers spell it
+differently), while the voucher filter and the trail still use the spelling the vouchers carry (#1085). What
+the outstandings report carries for such a ledger is not measured. `ledger_movement` takes its names from
+another report and is unchanged. Otherwise it
 refuses as `ledger_not_found`, or as `ledger_ambiguous` when several ledgers differ from it only in case
 or whitespace (such as a twin with a trailing line break, §9.4e). Every answer for a named ledger carries `ledger_match`:
 the ledger read, `matched` (`exact` or `case_or_spacing`) and `similar_ledgers` (at most 25, with `similar_ledgers_total`; both left out under `mask_parties`), the other ledgers that

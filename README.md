@@ -3,13 +3,13 @@
 [![ComplyEaze Bridge MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/ComplyEaze/bridge/badges/score.svg)](https://glama.ai/mcp/servers/ComplyEaze/bridge)
 
 <!-- llms:begin -->
-ComplyEaze Bridge is an open-source (Apache-2.0) TallyPrime MCP server for
-Claude Desktop. It connects Claude Desktop to the TallyPrime running on your
-own computer, and it is built for chartered accountants, CA firms and
-accountants. What Claude reads from your books goes to your AI provider as part
-of the chat. You can ask about the trial balance, outstanding receivables and
-payables with ageing, ledger movement and vouchers, the purchase and sales
-registers, the stock summary,
+ComplyEaze Bridge is an open-source (Apache-2.0) TallyPrime (also written Tally
+Prime) MCP server for Claude Desktop. It connects Claude Desktop to the
+TallyPrime running on your own computer, and it is built for chartered
+accountants, CA firms and accountants. What Claude reads from your books goes to
+your AI provider as part of the chat. You can ask about the trial balance,
+outstanding receivables and payables with ageing, ledger movement and vouchers,
+the purchase and sales registers, the stock summary,
 and the Profit and Loss and Balance Sheet (a book with stock items is expected
 to be refused for these two). It checks ledger names before you post. For bank
 statement to TallyPrime vouchers, it proposes Payment, Receipt and Contra
@@ -29,8 +29,9 @@ takes statement files in the formats Tally lists for each bank.
 
 **Current release:**
 <!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,
-for Windows x64 and Apple Silicon Macs. We check each release before we
-publish it: the release check confirms that each package launches, lists its
+for Windows x64 and Apple Silicon Macs, as a Claude Desktop extension (an .mcpb
+file); it has not been run in other MCP clients. We check each release before
+we publish it: the release check confirms that each package launches, lists its
 tools and parses a synthetic encrypted bank statement. It does not run against
 TallyPrime, and nothing we can run covers every
 Tally edition, set of books or setting. What has been run against a real
@@ -209,13 +210,13 @@ hosted CI runners for Windows x64 and Apple Silicon Mac.
 
 - Stock quantities, and stock reads on books with many masters of any kind; sales,
   purchase or tax posting; creating masters; bill-wise allocation
-- TallyPrime Education mode: the trial balance, the stock summary and the list of
-  masters are refused; so is a read of vouchers, ledger movement, either register
-  or another date-window read whose window starts or ends on a day other than the
-  1st, 2nd or 31st; so is an import file or a post with a voucher dated on any
-  other day (posting on Education has not been run)
-- The stock summary on a book with inventory turned off, and on a company split by
-  year into year-wise companies
+- TallyPrime Education mode: the trial balance, Profit and Loss, Balance Sheet,
+  the stock summary and the `masters` read are refused; so is a read of vouchers,
+  ledger movement, either register or another date-window read whose window starts
+  or ends on a day other than the 1st, 2nd or 31st; so is an import file or a post
+  with a voucher dated on any other day (posting on Education has not been run)
+- The stock summary on a book with inventory turned off, or on a company split by
+  year when a sibling year's company is loaded at the same time
 - Deleting or undoing a posted voucher (correct it in Tally)
 - Reads on very large books can fail or take longer than the assistant waits
   (#485, #703)

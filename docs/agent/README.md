@@ -1,4 +1,4 @@
-# Bridge MCP
+# ComplyEaze Bridge MCP
 
 For ordinary Claude Desktop installation, start with the
 [Download page](https://bridge.complyeaze.com/download.html), or use the
@@ -1644,7 +1644,7 @@ A ledger mapper is unnecessary for exact existing names: `validate_masters`
 returns exact matches and bounded near matches. Resolve ambiguity with the
 user rather than silently creating or choosing a ledger.
 
-## Review and post from the Bridge app
+## Review and post from the ComplyEaze Bridge app
 
 1. Build one Journal with `build_import_xml` as above. Keep its original XML
    file and local batch history on the same computer. The desktop app and MCP

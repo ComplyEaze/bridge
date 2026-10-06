@@ -219,12 +219,12 @@ pub enum CandidateRule {
     CatalogPrefix,
     /// The source name extends the catalog name.
     SourcePrefix,
-    /// Carries every word of the source name except the words this catalog
-    /// makes common (see `SharedToken`). Short words (under
-    /// `MIN_TOKEN_CHARS`, such as a GST rate or `OD`) are not tokens and are
-    /// not searched on, but a master missing one of them is not promoted. Set
-    /// inclusion, with no score and no threshold: it only orders (ahead of
-    /// [`Self::SharedToken`]); it marks no candidate best.
+    /// Carries every word of the source name: the distinctive tokens that
+    /// `SharedToken` searches on, and also the words it does not search on (a
+    /// token this catalog makes common, such as `input`; a short word such as a
+    /// GST rate or `OD`; a decimal such as `2.5`), which can only veto, never
+    /// create a candidate. Set inclusion, with no score and no threshold: it
+    /// only orders (ahead of [`Self::SharedToken`]); it marks no candidate best.
     SharedEveryDistinctiveToken,
     /// Shares a token that discriminates within this catalog.
     SharedToken,
@@ -762,6 +762,7 @@ struct CatalogEntry {
     key: String,
     identifiers: Vec<Identifier>,
     tokens: BTreeSet<String>,
+    short_words: BTreeSet<String>,
 }
 
 /// One company's observed masters of one class, indexed for binding.
@@ -826,6 +827,7 @@ impl MasterCatalog {
             entries.push(CatalogEntry {
                 identifiers: extract_identifiers(&name)?,
                 tokens: tokens_of(&key),
+                short_words: short_words_of(&key),
                 key,
                 name,
             });
@@ -1682,10 +1684,9 @@ fn collect_candidates(
             }
         }
     }
-    let distinctive = tokens_of(&entity.key)
+    let (common_typed, distinctive): (Vec<_>, Vec<_>) = tokens_of(&entity.key)
         .into_iter()
-        .filter(|token| !catalog.common_tokens.contains(token))
-        .collect::<Vec<_>>();
+        .partition(|token| catalog.common_tokens.contains(token));
     // How many of the distinctive tokens each master holds, counted while
     // walking the token index: one pass, no per-master subset search.
     let mut shared: BTreeMap<usize, usize> = BTreeMap::new();
@@ -1702,15 +1703,20 @@ fn collect_candidates(
     }
     let short_words = short_words_of(&entity.key);
     for (index, held) in shared {
-        // A master holding every distinctive word typed, and every short word
-        // typed (`5` against `18`), is listed ahead of one holding some of
-        // them. Ordering only: nothing is hidden, and `found` is unchanged, so
+        // A master holding every distinctive word typed, every common word
+        // typed (`input` against `output`) and every short word typed (`5`
+        // against `18`) is listed ahead of one holding some of them. Common
+        // and short words are never searched on, so they cannot create a
+        // candidate; they can only veto a promotion. Ordering only: nothing is hidden, and `found` is unchanged, so
         // a near-miss never turns into "missing" and no ledger is created for
         // want of a candidate. Over the cap the cut falls on the partial
         // matches first (#1076).
+        let entry = &catalog.entries[index];
         let rule = if held == distinctive.len()
-            && (short_words.is_empty()
-                || short_words.is_subset(&short_words_of(&catalog.entries[index].key)))
+            && common_typed
+                .iter()
+                .all(|token| entry.tokens.contains(token))
+            && short_words.is_subset(&entry.short_words)
         {
             CandidateRule::SharedEveryDistinctiveToken
         } else {
@@ -2006,12 +2012,15 @@ fn verified_fold(value: &str) -> String {
 /// content. That keeps the rule correct for scripts nobody here has tested,
 /// which is the property worth having.
 fn tokens_of(key: &str) -> BTreeSet<String> {
-    key.split(|character: char| {
-        character.is_whitespace() || (character.is_ascii() && !character.is_ascii_alphanumeric())
-    })
-    .filter(|token| token.chars().count() >= MIN_TOKEN_CHARS)
-    .map(str::to_string)
-    .collect()
+    key.split(is_word_separator)
+        .filter(|token| token.chars().count() >= MIN_TOKEN_CHARS)
+        .map(str::to_string)
+        .collect()
+}
+
+/// What splits a key into words, for tokens and for short words alike.
+fn is_word_separator(character: char) -> bool {
+    character.is_whitespace() || (character.is_ascii() && !character.is_ascii_alphanumeric())
 }
 
 /// The words of a key that are too short to be tokens, split the same way, and
@@ -2032,8 +2041,7 @@ fn short_words_of(key: &str) -> BTreeSet<String> {
         *decimal = false;
     };
     for (at, &character) in characters.iter().enumerate() {
-        let separator = character.is_whitespace()
-            || (character.is_ascii() && !character.is_ascii_alphanumeric());
+        let separator = is_word_separator(character);
         let joins_digits = character == '.'
             && at > 0
             && characters[at - 1].is_ascii_digit()

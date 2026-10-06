@@ -58,8 +58,8 @@ These changes are in source and not yet in a published build.
   `build_mark` for a file imported by hand, which has no POST of its own);
   `pre_import_mark` still reports the build-time mark (#1087).
 - When a ledger name you gave is not in the book, the candidates now list ahead
-  of the others the ledgers that hold every word you typed, apart from words
-  many ledgers in a large book share (`rule`: `shared_every_distinctive_token`);
+  of the others the ledgers that hold every word you typed
+  (`rule`: `shared_every_distinctive_token`), then those that share only some;
   a ledger matched by a stronger rule still comes first. The same ledgers are
   found and counted as before and none is chosen for you; when more than 25 are
   found, the ones left off the list are the ledgers holding only some of the

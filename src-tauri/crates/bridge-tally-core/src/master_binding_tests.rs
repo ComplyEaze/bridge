@@ -1990,20 +1990,66 @@ fn a_master_holding_every_typed_word_is_listed_before_one_holding_some_and_none_
 }
 
 #[test]
-fn a_word_common_in_the_catalog_is_not_required_for_the_stronger_rule() {
+fn a_typed_word_common_in_the_catalog_is_not_searched_on_but_vetoes_a_promotion() {
     // In a catalog of 20 or more, a word held by more than a tenth of the
-    // masters does not discriminate and never counted as a shared token, so a
-    // master missing it still holds every word that does count.
-    let mut names = vec!["Sharma Brothers".to_string(), "Verma Stores".to_string()];
+    // masters does not discriminate, so it never creates a candidate. It is
+    // still a word the user typed: a master lacking it holds only some of the
+    // words, so it stays `shared_token`.
+    let mut names = vec![
+        "Sharma Brothers".to_string(),
+        "Zed Sharma Traders".to_string(),
+    ];
     names.extend((0..18).map(|n| format!("Traders Unit{n:02}")));
     let refs = names.iter().map(String::as_str).collect::<Vec<_>>();
     let catalog = ledgers(&refs);
     let binding = bind_one_name(&catalog, "Sharma Traders");
-    assert_eq!(candidate_names(&binding), ["Sharma Brothers"]);
     assert_eq!(
-        rule_of(&binding, "Sharma Brothers"),
+        candidate_names(&binding),
+        ["Zed Sharma Traders", "Sharma Brothers"]
+    );
+    assert_eq!(
+        rule_of(&binding, "Zed Sharma Traders"),
         CandidateRule::SharedEveryDistinctiveToken
     );
+    assert_eq!(
+        rule_of(&binding, "Sharma Brothers"),
+        CandidateRule::SharedToken
+    );
+}
+
+#[test]
+fn a_gst_head_word_that_is_common_in_the_book_still_separates_input_from_output() {
+    // `input` sits on 11 of 100 ledgers, so it is common and not searched on.
+    // Typed "Input CGST @9%", "Output CGST 9%" holds `cgst` and `9` but not
+    // `input`: it must not be listed ahead of the input ledger under the rule
+    // that says every typed word is held, although it sorts first by name.
+    let mut names = vec![
+        "Output CGST 9%".to_string(),
+        "Zed Input CGST 9%".to_string(),
+    ];
+    names.extend((0..10).map(|n| format!("Input Filler{n:02}")));
+    names.extend((0..88).map(|n| format!("Misc Q{n:03}")));
+    let refs = names.iter().map(String::as_str).collect::<Vec<_>>();
+    let catalog = ledgers(&refs);
+    let binding = bind_one_name(&catalog, "Input CGST @9%");
+    assert_eq!(
+        candidate_names(&binding),
+        ["Zed Input CGST 9%", "Output CGST 9%"]
+    );
+    assert_eq!(
+        rule_of(&binding, "Zed Input CGST 9%"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(
+        rule_of(&binding, "Output CGST 9%"),
+        CandidateRule::SharedToken
+    );
+}
+
+#[test]
+fn the_new_rule_is_named_on_the_wire_by_its_snake_case_name() {
+    let json = serde_json::to_string(&CandidateRule::SharedEveryDistinctiveToken).unwrap();
+    assert_eq!(json, "\"shared_every_distinctive_token\"");
 }
 
 #[test]

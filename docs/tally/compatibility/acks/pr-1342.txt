@@ -1,0 +1,12 @@
+docs/adr/0004-tally-write-safety.md
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md
+src-tauri/src/agent.rs
+src-tauri/src/agent_import.rs
+src-tauri/src/agent_import_bill_wise.rs
+src-tauri/src/agent_import_post.rs
+src-tauri/src/agent_import_span_identity.rs
+src-tauri/src/agent_import_verification.rs
+src-tauri/src/agent_ledgers.rs
+src-tauri/src/agent_read_profiles.rs
+reviewer: lamemustafa

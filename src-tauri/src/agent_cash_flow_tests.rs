@@ -191,7 +191,7 @@ async fn a_net_that_ties_returns_the_months_and_says_what_was_checked() {
     assert_eq!(result["net_total"]["value"], "-4950.00");
     assert_eq!(
         result["basis"],
-        "tally_native_cash_flow_checked_against_trial_balance"
+        "tally_native_cash_flow_net_checked_against_trial_balance"
     );
     assert_eq!(result["net_total"]["money_ledgers"], 1);
     assert_eq!(
@@ -261,6 +261,20 @@ fn cash_under(group: &'static str) -> impl Fn(String) -> String {
         assert_ne!(changed, report, "the cash ledger's group was not found");
         changed
     }
+}
+
+#[tokio::test]
+async fn a_cash_flow_with_no_amount_against_ledgers_with_one_shows_that_side_as_null_not_zero() {
+    // Tally printed every month empty while the trial balance's cash ledger moved.
+    let (response, sent, expected) = call(plans(""), "2026-04-01", "2026-06-30").await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["state"], "not_established", "{result}");
+    assert_eq!(result["reason"], "cash_flow_differs_from_trial_balance");
+    assert!(result["months"].is_null(), "{result}");
+    let net = &result["net_total"];
+    assert!(net["tally_cash_flow_months_added"].is_null(), "{net}");
+    assert_eq!(net["trial_balance_cash_and_bank_ledgers"], "-4950.00");
 }
 
 #[tokio::test]

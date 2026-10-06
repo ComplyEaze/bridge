@@ -402,18 +402,22 @@ statement under AS 3. The window must be whole months: `from` the 1st of a month
 `to` the last day of a month, at most twelve months, so that each row Tally prints
 (a month name, with no year) can be placed in its year. Otherwise the call is
 refused before any trial balance or report request, after the status and company reads (`cash_flow_window_not_month_start`,
-`cash_flow_window_not_month_end`, `cash_flow_window_too_many_months`). Education
+`cash_flow_window_not_month_end`, `cash_flow_window_too_many_months`; a window starting
+before the book is `trial_balance_before_books`, and `cash_flow_window_reversed` and
+`cash_flow_window_unsupported_boundary` are the other window refusals). Education
 mode and a book with several currency masters are refused, as for the statements.
 
 The months are returned only once the **net total** of the whole window has been
 compared with the trial balance read for the same window and found equal: the
 months' closing amounts added up, against the debit and credit totals of every
-ledger under Cash-in-Hand or Bank Accounts (a group a user made inside one counts).
+ledger under Cash-in-Hand or Bank Accounts (a ledger under a group a user made inside
+one is counted by the group tree and was not measured). Both sides must carry an amount.
 The top-level `state` is `observed` when the months are returned and
 `not_established` otherwise, with `reason`:
 
-- `cash_flow_differs_from_trial_balance`: the two figures differ. `months` is
-  `null`; `net_total` carries both figures for investigation only (`use` says so),
+- `cash_flow_differs_from_trial_balance`: the two figures differ, or only one side
+  carries an amount (an empty amount is not a zero: that side shows as `null`).
+  `months` is `null`; `net_total` carries both figures for investigation only (`use` says so),
   and a count of ledgers with movement whose group could not be resolved, which is
   where to look. Neither figure is the cash movement.
 - `cash_flow_money_group_unmeasured`: a ledger under Bank OD A/c or Bank OCC A/c
@@ -429,7 +433,8 @@ The top-level `state` is `observed` when the months are returned and
 disagree), `not_checked` or `withheld`: the net total is checked; the split into months is Tally's own and is not checked (a total
 can tie while one month is wrong); Tally's debit and credit columns are read but
 not returned, because how a contra is counted in them is not measured. A month
-Tally printed with no amounts is returned with an empty `closing`, which is not zero.
+Tally printed with no amounts is returned with an empty `closing`, which is not zero and does not
+say the month had no entries (whether entries that cancel print an empty closing is not measured).
 A negative amount is a debit: cash and bank grew.
 
 An unknown report name, a reported failure, an empty answer and rows for other

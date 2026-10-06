@@ -9,9 +9,11 @@
 //! predefined group is Cash-in-Hand or Bank Accounts (a debit negative, a
 //! credit positive: the trial balance's convention, protocol reference §5.6; the
 //! sign and meaning of the Cash Flow's own credit column are not measured, and
-//! its closing figure was measured only where the credit column was empty). A
-//! contra between two such ledgers moves both and nets to nothing, so it cannot
-//! make the tie fail or pass.
+//! its closing figure was measured only where the credit column was empty). On
+//! the trial balance side a contra between two such ledgers moves both and nets
+//! to nothing; how Tally's own Cash Flow prints a contra is not measured. Both
+//! sides must carry an amount: an empty amount is not a zero, and a side with
+//! none is not compared (`Differs` or `NothingToCompare`).
 //!
 //! What it deliberately does not do:
 //! - **Bank OD A/c and Bank OCC A/c.** Whether Tally's Cash Flow counts a
@@ -35,12 +37,18 @@ use bridge_tally_protocol::{
     TallyNamedMaster,
 };
 
-/// The predefined groups whose ledgers Tally's Cash Flow was measured to count:
-/// a ledger under one of them (or under a group a user made inside one) is in
-/// the money set. The same identities the bank import's group table names.
+/// The predefined groups whose ledgers are taken as cash and bank: a ledger under
+/// one of them (or under a group a user made inside one) is in the money set. The
+/// book measured had its cash and bank ledgers directly under the two groups; a
+/// ledger under a user's sub-group is counted by the group tree and was not
+/// measured (a wrong guess fails safe as a difference). The same identities the
+/// bank import's group table names.
 const MEASURED_MONEY_GROUPS: [&str; 2] = ["Bank Accounts", "Cash-in-Hand"];
 
-/// Money groups whose treatment in the Cash Flow is not measured.
+/// Money groups whose treatment in the Cash Flow is not measured. In the group
+/// tree captured on 7.1 `Bank OCC A/c` is a language alias of the group whose
+/// reserved name is `Bank OD A/c`, so a lookup by reserved name returns the
+/// latter; the second entry covers a build that names it separately.
 const UNMEASURED_MONEY_GROUPS: [&str; 2] = ["Bank OD A/c", "Bank OCC A/c"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,14 +56,20 @@ pub(crate) enum CashFlowCheck {
     /// The months' closing amounts add up to the cash and bank ledgers' movement.
     Tied {
         net: ExactDecimal,
-        /// How many ledgers made up the money set; zero says there was nothing
-        /// to compare, not that something was checked.
+        /// How many ledgers made up the money set (at least one).
         money_ledgers: usize,
     },
-    /// The two figures differ. Nothing about the Cash Flow is checked.
+    /// The two figures differ, or only one side carries an amount. Nothing about
+    /// the Cash Flow is checked.
     Differs {
         tally_net: ExactDecimal,
         ledger_net: ExactDecimal,
+        /// Whether the months of Tally's Cash Flow carried any amount; when not,
+        /// `tally_net` is a zero standing for nothing.
+        tally_amounts: bool,
+        /// Whether any cash or bank ledger carried an amount; when not,
+        /// `ledger_net` is a zero standing for nothing.
+        ledger_amounts: bool,
         money_ledgers: usize,
         /// Ledgers whose group could not be resolved to a predefined identity
         /// and that carry movement: where to look when the figures differ.
@@ -111,7 +125,7 @@ fn decimals(text: &str) -> usize {
 }
 
 /// Adds `value` to `sum`, keeping the most decimals any term carried and
-/// counting the amount as observed.
+/// counting the amount as observed on its side.
 fn add(
     sum: &mut ExactDecimal,
     scale: &mut usize,
@@ -149,8 +163,9 @@ pub(crate) fn check_cash_flow(
     let index = GroupIndex::build(groups.iter().cloned());
     let mut ledger_net = ExactDecimal::zero();
     let mut scale = 0_usize;
-    // Amounts that were present on either side; empty ones are not counted.
-    let mut observed = 0_usize;
+    // Amounts that were present on each side; empty ones are not counted.
+    let mut ledger_observed = 0_usize;
+    let mut tally_observed = 0_usize;
     let mut money_ledgers = 0_usize;
     let mut unmeasured = 0_usize;
     let mut unclassified_with_movement = 0_usize;
@@ -160,7 +175,7 @@ pub(crate) fn check_cash_flow(
                 money_ledgers += 1;
                 for amount in [&row.debit, &row.credit] {
                     if let NativeTrialBalanceAmount::Present(value) = amount {
-                        add(&mut ledger_net, &mut scale, &mut observed, value)?;
+                        add(&mut ledger_net, &mut scale, &mut ledger_observed, value)?;
                     }
                 }
             }
@@ -185,18 +200,23 @@ pub(crate) fn check_cash_flow(
     let mut tally_net = ExactDecimal::zero();
     for row in &cash_flow.rows {
         if let NativeStatementAmount::Present(value) = &row.closing {
-            add(&mut tally_net, &mut scale, &mut observed, value)?;
+            add(&mut tally_net, &mut scale, &mut tally_observed, value)?;
         }
     }
     let tally_net = at_scale(tally_net, scale)?;
     let ledger_net = at_scale(ledger_net, scale)?;
     // Two sides with no amount at all agree about nothing: it is not a tie.
-    if observed == 0 {
+    if tally_observed == 0 && ledger_observed == 0 {
         return Ok(CashFlowCheck::NothingToCompare);
     }
-    // A tie needs a ledger to tie with: months that net to zero over no cash or
-    // bank ledger at all are Tally printing figures nothing accounts for.
-    if money_ledgers > 0 && tally_net.numeric_eq(&ledger_net) {
+    // A tie needs an amount on both sides and a ledger to tie with: an empty side
+    // is not a zero, and months that net to zero over no cash or bank ledger at
+    // all are Tally printing figures nothing accounts for.
+    if tally_observed > 0
+        && ledger_observed > 0
+        && money_ledgers > 0
+        && tally_net.numeric_eq(&ledger_net)
+    {
         Ok(CashFlowCheck::Tied {
             net: tally_net,
             money_ledgers,
@@ -205,6 +225,8 @@ pub(crate) fn check_cash_flow(
         Ok(CashFlowCheck::Differs {
             tally_net,
             ledger_net,
+            tally_amounts: tally_observed > 0,
+            ledger_amounts: ledger_observed > 0,
             money_ledgers,
             unclassified_with_movement,
         })

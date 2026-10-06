@@ -55,6 +55,8 @@ impl Server {
             CashFlowCheck::Differs {
                 tally_net,
                 ledger_net,
+                tally_amounts,
+                ledger_amounts,
                 money_ledgers,
                 unclassified_with_movement,
             } => (
@@ -64,8 +66,9 @@ impl Server {
                 json!({
                     "state": "differs",
                     "use": "investigation_only",
-                    "tally_cash_flow_months_added": tally_net,
-                    "trial_balance_cash_and_bank_ledgers": ledger_net,
+                    // A side that carried no amount is null, not a zero.
+                    "tally_cash_flow_months_added": tally_amounts.then_some(tally_net),
+                    "trial_balance_cash_and_bank_ledgers": ledger_amounts.then_some(ledger_net),
                     "money_ledgers": money_ledgers,
                     "ledgers_with_movement_and_no_group_identity": unclassified_with_movement,
                 }),
@@ -112,7 +115,7 @@ impl Server {
             "observed"
         };
         let basis_name = if !basis.months_withheld() {
-            "tally_native_cash_flow_checked_against_trial_balance"
+            "tally_native_cash_flow_net_checked_against_trial_balance"
         } else {
             "tally_native_cash_flow_withheld"
         };
@@ -129,9 +132,9 @@ impl Server {
                 "This is Tally's own Cash Flow: the month-wise movement of the cash and bank ledgers, not a cash flow statement under AS 3",
                 "A month's closing is Tally's closing column for that month. It was measured as the month's own net movement only where Tally's credit column was empty; its meaning with a credit present has not been measured",
                 "A negative amount is a debit, which is cash and bank growing; the sign of a net outflow is the opposite by the trial balance's convention and has not been measured on a month with an outflow",
-                "Only the net total of the whole period is compared with the trial balance, over the ledgers this check counts as cash and bank: those under Cash-in-Hand and Bank Accounts, a group inside them included. The split into months is Tally's and is not checked, and a total can tie while one month is wrong",
+                "Only the net total of the whole period is compared with the trial balance, over the ledgers this check counts as cash and bank: those under Cash-in-Hand and Bank Accounts, a group inside them included (a ledger under a group a user made inside one was not measured). The split into months is Tally's and is not checked, and a total can tie while one month is wrong",
                 "The comparison does not show that Tally honoured the year of the dates for each month: a wrong-year answer is caught only if its net total differs",
-                "A month Tally printed with empty amounts is returned as a month with an empty closing, which is not zero",
+                "A month Tally printed with empty amounts is returned as a month with an empty closing, which is not zero and does not say the month had no entries: whether a month with entries that cancel prints an empty closing has not been measured",
                 "Tally's debit and credit columns are not returned: how a contra is counted in them has not been measured",
                 "A ledger under Bank OD A/c or Bank OCC A/c with movement in the period refuses the result: whether Tally's Cash Flow counts it has not been measured. A ledger whose group could not be resolved is left out of the comparison and counted if the figures differ",
                 "The period must be whole months, at most twelve, so that each row can be placed in its year, and must not start before the book does: a book that begins mid-month cannot have its first month read",

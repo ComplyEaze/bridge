@@ -174,9 +174,12 @@ fn a_difference_of_one_paisa_is_not_a_tie_and_both_figures_are_returned() {
         CashFlowCheck::Differs {
             tally_net,
             ledger_net,
+            tally_amounts,
+            ledger_amounts,
             money_ledgers,
             unclassified_with_movement,
         } => {
+            assert!(tally_amounts && ledger_amounts);
             assert!(tally_net.numeric_eq(&decimal("-17975981.22")));
             assert!(ledger_net.numeric_eq(&decimal("-17975981.21")));
             assert_eq!((money_ledgers, unclassified_with_movement), (2, 0));
@@ -213,7 +216,7 @@ fn a_net_is_shown_at_the_scale_of_its_terms_not_with_its_trailing_zeros_dropped(
         row("Cash", "Cash-in-Hand", "", "2000.50"),
         row("Bank", "Bank Accounts", "-2000.50", ""),
     ];
-    match check(rows, &typed_cash_flow("")) {
+    match check(rows, &typed_cash_flow("0.00")) {
         CashFlowCheck::Tied { net, .. } => assert_eq!(net.as_str(), "0.00"),
         other => panic!("expected a tie, got {other:?}"),
     }
@@ -226,7 +229,7 @@ fn a_contra_between_two_money_ledgers_counts_on_both_sides_and_nets_to_nothing()
         row("Cash", "Cash-in-Hand", "", "2000.00"),
         row("Bank", "Bank Accounts", "-2000.00", ""),
     ];
-    assert_tied(&check(rows, &typed_cash_flow("")), "0.00", 2);
+    assert_tied(&check(rows, &typed_cash_flow("0.00")), "0.00", 2);
 }
 
 #[test]
@@ -316,10 +319,56 @@ fn money_ledgers_with_only_empty_amounts_and_an_empty_cash_flow_have_nothing_to_
 }
 
 #[test]
-fn a_ledger_that_prints_zero_and_an_empty_cash_flow_tie_at_zero() {
-    // A printed zero is an amount: both sides were read, and they agree.
+fn a_ledger_that_prints_zero_against_an_empty_cash_flow_is_not_a_tie() {
+    // Tally's Cash Flow printed no amount: an empty side is not a zero, so nothing ties.
     let rows = vec![row("Cash", "Cash-in-Hand", "0.00", "")];
-    assert_tied(&check(rows, &typed_cash_flow("")), "0.00", 1);
+    match check(rows, &typed_cash_flow("")) {
+        CashFlowCheck::Differs {
+            tally_amounts,
+            ledger_amounts,
+            ..
+        } => assert_eq!((tally_amounts, ledger_amounts), (false, true)),
+        other => panic!("expected a difference, got {other:?}"),
+    }
+}
+
+#[test]
+fn ledgers_that_net_to_zero_against_an_empty_cash_flow_are_not_a_tie() {
+    // A contra moves both ledgers; Tally printed no amount at all for the month.
+    let rows = vec![
+        row("Cash", "Cash-in-Hand", "", "2000.00"),
+        row("Bank", "Bank Accounts", "-2000.00", ""),
+    ];
+    match check(rows, &typed_cash_flow("")) {
+        CashFlowCheck::Differs { tally_amounts, .. } => assert!(!tally_amounts),
+        other => panic!("expected a difference, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_cash_flow_with_figures_against_money_ledgers_with_none_is_not_a_tie() {
+    // Tally printed -100.00 and 100.00 (net zero) while every cash and bank ledger is empty.
+    let rows = vec![row("Cash", "Cash-in-Hand", "", "")];
+    let mut cash_flow = typed_cash_flow("-100.00");
+    let mut october = cash_flow.rows[0].clone();
+    october.month.month = 10;
+    october.closing =
+        bridge_tally_protocol::native_statement_reports::NativeStatementAmount::Present(decimal(
+            "100.00",
+        ));
+    cash_flow.rows.push(october);
+    match check(rows, &cash_flow) {
+        CashFlowCheck::Differs {
+            tally_amounts,
+            ledger_amounts,
+            money_ledgers,
+            ..
+        } => assert_eq!(
+            (tally_amounts, ledger_amounts, money_ledgers),
+            (true, false, 1)
+        ),
+        other => panic!("expected a difference, got {other:?}"),
+    }
 }
 
 #[test]
@@ -358,6 +407,8 @@ fn the_refusal_codes_are_stable_and_distinct() {
     let differs = CashFlowCheck::Differs {
         tally_net: decimal("1"),
         ledger_net: decimal("2"),
+        tally_amounts: true,
+        ledger_amounts: true,
         money_ledgers: 1,
         unclassified_with_movement: 0,
     };

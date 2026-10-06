@@ -367,7 +367,7 @@ fn near_duplicate_masters_produce_candidates_and_choose_none() {
         [
             CandidateRule::CatalogPrefix,
             CandidateRule::CatalogPrefix,
-            CandidateRule::SharedToken
+            CandidateRule::SharedEveryDistinctiveToken
         ]
     );
     assert_eq!(unresolved.candidates.found(), 3);
@@ -1942,8 +1942,134 @@ fn candidate_order_is_rule_then_name_and_never_a_ranking() {
             ("ALPHA (5550000002)", CandidateRule::SharedIdentifier),
             ("ALPHA (5550000003)", CandidateRule::SharedIdentifier),
             ("ALPHA WHOLESALE", CandidateRule::CatalogPrefix),
-            ("ZETA ALPHA STORE", CandidateRule::SharedToken),
+            (
+                "ZETA ALPHA STORE",
+                CandidateRule::SharedEveryDistinctiveToken
+            ),
         ]
+    );
+}
+
+/// The rule of a listed candidate, by name.
+fn rule_of(binding: &EntityBinding, name: &str) -> CandidateRule {
+    binding
+        .unresolved()
+        .expect("binding did not resolve")
+        .candidates
+        .listed()
+        .iter()
+        .find(|candidate| candidate.catalog_name == name)
+        .unwrap_or_else(|| panic!("{name} is not listed"))
+        .rule
+}
+
+#[test]
+fn a_master_holding_every_typed_word_is_listed_before_one_holding_some_and_none_is_dropped() {
+    // #1076: "HDFC Cash Credit" must reach "Zed Cash Credit HDFC" (every word,
+    // not an extension of the typed name) ahead of a ledger that only shares
+    // "Cash" and "Credit". Name order alone would put "Cash Credit Interest"
+    // first. Nothing is hidden: all three are listed, so
+    // no near-miss becomes "missing".
+    let catalog = ledgers(&["Cash Credit Interest", "Zed Cash Credit HDFC", "HDFC Bank"]);
+    let binding = bind_one_name(&catalog, "HDFC Cash Credit");
+    assert_eq!(reason(&binding), UnboundReason::NearMiss);
+    assert_eq!(
+        candidate_names(&binding),
+        ["Zed Cash Credit HDFC", "Cash Credit Interest", "HDFC Bank"]
+    );
+    assert_eq!(
+        rule_of(&binding, "Zed Cash Credit HDFC"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(
+        rule_of(&binding, "Cash Credit Interest"),
+        CandidateRule::SharedToken
+    );
+    assert_eq!(rule_of(&binding, "HDFC Bank"), CandidateRule::SharedToken);
+    assert_eq!(binding.unresolved().unwrap().candidates.found(), 3);
+}
+
+#[test]
+fn a_word_common_in_the_catalog_is_not_required_for_the_stronger_rule() {
+    // In a catalog of 20 or more, a word held by more than a tenth of the
+    // masters does not discriminate and never counted as a shared token, so a
+    // master missing it still holds every word that does count.
+    let mut names = vec!["Sharma Brothers".to_string(), "Verma Stores".to_string()];
+    names.extend((0..18).map(|n| format!("Traders Unit{n:02}")));
+    let refs = names.iter().map(String::as_str).collect::<Vec<_>>();
+    let catalog = ledgers(&refs);
+    let binding = bind_one_name(&catalog, "Sharma Traders");
+    assert_eq!(candidate_names(&binding), ["Sharma Brothers"]);
+    assert_eq!(
+        rule_of(&binding, "Sharma Brothers"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+}
+
+#[test]
+fn the_stronger_rule_survives_the_candidate_cap_that_name_order_would_apply() {
+    // 26 masters share only "bravo" (under a tenth of 300) and sort before
+    // "Zulu Bravo Gamma", which holds every typed word. The cap is applied in
+    // the order the list is sorted into, so the full match must be inside it.
+    let mut names = (0..26)
+        .map(|n| format!("Bravo P{n:02}"))
+        .collect::<Vec<_>>();
+    names.push("Zulu Bravo Gamma".to_string());
+    names.extend((0..273).map(|n| format!("Filler Q{n:03}")));
+    let refs = names.iter().map(String::as_str).collect::<Vec<_>>();
+    let catalog = ledgers(&refs);
+    let binding = bind_one_name(&catalog, "Bravo Gamma");
+    let listed = candidate_names(&binding);
+    assert_eq!(listed.len(), MAX_CANDIDATES_PER_ENTITY);
+    assert_eq!(listed[0], "Zulu Bravo Gamma");
+    assert_eq!(
+        rule_of(&binding, "Zulu Bravo Gamma"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(binding.unresolved().unwrap().candidates.found(), 27);
+}
+
+#[test]
+fn a_short_word_typed_must_match_too_so_a_wrong_rate_ledger_is_not_lifted() {
+    // "5" is too short to be a token, but it is what tells these ledgers apart.
+    // "Input IGST 18%" holds both tokens and not the rate: it must not be
+    // promoted past the ledger that holds the rate. Both stay listed, in the
+    // order they had before this rule.
+    let catalog = ledgers(&["IGST 5%", "Input IGST 18%", "Zed Input IGST 5%"]);
+    let binding = bind_one_name(&catalog, "Input IGST 5%");
+    assert_eq!(
+        rule_of(&binding, "Zed Input IGST 5%"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(
+        rule_of(&binding, "Input IGST 18%"),
+        CandidateRule::SharedToken
+    );
+    assert_eq!(rule_of(&binding, "IGST 5%"), CandidateRule::SharedToken);
+    assert_eq!(
+        candidate_names(&binding),
+        ["Zed Input IGST 5%", "IGST 5%", "Input IGST 18%"]
+    );
+    assert_eq!(binding.unresolved().unwrap().candidates.found(), 3);
+}
+
+#[test]
+fn a_decimal_rate_is_one_word_so_five_does_not_match_inside_two_point_five() {
+    // `2.5` must not be read as `2` and `5`: typed "Input CGST 5%" would
+    // otherwise match the 2.5% ledger on its short words and lift it.
+    let catalog = ledgers(&["Input CGST 2.5%", "Zed Input CGST 5%"]);
+    let binding = bind_one_name(&catalog, "Input CGST 5%");
+    assert_eq!(
+        rule_of(&binding, "Zed Input CGST 5%"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(
+        rule_of(&binding, "Input CGST 2.5%"),
+        CandidateRule::SharedToken
+    );
+    assert_eq!(
+        candidate_names(&binding),
+        ["Zed Input CGST 5%", "Input CGST 2.5%"]
     );
 }
 

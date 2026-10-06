@@ -452,7 +452,7 @@ names**.
 | `Alpha Pilot Account 5550001001` | `identifier` | **the rule this module exists for**: a name sharing no word with the master bound on its embedded number |
 | `Zeta Holdings 5550001009` | `near_miss`, 2 candidates, `shared_identifier` | one identifier on two masters refuses and shows both |
 | `MB TRADING COMPANY LTD` | `near_miss`, 2 candidates | a truncation surfaces both neighbours and chooses neither |
-| `MB EXPENSES FY2025` | `near_miss`, 2 candidates, `shared_token` | a shared period label did **not** become an identifier |
+| `MB EXPENSES FY2025` | `near_miss`, 2 candidates, `shared_token` (as run, before #1076; a re-run now gives `shared_every_distinctive_token` where a master holds every distinctive word) | a shared period label did **not** become an identifier |
 | `MB ITEM PH-01-AB-00` | `identifier` | a code matched across punctuation |
 | `Zeta Nowhere Traders` | `missing`, `listing: "none"` | an absence stated as an absence, not as an empty list |
 | `MB PARTY BETA` | `near_miss`, 4 candidates | a prefix family surfaced whole |

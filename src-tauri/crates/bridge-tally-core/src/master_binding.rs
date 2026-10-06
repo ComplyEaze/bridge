@@ -219,6 +219,13 @@ pub enum CandidateRule {
     CatalogPrefix,
     /// The source name extends the catalog name.
     SourcePrefix,
+    /// Carries every word of the source name except the words this catalog
+    /// makes common (see `SharedToken`). Short words (under
+    /// `MIN_TOKEN_CHARS`, such as a GST rate or `OD`) are not tokens and are
+    /// not searched on, but a master missing one of them is not promoted. Set
+    /// inclusion, with no score and no threshold: it only orders (ahead of
+    /// [`Self::SharedToken`]); it marks no candidate best.
+    SharedEveryDistinctiveToken,
     /// Shares a token that discriminates within this catalog.
     SharedToken,
 }
@@ -231,7 +238,8 @@ impl CandidateRule {
             Self::NormalizedEqual => 2,
             Self::CatalogPrefix => 3,
             Self::SourcePrefix => 4,
-            Self::SharedToken => 5,
+            Self::SharedEveryDistinctiveToken => 5,
+            Self::SharedToken => 6,
         }
     }
 }
@@ -1674,19 +1682,41 @@ fn collect_candidates(
             }
         }
     }
-    for token in tokens_of(&entity.key) {
-        if catalog.common_tokens.contains(&token) {
-            continue;
-        }
+    let distinctive = tokens_of(&entity.key)
+        .into_iter()
+        .filter(|token| !catalog.common_tokens.contains(token))
+        .collect::<Vec<_>>();
+    // How many of the distinctive tokens each master holds, counted while
+    // walking the token index: one pass, no per-master subset search.
+    let mut shared: BTreeMap<usize, usize> = BTreeMap::new();
+    for token in &distinctive {
         for index in catalog
             .by_token
-            .get(&token)
+            .get(token)
             .into_iter()
             .flatten()
             .filter(|index| !withheld.contains(index))
         {
-            offer(*index, CandidateRule::SharedToken);
+            *shared.entry(*index).or_default() += 1;
         }
+    }
+    let short_words = short_words_of(&entity.key);
+    for (index, held) in shared {
+        // A master holding every distinctive word typed, and every short word
+        // typed (`5` against `18`), is listed ahead of one holding some of
+        // them. Ordering only: nothing is hidden, and `found` is unchanged, so
+        // a near-miss never turns into "missing" and no ledger is created for
+        // want of a candidate. Over the cap the cut falls on the partial
+        // matches first (#1076).
+        let rule = if held == distinctive.len()
+            && (short_words.is_empty()
+                || short_words.is_subset(&short_words_of(&catalog.entries[index].key)))
+        {
+            CandidateRule::SharedEveryDistinctiveToken
+        } else {
+            CandidateRule::SharedToken
+        };
+        offer(index, rule);
     }
 
     // The total is the union: a withheld family and the candidates still worth
@@ -1982,6 +2012,43 @@ fn tokens_of(key: &str) -> BTreeSet<String> {
     .filter(|token| token.chars().count() >= MIN_TOKEN_CHARS)
     .map(str::to_string)
     .collect()
+}
+
+/// The words of a key that are too short to be tokens, split the same way, and
+/// any decimal number (`2.5`, `12.5`) kept whole. A GST rate or `OD` is one: it
+/// tells two ledgers apart but is too short to search on, so it can only veto a
+/// promotion, never create a candidate. A decimal stays one word so that `5`
+/// does not match inside `2.5`.
+fn short_words_of(key: &str) -> BTreeSet<String> {
+    let characters = key.chars().collect::<Vec<_>>();
+    let mut words = BTreeSet::new();
+    let mut current = String::new();
+    let mut decimal = false;
+    let mut flush = |current: &mut String, decimal: &mut bool| {
+        if !current.is_empty() && (*decimal || current.chars().count() < MIN_TOKEN_CHARS) {
+            words.insert(std::mem::take(current));
+        }
+        current.clear();
+        *decimal = false;
+    };
+    for (at, &character) in characters.iter().enumerate() {
+        let separator = character.is_whitespace()
+            || (character.is_ascii() && !character.is_ascii_alphanumeric());
+        let joins_digits = character == '.'
+            && at > 0
+            && characters[at - 1].is_ascii_digit()
+            && characters.get(at + 1).is_some_and(char::is_ascii_digit);
+        if joins_digits {
+            current.push(character);
+            decimal = true;
+        } else if separator {
+            flush(&mut current, &mut decimal);
+        } else {
+            current.push(character);
+        }
+    }
+    flush(&mut current, &mut decimal);
+    words
 }
 
 /// Extracts every identifier a name carries, in canonical form.

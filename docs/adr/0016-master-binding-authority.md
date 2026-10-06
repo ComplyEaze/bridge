@@ -282,7 +282,7 @@ stemming, and no similarity threshold anywhere in the implementation.
 
 Every non-binding entity carries its candidates, each labelled with the **rule
 that produced it** — `SharedIdentifier`, `NormalizedEqual`, `SourcePrefix`,
-`CatalogPrefix`, or `SharedToken`. Candidates are ordered by rule and then by
+`CatalogPrefix`, `SharedEveryDistinctiveToken`, or `SharedToken`. Candidates are ordered by rule and then by
 name; **no candidate is marked best, first-choice, or `exact_live_spelling`,
 and no numeric score is emitted at all.**
 
@@ -297,6 +297,18 @@ it records what was observed).
 (20) entries, so a catalog-wide word cannot pull in every master. The
 suppression is measured from the catalog rather than from a built-in word list,
 which keeps it free of language and domain assumptions.
+
+`SharedEveryDistinctiveToken` (#1076) is `SharedToken` for a master that holds
+**every** token of the source name that survives that suppression, and every
+word of it too short to be a token (a GST rate, `OD`; a decimal such as `2.5` is one word), so `Input IGST 5%` does
+not lift `Input IGST 18%` past `IGST 5%`. It is set inclusion, not a degree of
+similarity, and there is no threshold in it. It lists such a master ahead of one
+holding some of the words, and it does so before the cap. It marks no candidate
+best, and a name with one distinctive word and no short word makes every candidate
+sharing it a `SharedEveryDistinctiveToken`. Neither rule removes a candidate from what is
+found or counted, so a near-miss never becomes "missing", which would get a
+ledger created. Under the 25-name cap the same masters are listed in a new order;
+over it, the cut now falls on the partial matches first.
 
 Candidates are capped at `MAX_CANDIDATES_PER_ENTITY` (25). The core retains
 `candidate_count`, listing state and `Candidates::count_is_lower_bound()`.

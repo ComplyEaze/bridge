@@ -424,7 +424,9 @@ pub fn check_invariants(book: &Book, result: &TestResult) -> Result<Vec<String>>
             if names.is_empty() {
                 continue;
             }
-            let movement = tb_sum(&names, |row| row.closing_paise - row.opening_paise)?;
+            let movement = tb_sum(&names, |row| row.closing_paise)?
+                .checked_sub(tb_sum(&names, |row| row.opening_paise)?)
+                .ok_or_else(overflow)?;
             let excess = value
                 .checked_abs()
                 .and_then(|v| v.checked_sub(movement.checked_abs()?))
@@ -496,6 +498,15 @@ closing payable does not hold (check for a transposed accrued/paid figure)",
 mod tests {
     use super::*;
 
+    /// A refusal's code and whole detail, so a refusal that loses the keys or the field it
+    /// names fails the test.
+    fn refusal(err: AuditError) -> (&'static str, String) {
+        match err {
+            AuditError::Refused { code, detail } => (code, detail),
+            other => panic!("not a refusal: {other}"),
+        }
+    }
+
     fn table(text: &str) -> RelatedPartiesConfig {
         let persons: toml::Table = text.parse().unwrap();
         RelatedPartiesConfig {
@@ -511,8 +522,13 @@ mod tests {
         let persons =
             related_persons(&table("\"Person PXD\" = {}\n\"Person ACOW\" = {}\n")).unwrap();
         assert_eq!(
-            person_tags(&persons).unwrap_err().code(),
-            Some("RELATED-tag-collision")
+            refusal(person_tags(&persons).unwrap_err()),
+            (
+                "RELATED-tag-collision",
+                "related_parties_cl23: related persons \"Person ACOW\" and \"Person PXD\" share \
+the tag 773442d1; rename one key in [related_parties]"
+                    .to_string()
+            )
         );
         // The tag is of the key as written: case and composed/decomposed forms are persons apart.
         let persons = related_persons(&table(
@@ -524,18 +540,51 @@ mod tests {
 
     #[test]
     fn a_present_field_of_the_wrong_shape_is_refused_naming_the_person() {
-        for text in [
-            "\"Person A\" = \"brother\"\n",
-            "[\"Person A\"]\nrelationship = 5\n",
-            "[\"Person A\"]\nledgers_by_nature = [\"Rent\"]\n",
-            "[\"Person A\"]\nledgers_by_nature = { rent = \"Rent\" }\n",
-            "[\"Person A\"]\nledgers_by_nature = { rent = [\"Rent\", 5] }\n",
-            "[\"Person A\"]\nledgers_by_nature = { commission = [true] }\n",
-            "[\"Person A\"]\npayable_natures = \"rent\"\n",
-            "[\"Person A\"]\npayable_natures = [1]\n",
+        for (text, field, expected) in [
+            ("\"Person A\" = \"brother\"\n", "(value)", "a table"),
+            ("[\"Person A\"]\nrelationship = 5\n", "relationship", "text"),
+            (
+                "[\"Person A\"]\nledgers_by_nature = [\"Rent\"]\n",
+                "ledgers_by_nature",
+                "a table",
+            ),
+            (
+                "[\"Person A\"]\nledgers_by_nature = { rent = \"Rent\" }\n",
+                "ledgers_by_nature.rent",
+                "a list of text",
+            ),
+            (
+                "[\"Person A\"]\nledgers_by_nature = { rent = [\"Rent\", 5] }\n",
+                "ledgers_by_nature.rent",
+                "a list of text",
+            ),
+            (
+                "[\"Person A\"]\nledgers_by_nature = { commission = [true] }\n",
+                "ledgers_by_nature.commission",
+                "a list of text",
+            ),
+            (
+                "[\"Person A\"]\npayable_natures = \"rent\"\n",
+                "payable_natures",
+                "a list of text",
+            ),
+            (
+                "[\"Person A\"]\npayable_natures = [1]\n",
+                "payable_natures",
+                "a list of text",
+            ),
         ] {
-            let err = related_persons(&table(text)).unwrap_err();
-            assert_eq!(err.code(), Some("RELATED-table-shape"), "{text}");
+            assert_eq!(
+                refusal(related_persons(&table(text)).unwrap_err()),
+                (
+                    "RELATED-table-shape",
+                    format!(
+                        "related_parties_cl23: related_parties.\"Person A\".{field} is present but \
+is not {expected}"
+                    )
+                ),
+                "{text}"
+            );
         }
     }
 
@@ -557,6 +606,72 @@ mod tests {
                 ledgers_by_nature: BTreeMap::from([("rent".to_string(), vec!["Rent".to_string()])]),
                 payable_natures: Vec::new(),
             }
+        );
+    }
+
+    /// XCL-1's three messages the test's own output cannot reach (spec pack §6), on a hand-built
+    /// result: a paid figure with no accrued figure, a paid figure citing no ledger, and a
+    /// published opening and closing payable the TB does not give.
+    #[test]
+    fn xcl_1_reports_what_the_test_itself_never_publishes() {
+        let mut book = Book::default();
+        book.tb.insert(
+            "Salary Payable".into(),
+            crate::book::TbRow {
+                opening_paise: -3_000_000,
+                debit_paise: 11_000_000,
+                credit_paise: 12_000_000,
+                closing_paise: -4_000_000,
+            },
+        );
+        let rules = Rules::vendored().unwrap();
+        let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
+        let ledger = || vec![EvidenceRef::new("ledger", "Salary Payable")];
+        r.fig(
+            "payable_paid_rent_aaaaaaaa",
+            Value::Int(10),
+            Unit::Paise,
+            "d",
+            ledger(),
+        )
+        .unwrap();
+        r.fig(
+            "payable_paid_other_bbbbbbbb",
+            Value::Int(10),
+            Unit::Paise,
+            "d",
+            Vec::new(),
+        )
+        .unwrap();
+        r.fig(
+            "payable_accrued_other_bbbbbbbb",
+            Value::Int(10),
+            Unit::Paise,
+            "d",
+            Vec::new(),
+        )
+        .unwrap();
+        for (figure, value) in [
+            ("payable_opening_salary_cccccccc", 1),
+            ("payable_closing_salary_cccccccc", 2),
+            ("payable_accrued_salary_cccccccc", 12_000_000),
+            ("payable_paid_salary_cccccccc", 11_000_000),
+        ] {
+            r.fig(figure, Value::Int(value), Unit::Paise, "d", ledger())
+                .unwrap();
+        }
+        assert_eq!(
+            check_invariants(&book, &r).unwrap(),
+            [
+                "XCL-1: related_parties_cl23.payable_paid_rent_aaaaaaaa has no matching \
+related_parties_cl23.payable_accrued_rent_aaaaaaaa",
+                "XCL-1: related_parties_cl23.payable_paid_other_bbbbbbbb carries no ledger evidence \
+to verify against the Trial Balance",
+                "XCL-1: related_parties_cl23.payable_opening_salary_cccccccc = 1p but the TB itself \
+gives opening payable 3000000p for the same ledger set",
+                "XCL-1: related_parties_cl23.payable_closing_salary_cccccccc = 2p but the TB itself \
+gives closing payable 4000000p for the same ledger set",
+            ]
         );
     }
 }

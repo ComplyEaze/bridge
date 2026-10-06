@@ -9638,5 +9638,45 @@
   "file": "src/binding.rs",
   "from": "            *v = toml::Value::Array(\n                lbinder\n                    .bind_list(&names, &location)?",
   "to": "            *v = toml::Value::Array(\n                names"
+ },
+ {
+  "id": "RP-21",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 says nothing of a paid figure with no accrued figure",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        let Some(accrued) = value_of(&accrued_id) else {\n            out.push(format!(\"XCL-1: {} has no matching {accrued_id}\", figure.id));",
+  "to": "        let Some(accrued) = value_of(&accrued_id) else {\n            let _ = &accrued_id;"
+ },
+ {
+  "id": "RP-22",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 says nothing of a paid figure citing no ledger",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if names.is_empty() {\n            out.push(format!(\n                \"XCL-1: {} carries no ledger evidence to verify against the Trial Balance\",\n                figure.id\n            ));",
+  "to": "        if names.is_empty() {"
+ },
+ {
+  "id": "RP-23",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 never compares a published opening or closing payable",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                if published != recomputed {",
+  "to": "                if published != recomputed && false {"
+ },
+ {
+  "id": "RP-24",
+  "by": "author",
+  "what": "related_parties_cl23: the tag-collision refusal names one key twice",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                    \"{TEST_ID}: related persons {first:?} and {key:?} share the tag {tag}; \\",
+  "to": "                    \"{TEST_ID}: related persons {key:?} and {key:?} share the tag {tag}; \\"
+ },
+ {
+  "id": "RP-25",
+  "by": "author",
+  "what": "related_parties_cl23: the shape refusal drops the person key",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        format!(\"{TEST_ID}: related_parties.{key:?}.{field} is present but is not {expected}\"),",
+  "to": "        format!(\"{TEST_ID}: related_parties.{field} is present but is not {expected}\"),"
  }
 ]

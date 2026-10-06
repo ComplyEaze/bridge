@@ -763,6 +763,10 @@ fn the_v2_catalogue_request_is_v1_plus_the_bill_wise_method() {
             .collect::<Vec<_>>(),
         v1.lines().collect::<Vec<_>>()
     );
+    assert_eq!(
+        ReadOnlyProfileId::StandardLedgerCatalogV2.as_str(),
+        "standard_ledger_catalog_v2"
+    );
     assert_ne!(
         ReadOnlyProfileId::StandardLedgerCatalogV1.template_sha256(),
         ReadOnlyProfileId::StandardLedgerCatalogV2.template_sha256()

@@ -65,10 +65,13 @@ mod voucher_search;
 #[path = "agent_vouchers.rs"]
 mod vouchers;
 use voucher_search::VoucherSearch;
+#[path = "agent_voucher_groups.rs"]
+mod voucher_groups;
 #[path = "agent_voucher_summary.rs"]
 mod voucher_summary;
 #[cfg(test)]
 use outstandings::*;
+use voucher_groups::Placements;
 use voucher_summary::{SummaryGroup, SummaryRequest};
 #[path = "agent_movement.rs"]
 mod movement;

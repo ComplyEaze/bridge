@@ -1020,8 +1020,10 @@ whole read carries no window.
 
 ### Search and summaries in `vouchers` (#1230)
 
-Both work on the rows `vouchers` has already read and labelled; neither sends a
-Tally request of its own, so each costs what the same `vouchers` call costs.
+Search, and the `ledger`, `month` and `voucher_type` summaries, work on the rows `vouchers`
+has already read and labelled and send no Tally request of their own, so each costs what the
+same `vouchers` call costs. The `group` and `primary_group` summaries also read the ledger
+list and the group list (see below).
 
 **Search.** `voucher_number`, `reference`, `narration_contains` and `amount` keep
 the vouchers that satisfy every criterion given.
@@ -1054,7 +1056,7 @@ the vouchers that satisfy every criterion given.
   question a held window answers. `voucher_types` counts (`included`, `in_scope`)
   are taken before the search, so with a search they do not add up to `total`.
 
-**Summaries.** `summarise_by` (`ledger`, `month` or `voucher_type`) replaces
+**Summaries.** `summarise_by` (`ledger`, `month`, `voucher_type`, `group` or `primary_group`) replaces
 `items` with `buckets`, over the same window, selectors and search. `offset` and
 `limit` page the buckets; a later page comes from the held window as a later page
 of vouchers does. A summary holds its own window (the grouping is part of the
@@ -1107,7 +1109,61 @@ each other.
   when more remain (the next `offset` is this `offset` plus the buckets returned); a page that still does not fit is refused
   `agent_response_too_large`, so lower `limit` or raise the budget. The egress
   receipt counts the buckets as the rows prepared.
-- Ledger names in `group` are masked when parties are masked.
+- Ledger names in `ledger` buckets, and in the `members` of a `group` or `primary_group` bucket, are masked when parties are masked; group names are not (below).
+- **`group` and `primary_group`** add each ledger's entries under the group it sits in:
+  - A `group` bucket holds only the ledgers directly under that group, as the ledger master
+    shows it (a ledger directly under the reserved root is under `Primary`, with `reserved_name`
+    null). So a predefined group whose ledgers all sit in user sub-groups, such as Sundry Debtors
+    split into two, has no bucket of its own, and Indirect Expenses has a smaller one than Tally's
+    group total. The whole figure of a group, descendants included, is in **`subtree_totals`**: each
+    group on any bucket's chain with its `depth` (1 for a group under the root), `vouchers`,
+    `debit`, `credit` and `net` over everything under it, largest movement first, at most 60, with
+    `subtree_totals_total` exact and `subtree_totals_complete`. They overlap (a ledger counts under
+    every group above it), so they do not add up to `totals`. Every page carries them. When
+    `subtree_totals_complete` is false the groups past the 60th are not in the answer: the groups
+    directly under the root are all in `primary_group`, and any other group's figure is the sum of
+    its member ledgers' buckets (read with `ledger`, or narrow the window).
+  - A `group` bucket carries `reserved_name` (empty for a group the book's user made), `chain`
+    (every group from it up to the one under the root, nearest first, each with `name` and
+    `reserved_name`) and `primary_group`. A user group is its own bucket, however deep it sits.
+  - A `primary_group` bucket holds every ledger under the group directly under the root and is
+    keyed by its reserved name, so a renamed predefined group stays one bucket and `group` shows
+    its current name; a group the book's user made there has no reserved name and is keyed by its
+    name, so two such groups are two buckets.
+  - Each bucket lists `members`: the ledgers in it with their own `debit` and `credit`, largest
+    movement first (never by name), at most 10, with `members_total` exact and `members_complete`.
+    Where a bucket is complete, its members add up to it. Every entry of the selected vouchers is
+    counted, also when `ledger` is given.
+  - A group bucket cannot be narrowed with a selector, so its vouchers are traced through a member
+    ledger with `ledger`; only 10 members are named, and `voucher_refs` names up to 5 vouchers.
+  - Group names are shown as the book has them, as `parent` is in `ledger_masters` and
+    `trial_balance` (a group may be named after a party); member ledger names are masked when
+    parties are masked.
+  - The groups are the book's masters read now, not the grouping in force on each voucher's date.
+    Each ledger's group chain is read before the window and again after it and must be the same, or
+    the call refuses: `group_snapshot_drifted` if a chain changed, `ledger_snapshot_drifted` if the
+    set of ledgers did. (A group that no listed ledger sits under could change unseen.)
+  - A ledger the ledger list does not hold, or whose chain cannot be walked to the root, refuses the
+    whole summary as `summary_group_unresolved`, with `cause` one of `no_parent`, `group_absent`,
+    `group_name_repeated`, `reserved_name_missing`, `cycle`, `exhausted`, `top_group_not_under_root`
+    (the top group of the chain has no parent, or none that is the root) or `ledger_not_in_catalogue`
+    (`no_parent` also covers a group name Tally returned that cannot be carried, one with control
+    characters or over 1,024 bytes): a group total that is short of an entry it could not place is the
+    misleading answer, so there is no "unplaced" bucket. A ledger no voucher of the window touches
+    does not matter. A voucher withheld for a foreign-currency amount is still in no bucket (the
+    result is `partial`, as for every summary).
+  - Cost, by construction and not measured: the ledger list in 4 requests and the group list in 4
+    more (two paired reads each), and 8 and 4 when `ledger` is also given, on top of the window
+    read; a large book's ledger list is large, and a real book's group buckets may need several
+    pages (use `offset`). For ledger totals over a month or more on a large book, `trial_balance` is
+    the cheaper read.
+  - A later page comes from the held window with the placements it was read with, so it reads no
+    masters.
+  - Not measured live: the group summaries have not been run against a live Tally. The tests use a
+    live ledger catalogue and group snapshot of the synthetic book and the same book's
+    `trial_balance` (its parent column comes from the same ledger collection, so it checks the
+    placement logic, while its amounts are independent), and scripted answers for the call itself,
+    with a group snapshot derived from the live one for the end-to-end tests.
 
 A summary over a `partial` window is only as complete as that window: `state` and `reason` say which, and `basis` does not repeat them.
 

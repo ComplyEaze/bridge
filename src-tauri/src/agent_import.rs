@@ -1667,6 +1667,34 @@ impl Server {
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
     ) -> Result<(Vec<String>, Evidence), ToolFailure> {
+        let (catalogue, evidence) = self
+            .read_standard_ledger_catalogue(identity, company_name)
+            .await?;
+        Ok((catalogue.names().map(str::to_string).collect(), evidence))
+    }
+
+    /// The same catalogue read, with each ledger's immediate parent group as Tally returned it
+    /// (`None` when it returned none), for the group summaries of `vouchers` (#1230).
+    pub(super) async fn read_ledger_parents(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(Vec<(String, Option<String>)>, Evidence), ToolFailure> {
+        let (catalogue, evidence) = self
+            .read_standard_ledger_catalogue(identity, company_name)
+            .await?;
+        let parents = catalogue
+            .parents()
+            .map(|(ledger, parent)| (ledger.to_string(), parent.map(str::to_string)))
+            .collect();
+        Ok((parents, evidence))
+    }
+
+    async fn read_standard_ledger_catalogue(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(bridge_tally_protocol::StandardLedgerCatalog, Evidence), ToolFailure> {
         let read = standard_ledger_catalog_read(company_name)
             .map_err(|_| "company_name_invalid".to_string())?;
         admit_standard_ledger_catalog_request(read.as_str().to_string())
@@ -1675,7 +1703,7 @@ impl Server {
         let catalogue =
             parse_standard_ledger_catalog_response(&xml, company_name, identity.company_guid())
                 .map_err(|error| catalogue_failure(error, &evidence))?;
-        Ok((catalogue.names().map(str::to_string).collect(), evidence))
+        Ok((catalogue, evidence))
     }
 
     /// The import family's ledger catalogue: V1's rows, each with its
@@ -1711,10 +1739,11 @@ impl Server {
         ))
     }
 
-    /// The company's group tree, read only when a payload needs one leg
-    /// classified as cash or bank. A ledger row carries a single `PARENT` hop
-    /// and no `PARENTSTRUCTURE`, so the group identities live here.
-    async fn read_group_collection(
+    /// The company's group tree, read when a payload needs one leg
+    /// classified as cash or bank and for the group summaries of `vouchers`. A
+    /// ledger row carries a single `PARENT` hop and no `PARENTSTRUCTURE`, so the
+    /// group identities live here.
+    pub(super) async fn read_group_collection(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,

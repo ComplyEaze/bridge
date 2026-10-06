@@ -4836,6 +4836,7 @@ async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
             Some(ledger_match.clone()),
             Some("Cash".to_string()),
             None,
+            None,
         ))));
     let second = one
         .call(json!({"ledger": "cash", "offset": 1, "limit": 1}))
@@ -4867,6 +4868,7 @@ fn a_held_window_is_found_by_its_own_question_only() {
             marks_of(3),
             Arc::new(Vec::new()),
             Value::Null,
+            None,
             None,
             None,
             None,
@@ -5507,10 +5509,10 @@ fn the_vouchers_schema_lists_the_groupings_and_the_search_criteria() {
         }
         validate_tool_arguments("vouchers", &args)
     };
-    for grouping in ["ledger", "month", "voucher_type"] {
+    for grouping in ["ledger", "month", "voucher_type", "group", "primary_group"] {
         assert_eq!(call(json!({"summarise_by": grouping})), Ok(()));
     }
-    assert!(call(json!({"summarise_by": "group"})).is_err());
+    assert!(call(json!({"summarise_by": "groups"})).is_err());
     for criterion in [
         "voucher_number",
         "reference",
@@ -5720,6 +5722,7 @@ async fn a_held_ledger_window_summarises_only_that_ledgers_entries_by_month() {
                 "similar_ledgers": [], "similar_ledgers_total": 0})),
             Some("WR2 Sales".to_string()),
             None,
+            None,
         ))));
     let second = one
         .call(json!({"ledger": "WR2 Sales", "summarise_by": "month", "offset": 1, "limit": 1}))
@@ -5749,6 +5752,7 @@ async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_rem
     let request = SummaryRequest {
         group: SummaryGroup::Ledger,
         selected_ledger: None,
+        placements: None,
     };
     let body =
         vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
@@ -5761,4 +5765,314 @@ async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_rem
         vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
     assert_eq!(whole.items.len(), 4);
     assert!(!whole.truncated);
+}
+
+// -- #1230: summarise_by group and primary_group ----------------------------------------------
+//
+// The masters the scripted Tally answers are captured: the WR2 book's ledger catalogue and the live group
+// snapshot of another synthetic book. That snapshot is DERIVED here for this book (its GUID and the GUIDs
+// that carry it moved to this book's, and one user group the catalogue needs added), because no group
+// snapshot of this book was captured.
+
+fn wr2_group_snapshot() -> String {
+    let live = captured_utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/shape-lab-group-snapshot.utf16le.xml"
+    ))
+    .replace("3a6bd6e1-b835-4bff-89dd-8a6af138c346", GUID);
+    let start = live.find("<GROUP NAME=\"Trade Debtors - Local\"").unwrap();
+    let end = live[start..].find("</GROUP>").unwrap() + start + "</GROUP>".len();
+    let row = live[start..end]
+        .replace("Trade Debtors - Local", "Bridge Nested Debtors WR4")
+        .replace("-000000dd", "-000000f0")
+        .replace("> 222<", "> 230<")
+        .replace("> 221<", "> 229<");
+    format!("{}\r\n    {}{}", &live[..end], row, &live[end..])
+}
+
+/// The scripted sequence of one first-page group summary: the identity, the masters, the counted window,
+/// the masters again.
+fn group_summary_plans(before: (String, String), after: (String, String)) -> Vec<ScenarioPlan> {
+    let mut plans = identity_plans();
+    plans.extend(paired(&xml_plan(before.0)));
+    plans.extend(paired(&xml_plan(before.1)));
+    plans.extend(paired(&counted_marks()));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(after.0)));
+    plans.extend(paired(&xml_plan(after.1)));
+    plans
+}
+
+fn masters() -> (String, String) {
+    (ledger_catalogue(), wr2_group_snapshot())
+}
+
+fn buckets_of(response: &Value) -> Vec<Value> {
+    assert_ne!(response["isError"], true, "{response}");
+    response["structuredContent"]["result"]["buckets"]
+        .as_array()
+        .unwrap()
+        .clone()
+}
+
+#[tokio::test]
+async fn a_group_summary_reads_the_masters_around_the_window_and_sums_by_group() {
+    let plans = group_summary_plans(masters(), masters());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let response = one.call(json!({"summarise_by": "group"})).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["summarised_by"], "group");
+    assert!(
+        result["basis"]
+            .as_str()
+            .unwrap()
+            .starts_with(super::vouchers::GROUP_BASIS),
+        "the group caveat leads the basis: {result}"
+    );
+    assert_eq!(
+        result["totals"],
+        json!({"debit": "-306.06", "credit": "306.06"}),
+        "{result}"
+    );
+    let buckets = buckets_of(&response);
+    let by_name = |name: &str| {
+        buckets
+            .iter()
+            .find(|b| b["group"] == name)
+            .unwrap_or_else(|| panic!("{name}: {buckets:?}"))
+    };
+    // The three captured vouchers: one sales ledger credited, parties under Sundry Debtors debited.
+    assert_eq!(by_name("Sales Accounts")["credit"], "306.06");
+    assert_eq!(
+        by_name("Sales Accounts")["primary_group"]["name"],
+        "Sales Accounts"
+    );
+    let debtors = buckets
+        .iter()
+        .filter(|b| b["primary_group"]["name"] == "Current Assets")
+        .count();
+    assert!(debtors >= 1, "{buckets:?}");
+    for bucket in &buckets {
+        assert!(
+            bucket["chain"]
+                .as_array()
+                .is_some_and(|chain| !chain.is_empty()),
+            "{bucket}"
+        );
+        assert_eq!(
+            bucket["members_total"],
+            bucket["members"].as_array().unwrap().len()
+        );
+    }
+    // Every scripted answer was used: the masters were read before and again after the window.
+    assert_eq!(one.requests(), total);
+    // The same window summarised by primary group.
+    let plans = group_summary_plans(masters(), masters());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let response = one.call(json!({"summarise_by": "primary_group"})).await;
+    let primary = buckets_of(&response);
+    assert!(
+        primary.iter().all(|b| b["reserved_name"] == b["group"]),
+        "{primary:?}"
+    );
+    assert_eq!(
+        response["structuredContent"]["result"]["totals"],
+        json!({"debit": "-306.06", "credit": "306.06"})
+    );
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_group_summary_refuses_when_a_ledger_or_a_group_moved_while_the_window_was_read() {
+    let run = |after: (String, String)| async move {
+        let one = OneServer::spawn(group_summary_plans(masters(), after));
+        let response = one.call(json!({"summarise_by": "group"})).await;
+        refusal_of(&response)["code"].clone()
+    };
+    // A ledger moved to another group.
+    let moved = ledger_catalogue().replacen(
+        "<PARENT TYPE=\"String\">Cash-in-Hand</PARENT>",
+        "<PARENT TYPE=\"String\">Sundry Debtors</PARENT>",
+        1,
+    );
+    assert_ne!(moved, ledger_catalogue());
+    assert_eq!(
+        run((moved, wr2_group_snapshot())).await,
+        "group_snapshot_drifted"
+    );
+    // A group the catalogued ledgers sit under moved under another one (`Sundry Debtors` out of `Current
+    // Assets`). A group that no listed ledger sits under could move without changing any chain, and is
+    // not seen.
+    let snapshot = wr2_group_snapshot();
+    let start = snapshot.find("<GROUP NAME=\"Sundry Debtors\"").unwrap();
+    let end = snapshot[start..].find("</GROUP>").unwrap() + start;
+    let row = &snapshot[start..end];
+    assert!(
+        row.contains("<PARENT TYPE=\"String\">Current Assets</PARENT>"),
+        "{row}"
+    );
+    let regrouped = format!(
+        "{}{}{}",
+        &snapshot[..start],
+        row.replacen(
+            "<PARENT TYPE=\"String\">Current Assets</PARENT>",
+            "<PARENT TYPE=\"String\">Current Liabilities</PARENT>",
+            1
+        ),
+        &snapshot[end..]
+    );
+    assert_ne!(regrouped, snapshot);
+    assert_eq!(
+        run((ledger_catalogue(), regrouped)).await,
+        "group_snapshot_drifted"
+    );
+    // A ledger gone from the catalogue.
+    let removed =
+        ledger_catalogue().replacen("<LEDGER NAME=\"Cash\"", "<LEDGER NAME=\"Cash Renamed\"", 1);
+    assert_ne!(removed, ledger_catalogue());
+    assert_eq!(
+        run((removed, wr2_group_snapshot())).await,
+        "ledger_snapshot_drifted"
+    );
+}
+
+#[tokio::test]
+async fn a_group_summary_refuses_with_the_gap_when_a_chain_cannot_be_walked() {
+    // Derived: the group snapshot without `Sundry Debtors`, which the captured parties sit under.
+    let snapshot = wr2_group_snapshot();
+    let start = snapshot.find("<GROUP NAME=\"Sundry Debtors\"").unwrap();
+    let end = snapshot[start..].find("</GROUP>").unwrap() + start + "</GROUP>".len();
+    let without = format!("{}{}", &snapshot[..start], &snapshot[end..]);
+    let one = OneServer::spawn(group_summary_plans(
+        (ledger_catalogue(), without.clone()),
+        (ledger_catalogue(), without),
+    ));
+    let response = one.call(json!({"summarise_by": "group"})).await;
+    let refusal = refusal_of(&response);
+    assert_eq!(refusal["code"], "summary_group_unresolved", "{refusal}");
+    assert_eq!(refusal["cause"], "group_absent", "{refusal}");
+}
+
+#[tokio::test]
+async fn a_later_page_of_a_group_summary_is_served_from_the_held_window_with_its_placements() {
+    let mut plans = group_summary_plans(masters(), masters());
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"summarise_by": "group", "limit": 1})).await;
+    let first_buckets = buckets_of(&first);
+    assert_eq!(first_buckets.len(), 1);
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(json!({"summarise_by": "group", "limit": 1, "offset": 1, "snapshot_id": id}))
+        .await;
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    let second_buckets = buckets_of(&second);
+    assert_eq!(second_buckets.len(), 1);
+    assert_ne!(second_buckets[0]["group"], first_buckets[0]["group"]);
+    assert!(second_buckets[0]["chain"]
+        .as_array()
+        .is_some_and(|chain| !chain.is_empty()));
+    // The page came from the held window: only the identity and the marks were read for it.
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_held_group_summary_does_not_serve_a_page_of_another_grouping() {
+    let mut plans = group_summary_plans(masters(), masters());
+    plans.extend(marks_page_plans(counted_marks()));
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"summarise_by": "group", "limit": 1})).await;
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let other = one
+        .call(json!({"summarise_by": "primary_group", "limit": 1, "offset": 1, "snapshot_id": id}))
+        .await;
+    let refusal = refusal_of(&other);
+    assert_eq!(refusal["code"], "listing_snapshot_changed", "{refusal}");
+    assert_eq!(refusal["cause"], "snapshot_not_held", "{refusal}");
+}
+
+#[tokio::test]
+async fn a_group_summary_with_a_ledger_counts_every_entry_of_that_ledgers_vouchers() {
+    // `ledger` first resolves the name against the catalogue, so the catalogue is read for it as well:
+    // the resolve read, the two reads of the masters around the window, and the corroboration read.
+    let mut plans = identity_plans();
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(paired(&xml_plan(wr2_group_snapshot())));
+    plans.extend(paired(&counted_marks()));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(paired(&xml_plan(wr2_group_snapshot())));
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let response = one
+        .call(json!({"summarise_by": "group", "ledger": "CAFé NAïVE TRADERS"}))
+        .await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["entries_counted"], "all_entries", "{result}");
+    assert_eq!(
+        result["ledger_match"]["ledger"], "Café Naïve Traders",
+        "{result}"
+    );
+    let buckets = buckets_of(&response);
+    assert!(!buckets.is_empty());
+    // Every entry of the vouchers that touch the ledger is counted, so debits and credits are equal in size.
+    let (debit, credit) = (
+        result["totals"]["debit"].as_str().unwrap(),
+        result["totals"]["credit"].as_str().unwrap(),
+    );
+    assert_eq!(debit.trim_start_matches('-'), credit, "{result}");
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_group_summary_refuses_a_catalogue_that_names_a_ledger_twice_at_the_catalogue_parse() {
+    let catalogue = ledger_catalogue();
+    let start = catalogue.find("<LEDGER NAME=\"Cash\"").unwrap();
+    let end = catalogue[start..].find("</LEDGER>").unwrap() + start + "</LEDGER>".len();
+    let twice = format!(
+        "{}{}{}",
+        &catalogue[..end],
+        &catalogue[start..end],
+        &catalogue[end..]
+    );
+    let mut plans = identity_plans();
+    plans.extend(paired(&xml_plan(twice)));
+    plans.extend(paired(&xml_plan(wr2_group_snapshot())));
+    let one = OneServer::spawn(plans);
+    let response = one.call(json!({"summarise_by": "group"})).await;
+    let refusal = refusal_of(&response);
+    // The catalogue parse refuses a repeated ledger before any placement is built.
+    assert_eq!(refusal["code"], "ledger_export_invalid", "{refusal}");
+    assert_eq!(
+        refusal["cause"], "ledger_catalogue_duplicate_identity",
+        "{refusal}"
+    );
+}
+
+#[tokio::test]
+async fn only_a_group_summary_carries_subtree_totals() {
+    let one = OneServer::spawn(group_summary_plans(masters(), masters()));
+    let response = one.call(json!({"summarise_by": "group"})).await;
+    let result = &response["structuredContent"]["result"];
+    let totals = result["subtree_totals"]
+        .as_array()
+        .expect("a group summary carries subtree totals");
+    assert!(
+        totals.iter().any(|t| t["group"] == "Sundry Debtors"),
+        "{totals:?}"
+    );
+    assert_eq!(result["subtree_totals_complete"], true);
+    let one = OneServer::spawn(group_summary_plans(masters(), masters()));
+    let response = one.call(json!({"summarise_by": "primary_group"})).await;
+    assert!(response["structuredContent"]["result"]
+        .get("subtree_totals")
+        .is_none());
 }

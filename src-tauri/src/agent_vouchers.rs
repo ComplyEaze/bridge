@@ -75,6 +75,9 @@ pub(super) struct VoucherPageSnapshot {
     /// The resolved name of that ledger, unredacted: a summary of a held window adds only
     /// that ledger's entries by month or type (#1230).
     selected_ledger: Option<String>,
+    /// Each ledger's place in the group tree, for a group summary: read before and after the window
+    /// and equal both times, held so a later page needs no read of the masters (#1230).
+    placements: Option<Arc<Placements>>,
     /// Why a complete window is complete when it is more than a counted read (an
     /// empty book), so a served page says it too.
     reason: Option<&'static str>,
@@ -93,10 +96,14 @@ impl VoucherPageSnapshot {
         voucher_types: Option<Value>,
         ledger_match: Option<Value>,
         selected_ledger: Option<String>,
+        placements: Option<Arc<Placements>>,
         reason: Option<&'static str>,
     ) -> Self {
         let bytes = rows.iter().map(|row| row.to_string().len()).sum::<usize>()
             + window.to_string().len()
+            + placements
+                .as_ref()
+                .map_or(0, |placements| placements.approx_bytes())
             + voucher_types
                 .as_ref()
                 .map_or(0, |types| types.to_string().len())
@@ -112,6 +119,7 @@ impl VoucherPageSnapshot {
             voucher_types,
             ledger_match,
             selected_ledger,
+            placements,
             reason,
             read_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
             taken: std::time::Instant::now(),
@@ -242,6 +250,23 @@ pub(super) fn page_items(
 /// are the same as `ledger_movement`'s; the voucher types are not told apart.
 const SUMMARY_BASIS: &str = "every voucher the window, selectors and search selected that is not cancelled, optional or without accounting entries, as ledger_movement counts (a narrowed window is not a ledger's whole movement); post-dated vouchers are summed too: post_dated_included counts those Tally flagged Yes and post_dated_flag_absent those with no flag at all (Tally asserts the flag on every voucher the current read asks for, so that is expected to be 0; only when it is not is a zero in the first no proof that none are post-dated); a voucher type that does not post (a memorandum, a reversing journal, a sales or purchase order, a delivery or receipt note), if the book uses it and Tally exports it with ledger entries, is not told apart and is summed (none of the vouchers in the one window this was checked on were of those types; the book's voucher-type masters were not read)";
 
+/// What a `group` or `primary_group` summary adds to its basis (#1230): where the groups come from and
+/// what a bucket is.
+pub(super) const GROUP_BASIS: &str = "groups are the book's masters read now (each ledger's group chain was the same when read before the window and again after it), not the grouping in force on each voucher's date; a `group` bucket holds only the ledgers directly under that group, as the ledger master shows it, so a predefined group whose ledgers sit in sub-groups has no bucket or a small one: its whole figure, descendants included, is in `subtree_totals` (a `group` summary only), which overlap and do not add up to `totals`; a `primary_group` bucket holds every ledger under the group directly under the reserved root, keyed by its reserved name (a group the book's user made there by its name); a ledger directly under the root has a bucket of its own named Primary; `members` lists the ledgers in a bucket, largest movement first and at most 10, with `members_total` exact; a ledger whose group chain cannot be walked, or that the ledger list does not hold, refuses the summary (`summary_group_unresolved`)";
+
+/// A refused summary as a failure: a ledger whose group chain could not be walked names the gap as
+/// the cause, so the answer says what to look at in the book's groups.
+fn summary_failure(code: String) -> ToolFailure {
+    match code.strip_prefix("summary_group_unresolved:") {
+        Some(gap) => {
+            let mut failure = ToolFailure::from("summary_group_unresolved".to_string());
+            failure.cause = Some(voucher_groups::static_gap_code(gap));
+            failure
+        }
+        None => ToolFailure::from(code),
+    }
+}
+
 /// What one page of a `vouchers` result holds: the vouchers, or with `summarise_by` the
 /// buckets (#1230), and the fields only the second carries.
 pub(super) struct PageBody {
@@ -272,9 +297,40 @@ pub(super) fn render_page_body(
             extra: Vec::new(),
         });
     };
-    let summary = voucher_summary::summarise(rows, request).map_err(ToolFailure::from)?;
+    let summary = voucher_summary::summarise(rows, request).map_err(summary_failure)?;
     let (page, truncated) =
         voucher_summary::page_buckets(&summary, offset, limit, server.settings.max_bytes / 5);
+    let mut extra = vec![
+        ("summarised_by", json!(request.group.name())),
+        ("entries_counted", json!(summary.entries_counted)),
+        ("vouchers_summarised", json!(summary.vouchers_summarised)),
+        ("excluded_from_buckets", summary.excluded),
+        ("post_dated_included", json!(summary.post_dated_included)),
+        (
+            "post_dated_flag_absent",
+            json!(summary.post_dated_flag_absent),
+        ),
+        ("totals", summary.totals),
+        (
+            "basis",
+            json!(if request.group.needs_placements() {
+                format!("{GROUP_BASIS}; {SUMMARY_BASIS}")
+            } else {
+                SUMMARY_BASIS.to_string()
+            }),
+        ),
+    ];
+    if request.group == SummaryGroup::Group {
+        // Group names are shown as the book has them, so the totals are not redacted.
+        extra.push(("subtree_totals", json!(summary.subtree_totals)));
+        extra.push(("subtree_totals_total", json!(summary.subtree_total_count)));
+        extra.push((
+            "subtree_totals_complete",
+            json!(voucher_summary::subtree_totals_complete(
+                summary.subtree_total_count
+            )),
+        ));
+    }
     Ok(PageBody {
         items_key: "buckets",
         profile: "agent_vouchers_v1_summary",
@@ -284,19 +340,7 @@ pub(super) fn render_page_body(
             .collect(),
         total: summary.buckets.len(),
         truncated,
-        extra: vec![
-            ("summarised_by", json!(request.group.name())),
-            ("entries_counted", json!(summary.entries_counted)),
-            ("vouchers_summarised", json!(summary.vouchers_summarised)),
-            ("excluded_from_buckets", summary.excluded),
-            ("post_dated_included", json!(summary.post_dated_included)),
-            (
-                "post_dated_flag_absent",
-                json!(summary.post_dated_flag_absent),
-            ),
-            ("totals", summary.totals),
-            ("basis", json!(SUMMARY_BASIS)),
-        ],
+        extra,
     })
 }
 
@@ -495,6 +539,14 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         } else {
             None
         };
+        // #1230: a group summary needs each ledger's place in the group tree. It is read before the
+        // window and again after it, and the two must be equal (below), so a ledger moved or a group
+        // renamed while the window was read refuses instead of being summed under a stale chain.
+        let placements_before = if summary_group.is_some_and(SummaryGroup::needs_placements) {
+            Some(server.read_group_placements(&identity, &company.name, &mut accumulated).await?)
+        } else {
+            None
+        };
         // A type filter asks Tally to resolve each row's type in the same
         // response (bridge#625); every other call sends the request unchanged.
         let shape = if type_selector.is_some() {
@@ -540,6 +592,21 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 evidence.reason_code = corroboration_reason.map(str::to_string);
             }
         }
+        let placements = match placements_before {
+            Some(first) => {
+                let second = server
+                    .read_group_placements(&identity, &company.name, &mut accumulated)
+                    .await?;
+                if !first.same_ledgers(&second) {
+                    return Err("ledger_snapshot_drifted".to_string().into());
+                }
+                if first != second {
+                    return Err("group_snapshot_drifted".to_string().into());
+                }
+                Some(Arc::new(first))
+            }
+            None => None,
+        };
         // A nonempty, validated source can legitimately have no selector match.
         // Corroborate actual source emptiness before any client-side selector.
         let mut ledger_match = None;
@@ -628,6 +695,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     voucher_types.clone(),
                     ledger_match.clone(),
                     selected_ledger.clone(),
+                    placements.clone(),
                     corroboration_reason,
                 ))?
             }
@@ -636,6 +704,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let summary = summary_group.map(|group| SummaryRequest {
             group,
             selected_ledger: selected_ledger.clone(),
+            placements: placements.clone(),
         });
         let body = render_page_body(server, &rows, summary.as_ref(), (offset, limit))?;
         let (mut payload, truncated) = voucher_page_payload(
@@ -797,6 +866,7 @@ impl Server {
         let summary = summary_group.map(|group| SummaryRequest {
             group,
             selected_ledger: snapshot.selected_ledger.clone(),
+            placements: snapshot.placements.clone(),
         });
         let body = render_page_body(self, &snapshot.rows, summary.as_ref(), (offset, limit))?;
         if let (Some(reason), Some(evidence)) = (snapshot.reason, accumulated.as_mut()) {
@@ -825,6 +895,26 @@ impl Server {
             company_guid: Some(guid.to_string()),
             truncated,
         }))
+    }
+
+    /// Each ledger's place in the group tree: the ledger catalogue's parents and the group snapshot,
+    /// read now (#1230). The catalogue parse has already refused a ledger name or GUID that repeats.
+    async fn read_group_placements(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &str,
+        accumulated: &mut Option<Evidence>,
+    ) -> Result<Placements, ToolFailure> {
+        let (parents, catalogue_evidence) = self.read_ledger_parents(identity, company).await?;
+        accumulate_evidence(accumulated, catalogue_evidence);
+        let (groups, group_evidence) = self.read_group_collection(identity, company).await?;
+        accumulate_evidence(accumulated, group_evidence);
+        Ok(Placements::build(
+            parents
+                .iter()
+                .map(|(ledger, parent)| (ledger.as_str(), parent.as_deref())),
+            groups,
+        ))
     }
 
     /// The book's voucher types (`voucher_type_catalogue_read`), bound to the

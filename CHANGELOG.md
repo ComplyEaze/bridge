@@ -20,11 +20,16 @@ These changes are in source and not yet in a published build.
 
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
-  `amount`), and can add a window up by ledger, month or voucher type
-  (`summarise_by`), with debit, credit and voucher counts per bucket and the
-  cancelled, optional and entry-less vouchers counted apart. Both run on the
-  rows the window read already holds, so they send no new request to Tally; a
-  zero from a counted window is a checked zero. A narration phrase is refused
+  `amount`), and can add a window up by ledger, month, voucher type, group or
+  primary group (`summarise_by`), with debit, credit and voucher counts per bucket and the
+  cancelled, optional and entry-less vouchers counted apart. Search and the
+  ledger, month and voucher-type summaries run on the rows the window read already
+  holds and send no new request to Tally; the group and primary-group summaries
+  also read the ledger list and the group list, before and after the window. They
+  refuse when any ledger's group chain, or the set of ledgers, changed meanwhile, and
+  when a ledger the window touches cannot be placed, so no entry is left out of a
+  group total. A `group` summary also gives each group's whole figure, descendants
+  included, as `subtree_totals`. A zero from a counted window is a checked zero. A narration phrase is refused
   where narrations are withheld from the assistant. A summary sums post-dated
   vouchers (counted, with the vouchers Tally sent no flag for counted apart) and any
   non-posting voucher type a book uses, and says so in the result. Checked once
@@ -32,7 +37,9 @@ These changes are in source and not yet in a published build.
   equalled the sums over the listed vouchers, the ledger buckets equalled
   `trial_balance` for the same year, and each search returned what the same
   criterion selects from the listing; it did not cover a large book, a memorandum,
-  a reversing journal or a voucher withheld for a foreign-currency amount (#1230).
+  a reversing journal or a voucher withheld for a foreign-currency amount. That check
+  covered search and the ledger, month and voucher-type summaries; the group and
+  primary-group summaries have not been run against a live Tally (#1230).
 
 **Safer or fixed**
 

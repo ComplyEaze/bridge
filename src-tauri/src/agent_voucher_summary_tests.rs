@@ -24,6 +24,7 @@ fn request(group: SummaryGroup, selected_ledger: Option<&str>) -> SummaryRequest
     SummaryRequest {
         group,
         selected_ledger: selected_ledger.map(str::to_string),
+        placements: None,
     }
 }
 
@@ -354,19 +355,21 @@ fn a_page_of_buckets_respects_offset_limit_and_the_byte_budget() {
 }
 
 #[test]
-fn only_the_three_named_groupings_are_accepted() {
+fn only_the_five_named_groupings_are_accepted() {
     assert_eq!(SummaryGroup::from_args(&json!({})).unwrap(), None);
     for (name, group) in [
         ("ledger", SummaryGroup::Ledger),
         ("month", SummaryGroup::Month),
         ("voucher_type", SummaryGroup::VoucherType),
+        ("group", SummaryGroup::Group),
+        ("primary_group", SummaryGroup::PrimaryGroup),
     ] {
         assert_eq!(
             SummaryGroup::from_args(&json!({"summarise_by": name})).unwrap(),
             Some(group)
         );
     }
-    for bad in ["group", "Month", "", "type"] {
+    for bad in ["groups", "Group", "Month", "", "type", "primary"] {
         assert_eq!(
             SummaryGroup::from_args(&json!({"summarise_by": bad}))
                 .expect_err("refused")
@@ -831,4 +834,715 @@ fn the_live_ledger_selected_month_buckets_count_only_that_ledgers_entries_by_an_
         assert_eq!(bucket["vouchers"], *vouchers);
     }
     assert_eq!(summary.entries_counted, "selected_ledger");
+}
+
+// ---- Group summaries over the live rows (#1230). The ledger catalogue and the group snapshot are the
+// live book's (see `shape-lab-group-chain.PROVENANCE.md`); the expected buckets are written separately
+// from the code under test (the trial balance's `parent` column and the catalogue's `PARENT` come from the same
+// ledger collection, so this checks the placement logic, not Tally's grouping), from the trial balance's own `parent` column and from a hand-written table of
+// which primary group each immediate group sits under (read from the group snapshot's structure).
+const LIVE_TRIAL_BALANCE: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/shape-lab-fy.trial-balance-ledgers.json"
+);
+
+fn live_request(group: SummaryGroup, placements: Placements) -> SummaryRequest {
+    SummaryRequest {
+        group,
+        selected_ledger: None,
+        placements: Some(Arc::new(placements)),
+    }
+}
+
+fn live_group_summary(group: SummaryGroup) -> Summary {
+    let request = live_request(
+        group,
+        crate::agent::voucher_groups::tests::live_placements(),
+    );
+    summarise(&live_rows(), &request).expect("the live rows summarise by group")
+}
+
+/// The trial balance's own parent of each ledger, with the reserved root written as `Primary`.
+fn trial_balance_parents() -> BTreeMap<String, String> {
+    let rows: Vec<Value> = serde_json::from_str(LIVE_TRIAL_BALANCE).unwrap();
+    rows.iter()
+        .map(|row| {
+            let parent = row["parent"].as_str().unwrap();
+            let parent = parent
+                .strip_prefix(bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER)
+                .map_or(parent, str::trim);
+            (
+                row["ledger"].as_str().unwrap().to_string(),
+                parent.to_string(),
+            )
+        })
+        .collect()
+}
+
+/// The group directly under the root that each immediate group of the live book sits under.
+const PRIMARY_OF: &[(&str, &str)] = &[
+    ("Bank Accounts", "Current Assets"),
+    ("Bank OD A/c", "Loans (Liability)"),
+    ("Capital Account", "Capital Account"),
+    ("Cash-in-Hand", "Current Assets"),
+    ("Chemical Suppliers", "Current Liabilities"),
+    ("Direct Expenses", "Direct Expenses"),
+    ("Duties & Taxes", "Current Liabilities"),
+    ("Indirect Expenses", "Indirect Expenses"),
+    ("Indirect Incomes", "Indirect Incomes"),
+    ("Power and Fuel", "Indirect Expenses"),
+    ("Primary", "Primary"),
+    ("Purchase Accounts", "Purchase Accounts"),
+    ("Sales Accounts", "Sales Accounts"),
+    ("Secured Loans", "Loans (Liability)"),
+    ("Trade Debtors - Local", "Current Assets"),
+    ("Trade Debtors - Outstation", "Current Assets"),
+];
+
+fn primary_of(group: &str) -> &'static str {
+    PRIMARY_OF
+        .iter()
+        .find(|(name, _)| *name == group)
+        .unwrap_or_else(|| panic!("{group}"))
+        .1
+}
+
+#[test]
+fn the_live_group_buckets_equal_independent_sums_by_the_trial_balances_own_parent() {
+    let parents = trial_balance_parents();
+    let rows = live_rows();
+    let summary = live_group_summary(SummaryGroup::Group);
+    let by_parent =
+        |_row: &Value, entry: &Value| parents[entry["ledger"].as_str().unwrap()].clone();
+    let want = independent_buckets(&rows, by_parent);
+    let buckets = presented(&summary);
+    assert_eq!(buckets.len(), want.len());
+    for bucket in &buckets {
+        let name = bucket["group"].as_str().unwrap();
+        let (debit, credit, vouchers) = want
+            .get(name)
+            .unwrap_or_else(|| panic!("no sum for {name}"));
+        assert!(
+            decimal(bucket["debit"].as_str().unwrap()).numeric_eq(debit),
+            "{name} debit"
+        );
+        assert!(
+            decimal(bucket["credit"].as_str().unwrap()).numeric_eq(credit),
+            "{name} credit"
+        );
+        assert_eq!(bucket["vouchers"], *vouchers, "{name} vouchers");
+    }
+    assert_eq!(summary.vouchers_summarised, 64);
+    assert_eq!(
+        summary.excluded,
+        json!({"cancelled": 1, "optional": 1, "no_accounting_entries": 1})
+    );
+}
+
+#[test]
+fn the_live_group_buckets_equal_the_trial_balance_rolled_up_by_its_own_parent() {
+    // Tally's own period figures per ledger, added up by the parent Tally reports for each ledger.
+    let tb: Vec<Value> = serde_json::from_str(LIVE_TRIAL_BALANCE).unwrap();
+    let amount = |value: &Value| match value["state"].as_str() {
+        Some("present") => decimal(value["value"].as_str().unwrap()),
+        _ => bridge_tally_core::ExactDecimal::zero(),
+    };
+    let mut rolled: BTreeMap<
+        String,
+        (
+            bridge_tally_core::ExactDecimal,
+            bridge_tally_core::ExactDecimal,
+        ),
+    > = BTreeMap::new();
+    for row in &tb {
+        let parent = row["parent"].as_str().unwrap();
+        let parent = parent
+            .strip_prefix(bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER)
+            .map_or(parent, str::trim);
+        let entry = rolled.entry(parent.to_string()).or_insert_with(|| {
+            (
+                bridge_tally_core::ExactDecimal::zero(),
+                bridge_tally_core::ExactDecimal::zero(),
+            )
+        });
+        entry.0 = entry.0.checked_add(&amount(&row["debit"])).unwrap();
+        entry.1 = entry.1.checked_add(&amount(&row["credit"])).unwrap();
+    }
+    let buckets = presented(&live_group_summary(SummaryGroup::Group));
+    for bucket in &buckets {
+        let name = bucket["group"].as_str().unwrap();
+        let (debit, credit) = &rolled[name];
+        assert!(
+            decimal(bucket["debit"].as_str().unwrap()).numeric_eq(debit),
+            "{name} debit"
+        );
+        assert!(
+            decimal(bucket["credit"].as_str().unwrap()).numeric_eq(credit),
+            "{name} credit"
+        );
+    }
+    // A group with movement in the trial balance and no bucket would be a miss.
+    let bucketed: BTreeSet<&str> = buckets
+        .iter()
+        .map(|b| b["group"].as_str().unwrap())
+        .collect();
+    for (name, (debit, credit)) in &rolled {
+        assert!(
+            bucketed.contains(name.as_str()) || (debit.is_zero() && credit.is_zero()),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn the_live_primary_group_buckets_add_the_group_buckets_under_each_primary_group() {
+    let by_group = presented(&live_group_summary(SummaryGroup::Group));
+    let primary = presented(&live_group_summary(SummaryGroup::PrimaryGroup));
+    let mut want: BTreeMap<
+        &str,
+        (
+            bridge_tally_core::ExactDecimal,
+            bridge_tally_core::ExactDecimal,
+        ),
+    > = BTreeMap::new();
+    for bucket in &by_group {
+        let entry = want
+            .entry(primary_of(bucket["group"].as_str().unwrap()))
+            .or_insert_with(|| {
+                (
+                    bridge_tally_core::ExactDecimal::zero(),
+                    bridge_tally_core::ExactDecimal::zero(),
+                )
+            });
+        entry.0 = entry
+            .0
+            .checked_add(&decimal(bucket["debit"].as_str().unwrap()))
+            .unwrap();
+        entry.1 = entry
+            .1
+            .checked_add(&decimal(bucket["credit"].as_str().unwrap()))
+            .unwrap();
+    }
+    assert_eq!(primary.len(), want.len());
+    for bucket in &primary {
+        let name = bucket["group"].as_str().unwrap();
+        let (debit, credit) = &want[name];
+        assert!(
+            decimal(bucket["debit"].as_str().unwrap()).numeric_eq(debit),
+            "{name} debit"
+        );
+        assert!(
+            decimal(bucket["credit"].as_str().unwrap()).numeric_eq(credit),
+            "{name} credit"
+        );
+        assert_eq!(
+            bucket["reserved_name"], bucket["group"],
+            "{name}: a predefined primary group keeps its name"
+        );
+    }
+    // A user group's ledgers land in the primary group above it, and the sum of everything is unchanged.
+    assert!(primary
+        .iter()
+        .any(|b| b["group"] == "Current Assets" && b["vouchers"].as_u64().unwrap() > 0));
+    let total = live_group_summary(SummaryGroup::PrimaryGroup).totals;
+    assert_eq!(
+        total,
+        summed(&live_rows(), SummaryGroup::Ledger, None).totals
+    );
+}
+
+#[test]
+fn a_group_bucket_names_its_chain_and_members_that_add_up_to_it() {
+    let buckets = presented(&live_group_summary(SummaryGroup::Group));
+    let debtors = buckets
+        .iter()
+        .find(|b| b["group"] == "Trade Debtors - Local")
+        .expect("a user group has a bucket");
+    assert_eq!(debtors["reserved_name"], "");
+    assert_eq!(
+        debtors["chain"],
+        json!([
+            {"name": "Trade Debtors - Local", "reserved_name": ""},
+            {"name": "Sundry Debtors", "reserved_name": "Sundry Debtors"},
+            {"name": "Current Assets", "reserved_name": "Current Assets"},
+        ])
+    );
+    assert_eq!(
+        debtors["primary_group"],
+        json!({"name": "Current Assets", "reserved_name": "Current Assets"})
+    );
+    for bucket in &buckets {
+        let members = bucket["members"].as_array().unwrap();
+        let total = bucket["members_total"].as_u64().unwrap() as usize;
+        assert_eq!(bucket["members_complete"], total <= MAX_MEMBERS_PER_BUCKET);
+        assert_eq!(members.len(), total.min(MAX_MEMBERS_PER_BUCKET));
+        if bucket["members_complete"] == true {
+            let (mut debit, mut credit) = (
+                bridge_tally_core::ExactDecimal::zero(),
+                bridge_tally_core::ExactDecimal::zero(),
+            );
+            for member in members {
+                debit = debit
+                    .checked_add(&decimal(member["debit"].as_str().unwrap()))
+                    .unwrap();
+                credit = credit
+                    .checked_add(&decimal(member["credit"].as_str().unwrap()))
+                    .unwrap();
+            }
+            assert!(
+                debit.numeric_eq(&decimal(bucket["debit"].as_str().unwrap())),
+                "{}",
+                bucket["group"]
+            );
+            assert!(
+                credit.numeric_eq(&decimal(bucket["credit"].as_str().unwrap())),
+                "{}",
+                bucket["group"]
+            );
+        }
+    }
+}
+
+#[test]
+fn group_names_are_shown_and_member_ledgers_are_masked_under_mask_parties() {
+    let summary = live_group_summary(SummaryGroup::Group);
+    let shown = |redaction: Redaction| -> Vec<Value> {
+        summary
+            .buckets
+            .iter()
+            .map(|b| redact_value(b.clone(), redaction))
+            .collect()
+    };
+    let (plain, masked) = (shown(Redaction::None), shown(Redaction::MaskParties));
+    for (open, hidden) in plain.iter().zip(&masked) {
+        assert_eq!(
+            open["group"], hidden["group"],
+            "a group name is not a party name"
+        );
+        assert_eq!(open["chain"], hidden["chain"]);
+        for (open_member, hidden_member) in open["members"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(hidden["members"].as_array().unwrap())
+        {
+            assert_ne!(
+                open_member["ledger"], hidden_member["ledger"],
+                "{}",
+                open_member["ledger"]
+            );
+            assert_eq!(open_member["debit"], hidden_member["debit"]);
+        }
+    }
+}
+
+#[test]
+fn a_ledger_directly_under_the_root_has_a_bucket_of_its_own_in_both_group_summaries() {
+    // Derived: one live voucher given an entry on `Profit & Loss A/c`, the live ledger under the reserved root.
+    let mut rows = live_rows();
+    let voucher = rows
+        .iter_mut()
+        .find(|row| {
+            row["cancelled"] != true
+                && row["optional"] != true
+                && !row["amounts"].as_array().unwrap().is_empty()
+        })
+        .unwrap();
+    let entries = voucher["amounts"].as_array_mut().unwrap();
+    entries.push(json!({"ledger": "Profit & Loss A/c", "amount": "5.00", "is_deemed_positive": "No", "bill_allocations": []}));
+    entries.push(json!({"ledger": "Cash", "amount": "-5.00", "is_deemed_positive": "Yes", "bill_allocations": []}));
+    for group in [SummaryGroup::Group, SummaryGroup::PrimaryGroup] {
+        let request = live_request(
+            group,
+            crate::agent::voucher_groups::tests::live_placements(),
+        );
+        let buckets = presented(&summarise(&rows, &request).unwrap());
+        let root = buckets
+            .iter()
+            .find(|b| b["group"] == "Primary")
+            .unwrap_or_else(|| panic!("{group:?}"));
+        assert_eq!(root["vouchers"], 1);
+        assert_eq!(root["credit"], "5");
+        assert_eq!(
+            root["reserved_name"],
+            Value::Null,
+            "the root has no reserved name: {group:?}"
+        );
+    }
+}
+
+#[test]
+fn a_ledger_whose_chain_cannot_be_walked_refuses_the_whole_group_summary_with_the_gap() {
+    let rows = live_rows();
+    // Derived: a ledger the live vouchers touch, given no parent in the catalogue.
+    let catalogue_parents = |changed: &str| -> Vec<(String, Option<String>)> {
+        crate::agent::voucher_groups::tests::live_parents()
+            .into_iter()
+            .map(|(ledger, parent)| {
+                (
+                    ledger.clone(),
+                    if ledger == changed { None } else { parent },
+                )
+            })
+            .collect()
+    };
+    let build = |parents: &Vec<(String, Option<String>)>| {
+        Placements::build(
+            parents.iter().map(|(l, p)| (l.as_str(), p.as_deref())),
+            crate::agent::voucher_groups::tests::live_groups(),
+        )
+    };
+    let touched = catalogue_parents("Cash");
+    for group in [SummaryGroup::Group, SummaryGroup::PrimaryGroup] {
+        let err = summarise(&rows, &live_request(group, build(&touched)))
+            .err()
+            .expect("refused");
+        assert_eq!(err, "summary_group_unresolved:no_parent", "{group:?}");
+    }
+    // A ledger the window never touches may have a gap: nothing is placed under it.
+    let untouched = catalogue_parents("Drawings");
+    assert!(rows.iter().all(|row| row["amounts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|e| e["ledger"] != "Drawings")));
+    assert!(summarise(&rows, &live_request(SummaryGroup::Group, build(&untouched))).is_ok());
+    // A ledger the vouchers name and the catalogue does not list is drift, not a bucket.
+    let mut missing = live_rows();
+    missing[0]["amounts"].as_array_mut().unwrap().push(json!({"ledger": "Not In The Catalogue", "amount": "0.00", "is_deemed_positive": "No", "bill_allocations": []}));
+    let err = summarise(
+        &missing,
+        &live_request(SummaryGroup::Group, build(&touched)),
+    )
+    .err()
+    .expect("refused");
+    assert_eq!(err, "summary_group_unresolved:ledger_not_in_catalogue");
+    // And a request that asks for a group grouping with no placements at all cannot summarise.
+    let none = SummaryRequest {
+        group: SummaryGroup::Group,
+        selected_ledger: None,
+        placements: None,
+    };
+    assert_eq!(
+        summarise(&rows, &none).err().unwrap(),
+        "summary_group_unresolved:no_placements"
+    );
+}
+
+#[test]
+fn a_group_bucket_lists_at_most_the_bound_of_members_largest_movement_first_and_counts_them_all() {
+    // Derived: one voucher with a debit on `Cash` and credits of 1 to 12 on twelve ledgers that all sit
+    // under one group, so the group has more members than the bound.
+    let mut parents = vec![("Cash".to_string(), Some("Cash-in-Hand".to_string()))];
+    let mut entries = vec![
+        json!({"ledger": "Cash", "amount": "-78.00", "is_deemed_positive": "Yes", "bill_allocations": []}),
+    ];
+    for n in 1..=12 {
+        let ledger = format!("Member {n:02}");
+        parents.push((ledger.clone(), Some("Cash-in-Hand".to_string())));
+        entries.push(json!({"ledger": ledger, "amount": format!("{n}.00"), "is_deemed_positive": "No", "bill_allocations": []}));
+    }
+    let row = json!({"date": "20250401", "voucher_type": "Journal", "voucher_number": "1", "guid": "g-1", "cancelled": false, "optional": false, "post_dated": false, "amounts": entries});
+    let placements = Placements::build(
+        parents.iter().map(|(l, p)| (l.as_str(), p.as_deref())),
+        crate::agent::voucher_groups::tests::live_groups(),
+    );
+    let summary = summarise(&[row], &live_request(SummaryGroup::Group, placements)).unwrap();
+    let buckets = presented(&summary);
+    assert_eq!(buckets.len(), 1);
+    let bucket = &buckets[0];
+    assert_eq!(bucket["group"], "Cash-in-Hand");
+    assert_eq!(bucket["members_total"], 13);
+    assert_eq!(bucket["members_complete"], false);
+    let members = bucket["members"].as_array().unwrap();
+    assert_eq!(members.len(), 10);
+    // Largest movement first: Cash (78), then Member 12, 11, 10 ... down to the tenth.
+    let order: Vec<&str> = members
+        .iter()
+        .map(|m| m["ledger"].as_str().unwrap())
+        .collect();
+    assert_eq!(order[..4], ["Cash", "Member 12", "Member 11", "Member 10"]);
+    assert_eq!(order[9], "Member 04");
+}
+
+/// The groups at and under each of these, written from the live group snapshot's tree.
+const SUBTREES: &[(&str, &[&str])] = &[
+    (
+        "Indirect Expenses",
+        &["Indirect Expenses", "Factory Overheads", "Power and Fuel"],
+    ),
+    (
+        "Sundry Debtors",
+        &[
+            "Sundry Debtors",
+            "Trade Debtors - Local",
+            "Trade Debtors - Outstation",
+        ],
+    ),
+    (
+        "Current Assets",
+        &[
+            "Current Assets",
+            "Bank Accounts",
+            "Cash-in-Hand",
+            "Sundry Debtors",
+            "Trade Debtors - Local",
+            "Trade Debtors - Outstation",
+        ],
+    ),
+    (
+        "Current Liabilities",
+        &[
+            "Current Liabilities",
+            "Duties & Taxes",
+            "Sundry Creditors",
+            "Chemical Suppliers",
+        ],
+    ),
+    (
+        "Loans (Liability)",
+        &["Loans (Liability)", "Bank OD A/c", "Secured Loans"],
+    ),
+];
+
+#[test]
+fn the_live_subtree_totals_give_a_predefined_group_its_whole_figure_descendants_included() {
+    // Oracle: Tally's own trial balance, ledger by ledger, added up by the trial balance's own parent over
+    // the hand-written subtree sets; vouchers counted from the rows by the same parents.
+    let tb: Vec<Value> = serde_json::from_str(LIVE_TRIAL_BALANCE).unwrap();
+    let amount = |value: &Value| match value["state"].as_str() {
+        Some("present") => decimal(value["value"].as_str().unwrap()),
+        _ => bridge_tally_core::ExactDecimal::zero(),
+    };
+    let parents = trial_balance_parents();
+    let summary = live_group_summary(SummaryGroup::Group);
+    assert_eq!(
+        summary.subtree_total_count,
+        summary.subtree_totals.len(),
+        "the live book has fewer groups than the bound"
+    );
+    let rows = live_rows();
+    for (group, members) in SUBTREES {
+        let (mut debit, mut credit) = (
+            bridge_tally_core::ExactDecimal::zero(),
+            bridge_tally_core::ExactDecimal::zero(),
+        );
+        for row in tb.iter().filter(|row| {
+            let parent = row["parent"].as_str().unwrap();
+            let parent = parent
+                .strip_prefix(bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER)
+                .map_or(parent, str::trim);
+            members.contains(&parent)
+        }) {
+            debit = debit.checked_add(&amount(&row["debit"])).unwrap();
+            credit = credit.checked_add(&amount(&row["credit"])).unwrap();
+        }
+        let vouchers = rows
+            .iter()
+            .filter(|row| row["cancelled"] != true && row["optional"] != true)
+            .filter(|row| {
+                row["amounts"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|e| members.contains(&parents[e["ledger"].as_str().unwrap()].as_str()))
+            })
+            .count();
+        let total = summary
+            .subtree_totals
+            .iter()
+            .find(|t| t["group"] == *group)
+            .unwrap_or_else(|| {
+                panic!("no subtree total for {group}: {:?}", summary.subtree_totals)
+            });
+        assert!(
+            decimal(total["debit"].as_str().unwrap()).numeric_eq(&debit),
+            "{group} debit"
+        );
+        assert!(
+            decimal(total["credit"].as_str().unwrap()).numeric_eq(&credit),
+            "{group} credit"
+        );
+        assert_eq!(total["vouchers"], vouchers, "{group} vouchers");
+    }
+    // A predefined group with no ledger of its own is still there, one level above its sub-groups.
+    let by = |name: &str| {
+        summary
+            .subtree_totals
+            .iter()
+            .find(|t| t["group"] == name)
+            .unwrap()
+    };
+    assert!(
+        summary
+            .buckets
+            .iter()
+            .all(|b| presented_name(b) != "Sundry Debtors"),
+        "Sundry Debtors has no ledger of its own"
+    );
+    assert_eq!(by("Current Assets")["depth"], 1);
+    assert_eq!(by("Sundry Debtors")["depth"], 2);
+    assert_eq!(by("Trade Debtors - Local")["depth"], 3);
+    assert_eq!(by("Sundry Debtors")["reserved_name"], "Sundry Debtors");
+    assert_eq!(by("Trade Debtors - Local")["reserved_name"], "");
+}
+
+fn presented_name(bucket: &Value) -> String {
+    redact_value(bucket.clone(), Redaction::None)["group"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
+#[test]
+fn the_subtree_totals_at_the_top_equal_the_primary_group_buckets() {
+    let group = live_group_summary(SummaryGroup::Group);
+    let primary = presented(&live_group_summary(SummaryGroup::PrimaryGroup));
+    let tops: Vec<&Value> = group
+        .subtree_totals
+        .iter()
+        .filter(|t| t["depth"] == 1)
+        .collect();
+    assert_eq!(tops.len(), primary.len());
+    for top in tops {
+        let bucket = primary
+            .iter()
+            .find(|b| b["group"] == top["group"])
+            .unwrap_or_else(|| panic!("{top}"));
+        assert!(
+            decimal(bucket["debit"].as_str().unwrap())
+                .numeric_eq(&decimal(top["debit"].as_str().unwrap())),
+            "{top}"
+        );
+        assert!(
+            decimal(bucket["credit"].as_str().unwrap())
+                .numeric_eq(&decimal(top["credit"].as_str().unwrap())),
+            "{top}"
+        );
+        assert_eq!(bucket["vouchers"], top["vouchers"], "{top}");
+    }
+    // The other groupings carry no subtree totals.
+    assert!(live_group_summary(SummaryGroup::PrimaryGroup)
+        .subtree_totals
+        .is_empty());
+    assert!(summed(&live_rows(), SummaryGroup::Ledger, None)
+        .subtree_totals
+        .is_empty());
+}
+
+#[test]
+fn subtree_totals_are_bounded_largest_first_and_counted_exactly() {
+    // Derived: one voucher over 70 ledgers each in its own user group directly under `Current Assets`.
+    let mut groups = crate::agent::voucher_groups::tests::live_groups();
+    let under_assets = bridge_tally_protocol::PartyLedgerMasterFieldObservation::Returned(
+        "Current Assets".to_string(),
+    );
+    let mut parents = vec![("Cash".to_string(), Some("Cash-in-Hand".to_string()))];
+    let mut entries = vec![
+        json!({"ledger": "Cash", "amount": "-2485.00", "is_deemed_positive": "Yes", "bill_allocations": []}),
+    ];
+    for n in 1..=70 {
+        let name = format!("Group {n:02}");
+        groups.push(bridge_tally_protocol::TallyNamedMaster {
+            name: name.clone(),
+            parent: under_assets.clone(),
+            reserved_name: Some(String::new()),
+        });
+        parents.push((format!("Ledger {n:02}"), Some(name)));
+        entries.push(json!({"ledger": format!("Ledger {n:02}"), "amount": format!("{n}.00"), "is_deemed_positive": "No", "bill_allocations": []}));
+    }
+    let row = json!({"date": "20250401", "voucher_type": "Journal", "voucher_number": "1", "guid": "g-1", "cancelled": false, "optional": false, "post_dated": false, "amounts": entries});
+    let placements = Placements::build(
+        parents.iter().map(|(l, p)| (l.as_str(), p.as_deref())),
+        groups,
+    );
+    let summary = summarise(&[row], &live_request(SummaryGroup::Group, placements)).unwrap();
+    assert_eq!(
+        summary.subtree_total_count, 72,
+        "70 groups, Cash-in-Hand and Current Assets"
+    );
+    assert_eq!(summary.subtree_totals.len(), MAX_SUBTREE_TOTALS);
+    // Largest first: Current Assets holds everything, then Cash-in-Hand (2485.00), then Group 70, 69, ...
+    let order: Vec<&str> = summary
+        .subtree_totals
+        .iter()
+        .map(|t| t["group"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        order[..4],
+        ["Current Assets", "Cash-in-Hand", "Group 70", "Group 69"]
+    );
+    assert_eq!(summary.subtree_totals[0]["vouchers"], 1);
+}
+
+#[test]
+fn a_user_group_named_like_the_reserved_root_is_not_the_roots_bucket() {
+    use super::super::voucher_groups::GroupHop;
+    let under_root = Placement {
+        chain: Vec::new(),
+        root_label: Some("Primary".to_string()),
+    };
+    let in_user_group = Placement {
+        chain: vec![GroupHop {
+            name: "Primary".to_string(),
+            reserved_name: String::new(),
+        }],
+        root_label: None,
+    };
+    assert_ne!(
+        group_key(SummaryGroup::Group, &under_root),
+        group_key(SummaryGroup::Group, &in_user_group)
+    );
+    assert_ne!(
+        group_key(SummaryGroup::PrimaryGroup, &under_root),
+        group_key(SummaryGroup::PrimaryGroup, &in_user_group)
+    );
+    // Nor is one named like the key the root itself is filed under.
+    let in_group_named_root = Placement {
+        chain: vec![GroupHop {
+            name: "root".to_string(),
+            reserved_name: String::new(),
+        }],
+        root_label: None,
+    };
+    assert_ne!(
+        group_key(SummaryGroup::Group, &under_root),
+        group_key(SummaryGroup::Group, &in_group_named_root)
+    );
+    assert_ne!(
+        group_key(SummaryGroup::PrimaryGroup, &under_root),
+        group_key(SummaryGroup::PrimaryGroup, &in_group_named_root)
+    );
+}
+
+#[test]
+fn subtree_totals_are_complete_up_to_the_bound_and_not_beyond() {
+    assert!(subtree_totals_complete(MAX_SUBTREE_TOTALS));
+    assert!(!subtree_totals_complete(MAX_SUBTREE_TOTALS + 1));
+}
+
+#[test]
+fn members_of_equal_movement_keep_the_order_they_first_appear_in_never_by_name() {
+    // Derived: three ledgers under one group, each credited 5.00, first seen as Zed, Alpha, Mid.
+    let mut parents = vec![("Cash".to_string(), Some("Cash-in-Hand".to_string()))];
+    let mut entries = vec![
+        json!({"ledger": "Cash", "amount": "-15.00", "is_deemed_positive": "Yes", "bill_allocations": []}),
+    ];
+    for ledger in ["Zed", "Alpha", "Mid"] {
+        parents.push((ledger.to_string(), Some("Cash-in-Hand".to_string())));
+        entries.push(json!({"ledger": ledger, "amount": "5.00", "is_deemed_positive": "No", "bill_allocations": []}));
+    }
+    let row = json!({"date": "20250401", "voucher_type": "Journal", "voucher_number": "1", "guid": "g-1", "cancelled": false, "optional": false, "post_dated": false, "amounts": entries});
+    let placements = Placements::build(
+        parents.iter().map(|(l, p)| (l.as_str(), p.as_deref())),
+        crate::agent::voucher_groups::tests::live_groups(),
+    );
+    let summary = summarise(&[row], &live_request(SummaryGroup::Group, placements)).unwrap();
+    let buckets = presented(&summary);
+    let order: Vec<&str> = buckets[0]["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["ledger"].as_str().unwrap())
+        .collect();
+    assert_eq!(order, ["Cash", "Zed", "Alpha", "Mid"]);
 }

@@ -95,3 +95,110 @@ test("a formula reference passes with any declared TYPE; an amount needs TYPE Am
   });
   assert.deepEqual([...actual], [violation("amount_typed_as_text", "Amount Text")]);
 });
+
+// #837 slice 2: a tree of several files, so that what reaches a file can be
+// tested. Returns the gate's `unexpected:` set, like `scan`.
+async function scanTree(files) {
+  const root = await mkdtemp(join(tmpdir(), ".request-builder-hazards-"));
+  try {
+    await mkdir(join(root, "tools"), { recursive: true });
+    for (const [path, text] of Object.entries(files)) {
+      await mkdir(join(root, path.split("/").slice(0, -1).join("/")), { recursive: true });
+      await writeFile(join(root, path), text);
+    }
+    try {
+      execFileSync("node", [GATE, "--root", root], { encoding: "utf8", stdio: "pipe" });
+    } catch (error) {
+      const output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+      assert.match(output, /\nmissing:\n/, "the scan must complete and report the pinned set missing");
+      const unexpected = /\nunexpected:\n([\s\S]*?)(?:\nmissing:|$)/.exec(output)?.[1] ?? "";
+      return [...new Set(unexpected.split("\n").filter(Boolean).map((line) => line.replace(/^- /, "")))].sort();
+    }
+    throw new Error("a fixture tree lacks the pinned set, so the gate must fail");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+const HAZARD = `pub fn planted() -> &'static str {\n    r#"<SET>$$NumItems:BRIDGE Planted Collection</SET>"#\n}\n`;
+const planted = (file) => `function-argument-with-space|${file}::planted|$$NumItems:BRIDGE Planted Collection`;
+
+test("a placeholder in an unquoted argument or a report name is reported as unresolved", async () => {
+  const actual = await scanTree({
+    "src-tauri/src/lib.rs": `pub fn unquoted(collection: &str) -> String {
+    format!(r#"<SET>$$NumItems:{collection}</SET>"#)
+}
+pub fn positional(collection: &str) -> String {
+    format!(r#"<SET>$$NumItems:{}</SET>"#, collection)
+}
+pub fn report(name: &str) -> String {
+    format!(r#"<REPORT NAME="{name}">"#)
+}
+pub fn quoted(from: &str) -> String {
+    format!(r#"<SET>$$Date:"{from}"</SET>"#)
+}
+pub fn escaped() -> String {
+    format!(r#"<SET>$$NumItems:{{Fixed}}</SET>"#)
+}
+`,
+  });
+  assert.deepEqual(actual, [
+    'unresolved-argument|src-tauri/src/lib.rs::positional|$$NumItems:{}',
+    'unresolved-argument|src-tauri/src/lib.rs::report|<REPORT NAME="{name}">',
+    "unresolved-argument|src-tauri/src/lib.rs::unquoted|$$NumItems:{collection}",
+  ]);
+});
+
+test("a file reached only through a test-only mod declaration is quarantined, and what it declares too", async () => {
+  const actual = await scanTree({
+    "src-tauri/src/lib.rs": `#[cfg(test)]
+#[path = "planted_tests.rs"]
+mod planted_tests;
+#[cfg(all(test, target_os = "macos"))]
+mod mac_only;
+#[cfg(any(test, feature = "seam"))]
+mod seam;
+mod production;
+#[cfg(test)]
+mod inline_tests {
+    #[path = "../nested.rs"]
+    mod nested;
+}
+`,
+    "src-tauri/src/planted_tests.rs": `${HAZARD}mod deeper;\n`,
+    "src-tauri/src/planted_tests/deeper.rs": HAZARD,
+    "src-tauri/src/mac_only.rs": HAZARD,
+    "src-tauri/src/seam.rs": HAZARD,
+    "src-tauri/src/production.rs": HAZARD,
+    "src-tauri/src/nested.rs": HAZARD,
+  });
+  // Only what production can reach is scanned: `any(test, ...)` is not test-only.
+  assert.deepEqual(actual, [planted("src-tauri/src/production.rs"), planted("src-tauri/src/seam.rs")]);
+});
+
+test("a file named like a test but reached by an ordinary mod is still scanned", async () => {
+  const actual = await scanTree({
+    "src-tauri/src/lib.rs": `#[path = "looks_like_tests.rs"]\nmod looks_like_tests;\n`,
+    "src-tauri/src/looks_like_tests.rs": HAZARD,
+  });
+  assert.deepEqual(actual, [planted("src-tauri/src/looks_like_tests.rs")]);
+});
+
+test("a file production also declares is scanned, and what it declares, whatever test code declares it", async () => {
+  const actual = await scanTree({
+    "src-tauri/src/lib.rs": `#[cfg(test)]
+#[path = "shared.rs"]
+mod shared_for_tests;
+#[path = "shared.rs"]
+mod shared;
+#[cfg(test)]
+#[path = "test_only.rs"]
+mod test_only;
+`,
+    "src-tauri/src/shared.rs": `${HAZARD}mod inner;\n`,
+    "src-tauri/src/shared/inner.rs": HAZARD,
+    "src-tauri/src/test_only.rs": HAZARD,
+  });
+  // The shared file and what it declares are scanned; a file only test code reaches is not.
+  assert.deepEqual(actual, [planted("src-tauri/src/shared.rs"), planted("src-tauri/src/shared/inner.rs")]);
+});

@@ -1,5 +1,6 @@
 //! Movement for the local MCP adapter.
 use super::*;
+use bridge_tally_core::TallyDate;
 
 impl Server {
     pub(super) async fn ledger_movement(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -18,8 +19,7 @@ impl Server {
                     .ok_or_else(|| "company_identity_incomplete".to_string())?,
             )?;
             ensure_movement_window_within_books(&from, &books_from)?;
-            let opening_date = bridge_tally_core::TallyDate::parse(from.clone())
-                .map_err(|_| "invalid_date".to_string())?;
+            let opening_date = from.clone();
             let (ledgers, ledger_evidence) = self
                 .read_movement_ledgers(&identity, opening_date.clone())
                 .await?;
@@ -119,12 +119,9 @@ impl Server {
                     };
                     let amount = bridge_tally_core::ExactDecimal::parse(entry.amount.clone())
                         .map_err(|_| "voucher_amount_invalid".to_string())?;
-                    let magnitude = amount
-                        .abs()
-                        .map_err(|_| "voucher_amount_invalid".to_string())?
-                        .as_str()
-                        .to_string();
-                    if movement_entry_is_debit(&amount, entry.is_deemed_positive) {
+                    let (is_debit, magnitude) =
+                        movement_entry_effect(&amount, entry.is_deemed_positive);
+                    if is_debit {
                         record.2 = add_decimal(&record.2, &format!("-{magnitude}"))?;
                     } else {
                         record.3 = add_decimal(&record.3, &magnitude)?;
@@ -228,21 +225,21 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
-        (from, to): (String, String),
+        (from, to): (TallyDate, TallyDate),
         source: WindowPlanSource,
         known_marks: Option<CompanyMarks>,
     ) -> Result<MovementWindowRead, ToolFailure> {
         let company = ValidatedCompanyName::new(company.to_string())
             .map_err(|_| "company_name_invalid".to_string())?;
-        let range =
-            ValidatedDateRange::new(from, to).map_err(|_| "invalid_date_range".to_string())?;
+        let range = ValidatedDateRange::new(from.as_str(), to.as_str())
+            .map_err(|_| "invalid_date_range".to_string())?;
         let shape = VoucherReadShape::Movement;
         let read = self
             .read_voucher_window(
                 identity,
                 company.as_str(),
-                range.from_yyyymmdd(),
-                range.to_yyyymmdd(),
+                &from,
+                &to,
                 shape,
                 source,
                 WindowReadLimits::for_shape(shape),
@@ -267,8 +264,8 @@ impl Server {
                     .corroborate_empty_voucher_read(
                         identity,
                         company.as_str(),
-                        range.from_yyyymmdd(),
-                        range.to_yyyymmdd(),
+                        &from,
+                        &to,
                         None,
                         marks,
                     )
@@ -324,7 +321,7 @@ struct MovementWindowRead {
 ///
 /// A zero amount carries no direction to read, so it stays on the side the flag
 /// observed rather than having one invented for it.
-fn movement_entry_is_debit(
+pub(super) fn movement_entry_is_debit(
     amount: &bridge_tally_core::ExactDecimal,
     is_deemed_positive: bool,
 ) -> bool {
@@ -333,6 +330,27 @@ fn movement_entry_is_debit(
     } else {
         amount.is_negative()
     }
+}
+
+/// The column a ledger entry adds to and the magnitude it adds there, shared by `ledger_movement`
+/// and the voucher summaries so the two cannot disagree (#1251).
+///
+/// A zero amount, signed or not (`-0.00` parses), has no magnitude to carry a sign on: it adds `0`
+/// to whichever side its flag names. Writing the magnitude of `-0.00` behind a minus sign gave
+/// `--0.00`, which is not a number, and refused a valid read as `voucher_amount_invalid`.
+pub(super) fn movement_entry_effect(
+    amount: &bridge_tally_core::ExactDecimal,
+    is_deemed_positive: bool,
+) -> (bool, String) {
+    let magnitude = if amount.is_zero() {
+        "0".to_string()
+    } else {
+        amount.magnitude().as_str().to_string()
+    };
+    (
+        movement_entry_is_debit(amount, is_deemed_positive),
+        magnitude,
+    )
 }
 
 fn validate_movement_snapshot(

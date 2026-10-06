@@ -232,7 +232,10 @@ fn classify_transport_error(error: &TallyTransportError) -> StandardLedgerCatalo
         | TallyTransportError::ResponseReadFailed
         // Held back by the wire gate (#697): a retry after the other sender
         // finishes can succeed.
-        | TallyTransportError::WireRefused { .. } => StandardLedgerCatalogReadError::Transport,
+        | TallyTransportError::WireRefused { .. }
+        // Not started because its caller withdrew (#778): nothing was sent,
+        // and a later call can succeed.
+        | TallyTransportError::SendWithdrawn => StandardLedgerCatalogReadError::Transport,
         TallyTransportError::ResponseTooLarge { .. } => {
             StandardLedgerCatalogReadError::BoundsViolation
         }

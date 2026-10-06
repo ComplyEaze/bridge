@@ -112,9 +112,10 @@ neither is ported, as neither is in `da9e2d3d`.
 - `edge-books/loans_interest_loan_transfer_tds.json` (a firm; bridge#803): a journal moving one loan to
   another lender's loan with TDS on it is a repayment of one and a loan taken on the other, both flagged in
   journal mode; a TDS journal on one loan stays neither taken nor repaid, also beside a nil line on another
-  loan (a nil line is not the opposite side). On that second journal LOAN-1 fires for Journal Loan: the
-  reference does not count TDS on a voucher that also posts to another configured loan, even a nil line, so
-  the loan's movement does not tie. That is the reference's own check, unchanged.
+  loan (a nil line is not the opposite side, and not a posting to that loan either). On that second journal
+  the TDS counts on Journal Loan's coverage and LOAN-1 does not fire (bridge#1201; at `da9e2d3d` the
+  reference left that TDS out because the exclusion tested only whether the loan appeared, and LOAN-1
+  fired for the whole 1,200). A voucher with an amount on another configured loan is still left out.
 - `edge-books/loans_interest_s194a_bounds.json` (a firm with no TDS; s.194A threshold Rs 10,000): a listed
   pair crediting and reversing one amount, on two vouchers or on one voucher beside a non-interest line,
   leaves the threshold open where the net reading did not; the least exactly at the threshold is not over
@@ -221,6 +222,6 @@ and regenerating all seven goldens there gives byte-identical files.
 | `loans_interest_interest_first.json` | 15,355 | `44efbb564d03a59c1e38fe8d6e6221eaae10eba392df14c81b3e69a6cc7a85f3` | `edge-books/loans_interest_interest_first.json` |
 | `edge.loans_interest_interest_first.loans_interest.json` | 115,359 | `5e39af62fc0ae8dfdb7b6bee6b595345a722b4ac2b7d1cc971f55f11be70d379` | `golden/edge.loans_interest_interest_first.loans_interest.json` |
 | `loans_interest_loan_transfer_tds.json` | 3,318 | `9190aaa7551a2a15e5a2b7fdd698031d63aea588f9eca62f570258fe8eb5a196` | `edge-books/loans_interest_loan_transfer_tds.json` |
-| `edge.loans_interest_loan_transfer_tds.loans_interest.json` | 26,151 | `eeb3045ca2d863d6646ab0c749d2d09bbf52238e784e45fec974b1d6a01498e3` | `golden/edge.loans_interest_loan_transfer_tds.loans_interest.json` |
+| `edge.loans_interest_loan_transfer_tds.loans_interest.json` | 25,960 | `2bf321e53b76e81b3ad3ccbd743929ad657e7618444eb4d337edc4af2f569073` | `golden/edge.loans_interest_loan_transfer_tds.loans_interest.json` |
 | `loans_interest_s194a_bounds.json` | 9,185 | `b7d651015d0db2d12d9021e4eea801b83f13b925393c0645f5ea3297cbcb821a` | `edge-books/loans_interest_s194a_bounds.json` |
 | `edge.loans_interest_s194a_bounds.loans_interest.json` | 106,955 | `4213fbcfa4c89ee87627e749bef0a9491acbbc8510979cd9e62c99fb3ef9c2a6` | `golden/edge.loans_interest_s194a_bounds.loans_interest.json` |

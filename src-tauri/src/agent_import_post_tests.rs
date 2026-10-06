@@ -399,11 +399,14 @@ fn a_busy_readback_after_a_recorded_send_names_verify_import_never_a_rebuild() {
         error["next_step"],
         "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again."
     );
-    // Held back before any attempt was recorded: it says when to retry but
-    // offers no verify_import step.
+    // Held back before any attempt was recorded: it says when to try again,
+    // and that the person approves again, never a verify_import step (#869).
     let before =
         reconciliation_failure_payload("bridge-test", Some(false), None, "tally_endpoint_busy");
-    assert!(before["result"]["error"].get("next_step").is_none());
+    assert_eq!(
+        before["result"]["error"]["next_step"],
+        "Nothing was posted: Tally's port was busy. Call post_import with this same batch again after retry_after_s seconds, once Tally is free. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch."
+    );
     assert_eq!(
         before["result"]["error"]["retry_after_s"],
         bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
@@ -452,6 +455,22 @@ fn a_row_refusal_without_a_named_blocker_still_says_not_to_rebuild() {
     assert!(step.contains("and say which"), "{step}");
     assert!(step.contains("Never rename a statement row"), "{step}");
     assert!(error.get("blocking_batch_id").is_none());
+}
+
+/// A queued read the transport did not start because the call was withdrawn
+/// (#778) names the withdrawal, `request_cancelled`, as a call withdrawn
+/// before its operation started does, never the operation's read failure.
+#[test]
+fn a_send_withdrawn_before_the_intent_names_the_withdrawal() {
+    let withdrawn = || {
+        anyhow::Error::from(crate::tally::approved_import::PreIntentQueueRefusal {
+            source: anyhow::Error::new(bridge_tally_transport::TallyTransportError::SendWithdrawn),
+        })
+    };
+    assert_eq!(
+        ToolFailure::from_runtime("post_queue_read_failed", withdrawn()).code,
+        "request_cancelled"
+    );
 }
 
 /// A wire refusal replaces a generic failure code with the refusal's own, but
@@ -655,10 +674,10 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
     // lower bounds stay, because a wait can only add to elapsed time.
     async fn reads_of(
         server: &Server,
+        reads: std::sync::Arc<std::sync::Mutex<Vec<Option<Duration>>>>,
         request: crate::tally::agent_read_request::AgentReadRequest,
         call_started: Instant,
     ) -> (anyhow::Result<String>, Vec<Option<Duration>>) {
-        let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let result = MARKS_READS
             .scope(
                 std::sync::Arc::clone(&reads),
@@ -668,15 +687,34 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
         let reads = reads.lock().unwrap().clone();
         (result, reads)
     }
+    let no_reads = || std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
 
-    // Freed after the first budget, inside the second: the retry gets through.
+    // Freed once the retry has begun, not on a timer: the first read is refused
+    // for its whole budget however late it starts, and the retry then reaches a
+    // lock that is already released. A timer (budget plus 300 ms from the release
+    // task's first poll) let a first read that started more than 300 ms after
+    // that find the lock released and never retry (#1261). The wait is bounded,
+    // so a missing retry fails the asserts below rather than hanging.
     let held = hold();
-    let release = tokio::spawn(async move {
-        tokio::time::sleep(budget + Duration::from_millis(300)).await;
-        drop(held);
+    let first_reads = no_reads();
+    let release = tokio::spawn({
+        let reads = std::sync::Arc::clone(&first_reads);
+        async move {
+            for _ in 0..2000 {
+                if reads.lock().unwrap().len() >= 2 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+            // 300 ms into the retry's wait, as before: the retry must keep polling,
+            // not make one try. The wait budget is charged by pause length, so a
+            // stall cannot spend it before this fires.
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            drop(held);
+        }
     });
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
+    let (result, reads) = reads_of(&server, first_reads, request(), Instant::now()).await;
     assert!(started.elapsed() >= budget);
     assert!(!busy(&result), "the retry must reach the wire: {result:?}");
     assert_eq!(reads, [None, Some(budget)]);
@@ -685,7 +723,7 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
     // Held throughout: refused once, after both budgets, never a third read.
     let _held = hold();
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
+    let (result, reads) = reads_of(&server, no_reads(), request(), Instant::now()).await;
     assert!(busy(&result));
     assert!(started.elapsed() >= budget * 2);
     assert_eq!(reads, [None, Some(budget)], "exactly one retry");
@@ -695,7 +733,7 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
         .checked_sub(Duration::from_secs(44))
         .unwrap_or_else(Instant::now);
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), spent).await;
+    let (result, reads) = reads_of(&server, no_reads(), request(), spent).await;
     assert!(busy(&result));
     assert!(started.elapsed() >= budget);
     assert_eq!(reads, [None], "no retry");
@@ -1853,13 +1891,13 @@ fn the_whole_window_pre_post_request_is_admitted_on_the_verification_measurement
     };
     let divided = [
         crate::agent::WindowPart {
-            from: "20260801".into(),
-            to: "20260815".into(),
+            from: crate::agent::tally_date("20260801"),
+            to: crate::agent::tally_date("20260815"),
             span: None,
         },
         crate::agent::WindowPart {
-            from: "20260816".into(),
-            to: "20260831".into(),
+            from: crate::agent::tally_date("20260816"),
+            to: crate::agent::tally_date("20260831"),
             span: None,
         },
     ];
@@ -2835,7 +2873,7 @@ fn a_batch_approval_summarizes_every_ledger_and_the_money_the_types_move() {
         "Money out by Payment vouchers: 15",
         "Contra: moves between cash/bank ledgers, net zero",
         "Journals may also move cash/bank ledgers; see the per-ledger totals",
-        "Not shown here: each voucher's own date, narration and reference.",
+        "Each voucher: type, date, amount, ledger, narration (references not shown):",
         "After a timeout, reconcile this batch; do not rebuild or resend it.",
     ] {
         assert!(
@@ -2848,6 +2886,277 @@ fn a_batch_approval_summarizes_every_ledger_and_the_money_the_types_move() {
     assert!(admit_fresh_saved_voucher(&one, &endpoint)
         .unwrap()
         .starts_with("Create ONE Journal"));
+}
+
+/// The lines of `preview` from the one after its `Dates:` line, up to its first
+/// blank line: where a batch lists its vouchers, or says why it does not.
+fn voucher_block(preview: &str) -> Vec<&str> {
+    preview
+        .lines()
+        .skip_while(|line| !line.starts_with("Dates: "))
+        .skip(1)
+        .take_while(|line| !line.is_empty())
+        .collect()
+}
+
+/// A batch of at most ten lists each voucher on one line (#1063): its type,
+/// date, value, the ledger a statement row names (a Receipt's first credit,
+/// any other type's first debit, "+N" for the rest of that side) and its
+/// narration as posted, in the batch file's order.
+#[test]
+fn a_small_batch_lists_each_voucher_on_one_line() {
+    let (mut line, endpoint) = batch_of_every_type();
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview),
+        [
+            "Each voucher: type, date, amount, ledger, narration (references not shown):",
+            "Each line ends with its narration, quoted exactly as it will be posted.",
+            "Journal 20260901  12.5  \"Expense\"  \"Synthetic test only\"",
+            "Receipt 20260902  40  \"Party A\"  \"Synthetic test only\"",
+            "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
+            "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
+        ],
+        "{preview}"
+    );
+    // A second ledger on the named side is counted, never dropped; a Receipt
+    // names its first credit and its value is still the sum of its debits.
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Expense","amount":"10.00","side":"Dr"},
+        {"ledger":"Rent","amount":"2.50","side":"Dr"},
+        {"ledger":"Cash","amount":"12.50","side":"Cr"}]))
+    .unwrap();
+    line.vouchers[1].entries = serde_json::from_value(json!([
+        {"ledger":"Cash","amount":"40.00","side":"Dr"},
+        {"ledger":"Party C","amount":"30.00","side":"Cr"},
+        {"ledger":"Party A","amount":"10.00","side":"Cr"}]))
+    .unwrap();
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview)[2..4],
+        [
+            "Journal 20260901  12.5  \"Expense\" +1  \"Synthetic test only\"",
+            "Receipt 20260902  40  \"Party C\" +1  \"Synthetic test only\"",
+        ],
+        "{preview}"
+    );
+}
+
+/// A voucher's line shows its narration as the post sends it, quoted: a
+/// Devanagari and rupee narration whole, outer spaces dropped, none as
+/// `(none)`, and one longer than 40 characters cut there with the cut marked.
+/// The cut counts characters, so it can split a conjunct: here it keeps the
+/// क of क्ष and drops its virama, and the marker says 22 characters follow.
+#[test]
+fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
+    let (mut line, endpoint) = batch_of_every_type();
+    let narrations = [
+        Some("जुलाई का किराया ₹500"),
+        Some("  NEFT CR 000123456789 SYNTHETIC TRADERS RENT FOR JULY 2026  "),
+        Some("जुलाई महीने का किराया बिजली बिल भुगतान क्षेत्रीय कार्यालय ₹500"),
+        None,
+    ];
+    for (voucher, narration) in line.vouchers.iter_mut().zip(narrations) {
+        voucher.narration = narration.map(str::to_owned);
+    }
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview)[2..],
+        [
+            "Journal 20260901  12.5  \"Expense\"  \"जुलाई का किराया ₹500\"",
+            "Receipt 20260902  40  \"Party A\"  \"NEFT CR 000123456789 SYNTHETIC TRADERS R\"… (+17 characters)",
+            "Payment 20260902  15  \"Party B\"  \"जुलाई महीने का किराया बिजली बिल भुगतान क\"… (+22 characters)",
+            "Contra 20260902  5  \"Bank\"  (none)",
+        ],
+        "{preview}"
+    );
+}
+
+/// A narration or reference holding a layout or format character leaves the
+/// batch's totals and one line in place of the voucher lines (#1063). The
+/// batch is never refused for it, nothing is stripped, and the line does not
+/// echo the text.
+#[test]
+fn an_unsafe_narration_or_reference_leaves_the_totals_and_says_so() {
+    for (narration, reference) in [
+        (Some("rent \u{202e}evil"), None),
+        (Some("rent\nevil"), None),
+        (None, Some("REF\u{2028}evil")),
+        (None, Some("REF\u{200b}evil")),
+    ] {
+        let (mut line, endpoint) = batch_of_every_type();
+        line.vouchers[2].narration = narration.map(str::to_owned);
+        line.vouchers[2].reference = reference.map(str::to_owned);
+        let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+        assert_eq!(
+            voucher_block(&preview),
+            ["Per-voucher lines are not shown: a narration/reference is unsafe."],
+            "{narration:?} {reference:?}"
+        );
+        assert!(!preview.contains("evil"), "{preview}");
+        assert!(
+            preview.contains("Total debit: 72.5  Total credit: 72.5"),
+            "{preview}"
+        );
+    }
+}
+
+/// A narration holding a shape a line of this dialog begins with is withheld
+/// on its voucher's line (#1063 follow-up): the dialog wraps long lines, so its
+/// tail could begin a row that passes for a real one. Only that narration is
+/// withheld; ordinary bank narrations that hold DR or CR with a number, a
+/// doctor's name or a MICR code are listed.
+#[test]
+fn a_narration_that_reads_like_a_dialog_line_is_withheld_on_its_line() {
+    let withheld =
+        "Receipt 20260902  40  \"Party A\"  (narration withheld: it reads like a dialog line)";
+    for narration in [
+        "x Dr 500.00  Cr 0 y",
+        "ATM 1234 Total debit: 0  Total credit: 0",
+        "refund TOTAL CREDIT : 5",
+        "see batch: abc",
+        "please Create 4 vouchers",
+        "dr 1,234.50 cr 9",
+    ] {
+        let (mut line, endpoint) = batch_of_every_type();
+        line.vouchers[1].narration = Some(narration.into());
+        let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+        assert_eq!(voucher_block(&preview)[3], withheld, "{narration}");
+        // The other vouchers keep theirs.
+        assert_eq!(
+            voucher_block(&preview)[4],
+            "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
+            "{narration}"
+        );
+    }
+    for narration in [
+        "NEFT CR 000123456789",
+        "UPI CR 4567 ref",
+        "ATM DR 1234",
+        "Dr Sharma fees",
+        "MICR 400002",
+        "Created 4 entries",
+    ] {
+        let (mut line, endpoint) = batch_of_every_type();
+        line.vouchers[1].narration = Some(narration.into());
+        let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+        assert_eq!(
+            voucher_block(&preview)[3],
+            format!("Receipt 20260902  40  \"Party A\"  \"{narration}\""),
+            "{narration}"
+        );
+    }
+}
+
+/// Each of the four shapes matches on its own, in any case, and the rule's
+/// edges hold: a word character before `dr`, no space after `create`, and a
+/// digit of another script after `create`.
+#[test]
+fn each_dialog_line_shape_is_matched_and_its_edges_hold() {
+    for (text, matched) in [
+        ("Dr 5 Cr 6", true),
+        ("(dR 5,000 cR 6)", true),
+        ("xDr 500 Cr 0", false),
+        ("Dr500 Cr 1", false),
+        ("Dr 5 Cr x", false),
+        ("total debit:", true),
+        ("Total Credit   :", true),
+        // Any whitespace between the words: a no-break space renders as the dialog's own line.
+        ("Total\u{a0}debit: 0", true),
+        ("Total  credit: 5", true),
+        ("totaldebit:", false),
+        ("Batch:", true),
+        ("batch", false),
+        ("CREATE ४ vouchers", true),
+        ("create4", false),
+        ("subtotals", false),
+    ] {
+        assert_eq!(reads_like_a_dialog_line(text), matched, "{text:?}");
+    }
+}
+
+/// Ten vouchers are listed; an eleventh leaves the totals and says why.
+#[test]
+fn ten_vouchers_are_listed_and_eleven_are_summarised() {
+    let (mut line, endpoint) = batch();
+    for index in 1..10 {
+        let mut extra = line.vouchers[0].clone();
+        extra.bridge_txn_id = format!("journal-{index}");
+        line.vouchers.push(extra);
+    }
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    let block = voucher_block(&preview);
+    assert_eq!(block.len(), 12, "{preview}");
+    assert_eq!(
+        block[..2],
+        [
+            "Each voucher: type, date, amount, ledger, narration (references not shown):",
+            "Each line ends with its narration, quoted exactly as it will be posted.",
+        ]
+    );
+    let mut eleven = line.clone();
+    let mut extra = line.vouchers[0].clone();
+    extra.bridge_txn_id = "journal-10".into();
+    eleven.vouchers.push(extra);
+    let preview = review_preview_with(&eleven, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview),
+        ["Per-voucher lines are not shown: this batch has over 10 vouchers."],
+        "{preview}"
+    );
+}
+
+/// Voucher lines that would break a cap leave the totals and say why, so no
+/// batch that posted before #1063 is refused for them: a line over 100
+/// characters, and ten Journals over twenty ledgers. With the agent's footer
+/// the batch text has 17 fixed lines, one per ledger and one per money line;
+/// ten voucher lines fit while ledgers and money lines come to 13 or fewer.
+/// Here they come to 21: the totals take 38 lines and pass, and the listing
+/// would take 48.
+#[test]
+fn voucher_lines_that_do_not_fit_leave_the_totals_and_say_so() {
+    let (mut wide, endpoint) = batch_of_every_type();
+    wide.vouchers[1].entries[1].ledger = "P".repeat(60);
+    let preview = review_preview_with(&wide, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview),
+        ["Per-voucher lines are not shown: they do not fit this dialog."],
+        "{preview}"
+    );
+    let (mut many, endpoint) = batch();
+    let journal = many.vouchers[0].clone();
+    many.vouchers = (0..10)
+        .map(|index| {
+            let mut voucher = journal.clone();
+            voucher.bridge_txn_id = format!("journal-{index}");
+            voucher.entries[0].ledger = format!("Expense {index}");
+            voucher.entries[1].ledger = format!("Cash {index}");
+            voucher
+        })
+        .collect();
+    let preview = review_preview_with(&many, &endpoint, &agent_post_timing_lines()).unwrap();
+    assert_eq!(
+        voucher_block(&preview),
+        ["Per-voucher lines are not shown: they do not fit this dialog."],
+        "{preview}"
+    );
+    assert_eq!(preview.lines().count(), 38, "{preview}");
+}
+
+/// Each line that stands in for the voucher lines is no longer than the line
+/// a batch showed in its place before #1063, so the totals-only text never
+/// outgrows a cap a batch passed before.
+#[test]
+fn each_sentence_in_place_of_the_voucher_lines_is_no_longer_than_the_old_one() {
+    let old = "Not shown here: each voucher's own date, narration and reference.";
+    for sentence in [
+        VOUCHER_LINES_OVER_LIMIT,
+        VOUCHER_LINES_UNSAFE,
+        VOUCHER_LINES_DO_NOT_FIT,
+    ] {
+        assert!(sentence.len() <= old.len(), "{sentence}");
+        assert!(sentence.is_ascii(), "{sentence}");
+    }
 }
 
 /// A batch whose summary would not fit one dialog is refused, never cut;

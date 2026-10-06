@@ -7,6 +7,7 @@
 
 use std::fmt;
 
+use bridge_tally_primitives::TallyDate;
 use sha2::{Digest, Sha256};
 
 use crate::encode_tally_xml_request_utf16le;
@@ -23,6 +24,13 @@ use crate::xml_text::escape_text as xml_escape;
 const TEMPLATE_COMPANY: &str = "BRIDGE TEMPLATE COMPANY";
 const TEMPLATE_FROM: &str = "20000101";
 const TEMPLATE_TO: &str = "20000102";
+
+/// A template date as the typed date a date-only renderer takes. The
+/// constants above are fixed valid dates, so this cannot fail; it is used only
+/// to render a profile's fixed template, never on an input (#861).
+fn template_date(value: &'static str) -> TallyDate {
+    TallyDate::parse(value).expect("template dates are fixed valid YYYYMMDD constants")
+}
 #[cfg(feature = "voucher-scan")]
 const TEMPLATE_ALTER_ID_START: u64 = 0;
 #[cfg(feature = "voucher-scan")]
@@ -72,8 +80,8 @@ impl fmt::Debug for ValidatedCompanyName {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidatedDateRange {
-    from_yyyymmdd: String,
-    to_yyyymmdd: String,
+    from: TallyDate,
+    to: TallyDate,
 }
 
 impl ValidatedDateRange {
@@ -81,26 +89,32 @@ impl ValidatedDateRange {
         from_yyyymmdd: impl Into<String>,
         to_yyyymmdd: impl Into<String>,
     ) -> Result<Self, ReadProfileValidationError> {
-        let from_yyyymmdd = from_yyyymmdd.into();
-        let to_yyyymmdd = to_yyyymmdd.into();
-        if !valid_yyyymmdd(&from_yyyymmdd) || !valid_yyyymmdd(&to_yyyymmdd) {
+        let (Ok(from), Ok(to)) = (
+            TallyDate::parse(from_yyyymmdd),
+            TallyDate::parse(to_yyyymmdd),
+        ) else {
             return Err(ReadProfileValidationError::DateInvalid);
-        }
-        if from_yyyymmdd > to_yyyymmdd {
+        };
+        if from > to {
             return Err(ReadProfileValidationError::DateRangeInvalid);
         }
-        Ok(Self {
-            from_yyyymmdd,
-            to_yyyymmdd,
-        })
+        Ok(Self { from, to })
     }
 
     pub fn from_yyyymmdd(&self) -> &str {
-        &self.from_yyyymmdd
+        self.from.as_str()
     }
 
     pub fn to_yyyymmdd(&self) -> &str {
-        &self.to_yyyymmdd
+        self.to.as_str()
+    }
+
+    pub fn from_date(&self) -> &TallyDate {
+        &self.from
+    }
+
+    pub fn to_date(&self) -> &TallyDate {
+        &self.to
     }
 }
 
@@ -206,9 +220,11 @@ impl ReadOnlyProfileId {
             Self::AuditLedgersV1 => {
                 render_audit_ledgers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
             }
-            Self::AuditVouchersV1 => {
-                render_audit_vouchers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
-            }
+            Self::AuditVouchersV1 => render_audit_vouchers(
+                TEMPLATE_COMPANY,
+                &template_date(TEMPLATE_FROM),
+                &template_date(TEMPLATE_TO),
+            ),
             Self::AuditStockItemsV1 => {
                 render_audit_stock_items(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
             }
@@ -417,11 +433,9 @@ impl ReadOnlyProfile<'_> {
                 period.from_yyyymmdd(),
                 period.to_yyyymmdd(),
             ),
-            Self::AuditVouchersV1 { company, window } => render_audit_vouchers(
-                company.as_str(),
-                window.from_yyyymmdd(),
-                window.to_yyyymmdd(),
-            ),
+            Self::AuditVouchersV1 { company, window } => {
+                render_audit_vouchers(company.as_str(), window.from_date(), window.to_date())
+            }
             Self::AuditStockItemsV1 { company, period } => render_audit_stock_items(
                 company.as_str(),
                 period.from_yyyymmdd(),
@@ -949,12 +963,16 @@ fn render_audit_ledgers(company: &str, from: &str, to: &str) -> String {
 /// FETCH, so the request is the qualified window shape. The response-side
 /// checks keyed to that shape (`window_not_honoured`, part admission) are not
 /// inherited by this renderer; the caller that sends it must apply them.
-fn render_audit_vouchers(company: &str, from: &str, to: &str) -> String {
+///
+/// The dates go into a quoted `$$Date:"…"` literal, which XML escaping cannot
+/// protect (Tally decodes `&quot;` before evaluating), so only a date is
+/// accepted (#861).
+fn render_audit_vouchers(company: &str, from: &TallyDate, to: &TallyDate) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Vouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Vouchers\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{AUDIT_VOUCHER_FETCH}</FETCH><FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
-        from = xml_escape(from),
-        to = xml_escape(to),
+        from = from.as_str(),
+        to = to.as_str(),
     )
 }
 
@@ -965,29 +983,6 @@ fn render_audit_stock_items(company: &str, from: &str, to: &str) -> String {
         from = xml_escape(from),
         to = xml_escape(to),
     )
-}
-
-fn valid_yyyymmdd(value: &str) -> bool {
-    if value.len() != 8 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
-        return false;
-    }
-    let year = value[0..4].parse::<u16>().ok();
-    let month = value[4..6].parse::<u8>().ok();
-    let day = value[6..8].parse::<u8>().ok();
-    let (Some(year), Some(month), Some(day)) = (year, month, day) else {
-        return false;
-    };
-    if year == 0 || !(1..=12).contains(&month) {
-        return false;
-    }
-    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-    let maximum_day = match month {
-        2 if leap => 29,
-        2 => 28,
-        4 | 6 | 9 | 11 => 30,
-        _ => 31,
-    };
-    (1..=maximum_day).contains(&day)
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

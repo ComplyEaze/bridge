@@ -1,0 +1,852 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "knock_off_candidates",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "dd6bb68919f0238a",
+  "population_note_text": "Every voucher in the books population. Party ledgers are those under Sundry Debtors, Sundry Creditors, Loans (Liability) or Loans & Advances (Asset); bank and cash, those under Bank Accounts, Bank OD A/c or Cash-in-Hand.",
+  "figures": [
+    {
+      "id": "knock_off_candidates.t1_candidate_total_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "46b0e33fa5177e15",
+      "definition_text": "Debits on party ledgers in the vouchers settling one party through another with no bank or cash line, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t1_row_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "b662ded04a0754bb",
+      "definition_text": "Vouchers with lines on two or more distinct party ledgers and no bank or cash line.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_candidate_total_paise",
+      "value": 4400000,
+      "unit": "paise",
+      "definition_sha256_16": "c81320270dcf7017",
+      "definition_text": "Bank and cash lines of the vouchers whose narration names a party ledger not on the voucher, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_embedded_candidate_total_paise",
+      "value": 700000,
+      "unit": "paise",
+      "definition_sha256_16": "2f59fc886c1b62be",
+      "definition_text": "Bank and cash lines of the vouchers whose narration holds a party's name only inside a longer name, summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_embedded_row_count",
+      "value": 7,
+      "unit": "count",
+      "definition_sha256_16": "f4bc1dfa1ae74236",
+      "definition_text": "Bank or cash vouchers whose narration holds a party ledger's name only inside a longer name (another name-like word beside it in the same part of the narration); listed apart from the others.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v38",
+          "label": "Payment v38 on 2025-07-16: booked to Office Rent; the name of Lambda Traders sits inside 'ZED.Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v39",
+          "label": "Payment v39 on 2025-07-18: booked to Office Rent; the name of Lambda Traders sits inside 'ZED&Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v40",
+          "label": "Payment v40 on 2025-07-20: booked to Office Rent; the name of Lambda Traders sits inside 'ZED#Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v41",
+          "label": "Payment v41 on 2025-07-22: booked to Office Rent; the name of Lambda Traders sits inside 'ZED_Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v42",
+          "label": "Payment v42 on 2025-07-24: booked to Office Rent; the name of Lambda Traders sits inside \"ZED'Lambda Traders\""
+        },
+        {
+          "kind": "voucher",
+          "id": "v43",
+          "label": "Payment v43 on 2025-07-26: booked to Office Rent; the name of Lambda Traders sits inside 'LAMBDA'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v50",
+          "label": "Payment v50 on 2025-08-09: booked to Office Rent; the name of Beta Stores sits inside 'ZED BETA STORES'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_1727dbff",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "9c36b9c7aef5bb67",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 1727dbff) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v44",
+          "label": "Payment v44 on 2025-07-28: narration: 'STRAßE WORKS'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_252cf3b7",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "96b456df0ff59a24",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 252cf3b7) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v46",
+          "label": "Payment v46 on 2025-08-01: narration: 'ﬁne Foods'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_33085fa2",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "572fb77d93e8a7ac",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 33085fa2) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v47",
+          "label": "Payment v47 on 2025-08-03: narration: 'KILO WORKS'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_426abb6b",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6aae239f843314ac",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 426abb6b) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v51",
+          "label": "Payment v51 on 2025-08-11: narration: 'ZÉRO MART and ZÉRO BAZAAR'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_8bd3ad32",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "92549b34c586c276",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 8bd3ad32) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v49",
+          "label": "Payment v49 on 2025-08-07: narration: 'for Alpha Traders'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_9bba715e",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "048743da68d8667b",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 9bba715e) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v51",
+          "label": "Payment v51 on 2025-08-11: narration: 'ZÉRO MART and ZÉRO BAZAAR'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_c7fc8869",
+      "value": 38,
+      "unit": "count",
+      "definition_sha256_16": "24dac8a02716e80c",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag c7fc8869) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v01",
+          "label": "Payment v01 on 2025-05-05: narration: 'to Lambda Traders from'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v02",
+          "label": "Payment v02 on 2025-05-05: narration: 'by Lambda Traders for'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v03",
+          "label": "Payment v03 on 2025-05-07: narration: 'paid Lambda Traders pay'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v04",
+          "label": "Payment v04 on 2025-05-09: narration: 'payment Lambda Traders pymt'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v05",
+          "label": "Payment v05 on 2025-05-11: narration: 'neft Lambda Traders rtgs'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v06",
+          "label": "Payment v06 on 2025-05-13: narration: 'imps Lambda Traders upi'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v07",
+          "label": "Payment v07 on 2025-05-15: narration: 'ref Lambda Traders cr'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v08",
+          "label": "Payment v08 on 2025-05-17: narration: 'dr Lambda Traders towards'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v09",
+          "label": "Payment v09 on 2025-05-19: narration: 'being Lambda Traders via'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v10",
+          "label": "Payment v10 on 2025-05-21: narration: 'and Lambda Traders of'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v11",
+          "label": "Payment v11 on 2025-05-23: narration: 'the Lambda Traders in'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v12",
+          "label": "Payment v12 on 2025-05-25: narration: 'on Lambda Traders at'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v13",
+          "label": "Payment v13 on 2025-05-27: narration: 'with Lambda Traders mr'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v14",
+          "label": "Payment v14 on 2025-05-29: narration: 'mrs Lambda Traders ms'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v15",
+          "label": "Payment v15 on 2025-05-31: narration: 'inb Lambda Traders transfer'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v16",
+          "label": "Payment v16 on 2025-06-02: narration: 'trf Lambda Traders chq'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v17",
+          "label": "Payment v17 on 2025-06-04: narration: 'cheque Lambda Traders cash'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v18",
+          "label": "Payment v18 on 2025-06-06: narration: 'deposit Lambda Traders withdrawal'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v19",
+          "label": "Payment v19 on 2025-06-08: narration: 'settled Lambda Traders adjustment'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v20",
+          "label": "Payment v20 on 2025-06-10: narration: 'bill Lambda Traders gr'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v21",
+          "label": "Payment v21 on 2025-06-12: narration: 'inv Lambda Traders invoice'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v22",
+          "label": "Payment v22 on 2025-06-14: narration: 'against Lambda Traders pvt'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v23",
+          "label": "Payment v23 on 2025-06-16: narration: 'ltd Lambda Traders limited'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v24",
+          "label": "Payment v24 on 2025-06-18: narration: 'llp Lambda Traders private'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v25",
+          "label": "Payment v25 on 2025-06-20: narration: 'rs Lambda Traders inr'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v26",
+          "label": "Payment v26 on 2025-06-22: narration: 'amt Lambda Traders amount'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v27",
+          "label": "Payment v27 on 2025-06-24: narration: 'no Lambda Traders a'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v28",
+          "label": "Payment v28 on 2025-06-26: narration: 'an Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v29",
+          "label": "Payment v29 on 2025-06-28: narration: 'ZED-Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v30",
+          "label": "Payment v30 on 2025-06-30: narration: 'ZED/Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v31",
+          "label": "Payment v31 on 2025-07-02: narration: 'ZED,Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v32",
+          "label": "Payment v32 on 2025-07-04: narration: 'ZED;Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v33",
+          "label": "Payment v33 on 2025-07-06: narration: 'ZED|Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v34",
+          "label": "Payment v34 on 2025-07-08: narration: 'ZED:Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v35",
+          "label": "Payment v35 on 2025-07-10: narration: 'ZED(Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v36",
+          "label": "Payment v36 on 2025-07-12: narration: 'ZED)Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v37",
+          "label": "Payment v37 on 2025-07-14: narration: 'ZED\\\\Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v50",
+          "label": "Payment v50 on 2025-08-09: narration: 'ZED LAMBDA TRADERS, paid Lambda Traders, ZED BETA STORES'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_dbfac766",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "fd1db490f60357b9",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag dbfac766) not on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v45",
+          "label": "Payment v45 on 2025-07-30: narration: 'GROSS MART'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_pair_count",
+      "value": 45,
+      "unit": "count",
+      "definition_sha256_16": "111e114ff2a3fa53",
+      "definition_text": "Voucher and named-party pairs across the groups: equal to the voucher count unless a narration names more than one party.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_1727dbff",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "6dca601e13271581",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 1727dbff), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_252cf3b7",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "e56b8805f6c8771d",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 252cf3b7), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_33085fa2",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "1ee9c0360b9521d2",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 33085fa2), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_426abb6b",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "da075b8182aab973",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 426abb6b), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_8bd3ad32",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "df436c1eb33e2f89",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 8bd3ad32), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_9bba715e",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "4b1c2f508aa35530",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 9bba715e), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_c7fc8869",
+      "value": 3800000,
+      "unit": "paise",
+      "definition_sha256_16": "1886482a24dad888",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag c7fc8869), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_dbfac766",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "12299973b55278f4",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag dbfac766), summed -- a candidate total, not a reportable amount.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_row_count",
+      "value": 44,
+      "unit": "count",
+      "definition_sha256_16": "a8baff95bb52e678",
+      "definition_text": "Bank or cash vouchers whose narration names, as whole words, a party ledger not on the voucher.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v01",
+          "label": "Payment v01 on 2025-05-05: booked to Office Rent; narration names Lambda Traders; narration: 'to Lambda Traders from'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v02",
+          "label": "Payment v02 on 2025-05-05: booked to Office Rent; narration names Lambda Traders; narration: 'by Lambda Traders for'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v03",
+          "label": "Payment v03 on 2025-05-07: booked to Office Rent; narration names Lambda Traders; narration: 'paid Lambda Traders pay'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v04",
+          "label": "Payment v04 on 2025-05-09: booked to Office Rent; narration names Lambda Traders; narration: 'payment Lambda Traders pymt'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v05",
+          "label": "Payment v05 on 2025-05-11: booked to Office Rent; narration names Lambda Traders; narration: 'neft Lambda Traders rtgs'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v06",
+          "label": "Payment v06 on 2025-05-13: booked to Office Rent; narration names Lambda Traders; narration: 'imps Lambda Traders upi'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v07",
+          "label": "Payment v07 on 2025-05-15: booked to Office Rent; narration names Lambda Traders; narration: 'ref Lambda Traders cr'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v08",
+          "label": "Payment v08 on 2025-05-17: booked to Office Rent; narration names Lambda Traders; narration: 'dr Lambda Traders towards'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v09",
+          "label": "Payment v09 on 2025-05-19: booked to Office Rent; narration names Lambda Traders; narration: 'being Lambda Traders via'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v10",
+          "label": "Payment v10 on 2025-05-21: booked to Office Rent; narration names Lambda Traders; narration: 'and Lambda Traders of'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v11",
+          "label": "Payment v11 on 2025-05-23: booked to Office Rent; narration names Lambda Traders; narration: 'the Lambda Traders in'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v12",
+          "label": "Payment v12 on 2025-05-25: booked to Office Rent; narration names Lambda Traders; narration: 'on Lambda Traders at'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v13",
+          "label": "Payment v13 on 2025-05-27: booked to Office Rent; narration names Lambda Traders; narration: 'with Lambda Traders mr'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v14",
+          "label": "Payment v14 on 2025-05-29: booked to Office Rent; narration names Lambda Traders; narration: 'mrs Lambda Traders ms'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v15",
+          "label": "Payment v15 on 2025-05-31: booked to Office Rent; narration names Lambda Traders; narration: 'inb Lambda Traders transfer'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v16",
+          "label": "Payment v16 on 2025-06-02: booked to Office Rent; narration names Lambda Traders; narration: 'trf Lambda Traders chq'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v17",
+          "label": "Payment v17 on 2025-06-04: booked to Office Rent; narration names Lambda Traders; narration: 'cheque Lambda Traders cash'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v18",
+          "label": "Payment v18 on 2025-06-06: booked to Office Rent; narration names Lambda Traders; narration: 'deposit Lambda Traders withdrawal'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v19",
+          "label": "Payment v19 on 2025-06-08: booked to Office Rent; narration names Lambda Traders; narration: 'settled Lambda Traders adjustment'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v20",
+          "label": "Payment v20 on 2025-06-10: booked to Office Rent; narration names Lambda Traders; narration: 'bill Lambda Traders gr'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v21",
+          "label": "Payment v21 on 2025-06-12: booked to Office Rent; narration names Lambda Traders; narration: 'inv Lambda Traders invoice'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v22",
+          "label": "Payment v22 on 2025-06-14: booked to Office Rent; narration names Lambda Traders; narration: 'against Lambda Traders pvt'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v23",
+          "label": "Payment v23 on 2025-06-16: booked to Office Rent; narration names Lambda Traders; narration: 'ltd Lambda Traders limited'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v24",
+          "label": "Payment v24 on 2025-06-18: booked to Office Rent; narration names Lambda Traders; narration: 'llp Lambda Traders private'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v25",
+          "label": "Payment v25 on 2025-06-20: booked to Office Rent; narration names Lambda Traders; narration: 'rs Lambda Traders inr'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v26",
+          "label": "Payment v26 on 2025-06-22: booked to Office Rent; narration names Lambda Traders; narration: 'amt Lambda Traders amount'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v27",
+          "label": "Payment v27 on 2025-06-24: booked to Office Rent; narration names Lambda Traders; narration: 'no Lambda Traders a'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v28",
+          "label": "Payment v28 on 2025-06-26: booked to Office Rent; narration names Lambda Traders; narration: 'an Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v29",
+          "label": "Payment v29 on 2025-06-28: booked to Office Rent; narration names Lambda Traders; narration: 'ZED-Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v30",
+          "label": "Payment v30 on 2025-06-30: booked to Office Rent; narration names Lambda Traders; narration: 'ZED/Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v31",
+          "label": "Payment v31 on 2025-07-02: booked to Office Rent; narration names Lambda Traders; narration: 'ZED,Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v32",
+          "label": "Payment v32 on 2025-07-04: booked to Office Rent; narration names Lambda Traders; narration: 'ZED;Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v33",
+          "label": "Payment v33 on 2025-07-06: booked to Office Rent; narration names Lambda Traders; narration: 'ZED|Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v34",
+          "label": "Payment v34 on 2025-07-08: booked to Office Rent; narration names Lambda Traders; narration: 'ZED:Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v35",
+          "label": "Payment v35 on 2025-07-10: booked to Office Rent; narration names Lambda Traders; narration: 'ZED(Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v36",
+          "label": "Payment v36 on 2025-07-12: booked to Office Rent; narration names Lambda Traders; narration: 'ZED)Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v37",
+          "label": "Payment v37 on 2025-07-14: booked to Office Rent; narration names Lambda Traders; narration: 'ZED\\\\Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v44",
+          "label": "Payment v44 on 2025-07-28: booked to Office Rent; narration names Strasse Works; narration: 'STRAßE WORKS'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v45",
+          "label": "Payment v45 on 2025-07-30: booked to Office Rent; narration names Groß Mart; narration: 'GROSS MART'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v46",
+          "label": "Payment v46 on 2025-08-01: booked to Office Rent; narration names Fine Foods; narration: 'ﬁne Foods'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v47",
+          "label": "Payment v47 on 2025-08-03: booked to Office Rent; narration names Kilo Works; narration: 'KILO WORKS'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v49",
+          "label": "Payment v49 on 2025-08-07: booked to Office Rent; narration names Alpha Traders; narration: 'for Alpha Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v50",
+          "label": "Payment v50 on 2025-08-09: booked to Office Rent; narration names Lambda Traders; narration: 'ZED LAMBDA TRADERS, paid Lambda Traders, ZED BETA STORES'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v51",
+          "label": "Payment v51 on 2025-08-11: booked to Office Rent; narration names Zéro Mart, Zéro Bazaar; narration: 'ZÉRO MART and ZÉRO BAZAAR'"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "knock_off_candidates/t2",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "knock_off_candidates.t2_candidate_total_paise"
+        },
+        {
+          "name": "named_pairs",
+          "figure_id": "knock_off_candidates.t2_named_pair_count"
+        },
+        {
+          "name": "rows",
+          "figure_id": "knock_off_candidates.t2_row_count"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Alpha Traders",
+          "label": "named in 1 voucher(s), ₹1,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Fine Foods",
+          "label": "named in 1 voucher(s), ₹1,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Groß Mart",
+          "label": "named in 1 voucher(s), ₹1,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Kilo Works",
+          "label": "named in 1 voucher(s), ₹1,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Lambda Traders",
+          "label": "named in 38 voucher(s), ₹38,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Strasse Works",
+          "label": "named in 1 voucher(s), ₹1,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Zéro Bazaar",
+          "label": "named in 1 voucher(s), ₹1,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Zéro Mart",
+          "label": "named in 1 voucher(s), ₹1,000 (a candidate total, not a reportable amount)"
+        }
+      ],
+      "title_sha256_16": "d8b00d332e376b71",
+      "title_text": "Bank or cash entries whose narration names a party other than the one booked: listed for the CA (may bear on clause 21(d) and s.68)",
+      "limits_sha256_16": "d17843ba3c36f4d6",
+      "limits_text": [
+        "Listed, never judged: the candidate total is a candidate total, not a reportable amount, and nothing is left out for being small or looking harmless. Whether a row is a payment under s.40A(3), a Rule 6DD case, a loan or deposit, a trade set-off, or one person under two ledgers is the CA's to determine; no clause 31 or 21(d) row is written.",
+        "Recall is not measured on real books.",
+        "A name is matched only whole and in full, and only when no other master shares it: a name cut short, broken up, abbreviated, or written in Hindi or Hinglish is missed, and a short or common name may be a coincidence (the proprietor, a family member, the operator)."
+      ],
+      "ask_client_sha256_16": "f934f81c9581b01c",
+      "ask_client_text": [
+        "The narration names someone other than the booked party. Who was paid (or who paid)? If an agent paid on the payee's behalf, give the agency basis."
+      ]
+    },
+    {
+      "id": "knock_off_candidates/t2_embedded",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "knock_off_candidates.t2_embedded_candidate_total_paise"
+        },
+        {
+          "name": "rows",
+          "figure_id": "knock_off_candidates.t2_embedded_row_count"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Beta Stores",
+          "label": "inside a longer name in 1 voucher(s)"
+        },
+        {
+          "kind": "ledger",
+          "id": "Lambda Traders",
+          "label": "inside a longer name in 6 voucher(s)"
+        },
+        {
+          "kind": "voucher",
+          "id": "v38",
+          "label": "Payment v38 on 2025-07-16: booked to Office Rent; the name of Lambda Traders sits inside 'ZED.Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v39",
+          "label": "Payment v39 on 2025-07-18: booked to Office Rent; the name of Lambda Traders sits inside 'ZED&Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v40",
+          "label": "Payment v40 on 2025-07-20: booked to Office Rent; the name of Lambda Traders sits inside 'ZED#Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v41",
+          "label": "Payment v41 on 2025-07-22: booked to Office Rent; the name of Lambda Traders sits inside 'ZED_Lambda Traders'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v42",
+          "label": "Payment v42 on 2025-07-24: booked to Office Rent; the name of Lambda Traders sits inside \"ZED'Lambda Traders\""
+        },
+        {
+          "kind": "voucher",
+          "id": "v43",
+          "label": "Payment v43 on 2025-07-26: booked to Office Rent; the name of Lambda Traders sits inside 'LAMBDA'"
+        },
+        {
+          "kind": "voucher",
+          "id": "v50",
+          "label": "Payment v50 on 2025-08-09: booked to Office Rent; the name of Beta Stores sits inside 'ZED BETA STORES'"
+        }
+      ],
+      "title_sha256_16": "01c1226717f8c3c1",
+      "title_text": "Bank or cash entries whose narration holds a party's name inside a longer name: listed apart for the CA (may bear on clause 21(d) and s.68)",
+      "limits_sha256_16": "40a6cf22081504a0",
+      "limits_text": [
+        "Listed, never judged: the candidate total is a candidate total, not a reportable amount, and nothing is left out for being small or looking harmless. Whether a row is a payment under s.40A(3), a Rule 6DD case, a loan or deposit, a trade set-off, or one person under two ledgers is the CA's to determine; no clause 31 or 21(d) row is written.",
+        "Recall is not measured on real books.",
+        "The narration's name is longer than the party's (for example a person's name before a firm's): it may be that party or another one. It is listed apart so that the CA sees the difference; nothing is refused or dropped."
+      ],
+      "ask_client_sha256_16": "f934f81c9581b01c",
+      "ask_client_text": [
+        "The narration names someone other than the booked party. Who was paid (or who paid)? If an agent paid on the payee's behalf, give the agency basis."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

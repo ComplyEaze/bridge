@@ -68,7 +68,8 @@ meaning none supplied, and none supplied with the reader's reason when that read
 `[roles].counterparty_type_by_ledger`; default {}) and `s194n_recipient_type` (one of the module's two
 recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it); and
 for `cash_payments_40a3`: `loan_ledgers` and `round_off_ledgers` (default []); for `entity_269st_gap`: `party_identity` (the engagement's own
-[party_identity] table, default {}), `round_off_ledgers`, and per ledger `pan` and `gstin` (default ""); for `read_scope`: `currency_read` (default false); and
+[party_identity] table, default {}), `round_off_ledgers`, and per ledger `pan` and `gstin` (default ""); for `read_scope`: `currency_read` (default false); for `books_examined`: `documents_read` (the
+names of the documents the pack loaded, in its order: a list of text, default []); and
 for `stock`: `stock_items` ({name: {base_unit?, guid?, opening_qty?, opening_value?, closing_qty?,
 closing_value?}}, default {}), `stock_opening` and `stock_closing` ({as_of, rows: {name: {qty?, value?,
 rate?}}}), each quantity a number, each value or rate integer paise, absent or null meaning None, and
@@ -96,11 +97,11 @@ def main() -> int:
                                              StatementPeriodRefused, load_bank_statement_json)
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
-    from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, cash_book_integrity, cash_payments_40a3, counter_cheques_40a3,
-                                 creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, stale_balances_41_1,
+    from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined, cash_book_integrity, cash_payments_40a3, counter_cheques_40a3,
+                                 creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
-    from tae.config import load_rules
+    from tae.config import load_rules, related_parties_config
     from tae.model import (BankStatementRow, Book, Engagement, Group, InventoryLine, Ledger, LedgerLine, Period,
                            TBRow, Voucher, VoucherStatus)
     from tae.parity import canonical
@@ -176,6 +177,9 @@ def main() -> int:
     counter_cheque_terms = typed(spec, "counter_cheque_terms",
                                  lambda x: isinstance(x, list) and all(isinstance(t, str) for t in x),
                                  "a list of text", absent=[], nullable=False)
+    documents_read = typed(spec, "documents_read",
+                           lambda x: isinstance(x, list) and all(isinstance(t, str) for t in x),
+                           "a list of text", absent=[], nullable=False)
     ca = spec.get("creditor_ageing", {})
     sd = spec.get("statutory_dues", {})
     post_year = {k: [(date.fromisoformat(d), a) for d, a in v] for k, v in ca.get("post_year_payments", {}).items()}
@@ -349,6 +353,8 @@ def main() -> int:
             eng, rules, cash, set(bkq.get("payment_channel_debtors", [])), bkq_tax,
             set(bkq.get("gst_payment_ledgers", [])), list(bkq.get("reissue_narration_terms", [])),
             set(bkq.get("writeoff_discount_ledgers", [])))),
+        # As tae/pack.py: the documents loaded, in the pack's order, as a tuple.
+        "books_examined": lambda: (books_examined, books_examined.run(eng, rules, tuple(documents_read))),
         "cash_book_integrity": lambda: (cash_book_integrity,
                                         cash_book_integrity.run(eng, rules, cash, bank, terms)),
         # As tae/pack.py: the loan ledgers the client configured and the round-off ledgers, as given.
@@ -380,6 +386,8 @@ def main() -> int:
             top_n=typed(spec, "top_n", lambda x: integer(x) and x >= 0, "a non-negative integer",
                         absent=party_monthly.PARTY_TOP_N, nullable=False))),
         "read_scope": lambda: (read_scope, read_scope.run(eng, rules)),
+        "related_parties_cl23": lambda: (related_parties_cl23, related_parties_cl23.run(
+            eng, rules, related_parties_config({"related_parties": spec.get("related_parties", {})}))),
         "stale_balances_41_1": lambda: (stale_balances_41_1, stale_balances_41_1.run(eng, rules)),
         "statutory_dues_43b": lambda: (statutory_dues_43b, statutory_dues_43b.run(
             eng, rules, dict(sd.get("nature_by_ledger", {})), frozenset(sd.get("salary_expense_ledgers", [])))),

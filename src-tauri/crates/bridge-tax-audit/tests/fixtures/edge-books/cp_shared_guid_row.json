@@ -1,0 +1,348 @@
+{
+ "comment": "cash_payments_40a3, two vouchers that share a GUID in one row (#1195), for every row map: two blank-GUID cash payments to one payee on one day told apart by their numbers (an s.40A(3) row and an s.269ST payment-leg party row); two blank-GUID cash receipts from one party on one day (an s.269ST party row); two blank-GUID walk-in sales and two blank-GUID cash purchases on one day (the unnamed s.269ST rows of each leg); one GUID on two payments to one payee on one day; two blank-GUID payments with no number of one type on one day (their refs are identical, so the row cites one); a unique GUID with two lines to one payee (cited once, by the GUID alone); two blank-GUID cash drawings to a capital ledger on one day (an excluded s.40A(3) row, cited in its excluded total). Each row sums both vouchers and cites both, unless their refs are identical.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Capital Account": null,
+  "Fixed Assets": null,
+  "Loans & Advances (Asset)": "Current Assets",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-cp_shared_guid_row-000"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-cp_shared_guid_row-001"
+  },
+  {
+   "name": "Payee P",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-cp_shared_guid_row-002"
+  },
+  {
+   "name": "Party Q",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-cp_shared_guid_row-003"
+  },
+  {
+   "name": "Party R",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-cp_shared_guid_row-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-cp_shared_guid_row-005"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-cp_shared_guid_row-006"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-cp_shared_guid_row-007"
+  },
+  {
+   "name": "Owner Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-cp_shared_guid_row-008"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "number": "P1",
+   "lines": [
+    [
+     "Cash",
+     -15000000
+    ],
+    [
+     "Payee P",
+     15000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "number": "P2",
+   "lines": [
+    [
+     "Cash",
+     -10000000
+    ],
+    [
+     "Payee P",
+     10000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "number": "R1",
+   "lines": [
+    [
+     "Cash",
+     15000000
+    ],
+    [
+     "Party Q",
+     -15000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "number": "R2",
+   "lines": [
+    [
+     "Cash",
+     10000000
+    ],
+    [
+     "Party Q",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-06",
+   "base_type": "Receipt",
+   "number": "S1",
+   "lines": [
+    [
+     "Cash",
+     15000000
+    ],
+    [
+     "Sales",
+     -15000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-06",
+   "base_type": "Receipt",
+   "number": "S2",
+   "lines": [
+    [
+     "Cash",
+     10000000
+    ],
+    [
+     "Sales",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-07",
+   "base_type": "Payment",
+   "number": "B1",
+   "lines": [
+    [
+     "Cash",
+     -15000000
+    ],
+    [
+     "Purchases",
+     15000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-07",
+   "base_type": "Payment",
+   "number": "B2",
+   "lines": [
+    [
+     "Cash",
+     -10000000
+    ],
+    [
+     "Purchases",
+     10000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup",
+   "date": "2025-06-08",
+   "base_type": "Payment",
+   "number": "D1",
+   "lines": [
+    [
+     "Cash",
+     -600000
+    ],
+    [
+     "Wages",
+     600000
+    ]
+   ]
+  },
+  {
+   "guid": "dup",
+   "date": "2025-06-08",
+   "base_type": "Payment",
+   "number": "D2",
+   "lines": [
+    [
+     "Cash",
+     -500000
+    ],
+    [
+     "Wages",
+     500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-09",
+   "base_type": "Payment",
+   "number": "",
+   "lines": [
+    [
+     "Cash",
+     -600000
+    ],
+    [
+     "Party R",
+     600000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-09",
+   "base_type": "Payment",
+   "number": "",
+   "lines": [
+    [
+     "Cash",
+     -500000
+    ],
+    [
+     "Party R",
+     500000
+    ]
+   ]
+  },
+  {
+   "guid": "u01",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "number": "U1",
+   "lines": [
+    [
+     "Cash",
+     -1100000
+    ],
+    [
+     "Wages",
+     600000
+    ],
+    [
+     "Wages",
+     500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-11",
+   "base_type": "Payment",
+   "number": "K1",
+   "lines": [
+    [
+     "Cash",
+     -300000
+    ],
+    [
+     "Owner Capital",
+     300000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-11",
+   "base_type": "Payment",
+   "number": "K2",
+   "lines": [
+    [
+     "Cash",
+     -200000
+    ],
+    [
+     "Owner Capital",
+     200000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "entity_type": "individual",
+ "loan_ledgers": [],
+ "tests": [
+  "cash_payments_40a3"
+ ]
+}

@@ -598,7 +598,7 @@ fn seed_original(server: &Server) {
 fn seed_original_as(server: &Server, status: &str, txn_ids: [&str; 2]) -> ImportLedgerLine {
     let mut vouchers = captured_catalogue_payload().vouchers;
     for (voucher, txn_id) in vouchers.iter_mut().zip(txn_ids) {
-        voucher.date = normalized_date(&voucher.date).unwrap();
+        voucher.date = normalized_date(&voucher.date).unwrap().as_str().to_string();
         voucher.bridge_txn_id = txn_id.into();
     }
     let line: ImportLedgerLine = serde_json::from_value(json!({
@@ -743,9 +743,10 @@ async fn an_amendment_of_a_voucher_edited_in_tally_writes_nothing() {
 
 #[test]
 fn the_amendment_admission_module_stays_pinned() {
-    // A pin the branch itself added and then lost in a merge resolution is seen by nothing; one
-    // that existed at the base is a removed pin, which merge-gate.sh blocks without a
-    // `removed-pin:` line.
+    // A pin the branch itself added and then lost in a merge resolution is a withdrawn pin:
+    // check-surface-ack.mjs reads the branch history and requires a `removed-pin:` line for it
+    // (#1006); one that existed at the base is a removed pin, which merge-gate.sh blocks
+    // without a `removed-pin:` line.
     // This module decides what an import file may overwrite; its reason sits
     // beside MAX_SURFACE_FILES.
     let surface: Value = serde_json::from_str(include_str!(
@@ -893,6 +894,33 @@ fn a_verified_baseline_file_is_written_once_per_voucher() {
     )
     .unwrap();
     assert!(record_verified_baseline(directory.path(), ORIGINAL, &proof(42)).is_err());
+    assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
+}
+
+/// A baseline larger than `MAX_RECORD_BYTES` is no baseline, as an unreadable
+/// one is; one at the bound reads whole (#837).
+#[test]
+fn a_verified_baseline_past_the_record_bound_is_no_baseline() {
+    let directory = tempfile::tempdir().unwrap();
+    let proof =
+        json!({"vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":40}]});
+    record_verified_baseline(directory.path(), ORIGINAL, &proof).unwrap();
+    let path = verified_baseline_path(directory.path(), ORIGINAL);
+    let record = std::fs::read(&path).unwrap();
+    std::fs::write(
+        &path,
+        super::padded_record(&record, ledger::MAX_RECORD_BYTES),
+    )
+    .unwrap();
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([("txn-001".to_string(), 40)]))
+    );
+    std::fs::write(
+        &path,
+        super::padded_record(&record, ledger::MAX_RECORD_BYTES + 1),
+    )
+    .unwrap();
     assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
 }
 

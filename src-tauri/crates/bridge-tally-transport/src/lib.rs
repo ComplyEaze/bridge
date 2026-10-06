@@ -75,6 +75,17 @@ pub trait SendObserver: Send + Sync {
     fn observe(&self, record: SendRecord);
 }
 
+/// Whether a send may still start (#778): asked before a send takes the wire
+/// lock and again once it holds it, so a send whose caller has withdrawn
+/// starts no request, while one already sent always runs to its end. A
+/// transport built without one admits every send.
+///
+/// Not the wire gate: a gate's refusal is `WireRefused`, which callers read as
+/// a busy port with a retry time, never as a withdrawal.
+pub trait SendAdmission: Send + Sync {
+    fn admits(&self) -> bool;
+}
+
 pub const STATUS_RESPONSE_MAX_BYTES: usize = 1024 * 1024;
 /// Maximum UTF-8 byte length of an XML source string accepted before UTF-16LE
 /// wire encoding. This preserves the pre-U1 request-cap contract; the encoded
@@ -319,6 +330,9 @@ pub enum TallyTransportError {
     /// The endpoint's wire gate refused the send; nothing was sent.
     #[error("Tally send was held back by the endpoint wire lock ({refusal:?})")]
     WireRefused { refusal: WireRefusal },
+    /// The send's caller withdrew before it started; nothing was sent (#778).
+    #[error("Tally send was not started: its caller withdrew")]
+    SendWithdrawn,
 }
 
 impl TallyTransportError {
@@ -338,6 +352,7 @@ impl TallyTransportError {
             Self::UnsupportedContentEncoding => "response_content_encoding_unsupported",
             Self::InvalidEncoding { .. } => "response_encoding_invalid",
             Self::WireRefused { refusal } => refusal.safe_code(),
+            Self::SendWithdrawn => "request_cancelled",
         }
     }
 }
@@ -394,6 +409,8 @@ pub struct TallyHttpTransport {
     wire_budget: Option<WireWaitBudget>,
     /// Told about every send, when the application keeps a record of them.
     observer: Option<Arc<dyn SendObserver>>,
+    /// Asked before each send starts, when its caller can withdraw (#778).
+    admission: Option<Arc<dyn SendAdmission>>,
 }
 
 /// A transport holding its endpoint's wire lock for exactly one send, from
@@ -466,6 +483,7 @@ impl TallyHttpTransport {
             wire_retry: WireRetryPolicy::DEFAULT,
             wire_budget: None,
             observer: None,
+            admission: None,
         })
     }
 
@@ -475,6 +493,36 @@ impl TallyHttpTransport {
     pub fn with_send_observer(mut self, observer: Arc<dyn SendObserver>) -> Self {
         self.observer = Some(observer);
         self
+    }
+
+    /// A clone whose sends, and those of its clones, start only while
+    /// `admission` admits them (#778). A refused send fails with
+    /// [`TallyTransportError::SendWithdrawn`] and sends nothing; the observer
+    /// is told, as for a wire refusal. [`Self::acquire_wire_lock`] does not
+    /// ask it: a send whose lock was taken for it is always sent.
+    #[must_use]
+    pub fn with_send_admission(&self, admission: Arc<dyn SendAdmission>) -> Self {
+        let mut admitted = self.clone();
+        admitted.admission = Some(admission);
+        admitted
+    }
+
+    /// Refuse a send its caller has withdrawn, telling the observer.
+    fn refuse_unless_admitted(
+        &self,
+        kind: SendKind,
+        request: Option<usize>,
+    ) -> Result<(), TallyTransportError> {
+        if self
+            .admission
+            .as_ref()
+            .is_some_and(|admission| !admission.admits())
+        {
+            let error = TallyTransportError::SendWithdrawn;
+            self.observe(kind, request, None, error.safe_code(), None);
+            return Err(error);
+        }
+        Ok(())
     }
 
     fn observe(
@@ -500,14 +548,20 @@ impl TallyHttpTransport {
     }
 
     /// `wire_lock`, telling the observer about a refusal: nothing was sent.
+    /// A withdrawn send is refused before the lock is taken and again once it
+    /// is held, so a withdrawal during the lock wait starts nothing (#778).
     async fn wire_lock_observed(
         &self,
         kind: SendKind,
         request: Option<usize>,
     ) -> Result<Box<dyn WireLockHeld>, TallyTransportError> {
-        self.wire_lock().await.inspect_err(|error| {
+        self.refuse_unless_admitted(kind, request)?;
+        let held = self.wire_lock().await.inspect_err(|error| {
             self.observe(kind, request, None, error.safe_code(), None);
-        })
+        })?;
+        // Dropping `held` on a refusal releases the lock unused.
+        self.refuse_unless_admitted(kind, request)?;
+        Ok(held)
     }
 
     /// Gate every send of this transport, and of its clones, on `gate`, trying

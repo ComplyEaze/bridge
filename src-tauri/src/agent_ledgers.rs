@@ -322,7 +322,7 @@ fn requested_gstin_as_of(args: &Value) -> Result<Option<String>, String> {
     if !ledger_master_fields(&fields)? {
         return Err("ledger_masters_as_of_requires_compliance".to_string());
     }
-    normalized_date(&as_of).map(Some)
+    normalized_date(&as_of).map(|date| Some(date.as_str().to_string()))
 }
 
 /// How long a ledger listing snapshot may serve its continuation pages

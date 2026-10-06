@@ -1,0 +1,949 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "cash_payments_40a3",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "0bed994af7c6a274",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout.",
+  "figures": [
+    {
+      "id": "cash_payments_40a3.s269ss269t_candidate_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "c41789d6fac8a23a",
+      "definition_text": "(Voucher, loan ledger, side) candidates on population, non-Contra vouchers with a cash line, where one side of a Loans (Liability)-chain ledger on the voucher -- its credits (a loan accepted) or its debits (a loan repaid), summed -- is at or over the s.269SS/269T limit (₹20,000).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_candidate_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "d75ad66d54b6c86b",
+      "definition_text": "Sum of the candidates' amounts: each (voucher, loan ledger, side) candidate's lines summed, taken without their sign, across the s.269SS/269T candidates. A voucher with entries on both sides of its loan ledgers (a correction, or a loan taken and repaid) may be counted in both directions.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_candidate_uncovered_by_loans_interest_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "b005998bd3934682",
+      "definition_text": "s.269SS/269T candidates (population, non-Contra vouchers with a cash line, where one side of a Loans (Liability)-chain ledger -- its credits or its debits, summed -- is at or over the limit) on a loan ledger NOT in the client's list of loans -- the only ones this test tags for Clause 31; every other candidate is covered by 'Loans and interest' instead.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269st_at_or_over_limit_count",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "d1cb2ed8cb702b93",
+      "definition_text": "(date, party) pairs where the day's total is at or over the s.269ST(a) limb (i) limit (₹2,00,000 per person per day).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269st_party_days_any_amount_count",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "39560ecf00e50bec",
+      "definition_text": "Distinct (date, party ledger) pairs with a cash receipt on a population, non-Contra voucher, party ledger not under 'Sales Accounts'.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269st_party_days_any_amount_total",
+      "value": 50000000,
+      "unit": "paise",
+      "definition_sha256_16": "b6d19da9c6734b41",
+      "definition_text": "Sum of cash received across every (date, party ledger) pair with a cash receipt on a population, non-Contra voucher, party ledger not under 'Sales Accounts', any amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt R1 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt R2 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S1 on 2025-06-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S2 on 2025-06-06"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269st_payment_at_or_over_limit_count",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "8f8629d398594be3",
+      "definition_text": "(date, party) pairs where the day's cash payment total is at or over the s.269ST(a) limb (a) threshold (₹2,00,000 per person per day) -- reportable in clause 31(bc), not a contravention by the assessee (s.269ST binds the receiver, not the payer).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269st_payment_party_days_any_amount_count",
+      "value": 6,
+      "unit": "count",
+      "definition_sha256_16": "18a18587fa068631",
+      "definition_text": "Distinct (date, party ledger) pairs with a cash payment on a population, non-Contra voucher, party ledger not under 'Purchase Accounts'.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269st_payment_party_days_any_amount_total",
+      "value": 53800000,
+      "unit": "paise",
+      "definition_sha256_16": "581c2a370cc96236",
+      "definition_text": "Sum of cash paid across every (date, party ledger) pair with a cash payment on a population, non-Contra voucher, party ledger not under 'Purchase Accounts', any amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B1 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B2 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment K1 on 2025-06-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment K2 on 2025-06-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P1 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P2 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Payment D1 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Payment D2 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "u01",
+          "label": "Payment U1 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269st_payment_row_amount_2025-06-04_2f04f463",
+      "value": 25000000,
+      "unit": "paise",
+      "definition_sha256_16": "cc8e047e90c74ad4",
+      "definition_text": "Cash paid to one party ledger (tag 2f04f463) on 2025-06-04, summed across every population voucher that day.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P1 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P2 on 2025-06-04"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269st_payment_row_amount_2025-06-07_0e76c1f2",
+      "value": 25000000,
+      "unit": "paise",
+      "definition_sha256_16": "87c52203483e1bba",
+      "definition_text": "Paid on 2025-06-07 on cash-payment vouchers with no party ledger (tag 0e76c1f2), whatever name they print, summed: the payees' side of each voucher, not only its cash.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B1 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B2 on 2025-06-07"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269st_row_amount_2025-06-05_75901e78",
+      "value": 25000000,
+      "unit": "paise",
+      "definition_sha256_16": "ae789ff0b5b3614c",
+      "definition_text": "Cash received from one party ledger (tag 75901e78) on 2025-06-05, summed across every population voucher that day.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt R1 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt R2 on 2025-06-05"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269st_row_amount_2025-06-06_0e76c1f2",
+      "value": 25000000,
+      "unit": "paise",
+      "definition_sha256_16": "77f35afa4101f6e2",
+      "definition_text": "Received on 2025-06-06 on cash-receipt vouchers with no party ledger (tag 0e76c1f2), whatever name they print, summed: the payers' side of each voucher, not only its cash.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S1 on 2025-06-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S2 on 2025-06-06"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_excluded_total_capital",
+      "value": 500000,
+      "unit": "paise",
+      "definition_sha256_16": "53aeea208640a9c9",
+      "definition_text": "Cash paid to ledgers under Tally group 'Capital Account' (excluded from s.40A(3) scope by the rules); 1 (date, payee) pairs.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment K1 on 2025-06-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment K2 on 2025-06-11"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_excluded_total_duties_taxes",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "5f4349ef51c79fb4",
+      "definition_text": "Cash paid to ledgers under Tally group 'Duties & Taxes' (excluded from s.40A(3) scope by the rules); 0 (date, payee) pairs.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_excluded_total_fixed_assets",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "08cab049a1fa8c42",
+      "definition_text": "Cash paid to ledgers under Tally group 'Fixed Assets' (excluded from s.40A(3) scope by the rules); 0 (date, payee) pairs.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_excluded_total_loans_advances_asset",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1fa53a3dd1761668",
+      "definition_text": "Cash paid to ledgers under Tally group 'Loans & Advances (Asset)' (excluded from s.40A(3) scope by the rules); 0 (date, payee) pairs.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_excluded_total_loans_liability",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "609ad3e4a30703e7",
+      "definition_text": "Cash paid to ledgers under Tally group 'Loans (Liability)' (excluded from s.40A(3) scope by the rules); 0 (date, payee) pairs.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_goods_carriage_candidate_2025-06-04_2f04f463",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "9585dc9d141a6a85",
+      "definition_text": "Heuristic only: ledger name matches a generic transport-name pattern and the day's total is within the ₹35,000 goods-carriage limit (proviso to s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_goods_carriage_candidate_2025-06-07_22c84e77",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "9585dc9d141a6a85",
+      "definition_text": "Heuristic only: ledger name matches a generic transport-name pattern and the day's total is within the ₹35,000 goods-carriage limit (proviso to s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_goods_carriage_candidate_2025-06-08_1c83321f",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "9585dc9d141a6a85",
+      "definition_text": "Heuristic only: ledger name matches a generic transport-name pattern and the day's total is within the ₹35,000 goods-carriage limit (proviso to s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_goods_carriage_candidate_2025-06-09_4e1f330d",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "9585dc9d141a6a85",
+      "definition_text": "Heuristic only: ledger name matches a generic transport-name pattern and the day's total is within the ₹35,000 goods-carriage limit (proviso to s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_goods_carriage_candidate_2025-06-10_1c83321f",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "9585dc9d141a6a85",
+      "definition_text": "Heuristic only: ledger name matches a generic transport-name pattern and the day's total is within the ₹35,000 goods-carriage limit (proviso to s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_over_limit_all_kinds_count",
+      "value": 5,
+      "unit": "count",
+      "definition_sha256_16": "23053c3df828c87b",
+      "definition_text": "(date, payee) pairs over the s.40A(3) limit before excluding capital, loans, fixed assets and duties and taxes; the in-scope count is a subset.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_over_limit_in_scope_count",
+      "value": 5,
+      "unit": "count",
+      "definition_sha256_16": "7686f9a6ffe4f134",
+      "definition_text": "In-scope (date, payee) pairs where the day's total exceeds the s.40A(3) limit (₹10,000 per person per day).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_payee_days_any_amount_count",
+      "value": 5,
+      "unit": "count",
+      "definition_sha256_16": "09d653aa443bd158",
+      "definition_text": "Distinct (date, payee ledger) pairs with a cash payment on a population, non-Contra voucher, payee classified as expenditure (not in a group the rules exclude from s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_payee_days_any_amount_total",
+      "value": 53300000,
+      "unit": "paise",
+      "definition_sha256_16": "4a6c107b00b43bb6",
+      "definition_text": "Sum of cash paid across every (date, payee ledger) pair with a cash payment on a population, non-Contra voucher, payee classified as expenditure, any amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B1 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B2 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P1 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P2 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Payment D1 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Payment D2 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "u01",
+          "label": "Payment U1 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_row_amount_2025-06-04_2f04f463",
+      "value": 25000000,
+      "unit": "paise",
+      "definition_sha256_16": "ad7734b96eb8356a",
+      "definition_text": "Cash paid to one payee ledger (tag 2f04f463) on 2025-06-04, summed across every population voucher that day.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P1 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P2 on 2025-06-04"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_row_amount_2025-06-07_22c84e77",
+      "value": 25000000,
+      "unit": "paise",
+      "definition_sha256_16": "c0961ff1e470ae6a",
+      "definition_text": "Debits to one purchase ledger (tag 22c84e77) on 2025-06-07, on population vouchers with a cash payment, summed: the debits, not the cash paid.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B1 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B2 on 2025-06-07"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_row_amount_2025-06-08_1c83321f",
+      "value": 1100000,
+      "unit": "paise",
+      "definition_sha256_16": "abab261937f3982b",
+      "definition_text": "Debits to one expense ledger (tag 1c83321f) on 2025-06-08, on population vouchers with a cash payment, summed: the debits, not the cash paid.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Payment D1 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Payment D2 on 2025-06-08"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_row_amount_2025-06-09_4e1f330d",
+      "value": 1100000,
+      "unit": "paise",
+      "definition_sha256_16": "83602ab26c0106a8",
+      "definition_text": "Cash paid to one payee ledger (tag 4e1f330d) on 2025-06-09, summed across every population voucher that day.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-06-09"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_row_amount_2025-06-10_1c83321f",
+      "value": 1100000,
+      "unit": "paise",
+      "definition_sha256_16": "ac98b4a230cae564",
+      "definition_text": "Debits to one expense ledger (tag 1c83321f) on 2025-06-10, on population vouchers with a cash payment, summed: the debits, not the cash paid.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "u01",
+          "label": "Payment U1 on 2025-06-10"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "cash_payments_40a3/s269st/2025-06-05_75901e78",
+      "clauses": [
+        "s.269ST(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269st_row_amount_2025-06-05_75901e78"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Party Q",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt R1 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt R2 on 2025-06-05"
+        }
+      ],
+      "title_sha256_16": "b70c620fa54632d9",
+      "title_text": "Cash received from one party at or over the s.269ST(a) limb (i) limit on 2025-06-05",
+      "limits_sha256_16": "25fdcb810ed3cc2a",
+      "limits_text": [
+        "Books test covers limb (i) (aggregate per person per day) only. Limbs (ii) (a single transaction) and (iii) (receipts relating to one event or occasion from a person) need bill-wise/event linkage the books do not carry; a same-party pattern across several days that never reaches this limit on one day is not tested here.",
+        "No Clause 31 tag here: this is the same (party, date) cash-mode receipt that the party-day scan of 'High-value transactions' already tags 3CD-31(ba) for every party, so this finding is an observation only, never counted a second time in the Clause 31 filing-aid total."
+      ],
+      "ask_client_sha256_16": "4e5df75a8bc77dd8",
+      "ask_client_text": [
+        "Confirm whether this receipt is genuinely from one party.",
+        "Confirm whether limbs (ii)/(iii) are separately breached (documents needed)."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269st/2025-06-06_0e76c1f2",
+      "clauses": [
+        "s.269ST(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269st_row_amount_2025-06-06_0e76c1f2"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "row",
+          "id": "cash_payments_40a3:unidentified_party",
+          "label": "‹cash leg with no identified party›"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S1 on 2025-06-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S2 on 2025-06-06"
+        }
+      ],
+      "title_sha256_16": "e396b5ecd673e947",
+      "title_text": "Cash received on 2025-06-06 on vouchers that do not name the payer: the total is at or over the s.269ST(a) limit; whether any one person paid that much is not known",
+      "limits_sha256_16": "25fdcb810ed3cc2a",
+      "limits_text": [
+        "Books test covers limb (i) (aggregate per person per day) only. Limbs (ii) (a single transaction) and (iii) (receipts relating to one event or occasion from a person) need bill-wise/event linkage the books do not carry; a same-party pattern across several days that never reaches this limit on one day is not tested here.",
+        "No Clause 31 tag here: this is the same (party, date) cash-mode receipt that the party-day scan of 'High-value transactions' already tags 3CD-31(ba) for every party, so this finding is an observation only, never counted a second time in the Clause 31 filing-aid total."
+      ],
+      "ask_client_sha256_16": "c3621b850b31624e",
+      "ask_client_text": [
+        "Who paid on each of these vouchers, and did any one person reach the s.269ST limit this day? Supply each payer's name and PAN.",
+        "Confirm whether limbs (ii)/(iii) are separately breached (documents needed)."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269st_payment/2025-06-04_2f04f463",
+      "clauses": [
+        "s.269ST(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269st_payment_row_amount_2025-06-04_2f04f463"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Payee P",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P1 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P2 on 2025-06-04"
+        }
+      ],
+      "title_sha256_16": "b76923f04e758a21",
+      "title_text": "Cash paid to one party at or over the s.269ST person-per-day threshold on 2025-06-04 -- reportable in clause 31(bc)",
+      "limits_sha256_16": "12dc1fc0e70c3fb7",
+      "limits_text": [
+        "s.269ST(a) is a duty on the receiver of the cash, not the payer: the section reads 'No person shall receive...'. A payment made by the assessee is not itself a books-testable exposure for the assessee under s.269ST; it is a Form 3CD clause 31(bc) reporting item only (limb (a): aggregate per person per day).",
+        "Books test covers limb (a) (aggregate per person per day) only. Limbs (b) (a single transaction) and (c) (receipts relating to one event or occasion) need bill-wise/event linkage the books do not carry.",
+        "This payment is counted once for clause 31(bc), in the high-value transactions list; it is shown here for the s.40A(3) review only and is not counted a second time."
+      ],
+      "ask_client_sha256_16": "6e00ef51c09c64fc",
+      "ask_client_text": [
+        "Confirm whether this payment is genuinely to one party.",
+        "Confirm whether limbs (b)/(c) apply from the party's own records (documents needed)."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269st_payment/2025-06-07_0e76c1f2",
+      "clauses": [
+        "s.269ST(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269st_payment_row_amount_2025-06-07_0e76c1f2"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "row",
+          "id": "cash_payments_40a3:unidentified_party",
+          "label": "‹cash leg with no identified party›"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B1 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B2 on 2025-06-07"
+        }
+      ],
+      "title_sha256_16": "1acfc5385e174e30",
+      "title_text": "Cash paid on 2025-06-07 on vouchers that do not name the payee: the total is at or over the s.269ST limit; whether any one person was paid that much is not known",
+      "limits_sha256_16": "12dc1fc0e70c3fb7",
+      "limits_text": [
+        "s.269ST(a) is a duty on the receiver of the cash, not the payer: the section reads 'No person shall receive...'. A payment made by the assessee is not itself a books-testable exposure for the assessee under s.269ST; it is a Form 3CD clause 31(bc) reporting item only (limb (a): aggregate per person per day).",
+        "Books test covers limb (a) (aggregate per person per day) only. Limbs (b) (a single transaction) and (c) (receipts relating to one event or occasion) need bill-wise/event linkage the books do not carry.",
+        "This payment is counted once for clause 31(bc), in the high-value transactions list; it is shown here for the s.40A(3) review only and is not counted a second time."
+      ],
+      "ask_client_sha256_16": "8d0f2c73d9640637",
+      "ask_client_text": [
+        "Who was paid on each of these vouchers, and was any one person paid at or over the s.269ST limit this day? Supply each payee's name and PAN.",
+        "Confirm whether limbs (b)/(c) apply (documents needed)."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s40a3/2025-06-04_2f04f463",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s40a3_row_amount_2025-06-04_2f04f463"
+        },
+        {
+          "name": "goods_carriage_candidate",
+          "figure_id": "cash_payments_40a3.s40a3_goods_carriage_candidate_2025-06-04_2f04f463"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Payee P",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P1 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment P2 on 2025-06-04"
+        }
+      ],
+      "title_sha256_16": "9bade472206991a9",
+      "title_text": "Cash paid to one payee over the s.40A(3) daily limit on 2025-06-04",
+      "limits_sha256_16": "b7a8d59cd2c8f86c",
+      "limits_text": [
+        "Books only: Rule 6DD exceptions (e.g. bank/cooperative-bank closure, payments to government, payments where banking facilities are not available) are not visible from vouchers; ask the client whether any exception applies to this payment.",
+        "A single cash entry on this ledger and day may be a lump/year-end total covering several smaller payments to different people or on different days that the books do not itemise separately; confirm before treating it as one payee-day breach."
+      ],
+      "ask_client_sha256_16": "764d41d5b385c5e2",
+      "ask_client_text": [
+        "Confirm whether any Rule 6DD exception applies to this payment.",
+        "Confirm whether this ledger/day is a single payee or a lump entry covering several payments."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s40a3/2025-06-07_22c84e77",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s40a3_row_amount_2025-06-07_22c84e77"
+        },
+        {
+          "name": "goods_carriage_candidate",
+          "figure_id": "cash_payments_40a3.s40a3_goods_carriage_candidate_2025-06-07_22c84e77"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Purchases",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B1 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B2 on 2025-06-07"
+        }
+      ],
+      "title_sha256_16": "f581328f1f30f375",
+      "title_text": "Debits to one purchase ledger on vouchers with a cash payment total over the s.40A(3) daily limit on 2025-06-07: the cash paid, and whether it went to one person, are not shown",
+      "limits_sha256_16": "6ec80e4dc68df6a7",
+      "limits_text": [
+        "Books only: Rule 6DD exceptions (e.g. bank/cooperative-bank closure, payments to government, payments where banking facilities are not available) are not visible from vouchers; ask the client whether any exception applies to this payment.",
+        "A single cash entry on this ledger and day may be a lump/year-end total covering several smaller payments to different people or on different days that the books do not itemise separately; confirm before treating it as one payee-day breach.",
+        "This ledger records purchases and may hold payments to several people on one day; the row does not show whether they went to one person. No usable name is printed on its vouchers. (A printed name is usable when it is not blank, a cash or bank ledger, or one of the voucher's own ledgers.)"
+      ],
+      "ask_client_sha256_16": "764d41d5b385c5e2",
+      "ask_client_text": [
+        "Confirm whether any Rule 6DD exception applies to this payment.",
+        "Confirm whether this ledger/day is a single payee or a lump entry covering several payments."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s40a3/2025-06-08_1c83321f",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s40a3_row_amount_2025-06-08_1c83321f"
+        },
+        {
+          "name": "goods_carriage_candidate",
+          "figure_id": "cash_payments_40a3.s40a3_goods_carriage_candidate_2025-06-08_1c83321f"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Wages",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Payment D1 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Payment D2 on 2025-06-08"
+        }
+      ],
+      "title_sha256_16": "27ddb6aeab335493",
+      "title_text": "Debits to one expense ledger on vouchers with a cash payment total over the s.40A(3) daily limit on 2025-06-08: the cash paid, and whether it went to one person, are not shown",
+      "limits_sha256_16": "8628fde1f6b34652",
+      "limits_text": [
+        "Books only: Rule 6DD exceptions (e.g. bank/cooperative-bank closure, payments to government, payments where banking facilities are not available) are not visible from vouchers; ask the client whether any exception applies to this payment.",
+        "A single cash entry on this ledger and day may be a lump/year-end total covering several smaller payments to different people or on different days that the books do not itemise separately; confirm before treating it as one payee-day breach.",
+        "This ledger records expenses and may hold payments to several people on one day; the row does not show whether they went to one person. No usable name is printed on its vouchers. (A printed name is usable when it is not blank, a cash or bank ledger, or one of the voucher's own ledgers.)"
+      ],
+      "ask_client_sha256_16": "764d41d5b385c5e2",
+      "ask_client_text": [
+        "Confirm whether any Rule 6DD exception applies to this payment.",
+        "Confirm whether this ledger/day is a single payee or a lump entry covering several payments."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s40a3/2025-06-09_4e1f330d",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s40a3_row_amount_2025-06-09_4e1f330d"
+        },
+        {
+          "name": "goods_carriage_candidate",
+          "figure_id": "cash_payments_40a3.s40a3_goods_carriage_candidate_2025-06-09_4e1f330d"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Party R",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-06-09"
+        }
+      ],
+      "title_sha256_16": "c84d2abc3e1a12ee",
+      "title_text": "Cash paid to one payee over the s.40A(3) daily limit on 2025-06-09",
+      "limits_sha256_16": "b7a8d59cd2c8f86c",
+      "limits_text": [
+        "Books only: Rule 6DD exceptions (e.g. bank/cooperative-bank closure, payments to government, payments where banking facilities are not available) are not visible from vouchers; ask the client whether any exception applies to this payment.",
+        "A single cash entry on this ledger and day may be a lump/year-end total covering several smaller payments to different people or on different days that the books do not itemise separately; confirm before treating it as one payee-day breach."
+      ],
+      "ask_client_sha256_16": "764d41d5b385c5e2",
+      "ask_client_text": [
+        "Confirm whether any Rule 6DD exception applies to this payment.",
+        "Confirm whether this ledger/day is a single payee or a lump entry covering several payments."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s40a3/2025-06-10_1c83321f",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s40a3_row_amount_2025-06-10_1c83321f"
+        },
+        {
+          "name": "goods_carriage_candidate",
+          "figure_id": "cash_payments_40a3.s40a3_goods_carriage_candidate_2025-06-10_1c83321f"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Wages",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "u01",
+          "label": "Payment U1 on 2025-06-10"
+        }
+      ],
+      "title_sha256_16": "80809c19d144d062",
+      "title_text": "Debits to one expense ledger on vouchers with a cash payment total over the s.40A(3) daily limit on 2025-06-10: the cash paid, and whether it went to one person, are not shown",
+      "limits_sha256_16": "8628fde1f6b34652",
+      "limits_text": [
+        "Books only: Rule 6DD exceptions (e.g. bank/cooperative-bank closure, payments to government, payments where banking facilities are not available) are not visible from vouchers; ask the client whether any exception applies to this payment.",
+        "A single cash entry on this ledger and day may be a lump/year-end total covering several smaller payments to different people or on different days that the books do not itemise separately; confirm before treating it as one payee-day breach.",
+        "This ledger records expenses and may hold payments to several people on one day; the row does not show whether they went to one person. No usable name is printed on its vouchers. (A printed name is usable when it is not blank, a cash or bank ledger, or one of the voucher's own ledgers.)"
+      ],
+      "ask_client_sha256_16": "764d41d5b385c5e2",
+      "ask_client_text": [
+        "Confirm whether any Rule 6DD exception applies to this payment.",
+        "Confirm whether this ledger/day is a single payee or a lump entry covering several payments."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "POP-1",
+      "subject": "Cash",
+      "detail": "vouchers -3800000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Owner Capital",
+      "detail": "vouchers 500000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Party Q",
+      "detail": "vouchers -25000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Party R",
+      "detail": "vouchers 1100000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Payee P",
+      "detail": "vouchers 25000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Purchases",
+      "detail": "vouchers 25000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Sales",
+      "detail": "vouchers -25000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Wages",
+      "detail": "vouchers 2200000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "(blank)",
+      "detail": "12 in-books voucher(s) have no GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "dup",
+      "detail": "2 in-books vouchers share this GUID"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

@@ -3132,7 +3132,7 @@
   "by": "author (Lane E2)",
   "what": "TDS on a voucher that also posts to another loan is counted",
   "file": "src/loans_interest.rs",
-  "from": "                        .any(|l| other_loans.contains(l.ledger.as_str()))",
+  "from": "                        .any(|l| other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
   "to": "                        .any(|l| l.ledger.is_empty())"
  },
  {
@@ -7612,8 +7612,8 @@
   "by": "author",
   "what": "a finding id ignores the voucher",
   "file": "src/counter_cheques_40a3.rs",
-  "from": "let rid = format!(\"{day}_{}\", hash8(&format!(\"{}|{tag}\", v.guid)));",
-  "to": "let rid = format!(\"{day}_{}\", hash8(&format!(\"{tag}\")));"
+  "from": "hash8(&format!(\"{}|{tag}\", v.guid))",
+  "to": "hash8(&format!(\"{tag}\"))"
  },
  {
   "id": "CQ-17",
@@ -9102,5 +9102,541 @@
   "file": "src/bank_reconciliation.rs",
   "from": "let mut evidence: Vec<EvidenceRef> = books_by_reason[REASON_NOT_COMPUTED]",
   "to": "let mut evidence: Vec<EvidenceRef> = Vec::<usize>::new()"
+ },
+ {
+  "id": "EG-63",
+  "by": "author",
+  "what": "a finding and its figures are keyed by the raw PAN, not its tag",
+  "file": "src/entity_269st_gap.rs",
+  "from": "let rid = format!(\"{day_text}_{}\", hash8(pan));",
+  "to": "let rid = format!(\"{day_text}_{pan}\");"
+ },
+ {
+  "id": "EG-65",
+  "by": "author",
+  "what": "a gap finding does not cite the PAN",
+  "file": "src/entity_269st_gap.rs",
+  "from": "        evidence.push(EvidenceRef::new(\"pan\", &binding.pan));\n",
+  "to": ""
+ },
+ {
+  "id": "EG-66",
+  "by": "author",
+  "what": "the pan evidence ref carries the tag, not the PAN",
+  "file": "src/entity_269st_gap.rs",
+  "from": "EvidenceRef::new(\"pan\", &binding.pan)",
+  "to": "EvidenceRef::new(\"pan\", &hash8(&binding.pan))"
+ },
+ {
+  "id": "EG-67",
+  "by": "author",
+  "what": "the PAN is cited as a ledger name",
+  "file": "src/entity_269st_gap.rs",
+  "from": "EvidenceRef::new(\"pan\", &binding.pan)",
+  "to": "EvidenceRef::new(\"ledger\", &binding.pan)"
+ },
+ {
+  "id": "EG-68",
+  "by": "author",
+  "what": "the PAN is lower-cased before it is hashed",
+  "file": "src/entity_269st_gap.rs",
+  "from": "hash8(pan)",
+  "to": "hash8(&pan.to_lowercase())"
+ },
+ {
+  "id": "LR-81",
+  "by": "author",
+  "what": "a nil line on another loan counts as a posting to it (the pre-#1201 coverage exclusion)",
+  "file": "src/loans_interest.rs",
+  "from": "other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
+  "to": "other_loans.contains(l.ledger.as_str()))"
+ },
+ {
+  "id": "LR-82",
+  "by": "author",
+  "what": "only a positive line on another loan stops its voucher counting for coverage",
+  "file": "src/loans_interest.rs",
+  "from": "other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
+  "to": "other_loans.contains(l.ledger.as_str()) && l.amount_paise > 0)"
+ },
+ {
+  "id": "CP-48",
+  "by": "author",
+  "what": "cash_payments_40a3 keys a row's vouchers by GUID alone (the pre-#1195 row map)",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        self.vouchers.insert((v.guid.clone(), voucher_label(v)), v);",
+  "to": "        self.vouchers.insert((v.guid.clone(), String::new()), v);"
+ },
+ {
+  "id": "HV-30",
+  "by": "author",
+  "what": "high_value_register keys a row's vouchers by GUID alone (the pre-#1195 row map)",
+  "file": "src/high_value_register.rs",
+  "from": "        self.vouchers.insert((v.guid.clone(), voucher_label(v)), v);",
+  "to": "        self.vouchers.insert((v.guid.clone(), String::new()), v);"
+ },
+ {
+  "id": "HV-31",
+  "by": "author",
+  "what": "the referenced-voucher count reads the labels of the referenced vouchers' keys, not their GUIDs",
+  "file": "src/high_value_register.rs",
+  "from": "    let with_ref: BTreeSet<&String> = rows\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))",
+  "to": "    let with_ref: BTreeSet<&String> = rows\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(_, l)| l))"
+ },
+ {
+  "id": "HV-32",
+  "by": "author",
+  "what": "the all-vouchers side of the no-reference count reads labels, not GUIDs",
+  "file": "src/high_value_register.rs",
+  "from": "    let all_guids: BTreeSet<&String> = with_money_leg\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))",
+  "to": "    let all_guids: BTreeSet<&String> = with_money_leg\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(_, l)| l))"
+ },
+ {
+  "id": "EG-69",
+  "by": "author",
+  "what": "the gap row's refs are keyed by GUID and label, so two vouchers sharing a GUID are cited twice",
+  "file": "src/entity_269st_gap.rs",
+  "from": "        for ((g, _), v) in &data.vouchers {\n            slot.vouchers.insert(g.clone(), v);",
+  "to": "        for ((g, l), v) in &data.vouchers {\n            slot.vouchers.insert(format!(\"{g}|{l}\"), v);"
+ },
+ {
+  "id": "CQ-33",
+  "by": "author",
+  "what": "a repeated counter-cheque row id never takes a suffix",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "        let rid = if repeated.contains(base.as_str()) {",
+  "to": "        let rid = if false && repeated.contains(base.as_str()) {"
+ },
+ {
+  "id": "CQ-34",
+  "by": "author",
+  "what": "every counter-cheque row id takes a suffix, even a unique one",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "        let rid = if repeated.contains(base.as_str()) {",
+  "to": "        let rid = if true {"
+ },
+ {
+  "id": "CQ-35",
+  "by": "author",
+  "what": "a repeated counter-cheque row id's suffix counts from 0",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            format!(\"{base}_{k}\")",
+  "to": "            format!(\"{base}_{}\", *k - 1)"
+ },
+ {
+  "id": "CQ-36",
+  "by": "author",
+  "what": "a repeated counter-cheque row id's suffixes are given in reverse reading order",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "    for (row, base) in over.iter().zip(&base_ids) {",
+  "to": "    for (row, base) in over.iter().rev().zip(base_ids.iter().rev()) {"
+ },
+ {
+  "id": "LR-83",
+  "by": "author",
+  "what": "a nil line on the loan being tested counts as a posting to it (the pre-#1259 coverage filter)",
+  "file": "src/loans_interest.rs",
+  "from": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise != 0)",
+  "to": "                        .any(|l| l.ledger == *loan_ledger)"
+ },
+ {
+  "id": "LR-84",
+  "by": "author",
+  "what": "only a positive line on the loan being tested counts as a posting to it",
+  "file": "src/loans_interest.rs",
+  "from": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise != 0)",
+  "to": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise > 0)"
+ },
+ {
+  "id": "BE-01",
+  "by": "author",
+  "what": "the day book counts voucher types by their own name, not their base type",
+  "file": "src/books_examined.rs",
+  "from": "*counts.entry(v.base_type.as_str()).or_default() += 1;",
+  "to": "*counts.entry(v.vtype.as_str()).or_default() += 1;"
+ },
+ {
+  "id": "BE-02",
+  "by": "author",
+  "what": "the day book counts every voucher, not the books population",
+  "file": "src/books_examined.rs",
+  "from": "for v in book.population()? {",
+  "to": "for v in book.vouchers.iter() {"
+ },
+ {
+  "id": "BE-03",
+  "by": "author",
+  "what": "a type of the CA's order with no voucher is listed with 0",
+  "file": "src/books_examined.rs",
+  "from": ".filter_map(|t| counts.get(t).map(|n| format!(\"{t} {n}\")))",
+  "to": ".map(|t| format!(\"{t} {}\", counts.get(t).copied().unwrap_or(0)))"
+ },
+ {
+  "id": "BE-04",
+  "by": "author",
+  "what": "a type outside the CA's order is not listed",
+  "file": "src/books_examined.rs",
+  "from": ".filter(|(t, _)| !VOUCHER_ORDER.contains(*t))",
+  "to": ".filter(|_| false)"
+ },
+ {
+  "id": "BE-05",
+  "by": "author",
+  "what": "a type of the CA's order is listed again among the other types",
+  "file": "src/books_examined.rs",
+  "from": ".filter(|(t, _)| !VOUCHER_ORDER.contains(*t))",
+  "to": ".filter(|_| true)"
+ },
+ {
+  "id": "BE-06",
+  "by": "author",
+  "what": "every type is listed by name, without the CA's order",
+  "file": "src/books_examined.rs",
+  "from": "    let order: Vec<String> = VOUCHER_ORDER\n        .iter()\n        .filter_map(|t| counts.get(t).map(|n| format!(\"{t} {n}\")))\n        .chain(\n            counts\n                .iter()\n                .filter(|(t, _)| !VOUCHER_ORDER.contains(*t))\n                .map(|(t, n)| format!(\"{t} {n}\")),\n        )\n        .collect();",
+  "to": "    let order: Vec<String> = counts.iter().map(|(t, n)| format!(\"{t} {n}\")).collect();"
+ },
+ {
+  "id": "BE-07",
+  "by": "author",
+  "what": "a day book is listed when the books have no voucher",
+  "file": "src/books_examined.rs",
+  "from": "    if !order.is_empty() {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-08",
+  "by": "author",
+  "what": "a cash book is listed when no ledger is under Cash-in-Hand",
+  "file": "src/books_examined.rs",
+  "from": "    if cash > 0 {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-09",
+  "by": "author",
+  "what": "bank books are listed when no ledger is under a bank group",
+  "file": "src/books_examined.rs",
+  "from": "    if bank > 0 {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-10",
+  "by": "author",
+  "what": "one cash or bank ledger is made plural",
+  "file": "src/books_examined.rs",
+  "from": "if n == 1 { \"\" } else { \"s\" }",
+  "to": "\"s\""
+ },
+ {
+  "id": "BE-11",
+  "by": "author",
+  "what": "several cash or bank ledgers are made singular",
+  "file": "src/books_examined.rs",
+  "from": "if n == 1 { \"\" } else { \"s\" }",
+  "to": "\"\""
+ },
+ {
+  "id": "BE-12",
+  "by": "author",
+  "what": "a ledger under both bank groups is counted twice",
+  "file": "src/books_examined.rs",
+  "from": "let bank = under(&BANK_GROUPS);",
+  "to": "let bank = under(&BANK_GROUPS[..1]) + under(&BANK_GROUPS[1..]);"
+ },
+ {
+  "id": "BE-13",
+  "by": "author",
+  "what": "only ledgers under Bank Accounts are bank ledgers",
+  "file": "src/books_examined.rs",
+  "from": "let bank = under(&BANK_GROUPS);",
+  "to": "let bank = under(&BANK_GROUPS[..1]);"
+ },
+ {
+  "id": "BE-14",
+  "by": "author",
+  "what": "only ledgers under Bank OD A/c are bank ledgers",
+  "file": "src/books_examined.rs",
+  "from": "let bank = under(&BANK_GROUPS);",
+  "to": "let bank = under(&BANK_GROUPS[1..]);"
+ },
+ {
+  "id": "BE-15",
+  "by": "author",
+  "what": "one ledger account is made singular, as the reference does not",
+  "file": "src/books_examined.rs",
+  "from": "parts.push(format!(\"ledger ({} ledger accounts)\", book.ledgers.len()));",
+  "to": "parts.push(format!(\"ledger ({})\", plural(book.ledgers.len(), \"ledger account\")));"
+ },
+ {
+  "id": "BE-16",
+  "by": "author",
+  "what": "a Trial Balance is listed when the read has none",
+  "file": "src/books_examined.rs",
+  "from": "    if !book.tb.is_empty() {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-17",
+  "by": "author",
+  "what": "the Trial Balance is never listed",
+  "file": "src/books_examined.rs",
+  "from": "    if !book.tb.is_empty() {",
+  "to": "    if false {"
+ },
+ {
+  "id": "BE-18",
+  "by": "author",
+  "what": "no document loaded is written as an empty list",
+  "file": "src/books_examined.rs",
+  "from": "    let docs = if documents_read.is_empty() {",
+  "to": "    let docs = if false {"
+ },
+ {
+  "id": "BE-19",
+  "by": "author",
+  "what": "documents loaded are written as none",
+  "file": "src/books_examined.rs",
+  "from": "    let docs = if documents_read.is_empty() {",
+  "to": "    let docs = if true {"
+ },
+ {
+  "id": "BE-20",
+  "by": "author",
+  "what": "the documents are written in reverse of the pack's order",
+  "file": "src/books_examined.rs",
+  "from": "            .iter()\n            .map(|d| d.name())",
+  "to": "            .iter()\n            .rev()\n            .map(|d| d.name())"
+ },
+ {
+  "id": "BE-21",
+  "by": "author",
+  "what": "GSTR-1 is ordered before GSTR-2B",
+  "file": "src/books_examined.rs",
+  "from": "    Gstr2b,\n    Gstr1,\n    Form26as,",
+  "to": "    Gstr1,\n    Gstr2b,\n    Form26as,"
+ },
+ {
+  "id": "BE-22",
+  "by": "author",
+  "what": "the Profit & Loss report is named otherwise than the pack names it",
+  "file": "src/books_examined.rs",
+  "from": "Self::ProfitAndLossReport => \"Tally Profit & Loss report export\",",
+  "to": "Self::ProfitAndLossReport => \"Tally Profit and Loss report export\","
+ },
+ {
+  "id": "BE-23",
+  "by": "author",
+  "what": "a document name is matched ignoring case",
+  "file": "src/books_examined.rs",
+  "from": "Self::ALL.into_iter().find(|d| d.name() == name)",
+  "to": "Self::ALL.into_iter().find(|d| d.name().eq_ignore_ascii_case(name))"
+ },
+ {
+  "id": "BE-24",
+  "by": "author",
+  "what": "the finding is computed, not for the CA's judgement",
+  "file": "src/books_examined.rs",
+  "from": "confidence: Confidence::JudgementRequired,",
+  "to": "confidence: Confidence::NeedsDocument,"
+ },
+ {
+  "id": "BE-25",
+  "by": "author",
+  "what": "a caller's list out of the pack's order is read, reordered",
+  "file": "src/registry.rs",
+  "from": "if out.last().is_some_and(|last| *last >= d) {",
+  "to": "if out.last().is_some_and(|last| *last == d) {"
+ },
+ {
+  "id": "BE-26",
+  "by": "author",
+  "what": "a caller's list that repeats a document is read",
+  "file": "src/registry.rs",
+  "from": "if out.last().is_some_and(|last| *last >= d) {",
+  "to": "if out.last().is_some_and(|last| *last > d) {"
+ },
+ {
+  "id": "BE-27",
+  "by": "author",
+  "what": "the registry runs books_examined with no documents whatever the caller loaded",
+  "file": "src/registry.rs",
+  "from": "run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read),",
+  "to": "run_on: |_, b, r, _| crate::books_examined_on(b, r, &Default::default()),"
+ },
+ {
+  "id": "BE-28",
+  "by": "author",
+  "what": "the cash book part is listed on the bank ledger count (counted inline)",
+  "file": "src/books_examined.rs",
+  "from": "    if cash > 0 {",
+  "to": "    if under(&BANK_GROUPS) > 0 {"
+ },
+ {
+  "id": "BE-29",
+  "by": "author",
+  "what": "the bank books part is listed on the cash ledger count",
+  "file": "src/books_examined.rs",
+  "from": "    if bank > 0 {",
+  "to": "    if cash > 0 {"
+ },
+ {
+  "id": "RP-01",
+  "by": "author",
+  "what": "related_parties_cl23: the gate opens only past one person",
+  "file": "src/related_parties_cl23.rs",
+  "from": "    if persons.is_empty() {",
+  "to": "    if persons.len() <= 1 {"
+ },
+ {
+  "id": "RP-02",
+  "by": "author",
+  "what": "related_parties_cl23: a nature with an empty list still gets its figures",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            if set.is_empty() {\n                continue;\n            }",
+  "to": "            if set.is_empty() && false {\n                continue;\n            }"
+ },
+ {
+  "id": "RP-03",
+  "by": "author",
+  "what": "related_parties_cl23: a voucher netting to zero on the set is still an entry",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if net != 0 {\n            entries.insert(",
+  "to": "        if true {\n            entries.insert("
+ },
+ {
+  "id": "RP-04",
+  "by": "author",
+  "what": "related_parties_cl23: a later voucher sharing a GUID does not replace the earlier entry",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            entries.insert(v.guid.as_str(), (net, v));",
+  "to": "            entries.entry(v.guid.as_str()).or_insert((net, v));"
+ },
+ {
+  "id": "RP-05",
+  "by": "author",
+  "what": "related_parties_cl23: every configured nature is a payable nature once any is",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            if !person.payable_natures.iter().any(|p| p == nature) {",
+  "to": "            if person.payable_natures.is_empty() {"
+ },
+ {
+  "id": "RP-06",
+  "by": "author",
+  "what": "related_parties_cl23: opening payable keeps the TB sign",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                    opening.checked_neg().ok_or_else(overflow)?,",
+  "to": "                    opening.checked_add(0).ok_or_else(overflow)?,"
+ },
+ {
+  "id": "RP-07",
+  "by": "author",
+  "what": "related_parties_cl23: accrued reads the debit column",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                    \"accrued\",\n                    credit,",
+  "to": "                    \"accrued\",\n                    debit,"
+ },
+ {
+  "id": "RP-08",
+  "by": "author",
+  "what": "related_parties_cl23: a finding needs a nonzero total, not a nature that moved",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if !any_nonzero {",
+  "to": "        if total == 0 {"
+ },
+ {
+  "id": "RP-09",
+  "by": "author",
+  "what": "related_parties_cl23: the total adds each nature without its sign",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            total = total.checked_add(amount).ok_or_else(overflow)?;",
+  "to": "            total = total.checked_add(amount.abs()).ok_or_else(overflow)?;"
+ },
+ {
+  "id": "RP-10",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1 fires at the tolerance",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            if excess > TOLERANCE_PAISE {",
+  "to": "            if excess >= TOLERANCE_PAISE {"
+ },
+ {
+  "id": "RP-11",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1 compares the walk with the signed TB movement",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                .and_then(|v| v.checked_sub(movement.checked_abs()?))",
+  "to": "                .and_then(|v| v.checked_sub(movement))"
+ },
+ {
+  "id": "RP-12",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 fires at the tolerance",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if gap > TOLERANCE_PAISE {",
+  "to": "        if gap >= TOLERANCE_PAISE {"
+ },
+ {
+  "id": "RP-13",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 adds the paid figure where the accrued belongs",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            .checked_add(accrued)\n            .and_then(|v| v.checked_sub(closing))",
+  "to": "            .checked_add(paid)\n            .and_then(|v| v.checked_sub(closing))"
+ },
+ {
+  "id": "RP-14",
+  "by": "author",
+  "what": "related_parties_cl23: two keys sharing a tag are not refused",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if let Some(first) = by_tag.insert(tag.clone(), key) {",
+  "to": "        if let Some(first) = by_tag.insert(tag.clone(), key).filter(|_| false) {"
+ },
+ {
+  "id": "RP-15",
+  "by": "author",
+  "what": "related_parties_cl23: a relationship that is not text is read as empty",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                .ok_or_else(|| shape_error(key, \"relationship\", \"text\"))?\n                .to_string(),",
+  "to": "                .unwrap_or_default()\n                .to_string(),"
+ },
+ {
+  "id": "RP-16",
+  "by": "author",
+  "what": "related_parties_cl23: payable natures of the wrong shape are read as none",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            Some(v) => texts(v, key, \"payable_natures\")?,",
+  "to": "            Some(_) => Vec::new(),"
+ },
+ {
+  "id": "RP-17",
+  "by": "author",
+  "what": "related_parties_cl23: an amount cites no voucher",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            evidence.extend(entries.values().map(",
+  "to": "            evidence.extend(entries.values().take(0).map("
+ },
+ {
+  "id": "RP-18",
+  "by": "author",
+  "what": "related_parties_cl23: the walk reads every voucher, not the population",
+  "file": "src/related_parties_cl23.rs",
+  "from": "    let population = book.population()?;",
+  "to": "    let population: Vec<&Voucher> = book.vouchers.iter().collect();"
+ },
+ {
+  "id": "RP-19",
+  "by": "author",
+  "what": "related_parties_cl23: a ledger list item that is not text is skipped",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            item.as_str()\n                .map(str::to_string)\n                .ok_or_else(|| shape_error(key, field, expected))",
+  "to": "            Some(item.as_str().unwrap_or_default().to_string())\n                .ok_or_else(|| shape_error(key, field, expected))"
+ },
+ {
+  "id": "RP-20",
+  "by": "author",
+  "what": "related_parties_cl23: related-party ledger names are not bound",
+  "file": "src/binding.rs",
+  "from": "            *v = toml::Value::Array(\n                lbinder\n                    .bind_list(&names, &location)?",
+  "to": "            *v = toml::Value::Array(\n                names"
  }
 ]

@@ -66,14 +66,14 @@ with no figures, to a log on this computer.
 | `purchase_register` | Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
 | `sales_register` | Sales and Credit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
-| `stock_summary` | The closing stock value of each item as of a date | Nothing |
+| `stock_summary` | The closing stock value of each item as of a 31 March, values only; small books only (a book with many masters of any kind is refused, and so is any other date); only the year ending 31 March 2026 has been checked | Nothing |
 | `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded | Nothing |
 | `trial_balance` | The ledger-wise Trial Balance for a date range | Nothing |
 | `validate_masters` | Checks ledger names against the live book before you build an import file | Nothing |
 | `verify_import` | Reads back a batch you imported by hand in TallyPrime | Proof files and status records on this computer |
 | `voucher_presence` | Which proposed vouchers are already in the book | Nothing |
 | `voucher_schema` | The voucher-file format, without asking TallyPrime | Nothing |
-| `vouchers` | The vouchers in a period | Nothing |
+| `vouchers` | The vouchers in a period, optionally searched by voucher number, reference, narration or amount, or summarised by ledger, month or voucher type (search and summaries not yet measured against a live book) | Nothing |
 
 With posting turned on in the extension, two more appear: `post_import` posts one saved voucher after you approve it in a
 ComplyEaze Bridge window, and `acknowledge_post_review` asks you, in its own window, to record that you reviewed a posted voucher
@@ -96,19 +96,21 @@ whose ledger now points to a different master.
   separate ComplyEaze Bridge window. No Bridge tool lets the assistant approve
   it, and an approval counts only when that window returns a fresh one-time
   token. After posting, the voucher is read back from Tally so you can see what
-  landed. Three known limits remain: ComplyEaze Bridge cannot undo a posted
+  landed. Four known limits remain: ComplyEaze Bridge cannot undo a posted
   voucher (you correct it in Tally); a company renamed to, or loaded under, the
   target company's name (or one differing only in case or spacing) just after
   its last check could still receive the voucher, if it has the voucher's
   ledgers, and ComplyEaze Bridge cannot always say where it went or prevent it;
-  and a ledger renamed and replaced in that same moment could receive the
-  entry, and not every such change is noticed. Read *Before you turn on
+  a ledger renamed and replaced in that same moment could receive the
+  entry, and not every such change is noticed; and the approval window covers
+  only ComplyEaze Bridge, so another Tally connector in the same Claude Desktop
+  that can change entries can do so without it. Read *Before you turn on
   posting* first.
 - **Tool calls leave receipts** in a log on your computer: the company's Tally
   identifier, and a fingerprint of what was asked and of what came back,
   written whether the call succeeds or is refused.
 - **You accept the Terms of Use first.** The extension asks you to accept the
-  ComplyEaze Bridge Terms of Use (version 2026-10) in its settings, and every
+  ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings, and every
   tool refuses with `terms_not_accepted` until you do.
 - **Open source** under Apache-2.0.
 
@@ -203,7 +205,7 @@ hosted CI runners for Windows x64 and Apple Silicon Mac.
 
 ## Not in the latest release
 
-- Stock quantities, and stock reads on books with many stock items; sales,
+- Stock quantities, and stock reads on books with many masters of any kind; sales,
   purchase or tax posting; creating masters; bill-wise allocation
 - Deleting or undoing a posted voucher (correct it in Tally)
 - Reads on very large books can fail or take longer than the assistant waits
@@ -246,8 +248,8 @@ reading. When writing is off, the write tools do not merely refuse — they are
 **absent from the tool list entirely**, so an assistant cannot see that they
 exist.
 
-- **The Claude Desktop extension turns voucher posting off by default.** Three
-  known limits in posting remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). Turning on
+- **The Claude Desktop extension turns voucher posting off by default.** Four
+  known limits in posting remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it. Turning on
   **Allow voucher posting (Journal, Payment, Receipt, Contra)** in the extension
   settings adds `post_import`, which posts one saved voucher of those types; every
   posting still waits for your approval in a separate Bridge dialog. Leave it

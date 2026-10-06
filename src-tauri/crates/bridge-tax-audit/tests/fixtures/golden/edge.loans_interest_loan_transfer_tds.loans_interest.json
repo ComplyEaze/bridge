@@ -325,6 +325,11 @@
           "kind": "voucher",
           "id": "j01",
           "label": "Journal j01 on 2025-09-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "j02",
+          "label": "Journal j02 on 2025-09-02"
         }
       ]
     },
@@ -386,7 +391,7 @@
     },
     {
       "id": "loans_interest.tds_on_loan_a3f1ba0c",
-      "value": 120000,
+      "value": 240000,
       "unit": "paise",
       "definition_sha256_16": "ef5ddd0b22965b9e",
       "definition_text": "TDS deducted on loan ledger (tag a3f1ba0c): the lines on ledgers in the client's statutory dues classified as TDS payable, on every voucher that posts to the loan.",
@@ -395,6 +400,11 @@
           "kind": "voucher",
           "id": "j01",
           "label": "Journal j01 on 2025-09-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "j02",
+          "label": "Journal j02 on 2025-09-02"
         }
       ]
     },
@@ -524,11 +534,5 @@
   "module_invariants_evaluated": [
     "loans_interest.check_invariants"
   ],
-  "module_invariant_violations": [
-    {
-      "invariant": "loans_interest.check_invariants",
-      "subject": "loans_interest",
-      "detail": "LOAN-1: Journal Loan (tag a3f1ba0c) expected FY movement 120000p (= -taken 0p + repaid 0p - interest 0p + TDS 120000p) does not tie the TB movement 240000p (opening -5000000p, closing -4760000p); difference -120000p -- a voucher on this loan ledger was likely dropped from or wrongly added to the population."
-    }
-  ]
+  "module_invariant_violations": []
 }

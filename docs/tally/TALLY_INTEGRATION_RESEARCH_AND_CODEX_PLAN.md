@@ -163,6 +163,8 @@ These controls should be preserved.
 
 `TallyClient` owns a `SerialTallyQueue`, but every Tauri command creates a fresh `TallyClient`.
 
+> Status, 6 Oct 2026: this describes the code when the plan was written. `SerialTallyQueue` was taken out of `TallyClient` in an earlier change (0100e6b2b) and the unused module is now deleted; requests are serialised by the runtime's control gate (`runtime_control.rs`) and the endpoint wire lock.
+
 That means the mutex only serialises requests made through one temporary client. Two concurrent Tauri commands can each own a separate mutex and post to the same Tally endpoint simultaneously.
 
 **Required fix:** manage a shared `TallyRuntime` in Tauri state. It must reuse one endpoint session and one queue per canonical endpoint.
@@ -2221,6 +2223,7 @@ Goal:
 Fix the current Tally serialization scope. Today every Tauri command constructs a
 new TallyClient, and every TallyClient constructs its own SerialTallyQueue. This
 does not prevent concurrent commands from posting to the same Tally endpoint.
+(Status, 6 Oct 2026: historical. The queue is gone from `TallyClient` and the module is deleted; see section 3.2.)
 
 Implement:
 1. Add a Tauri-managed TallyRuntime.

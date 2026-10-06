@@ -1,0 +1,257 @@
+{
+ "comment": "OD Account is under Bank OD A/c, itself under Loans (Liability), so it is both a bank ledger and a party. Partner Pi Current is under Partner Current Accounts, a group under Capital Account. The book's bank list names only Bank A, which the test does not read. Both books give every ledger the same GUID, so a party's figure ids are the same in both. This book's party_identity table lists party_groups: Partner Current Accounts, Sundry Debtors again, Cash-in-Hand, and No Such Group (no group has that name). So g01 (partner against a debtor, no bank or cash line) is listed as a journal settlement; g02 (paid from the OD, naming Alpha Traders) and g03 (naming the OD) are listed; g04 names Petty Cash, now a party; g05 is not listed (the OD is a bank ledger); g06 names the partner's ledger, now a party. ko_groups_off is the same book without party_groups.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Partner Current Accounts": "Capital Account"
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_grp-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_grp-001"
+  },
+  {
+   "name": "Beta Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_grp-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-ko_grp-003"
+  },
+  {
+   "name": "OD Account",
+   "chain": [
+    "Bank OD A/c",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-ko_grp-004"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_grp-005"
+  },
+  {
+   "name": "Partner Pi Current",
+   "chain": [
+    "Partner Current Accounts",
+    "Capital Account"
+   ],
+   "guid": "edge-ko_grp-006"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_grp-007"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 400000,
+   "closing": -400000
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 100000,
+   "credit": 150000,
+   "closing": 49950000
+  },
+  {
+   "ledger": "Beta Stores",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 0,
+   "closing": 300000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "OD Account",
+   "opening": 0,
+   "debit": 0,
+   "credit": 350000,
+   "closing": -350000
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 0,
+   "closing": 50000
+  },
+  {
+   "ledger": "Partner Pi Current",
+   "opening": 0,
+   "debit": 450000,
+   "credit": 0,
+   "closing": 450000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "g01",
+   "date": "2025-04-12",
+   "base_type": "Journal",
+   "narration": "Debtor dues taken over by partner",
+   "lines": [
+    [
+     "Partner Pi Current",
+     300000
+    ],
+    [
+     "Alpha Traders",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "narration": "Paid from OD Account for Alpha Traders",
+   "lines": [
+    [
+     "Beta Stores",
+     200000
+    ],
+    [
+     "OD Account",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "g03",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "narration": "Transfer to OD Account",
+   "lines": [
+    [
+     "Beta Stores",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "g04",
+   "date": "2025-07-12",
+   "base_type": "Payment",
+   "narration": "Cash for Petty Cash",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Bank A",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "g05",
+   "date": "2025-08-12",
+   "base_type": "Journal",
+   "narration": "Partner drawing through OD",
+   "lines": [
+    [
+     "Partner Pi Current",
+     150000
+    ],
+    [
+     "OD Account",
+     -150000
+    ]
+   ]
+  },
+  {
+   "guid": "g06",
+   "date": "2025-09-12",
+   "base_type": "Receipt",
+   "narration": "On behalf of Partner Pi Current",
+   "lines": [
+    [
+     "Bank A",
+     100000
+    ],
+    [
+     "Alpha Traders",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "party_identity": {
+  "party_groups": [
+   "Partner Current Accounts",
+   "Sundry Debtors",
+   "Cash-in-Hand",
+   "No Such Group"
+  ]
+ }
+}

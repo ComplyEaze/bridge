@@ -1758,13 +1758,19 @@ impl Server {
         (from, to): (&str, &str),
         source: super::WindowPlanSource,
     ) -> Result<VerificationWindowRead, ToolFailure> {
+        // The window comes from the stored batch, not a tool argument: it is
+        // parsed here, where it enters the window layer.
+        let (from, to) = (
+            super::parse_window_date(from)?,
+            super::parse_window_date(to)?,
+        );
         let shape = super::VoucherReadShape::ImportVerification;
         let read = self
             .read_voucher_window(
                 identity,
                 company,
-                from,
-                to,
+                &from,
+                &to,
                 shape,
                 source,
                 super::WindowReadLimits::for_shape(shape),
@@ -2352,7 +2358,9 @@ fn import_company_tuple(
                 .books_from
                 .as_deref()
                 .ok_or_else(|| "company_identity_incomplete".to_string())?,
-        )?,
+        )?
+        .as_str()
+        .to_string(),
     })
 }
 
@@ -3043,7 +3051,7 @@ fn contains_reserved_marker(value: &str) -> bool {
 /// in the exact Tally form used in the generated XML and verification window.
 fn normalize_payload_dates(payload: &mut ImportPayload) -> Result<(), String> {
     for voucher in &mut payload.vouchers {
-        voucher.date = normalized_date(&voucher.date)?;
+        voucher.date = normalized_date(&voucher.date)?.as_str().to_string();
     }
     Ok(())
 }
@@ -3054,7 +3062,7 @@ fn validate_dates(payload: &ImportPayload, books_from: Option<&str>) -> Result<(
     let today = super::tally_host_today();
     for voucher in &payload.vouchers {
         let date = normalized_date(&voucher.date)?;
-        if date < from || date > today {
+        if date < from || date.as_str() > today.as_str() {
             return Err("voucher_date_outside_company_extent".to_string());
         }
     }
@@ -3627,7 +3635,9 @@ fn render_voucher_xml(
         let amount = match entry.side { EntrySide::Dr => format!("-{}", entry.amount), EntrySide::Cr => entry.amount.clone() };
         format!("<ALLLEDGERENTRIES.LIST><LEDGERNAME>{}</LEDGERNAME><ISDEEMEDPOSITIVE>{}</ISDEEMEDPOSITIVE><AMOUNT>{}</AMOUNT></ALLLEDGERENTRIES.LIST>", xml_escape(&entry.ledger), entry.side.tally_positive(), amount)
     }).collect::<String>();
-    let date = normalized_date(&voucher.date).unwrap_or_default();
+    let date = normalized_date(&voucher.date)
+        .map(|date| date.as_str().to_string())
+        .unwrap_or_default();
     // §9.13: the imported Payment/Receipt/Contra files carried EFFECTIVEDATE
     // beside DATE, and named the party on the side opposite the money. The
     // Journal shape qualified in §9.8 carries neither element, and is left
@@ -3675,7 +3685,11 @@ struct VerificationWindowRead {
     refused_a_part: bool,
 }
 
-pub(super) fn render_import_verification_read(company: &str, from: &str, to: &str) -> String {
+pub(super) fn render_import_verification_read(
+    company: &str,
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
+) -> String {
     render_import_verification_in_span(company, from, to, None)
 }
 
@@ -3685,11 +3699,14 @@ pub(super) fn render_import_verification_read(company: &str, from: &str, to: &st
 /// and verified against; none is discarded.
 pub(super) fn render_import_verification_in_span(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
     span: Option<super::AlterIdSpan>,
 ) -> String {
     let span_filter = span.map(super::AlterIdSpan::filter).unwrap_or_default();
+    // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
+    // protect it, since Tally decodes `&quot;` before evaluating (#861).
+    let (from, to) = (from.as_str(), to.as_str());
     format!("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,REMOTEID,GUID,MASTERID,ALTERID,NARRATION,ISCANCELLED,ISOPTIONAL,ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,EFFECTIVEDATE</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>", xml_escape(company))
 }
 
@@ -3771,11 +3788,24 @@ fn read_masters_record(path: &Path) -> Option<Value> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
         Err(_) => return unreadable(),
     };
-    let mut bytes = Vec::new();
-    if std::io::Read::read_to_end(&mut file, &mut bytes).is_err() {
+    let Some(bytes) = read_capped_record(&mut file) else {
         return unreadable();
-    }
+    };
     serde_json::from_slice(&bytes).ok().or_else(unreadable)
+}
+
+/// A persisted record read whole, or `None` when it cannot be read or is
+/// larger than `MAX_RECORD_BYTES`, the bound every persisted record has
+/// (#837). One byte past the bound is read, so a larger record is refused,
+/// never truncated.
+fn read_capped_record(file: &mut fs::File) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(
+        &mut std::io::Read::take(file, (ledger::MAX_RECORD_BYTES + 1) as u64),
+        &mut bytes,
+    )
+    .ok()?;
+    (bytes.len() <= ledger::MAX_RECORD_BYTES).then_some(bytes)
 }
 
 /// Staged under a name no other writer uses, then renamed into place, so
@@ -3933,8 +3963,7 @@ fn read_verified_baseline_for(
     let mut file =
         super::local_file::open_local_file(&verified_baseline_path(imports, batch_id), false)
             .ok()?;
-    let mut bytes = Vec::new();
-    std::io::Read::read_to_end(&mut file, &mut bytes).ok()?;
+    let bytes = read_capped_record(&mut file)?;
     serde_json::from_slice(&bytes).ok()
 }
 

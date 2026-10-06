@@ -1162,3 +1162,25 @@ fn a_bound_voucher_is_reviewed_by_its_guid_not_a_tag() {
         Some(&tagged)
     );
 }
+
+/// A masters record larger than `MAX_RECORD_BYTES` is unreadable, `Err(())`,
+/// never read as its content; one at the bound reads whole (#837).
+#[test]
+fn a_masters_record_past_the_record_bound_is_unreadable() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("masters.json");
+    let record = json!({"state": "verified"});
+    let padded = |size: usize| {
+        let mut bytes = record.to_string().into_bytes();
+        bytes.resize(size, b' ');
+        bytes
+    };
+    let at_bound = padded(ledger::MAX_RECORD_BYTES);
+    std::fs::write(&path, &at_bound).unwrap();
+    assert_eq!(
+        read_masters_record_raw(&path),
+        Ok(Some((at_bound, record.clone())))
+    );
+    std::fs::write(&path, padded(ledger::MAX_RECORD_BYTES + 1)).unwrap();
+    assert_eq!(read_masters_record_raw(&path), Err(()));
+}

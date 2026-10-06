@@ -1372,7 +1372,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
             guid: Some("guid-bank".into()),
             master_id: Some("41".into()),
             alter_id: Some(63),
-            date: Some(normalized_date(&voucher.date).unwrap()),
+            date: Some(normalized_date(&voucher.date).unwrap().as_str().to_string()),
             voucher_type: Some(voucher_type.as_str().into()),
             narration: Some(format!("[BRIDGE:{}]", voucher.bridge_txn_id)),
             // Tally's own number, which Bridge never sent and must not compare.
@@ -2176,7 +2176,11 @@ async fn a_parsed_statement_builds_an_import_file_by_proposals_id() {
 
 #[test]
 fn the_verification_read_fetches_the_effective_date_and_not_the_party() {
-    let request = render_import_verification_read("Synthetic Book", "20260901", "20260901");
+    let request = render_import_verification_read(
+        "Synthetic Book",
+        &crate::agent::tally_date("20260901"),
+        &crate::agent::tally_date("20260901"),
+    );
     let fetch = request
         .split_once("<FETCH>")
         .and_then(|(_, rest)| rest.split_once("</FETCH>"))

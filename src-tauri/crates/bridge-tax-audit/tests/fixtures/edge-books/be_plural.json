@@ -1,0 +1,430 @@
+{
+ "comment": "books_examined with two cash ledgers and three bank ledgers, one under each bank group and one whose chain passes through both (counted once); every voucher type of the CA's order, written out of that order, each with its own count; three other types with no ledger entries, listed after them by name; a cancelled Sales voucher left out; a Trial Balance; every document the pack can load, in its order.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-be_plural-000"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-be_plural-001"
+  },
+  {
+   "name": "Current Account",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-be_plural-002"
+  },
+  {
+   "name": "Overdraft",
+   "chain": [
+    "Bank OD A/c",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-be_plural-003"
+  },
+  {
+   "name": "Sweep Account",
+   "chain": [
+    "Bank OD A/c",
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-be_plural-004"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-be_plural-005"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-be_plural-006"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-be_plural-007"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-be_plural-008"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-be_plural-009"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 200000,
+   "closing": 100000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 100000,
+   "closing": 0
+  },
+  {
+   "ledger": "Current Account",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Overdraft",
+   "opening": 0,
+   "debit": 0,
+   "credit": 300000,
+   "closing": -300000
+  },
+  {
+   "ledger": "Sweep Account",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 0,
+   "closing": 200000
+  },
+  {
+   "ledger": "Customer A",
+   "opening": 0,
+   "debit": 1600000,
+   "credit": 1100000,
+   "closing": 500000
+  },
+  {
+   "ledger": "Supplier B",
+   "opening": 0,
+   "debit": 400000,
+   "credit": 1100000,
+   "closing": -700000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 1600000,
+   "closing": -1500000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 800000,
+   "credit": 100000,
+   "closing": 700000
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "p01",
+   "date": "2025-04-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent",
+     100000
+    ],
+    [
+     "Cash",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-04-11",
+   "base_type": "Stock Journal",
+   "lines": []
+  },
+  {
+   "guid": "p03",
+   "date": "2025-04-12",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Rent",
+     200000
+    ],
+    [
+     "Supplier B",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2025-04-13",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Customer A",
+     1000000
+    ],
+    [
+     "Sales",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "p05",
+   "date": "2025-04-14",
+   "base_type": "Debit Note",
+   "lines": [
+    [
+     "Supplier B",
+     100000
+    ],
+    [
+     "Purchases",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "p06",
+   "date": "2025-04-15",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Current Account",
+     500000
+    ],
+    [
+     "Customer A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "p07",
+   "date": "2025-04-16",
+   "base_type": "Physical Stock",
+   "lines": []
+  },
+  {
+   "guid": "p08",
+   "date": "2025-04-17",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Petty Cash",
+     100000
+    ],
+    [
+     "Cash",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "p09",
+   "date": "2025-04-18",
+   "base_type": "Purchase",
+   "lines": [
+    [
+     "Purchases",
+     800000
+    ],
+    [
+     "Supplier B",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "p10",
+   "date": "2025-04-19",
+   "base_type": "Credit Note",
+   "lines": [
+    [
+     "Sales",
+     100000
+    ],
+    [
+     "Customer A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "p11",
+   "date": "2025-04-20",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier B",
+     300000
+    ],
+    [
+     "Overdraft",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "p12",
+   "date": "2025-04-21",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Sweep Account",
+     200000
+    ],
+    [
+     "Customer A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "p13",
+   "date": "2025-04-22",
+   "base_type": "Delivery Note",
+   "lines": []
+  },
+  {
+   "guid": "p14",
+   "date": "2025-04-23",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Customer A",
+     600000
+    ],
+    [
+     "Sales",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "p15",
+   "date": "2025-04-24",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent",
+     100000
+    ],
+    [
+     "Petty Cash",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "p16",
+   "date": "2025-04-25",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Customer A",
+     900000
+    ],
+    [
+     "Sales",
+     -900000
+    ]
+   ],
+   "status": "cancelled"
+  },
+  {
+   "guid": "p17",
+   "date": "2025-04-26",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     300000
+    ],
+    [
+     "Customer A",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "p18",
+   "date": "2025-04-27",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Rent",
+     100000
+    ],
+    [
+     "Supplier B",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "books_examined"
+ ],
+ "documents_read": [
+  "GSTR-2B",
+  "GSTR-1",
+  "Form 26AS",
+  "Tally Profit & Loss report export",
+  "AIS",
+  "TIS",
+  "GSTR-3B",
+  "GSTR-3B vs 2B workbook",
+  "Bank statement",
+  "Draft Form 3CD"
+ ]
+}

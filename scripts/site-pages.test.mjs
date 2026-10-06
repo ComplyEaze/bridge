@@ -6,7 +6,7 @@ const site = new URL("../site/", import.meta.url);
 const read = (name) => readFileSync(new URL(name, site), "utf8");
 // The deploy writes these from the tracked templates; a template is the page this test reads.
 const siteOrigin = "https://bridge.complyeaze.com/";
-const generated = new Set(["changelog.html", "privacy.html", "releases.json", "terms.html"]);
+const generated = new Set(["changelog.html", "privacy.html", "releases.json", "terms.html", "terms-2026-10.html"]);
 const pages = readdirSync(site).filter((name) => name.endsWith(".html") && !generated.has(name)).sort();
 
 function region(html, open, close) {
@@ -297,6 +297,18 @@ test("the page says which release and day it was checked against, and the struct
   assert.match(stamp[2], /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
   assert.match(modified, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
   assert.ok(modified >= stamp[2], `the structured copy says the page last changed on ${modified}, before it was checked on ${stamp[2]}`);
+});
+
+test("the Download page and the install guide each carry an at-a-glance block for the manifest's release, with the bank-statement limit", () => {
+  const version = JSON.parse(readFileSync(new URL("../packaging/mcpb/manifest.json", import.meta.url), "utf8")).version;
+  const guide = readFileSync(new URL("../docs/agent/INSTALL.md", import.meta.url), "utf8");
+  const heading = `At a glance, release ${version}`;
+  // a version bump fails here until the block is read again against the Questions page and its heading moved
+  assert.ok(read("download.html").includes(`<h2>${heading}</h2>`), `site/download.html has no "${heading}" block`);
+  assert.ok(guide.includes(`## ${heading}`), `docs/agent/INSTALL.md has no "${heading}" block`);
+  for (const text of [visibleText(region(read("download.html"), 'id="at-a-glance"', "</section>")), region(guide, `## ${heading}`, "## Before you install")]) {
+    assert.match(text, /not yet been run on a real\s+bank statement/);
+  }
 });
 
 test("the list above the questions tells a person asked to try it out the four things to do first", () => {

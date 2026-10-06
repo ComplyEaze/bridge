@@ -1,5 +1,6 @@
 //! Read profiles for the local MCP adapter.
 use super::*;
+use bridge_tally_core::TallyDate;
 
 /// The FETCH list for reads that RETURN bill allocations.
 ///
@@ -59,8 +60,8 @@ ALLLEDGERENTRIES.ISDEEMEDPOSITIVE";
 /// Windowed voucher read for `ledger_movement`, which does not return allocations.
 pub(super) fn render_agent_movement_vouchers(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
 ) -> Result<String, String> {
     render_agent_movement_vouchers_in_span(company, from, to, None)
 }
@@ -70,8 +71,8 @@ pub(super) fn render_agent_movement_vouchers(
 /// a day too heavy for one read (protocol reference §11c).
 pub(super) fn render_agent_movement_vouchers_in_span(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
     span: Option<AlterIdSpan>,
 ) -> Result<String, String> {
     render_windowed_vouchers(
@@ -86,8 +87,8 @@ pub(super) fn render_agent_movement_vouchers_in_span(
 
 pub(super) fn render_agent_vouchers(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
     alter_id: Option<u64>,
 ) -> Result<String, String> {
     let alter_filter = alter_id
@@ -101,8 +102,8 @@ pub(super) fn render_agent_vouchers(
 /// too heavy for one read (protocol reference §11c).
 pub(super) fn render_agent_vouchers_in_span(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
     span: Option<AlterIdSpan>,
 ) -> Result<String, String> {
     render_windowed_vouchers(
@@ -121,8 +122,8 @@ pub(super) fn render_agent_vouchers_in_span(
 /// `vouchers` call that filters by type, so every other read is unchanged.
 pub(super) fn render_agent_class_vouchers_in_span(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
     span: Option<AlterIdSpan>,
 ) -> Result<String, String> {
     render_windowed_vouchers(
@@ -146,13 +147,16 @@ pub(super) fn render_agent_class_vouchers_in_span(
 /// larger than one census (protocol reference §11c.3).
 pub(super) fn render_agent_voucher_census(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
     span: Option<AlterIdSpan>,
 ) -> Result<String, String> {
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
     let span_filter = span.map(AlterIdSpan::filter).unwrap_or_default();
+    // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
+    // protect it, since Tally decodes `&quot;` before evaluating (#861).
+    let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Voucher Census</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentCensus\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Voucher Census\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>GUID,ALTERID,DATE</FETCH><FILTERS>BridgeAgentCensus</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str())
@@ -161,14 +165,17 @@ pub(super) fn render_agent_voucher_census(
 
 fn render_windowed_vouchers(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
     alter_filter: &str,
     fetch: &str,
     computes: &str,
 ) -> Result<String, String> {
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
+    // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
+    // protect it, since Tally decodes `&quot;` before evaluating (#861).
+    let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Vouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{alter_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Vouchers\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{fetch}</FETCH>{computes}<FILTERS>BridgeAgentWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str())
@@ -192,8 +199,8 @@ PARTYLEDGERNAME,NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ALLINVENT
 #[cfg(feature = "lab-writes")]
 pub(super) fn render_agent_lab_inventory_vouchers(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
 ) -> Result<String, String> {
     render_windowed_vouchers(company, from, to, "", AGENT_LAB_INVENTORY_VOUCHER_FETCH, "")
 }
@@ -355,8 +362,8 @@ pub(super) fn company_currency_read(company: &str) -> ReadRequest {
 pub(super) fn voucher_window_part_read(
     shape: super::voucher_window::VoucherReadShape,
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
     span: Option<AlterIdSpan>,
 ) -> Result<ReadRequest, String> {
     shape.render(company, from, to, span).map(ReadRequest)
@@ -364,8 +371,8 @@ pub(super) fn voucher_window_part_read(
 
 pub(super) fn voucher_census_read(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
     span: Option<AlterIdSpan>,
 ) -> Result<ReadRequest, String> {
     render_agent_voucher_census(company, from, to, span).map(ReadRequest)
@@ -374,8 +381,8 @@ pub(super) fn voucher_census_read(
 #[cfg(feature = "lab-writes")]
 pub(super) fn lab_inventory_vouchers_read(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
 ) -> Result<ReadRequest, String> {
     render_agent_lab_inventory_vouchers(company, from, to).map(ReadRequest)
 }
@@ -401,8 +408,8 @@ pub(super) fn lab_write_master_collection_read(
 #[cfg(feature = "lab-writes")]
 pub(super) fn lab_voucher_window_read(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
 ) -> Result<ReadRequest, String> {
     super::lab::import::render_voucher_window_request(company, from, to).map(ReadRequest)
 }
@@ -422,6 +429,7 @@ mod sealed_read_tests {
             after: 10,
             through: 20,
         });
+        let (from, to) = (tally_date("20260401"), tally_date("20260430"));
         let mut reads = vec![
             company_high_water_read(company),
             master_domain_high_water_read(company, MasterKind::Ledger),
@@ -430,7 +438,7 @@ mod sealed_read_tests {
             changed_masters_read(company, 1, 2, MasterKind::Ledger),
             standard_ledger_catalog_read(company).unwrap(),
             native_group_snapshot_read(company),
-            voucher_census_read(company, "20260401", "20260430", span).unwrap(),
+            voucher_census_read(company, &from, &to, span).unwrap(),
         ];
         for shape in [
             super::super::voucher_window::VoucherReadShape::ImportVerification,
@@ -439,10 +447,8 @@ mod sealed_read_tests {
             super::super::voucher_window::VoucherReadShape::ClassEntryWildcard,
         ] {
             for part_span in [None, span] {
-                reads.push(
-                    voucher_window_part_read(shape, company, "20260401", "20260430", part_span)
-                        .unwrap(),
-                );
+                reads
+                    .push(voucher_window_part_read(shape, company, &from, &to, part_span).unwrap());
             }
         }
         for read in reads {

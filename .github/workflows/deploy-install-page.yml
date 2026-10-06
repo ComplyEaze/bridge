@@ -68,6 +68,7 @@ jobs:
           set -euo pipefail
           node scripts/render-legal.mjs page --in docs/legal/privacy.md --template site/legal.template.html --out site/privacy.html
           node scripts/render-legal.mjs page --in docs/legal/terms.md --template site/legal.template.html --out site/terms.html
+          node scripts/render-legal.mjs page --in docs/legal/terms-2026-10.md --template site/legal.template.html --out site/terms-2026-10.html
       # The page text is a public claim, and a deploy publishes every merged site/ change at once.
       # This lists what differs from the last successfully deployed commit in the run summary so a
       # maintainer can read it. This run's own deployment is created by the deploy job, after this one,

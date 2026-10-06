@@ -16,6 +16,20 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
+**New**
+
+- `vouchers` can now find a voucher by its number, reference, a phrase of its
+  narration or an amount (`voucher_number`, `reference`, `narration_contains`,
+  `amount`), and can add a window up by ledger, month or voucher type
+  (`summarise_by`), with debit, credit and voucher counts per bucket and the
+  cancelled, optional and entry-less vouchers counted apart. Both run on the
+  rows the window read already holds, so they send no new request to Tally; a
+  zero from a counted window is a checked zero. A narration phrase is refused
+  where narrations are withheld from the assistant. A summary sums post-dated
+  vouchers (counted, with the vouchers Tally sent no flag for counted apart) and any
+  non-posting voucher type a book uses, and says so in the result. Not measured
+  against a live book yet (#1230).
+
 **Safer or fixed**
 
 - `purchase_register` and `sales_register` now take their `state` from the rule
@@ -55,6 +69,22 @@ These changes are in source and not yet in a published build.
   approval is the assistant's word, not proof that a person said yes, and a hand
   import of the file is not checked. Not measured: a large book, and the bills
   of a ledger whose flag reads No (#1234).
+- The posting setting is shorter and names its four known limits in plainer
+  words, and Terms of Use section 9.2 (version 2026-10.1, effective 7 October
+  2026) now lists the same limits and more: a company or ledger renamed or opened
+  at the moment of a post, another Tally connector that can change entries
+  without the approval window, and that dealing with a voucher that reaches the
+  wrong company remains yours. The setting that accepts the Terms is now named
+  for version 2026-10.1, so the next build asks you to accept the Terms once
+  more; version 2026-10 stays published for the builds that asked for it
+  (#1010).
+- When a ledger name you gave is not in the book, the candidates now list ahead
+  of the others the ledgers that hold every word you typed
+  (`rule`: `shared_every_distinctive_token`), then those that share only some;
+  a ledger matched by a stronger rule still comes first. The same ledgers are
+  found and counted as before and none is chosen for you; when more than 25 are
+  found, the ones left off the list are the ledgers holding only some of the
+  words before those holding all of them (#1076).
 
 ## [0.4.2] - 2026-10-03
 

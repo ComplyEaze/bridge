@@ -172,7 +172,7 @@ settings (section 4).
   count of the rest. The second records that the response was written out. It
   holds no row values.
 - **A terms record** (`terms-acceptance.jsonl`): the extension asks you to
-  accept the ComplyEaze Bridge Terms of Use (version 2026-10) in its settings,
+  accept the ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings,
   and every tool refuses with `terms_not_accepted` until you do. When the
   server starts with the setting on, it appends a line with the terms version,
   the time, and that the acceptance came through the setting (once per
@@ -258,6 +258,9 @@ not used within fifteen minutes, or before the program restarts, is dropped.
 From 0.4.1 a clicked approval is also withdrawn when the post is refused
 before its checks begin (for example when the batch is not found or the
 journal is busy); a refusal inside the checks already withdrew it.
+
+The window covers only ComplyEaze Bridge's own tools. Another Tally connector in
+the same Claude Desktop that can change entries can do so without it.
 
 **Not measured:** what Claude Desktop itself needs when installing an extension,
 and a check of a machine before and after installing and running it.

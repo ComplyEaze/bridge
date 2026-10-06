@@ -19,7 +19,7 @@
 //! fact and never called an opening. A [`BillTrail`] exists only for a bill
 //! that tied (its constructor is private).
 use super::*;
-use bridge_tally_core::ExactDecimal;
+use bridge_tally_core::{ExactDecimal, TallyDate};
 use std::collections::BTreeMap;
 
 /// A refusal to build a trail: the rows are not shaped as a trail needs, and a
@@ -829,7 +829,7 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &TallyCompany,
-        as_of: &str,
+        as_of: &TallyDate,
         party_argument: &str,
         kind: DetailKind,
         reference: Option<&str>,
@@ -861,7 +861,7 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &TallyCompany,
-        as_of: &str,
+        as_of: &TallyDate,
         party_argument: &str,
         kind: DetailKind,
         reference: Option<&str>,
@@ -886,6 +886,15 @@ impl Server {
         // The `vouchers` window read, with its own limits: in production the
         // planner's, so a window needing more requests than one call may spend
         // is refused, and told as this detail's own refusal.
+        // Refused, it keeps the catalogue read's evidence before its own,
+        // as the detail's later refusals do.
+        let refused = |failure: ToolFailure| {
+            with_evidence(window_too_large(failure, kind, reference), &evidence)
+        };
+        // The window's start comes from the book (a bill date or the books'
+        // start): it is parsed here, where it enters the window layer. Its end
+        // is the outstandings' as-of date, already a `TallyDate`.
+        let from = parse_window_date(&from).map_err(refused)?;
         let read = self
             .read_voucher_window(
                 identity,
@@ -898,16 +907,12 @@ impl Server {
                 |xml| parse_agent_rows(xml, identity.company_guid()),
             )
             .await
-            // Refused, it keeps the catalogue read's evidence before its own,
-            // as the detail's later refusals do.
-            .map_err(|failure| {
-                with_evidence(window_too_large(failure, kind, reference), &evidence)
-            })?;
+            .map_err(refused)?;
         evidence = combine_evidence(evidence, read.all_evidence());
         let late = |failure: ToolFailure| with_evidence(failure, &evidence);
         let rows = read.rows;
         let vouchers_read = rows.len();
-        let rows = validate_then_filter_voucher_rows(rows, &from, as_of, None)
+        let rows = validate_then_filter_voucher_rows(rows, from.as_str(), as_of.as_str(), None)
             .map_err(|code| late(ToolFailure::from(code)))?;
         let entries = entries_for_party(&rows, &party)
             .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;

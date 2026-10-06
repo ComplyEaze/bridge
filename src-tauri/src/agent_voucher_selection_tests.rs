@@ -551,6 +551,26 @@ async fn call_filtered_vouchers_configured(
     max_bytes: usize,
     redaction: Redaction,
 ) -> Value {
+    call_filtered_vouchers_args(
+        window,
+        catalogue,
+        json!({"company_guid":CAPTURED_GUID,
+        "from":"20260801","to":"20260802","ledger":ledger}),
+        max_bytes,
+        redaction,
+    )
+    .await
+}
+
+/// [`call_filtered_vouchers_configured`] with the whole argument object given, for a ledger
+/// call that also searches or summarises.
+async fn call_filtered_vouchers_args(
+    window: String,
+    catalogue: impl Fn(&str) -> String,
+    args: Value,
+    max_bytes: usize,
+    redaction: Redaction,
+) -> Value {
     let vouchers = ScenarioPlan::new(Fixture::SyntheticXml(window))
         .with_encoding(WireEncoding::Utf16Le)
         .with_framing(ResponseFraming::ContentLength);
@@ -575,13 +595,7 @@ async fn call_filtered_vouchers_configured(
     let mut server = server_for(simulator.address(), directory.path());
     server.settings.max_bytes = max_bytes;
     server.settings.redaction = redaction;
-    let response = server
-        .call_tool(
-            "vouchers",
-            json!({"company_guid":CAPTURED_GUID,
-            "from":"20260801","to":"20260802","ledger":ledger}),
-        )
-        .await;
+    let response = server.call_tool("vouchers", args).await;
     simulator.cancel();
     simulator.finish().unwrap();
     response
@@ -1093,4 +1107,83 @@ async fn a_ledger_filter_says_which_ledger_it_read_and_how() {
         );
         assert_eq!(ledger_match["similar_ledgers"], json!([]), "{ledger_match}");
     }
+}
+
+// -- #1230: a summary over the selectors the tool already had --
+
+/// A summary of a window narrowed to one ledger adds only that ledger's entries by month, and
+/// says so; the ledger is resolved through the live catalogue as for any `ledger` call.
+/// Mutant killed: not carrying the resolved ledger from the operation into the summary.
+#[tokio::test]
+async fn a_summary_of_a_ledger_window_adds_only_that_ledgers_entries() {
+    let words = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+    )
+    .chunks_exact(2)
+    .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+    .collect::<Vec<_>>();
+    let response = call_filtered_vouchers_args(
+        String::from_utf16(&words).unwrap(),
+        |catalogue| catalogue.to_string(),
+        json!({"company_guid": CAPTURED_GUID, "from": "20260801", "to": "20260802",
+            "ledger": "wr2 sales", "summarise_by": "month"}),
+        200_000,
+        Redaction::None,
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["entries_counted"], "selected_ledger", "{result}");
+    assert_eq!(result["buckets"][0]["group"], "2026-08");
+    assert_eq!(result["buckets"][0]["debit"], "0");
+    assert_eq!(result["buckets"][0]["credit"], "306.06");
+    assert_eq!(result["ledger_match"]["matched"], "case_or_spacing");
+}
+
+/// A voucher withheld for a foreign-currency amount is in no bucket, and the result says its
+/// totals are short by it. Mutant killed: summing a withheld row, or the listing's coverage text.
+#[tokio::test]
+async fn a_summary_leaves_a_withheld_voucher_out_and_says_so() {
+    let response = call_vouchers_with(
+        vouchers_plans(window_with_a_composite_voucher()),
+        json!({"summarise_by": "voucher_type"}),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(result["reason"], "vouchers_withheld");
+    assert_eq!(result["vouchers_summarised"], 2);
+    assert_eq!(result["buckets"][0]["vouchers"], 2);
+    assert_eq!(result["buckets"][0]["credit"], "205.05");
+    assert_eq!(result["withheld_total"], 1);
+    assert!(result["coverage"]
+        .as_str()
+        .unwrap()
+        .starts_with("buckets exclude 1 voucher"));
+    assert!(!result.to_string().contains(" @ "), "{result}");
+}
+
+/// An amount search keeps a withheld voucher it cannot judge and the result stays partial.
+#[tokio::test]
+async fn an_amount_search_over_a_window_with_a_withheld_voucher_stays_partial() {
+    let response = call_vouchers_with(
+        vouchers_plans(window_with_a_composite_voucher()),
+        json!({"amount": "103.03"}),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(result["total"], 1);
+    assert_eq!(result["items"][0]["voucher_number"], "3");
+    assert_eq!(
+        result["items"][0]["matched"],
+        json!({"amount_entries": [0, 1]})
+    );
+    assert_eq!(result["withheld_total"], 1);
+    assert!(result["coverage"]
+        .as_str()
+        .unwrap()
+        .contains("an amount search keeps every withheld voucher"));
 }

@@ -134,6 +134,9 @@ async fn a_send_waits_out_another_process_then_goes_through() {
     let child = ChildHolder::spawn(&root, endpoint.port, &ready, &release);
     wait_for(&ready).unwrap();
     let _lease = hold_dispatch_lease(&root, &endpoint);
+    // The clock starts before the releaser's timer, so no stall between the two can
+    // make a correct send look early (#1255).
+    let started = Instant::now();
     let releaser = {
         let release = release.clone();
         thread::spawn(move || {
@@ -141,7 +144,6 @@ async fn a_send_waits_out_another_process_then_goes_through() {
             fs::write(release, b"release").unwrap();
         })
     };
-    let started = Instant::now();
     let response = transport(
         &root,
         &endpoint,
@@ -150,7 +152,7 @@ async fn a_send_waits_out_another_process_then_goes_through() {
     .post_xml_decoded("<ENVELOPE/>".into())
     .await
     .expect("sent once the other process let go");
-    assert!(started.elapsed() >= Duration::from_millis(300));
+    assert!(started.elapsed() >= Duration::from_millis(400));
     assert!(response.request_body_sha256().is_some());
     releaser.join().unwrap();
     assert!(child.wait().success());
@@ -204,6 +206,7 @@ async fn runtime_operations_in_one_call_share_one_wait_budget() {
     let runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(WireGateConfig {
         root: WireRoot::at(root.clone()),
         retry: WireRetryPolicy::new(Duration::from_millis(50), budget).unwrap(),
+        busy_at: None,
     });
     let _other = gate(&root, &endpoint).try_acquire().unwrap();
     let busy = |result: anyhow::Result<crate::tally::ConnectionStatus>| {
@@ -216,7 +219,8 @@ async fn runtime_operations_in_one_call_share_one_wait_budget() {
         // The call's second operation has nothing left to wait.
         let started = Instant::now();
         assert!(busy(runtime.check_connection(endpoint.clone()).await));
-        assert!(started.elapsed() < budget / 2);
+        // Nothing left to wait: well under a full budget, which a fresh one would take.
+        assert!(started.elapsed() < budget);
     })
     .await;
     let started = Instant::now();

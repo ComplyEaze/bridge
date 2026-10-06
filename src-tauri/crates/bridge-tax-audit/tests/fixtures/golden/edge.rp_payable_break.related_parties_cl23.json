@@ -1,0 +1,483 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "related_parties_cl23",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "ab3d3f4e061679c1",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). One entry = one voucher's net Dr+/Cr- line-sum on a person's nature ledger set.",
+  "figures": [
+    {
+      "id": "related_parties_cl23.amount_interest_8db276be",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3ea568ba27142a54",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 8db276be)'s 'interest' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Interest Payable",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "j03",
+          "label": "Journal j03 on 2025-09-30"
+        },
+        {
+          "kind": "voucher",
+          "id": "p03",
+          "label": "Payment p03 on 2025-10-05"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_rent_8db276be",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "36779a86500c295c",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 8db276be)'s 'rent' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Rent Payable",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "j02",
+          "label": "Journal j02 on 2025-09-30"
+        },
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Payment p02 on 2025-10-05"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_8db276be",
+      "value": -1000000,
+      "unit": "paise",
+      "definition_sha256_16": "ed2743b2a97fd46a",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 8db276be)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Salary Payable",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "j01",
+          "label": "Journal j01 on 2025-09-30"
+        },
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Payment p01 on 2025-10-05"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_total_8db276be",
+      "value": -1000000,
+      "unit": "paise",
+      "definition_sha256_16": "4c6887828227bba1",
+      "definition_text": "Sum of amount_<nature>_8db276be across every nature configured for person (tag 8db276be).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.applicable",
+      "value": "yes",
+      "unit": "text",
+      "definition_sha256_16": "9b27b7c2da441e41",
+      "definition_text": "Whether any related person has been confirmed by the client for this engagement. 'no' means none were confirmed -- never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.payable_accrued_interest_8db276be",
+      "value": 40000,
+      "unit": "paise",
+      "definition_sha256_16": "ae4903238d37a82c",
+      "definition_text": "TB period CREDIT movement (accrual, P&L side) on person (tag 8db276be)'s 'interest' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Interest Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_accrued_rent_8db276be",
+      "value": 90000,
+      "unit": "paise",
+      "definition_sha256_16": "0c7e83ba24a7b73c",
+      "definition_text": "TB period CREDIT movement (accrual, P&L side) on person (tag 8db276be)'s 'rent' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Rent Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_accrued_salary_8db276be",
+      "value": 11000000,
+      "unit": "paise",
+      "definition_sha256_16": "2cbc6b8202457d20",
+      "definition_text": "TB period CREDIT movement (accrual, P&L side) on person (tag 8db276be)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Salary Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_closing_interest_8db276be",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "b91289ae80e0cc69",
+      "definition_text": "Closing payable (-TB closing_paise) on person (tag 8db276be)'s 'interest' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Interest Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_closing_rent_8db276be",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a6b8ea4b0fa7e3a6",
+      "definition_text": "Closing payable (-TB closing_paise) on person (tag 8db276be)'s 'rent' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Rent Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_closing_salary_8db276be",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "c96e87cf78a9f4da",
+      "definition_text": "Closing payable (-TB closing_paise) on person (tag 8db276be)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Salary Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_opening_interest_8db276be",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "fd54ba6a29687014",
+      "definition_text": "Opening payable (-TB opening_paise) on person (tag 8db276be)'s 'interest' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Interest Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_opening_rent_8db276be",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "76a642875c1250f0",
+      "definition_text": "Opening payable (-TB opening_paise) on person (tag 8db276be)'s 'rent' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Rent Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_opening_salary_8db276be",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "cd469ead1365911e",
+      "definition_text": "Opening payable (-TB opening_paise) on person (tag 8db276be)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Salary Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_paid_interest_8db276be",
+      "value": 40101,
+      "unit": "paise",
+      "definition_sha256_16": "02b80816ac4f6fb5",
+      "definition_text": "TB period DEBIT movement (amount actually paid) on person (tag 8db276be)'s 'interest' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Interest Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_paid_rent_8db276be",
+      "value": 90100,
+      "unit": "paise",
+      "definition_sha256_16": "09fd66ad899ef32d",
+      "definition_text": "TB period DEBIT movement (amount actually paid) on person (tag 8db276be)'s 'rent' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Rent Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_paid_salary_8db276be",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "cb2a79f1fa258cd8",
+      "definition_text": "TB period DEBIT movement (amount actually paid) on person (tag 8db276be)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Pay Salary Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.related_person_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "8feb927f1116a35a",
+      "definition_text": "Related persons confirmed by the client for this engagement.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_8db276be",
+      "value": "son of the proprietor",
+      "unit": "text",
+      "definition_sha256_16": "5b6beded980622ea",
+      "definition_text": "Relationship confirmed by the client for related person (tag 8db276be) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/8db276be",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "interest",
+          "figure_id": "related_parties_cl23.amount_interest_8db276be"
+        },
+        {
+          "name": "interest_accrued",
+          "figure_id": "related_parties_cl23.payable_accrued_interest_8db276be"
+        },
+        {
+          "name": "interest_paid",
+          "figure_id": "related_parties_cl23.payable_paid_interest_8db276be"
+        },
+        {
+          "name": "interest_payable_closing",
+          "figure_id": "related_parties_cl23.payable_closing_interest_8db276be"
+        },
+        {
+          "name": "interest_payable_opening",
+          "figure_id": "related_parties_cl23.payable_opening_interest_8db276be"
+        },
+        {
+          "name": "rent",
+          "figure_id": "related_parties_cl23.amount_rent_8db276be"
+        },
+        {
+          "name": "rent_accrued",
+          "figure_id": "related_parties_cl23.payable_accrued_rent_8db276be"
+        },
+        {
+          "name": "rent_paid",
+          "figure_id": "related_parties_cl23.payable_paid_rent_8db276be"
+        },
+        {
+          "name": "rent_payable_closing",
+          "figure_id": "related_parties_cl23.payable_closing_rent_8db276be"
+        },
+        {
+          "name": "rent_payable_opening",
+          "figure_id": "related_parties_cl23.payable_opening_rent_8db276be"
+        },
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_8db276be"
+        },
+        {
+          "name": "salary_accrued",
+          "figure_id": "related_parties_cl23.payable_accrued_salary_8db276be"
+        },
+        {
+          "name": "salary_paid",
+          "figure_id": "related_parties_cl23.payable_paid_salary_8db276be"
+        },
+        {
+          "name": "salary_payable_closing",
+          "figure_id": "related_parties_cl23.payable_closing_salary_8db276be"
+        },
+        {
+          "name": "salary_payable_opening",
+          "figure_id": "related_parties_cl23.payable_opening_salary_8db276be"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_8db276be"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "6d2f6eae1ece7176",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 8db276be) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/clause23/8db276be",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "interest",
+          "figure_id": "related_parties_cl23.amount_interest_8db276be"
+        },
+        {
+          "name": "interest_accrued",
+          "figure_id": "related_parties_cl23.payable_accrued_interest_8db276be"
+        },
+        {
+          "name": "interest_paid",
+          "figure_id": "related_parties_cl23.payable_paid_interest_8db276be"
+        },
+        {
+          "name": "interest_payable_closing",
+          "figure_id": "related_parties_cl23.payable_closing_interest_8db276be"
+        },
+        {
+          "name": "interest_payable_opening",
+          "figure_id": "related_parties_cl23.payable_opening_interest_8db276be"
+        },
+        {
+          "name": "rent",
+          "figure_id": "related_parties_cl23.amount_rent_8db276be"
+        },
+        {
+          "name": "rent_accrued",
+          "figure_id": "related_parties_cl23.payable_accrued_rent_8db276be"
+        },
+        {
+          "name": "rent_paid",
+          "figure_id": "related_parties_cl23.payable_paid_rent_8db276be"
+        },
+        {
+          "name": "rent_payable_closing",
+          "figure_id": "related_parties_cl23.payable_closing_rent_8db276be"
+        },
+        {
+          "name": "rent_payable_opening",
+          "figure_id": "related_parties_cl23.payable_opening_rent_8db276be"
+        },
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_8db276be"
+        },
+        {
+          "name": "salary_accrued",
+          "figure_id": "related_parties_cl23.payable_accrued_salary_8db276be"
+        },
+        {
+          "name": "salary_paid",
+          "figure_id": "related_parties_cl23.payable_paid_salary_8db276be"
+        },
+        {
+          "name": "salary_payable_closing",
+          "figure_id": "related_parties_cl23.payable_closing_salary_8db276be"
+        },
+        {
+          "name": "salary_payable_opening",
+          "figure_id": "related_parties_cl23.payable_opening_salary_8db276be"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_8db276be"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "cb1d9c463cedb0cf",
+      "title_text": "Transactions with a related person (tag 8db276be) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "related_parties_cl23.check_invariants"
+  ],
+  "module_invariant_violations": [
+    {
+      "invariant": "related_parties_cl23.check_invariants",
+      "subject": "related_parties_cl23",
+      "detail": "XCL-1: related_parties_cl23.payable_paid_interest_8db276be = 40101p but opening payable (0p) + accrued (40000p) - closing payable (0p) = 40000p -- the identity paid = opening payable + accrued - closing payable does not hold (check for a transposed accrued/paid figure)"
+    },
+    {
+      "invariant": "related_parties_cl23.check_invariants",
+      "subject": "related_parties_cl23",
+      "detail": "XCL-1: related_parties_cl23.payable_paid_salary_8db276be = 12000000p but opening payable (3000000p) + accrued (11000000p) - closing payable (4000000p) = 10000000p -- the identity paid = opening payable + accrued - closing payable does not hold (check for a transposed accrued/paid figure)"
+    }
+  ]
+}

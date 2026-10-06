@@ -17,13 +17,11 @@ impl Server {
         .map_err(|code| ToolFailure::from(code.to_string()))?;
         let (company, identity, mut result_evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
-            let as_of = optional_string(args, "as_of")?
-                .as_deref()
-                .map(normalized_date)
-                .transpose()?
-                .unwrap_or_else(tally_host_today);
-            let to =
-                bridge_tally_core::TallyDate::parse(as_of).map_err(|_| "invalid_as_of".to_string())?;
+            let to = match optional_string(args, "as_of")?.as_deref().map(normalized_date) {
+                Some(as_of) => as_of?,
+                None => bridge_tally_core::TallyDate::parse(tally_host_today())
+                    .map_err(|_| "invalid_as_of".to_string())?,
+            };
             let ageing_basis =
                 optional_string(args, "ageing_basis")?.unwrap_or_else(|| "due_date".to_string());
             let ageing_anchor = match ageing_basis.as_str() {

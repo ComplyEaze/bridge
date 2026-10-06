@@ -1,6 +1,7 @@
 //! Vouchers for the local MCP adapter.
 use super::*;
 use bridge_tally_core::book_presence::WindowRead;
+use bridge_tally_core::TallyDate;
 use std::collections::BTreeSet;
 
 impl Server {
@@ -15,8 +16,8 @@ impl Server {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct VoucherPageKey {
     company_guid: String,
-    from: String,
-    to: String,
+    from: TallyDate,
+    to: TallyDate,
     ledger: Option<String>,
     selector: Option<VoucherTypeSelector>,
     /// The search (#1230): a differently searched window is a different question.
@@ -29,16 +30,16 @@ pub(super) struct VoucherPageKey {
 impl VoucherPageKey {
     pub(super) fn new(
         identity: &VerifiedCompanyIdentity,
-        from: &str,
-        to: &str,
+        from: &TallyDate,
+        to: &TallyDate,
         ledger: Option<&str>,
         selector: Option<&VoucherTypeSelector>,
         search: Option<&VoucherSearch>,
     ) -> Self {
         Self {
             company_guid: identity.company_guid().to_string(),
-            from: from.to_string(),
-            to: to.to_string(),
+            from: from.clone(),
+            to: to.clone(),
             ledger: ledger.map(str::to_string),
             selector: selector.cloned(),
             search: search.cloned(),
@@ -376,8 +377,8 @@ pub(crate) struct VoucherOperationScope {
     /// Only the MCP adapter holds windows: the desktop adapter never does.
     pub(crate) held_pages: bool,
     pub(crate) guid: String,
-    pub(crate) from: String,
-    pub(crate) to: String,
+    pub(crate) from: TallyDate,
+    pub(crate) to: TallyDate,
     pub(crate) company: TallyCompany,
     pub(crate) identity: VerifiedCompanyIdentity,
     pub(crate) initial_evidence: Option<Evidence>,
@@ -391,8 +392,8 @@ impl VoucherOperationScope {
     /// `snapshot`.
     pub(crate) fn desktop(
         guid: String,
-        from: String,
-        to: String,
+        from: TallyDate,
+        to: TallyDate,
         company: TallyCompany,
         identity: VerifiedCompanyIdentity,
     ) -> Self {
@@ -513,7 +514,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         // A withheld voucher goes through every date, ledger and type check as
         // a row with no amounts, and is set aside only after them (#674).
         let rows = read.rows.into_iter().map(VoucherRow::into_filter_row).collect();
-        let mut rows = validate_then_filter_voucher_rows(rows, &from, &to, None)?;
+        let mut rows = validate_then_filter_voucher_rows(rows, from.as_str(), to.as_str(), None)?;
         let empty_window = if rows.is_empty() {
             let (read_evidence, partial, reason) = server
                 .corroborate_empty_voucher_read(&identity, &company.name, &from, &to, None, source_marks)
@@ -862,8 +863,8 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
-        from: &str,
-        to: &str,
+        from: &TallyDate,
+        to: &TallyDate,
         ledger: Option<&str>,
         known_marks: Option<CompanyMarks>,
     ) -> Result<(Evidence, bool, Option<&'static str>), ToolFailure> {
@@ -877,8 +878,12 @@ impl Server {
         let mut evidence = wider.all_evidence();
         let wider_rows = wider.rows;
         let outcome = async {
-            let wider_rows =
-                validate_then_filter_voucher_rows(wider_rows, &wider_from, &wider_to, ledger)?;
+            let wider_rows = validate_then_filter_voucher_rows(
+                wider_rows,
+                wider_from.as_str(),
+                wider_to.as_str(),
+                ledger,
+            )?;
             let high_water = if wider_rows.is_empty() {
                 let (high_water_xml, high_water_evidence) = self
                     .post_read(identity, company_high_water_read(company))
@@ -891,8 +896,12 @@ impl Server {
             } else {
                 None
             };
-            let (partial, reason) =
-                corroborate_empty_voucher_window(&wider_rows, from, to, high_water)?;
+            let (partial, reason) = corroborate_empty_voucher_window(
+                &wider_rows,
+                from.as_str(),
+                to.as_str(),
+                high_water,
+            )?;
             Ok((evidence.clone(), partial, reason))
         }
         .await;
@@ -909,8 +918,8 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
-        from: &str,
-        to: &str,
+        from: &TallyDate,
+        to: &TallyDate,
         known_marks: Option<CompanyMarks>,
     ) -> Result<WindowReadOutcome<Value>, ToolFailure> {
         self.read_entry_window_shaped(
@@ -930,8 +939,8 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
-        from: &str,
-        to: &str,
+        from: &TallyDate,
+        to: &TallyDate,
         shape: VoucherReadShape,
         composites: VoucherComposites,
     ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
@@ -960,8 +969,8 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
-        from: &str,
-        to: &str,
+        from: &TallyDate,
+        to: &TallyDate,
         known_marks: Option<CompanyMarks>,
         shape: VoucherReadShape,
     ) -> Result<WindowReadOutcome<Value>, ToolFailure> {

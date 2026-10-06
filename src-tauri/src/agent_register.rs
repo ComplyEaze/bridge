@@ -728,7 +728,7 @@ impl Server {
                 kind,
                 &first.index,
                 window.rows,
-                (&from, &to),
+                (from.as_str(), to.as_str()),
                 (offset, limit),
                 self.settings.redaction,
             )?;

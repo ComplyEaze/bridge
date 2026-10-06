@@ -1358,7 +1358,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
             guid: Some("guid-bank".into()),
             master_id: Some("41".into()),
             alter_id: Some(63),
-            date: Some(normalized_date(&voucher.date).unwrap()),
+            date: Some(normalized_date(&voucher.date).unwrap().as_str().to_string()),
             voucher_type: Some(voucher_type.as_str().into()),
             narration: Some(format!("[BRIDGE:{}]", voucher.bridge_txn_id)),
             // Tally's own number, which Bridge never sent and must not compare.

@@ -886,28 +886,36 @@ impl Server {
         // The `vouchers` window read, with its own limits: in production the
         // planner's, so a window needing more requests than one call may spend
         // is refused, and told as this detail's own refusal.
+        // Refused, it keeps the catalogue read's evidence before its own,
+        // as the detail's later refusals do.
+        let refused = |failure: ToolFailure| {
+            with_evidence(window_too_large(failure, kind, reference), &evidence)
+        };
+        // The window comes from the book (a bill date or the books' start) and
+        // the outstandings' as-of date: it is parsed here, where it enters the
+        // window layer.
+        let (from, as_of) = match (parse_window_date(&from), parse_window_date(as_of)) {
+            (Ok(from), Ok(as_of)) => (from, as_of),
+            (Err(failure), _) | (_, Err(failure)) => return Err(refused(failure)),
+        };
         let read = self
             .read_voucher_window(
                 identity,
                 &company.name,
                 &from,
-                as_of,
+                &as_of,
                 VoucherReadShape::EntryWildcard,
                 WindowPlanSource::Estimate { known_marks: None },
                 limits.window,
                 |xml| parse_agent_rows(xml, identity.company_guid()),
             )
             .await
-            // Refused, it keeps the catalogue read's evidence before its own,
-            // as the detail's later refusals do.
-            .map_err(|failure| {
-                with_evidence(window_too_large(failure, kind, reference), &evidence)
-            })?;
+            .map_err(refused)?;
         evidence = combine_evidence(evidence, read.all_evidence());
         let late = |failure: ToolFailure| with_evidence(failure, &evidence);
         let rows = read.rows;
         let vouchers_read = rows.len();
-        let rows = validate_then_filter_voucher_rows(rows, &from, as_of, None)
+        let rows = validate_then_filter_voucher_rows(rows, from.as_str(), as_of.as_str(), None)
             .map_err(|code| late(ToolFailure::from(code)))?;
         let entries = entries_for_party(&rows, &party)
             .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;

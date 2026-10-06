@@ -303,9 +303,10 @@ impl LedgerRead {
 
 /// The catalogue dates a tie-out reads: the first row's date, the day after
 /// the last (the book's position at the end of the last day), and the first
-/// again. The third read catches a change dated before the first date made
-/// between the first and the third read; a voucher dated inside the window and
-/// posted in between moves only the end figure, and is not caught.
+/// again. The third read catches a change dated before the first date, or an
+/// edit to the ledger itself, made between the first and the third read; a
+/// voucher dated inside the window and posted in between moves only the end
+/// figure, and is not caught.
 fn read_dates(first: Date, last: Date) -> Result<[TallyDate; 3], String> {
     let tally = |date: Date| {
         TallyDate::parse(date.iso().replace('-', "")).map_err(|_| "invalid_date".to_string())
@@ -374,7 +375,7 @@ fn gaps(
 const SIGN_SENTENCE: &str = "A positive amount means the book shows more money in the bank than the statement does; a negative amount, less.";
 const POSSIBLE_CAUSES: &str = "Uncleared cheques and deposits in transit explain differences like these. So can a missing entry, a repeated entry or the wrong bank ledger. This check cannot tell them apart. To see which vouchers are involved, read the bank ledger's vouchers for these dates.";
 const SCOPE: &str =
-    "This checks the bank ledger only, and takes the ledger named in the file to be a bank account: a ledger of another kind opens at zero for the period, so its gaps would mean nothing. A wrong party or expense ledger is not caught here.";
+    "This checks the bank ledger only, and takes the ledger named in the file to be a bank account: an income or expense ledger opens at zero for the period, so its gaps would mean nothing. A wrong party or expense ledger is not caught here.";
 
 /// The fixed reading text. The headline comes first; it names every figure
 /// that is not established, then every gap that is not zero, and prescribes

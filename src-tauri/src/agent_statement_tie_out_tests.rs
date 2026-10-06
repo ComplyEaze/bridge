@@ -519,7 +519,7 @@ fn a_ledger_named_twice_in_one_catalogue_is_refused() {
 
 const CAUSES: &str = "Uncleared cheques and deposits in transit explain differences like these. So can a missing entry, a repeated entry or the wrong bank ledger. This check cannot tell them apart. To see which vouchers are involved, read the bank ledger's vouchers for these dates.";
 const SCOPE: &str =
-    "This checks the bank ledger only, and takes the ledger named in the file to be a bank account: a ledger of another kind opens at zero for the period, so its gaps would mean nothing. A wrong party or expense ledger is not caught here.";
+    "This checks the bank ledger only, and takes the ledger named in the file to be a bank account: an income or expense ledger opens at zero for the period, so its gaps would mean nothing. A wrong party or expense ledger is not caught here.";
 
 fn window() -> Option<(Date, Date)> {
     Some((date(2026, 8, 1), date(2026, 8, 7)))

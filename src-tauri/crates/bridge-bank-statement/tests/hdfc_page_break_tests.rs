@@ -116,17 +116,24 @@ const NOTHING_BELOW: Below<'static> = Below {
 
 #[test]
 fn a_period_line_below_the_anchor_line_is_not_part_of_the_last_row() {
-    // 5 pt: its own visual line under the anchor, the shape the refusal on the real print implies.
-    let parsed = rows(5.0, &NOTHING_BELOW);
+    // 3.266 pt is what PDFium measured on the real print (From at y 214.679, Statement at 211.413): its own
+    // visual line under the anchor, 0.27 pt past the grouping. 5 pt is the same shape with room to spare.
+    for gap in [3.266, 5.0] {
+        assert_period_line_skipped(gap);
+    }
+}
+
+fn assert_period_line_skipped(gap: f64) {
+    let parsed = rows(gap, &NOTHING_BELOW);
     assert_eq!(
         parsed[0].get("date"),
         "01/08/26",
-        "page 1's last row keeps its own date cell"
+        "page 1's last row keeps its own date cell, gap {gap}"
     );
     assert_eq!(
         parsed[0].get("narr"),
         FIRST_NARRATION,
-        "and its own narration, no period dates in it"
+        "and its own narration, no period dates in it, gap {gap}"
     );
     assert_eq!(parsed[0].get("narr_spaced"), FIRST_NARRATION);
     assert_eq!(parsed[1].get("date"), "02/08/26");
@@ -152,7 +159,7 @@ fn a_split_rows_tail_after_the_period_line_still_reaches_its_row() {
     };
     // -5.0 puts the period line above the anchor line: the anchor's own words then sit below the top, in
     // columns the row never reads from a continuation line.
-    for gap in [-5.0, 2.4, 5.0] {
+    for gap in [-5.0, 2.4, 3.266, 5.0] {
         let parsed = rows(gap, &below);
         assert_eq!(parsed[0].get("date"), "01/08/26", "gap {gap}");
         assert_eq!(

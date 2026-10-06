@@ -13,7 +13,7 @@ fn identical_batch() -> (ImportLedgerLine, Vec<ReadVoucher>) {
             guid: Some(format!("guid-{index}")),
             master_id: Some(index.to_string()),
             alter_id: Some(11 + index as u64),
-            date: Some(normalized_date(&voucher.date).unwrap()),
+            date: Some(normalized_date(&voucher.date).unwrap().as_str().to_string()),
             voucher_type: Some(voucher.voucher_type.as_str().into()),
             narration: Some(format!("[BRIDGE:{}]", voucher.bridge_txn_id)),
             voucher_number: None,

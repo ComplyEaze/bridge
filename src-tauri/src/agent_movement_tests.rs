@@ -247,8 +247,9 @@ async fn movement_read_preserves_observed_count_after_accounting_exclusions() {
         assert_ne!(xml, captured);
         let date = parse_agent_changed_rows(&xml, identity.company_guid()).unwrap()[0]["date"]
             .as_str()
+            .map(bridge_tally_core::TallyDate::parse)
             .unwrap()
-            .to_string();
+            .unwrap();
         let plan = |xml: String| {
             ScenarioPlan::new(Fixture::SyntheticXml(xml))
                 .with_encoding(WireEncoding::Utf16Le)

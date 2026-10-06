@@ -11,6 +11,11 @@ use crate::agent::bill_trail::{DetailKind, DetailLimits};
 use crate::agent::voucher_window::{VoucherReadShape, WindowReadLimits};
 use crate::tally::{ExposureDirection, OpenBillRow, UnallocatedComposition, UnallocatedParty};
 
+/// The outstandings' as-of date, as the bill trail is handed it.
+fn tally_date(text: &str) -> bridge_tally_core::TallyDate {
+    bridge_tally_core::TallyDate::parse(text).unwrap()
+}
+
 const PARTY: &str = "Café Naïve Traders";
 const AS_OF: &str = "20260802";
 
@@ -143,7 +148,7 @@ async fn run(
                 .outstandings_detail(
                     &identity,
                     &company,
-                    call.as_of,
+                    &tally_date(call.as_of),
                     call.party,
                     call.kind,
                     call.reference,
@@ -157,7 +162,7 @@ async fn run(
                 .outstandings_detail_within(
                     &identity,
                     &company,
-                    call.as_of,
+                    &tally_date(call.as_of),
                     call.party,
                     call.kind,
                     call.reference,

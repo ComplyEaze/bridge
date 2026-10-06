@@ -944,6 +944,11 @@ fn request_sha(xml: &str) -> String {
     ))
 }
 
+/// A window date, as `normalized_date` hands it to the window layer.
+fn tally_date(text: &str) -> TallyDate {
+    TallyDate::parse(text).unwrap()
+}
+
 fn identity() -> VerifiedCompanyIdentity {
     let company = company_plan().fixture.body().into_owned();
     let companies = bridge_tally_protocol::parse_companies_from_collection(&company).unwrap();
@@ -1019,8 +1024,8 @@ async fn read_window(
         .read_voucher_window(
             &identity,
             identity.display_name(),
-            from,
-            to,
+            &tally_date(from),
+            &tally_date(to),
             shape,
             source,
             limits,
@@ -1030,46 +1035,23 @@ async fn read_window(
     (outcome, simulator.finish().unwrap())
 }
 
-/// #861: a window date that is not a Tally date is refused where it enters
-/// the window layer, by its typed code, before any request is sent.
-#[tokio::test]
-async fn a_window_date_that_is_not_a_tally_date_is_refused_before_any_request() {
-    for (from, to) in [
-        ("20261301", "20261302"),
-        ("20260801", "2026-08-02"),
-        ("20260229", "20260301"),
-    ] {
-        let simulator = SequenceSimulator::spawn(
-            divided_window_reads(marks_plan(3, 7))
-                .iter()
-                .flat_map(paired)
-                .collect(),
-        )
-        .unwrap();
-        let directory = tempfile::tempdir().unwrap();
-        let server = server_at(simulator.address(), directory.path());
-        let identity = identity();
-        let outcome = server
-            .read_voucher_window(
-                &identity,
-                identity.display_name(),
-                from,
-                to,
-                VoucherReadShape::EntryWildcard,
-                WindowPlanSource::Estimate {
-                    known_marks: Some(marks_of(3)),
-                },
-                three_a_read(),
-                |xml| parse_agent_rows(xml, GUID),
-            )
-            .await;
+/// #861: a window date that reaches the window layer as text (a bill date, a
+/// stored batch's window) and is not a Tally date is refused by its typed code
+/// where it is parsed, before any read. A tool's own date is parsed earlier, by
+/// `normalized_date` (`a_tool_date_that_is_not_a_tally_date_is_refused_at_the_boundary`).
+#[test]
+fn a_window_date_that_is_not_a_tally_date_is_refused_where_it_is_parsed() {
+    for text in ["20261301", "2026-08-02", "20260229"] {
         assert_eq!(
-            outcome.err().map(|failure| failure.code),
+            parse_window_date(text).err().map(|failure| failure.code),
             Some("invalid_date_range".to_string()),
-            "{from}..{to}"
+            "{text}"
         );
-        assert_eq!(simulator.received(), 0, "{from}..{to}: nothing was sent");
     }
+    assert_eq!(
+        parse_window_date("20260801").ok(),
+        Some(tally_date("20260801"))
+    );
 }
 
 /// The request bodies of the data POSTs among `observed`, by the six-leg pattern:
@@ -1212,8 +1194,8 @@ async fn a_single_voucher_over_budget_is_refused_before_any_read() {
         .read_voucher_window(
             &identity,
             identity.display_name(),
-            "20260801",
-            "20260802",
+            &tally_date("20260801"),
+            &tally_date("20260802"),
             VoucherReadShape::EntryWildcard,
             WindowPlanSource::Counted(WindowCensus::from_rows([(day("20260801"), 1)])),
             WindowReadLimits {
@@ -1417,8 +1399,8 @@ async fn a_book_too_large_to_count_is_refused_by_name_before_any_census() {
         .read_voucher_window(
             &identity,
             identity.display_name(),
-            "20260801",
-            "20260801",
+            &tally_date("20260801"),
+            &tally_date("20260801"),
             VoucherReadShape::EntryWildcard,
             WindowPlanSource::Estimate {
                 known_marks: Some(marks_of(
@@ -1893,8 +1875,8 @@ async fn a_supplied_count_of_another_window_is_refused_before_any_read() {
         .read_voucher_window(
             &identity,
             identity.display_name(),
-            "20260801",
-            "20260802",
+            &tally_date("20260801"),
+            &tally_date("20260802"),
             VoucherReadShape::EntryWildcard,
             WindowPlanSource::Counted(WindowCensus::from_rows([
                 (day("20260801"), 1),
@@ -2262,8 +2244,8 @@ async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
         .read_voucher_window(
             &identity,
             identity.display_name(),
-            "20260801",
-            "20260801",
+            &tally_date("20260801"),
+            &tally_date("20260801"),
             VoucherReadShape::EntryWildcard,
             WindowPlanSource::Estimate {
                 known_marks: Some(marks_of(9)),
@@ -2498,8 +2480,8 @@ async fn a_replay_of_a_divided_read_without_its_witness_is_refused_unread() {
         .read_voucher_window(
             &identity,
             identity.display_name(),
-            "20260801",
-            "20260802",
+            &tally_date("20260801"),
+            &tally_date("20260802"),
             VoucherReadShape::EntryWildcard,
             WindowPlanSource::Replay {
                 parts: first.reads,
@@ -2959,8 +2941,8 @@ async fn read_three_parts_under(
             server.read_voucher_window(
                 &identity,
                 identity.display_name(),
-                "20260801",
-                "20260802",
+                &tally_date("20260801"),
+                &tally_date("20260802"),
                 VoucherReadShape::EntryWildcard,
                 WindowPlanSource::Counted(three_part_census()),
                 three_a_read(),
@@ -3664,8 +3646,8 @@ async fn read_audit_window(
         .read_window(
             &identity,
             identity.display_name(),
-            "20260801",
-            "20260802",
+            &tally_date("20260801"),
+            &tally_date("20260802"),
             VoucherReadShape::EntryWildcard,
             three_a_read(),
             |xml| parse_agent_rows(xml, GUID),
@@ -3758,8 +3740,8 @@ async fn the_agent_reader_sends_exactly_the_requests_the_window_read_sent() {
         &AgentReader(&server),
         &identity,
         identity.display_name(),
-        "20260801",
-        "20260802",
+        &tally_date("20260801"),
+        &tally_date("20260802"),
         VoucherReadShape::EntryWildcard,
         WindowPlanSource::Estimate {
             known_marks: Some(marks_of(3)),
@@ -3929,8 +3911,8 @@ async fn an_audit_window_stops_at_a_dropped_part_and_owes_a_drain() {
         &reader,
         &identity,
         identity.display_name(),
-        "20260801",
-        "20260802",
+        &tally_date("20260801"),
+        &tally_date("20260802"),
         VoucherReadShape::EntryWildcard,
         WindowPlanSource::Estimate { known_marks: None },
         three_a_read(),
@@ -4051,8 +4033,8 @@ async fn the_audit_reader_plans_later_parts_at_the_cost_the_agent_reader_measure
         &reader,
         &identity,
         identity.display_name(),
-        "20260801",
-        "20260802",
+        &tally_date("20260801"),
+        &tally_date("20260802"),
         VoucherReadShape::EntryWildcard,
         WindowPlanSource::Estimate { known_marks: None },
         limits,
@@ -4088,13 +4070,14 @@ async fn a_reused_audit_reader_yields_only_the_window_that_succeeded() {
         },
     );
     let identity = identity();
+    let (from, to) = (tally_date("20260801"), tally_date("20260802"));
     let window = || {
         read_voucher_window_with(
             &reader,
             &identity,
             identity.display_name(),
-            "20260801",
-            "20260802",
+            &from,
+            &to,
             VoucherReadShape::EntryWildcard,
             WindowPlanSource::Estimate { known_marks: None },
             three_a_read(),
@@ -4141,8 +4124,8 @@ async fn an_audit_window_that_would_not_read_its_own_marks_is_refused_unread() {
             &reader,
             &identity,
             identity.display_name(),
-            "20260801",
-            "20260802",
+            &tally_date("20260801"),
+            &tally_date("20260802"),
             VoucherReadShape::EntryWildcard,
             source,
             three_a_read(),
@@ -4321,8 +4304,8 @@ async fn a_withheld_voucher_is_admitted_through_a_divided_window() {
         .read_voucher_window(
             &identity,
             identity.display_name(),
-            "20260801",
-            "20260802",
+            &tally_date("20260801"),
+            &tally_date("20260802"),
             VoucherReadShape::EntryWildcard,
             WindowPlanSource::Counted(census),
             three_a_read(),
@@ -4833,8 +4816,8 @@ async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
         "similar_ledgers": [], "similar_ledgers_total": 0});
     let key = VoucherPageKey::new(
         &identity(),
-        "20260801",
-        "20260831",
+        &tally_date("20260801"),
+        &tally_date("20260831"),
         Some("cash"),
         None,
         None,
@@ -4869,7 +4852,14 @@ async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
 fn a_held_window_is_found_by_its_own_question_only() {
     let identity = identity();
     let key = |ledger: Option<&str>, selector: Option<&VoucherTypeSelector>| {
-        VoucherPageKey::new(&identity, "20260801", "20260831", ledger, selector, None)
+        VoucherPageKey::new(
+            &identity,
+            &tally_date("20260801"),
+            &tally_date("20260831"),
+            ledger,
+            selector,
+            None,
+        )
     };
     let held = |key: VoucherPageKey| {
         Arc::new(VoucherPageSnapshot::new(
@@ -4989,27 +4979,57 @@ async fn an_expired_or_oversized_window_is_not_held() {
 #[test]
 fn a_held_window_answers_one_question_only() {
     let identity = identity();
-    let base = || VoucherPageKey::new(&identity, "20260801", "20260831", None, None, None);
+    let base = || {
+        VoucherPageKey::new(
+            &identity,
+            &tally_date("20260801"),
+            &tally_date("20260831"),
+            None,
+            None,
+            None,
+        )
+    };
     assert_eq!(base(), base());
     assert_ne!(
         base(),
-        VoucherPageKey::new(&identity, "20260802", "20260831", None, None, None)
+        VoucherPageKey::new(
+            &identity,
+            &tally_date("20260802"),
+            &tally_date("20260831"),
+            None,
+            None,
+            None
+        )
     );
     assert_ne!(
         base(),
-        VoucherPageKey::new(&identity, "20260801", "20260830", None, None, None)
+        VoucherPageKey::new(
+            &identity,
+            &tally_date("20260801"),
+            &tally_date("20260830"),
+            None,
+            None,
+            None
+        )
     );
     assert_ne!(
         base(),
-        VoucherPageKey::new(&identity, "20260801", "20260831", Some("Cash"), None, None)
+        VoucherPageKey::new(
+            &identity,
+            &tally_date("20260801"),
+            &tally_date("20260831"),
+            Some("Cash"),
+            None,
+            None
+        )
     );
     let sales = VoucherTypeSelector::Name("Sales".to_string());
     let purchase = VoucherTypeSelector::Name("Purchase".to_string());
     let keyed = |selector| {
         VoucherPageKey::new(
             &identity,
-            "20260801",
-            "20260831",
+            &tally_date("20260801"),
+            &tally_date("20260831"),
             None,
             Some(selector),
             None,
@@ -5021,8 +5041,8 @@ fn a_held_window_answers_one_question_only() {
         let search = VoucherSearch::from_args(&args, Redaction::None).unwrap();
         VoucherPageKey::new(
             &identity,
-            "20260801",
-            "20260831",
+            &tally_date("20260801"),
+            &tally_date("20260831"),
             None,
             None,
             search.as_ref(),
@@ -5060,8 +5080,8 @@ async fn the_desktop_adapter_never_holds_a_window() {
             initial_evidence: Some(evidence),
             ..VoucherOperationScope::desktop(
                 GUID.to_string(),
-                "20260801".to_string(),
-                "20260831".to_string(),
+                tally_date("20260801"),
+                tally_date("20260831"),
                 company,
                 identity,
             )
@@ -5678,8 +5698,8 @@ async fn a_held_ledger_window_summarises_only_that_ledgers_entries_by_month() {
     let one = OneServer::spawn(plans);
     let key = VoucherPageKey::new(
         &identity(),
-        "20260801",
-        "20260831",
+        &tally_date("20260801"),
+        &tally_date("20260831"),
         Some("WR2 Sales"),
         None,
         None,

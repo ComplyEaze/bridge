@@ -792,8 +792,7 @@ pub(super) async fn lab_read_inventory(
 ) -> Result<ToolOutcome, ToolFailure> {
     let guid = required_string(args, "company_guid")?;
     let date = |key| -> Result<bridge_tally_core::TallyDate, ToolFailure> {
-        bridge_tally_core::TallyDate::parse(normalized_date(required_string(args, key)?)?)
-            .map_err(|_| "invalid_date".to_string().into())
+        Ok(normalized_date(required_string(args, key)?)?)
     };
     let (from, to) = (date("from")?, date("to")?);
     if from > to {

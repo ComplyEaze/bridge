@@ -167,7 +167,8 @@ fn local_disk_path(args: &Value, key: &str) -> Result<LocalDiskPath, String> {
 fn window_date(args: &Value, key: &str) -> Result<Option<Date>, String> {
     optional_string(args, key)?
         .map(|text| {
-            let compact = normalized_date(&text)?;
+            let date = normalized_date(&text)?;
+            let compact = date.as_str();
             Date::parse_iso(&format!(
                 "{}-{}-{}",
                 &compact[..4],

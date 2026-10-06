@@ -2238,8 +2238,8 @@ pub(crate) async fn desktop_selected_vouchers(
         &server,
         &json!({
             "company_guid": company_guid,
-            "from": normalized_from,
-            "to": normalized_to,
+            "from": normalized_from.as_str(),
+            "to": normalized_to.as_str(),
             "ledger": ledger,
             "offset": offset,
             "limit": limit,
@@ -2296,7 +2296,10 @@ fn page_is_truncated(total: usize, offset: usize, page_len: usize) -> bool {
     offset.saturating_add(page_len) < total
 }
 
-fn ensure_movement_window_within_books(from: &str, books_from: &str) -> Result<(), String> {
+fn ensure_movement_window_within_books(
+    from: &bridge_tally_core::TallyDate,
+    books_from: &bridge_tally_core::TallyDate,
+) -> Result<(), String> {
     (from >= books_from)
         .then_some(())
         .ok_or_else(|| "window_precedes_books_from".to_string())
@@ -2530,25 +2533,22 @@ fn row_in_window(row: &Value, from: &str, to: &str) -> bool {
         .is_some_and(|date| date >= from && date <= to)
 }
 
-fn widened_window(from: &str, to: &str) -> Result<(String, String), String> {
-    let date = |value: &str| {
-        bridge_tally_core::TallyDate::parse(value).map_err(|_| "invalid_date".to_string())
-    };
+fn widened_window(
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
+) -> Result<(bridge_tally_core::TallyDate, bridge_tally_core::TallyDate), String> {
     // A window at either end of the calendar has no day beyond it to read. It
     // is refused by `TallyDate`'s own code (`tally_date_overflow`,
     // `tally_date_underflow`) rather than sent on as a date that is not eight
     // digits (#861).
     let step = |stepped: Result<bridge_tally_core::TallyDate, bridge_tally_core::TallyError>| {
         match stepped {
-            Ok(date) => Ok(date.as_str().to_string()),
+            Ok(date) => Ok(date),
             Err(bridge_tally_core::TallyError::InvalidData { code }) => Err(code),
             Err(_) => Err("invalid_date".to_string()),
         }
     };
-    Ok((
-        step(date(from)?.previous_day())?,
-        step(date(to)?.next_day())?,
-    ))
+    Ok((step(from.previous_day())?, step(to.next_day())?))
 }
 
 /// Tally is local to the Bridge host; accounting-day defaults therefore use
@@ -2645,10 +2645,11 @@ fn arg_positive_usize(args: &Value, key: &str, default: usize) -> Result<usize, 
         .then_some(value)
         .ok_or_else(|| "pagination_invalid".to_string())
 }
-fn normalized_date(value: &str) -> Result<String, String> {
-    let value = value.replace('-', "");
-    bridge_tally_core::TallyDate::parse(value.clone()).map_err(|_| "invalid_date".to_string())?;
-    Ok(value)
+/// A tool's date argument, parsed once at the boundary: every `-` is dropped, and
+/// the rest must be a valid `YYYYMMDD` date.
+fn normalized_date(value: &str) -> Result<bridge_tally_core::TallyDate, String> {
+    bridge_tally_core::TallyDate::parse(value.replace('-', ""))
+        .map_err(|_| "invalid_date".to_string())
 }
 
 fn add_decimal(left: &str, right: &str) -> Result<String, String> {

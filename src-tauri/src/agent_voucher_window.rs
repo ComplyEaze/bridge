@@ -173,6 +173,14 @@ impl AlterIdSpan {
     }
 }
 
+/// A window date that reaches this layer as text from a read or a stored
+/// record, not from a tool argument (whose date [`normalized_date`] parses):
+/// parsed once, by the caller, and carried as a [`TallyDate`] into every
+/// request rendered from it (#861).
+pub(super) fn parse_window_date(value: &str) -> Result<TallyDate, ToolFailure> {
+    TallyDate::parse(value).map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
+}
+
 /// One request of a divided window: a date range, and for a part of one day, the
 /// AlterID span of that day it covers.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1111,12 +1119,6 @@ fn fold_evidence(target: &mut Option<Evidence>, next: Evidence) {
 /// `TallyDate::next_day` refuses the same overflow with.
 const TALLY_DATE_OVERFLOW: &str = "tally_date_overflow";
 
-/// A window's date as it enters this layer: parsed once, here, and carried as
-/// a [`TallyDate`] into every request rendered from it (#861).
-fn parse_window_date(value: &str) -> Result<TallyDate, ToolFailure> {
-    TallyDate::parse(value).map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
-}
-
 /// A date as a planning day. A [`TallyDate`] is a valid Gregorian date in years
 /// 1 to 9999, all inside `NaiveDate`'s range, so this does not fail; it keeps
 /// the typed refusal rather than a panic should that ever change.
@@ -1307,8 +1309,8 @@ impl<'a> AuditWindowReader<'a> {
         self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
-        from: &str,
-        to: &str,
+        from: &TallyDate,
+        to: &TallyDate,
         shape: VoucherReadShape,
         limits: WindowReadLimits,
         parse: P,
@@ -1522,8 +1524,8 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
-        from: &str,
-        to: &str,
+        from: &TallyDate,
+        to: &TallyDate,
         shape: VoucherReadShape,
         source: WindowPlanSource,
         limits: WindowReadLimits,
@@ -1575,8 +1577,8 @@ pub(super) async fn read_voucher_window_with<R, T, P>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
     shape: VoucherReadShape,
     source: WindowPlanSource,
     limits: WindowReadLimits,
@@ -1593,10 +1595,9 @@ where
     {
         return Err(AUDIT_WINDOW_NEEDS_ITS_OWN_MARKS.to_string().into());
     }
-    let (from, to) = (parse_window_date(from)?, parse_window_date(to)?);
-    let timed = TimedReader::new(reader, &from, &to);
+    let timed = TimedReader::new(reader, from, to);
     let read = read_voucher_window_timed(
-        &timed, identity, company, &from, &to, shape, source, limits, parse,
+        &timed, identity, company, from, to, shape, source, limits, parse,
     )
     .await;
     let timings = timed.into_timings();

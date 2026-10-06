@@ -6,9 +6,6 @@ impl Server {
         let guid = required_string(args, "company_guid")?;
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
-        let from =
-            bridge_tally_core::TallyDate::parse(from).map_err(|_| "invalid_date".to_string())?;
-        let to = bridge_tally_core::TallyDate::parse(to).map_err(|_| "invalid_date".to_string())?;
         let period = crate::tally::runtime::TrialBalancePeriod::new(from.clone(), to.clone())
             .map_err(|_| "invalid_date_range".to_string())?;
         let (company, identity, mut prior) = self.verified_company(guid).await?;

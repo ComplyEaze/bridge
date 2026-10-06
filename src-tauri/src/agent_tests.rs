@@ -8,6 +8,11 @@ use tally_protocol_simulator::{
 };
 use tokio::io::AsyncReadExt;
 
+/// A date as `normalized_date` returns it.
+fn day(text: &str) -> bridge_tally_core::TallyDate {
+    bridge_tally_core::TallyDate::parse(text).unwrap()
+}
+
 pub(super) fn company_collection_xml() -> String {
     "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME=\"BRIDGE SYNTHETIC BOOK\"><GUID>00000000-0000-4000-8000-000000000001</GUID><COMPANYNUMBER>1</COMPANYNUMBER><BOOKSFROM>20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>".to_string()
 }
@@ -1451,11 +1456,11 @@ fn ledger_masters_evidence_changes_when_a_ledger_response_changes() {
 #[test]
 fn ledger_movement_rejects_a_window_before_the_observed_books_from() {
     assert_eq!(
-        ensure_movement_window_within_books("20260331", "20260401"),
+        ensure_movement_window_within_books(&day("20260331"), &day("20260401")),
         Err("window_precedes_books_from".to_string())
     );
     assert_eq!(
-        ensure_movement_window_within_books("20260401", "20260401"),
+        ensure_movement_window_within_books(&day("20260401"), &day("20260401")),
         Ok(())
     );
 }
@@ -2037,8 +2042,8 @@ fn voucher_window_rejects_out_of_range_rows_and_requires_a_wider_empty_check() {
     ));
     assert!(window_honoured(&[], "20260901", "20260902"));
     assert_eq!(
-        widened_window("20260901", "20260902"),
-        Ok(("20260831".to_string(), "20260903".to_string()))
+        widened_window(&day("20260901"), &day("20260902")),
+        Ok((day("20260831"), day("20260903")))
     );
 }
 
@@ -2048,21 +2053,41 @@ fn voucher_window_rejects_out_of_range_rows_and_requires_a_wider_empty_check() {
 #[test]
 fn widening_a_window_at_the_calendar_edge_is_refused_by_its_typed_code() {
     assert_eq!(
-        widened_window("20260901", "99991231"),
+        widened_window(&day("20260901"), &day("99991231")),
         Err("tally_date_overflow".to_string())
     );
     assert_eq!(
-        widened_window("00010101", "20260902"),
+        widened_window(&day("00010101"), &day("20260902")),
         Err("tally_date_underflow".to_string())
     );
     assert_eq!(
-        widened_window("2026-09-01", "20260902"),
-        Err("invalid_date".to_string())
+        widened_window(&day("99991230"), &day("99991230")),
+        Ok((day("99991229"), day("99991231")))
     );
-    assert_eq!(
-        widened_window("99991230", "99991230"),
-        Ok(("99991229".to_string(), "99991231".to_string()))
-    );
+}
+
+/// A tool's date is parsed once, at the boundary, by `normalized_date`: a date
+/// no `YYYYMMDD` can name is refused there by its typed code, so no window
+/// below it can hold one (#1245; formerly asserted where the window was read).
+#[test]
+fn a_tool_date_that_is_not_a_tally_date_is_refused_at_the_boundary() {
+    for text in [
+        "20261301",
+        "20260229",
+        "2026-13-01",
+        "2026090",
+        "",
+        "2026-09-0x",
+    ] {
+        assert_eq!(
+            normalized_date(text),
+            Err("invalid_date".to_string()),
+            "{text:?}"
+        );
+    }
+    // Every `-` is dropped before parsing, as before #1245.
+    assert_eq!(normalized_date("2026-09-01"), Ok(day("20260901")));
+    assert_eq!(normalized_date("20240229"), Ok(day("20240229")));
 }
 
 #[test]

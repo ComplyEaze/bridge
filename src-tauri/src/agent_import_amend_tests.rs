@@ -598,7 +598,7 @@ fn seed_original(server: &Server) {
 fn seed_original_as(server: &Server, status: &str, txn_ids: [&str; 2]) -> ImportLedgerLine {
     let mut vouchers = captured_catalogue_payload().vouchers;
     for (voucher, txn_id) in vouchers.iter_mut().zip(txn_ids) {
-        voucher.date = normalized_date(&voucher.date).unwrap();
+        voucher.date = normalized_date(&voucher.date).unwrap().as_str().to_string();
         voucher.bridge_txn_id = txn_id.into();
     }
     let line: ImportLedgerLine = serde_json::from_value(json!({

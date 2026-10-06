@@ -18,6 +18,17 @@ These changes are in source and not yet in a published build.
 
 **New**
 
+- `vouchers` and the `outstandings` party detail now reach a ledger by either
+  spelling of its name when Tally's own name for it differs in case or symbols from the
+  spelling its vouchers carry (26 of 4,017 ledgers in a separate census of 13 books,
+  not reproducible from this repository), and `ledger_match` shows Tally's own name,
+  with `ledger_row_spelling` when the vouchers spell it differently. A spelling
+  that is two ledgers' is refused as `ledger_ambiguous`. The voucher filter and the
+  trail still use the spelling the vouchers carry; `ledger_movement` and imports are
+  unchanged. Not measured: that Tally accepts the voucher-row spelling when it
+  differs from the ledger's own name, what a voucher row carries for such a ledger
+  on a book other than the one measured, and what the outstandings report that the
+  trail reads carries for it; that the first name list is the primary language (#1085).
 - `cash_flow` reads Tally's own Cash Flow for whole months (the month-wise
   movement of the cash and bank ledgers, not a cash flow statement under AS 3). The
   months are returned only after their net total has been compared with the

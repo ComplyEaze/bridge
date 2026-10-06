@@ -1109,6 +1109,46 @@ async fn a_ledger_filter_says_which_ledger_it_read_and_how() {
     }
 }
 
+/// #1085: a ledger whose stored name differs from the spelling its voucher rows
+/// carry is reached by either, and the answer names it by the stored name. The
+/// window is still filtered by the row spelling: filtering by the stored name
+/// would read the ledger as having no voucher. The catalogue is hand-edited from
+/// a capture and the voucher rows carry the row spelling by construction, so this
+/// shows the wiring, not what Tally's voucher rows carry for such a ledger (not
+/// measured). Mutant killed: the row filter compared with the stored name, or the
+/// answer naming the row spelling or leaving it out.
+#[tokio::test]
+async fn a_ledger_filter_reaches_a_ledger_by_its_stored_name_or_its_row_spelling() {
+    for requested in ["Cafe Traders", "Café Naïve Traders"] {
+        let response = call_filtered_vouchers(
+            |catalogue| {
+                catalogue.replace(
+                    "<NAME>Café Naïve Traders</NAME>",
+                    "<NAME>Cafe Traders</NAME>",
+                )
+            },
+            requested,
+        )
+        .await;
+        assert_eq!(response["isError"], false, "{requested}: {response}");
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(result["total"], 1, "{requested}: {result}");
+        let ledger_match = &result["ledger_match"];
+        assert_eq!(
+            ledger_match["matched"], "exact",
+            "{requested}: {ledger_match}"
+        );
+        assert_eq!(
+            ledger_match["ledger"], "Cafe Traders",
+            "{requested}: {ledger_match}"
+        );
+        assert_eq!(
+            ledger_match["ledger_row_spelling"], "Café Naïve Traders",
+            "{requested}: {ledger_match}"
+        );
+    }
+}
+
 // -- #1230: a summary over the selectors the tool already had --
 
 /// A summary of a window narrowed to one ledger adds only that ledger's entries by month, and

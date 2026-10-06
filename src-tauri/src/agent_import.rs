@@ -1660,13 +1660,39 @@ impl Server {
         Ok(())
     }
 
-    /// The V1 ledger catalogue, for every read outside the import family
-    /// (presence, vouchers, the bill trail).
+    /// The V1 ledger catalogue, for the reads outside the import family that
+    /// need row spellings alone (presence, the drift re-read after a voucher
+    /// window); `read_resolvable_ledgers` serves the tools that resolve a name.
     pub(super) async fn read_ledger_catalogue(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
     ) -> Result<(Vec<String>, Evidence), ToolFailure> {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        Ok((catalogue.names().map(str::to_string).collect(), evidence))
+    }
+
+    /// The catalogue's ledgers as a request can reach them, for the tools that
+    /// resolve a typed ledger name (#1085). The same V1 read as
+    /// `read_ledger_catalogue`, which keeps the row spellings alone.
+    pub(super) async fn read_resolvable_ledgers(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(Vec<super::ledger_candidates::CatalogueLedger>, Evidence), ToolFailure> {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        let ledgers = catalogue
+            .spellings()
+            .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
+            .collect();
+        Ok((ledgers, evidence))
+    }
+
+    async fn read_v1_catalogue(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(bridge_tally_protocol::StandardLedgerCatalog, Evidence), ToolFailure> {
         let read = standard_ledger_catalog_read(company_name)
             .map_err(|_| "company_name_invalid".to_string())?;
         admit_standard_ledger_catalog_request(read.as_str().to_string())
@@ -1675,7 +1701,7 @@ impl Server {
         let catalogue =
             parse_standard_ledger_catalog_response(&xml, company_name, identity.company_guid())
                 .map_err(|error| catalogue_failure(error, &evidence))?;
-        Ok((catalogue.names().map(str::to_string).collect(), evidence))
+        Ok((catalogue, evidence))
     }
 
     /// The import family's ledger catalogue: V1's rows, each with its

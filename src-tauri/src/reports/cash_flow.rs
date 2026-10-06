@@ -209,14 +209,10 @@ pub(crate) fn check_cash_flow(
     if tally_observed == 0 && ledger_observed == 0 {
         return Ok(CashFlowCheck::NothingToCompare);
     }
-    // A tie needs an amount on both sides and a ledger to tie with: an empty side
-    // is not a zero, and months that net to zero over no cash or bank ledger at
-    // all are Tally printing figures nothing accounts for.
-    if tally_observed > 0
-        && ledger_observed > 0
-        && money_ledgers > 0
-        && tally_net.numeric_eq(&ledger_net)
-    {
+    // A tie needs an amount on both sides: an empty side is not a zero, and months
+    // that net to zero over no cash or bank ledger at all (no ledger amount) are
+    // Tally printing figures nothing accounts for.
+    if tally_observed > 0 && ledger_observed > 0 && tally_net.numeric_eq(&ledger_net) {
         Ok(CashFlowCheck::Tied {
             net: tally_net,
             money_ledgers,

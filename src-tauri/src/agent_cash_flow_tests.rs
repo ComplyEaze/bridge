@@ -278,6 +278,27 @@ async fn a_cash_flow_with_no_amount_against_ledgers_with_one_shows_that_side_as_
 }
 
 #[tokio::test]
+async fn ledgers_with_no_cash_or_bank_amount_against_a_cash_flow_with_one_show_that_side_as_null() {
+    // synthetic: the cash ledger moved under Sundry Debtors, so no cash or bank ledger carries an amount.
+    let (response, sent, expected) = call(
+        plans_with("-4950.00", cash_under("Sundry Debtors")),
+        "2026-04-01",
+        "2026-06-30",
+    )
+    .await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["state"], "not_established", "{result}");
+    assert_eq!(result["reason"], "cash_flow_differs_from_trial_balance");
+    let net = &result["net_total"];
+    assert_eq!(net["tally_cash_flow_months_added"], "-4950.00");
+    assert!(
+        net["trial_balance_cash_and_bank_ledgers"].is_null(),
+        "{net}"
+    );
+}
+
+#[tokio::test]
 async fn a_bank_od_ledger_with_movement_refuses_the_result_and_says_why() {
     // synthetic: the cash ledger moved under Bank OD A/c, so it carries movement there.
     let (response, sent, expected) = call(

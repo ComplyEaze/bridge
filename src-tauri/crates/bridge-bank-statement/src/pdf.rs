@@ -272,7 +272,7 @@ fn require_readable_text(pages: &[Page]) -> Result<(), Refusal> {
     }
     Err(Refusal::new(
         "no_readable_text",
-        "the PDF has no readable text with figures in it: it is a scan, a printed copy or an image",
+        "no figures could be read from the PDF: a scan, a printed copy or an image has none",
     ))
 }
 

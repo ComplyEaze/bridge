@@ -515,8 +515,8 @@ pub(super) enum CashFlowOutcome {
     /// A Bank OD A/c or Bank OCC A/c ledger has movement in the period, and
     /// whether Tally's Cash Flow counts it is not measured.
     MoneyGroupUnmeasured,
-    /// No cash or bank ledger in the trial balance and an empty Cash Flow:
-    /// nothing was compared.
+    /// No amount on either side (no cash or bank ledger with an amount, and an
+    /// empty Cash Flow): nothing was compared.
     NothingToCompare,
 }
 
@@ -563,7 +563,7 @@ impl CashFlowBasis {
                 "Not established: the {subject}. A ledger under Bank OD A/c or Bank OCC A/c has movement in the period, and whether Tally's Cash Flow counts such a ledger has not been measured, so the months are withheld. Tell the user that cash flow for this period has to be read in Tally."
             ),
             CashFlowOutcome::NothingToCompare => format!(
-                "Not established: the {subject}. The trial balance holds no ledger under Cash-in-Hand or Bank Accounts to compare Tally's Cash Flow with, so nothing was checked and the months are withheld. Tell the user that this book keeps no cash or bank ledger ComplyEaze Bridge can check, and that cash flow for this period has to be read in Tally."
+                "Not established: the {subject}. Neither the trial balance's cash and bank ledgers (Cash-in-Hand and Bank Accounts) nor Tally's Cash Flow carry any amount for the period, so nothing was checked and the months are withheld. An empty month is not a zero. Tell the user that cash flow for this period has to be read in Tally."
             ),
         };
         Headline {

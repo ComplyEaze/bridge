@@ -64,8 +64,10 @@ pub(crate) enum CashFlowCheck {
     /// A ledger under Bank OD A/c or Bank OCC A/c has movement in the window,
     /// and whether Tally's Cash Flow counts it is not measured.
     MoneyGroupUnmeasured { ledgers: usize },
-    /// The trial balance holds no ledger under Cash-in-Hand or Bank Accounts and
-    /// Tally's Cash Flow is empty: both sides are zero, and nothing was compared.
+    /// Neither side carries an amount: the trial balance has no ledger under
+    /// Cash-in-Hand or Bank Accounts, or none of them has an amount, and every
+    /// month of Tally's Cash Flow is empty. An empty amount is not zero (§7), so
+    /// nothing was compared.
     NothingToCompare,
 }
 
@@ -76,7 +78,7 @@ impl CashFlowCheck {
             Self::Tied { .. } => None,
             Self::Differs { .. } => Some("cash_flow_differs_from_trial_balance"),
             Self::MoneyGroupUnmeasured { .. } => Some("cash_flow_money_group_unmeasured"),
-            Self::NothingToCompare => Some("cash_flow_no_money_ledger"),
+            Self::NothingToCompare => Some("cash_flow_nothing_to_compare"),
         }
     }
 }
@@ -108,12 +110,15 @@ fn decimals(text: &str) -> usize {
         .map_or(0, |(_, fraction)| fraction.len())
 }
 
-/// Adds `value` to `sum`, keeping the most decimals any term carried.
+/// Adds `value` to `sum`, keeping the most decimals any term carried and
+/// counting the amount as observed.
 fn add(
     sum: &mut ExactDecimal,
     scale: &mut usize,
+    observed: &mut usize,
     value: &ExactDecimal,
 ) -> Result<(), CashFlowCheckError> {
+    *observed += 1;
     *scale = (*scale).max(decimals(value.as_str()));
     *sum = sum
         .checked_add(value)
@@ -144,6 +149,8 @@ pub(crate) fn check_cash_flow(
     let index = GroupIndex::build(groups.iter().cloned());
     let mut ledger_net = ExactDecimal::zero();
     let mut scale = 0_usize;
+    // Amounts that were present on either side; empty ones are not counted.
+    let mut observed = 0_usize;
     let mut money_ledgers = 0_usize;
     let mut unmeasured = 0_usize;
     let mut unclassified_with_movement = 0_usize;
@@ -153,7 +160,7 @@ pub(crate) fn check_cash_flow(
                 money_ledgers += 1;
                 for amount in [&row.debit, &row.credit] {
                     if let NativeTrialBalanceAmount::Present(value) = amount {
-                        add(&mut ledger_net, &mut scale, value)?;
+                        add(&mut ledger_net, &mut scale, &mut observed, value)?;
                     }
                 }
             }
@@ -178,16 +185,18 @@ pub(crate) fn check_cash_flow(
     let mut tally_net = ExactDecimal::zero();
     for row in &cash_flow.rows {
         if let NativeStatementAmount::Present(value) = &row.closing {
-            add(&mut tally_net, &mut scale, value)?;
+            add(&mut tally_net, &mut scale, &mut observed, value)?;
         }
     }
     let tally_net = at_scale(tally_net, scale)?;
     let ledger_net = at_scale(ledger_net, scale)?;
-    // Two zeros over no ledger at all agree about nothing: it is not a tie.
-    if money_ledgers == 0 && tally_net.is_zero() {
+    // Two sides with no amount at all agree about nothing: it is not a tie.
+    if observed == 0 {
         return Ok(CashFlowCheck::NothingToCompare);
     }
-    if tally_net.numeric_eq(&ledger_net) {
+    // A tie needs a ledger to tie with: months that net to zero over no cash or
+    // bank ledger at all are Tally printing figures nothing accounts for.
+    if money_ledgers > 0 && tally_net.numeric_eq(&ledger_net) {
         Ok(CashFlowCheck::Tied {
             net: tally_net,
             money_ledgers,

@@ -419,9 +419,11 @@ The top-level `state` is `observed` when the months are returned and
 - `cash_flow_money_group_unmeasured`: a ledger under Bank OD A/c or Bank OCC A/c
   has movement in the window, and whether Tally's Cash Flow counts such a ledger
   has not been measured. `months` is `null`.
-- `cash_flow_no_money_ledger`: the trial balance holds no ledger under Cash-in-Hand
-  or Bank Accounts and Tally's Cash Flow is empty, so nothing was compared. `months`
-  is `null`.
+- `cash_flow_nothing_to_compare`: neither the cash and bank ledgers of the trial
+  balance nor Tally's Cash Flow carry an amount for the window (no such ledger, or
+  none with an amount, and every month empty), so nothing was compared. An empty
+  amount is not a zero. `months` is `null`. Months that net to zero over no cash or
+  bank ledger at all are `cash_flow_differs_from_trial_balance`, not a tie.
 
 `checks` says per field what was `checked`, `differs` (compared, and the figures
 disagree), `not_checked` or `withheld`: the net total is checked; the split into months is Tally's own and is not checked (a total
@@ -438,10 +440,17 @@ answer: on licensed 7.1 an unknown name is answered in band (`STATUS` 0 with a
 `cash_flow_empty_envelope` and `cash_flow_months_unexpected`. A change between the
 two paired Cash Flow reads is `native_cash_flow_changed`.
 
+The refusals above reach the caller as an `isError` result whose `error.code` is
+`cash_flow_read_failed` and whose `error.cause` is the code named (the window codes
+are the `error.code` itself).
+
 The tool itself has not yet been run against Tally. Tally's Cash Flow answers were captured
 with a lab script on one synthetic company on licensed TallyPrime 7.1 (inflows into one bank
-and one cash ledger only): the net total of three windows tied to the trial balance to
-the paisa. Not measured: an outflow, a contra, a Bank OD A/c ledger, a month with
+and one cash ledger only): the sum of the months' debits tied to the trial balance's debit
+totals for the same window to the paisa, on three windows. Those trial balance figures were
+read at the time and are not kept as committed bytes; the check the tool applies (the months'
+closing figures against debit plus credit) was equal to that on all three captures only because
+the credit column was empty. Not measured: an outflow, a contra, a Bank OD A/c ledger, a month with
 both an inflow and an outflow, a book with several currencies, and a large book.
 
 ### Stock Summary

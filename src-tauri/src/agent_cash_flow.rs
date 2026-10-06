@@ -82,7 +82,7 @@ impl Server {
                 headline::CashFlowOutcome::NothingToCompare,
                 json!({
                     "state": "not_checked",
-                    "reason": "no_cash_or_bank_ledger_in_the_trial_balance",
+                    "reason": "no_cash_or_bank_amount_on_either_side",
                 }),
             ),
         };
@@ -111,7 +111,7 @@ impl Server {
         } else {
             "observed"
         };
-        let basis_name = if matches!(read.check, CashFlowCheck::Tied { .. }) {
+        let basis_name = if !basis.months_withheld() {
             "tally_native_cash_flow_checked_against_trial_balance"
         } else {
             "tally_native_cash_flow_withheld"

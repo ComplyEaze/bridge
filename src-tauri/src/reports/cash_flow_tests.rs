@@ -306,10 +306,38 @@ fn a_book_with_no_cash_or_bank_ledger_and_a_cash_flow_with_a_figure_differs() {
 }
 
 #[test]
-fn money_ledgers_with_no_movement_and_an_empty_cash_flow_tie_at_zero() {
-    // A checked "no movement": both sides were compared and both are empty.
+fn money_ledgers_with_only_empty_amounts_and_an_empty_cash_flow_have_nothing_to_compare() {
+    // An empty amount is not zero: no amount on either side is no comparison.
     let rows = vec![row("Cash", "Cash-in-Hand", "", "")];
-    assert_tied(&check(rows, &typed_cash_flow("")), "0", 1);
+    assert_eq!(
+        check(rows, &typed_cash_flow("")),
+        CashFlowCheck::NothingToCompare
+    );
+}
+
+#[test]
+fn a_ledger_that_prints_zero_and_an_empty_cash_flow_tie_at_zero() {
+    // A printed zero is an amount: both sides were read, and they agree.
+    let rows = vec![row("Cash", "Cash-in-Hand", "0.00", "")];
+    assert_tied(&check(rows, &typed_cash_flow("")), "0.00", 1);
+}
+
+#[test]
+fn months_that_net_to_zero_over_no_money_ledger_are_not_a_tie() {
+    // synthetic: -100.00 and 100.00 add up to zero, and there is no ledger to tie with.
+    let rows = vec![row("A Debtor", "Sundry Debtors", "-10.00", "")];
+    let mut cash_flow = typed_cash_flow("-100.00");
+    let mut october = cash_flow.rows[0].clone();
+    october.month.month = 10;
+    october.closing =
+        bridge_tally_protocol::native_statement_reports::NativeStatementAmount::Present(decimal(
+            "100.00",
+        ));
+    cash_flow.rows.push(october);
+    match check(rows, &cash_flow) {
+        CashFlowCheck::Differs { money_ledgers, .. } => assert_eq!(money_ledgers, 0),
+        other => panic!("expected a difference, got {other:?}"),
+    }
 }
 
 #[test]
@@ -339,7 +367,7 @@ fn the_refusal_codes_are_stable_and_distinct() {
     );
     assert_eq!(
         CashFlowCheck::NothingToCompare.refusal_code(),
-        Some("cash_flow_no_money_ledger")
+        Some("cash_flow_nothing_to_compare")
     );
     let tied = CashFlowCheck::Tied {
         net: decimal("0"),

@@ -303,7 +303,7 @@ async fn a_book_with_no_cash_or_bank_ledger_and_an_empty_cash_flow_is_not_called
     let result = result(&response);
     assert_eq!(sent, expected);
     assert_eq!(result["state"], "not_established", "{result}");
-    assert_eq!(result["reason"], "cash_flow_no_money_ledger");
+    assert_eq!(result["reason"], "cash_flow_nothing_to_compare");
     assert!(result["months"].is_null(), "{result}");
     assert_eq!(result["net_total"]["state"], "not_checked");
     assert_eq!(result["checks"]["net_total"], "not_checked");

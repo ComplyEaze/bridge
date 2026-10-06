@@ -528,6 +528,134 @@ fn a_failure_signal_inside_a_row_beats_the_row() {
     );
 }
 
+fn invalid_response(code: &'static str) -> Result<NativeCashFlow, NativeCashFlowError> {
+    Err(NativeCashFlowError::InvalidResponse(code))
+}
+
+#[test]
+fn a_root_that_is_not_an_envelope_is_refused_whether_it_is_empty_or_not() {
+    for xml in ["<REPORT/>", "<REPORT></REPORT>"] {
+        assert_eq!(
+            parse_year(xml),
+            invalid_response("cash_flow_root_not_envelope")
+        );
+    }
+}
+
+#[test]
+fn an_unexpected_self_closed_element_is_refused() {
+    assert_eq!(
+        parse_year("<ENVELOPE><DSPEXTRA/></ENVELOPE>"),
+        invalid_response("cash_flow_unexpected_empty_element")
+    );
+}
+
+#[test]
+fn cdata_and_a_doctype_are_not_content_of_a_report() {
+    for xml in [
+        "<ENVELOPE><![CDATA[x]]></ENVELOPE>",
+        "<ENVELOPE><!DOCTYPE x></ENVELOPE>",
+    ] {
+        assert_eq!(
+            parse_year(xml),
+            invalid_response("cash_flow_unexpected_content")
+        );
+    }
+}
+
+#[test]
+fn text_or_an_unknown_element_where_a_column_belongs_is_refused() {
+    let in_row = mutate(
+        &year(),
+        "<DSPDRAMT><DSPDRAMTA>-3864.02</DSPDRAMTA></DSPDRAMT>",
+        "stray",
+    );
+    assert_eq!(parse_year(&in_row), invalid_response("cash_flow_row_shape"));
+    let in_column = mutate(
+        &year(),
+        "<DSPDRAMT><DSPDRAMTA>-3864.02</DSPDRAMTA></DSPDRAMT>",
+        "<DSPDRAMT>stray</DSPDRAMT>",
+    );
+    assert_eq!(
+        parse_year(&in_column),
+        invalid_response("cash_flow_column_shape")
+    );
+    // A failure signal is looked for between columns, not inside one: here the
+    // column is refused for its shape.
+    let signal_in_column = mutate(
+        &year(),
+        "<DSPDRAMT><DSPDRAMTA>-3864.02</DSPDRAMTA></DSPDRAMT>",
+        "<DSPDRAMT><LINEERROR>x</LINEERROR></DSPDRAMT>",
+    );
+    assert_eq!(
+        parse_year(&signal_in_column),
+        invalid_response("cash_flow_column_shape")
+    );
+}
+
+#[test]
+fn a_column_without_its_amount_element_is_refused_and_a_self_closed_amount_is_empty() {
+    let missing = mutate(
+        &year(),
+        "<DSPDRAMT><DSPDRAMTA>-3864.02</DSPDRAMTA></DSPDRAMT>",
+        "<DSPDRAMT></DSPDRAMT>",
+    );
+    assert_eq!(
+        parse_year(&missing),
+        invalid_response("cash_flow_amount_missing")
+    );
+    let self_closed = mutate(
+        &year(),
+        "<DSPDRAMT><DSPDRAMTA>-3864.02</DSPDRAMTA></DSPDRAMT>",
+        "<DSPDRAMT><DSPDRAMTA/></DSPDRAMT>",
+    );
+    let parsed = parse_year(&self_closed).unwrap();
+    assert_eq!(parsed.rows[0].debit, NativeStatementAmount::Empty);
+}
+
+#[test]
+fn swapped_and_repeated_months_are_not_the_windows_months() {
+    for xml in [
+        // April twice, May gone.
+        mutate(
+            &year(),
+            "<DSPPERIOD>May</DSPPERIOD>",
+            "<DSPPERIOD>April</DSPPERIOD>",
+        ),
+        // May and April in each other's place.
+        {
+            let marked = mutate(
+                &year(),
+                "<DSPPERIOD>April</DSPPERIOD>",
+                "<DSPPERIOD>@@</DSPPERIOD>",
+            );
+            marked
+                .replacen(
+                    "<DSPPERIOD>May</DSPPERIOD>",
+                    "<DSPPERIOD>April</DSPPERIOD>",
+                    1,
+                )
+                .replacen("<DSPPERIOD>@@</DSPPERIOD>", "<DSPPERIOD>May</DSPPERIOD>", 1)
+        },
+    ] {
+        assert_eq!(parse_year(&xml), Err(NativeCashFlowError::MonthsUnexpected));
+    }
+}
+
+#[test]
+fn a_response_cut_inside_an_element_is_refused() {
+    let full = mutate(&year(), "", "");
+    let cut = full.find("<DSPDRAMTA>").unwrap() + "<DSPDRAMTA>-38".len();
+    assert!(
+        matches!(
+            parse_year(&full[..cut]),
+            Err(NativeCashFlowError::InvalidResponse(_))
+        ),
+        "{:?}",
+        parse_year(&full[..cut])
+    );
+}
+
 #[test]
 fn a_wrapper_with_no_failure_signal_is_not_read_as_a_report() {
     let xml =

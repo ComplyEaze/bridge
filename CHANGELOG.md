@@ -27,8 +27,12 @@ These changes are in source and not yet in a published build.
   zero from a counted window is a checked zero. A narration phrase is refused
   where narrations are withheld from the assistant. A summary sums post-dated
   vouchers (counted, with the vouchers Tally sent no flag for counted apart) and any
-  non-posting voucher type a book uses, and says so in the result. Not measured
-  against a live book yet (#1230).
+  non-posting voucher type a book uses, and says so in the result. Checked once
+  against a live TallyPrime 7.1 on a synthetic book of 67 vouchers: every bucket
+  equalled the sums over the listed vouchers, the ledger buckets equalled
+  `trial_balance` for the same year, and each search returned what the same
+  criterion selects from the listing; it did not cover a large book, a memorandum,
+  a reversing journal or a voucher withheld for a foreign-currency amount (#1230).
 
 **Safer or fixed**
 

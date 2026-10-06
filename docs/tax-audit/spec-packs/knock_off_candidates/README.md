@@ -536,7 +536,8 @@ with its golden as the other edge books do (parity spec section 7). There is no 
 The reference's side of the edge harness, `parity/edge_golden.py`, is in this repository, but it has
 no runner for this test yet: the runner that produced these goldens extends it and is held by the
 reference's maintainers, outside this pack (HASHES.md says how it calls the test). A porter does not
-write one. The goldens are regenerated only by the reference's maintainers.
+write the generator that makes the goldens, which only the reference's maintainers regenerate; a port
+adds just the registration lines of README section 14, so that its own harness can name the test.
 
 ### 13.1 Re-pin note: names in any alphabet, zero lines and plainer texts (reference commit `742f67fc`)
 
@@ -556,7 +557,7 @@ reproduced all fourteen goldens of the previous pin byte for byte. All fourteen 
   `ko_t2` now lists b12.
 - **The part shown (README section 4.2).** It was the part holding the name's first token, and all
   the parts sat inside one quote, joined by ` | `. It now runs to the part holding the last token,
-  and each is quoted on its own (`ko_nested`'s n17 and n18, `ko_vocab`'s v43).
+  and each text is quoted on its own (`ko_nested`'s n17 and n18, `ko_vocab`'s v43).
 - **Figures.** `ko_t2`: `t2_row_count` 13 (was 10), `t2_named_pair_count` 14 (was 11),
   `t2_candidate_total_paise` 2,880,000 (was 2,760,000); `Café Corner` named in 2 vouchers, ₹1,000
   (was 1, ₹600); `Gamma Supplies` in 5, ₹20,500 (was 4, ₹20,000); a new group for `देव ट्रेडर्स`,
@@ -568,7 +569,7 @@ reproduced all fourteen goldens of the previous pin byte for byte. All fourteen 
 
 ### 13.2 Re-pin note: the reference's fix of two behaviours (reference commit `66e842e7`)
 
-The figures in this note are those of that commit; README section 13.1 gives what changed after it.
+The figures in this section are those of that commit; README section 13.1 gives what changed after it.
 
 An earlier form of this pack documented two reference behaviours as defects. The reference has since
 fixed both, and the goldens were then regenerated from it (reference commit `66e842e7`, Python 3.13, the

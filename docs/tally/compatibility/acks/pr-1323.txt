@@ -1,5 +1,6 @@
 docs/tally/TALLY_PROTOCOL_REFERENCE.md
 docs/tally/TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md
+scripts/ledger-entries-ui.test.mjs
 src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs
 src-tauri/src/agent.rs
 src-tauri/src/agent_catalog.rs

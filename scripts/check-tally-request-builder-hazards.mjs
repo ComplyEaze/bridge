@@ -544,7 +544,9 @@ function moduleFile(file, declaration) {
 }
 
 // Every file reached only through a test-only module declaration, and every
-// file such a file declares in turn.
+// file such a file declares in turn. A file that production code also reaches
+// through an ordinary `mod` is scanned, whatever else declares it (#837): a
+// gate that fails closed never lets a shared file go unscanned.
 function testOnlyFiles(files) {
   const declared = new Map(files.map((file) => [file, moduleDeclarations(readFileSync(file, "utf8"))]));
   const quarantined = new Set();
@@ -567,6 +569,15 @@ function testOnlyFiles(files) {
         quarantined.add(target);
         pending.push(target);
       }
+    }
+  }
+  const production = files.filter((file) => !quarantined.has(file));
+  while (production.length) {
+    const file = production.pop();
+    const declarations = declared.get(file) ?? moduleDeclarations(readFileSync(file, "utf8"));
+    for (const declaration of declarations.filter((d) => !d.test)) {
+      const target = moduleFile(file, declaration);
+      if (target && quarantined.delete(target)) production.push(target);
     }
   }
   return quarantined;

@@ -1,0 +1,86 @@
+# Form 3CD clause 21(a) candidate lister: the words that make a P&L debit a CANDIDATE for one of the clause's items.
+# Data, not code (the clause 21(a) candidate spec, 25-Sep): a CA may add terms per client with
+# [clause21a].extra_terms, never remove these. A term matches as a whole word or phrase, case-insensitive, in the
+# ledger name, the voucher narration or the party field -- except a `ledger_or_narration_terms` word, never read in
+# the party field, and a `qualified_terms` word, which counts only with one of its `qualifiers` in the same ledger
+# name or narration ("new" and "fine" alone listed place names and qualities). A match is a candidate for the CA's
+# question, never a conclusion: capital, personal, penal, club, party, allowability and materiality are the CA's to decide.
+# Each table's `source` line says where its words come from, so the list is auditable, not invented.
+
+[capital]
+source = "ICAI GN on tax audit (2025) ch.33 paras 33.2-33.6; the clause 21(a) candidate spec (repairs/software/computer ledgers, purchase narrations, preliminary expenses)"
+item = "(i) capital expenditure"
+terms = ["purchase of", "installation", "renovation", "construction", "laptop", "air conditioner", "ac",
+         "machine", "machinery", "licence", "license", "software", "computer", "preliminary expenses"]
+# the clause 21(a) candidate spec lists "new" as a narration keyword; in a party's name or address it is a place or a firm
+# ("New Delhi", "New India"), so it is never read there.
+ledger_or_narration_terms = ["new"]
+# Ledgers whose large entries (ledger_scrutiny's threshold) are capital candidates even without a word in the line.
+large_entry_ledger_terms = ["repair", "repairs", "maintenance", "software", "computer", "office expenses"]
+question = "Is any of this capital expenditure debited to P&L (enduring benefit, fixed asset, intangible, preliminary expenses)? Confirm the amount per item, and whether an accounting-standard observation is needed in para 3 of 3CA / para 3(a) of 3CB."
+
+[personal]
+source = "ICAI GN ch.33 paras 33.7-33.8 (personal expenses of the assessee; family travel, driver, household); the clause 21(a) candidate spec"
+item = "(ii) personal expenditure"
+terms = ["school", "tuition", "lic", "life insurance", "household", "grocery", "groceries", "jewellery", "jewelry", "gift",
+         "family", "residence", "personal", "holiday"]
+question = "Which of these are personal expenses of the assessee? Add any not listed (family travel, a driver, household). If records to decide are not kept, select observation 07."
+
+[political_ad]
+source = "ICAI GN ch.33 paras 33.11-33.13 (s.37(2B): advertisement in a political party's souvenir, brochure, tract or pamphlet); the clause 21(a) candidate spec"
+item = "(iii) political-party advertisement"
+terms = ["souvenir", "smarika", "brochure", "pamphlet", "patrika", "tract"]
+question = "Was any of this an advertisement in a souvenir, brochure, tract or pamphlet published by a political party (not a separately registered union)?"
+
+[club_fee]
+source = "ICAI GN ch.33 paras 33.14-33.17 (club entrance fees and subscriptions, reported apart from services: TAQRB, GN 2026 p.170); the clause 21(a) candidate spec"
+item = "(iv) club entrance fees and subscriptions"
+club_terms = ["club", "gymkhana", "golf"]
+terms = ["entrance", "admission", "membership", "subscription", "annual fee"]
+question = "Club entrance or admission fees and subscriptions: confirm the club, the amount and that it is a business expense. Personal items belong under (ii)."
+
+[club_service]
+source = "ICAI GN ch.33 paras 33.14-33.17 (club services and facilities used, a separate row from fees); the clause 21(a) candidate spec"
+item = "(v) club services and facilities"
+club_terms = ["club", "gymkhana", "golf"]
+terms = ["food", "beverage", "bar", "banquet", "room", "facility", "facilities"]
+question = "Cost of club services and facilities used: confirm the club and the amount, as a row separate from fees and subscriptions."
+
+[penalty_or_fine]
+source = "ICAI GN ch.33 para 33.21 (Explanation 1 and 3 to s.37(1); the two penalty heads apart: TAQRB, GN 2026 p.170); the clause 21(a) candidate spec"
+item = "(vi)/(via) penalty or fine"
+terms = ["penalty", "penalties", "penal", "prosecution"]
+# "fine" alone is often a quality ("fine chemicals", "fine paper"); it counts only beside a penalty or challan word.
+qualified_terms = ["fine", "fines"]
+qualifiers = ["penalty", "penalties", "penal", "late", "violation", "violations", "challan", "challans"]
+question = "Attach or confirm the assessee's written list of penalties and fines (GN 33.21 A(c)). For each: is it for violation of a law (India or abroad), or for an offence or prohibited purpose, or any other penalty or fine? Enter the penal part only, if composite."
+
+[late_fee]
+source = "TAQRB (GN 2026 p.170): late filing fees under s.234E were wrongly reported as a penalty or fine; the clause 21(a) candidate spec keeps late fees apart"
+item = "late fees -- not 21(a)(vi)/(via)"
+terms = ["late fee", "late fees", "late filing", "234e"]
+question = "These are shown for completeness. Late fees under s.234E are not penalties (TAQRB); decide where, if anywhere, each is reported."
+
+[statutory_interest]
+source = "the clause 21(a) candidate spec: statutory interest (s.201(1A), GST s.50) is kept apart from penalties and never merged into (vi)/(via)"
+item = "statutory interest -- the CA decides"
+terms = ["interest on tds", "interest on gst", "interest on tax", "201(1a)", "interest on late payment"]
+question = "These are shown for completeness. Decide separately where statutory interest is reported."
+
+[compounding]
+source = "ICAI GN ch.33 para 33.22 (Explanation 3(iii) to s.37(1): compounding an offence); the clause 21(a) candidate spec"
+item = "(vii) compounding an offence"
+terms = ["compounding", "compounded", "compound"]
+question = "Any compounding fee paid in the year? Enter it from the compounding application."
+
+[benefit_perquisite]
+source = "ICAI GN ch.33 para 33.23 (Explanation 3(ii) to s.37(1); CBDT Circular 5/2012; cross-check s.194R); the clause 21(a) candidate spec"
+item = "(viii) benefit or perquisite in breach of the recipient's rules"
+terms = ["sponsorship", "sponsor", "free sample", "free samples", "hospitality", "conference"]
+question = "Any benefit or perquisite whose acceptance breaches the recipient's conduct rules? Cross-check the s.194R list."
+
+[settlement]
+source = "ICAI GN ch.33 para 33.24 (Explanation 3(iv) to s.37(1); Notification 38/2025: SEBI Act, SCRA, Depositories Act, Competition Act); the clause 21(a) candidate spec"
+item = "(ix) settling proceedings under a notified law"
+terms = ["sebi", "cci", "settlement order", "competition commission"]
+question = "Any amount paid to settle proceedings under the SEBI Act, SCRA, Depositories Act or Competition Act?"

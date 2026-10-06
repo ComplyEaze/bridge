@@ -81,8 +81,15 @@ fn every_row_carries_its_flag_and_the_catalogue_is_v1s() {
 }
 
 #[test]
-fn the_flag_is_exactly_yes_or_no_and_nothing_else() {
-    for (text, expected) in [("Yes", BillWiseFlag::On), ("No", BillWiseFlag::Off)] {
+fn the_flag_is_exactly_yes_or_no_after_trimming_and_nothing_else() {
+    // The text reader trims, as it does for every other value, so padding
+    // around an exact spelling is read; whitespace alone is not.
+    for (text, expected) in [
+        ("Yes", BillWiseFlag::On),
+        ("No", BillWiseFlag::Off),
+        (" Yes ", BillWiseFlag::On),
+        ("\nNo\t", BillWiseFlag::Off),
+    ] {
         let v2 = parse_v2(&three_rows(Some(text))).unwrap();
         assert_eq!(v2.bill_wise_flags().nth(1).unwrap().2, expected, "{text}");
     }
@@ -193,6 +200,16 @@ fn the_flag_element_belongs_to_v2_alone() {
         StandardLedgerCatalogError::MalformedResponse
     );
     assert!(parse_standard_ledger_identity_observation(&v2_body, COMPANY).is_err());
+    // Control: the same rows without the flag pass all three, so the refusals
+    // above are the flag's and not some other defect of the body.
+    let v1_body = body(&[
+        row("Cash", "01", "Cash-in-Hand", None),
+        row("Debtor A", "02", "Sundry Debtors", None),
+        row("Creditor B", "03", "Sundry Creditors", None),
+    ]);
+    assert!(parse_standard_ledger_catalog_with_identities(&v1_body, COMPANY, COMPANY_GUID).is_ok());
+    assert!(parse_standard_ledger_catalog(&v1_body, COMPANY, COMPANY_GUID).is_ok());
+    assert!(parse_standard_ledger_identity_observation(&v1_body, COMPANY).is_ok());
 }
 
 /// The flag codes are new strings: the older outstandings parser already emits

@@ -1004,10 +1004,12 @@ The block is added only when the response can carry it: three times the smallest
 (one item) and the block, plus a kilobyte, must fit `max_bytes` (a result is carried
 twice and its text copy is escaped). A page that fitted whole near the cap can lose
 its last few rows to the block (it is trimmed like any field, with `truncated` and
-`next_offset`): the rows left off come back on the next page, so nothing is lost; when
-the window is not held (a partial window, or the desktop screen) that next page is a
-fresh read. A `summarise_by` page has buckets, not items, and is judged as a whole
-page. When the block is left out the window says so (`read_cost_left_out`). It is on a page read now: a later page served from a held
+`next_offset`): on a held window the rows left off come back on the next page, so
+nothing is lost there; when the window is not held (a partial window, or the desktop
+screen) the next page is a fresh read, and if the book changed meanwhile its offsets
+may not continue this page's. A `summarise_by` page has buckets, not items, and is
+judged as a whole page. When the block is left out the window says so
+(`read_cost_left_out`). It is on a page read now: a later page served from a held
 window carries the window timings and no `read_cost`, and a page read afresh is read
 now. The desktop screen's voucher list shares the read and receives the
 block too. `outstandings`, which also reports window timings, keeps its shape; the

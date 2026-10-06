@@ -54,23 +54,21 @@ fn comparable(nature: &str) -> &'static str {
     }
 }
 
-/// The rule of spec pack §3.3, its three conditions in the reference's order: the rate is looked
-/// up first, for every pair it is asked about, so rules with no `[entity]` table refuse wherever a
-/// nonzero amount exists (§8).
-fn treatment(
-    rules: &Rules,
-    entity_type: &str,
-    person: &RelatedPerson,
-    nature: &str,
-) -> Result<Treatment> {
-    let open = rules.s40b_interest_rate_bp(entity_type)? > 0;
+/// Whether the engagement's entity rules apply s.40(b) (spec pack §2.4). Rules with no `[entity]`
+/// table refuse, so it is called only where the reference looks the rate up (§8).
+fn s40b_open(rules: &Rules, entity_type: &str) -> Result<bool> {
+    Ok(rules.s40b_interest_rate_bp(entity_type)? > 0)
+}
+
+/// The rule of spec pack §3.3, given whether the entity rules apply s.40(b).
+fn treatment(open: bool, person: &RelatedPerson, nature: &str) -> Treatment {
     let partner = PARTNER_LABELS
         .contains(&support::py_lower(support::py_strip(&person.relationship)).as_str());
-    Ok(if open && partner && S40B_NATURES.contains(&nature) {
+    if open && partner && S40B_NATURES.contains(&nature) {
         Treatment::S40bGoverns
     } else {
         Treatment::ComparableRequired
-    })
+    }
 }
 
 /// One (person, nature) the table gives a non-empty vocabulary list, with the related-party
@@ -145,6 +143,12 @@ SAME [related_parties] config related_parties_cl23 reads). 'no' means none were 
 test reports nothing further.",
         Vec::new(),
     )?;
+    if persons.is_empty() {
+        return Ok(r);
+    }
+    // Once for a confirmed table, before any person's natures are read (spec pack §8), so rules
+    // with no `[entity]` table refuse whatever the amounts.
+    let open = s40b_open(rules, entity_type)?;
     for pair in pairs(&persons, &tags, related) {
         let Some((figure, amount)) = pair.figure else {
             return Err(AuditError::refused(
@@ -160,7 +164,7 @@ related person {:?}; run both tests on the same [related_parties] table",
             continue;
         }
         let (tag, nature) = (pair.tag, pair.nature);
-        let treatment = treatment(rules, entity_type, pair.person, nature)?;
+        let treatment = treatment(open, pair.person, nature);
         let (clauses, title, limits, ask_client) = match treatment {
             Treatment::ComparableRequired => (
                 ["3CD-23", "s.40A(2)(b)"],
@@ -192,7 +196,7 @@ confirmation of partner status, and this engagement's rules apply s.40(b) to a p
 and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This \
 rests on the client's own confirmation, not a reading of the deed, so it is stated here for \
 confirmation, not as a settled fact.",
-                    support::py_repr_str(&pair.person.relationship)
+                    as_written(&pair.person.relationship)
                 ),
                 vec![
                     "Confirm the partnership deed treats this amount as partner interest or \
@@ -215,6 +219,12 @@ remuneration under s.40(b), not a separate related-party payment under s.40A(2)(
     Ok(r)
 }
 
+/// The relationship as the limits text shows it (spec pack §3.4): split on Python's whitespace,
+/// joined with single spaces and single-quoted, with no escaping.
+fn as_written(relationship: &str) -> String {
+    format!("'{}'", support::py_split(relationship).join(" "))
+}
+
 /// SPD-1 (spec pack §4), independent of [`run`]: each nonzero pair has exactly the one finding
 /// the rule calls for. A pair with no amount figure, or a zero one, is skipped.
 pub fn check_invariants(
@@ -231,8 +241,9 @@ pub fn check_invariants(
         if pair.figure.is_none_or(|(_, amount)| amount == 0) {
             continue;
         }
-        let governs =
-            treatment(rules, entity_type, pair.person, pair.nature)? == Treatment::S40bGoverns;
+        // SPD-1 looks the rate up for each pair it checks, as the reference does.
+        let governs = treatment(s40b_open(rules, entity_type)?, pair.person, pair.nature)
+            == Treatment::S40bGoverns;
         let governed_id = finding_id(Treatment::S40bGoverns, pair.tag, pair.nature);
         let comparable_id = finding_id(Treatment::ComparableRequired, pair.tag, pair.nature);
         let has = |id: &str| result.findings.iter().any(|f| f.id == id);
@@ -240,24 +251,31 @@ pub fn check_invariants(
             support::py_repr_str(pair.key),
             support::py_repr_str(pair.nature),
         );
-        let detail = if has(&governed_id) && has(&comparable_id) {
+        let (governed, comparable) = (has(&governed_id), has(&comparable_id));
+        let detail = if governed && comparable {
             format!(
                 "SPD-1: {key} nature {nature} has BOTH {governed_id} and {comparable_id} -- \
 exactly one must be emitted"
             )
-        } else if governs && !has(&governed_id) {
+        } else if governs && !governed {
+            let emitted = if comparable {
+                format!("a comparable-required finding {comparable_id} was emitted instead")
+            } else {
+                format!("{governed_id} is missing")
+            };
             format!(
                 "SPD-1: {key} nature {nature} should be governed by s.40(b) (relationship {}, \
-entity rules gate open) but {governed_id} is missing",
+entity rules gate open) but {emitted}",
                 support::py_repr_str(&pair.person.relationship)
             )
-        } else if !governs && !has(&comparable_id) {
-            format!(
-                "SPD-1: {key} nature {nature} should ask for a comparable but {comparable_id} is \
-missing"
-            )
+        } else if !governs && !comparable {
+            let emitted = if governed {
+                format!("a s.40(b)-governs finding {governed_id} was emitted instead")
+            } else {
+                format!("{comparable_id} is missing")
+            };
+            format!("SPD-1: {key} nature {nature} should ask for a comparable but {emitted}")
         } else {
-            // Messages 4 and 5 of §4 cannot be reached: each case they name is message 1, 2 or 3.
             continue;
         };
         out.push(detail);
@@ -341,28 +359,33 @@ table"
     }
 
     #[test]
-    fn the_rate_is_looked_up_for_every_nonzero_amount_and_never_for_a_zero_one() {
-        // Rules with no [entity] table refuse on any lookup (spec pack §8): a zero amount never
-        // looks, and a nonzero one looks before the partner-label and nature tests.
+    fn rules_with_no_entity_table_refuse_any_confirmed_table_and_never_an_empty_one() {
+        // The rate is looked up once for a confirmed table, before any nature is read, so such
+        // rules refuse whatever the amounts; an empty table never looks (spec pack §8). SPD-1
+        // looks it up only for a pair with a nonzero amount.
         let mut rules = Rules::vendored().unwrap();
         rules.entity = None;
-        let cfg = table("[\"Person A\"]\nledgers_by_nature = { rent = [\"Rent\"] }\n");
-        let zero = rent_amount(&rules, "Person A", 0);
-        let result = run(&rules, "firm", &cfg, &zero).unwrap();
-        assert!(result.findings.is_empty());
-        let check = check_invariants(&rules, "firm", &cfg, &zero, &result).unwrap();
-        assert_eq!(check, Vec::<String>::new());
-
-        let moved = rent_amount(&rules, "Person A", 1);
         let no_entity =
             |err| matches!(err, AuditError::Config(m) if m == "rules: no [entity] table");
-        assert!(no_entity(run(&rules, "firm", &cfg, &moved).unwrap_err()));
+        let empty = RelatedPartiesConfig::default();
+        let nothing = TestResult::new(related_parties_cl23::TEST_ID, "1", &rules.version);
+        let result = run(&rules, "firm", &empty, &nothing).unwrap();
+        assert!(result.findings.is_empty());
+        let check = check_invariants(&rules, "firm", &empty, &nothing, &result).unwrap();
+        assert_eq!(check, Vec::<String>::new());
+
+        let cfg = table("[\"Person A\"]\nledgers_by_nature = { rent = [\"Rent\"] }\n");
+        let zero = rent_amount(&rules, "Person A", 0);
+        assert!(no_entity(run(&rules, "firm", &cfg, &zero).unwrap_err()));
+        let check = check_invariants(&rules, "firm", &cfg, &zero, &result).unwrap();
+        assert_eq!(check, Vec::<String>::new());
+        let moved = rent_amount(&rules, "Person A", 1);
         let check = check_invariants(&rules, "firm", &cfg, &moved, &result).unwrap_err();
         assert!(no_entity(check));
     }
 
     #[test]
-    fn spd_1_reports_each_reachable_message_whole() {
+    fn spd_1_reports_each_message_whole() {
         let rules = Rules::vendored().unwrap();
         let cfg = table(
             "[\"Person A\"]\nrelationship = \" Partner\"\nledgers_by_nature = { rent = [\"Rent\"], \
@@ -385,7 +408,7 @@ salary = [\"Pay\"] }\n",
         let check = |r: &TestResult| check_invariants(&rules, "firm", &cfg, &related, r).unwrap();
         assert_eq!(check(&result), Vec::<String>::new());
 
-        // Each finding dropped, and then each pair given both kinds.
+        // Each finding dropped.
         let mut tampered = result.clone();
         tampered.findings.clear();
         assert_eq!(
@@ -401,6 +424,7 @@ is missing"
                 ),
             ]
         );
+        // Each pair given both kinds.
         let mut tampered = result.clone();
         for f in &result.findings {
             let mut twin = f.clone();
@@ -421,6 +445,29 @@ is missing"
                 format!(
                     "SPD-1: 'Person A' nature 'rent' has BOTH {TEST_ID}/s40b_governs/{tag}/rent \
 and {comparable} -- exactly one must be emitted"
+                ),
+            ]
+        );
+        // Each pair given the other kind instead.
+        let mut tampered = result.clone();
+        for f in &mut tampered.findings {
+            f.id = if f.id == comparable {
+                format!("{TEST_ID}/s40b_governs/{tag}/rent")
+            } else {
+                format!("{TEST_ID}/comparable_required/{tag}/salary")
+            };
+        }
+        assert_eq!(
+            check(&tampered),
+            [
+                format!(
+                    "SPD-1: 'Person A' nature 'salary' should be governed by s.40(b) \
+(relationship ' Partner', entity rules gate open) but a comparable-required finding \
+{TEST_ID}/comparable_required/{tag}/salary was emitted instead"
+                ),
+                format!(
+                    "SPD-1: 'Person A' nature 'rent' should ask for a comparable but a \
+s.40(b)-governs finding {TEST_ID}/s40b_governs/{tag}/rent was emitted instead"
                 ),
             ]
         );

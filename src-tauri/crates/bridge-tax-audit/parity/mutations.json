@@ -9676,8 +9676,8 @@
   "by": "author",
   "what": "specified_persons_40a2b: a zero rate opens the s.40(b) rule",
   "file": "src/specified_persons_40a2b.rs",
-  "from": "rules.s40b_interest_rate_bp(entity_type)? > 0;",
-  "to": "rules.s40b_interest_rate_bp(entity_type)? >= 0;"
+  "from": "Ok(rules.s40b_interest_rate_bp(entity_type)? > 0)",
+  "to": "Ok(rules.s40b_interest_rate_bp(entity_type)? >= 0)"
  },
  {
   "id": "SP-06",
@@ -9722,10 +9722,10 @@
  {
   "id": "SP-11",
   "by": "author",
-  "what": "specified_persons_40a2b: the rate is looked up only for salary and interest",
+  "what": "specified_persons_40a2b: an empty table looks the rate up too",
   "file": "src/specified_persons_40a2b.rs",
-  "from": "let open = rules.s40b_interest_rate_bp(entity_type)? > 0;",
-  "to": "let open = S40B_NATURES.contains(&nature) && rules.s40b_interest_rate_bp(entity_type)? > 0;"
+  "from": "    if persons.is_empty() {\n        return Ok(r);\n    }\n",
+  "to": "    if persons.is_empty() && false {\n        return Ok(r);\n    }\n"
  },
  {
   "id": "SP-12",
@@ -9738,13 +9738,21 @@
  {
   "id": "SP-13",
   "by": "author",
-  "what": "specified_persons_40a2b: the limits text renders the relationship stripped, not as written",
+  "what": "specified_persons_40a2b: the limits text shows the relationship as Python's repr()",
   "file": "src/specified_persons_40a2b.rs",
-  "from": "confirmation, not as a settled fact.\",\n                    support::py_repr_str(&pair.person.relationship)",
-  "to": "confirmation, not as a settled fact.\",\n                    support::py_repr_str(support::py_strip(&pair.person.relationship))"
+  "from": "                    as_written(&pair.person.relationship)\n",
+  "to": "                    support::py_repr_str(&pair.person.relationship)\n"
  },
  {
   "id": "SP-14",
+  "by": "author",
+  "what": "specified_persons_40a2b: the limits text splits on Rust's whitespace, not Python's",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "format!(\"'{}'\", support::py_split(relationship).join(\" \"))",
+  "to": "format!(\"'{}'\", relationship.split_whitespace().collect::<Vec<_>>().join(\" \"))"
+ },
+ {
+  "id": "SP-15",
   "by": "author",
   "what": "specified_persons_40a2b: a missing related-party figure is skipped, not refused",
   "file": "src/specified_persons_40a2b.rs",
@@ -9752,7 +9760,7 @@
   "to": "        let Some((figure, amount)) = pair.figure else {\n            continue;\n            return Err("
  },
  {
-  "id": "SP-15",
+  "id": "SP-16",
   "by": "author",
   "what": "specified_persons_40a2b: SPD-1 checks a pair with no amount figure",
   "file": "src/specified_persons_40a2b.rs",
@@ -9760,7 +9768,7 @@
   "to": "if pair.figure.is_some_and(|(_, amount)| amount == 0) {"
  },
  {
-  "id": "SP-16",
+  "id": "SP-17",
   "by": "author",
   "what": "specified_persons_40a2b: SPD-1 checks a zero amount",
   "file": "src/specified_persons_40a2b.rs",
@@ -9768,31 +9776,47 @@
   "to": "if pair.figure.is_none() {"
  },
  {
-  "id": "SP-17",
+  "id": "SP-18",
   "by": "author",
   "what": "specified_persons_40a2b: SPD-1 never reports both kinds",
   "file": "src/specified_persons_40a2b.rs",
-  "from": "let detail = if has(&governed_id) && has(&comparable_id) {",
-  "to": "let detail = if has(&governed_id) && has(&comparable_id) && false {"
- },
- {
-  "id": "SP-18",
-  "by": "author",
-  "what": "specified_persons_40a2b: SPD-1 never reports a missing governed finding",
-  "file": "src/specified_persons_40a2b.rs",
-  "from": "} else if governs && !has(&governed_id) {",
-  "to": "} else if false && governs && !has(&governed_id) {"
+  "from": "let detail = if governed && comparable {",
+  "to": "let detail = if governed && comparable && false {"
  },
  {
   "id": "SP-19",
   "by": "author",
-  "what": "specified_persons_40a2b: SPD-1 never reports a missing comparable finding",
+  "what": "specified_persons_40a2b: SPD-1 never reports a missing governed finding",
   "file": "src/specified_persons_40a2b.rs",
-  "from": "} else if !governs && !has(&comparable_id) {",
-  "to": "} else if false && !governs && !has(&comparable_id) {"
+  "from": "} else if governs && !governed {",
+  "to": "} else if false && governs && !governed {"
  },
  {
   "id": "SP-20",
+  "by": "author",
+  "what": "specified_persons_40a2b: SPD-1 never reports a missing comparable finding",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "} else if !governs && !comparable {",
+  "to": "} else if false && !governs && !comparable {"
+ },
+ {
+  "id": "SP-21",
+  "by": "author",
+  "what": "specified_persons_40a2b: SPD-1 says a governed finding is missing when a comparable one was emitted",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "            let emitted = if comparable {",
+  "to": "            let emitted = if false && comparable {"
+ },
+ {
+  "id": "SP-22",
+  "by": "author",
+  "what": "specified_persons_40a2b: SPD-1 says a comparable finding is missing when a governed one was emitted",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "            let emitted = if governed {",
+  "to": "            let emitted = if false && governed {"
+ },
+ {
+  "id": "SP-23",
   "by": "author",
   "what": "specified_persons_40a2b: SPD-1 renders the key unquoted",
   "file": "src/specified_persons_40a2b.rs",

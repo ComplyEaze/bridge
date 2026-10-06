@@ -1,7 +1,7 @@
 # Fixture provenance: `specified_persons_40a2b` (6 Oct 2026)
 
 The eleven edge books, their 22 goldens and the synthetic golden come unchanged, byte for byte, from the
-spec pack `docs/tax-audit/spec-packs/specified_persons_40a2b/` (#1282, #1301), whose `HASHES.md` lists the
+spec pack `docs/tax-audit/spec-packs/specified_persons_40a2b/` (#1282, #1301, re-pinned in #1311), whose `HASHES.md` lists the
 same bytes and SHA-256 for each file. Every book there is invented, with round figures and plain names: no
 book is a Tally read of any real assessee, and no figure comes from one.
 
@@ -27,7 +27,7 @@ book is a Tally read of any real assessee, and no figure comes from one.
 
 ## How they were produced
 
-At the reference engine (a private repository), commit `4df1cc43`, under Python 3.13, with
+At the reference engine (a private repository), commit `ed9a29af` (re-pinned in #1311; `edge.sp_labels.specified_persons_40a2b.json` is the one file that moved), under Python 3.13, with
 `parity/edge_golden.py` extended by runners for both tests. Each passes a book's `related_parties` key
 (absent meaning `{}`) through the reference's own configuration reader. The `specified_persons_40a2b`
 runner runs `related_parties_cl23` on the same table first, then this test with the table, the rules for
@@ -77,7 +77,7 @@ only by the reference's maintainers.
 | `edge.sp_keys.related_parties_cl23.json` | 18,565 | `49e8a9df736a6fdd73c5e65862d91ba830fa1d12cf22093faa81b928ca4358fa` | `golden/edge.sp_keys.related_parties_cl23.json` |
 | `edge.sp_keys.specified_persons_40a2b.json` | 8,911 | `1ca9d472284458b0f28057d133dfccf4595438002135fce254dfa520a71ec353` | `golden/edge.sp_keys.specified_persons_40a2b.json` |
 | `edge.sp_labels.related_parties_cl23.json` | 50,466 | `2805e97c62afb0dd82caca68bbb9a27eaaad4a61fe5f2a522fbdaa6ab7d0b724` | `golden/edge.sp_labels.related_parties_cl23.json` |
-| `edge.sp_labels.specified_persons_40a2b.json` | 25,975 | `8fc589455942ff27ee7dd02b5ffa84e8fa9e4747a3fb7ea3c5201dd32546c4bc` | `golden/edge.sp_labels.specified_persons_40a2b.json` |
+| `edge.sp_labels.specified_persons_40a2b.json` | 25,943 | `9a9e30f645dd234955df7580bcd65ae2390770eaf80c5e7c146aa1a7f2b46e17` | `golden/edge.sp_labels.specified_persons_40a2b.json` |
 | `edge.sp_none.related_parties_cl23.json` | 1,849 | `074cd0b565b1148f347392e2c162f5703d2decd5767576ca12062a83b10112a9` | `golden/edge.sp_none.related_parties_cl23.json` |
 | `edge.sp_none.specified_persons_40a2b.json` | 1,081 | `d339734fbfaaef747fc1ad5cd0eb83916e13178f8539e2970f5a594ac58eb3eb` | `golden/edge.sp_none.specified_persons_40a2b.json` |
 | `edge.sp_shapes.related_parties_cl23.json` | 7,522 | `ff56d477a45f66d4f89457fdbfe5ff9d29b10727ed0de9a029267094622a0342` | `golden/edge.sp_shapes.related_parties_cl23.json` |

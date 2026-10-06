@@ -123,6 +123,14 @@ fn plans_with_report(
     plans
 }
 
+/// The plans of a call that ends at the Cash Flow pair: the closing extent pair
+/// (four requests) and the closing identity bracket (three) are never sent, and
+/// an unsent plan is a hang.
+fn plans_ending_at_the_cash_flow(mut plans: Vec<ScenarioPlan>) -> Vec<ScenarioPlan> {
+    plans.truncate(plans.len() - 7);
+    plans
+}
+
 async fn call(plans: Vec<ScenarioPlan>, from: &str, to: &str) -> (Value, usize, usize) {
     let expected = plans.len();
     let simulator = SequenceSimulator::spawn(plans).unwrap();
@@ -307,16 +315,59 @@ async fn a_book_with_no_cash_or_bank_ledger_and_an_empty_cash_flow_is_not_called
 #[tokio::test]
 async fn an_answer_that_is_refused_by_the_parser_names_its_own_cause() {
     // Tally's Cash Flow came back as an empty envelope: a report that was not rendered.
-    let mut plans = plans_with_report(xml("<ENVELOPE></ENVELOPE>".to_string()), |report| report);
-    // The call stops at the refused answer: the closing extent pair (four requests) and
-    // the closing identity bracket (three) are never sent, and an unsent plan is a hang.
-    plans.truncate(plans.len() - 7);
+    let plans = plans_ending_at_the_cash_flow(plans_with_report(
+        xml("<ENVELOPE></ENVELOPE>".to_string()),
+        |report| report,
+    ));
     let (response, sent, expected) = call(plans, "2026-04-01", "2026-06-30").await;
     assert_eq!(sent, expected);
     assert_eq!(response["isError"], true, "{response}");
     let error = &response["structuredContent"]["result"]["error"];
     assert_eq!(error["code"], "cash_flow_read_failed", "{response}");
     assert_eq!(error["cause"], "cash_flow_empty_envelope", "{response}");
+}
+
+#[tokio::test]
+async fn a_month_shows_tallys_closing_column_not_its_debit() {
+    // The captured shape has the same figure in both columns, so the debit is changed here:
+    // the net total (the closings) still ties, and the month must carry the closing.
+    let changed = cash_flow("-4950.00").replace(
+        "<DSPDRAMTA>-4950.00</DSPDRAMTA>",
+        "<DSPDRAMTA>-1.00</DSPDRAMTA>",
+    );
+    assert_ne!(changed, cash_flow("-4950.00"), "the debit was not found");
+    let (response, sent, expected) = call(
+        plans_with_report(xml(changed), |report| report),
+        "2026-04-01",
+        "2026-06-30",
+    )
+    .await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["state"], "observed", "{result}");
+    assert_eq!(
+        result["months"][0]["closing"],
+        json!({"state": "present", "value": "-4950.00"})
+    );
+}
+
+#[tokio::test]
+async fn a_cash_flow_that_changes_between_its_two_reads_is_refused_as_its_own_drift() {
+    let mut plans = plans_with("-4950.00", |report| report);
+    // The pair sits just before the closing extent pair (four) and identity bracket (three).
+    let second = plans.len() - 7 - 2;
+    plans[second] = xml(cash_flow("-4949.00"));
+    let (response, sent, expected) = call(
+        plans_ending_at_the_cash_flow(plans),
+        "2026-04-01",
+        "2026-06-30",
+    )
+    .await;
+    assert_eq!(sent, expected);
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "cash_flow_read_failed", "{response}");
+    assert_eq!(error["cause"], "native_cash_flow_changed", "{response}");
 }
 
 #[tokio::test]

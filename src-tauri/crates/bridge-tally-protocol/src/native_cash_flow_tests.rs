@@ -504,6 +504,31 @@ fn a_failure_signal_anywhere_beats_the_rows() {
 }
 
 #[test]
+fn a_self_closed_failure_signal_beats_the_rows() {
+    for signal in ["<LINEERROR/>", "<STATUS/>", "<ERROR/>"] {
+        let xml = mutate(&year(), "</ENVELOPE>", &format!("{signal}</ENVELOPE>"));
+        assert_eq!(
+            parse_year(&xml),
+            Err(NativeCashFlowError::TallyReportedFailure),
+            "{signal}"
+        );
+    }
+}
+
+#[test]
+fn a_failure_signal_inside_a_row_beats_the_row() {
+    let xml = mutate(
+        &year(),
+        "<DSPDRAMT><DSPDRAMTA>-3864.02</DSPDRAMTA></DSPDRAMT>",
+        "<LINEERROR>x</LINEERROR>",
+    );
+    assert_eq!(
+        parse_year(&xml),
+        Err(NativeCashFlowError::TallyReportedFailure)
+    );
+}
+
+#[test]
 fn a_wrapper_with_no_failure_signal_is_not_read_as_a_report() {
     let xml =
         "<ENVELOPE><HEADER><VERSION>1</VERSION></HEADER><BODY><DATA></DATA></BODY></ENVELOPE>";

@@ -1038,7 +1038,7 @@ the vouchers that satisfy every criterion given.
   let the assistant read the narrations back one probe at a time.
 - `amount` is an unsigned decimal above zero. It is matched, by numeric value,
   against the absolute value of every ledger entry of a voucher, so it finds an
-  invoice total and a tax line alike (reasoned from the entry shape, not measured on an item invoice). Each item carries `matched.amount_entries`,
+  invoice total and a tax line alike (checked live on an invoice-mode Purchase: 900.25 found its CGST and State Tax lines; an invoice total was not searched, nor an item invoice with stock lines). Each item carries `matched.amount_entries`,
   the positions in its `amounts` that equalled the amount.
 - A blank or over-long term, a narration phrase under three characters and an
   amount that is not a plain positive decimal are refused before the window is read (the identity read has already happened)
@@ -1070,7 +1070,7 @@ each other.
 - A debit is an entry with a negative amount and a credit one with a positive
   amount, the rule `ledger_movement` uses (the same function); `ISDEEMEDPOSITIVE`
   decides only a zero amount, which adds nothing to either side but still counts
-  its voucher. The two reads were not run side by side on the same book.
+  its voucher. `ledger_movement` would refuse the book of the live check (several Currency masters, #716), so it was not run and the live tie is to `trial_balance`; the two reads were not run side by side.
 - A ledger bucket adds the entries on that ledger of the vouchers the window,
   selectors and search selected: with a `ledger`, a type or a search given, a
   counter-ledger's bucket holds only its entries on those vouchers, not that
@@ -1094,7 +1094,7 @@ each other.
   memorandum, a reversing journal, a sales or purchase order, a delivery or receipt
   note), if the book uses it and Tally exports it with ledger entries, is not told
   apart and is summed; the
-  result's `basis` says so. `ledger_movement` has the same gap. Not measured live.
+  result's `basis` says so. `ledger_movement` has the same gap. The book of the live check used none of those types, so this is not seen live.
 - A voucher whose entries do not sum to zero refuses the whole summary
   (`voucher_entries_unbalanced`): a bucket built from it could not be tied out.
 - A voucher withheld for a foreign-currency amount is in no bucket; the result is
@@ -1111,10 +1111,49 @@ each other.
 
 A summary over a `partial` window is only as complete as that window: `state` and `reason` say which, and `basis` does not repeat them.
 
-Not measured: a live Tally run of either feature (the tests read the captured
-three-voucher window and variants of it); a `reference` captured from a real
-book (the captured window carries none, so that test adds one to a captured
-voucher); a summary over a window large enough to need a census.
+**Checked once against a live Tally** (6 October 2026; TallyPrime 7.1 Silver; a debug build of master at
+4c30f3f9f, which is not in a published build, with the response budget raised to 2,000,000 (the largest
+result, 86 KB, fits the default); the synthetic company `BRIDGE SHAPE LAB`, 67 vouchers in
+2025-04-01 to 2026-03-31 and 44 ledgers; the rows and the answers are committed as a fixture with a
+provenance note, and the tests read them). Every ledger, month and voucher-type bucket equalled the
+sums over the listed vouchers. The 30 ledger buckets equalled `trial_balance`'s period debit and credit
+for the same year (the other 14 ledgers of the trial balance had no movement in it) and the totals
+equalled its totals; the opening columns were not compared, and `trial_balance` prints `-28464.50`
+where a bucket prints `-28464.5`, so compare them as numbers. Each search returned the vouchers the same
+criterion selects from the listing: 9 with the reference, 4 numbered 7, 57 with a narration phrase, 1
+holding an amount of 900.25 on its CGST and State Tax lines, and none for a number no voucher has, from
+a window the read called `complete`. The vouchers left out of the buckets were a cancelled Purchase
+that Tally exported with no entries, an optional Payment and a Stock Journal with no entries; the
+voucher Tally flagged post-dated (a voucher dated after the read date could not be in this window)
+was counted. A second page came from the held window in 10 small requests (4 status checks, 4
+company-identity reads and 2 marks reads), with no voucher data. With `ledger` given, a month bucket
+counted only that ledger's entries.
+
+Cost, from the same run (one run, a debug build): a plain read of that year took 34 requests (12
+status checks, 12 company-identity reads, 4 marks reads, and the window count and its two parts, each
+read twice), about 7 s and about 6 MB of answers from Tally. This book's mark (111) needed one count
+read; a large book needs many more. Every `summarise_by` or search call reads the window again at the
+same cost (34 requests, 6 to 11 s). `ledger` adds 12 requests, four of them reads of the whole ledger
+list, which grows with the ledger count. For a month or more on a large book, read ledger totals with
+`trial_balance` instead: it has no month or voucher-type grouping and no search. On the largest book
+measured (a voucher mark of about a million) one day of vouchers took minutes in another run, and a
+month's `trial_balance` took about 30 s once, two of its reads within a few seconds of the 20 s request
+limit.
+
+A bucket's `debit`, `credit` and `net`, and `totals`, are plain decimals with trailing zeros dropped
+(`1000`, `-87900.5`); an item's `amounts` keep the two places Tally sent (`1000.00`).
+
+Two entries (both `Round Off`, +0.50 and -0.50) carry a deemed-positive flag that disagrees with the sign
+of their amount. The trial-balance tie is the same by either rule and does not tell them apart; each of
+those two vouchers balances only by the sign, which is the rule the summary uses. No live entry had a
+zero amount, so the `ISDEEMEDPOSITIVE` rule for a zero amount was not exercised.
+
+Not measured: a memorandum or a reversing journal in the book; a voucher withheld for a foreign-currency
+amount (none was withheld); `mask_parties` and withheld narrations; an item invoice with stock lines;
+paging of a summary past one page; the `ledger` name resolution and its drift check; a book of many
+thousands of vouchers and a window the read refuses; another edition or release; a `reference` on a book
+other than this one (9 of its 67 vouchers carry one). A `voucher_class` summary was also run live and
+is not kept in the fixture.
 
 ### Foreign-currency composites in `vouchers`
 

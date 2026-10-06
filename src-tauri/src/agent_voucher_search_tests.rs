@@ -271,3 +271,154 @@ fn a_voucher_number_the_book_stored_with_spaces_still_matches() {
         [" 7 "]
     );
 }
+
+// ---- The live rows (#1230): the same 67 synthetic-book vouchers and the searches the tool answered
+// over them on 6 Oct 2026 (a debug build of master at 4c30f3f9f; see the PROVENANCE note beside the
+// fixtures).
+#[test]
+fn each_live_search_over_the_live_rows_returns_the_vouchers_the_tool_returned_live() {
+    let rows: Vec<Value> = serde_json::from_str(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-shape-lab-fy.rows.json"
+    ))
+    .unwrap();
+    let answers: Value = serde_json::from_str(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-shape-lab-fy.live-answers.json"
+    ))
+    .unwrap();
+    let searches = answers["searches"].as_array().unwrap();
+    assert_eq!(searches.len(), 5);
+    for live in searches {
+        let found = search(live["args"].clone()).apply(rows.clone());
+        let guids: Vec<&Value> = found.iter().map(|row| &row["guid"]).collect();
+        assert_eq!(
+            guids,
+            live["guids"].as_array().unwrap().iter().collect::<Vec<_>>(),
+            "{}",
+            live["step"]
+        );
+        let matched: Vec<&Value> = found.iter().map(|row| &row["matched"]).collect();
+        assert_eq!(
+            matched,
+            live["matched"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .collect::<Vec<_>>(),
+            "{}",
+            live["step"]
+        );
+        assert_eq!(json!(found.len()), live["total"], "{}", live["step"]);
+    }
+    // The live run's counts, from the capture: 9 with the reference, 4 numbered 7, 57 with the narration
+    // phrase, 1 holding the amount, none for a number no voucher has.
+    let totals: Vec<u64> = searches
+        .iter()
+        .map(|s| s["total"].as_u64().unwrap())
+        .collect();
+    assert_eq!(totals, vec![9, 4, 57, 1, 0]);
+}
+
+#[test]
+fn a_live_narration_phrase_is_found_whatever_its_letter_case() {
+    // Every live search term was given in the case it is stored in, so this one asks for the live
+    // narration phrase in other cases and requires the vouchers the live run returned.
+    let rows: Vec<Value> = serde_json::from_str(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-shape-lab-fy.rows.json"
+    ))
+    .unwrap();
+    let answers: Value = serde_json::from_str(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-shape-lab-fy.live-answers.json"
+    ))
+    .unwrap();
+    let live = answers["searches"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["step"] == "s10_narration")
+        .unwrap();
+    let phrase = live["args"]["narration_contains"].as_str().unwrap();
+    assert_eq!(phrase, "SHAPELAB");
+    for variant in [
+        phrase.to_lowercase(),
+        "ShapeLab".to_string(),
+        format!("  {phrase}  "),
+    ] {
+        let found = search(json!({ "narration_contains": variant })).apply(rows.clone());
+        let guids: Vec<&Value> = found.iter().map(|row| &row["guid"]).collect();
+        assert_eq!(
+            guids,
+            live["guids"].as_array().unwrap().iter().collect::<Vec<_>>(),
+            "{variant:?}"
+        );
+    }
+}
+
+/// The vouchers a criterion selects, written separately from `VoucherSearch::apply`: a number or a
+/// reference equal whole ignoring ASCII case and the spaces around it, a narration phrase contained
+/// ignoring ASCII case and runs of spaces, an amount equal to the absolute value of any entry. (The live
+/// terms are ASCII, so this folding is enough here.)
+fn independent_selection<'a>(rows: &'a [Value], args: &Value) -> Vec<&'a Value> {
+    let fold = |text: &str| {
+        text.split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_ascii_lowercase()
+    };
+    rows.iter()
+        .filter(|row| {
+            let whole = |key: &str, wanted: &Value| match (row[key].as_str(), wanted.as_str()) {
+                (Some(have), Some(want)) => have.trim().eq_ignore_ascii_case(want.trim()),
+                (None, Some(_)) => false,
+                _ => true,
+            };
+            let number = whole("voucher_number", &args["voucher_number"]);
+            let reference = whole("reference", &args["reference"]);
+            let narration = args["narration_contains"].as_str().is_none_or(|phrase| {
+                row["narration"]
+                    .as_str()
+                    .is_some_and(|text| fold(text).contains(&fold(phrase)))
+            });
+            let amount = args["amount"].as_str().is_none_or(|wanted| {
+                let wanted = bridge_tally_core::ExactDecimal::parse(wanted.to_string()).unwrap();
+                row["amounts"].as_array().unwrap().iter().any(|entry| {
+                    let text = entry["amount"].as_str().unwrap().trim_start_matches('-');
+                    bridge_tally_core::ExactDecimal::parse(text.to_string())
+                        .unwrap()
+                        .numeric_eq(&wanted)
+                })
+            });
+            number && reference && narration && amount
+        })
+        .collect()
+}
+
+#[test]
+fn each_live_search_equals_an_independent_selection_over_the_rows() {
+    let rows: Vec<Value> = serde_json::from_str(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-shape-lab-fy.rows.json"
+    ))
+    .unwrap();
+    let answers: Value = serde_json::from_str(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-shape-lab-fy.live-answers.json"
+    ))
+    .unwrap();
+    for live in answers["searches"].as_array().unwrap() {
+        let wanted: Vec<&Value> = independent_selection(&rows, &live["args"])
+            .iter()
+            .map(|row| &row["guid"])
+            .collect();
+        let found = search(live["args"].clone()).apply(rows.clone());
+        let got: Vec<&Value> = found.iter().map(|row| &row["guid"]).collect();
+        assert_eq!(
+            got, wanted,
+            "{}: the code under test against the independent selection",
+            live["step"]
+        );
+        assert_eq!(
+            wanted,
+            live["guids"].as_array().unwrap().iter().collect::<Vec<_>>(),
+            "{}: the live answer",
+            live["step"]
+        );
+    }
+}

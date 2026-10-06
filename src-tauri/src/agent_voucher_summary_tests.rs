@@ -423,3 +423,346 @@ fn every_bucket_carries_its_position_in_the_whole_ordering() {
     let (page, _) = page_buckets(&summary, 2, 10, usize::MAX);
     assert_eq!(page[0]["position"], 3);
 }
+
+// ---- The live rows (#1230). `vouchers-shape-lab-fy.rows.json` holds the 67 vouchers of a synthetic
+// book as the tool returned them on 6 Oct 2026 (a debug build of master at 4c30f3f9f), and
+// `vouchers-shape-lab-fy.live-answers.json` what the same build answered for each summary and search over them and what Tally's own
+// `trial_balance` reported for the same year (see the PROVENANCE note beside them). These tests run
+// the production summary and search code over those rows and require the answers the live run gave.
+const LIVE_ROWS: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-shape-lab-fy.rows.json"
+);
+const LIVE_ANSWERS: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-shape-lab-fy.live-answers.json"
+);
+
+fn live_rows() -> Vec<Value> {
+    serde_json::from_str(LIVE_ROWS).expect("the live rows parse")
+}
+
+fn live_answers() -> Value {
+    serde_json::from_str(LIVE_ANSWERS).expect("the live answers parse")
+}
+
+/// The buckets as the tool presents them: `vouchers` passes each through `redact_value` (default settings
+/// here), which turns the in-memory party-name marker of a ledger bucket into the name.
+fn presented(summary: &Summary) -> Vec<Value> {
+    summary
+        .buckets
+        .iter()
+        .map(|bucket| redact_value(bucket.clone(), Redaction::None))
+        .collect()
+}
+
+fn assert_equals_live(summary: &Summary, golden: &Value, what: &str) {
+    assert_eq!(
+        Value::Array(presented(summary)),
+        golden["buckets"],
+        "{what}: buckets"
+    );
+    assert_eq!(
+        json!(summary.buckets.len()),
+        golden["total"],
+        "{what}: bucket count"
+    );
+    assert_eq!(summary.totals, golden["totals"], "{what}: totals");
+    assert_eq!(
+        json!(summary.vouchers_summarised),
+        golden["vouchers_summarised"],
+        "{what}: vouchers summarised"
+    );
+    assert_eq!(
+        summary.excluded, golden["excluded_from_buckets"],
+        "{what}: excluded"
+    );
+    assert_eq!(
+        json!(summary.post_dated_included),
+        golden["post_dated_included"],
+        "{what}: post-dated"
+    );
+    assert_eq!(
+        json!(summary.post_dated_flag_absent),
+        golden["post_dated_flag_absent"],
+        "{what}: flag absent"
+    );
+    assert_eq!(
+        json!(summary.entries_counted),
+        golden["entries_counted"],
+        "{what}: entries counted"
+    );
+}
+
+fn decimal(text: &str) -> bridge_tally_core::ExactDecimal {
+    bridge_tally_core::ExactDecimal::parse(text.to_string()).expect("a plain decimal")
+}
+
+#[test]
+fn the_live_rows_summarise_to_the_answers_the_tool_gave_live() {
+    let (rows, answers) = (live_rows(), live_answers());
+    assert_eq!(rows.len(), 67);
+    for (group, name) in [
+        (SummaryGroup::Ledger, "ledger"),
+        (SummaryGroup::Month, "month"),
+        (SummaryGroup::VoucherType, "voucher_type"),
+    ] {
+        assert_eq!(answers["summaries"][name]["summarised_by"], name);
+        assert_equals_live(
+            &summed(&rows, group, None),
+            &answers["summaries"][name],
+            name,
+        );
+    }
+}
+
+#[test]
+fn the_live_ledger_selected_and_searched_summaries_are_reproduced() {
+    let answers = live_answers();
+    let selected = &answers["summary_with_ledger_selected"];
+    let ledger = selected["ledger"].as_str().unwrap();
+    let kept = filter_voucher_rows_for_ledger(live_rows(), ledger);
+    assert_equals_live(
+        &summed(&kept, SummaryGroup::Month, Some(ledger)),
+        selected,
+        "ledger selected",
+    );
+    let searched = &answers["summary_of_amount_search"];
+    let found = VoucherSearch::from_args(&searched["args"], Redaction::None)
+        .expect("the live search arguments are accepted")
+        .expect("a criterion was given")
+        .apply(live_rows());
+    assert_equals_live(
+        &summed(&found, SummaryGroup::Ledger, None),
+        searched,
+        "amount search, by ledger",
+    );
+}
+
+#[test]
+fn the_live_ledger_buckets_equal_the_trial_balance_of_the_same_year() {
+    let answers = live_answers();
+    let summary = summed(&live_rows(), SummaryGroup::Ledger, None);
+    let amount = |value: &Value| match value["state"].as_str() {
+        Some("present") => value["value"].as_str().unwrap().to_string(),
+        Some("present_empty") => "0".to_string(),
+        other => panic!("a trial balance amount in state {other:?}"),
+    };
+    let rows = answers["trial_balance_ledgers"].as_array().unwrap();
+    let mut tied = 0;
+    let buckets = presented(&summary);
+    for bucket in &buckets {
+        let name = bucket["group"].as_str().unwrap();
+        let row = rows
+            .iter()
+            .find(|row| row["ledger"] == name)
+            .unwrap_or_else(|| panic!("the trial balance has no row for {name}"));
+        assert!(
+            decimal(bucket["debit"].as_str().unwrap()).numeric_eq(&decimal(&amount(&row["debit"]))),
+            "{name} debit"
+        );
+        assert!(
+            decimal(bucket["credit"].as_str().unwrap())
+                .numeric_eq(&decimal(&amount(&row["credit"]))),
+            "{name} credit"
+        );
+        tied += 1;
+    }
+    assert_eq!(tied, 30);
+    // A ledger the trial balance shows movement for, and the summary has no bucket for, would be a miss.
+    let bucketed: BTreeSet<&str> = buckets
+        .iter()
+        .map(|b| b["group"].as_str().unwrap())
+        .collect();
+    for row in rows
+        .iter()
+        .filter(|row| !bucketed.contains(row["ledger"].as_str().unwrap()))
+    {
+        assert!(
+            decimal(&amount(&row["debit"])).is_zero() && decimal(&amount(&row["credit"])).is_zero(),
+            "{}",
+            row["ledger"]
+        );
+    }
+}
+
+/// The buckets of a grouping summed straight from the rows: each posting voucher's entries by `key`,
+/// a negative amount a debit and a positive one a credit, a voucher counted once per bucket. It uses
+/// `ExactDecimal` only, not the summary code's own helpers, so it does not share the code under test.
+fn independent_buckets(
+    rows: &[Value],
+    key: impl Fn(&Value, &Value) -> String,
+) -> BTreeMap<
+    String,
+    (
+        bridge_tally_core::ExactDecimal,
+        bridge_tally_core::ExactDecimal,
+        usize,
+    ),
+> {
+    let zero = bridge_tally_core::ExactDecimal::zero;
+    let mut out: BTreeMap<
+        String,
+        (
+            bridge_tally_core::ExactDecimal,
+            bridge_tally_core::ExactDecimal,
+            usize,
+        ),
+    > = BTreeMap::new();
+    for row in rows.iter().filter(|row| {
+        row["cancelled"] != true
+            && row["optional"] != true
+            && !row["amounts"].as_array().unwrap().is_empty()
+    }) {
+        let mut touched = BTreeSet::new();
+        for entry in row["amounts"].as_array().unwrap() {
+            let name = key(row, entry);
+            let amount = decimal(entry["amount"].as_str().unwrap());
+            let bucket = out
+                .entry(name.clone())
+                .or_insert_with(|| (zero(), zero(), 0));
+            if entry["amount"].as_str().unwrap().starts_with('-') {
+                bucket.0 = bucket.0.checked_add(&amount).unwrap();
+            } else {
+                bucket.1 = bucket.1.checked_add(&amount).unwrap();
+            }
+            if touched.insert(name) {
+                bucket.2 += 1;
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn the_live_buckets_of_every_grouping_are_the_sums_of_the_listed_vouchers_and_trace_to_them() {
+    let rows = live_rows();
+    type Key = fn(&Value, &Value) -> String;
+    let by_ledger: Key = |_, entry| entry["ledger"].as_str().unwrap().to_string();
+    let by_month: Key = |row, _| {
+        let date = row["date"].as_str().unwrap();
+        format!("{}-{}", &date[..4], &date[4..6])
+    };
+    let by_type: Key = |row, _| row["voucher_type"].as_str().unwrap().to_string();
+    for (group, key) in [
+        (SummaryGroup::Ledger, by_ledger),
+        (SummaryGroup::Month, by_month),
+        (SummaryGroup::VoucherType, by_type),
+    ] {
+        let summary = summed(&rows, group, None);
+        let buckets = presented(&summary);
+        let want = independent_buckets(&rows, key);
+        assert_eq!(buckets.len(), want.len(), "{group:?}: bucket count");
+        let (mut total_debit, mut total_credit) = (
+            bridge_tally_core::ExactDecimal::zero(),
+            bridge_tally_core::ExactDecimal::zero(),
+        );
+        for bucket in &buckets {
+            let name = bucket["group"].as_str().unwrap();
+            let (debit, credit, vouchers) = want
+                .get(name)
+                .unwrap_or_else(|| panic!("{group:?}: no sum for {name}"));
+            assert!(
+                decimal(bucket["debit"].as_str().unwrap()).numeric_eq(debit),
+                "{group:?} {name} debit"
+            );
+            assert!(
+                decimal(bucket["credit"].as_str().unwrap()).numeric_eq(credit),
+                "{group:?} {name} credit"
+            );
+            assert_eq!(bucket["vouchers"], *vouchers, "{group:?} {name} vouchers");
+            total_debit = total_debit.checked_add(debit).unwrap();
+            total_credit = total_credit.checked_add(credit).unwrap();
+            let refs = bucket["voucher_refs"].as_array().unwrap();
+            assert_eq!(
+                refs.len(),
+                (*vouchers).min(MAX_VOUCHER_REFS_PER_BUCKET),
+                "{group:?} {name} refs"
+            );
+            assert_eq!(bucket["voucher_refs_complete"], refs.len() == *vouchers);
+            for reference in refs {
+                let row = rows
+                    .iter()
+                    .find(|row| row["guid"] == reference["guid"])
+                    .expect("a ref names a listed voucher");
+                assert!(
+                    row["cancelled"] != true
+                        && row["optional"] != true
+                        && row["amounts"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .any(|entry| key(row, entry) == name),
+                    "{group:?} {name}: {}",
+                    reference["guid"]
+                );
+            }
+        }
+        assert!(
+            decimal(summary.totals["debit"].as_str().unwrap()).numeric_eq(&total_debit),
+            "{group:?} totals debit"
+        );
+        assert!(
+            decimal(summary.totals["credit"].as_str().unwrap()).numeric_eq(&total_credit),
+            "{group:?} totals credit"
+        );
+    }
+}
+
+#[test]
+fn the_live_buckets_page_without_a_gap_or_a_repeat() {
+    let summary = summed(&live_rows(), SummaryGroup::Ledger, None);
+    assert_eq!(summary.buckets.len(), 30);
+    let (mut seen, mut offset) = (Vec::new(), 0);
+    loop {
+        let (page, truncated) = page_buckets(&summary, offset, 7, usize::MAX);
+        offset += page.len();
+        seen.extend(page);
+        if !truncated {
+            break;
+        }
+    }
+    assert_eq!(seen, summary.buckets);
+    // A byte budget below one bucket still returns one, so a page always advances.
+    let (page, truncated) = page_buckets(&summary, 0, 30, 1);
+    assert_eq!((page.len(), truncated), (1, true));
+}
+
+#[test]
+fn each_live_voucher_with_a_disagreeing_flag_balances_by_the_sign_of_the_amount_and_the_summary_accepts_it(
+) {
+    // Two Round Off entries carry a deemed-positive flag that disagrees with the sign of their amount.
+    // The summary counts by sign (as `ledger_movement` does) and every live voucher balances that way;
+    // counting by the flag would leave those two vouchers unbalanced.
+    let rows = live_rows();
+    let disagreeing: Vec<&Value> = rows
+        .iter()
+        .filter(|row| {
+            row["amounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|e| e["polarity_disagrees_with_amount"] == true)
+        })
+        .collect();
+    assert_eq!(disagreeing.len(), 2);
+    for row in disagreeing {
+        let entries = row["amounts"].as_array().unwrap();
+        let (mut by_sign, mut by_flag) = ("0".to_string(), "0".to_string());
+        for entry in entries {
+            let amount = entry["amount"].as_str().unwrap();
+            by_sign = add_decimal(&by_sign, amount).unwrap();
+            let magnitude = amount.trim_start_matches('-');
+            let flagged = if entry["is_deemed_positive"] == "Yes" {
+                format!("-{magnitude}")
+            } else {
+                magnitude.to_string()
+            };
+            by_flag = add_decimal(&by_flag, &flagged).unwrap();
+        }
+        assert!(decimal(&by_sign).is_zero(), "balances by sign");
+        assert!(
+            !decimal(&by_flag).is_zero(),
+            "would not balance by the flag"
+        );
+    }
+    assert!(summarise(&rows, &request(SummaryGroup::Ledger, None)).is_ok());
+}

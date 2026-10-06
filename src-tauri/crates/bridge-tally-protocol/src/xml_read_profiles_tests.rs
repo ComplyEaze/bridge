@@ -763,6 +763,13 @@ fn the_v2_catalogue_request_is_v1_plus_the_bill_wise_method() {
             .collect::<Vec<_>>(),
         v1.lines().collect::<Vec<_>>()
     );
+    // The method sits with the other native methods, not elsewhere in the request.
+    let lines = v2.lines().collect::<Vec<_>>();
+    let parent = lines
+        .iter()
+        .position(|line| line.trim() == "<NATIVEMETHOD>Parent</NATIVEMETHOD>")
+        .unwrap();
+    assert_eq!(lines[parent + 1].trim(), method);
     assert_eq!(
         ReadOnlyProfileId::StandardLedgerCatalogV2.as_str(),
         "standard_ledger_catalog_v2"

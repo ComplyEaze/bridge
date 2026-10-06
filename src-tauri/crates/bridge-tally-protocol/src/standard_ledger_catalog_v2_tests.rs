@@ -81,18 +81,17 @@ fn every_row_carries_its_flag_and_the_catalogue_is_v1s() {
 }
 
 #[test]
-fn the_flag_is_yes_or_no_in_any_case_and_nothing_else() {
-    for (text, expected) in [
-        ("Yes", BillWiseFlag::On),
-        ("no", BillWiseFlag::Off),
-        ("YES", BillWiseFlag::On),
-    ] {
+fn the_flag_is_exactly_yes_or_no_and_nothing_else() {
+    for (text, expected) in [("Yes", BillWiseFlag::On), ("No", BillWiseFlag::Off)] {
         let v2 = parse_v2(&three_rows(Some(text))).unwrap();
         assert_eq!(v2.bill_wise_flags().nth(1).unwrap().2, expected, "{text}");
     }
-    // Tally's other logical spellings are refused, not read as on or off: a
-    // spelling this parser has not seen live is not a flag.
-    for text in ["", " ", "Maybe", "true", "false", "1", "0", "Yes Yes"] {
+    // Only the two spellings seen live are a flag. Tally's other logical
+    // spellings, and other letter cases, are refused until a capture shows
+    // them, not read as on or off.
+    for text in [
+        "", " ", "Maybe", "true", "false", "1", "0", "Yes Yes", "yes", "NO", "YES",
+    ] {
         assert_eq!(
             parse_v2(&three_rows(Some(text))).unwrap_err(),
             StandardLedgerCatalogError::BillWiseFlagInvalid,
@@ -182,26 +181,41 @@ fn v2_keeps_every_v1_check() {
 
 #[test]
 fn the_flag_element_belongs_to_v2_alone() {
-    // V1's parse refuses a row that carries it, so a V2 answer can never be
-    // read as a V1 one by a caller that holds the wrong parser.
+    // Every V1 parser refuses a row that carries it, so a V2 answer can never
+    // be read as a V1 one by a caller that holds the wrong parser.
+    let v2_body = three_rows(Some("Yes"));
     assert_eq!(
-        parse_standard_ledger_catalog_with_identities(
-            &three_rows(Some("Yes")),
-            COMPANY,
-            COMPANY_GUID
-        )
-        .unwrap_err(),
+        parse_standard_ledger_catalog_with_identities(&v2_body, COMPANY, COMPANY_GUID).unwrap_err(),
         StandardLedgerCatalogError::MalformedResponse
     );
+    assert_eq!(
+        parse_standard_ledger_catalog(&v2_body, COMPANY, COMPANY_GUID).unwrap_err(),
+        StandardLedgerCatalogError::MalformedResponse
+    );
+    assert!(parse_standard_ledger_identity_observation(&v2_body, COMPANY).is_err());
 }
 
+/// The flag codes are new strings: the older outstandings parser already emits
+/// `ledger_bill_wise_flag_missing` and `_invalid` for its own read, which stays
+/// in the import path until V2 replaces it, so a failure log must say which read
+/// refused.
 #[test]
-fn the_flag_codes_name_no_ledger() {
-    for error in [
-        StandardLedgerCatalogError::BillWiseFlagMissing,
-        StandardLedgerCatalogError::BillWiseFlagInvalid,
-        StandardLedgerCatalogError::BillWiseFlagRepeated,
+fn the_flag_codes_are_not_the_outstandings_parsers_codes() {
+    let codes = [
+        StandardLedgerCatalogError::BillWiseFlagMissing.safe_code(),
+        StandardLedgerCatalogError::BillWiseFlagInvalid.safe_code(),
+        StandardLedgerCatalogError::BillWiseFlagRepeated.safe_code(),
+    ];
+    for code in codes {
+        assert!(
+            code.starts_with("ledger_catalogue_bill_wise_flag_"),
+            "{code}"
+        );
+    }
+    for outstandings in [
+        "ledger_bill_wise_flag_missing",
+        "ledger_bill_wise_flag_invalid",
     ] {
-        assert!(error.safe_code().starts_with("ledger_bill_wise_flag_"));
+        assert!(!codes.contains(&outstandings));
     }
 }

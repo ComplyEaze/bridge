@@ -298,7 +298,7 @@ pub enum ReadOnlyProfile<'a> {
         company: &'a ValidatedCompanyName,
     },
     /// V1's request with each ledger's `ISBILLWISEON` fetched in the same row,
-    /// so the import family learns which ledgers keep bills in Tally from the
+    /// so the import family learns which ledgers are maintained bill by bill from the
     /// catalogue read it already makes. Not for `source_draft`, presence or
     /// the voucher and bill reads, which keep V1.
     StandardLedgerCatalogV2 {

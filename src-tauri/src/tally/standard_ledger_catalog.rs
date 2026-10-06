@@ -58,7 +58,9 @@ impl From<StandardLedgerCatalogError> for StandardLedgerCatalogReadError {
             // is that a log or a debugger now names the half of the system at
             // fault instead of pointing every reader at the transport.
             StandardLedgerCatalogError::LedgerNameUnusable => Self::MalformedResponse,
-            // The V1 read this error type serves never parses a flag.
+            // The V1 read this error type serves never parses a flag. A V2 read
+            // must have its own error type: reusing this `From` would flatten
+            // the typed flag errors into a malformed-response code.
             StandardLedgerCatalogError::BillWiseFlagMissing
             | StandardLedgerCatalogError::BillWiseFlagInvalid
             | StandardLedgerCatalogError::BillWiseFlagRepeated => Self::MalformedResponse,

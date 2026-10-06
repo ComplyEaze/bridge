@@ -90,9 +90,9 @@ impl StandardLedgerCatalogError {
             Self::CompanyIdentityMismatch => "ledger_catalogue_identity_mismatch",
             Self::DuplicateIdentity => "ledger_catalogue_duplicate_identity",
             Self::BoundsViolation => "ledger_catalogue_bounds_exceeded",
-            Self::BillWiseFlagMissing => "ledger_bill_wise_flag_missing",
-            Self::BillWiseFlagInvalid => "ledger_bill_wise_flag_invalid",
-            Self::BillWiseFlagRepeated => "ledger_bill_wise_flag_repeated",
+            Self::BillWiseFlagMissing => "ledger_catalogue_bill_wise_flag_missing",
+            Self::BillWiseFlagInvalid => "ledger_catalogue_bill_wise_flag_invalid",
+            Self::BillWiseFlagRepeated => "ledger_catalogue_bill_wise_flag_repeated",
         }
     }
 }
@@ -248,9 +248,8 @@ impl StandardLedgerCatalog {
     }
 }
 
-/// A ledger's `ISBILLWISEON`: a ledger that keeps bills in Tally, or one that
-/// does not. Two states and no default: a row that does not say is refused, so
-/// "does not keep bills" is never what an absent or unreadable flag turns into.
+/// A ledger's `ISBILLWISEON`: maintained bill by bill, or not. Two states and no default: a row that does not say is refused, so
+/// "not maintained bill by bill" is never what an absent or unreadable flag turns into.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BillWiseFlag {
     On,
@@ -259,9 +258,11 @@ pub enum BillWiseFlag {
 
 impl BillWiseFlag {
     fn parse(text: &str) -> Result<Self, StandardLedgerCatalogError> {
-        if text.eq_ignore_ascii_case("yes") {
+        // Exactly the two spellings observed live (the outstandings snapshot);
+        // any other is refused until a capture shows Tally uses it (P1).
+        if text == "Yes" {
             Ok(Self::On)
-        } else if text.eq_ignore_ascii_case("no") {
+        } else if text == "No" {
             Ok(Self::Off)
         } else {
             Err(StandardLedgerCatalogError::BillWiseFlagInvalid)
@@ -576,7 +577,7 @@ struct StandardLedgerCatalogRow {
     ledger: TallyLedger,
     guid: String,
     parent_unsupported: bool,
-    /// `Some` for every row of a V2 parse, `None` for V1.
+    /// `None` for V1; a V2 parse refuses a row without one in the row parser.
     bill_wise: Option<BillWiseFlag>,
 }
 

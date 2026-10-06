@@ -257,12 +257,15 @@ impl VoucherType {
     }
 }
 
-// Every variant here carries live import/readback evidence for the exact file
-// shape this module renders for it: Journal in
+// Journal, Payment, Receipt and Contra carry live import/readback evidence for
+// the exact file shape this module renders for them: Journal in
 // docs/agent/ASSESSMENT-2026-09-06.md, and Payment/Receipt/Contra in
-// docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.13. Adding a `VoucherType` variant
-// does not qualify it; the build refuses any type absent from this list, so
-// evidence has to arrive before the file can.
+// docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.13. Sales is admitted on weaker
+// evidence, stated in §9.16 (reads of hand-keyed invoices and hand imports, no
+// invoice posted and read back by ComplyEaze Bridge yet); its post stays
+// refused until the duplicate-number read is measured. Adding a `VoucherType`
+// variant does not qualify it; the build refuses any type absent from this
+// list, so evidence has to arrive before the file can.
 const LIVE_QUALIFIED_VOUCHER_TYPES: &[VoucherType] = &[
     VoucherType::Journal,
     VoucherType::Payment,

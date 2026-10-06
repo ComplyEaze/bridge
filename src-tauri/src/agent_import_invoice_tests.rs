@@ -509,12 +509,15 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
         change(&mut changed);
         assert_ne!(digest(&base), digest(&changed));
     }
-    // A voucher with no invoice detail hashes as before this field existed.
+    // A voucher with no invoice detail binds exactly what it bound before this field
+    // existed: its digest does not depend on the invoice code path at all (pinned
+    // value, so a change to how a plain voucher is encoded shows here).
     let mut plain = voucher();
     plain.voucher_type = VoucherType::Journal;
     plain.invoice = None;
-    let again = plain.clone();
-    assert_eq!(digest(&plain), digest(&again));
+    let first = digest(&plain);
+    plain.voucher_number = Some("1".into());
+    assert_ne!(first, digest(&plain), "the digest still binds the voucher number");
 }
 
 /// A voucher as Tally's export returns it, written out by hand from the shape of a

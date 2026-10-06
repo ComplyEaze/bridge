@@ -3,13 +3,13 @@
 [![ComplyEaze Bridge MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/ComplyEaze/bridge/badges/score.svg)](https://glama.ai/mcp/servers/ComplyEaze/bridge)
 
 <!-- llms:begin -->
-ComplyEaze Bridge is an open-source (Apache-2.0) TallyPrime MCP server for
-Claude Desktop. It connects Claude Desktop to the TallyPrime running on your
-own computer, and it is built for chartered accountants, CA firms and
-accountants. What Claude reads from your books goes to your AI provider as part
-of the chat. You can ask about the trial balance, outstanding receivables and
-payables with ageing, ledger movement and vouchers, the purchase and sales
-registers, the stock summary,
+ComplyEaze Bridge is an open-source (Apache-2.0) TallyPrime (also written Tally
+Prime) MCP server for Claude Desktop. It connects Claude Desktop to the
+TallyPrime running on your own computer, and it is built for chartered
+accountants, CA firms and accountants. What Claude reads from your books goes to
+your AI provider as part of the chat. You can ask about the trial balance,
+outstanding receivables and payables with ageing, ledger movement and vouchers,
+the purchase and sales registers, the stock summary,
 and the Profit and Loss and Balance Sheet (a book with stock items is expected
 to be refused for these two). It checks ledger names before you post. For bank
 statement to TallyPrime vouchers, it proposes Payment, Receipt and Contra
@@ -29,8 +29,9 @@ takes statement files in the formats Tally lists for each bank.
 
 **Current release:**
 <!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,
-for Windows x64 and Apple Silicon Macs. We check each release before we
-publish it: the release check confirms that each package launches, lists its
+for Windows x64 and Apple Silicon Macs, as a Claude Desktop extension (an .mcpb
+file); it has not been run in other MCP clients. We check each release before
+we publish it: the release check confirms that each package launches, lists its
 tools and parses a synthetic encrypted bank statement. It does not run against
 TallyPrime, and nothing we can run covers every
 Tally edition, set of books or setting. What has been run against a real

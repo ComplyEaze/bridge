@@ -153,7 +153,7 @@ Journals in a fifth. `CREATED` equalled the voucher count on every file with zer
 exceptions, and each affected bank ledger reproduced, on readback, the debit total, credit total
 and closing balance its own statement printed.
 
-*(The session record headlined 148. That figure does not reconcile with its own per-file table
+*(An earlier summary headlined 148. That figure does not reconcile with its own per-file table
 or with the artifacts, both of which give 157; the count above is taken from the files.)*
 
 **A bank statement cannot be expressed as Journals.** Booking bank lines as Journals reconciles

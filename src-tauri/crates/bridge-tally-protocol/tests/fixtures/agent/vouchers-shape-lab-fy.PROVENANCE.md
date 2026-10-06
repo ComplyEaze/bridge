@@ -27,6 +27,17 @@ answers, not Tally wire bytes.
   `trial_balance` for the same year. A summary with `voucher_class` set was also run and is
   not kept in the fixture.
 
+## How to repeat it
+
+With a licensed TallyPrime and a company of about this shape loaded, and the build above, one
+`vouchers` call with `from` 2025-04-01 and `to` 2026-03-31 returns the rows. The answers come
+from the same call with, in turn: `summarise_by` set to `ledger`, `month` and `voucher_type`;
+`ledger` set to `Shape Buyer 1` with `summarise_by` `month`; `reference` set to
+`SHAPELAB-MANUAL-1`; `voucher_number` set to `7`; `narration_contains` set to `SHAPELAB`;
+`amount` set to `900.25`, alone and with `summarise_by` `ledger`; a `voucher_number` no voucher
+has. `trial_balance` takes the same two dates. Every call was one request at a time through a
+read-only recording relay, and none was repeated.
+
 ## Transformation
 
 - `rows.json`: the `items` of the plain listing of the year, exactly as the tool

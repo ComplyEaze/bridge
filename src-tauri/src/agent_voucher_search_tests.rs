@@ -422,3 +422,50 @@ fn each_live_search_equals_an_independent_selection_over_the_rows() {
         );
     }
 }
+
+#[test]
+fn searches_the_live_answers_do_not_cover_still_equal_the_independent_selection() {
+    // Terms chosen so that a wrong rule gives a different answer: a reference that is only a prefix of the
+    // live one, the live one in other letter cases, a number written with a leading zero, a narration phrase
+    // that fits a single voucher, an amount that is a whole number of the live decimals, and two criteria
+    // together. The expected vouchers are the independent selection's, not the code under test's.
+    let rows: Vec<Value> = serde_json::from_str(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-shape-lab-fy.rows.json"
+    ))
+    .unwrap();
+    let cases = [
+        (json!({"reference": "SHAPELAB-MANUAL"}), 0),
+        (json!({"reference": "shapelab-manual-1"}), 9),
+        (
+            json!({"reference": "SHAPELAB-MANUAL-1", "narration_contains": "SHAPELAB"}),
+            8,
+        ),
+        (json!({"reference": "  SHAPELAB-MANUAL-1 "}), 9),
+        (json!({"voucher_number": "07"}), 0),
+        (
+            json!({"voucher_number": "7", "narration_contains": "SHAPELAB"}),
+            3,
+        ),
+        (
+            json!({"reference": "SHAPELAB-MANUAL-1", "narration_contains": "SHAPELAB"}),
+            8,
+        ),
+        (json!({"narration_contains": "T-0401"}), 1),
+        (json!({"narration_contains": "t-0401"}), 1),
+        (json!({"amount": "10000"}), 7),
+        (
+            json!({"amount": "10000.00", "narration_contains": "SHAPELAB"}),
+            7,
+        ),
+    ];
+    for (args, expected) in cases {
+        let wanted = independent_selection(&rows, &args);
+        let found = search(args.clone()).apply(rows.clone());
+        assert_eq!(
+            found.iter().map(|row| &row["guid"]).collect::<Vec<_>>(),
+            wanted.iter().map(|row| &row["guid"]).collect::<Vec<_>>(),
+            "{args}"
+        );
+        assert_eq!(found.len(), expected, "{args}: the count on the live rows");
+    }
+}

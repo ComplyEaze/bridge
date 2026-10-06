@@ -766,3 +766,69 @@ fn each_live_voucher_with_a_disagreeing_flag_balances_by_the_sign_of_the_amount_
     }
     assert!(summarise(&rows, &request(SummaryGroup::Ledger, None)).is_ok());
 }
+
+#[test]
+fn a_cancelled_voucher_that_keeps_its_entries_is_left_out_and_counted() {
+    // Derived: the live rows with the one cancelled voucher (exported with no entries) given the entries of
+    // another voucher, as a book whose export keeps them would show.
+    let rows = live_rows();
+    let baseline = summed(&rows, SummaryGroup::Ledger, None);
+    let mut derived = rows.clone();
+    let donor = rows
+        .iter()
+        .find(|row| {
+            row["cancelled"] != true
+                && row["optional"] != true
+                && !row["amounts"].as_array().unwrap().is_empty()
+        })
+        .unwrap()["amounts"]
+        .clone();
+    let cancelled = derived
+        .iter_mut()
+        .find(|row| row["cancelled"] == true)
+        .unwrap();
+    cancelled["amounts"] = donor;
+    let after = summed(&derived, SummaryGroup::Ledger, None);
+    assert_eq!(presented(&after), presented(&baseline));
+    assert_eq!(after.excluded, baseline.excluded);
+    assert_eq!(after.excluded["cancelled"], 1);
+    assert_eq!(after.vouchers_summarised, baseline.vouchers_summarised);
+}
+
+#[test]
+fn the_live_ledger_selected_month_buckets_count_only_that_ledgers_entries_by_an_independent_sum() {
+    let rows = live_rows();
+    let ledger = "Shape Buyer 1";
+    let kept = filter_voucher_rows_for_ledger(rows.clone(), ledger);
+    let summary = summed(&kept, SummaryGroup::Month, Some(ledger));
+    // The same rows with every other entry removed: a plain month sum of what is left.
+    let only_that_ledger: Vec<Value> = kept
+        .iter()
+        .map(|row| {
+            let mut row = row.clone();
+            row["amounts"] = Value::Array(
+                row["amounts"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|e| e["ledger"] == ledger)
+                    .cloned()
+                    .collect(),
+            );
+            row
+        })
+        .collect();
+    let want = independent_buckets(&only_that_ledger, |row, _| {
+        let date = row["date"].as_str().unwrap();
+        format!("{}-{}", &date[..4], &date[4..6])
+    });
+    let buckets = presented(&summary);
+    assert_eq!(buckets.len(), want.len());
+    for bucket in &buckets {
+        let (debit, credit, vouchers) = &want[bucket["group"].as_str().unwrap()];
+        assert!(decimal(bucket["debit"].as_str().unwrap()).numeric_eq(debit));
+        assert!(decimal(bucket["credit"].as_str().unwrap()).numeric_eq(credit));
+        assert_eq!(bucket["vouchers"], *vouchers);
+    }
+    assert_eq!(summary.entries_counted, "selected_ledger");
+}

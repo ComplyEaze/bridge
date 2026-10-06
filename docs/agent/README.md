@@ -1070,7 +1070,7 @@ each other.
 - A debit is an entry with a negative amount and a credit one with a positive
   amount, the rule `ledger_movement` uses (the same function); `ISDEEMEDPOSITIVE`
   decides only a zero amount, which adds nothing to either side but still counts
-  its voucher. `ledger_movement` would refuse the book of the live check (several Currency masters, #716), so it was not run and the live tie is to `trial_balance`; the two reads were not run side by side.
+  its voucher. `ledger_movement` is expected to refuse the book of the live check (several Currency masters, #716; reasoned from the code, not run), so the live tie is to `trial_balance`; the two reads were not run side by side.
 - A ledger bucket adds the entries on that ledger of the vouchers the window,
   selectors and search selected: with a `ledger`, a type or a search given, a
   counter-ledger's bucket holds only its entries on those vouchers, not that
@@ -1130,15 +1130,14 @@ company-identity reads and 2 marks reads), with no voucher data. With `ledger` g
 counted only that ledger's entries.
 
 Cost, from the same run (one run, a debug build): a plain read of that year took 34 requests (12
-status checks, 12 company-identity reads, 4 marks reads, and the window count and its two parts, each
-read twice), about 7 s and about 6 MB of answers from Tally. This book's mark (111) needed one count
-read; a large book needs many more. Every `summarise_by` or search call reads the window again at the
+status checks, 12 company-identity reads, 4 marks reads, the window's count as one paired read of 2
+requests, and its two parts as a paired read each, 4 requests), about 7 s and about 6 MB of answers from
+Tally. This book's mark (111) needed one count read; a large book needs many more. Every `summarise_by` or search call reads the window again at the
 same cost (34 requests, 6 to 11 s). `ledger` adds 12 requests, four of them reads of the whole ledger
 list, which grows with the ledger count. For a month or more on a large book, read ledger totals with
-`trial_balance` instead: it has no month or voucher-type grouping and no search. On the largest book
-measured (a voucher mark of about a million) one day of vouchers took minutes in another run, and a
-month's `trial_balance` took about 30 s once, two of its reads within a few seconds of the 20 s request
-limit.
+`trial_balance` instead: it has no month or voucher-type grouping and no search. The same year's
+`trial_balance` took 34 requests and 2.5 s on this book. One day of vouchers took minutes on the largest
+book measured (a voucher mark of about a million; see the cost note on window reads above, #595).
 
 A bucket's `debit`, `credit` and `net`, and `totals`, are plain decimals with trailing zeros dropped
 (`1000`, `-87900.5`); an item's `amounts` keep the two places Tally sent (`1000.00`).
@@ -1151,8 +1150,8 @@ zero amount, so the `ISDEEMEDPOSITIVE` rule for a zero amount was not exercised.
 Not measured: a memorandum or a reversing journal in the book; a voucher withheld for a foreign-currency
 amount (none was withheld); `mask_parties` and withheld narrations; an item invoice with stock lines;
 paging of a summary past one page; the `ledger` name resolution and its drift check; a book of many
-thousands of vouchers and a window the read refuses; another edition or release; a `reference` on a book
-other than this one (9 of its 67 vouchers carry one). A `voucher_class` summary was also run live and
+thousands of vouchers and a window the read refuses; another TallyPrime edition or release; Windows; a
+`reference` on a book other than this one (9 of its 67 vouchers carry one). A `voucher_class` summary was also run live and
 is not kept in the fixture.
 
 ### Foreign-currency composites in `vouchers`

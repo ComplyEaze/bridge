@@ -247,7 +247,7 @@ async fn an_approved_party_builds_and_the_record_carries_the_approval() {
 /// refusal listed, with the masked name beside it or none, and the build records
 /// the party's real name. The build's own answer, taken through the tool call
 /// as the assistant receives it, lists the approved party under the same
-/// masked name and holds the real one nowhere.
+/// masked name, and that answer does not contain the party's real name.
 #[tokio::test]
 async fn an_approval_by_digest_builds_when_party_names_are_masked() {
     let yes = || journal_plans(&[PARTY]);
@@ -290,6 +290,46 @@ async fn an_approval_by_digest_builds_when_party_names_are_masked() {
                 party_digest: digest,
             }])
         );
+    }
+}
+
+/// Two approved parties are both listed in the build's answer, each under the
+/// masked name and with the digest the refusal showed for it, and the answer
+/// contains neither real name.
+#[tokio::test]
+async fn every_approved_party_is_listed_under_its_masked_name() {
+    let both = || journal_plans(&[PARTY, SALES]);
+    let simulator =
+        SequenceSimulator::spawn([both()[..REFUSAL_REQUESTS].to_vec(), both()].concat()).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server(directory.path(), simulator.address().port(), 200_000);
+    server.settings.redaction = crate::agent::Redaction::MaskParties;
+    let refused = answered(&server.call_tool("build_import_xml", build_args(None)).await);
+    let parties = refused["result"]["refused_parties"]
+        .as_array()
+        .expect("the refusal lists its parties")
+        .clone();
+    assert_eq!(parties.len(), 2, "{refused}");
+    assert_ne!(parties[0]["ledger"], parties[1]["ledger"]);
+    let approvals: Vec<Value> = parties
+        .iter()
+        .map(|party| json!({"party_digest": party["party_digest"]}))
+        .collect();
+    let response = server
+        .call_tool("build_import_xml", build_args(Some(json!(approvals))))
+        .await;
+    let built = answered(&response);
+    let listed: Vec<Value> = parties
+        .iter()
+        .map(|party| json!({"ledger": party["ledger"], "party_digest": party["party_digest"]}))
+        .collect();
+    assert_eq!(
+        built["result"]["on_account_approved"],
+        json!(listed),
+        "{built}"
+    );
+    for name in [PARTY, SALES] {
+        assert!(!response.to_string().contains(name), "{name}: {response}");
     }
 }
 

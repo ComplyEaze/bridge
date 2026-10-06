@@ -1165,9 +1165,10 @@ impl Server {
                     "live_evidence": live_evidence(&line.vouchers),
                     "verification_preflight": verification_preflight,
                     "identity_scheme": line.identity_scheme,
-                    // The bill-wise ledgers a person approved, each with the
-                    // digest the approval was tied to, and the catalogue
-                    // response the flags came from (#1234).
+                    // The bill-wise ledgers a person approved, each name
+                    // marked as a party name, with the digest the approval
+                    // was tied to, and the catalogue response the flags came
+                    // from (#1234).
                     "on_account_approved": line
                         .on_account_approved
                         .as_deref()

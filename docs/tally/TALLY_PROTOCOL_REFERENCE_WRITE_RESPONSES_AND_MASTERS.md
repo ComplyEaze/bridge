@@ -1005,7 +1005,7 @@ A ledger row names its ledger twice: in the row's `NAME` attribute, and as the f
 
 - **26** of the 4,017 GUIDs ever had an attribute that differed from their own name, in 4 of the 13 books. Every such pair shares the same letters and digits and differs in case or symbols. The committed capture `native-shape-lab-ledger-catalogue.utf16le.xml` holds one: attribute `ROUND OFF`, own name `Round Off`.
 - For 21 GUIDs the attribute changed between captures (the `ALTERID` advanced) while the own name stayed the same. The own name never varied for a GUID.
-- ComplyEaze Bridge reads the own name (`standard_ledger_catalog.rs`), takes either spelling as an exact request for that one ledger (a spelling that is two ledgers' is `ledger_ambiguous`), and shows the own name. The voucher filter still compares the spelling the voucher rows carry.
+- ComplyEaze Bridge reads the own name (`standard_ledger_catalog.rs`), takes either spelling as an exact request for that one ledger in `vouchers` and the `outstandings` party detail (a spelling that is two ledgers' is `ledger_ambiguous`, and so is a case-and-spaces match over either spelling of two ledgers), and shows the own name. The voucher filter still compares the spelling the voucher rows carry.
 
 **Not measured:** that the first `LANGUAGENAME.LIST` is the primary language when a master has several; what the outstandings (bills) reports carry for such a ledger; which spelling a voucher row carries for such a ledger on a book other than the one it was read on; whether Tally accepts the attribute spelling in an import when it differs from the own name (imports are unchanged); whether an alias can equal another ledger's own name.
 

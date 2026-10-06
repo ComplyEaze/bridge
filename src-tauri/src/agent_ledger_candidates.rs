@@ -123,6 +123,11 @@ impl CatalogueLedger {
         &self.row
     }
 
+    /// Both spellings the ledger answers to.
+    fn spellings(&self) -> impl Iterator<Item = &str> {
+        std::iter::once(self.row.as_str()).chain(self.stored.as_deref())
+    }
+
     /// The name an answer shows: the stored name when there is one.
     fn display(&self) -> &str {
         self.stored.as_deref().unwrap_or(&self.row)
@@ -152,7 +157,8 @@ fn names_to_choose_from(ledgers: &[&CatalogueLedger]) -> Vec<String> {
 /// can pass it to a tool that keys on it (#1085).
 pub(super) fn ledger_match_json(found: &LedgerMatch, row: &str, redaction: Redaction) -> Value {
     let mut json = found.to_json(redaction);
-    if row != found.name() {
+    // Under masking the field would name nothing a caller could pass on.
+    if row != found.name() && redaction != Redaction::MaskParties {
         json["ledger_row_spelling"] = redact_value(party_name_value(row.to_string()), redaction);
     }
     json
@@ -180,39 +186,45 @@ pub(super) fn resolve_catalogue_ledger_or_refuse(
     let resolved = match reached.as_slice() {
         [one] => resolve_ledger_name(names.iter().copied(), one.display())
             .map(|found| (found, one.row.clone())),
-        [] => match resolve_ledger_name(names.iter().copied(), requested) {
-            Ok(found) => {
-                let same_name = ledgers
-                    .iter()
-                    .filter(|ledger| ledger.display() == found.name())
-                    .collect::<Vec<_>>();
-                match same_name.as_slice() {
-                    [one] => Ok((found, one.row.clone())),
-                    _ => Err(LedgerRefusal::Ambiguous(names_to_choose_from(&same_name))),
+        // Not exactly any ledger's spelling: the case-and-spaces fold, over both
+        // spellings of every ledger. More than one ledger answering to it, or to a
+        // whitespace twin of it, asks, as before the own name was read.
+        [] => {
+            let key = ledger_spelling_key(requested);
+            let spelled = ledgers
+                .iter()
+                .filter_map(|ledger| {
+                    ledger
+                        .spellings()
+                        .find(|spelling| ledger_spelling_key(spelling) == key)
+                        .map(|spelling| (ledger, spelling))
+                })
+                .collect::<Vec<_>>();
+            match spelled.as_slice() {
+                [] => Err(LedgerRefusal::NotFound),
+                [(one, matched)] => {
+                    let twin = ledger_twin_key(matched);
+                    let twins = ledgers
+                        .iter()
+                        .filter(|ledger| ledger.spellings().any(|s| ledger_twin_key(s) == twin))
+                        .collect::<Vec<_>>();
+                    if twins.len() == 1 {
+                        Ok((
+                            LedgerMatch::CaseOrSpacing {
+                                name: one.display().to_string(),
+                            },
+                            one.row.clone(),
+                        ))
+                    } else {
+                        Err(LedgerRefusal::Ambiguous(names_to_choose_from(&twins)))
+                    }
+                }
+                many => {
+                    let ledgers = many.iter().map(|(ledger, _)| *ledger).collect::<Vec<_>>();
+                    Err(LedgerRefusal::Ambiguous(names_to_choose_from(&ledgers)))
                 }
             }
-            // A request typed from a voucher row (the row spelling, loosely): the same
-            // case-and-spaces fold, over the row spellings, as before the stored name.
-            Err(LedgerRefusal::NotFound) => {
-                resolve_ledger_name(ledgers.iter().map(CatalogueLedger::row), requested).and_then(
-                    |found| {
-                        ledgers
-                            .iter()
-                            .find(|ledger| ledger.row == found.name())
-                            .map(|ledger| {
-                                (
-                                    LedgerMatch::CaseOrSpacing {
-                                        name: ledger.display().to_string(),
-                                    },
-                                    ledger.row.clone(),
-                                )
-                            })
-                            .ok_or(LedgerRefusal::NotFound)
-                    },
-                )
-            }
-            Err(refusal) => Err(refusal),
-        },
+        }
         many => Err(LedgerRefusal::SharedSpelling(names_to_choose_from(many))),
     };
     settle_ledger_resolution(resolved, &names, requested, redaction)

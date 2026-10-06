@@ -806,3 +806,56 @@ fn the_answer_names_the_row_spelling_only_when_it_differs() {
         .get("ledger_row_spelling")
         .is_none());
 }
+
+/// A case-and-spaces match over either spelling of two ledgers asks, as it did before
+/// the own name was read. Here the first ledger answers to `round off` by its row
+/// spelling and the second by its own name (a whitespace twin of it). Folding the
+/// shown names first resolved this silently to the second.
+/// Mutant killed: folding over the shown names only.
+#[test]
+fn a_loose_match_over_either_spelling_of_two_ledgers_asks() {
+    let failure = resolved(
+        &[("ROUND OFF", Some("Round-Off")), ("Round  Off", None)],
+        "round off",
+    )
+    .unwrap_err();
+    assert_eq!(failure.code, "ledger_ambiguous");
+    assert_eq!(
+        listed_names(&failure.candidates.unwrap().items),
+        ["Round  Off", "Round-Off"]
+    );
+}
+
+/// One ledger whose two spellings both fold to the request is one ledger, not a clash;
+/// a whitespace twin of either spelling makes it two. Mutant killed: counting spellings
+/// as ledgers, or ignoring a twin of the stored name.
+#[test]
+fn one_ledger_answering_by_both_spellings_is_not_a_clash_but_a_twin_of_either_is() {
+    let (found, row) = resolved(&[("ROUND OFF", Some("Round Off"))], "round  off").unwrap();
+    assert_eq!((found.name(), row.as_str()), ("Round Off", "ROUND OFF"));
+    // A loose request that only the own name answers to still resolves.
+    let (found, row) = resolved(
+        &[("ROUND OFF", Some("Round-Off")), ("Cash", None)],
+        "round-off",
+    )
+    .unwrap();
+    assert_eq!((found.name(), row.as_str()), ("Round-Off", "ROUND OFF"));
+    // A twin that differs by a line break, not by ASCII case or spaces, is no match
+    // of its own but still makes the answer unsafe to give silently (reference 9.4e).
+    let failure = resolved(
+        &[("ROUND OFF", Some("Round Off")), ("Round Off\r\n", None)],
+        "round off",
+    )
+    .unwrap_err();
+    assert_eq!(failure.code, "ledger_ambiguous");
+}
+
+/// Under masking the row spelling is left out of the answer: it would name nothing a
+/// caller could pass on. Mutant killed: adding the field under masking.
+#[test]
+fn the_row_spelling_is_left_out_of_a_masked_answer() {
+    let (found, row) = resolved(&[("ROUND OFF", Some("Round Off"))], "Round Off").unwrap();
+    assert!(ledger_match_json(&found, &row, Redaction::MaskParties)
+        .get("ledger_row_spelling")
+        .is_none());
+}

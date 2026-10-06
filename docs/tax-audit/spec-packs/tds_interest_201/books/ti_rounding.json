@@ -1,0 +1,279 @@
+{
+ "comment": "Rounding, to the paisa, on three s.194C payees of a firm (lower rate 1%, higher rate 2%): 16 rows, 6 findings. Neem Movers: x01 (Rs 31,003.50) is taxed at 1% as Rs 310.04, the half paisa rounded up; x02 (Rs 69,000.49), which also takes the year's total over Rs 1,00,000, as Rs 690.00, the 0.49 of a paisa rounded down. After the crossing every credit is a tranche: x03 (49 paise) has no tax at 1% and 1 paisa at 2%; x04 (24 paise) has no tax at either rate; x05 (Rs 50) has tax of 50 paise at 1%, and 9 months of interest on it, 4.5 paise, is 5; x06 (Rs 49) has tax of 49 paise at 1%, and 9 months, 4.41 paise, is 4. The lower-rate finding lists 4 tranches and the higher-rate finding 5, because a tranche with no tax is left out of a finding while its figures stay. Oak Transit: x07 and x08 (Rs 31,050 each, both on 10 March) are one tranche of two credits; at 1% the tranche's maximum is Rs 43.47 and its own-date maximum, each credit rounded on its own, Rs 43.48, a paisa more. Palm Freight: x09 and x10 (Rs 31,075 each, same day) are one tranche; at 1% its maximum is Rs 43.51 and its own-date maximum Rs 43.50, a paisa less, and at 2% Rs 87.01 and Rs 87.02, a paisa more.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Carriage Outward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "ti_rounding-ledger-00j"
+  },
+  {
+   "name": "Neem Movers",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_rounding-ledger-01j"
+  },
+  {
+   "name": "Oak Transit",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_rounding-ledger-02j"
+  },
+  {
+   "name": "Palm Freight",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_rounding-ledger-03j"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_rounding-ledger-04j"
+  },
+  {
+   "name": "Proprietor Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_rounding-ledger-05j"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Carriage Outward",
+   "opening": 0,
+   "debit": 22435372,
+   "credit": 0,
+   "closing": 22435372
+  },
+  {
+   "ledger": "Neem Movers",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10010372,
+   "closing": -10010372
+  },
+  {
+   "ledger": "Oak Transit",
+   "opening": 0,
+   "debit": 0,
+   "credit": 6210000,
+   "closing": -6210000
+  },
+  {
+   "ledger": "Palm Freight",
+   "opening": 0,
+   "debit": 0,
+   "credit": 6215000,
+   "closing": -6215000
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 50000000
+  },
+  {
+   "ledger": "Proprietor Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-x01",
+   "date": "2025-06-02",
+   "base_type": "Journal",
+   "number": "CJ/01",
+   "lines": [
+    [
+     "Carriage Outward",
+     3100350
+    ],
+    [
+     "Neem Movers",
+     -3100350
+    ]
+   ]
+  },
+  {
+   "guid": "ti-x02",
+   "date": "2025-06-03",
+   "base_type": "Journal",
+   "number": "CJ/02",
+   "lines": [
+    [
+     "Carriage Outward",
+     6900049
+    ],
+    [
+     "Neem Movers",
+     -6900049
+    ]
+   ]
+  },
+  {
+   "guid": "ti-x03",
+   "date": "2025-12-10",
+   "base_type": "Journal",
+   "number": "CJ/03",
+   "lines": [
+    [
+     "Carriage Outward",
+     49
+    ],
+    [
+     "Neem Movers",
+     -49
+    ]
+   ]
+  },
+  {
+   "guid": "ti-x04",
+   "date": "2025-12-11",
+   "base_type": "Journal",
+   "number": "CJ/04",
+   "lines": [
+    [
+     "Carriage Outward",
+     24
+    ],
+    [
+     "Neem Movers",
+     -24
+    ]
+   ]
+  },
+  {
+   "guid": "ti-x05",
+   "date": "2026-01-20",
+   "base_type": "Journal",
+   "number": "CJ/05",
+   "lines": [
+    [
+     "Carriage Outward",
+     5000
+    ],
+    [
+     "Neem Movers",
+     -5000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-x06",
+   "date": "2026-01-21",
+   "base_type": "Journal",
+   "number": "CJ/06",
+   "lines": [
+    [
+     "Carriage Outward",
+     4900
+    ],
+    [
+     "Neem Movers",
+     -4900
+    ]
+   ]
+  },
+  {
+   "guid": "ti-x07",
+   "date": "2026-03-10",
+   "base_type": "Journal",
+   "number": "CJ/07",
+   "lines": [
+    [
+     "Carriage Outward",
+     3105000
+    ],
+    [
+     "Oak Transit",
+     -3105000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-x08",
+   "date": "2026-03-10",
+   "base_type": "Journal",
+   "number": "CJ/08",
+   "lines": [
+    [
+     "Carriage Outward",
+     3105000
+    ],
+    [
+     "Oak Transit",
+     -3105000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-x09",
+   "date": "2026-03-10",
+   "base_type": "Journal",
+   "number": "CJ/09",
+   "lines": [
+    [
+     "Carriage Outward",
+     3107500
+    ],
+    [
+     "Palm Freight",
+     -3107500
+    ]
+   ]
+  },
+  {
+   "guid": "ti-x10",
+   "date": "2026-03-10",
+   "base_type": "Journal",
+   "number": "CJ/10",
+   "lines": [
+    [
+     "Carriage Outward",
+     3107500
+    ],
+    [
+     "Palm Freight",
+     -3107500
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Carriage Outward": "194C"
+ }
+}

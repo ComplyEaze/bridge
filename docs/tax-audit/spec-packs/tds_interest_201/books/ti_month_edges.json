@@ -1,0 +1,267 @@
+{
+ "comment": "Month-or-part counting at each edge, against the as-of date of 30 September 2026, on a firm's book whose period runs from 1 May 2025 to 31 October 2026 so that vouchers can sit on both sides of that date: three s.194H payees, 9 rows at 2%, 1 finding. Kauri Agency: m01 (Rs 20,000.01, 30 September 2025) crosses the limit, 13 months; each later credit of Rs 1,000 is its own tranche: m02 on 1 October 2025, 12 months; m03 on 31 August 2026, 2 months although 30 days before the as-of date; m04 on 1 September 2026, 1 month; m05 on 29 September 2026, 1 month; m06 on the as-of date itself, 0 months; m07 the day after it, 0 months. Its finding lists all 7 tranches, the two with a maximum of 0 included. Larch Brokers: m08 (Rs 25,510.50) on the as-of date, 0 months: its figures are published and its tax is in the totals, but with no maximum above 0 it has no finding. Maple Brokers: m09 (Rs 25,000) on 15 October 2026, after the as-of date: likewise no finding.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Sales Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_month_edges-ledger-00a"
+  },
+  {
+   "name": "Kauri Agency",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_month_edges-ledger-01a"
+  },
+  {
+   "name": "Larch Brokers",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_month_edges-ledger-02a"
+  },
+  {
+   "name": "Maple Brokers",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_month_edges-ledger-03a"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_month_edges-ledger-04a"
+  },
+  {
+   "name": "Proprietor Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_month_edges-ledger-05a"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Sales Commission",
+   "opening": 0,
+   "debit": 7651051,
+   "credit": 0,
+   "closing": 7651051
+  },
+  {
+   "ledger": "Kauri Agency",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2600001,
+   "closing": -2600001
+  },
+  {
+   "ledger": "Larch Brokers",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2551050,
+   "closing": -2551050
+  },
+  {
+   "ledger": "Maple Brokers",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2500000,
+   "closing": -2500000
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 50000000
+  },
+  {
+   "ledger": "Proprietor Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-m01",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "number": "CJ/01",
+   "lines": [
+    [
+     "Sales Commission",
+     2000001
+    ],
+    [
+     "Kauri Agency",
+     -2000001
+    ]
+   ]
+  },
+  {
+   "guid": "ti-m02",
+   "date": "2025-10-01",
+   "base_type": "Journal",
+   "number": "CJ/02",
+   "lines": [
+    [
+     "Sales Commission",
+     100000
+    ],
+    [
+     "Kauri Agency",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-m03",
+   "date": "2026-08-31",
+   "base_type": "Journal",
+   "number": "CJ/03",
+   "lines": [
+    [
+     "Sales Commission",
+     100000
+    ],
+    [
+     "Kauri Agency",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-m04",
+   "date": "2026-09-01",
+   "base_type": "Journal",
+   "number": "CJ/04",
+   "lines": [
+    [
+     "Sales Commission",
+     100000
+    ],
+    [
+     "Kauri Agency",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-m05",
+   "date": "2026-09-29",
+   "base_type": "Journal",
+   "number": "CJ/05",
+   "lines": [
+    [
+     "Sales Commission",
+     100000
+    ],
+    [
+     "Kauri Agency",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-m06",
+   "date": "2026-09-30",
+   "base_type": "Journal",
+   "number": "CJ/06",
+   "lines": [
+    [
+     "Sales Commission",
+     100000
+    ],
+    [
+     "Kauri Agency",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-m07",
+   "date": "2026-10-01",
+   "base_type": "Journal",
+   "number": "CJ/07",
+   "lines": [
+    [
+     "Sales Commission",
+     100000
+    ],
+    [
+     "Kauri Agency",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-m08",
+   "date": "2026-09-30",
+   "base_type": "Journal",
+   "number": "CJ/08",
+   "lines": [
+    [
+     "Sales Commission",
+     2551050
+    ],
+    [
+     "Larch Brokers",
+     -2551050
+    ]
+   ]
+  },
+  {
+   "guid": "ti-m09",
+   "date": "2026-10-15",
+   "base_type": "Journal",
+   "number": "CJ/09",
+   "lines": [
+    [
+     "Sales Commission",
+     2500000
+    ],
+    [
+     "Maple Brokers",
+     -2500000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "period": [
+  "2025-05-01",
+  "2026-10-31"
+ ],
+ "nature_by_ledger": {
+  "Sales Commission": "194H"
+ }
+}

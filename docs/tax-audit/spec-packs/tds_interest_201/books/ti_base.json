@@ -1,0 +1,221 @@
+{
+ "comment": "What the tax is taken on, for three s.194J professional payees of a firm (one rate, 10%): 3 rows, 3 findings. b01 credits Kauri Counsel fees of Rs 60,000 net of Rs 6,000 on TDS on Fees, a ledger classified as TDS payable: the credit is read gross, Rs 60,000, and the row's tax is Rs 6,000, the whole of it, although that same Rs 6,000 of TDS is on the voucher. b02 credits Larch Advisors Rs 70,800 including Rs 10,800 on Input IGST; the configuration records that its agreement states GST separately, so the credit is read as Rs 60,000 and the tax is Rs 6,000. b03 credits Maple Chambers the same Rs 70,800 with no agreement recorded: GST stays in, and the tax is Rs 7,080.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Legal Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_base-ledger-00a"
+  },
+  {
+   "name": "Input IGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "ti_base-ledger-01a"
+  },
+  {
+   "name": "TDS on Fees",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "ti_base-ledger-02a"
+  },
+  {
+   "name": "Kauri Counsel",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_base-ledger-03a"
+  },
+  {
+   "name": "Larch Advisors",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_base-ledger-04a"
+  },
+  {
+   "name": "Maple Chambers",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_base-ledger-05a"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_base-ledger-06a"
+  },
+  {
+   "name": "Proprietor Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_base-ledger-07a"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Legal Fees",
+   "opening": 0,
+   "debit": 18000000,
+   "credit": 0,
+   "closing": 18000000
+  },
+  {
+   "ledger": "Input IGST",
+   "opening": 0,
+   "debit": 2160000,
+   "credit": 0,
+   "closing": 2160000
+  },
+  {
+   "ledger": "TDS on Fees",
+   "opening": 0,
+   "debit": 0,
+   "credit": 600000,
+   "closing": -600000
+  },
+  {
+   "ledger": "Kauri Counsel",
+   "opening": 0,
+   "debit": 0,
+   "credit": 5400000,
+   "closing": -5400000
+  },
+  {
+   "ledger": "Larch Advisors",
+   "opening": 0,
+   "debit": 0,
+   "credit": 7080000,
+   "closing": -7080000
+  },
+  {
+   "ledger": "Maple Chambers",
+   "opening": 0,
+   "debit": 0,
+   "credit": 7080000,
+   "closing": -7080000
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 50000000
+  },
+  {
+   "ledger": "Proprietor Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-b01",
+   "date": "2025-06-16",
+   "base_type": "Journal",
+   "number": "LJ/01",
+   "lines": [
+    [
+     "Legal Fees",
+     6000000
+    ],
+    [
+     "Kauri Counsel",
+     -5400000
+    ],
+    [
+     "TDS on Fees",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-b02",
+   "date": "2025-07-21",
+   "base_type": "Journal",
+   "number": "LJ/02",
+   "lines": [
+    [
+     "Legal Fees",
+     6000000
+    ],
+    [
+     "Input IGST",
+     1080000
+    ],
+    [
+     "Larch Advisors",
+     -7080000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-b03",
+   "date": "2025-08-25",
+   "base_type": "Journal",
+   "number": "LJ/03",
+   "lines": [
+    [
+     "Legal Fees",
+     6000000
+    ],
+    [
+     "Input IGST",
+     1080000
+    ],
+    [
+     "Maple Chambers",
+     -7080000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Legal Fees": "194J"
+ },
+ "s194j_category_by_ledger": {
+  "Legal Fees": "professional"
+ },
+ "tds_payable_ledgers": [
+  "TDS on Fees"
+ ],
+ "gst_ledgers": [
+  "Input IGST"
+ ],
+ "gst_separate_by_agreement": [
+  "Larch Advisors"
+ ]
+}

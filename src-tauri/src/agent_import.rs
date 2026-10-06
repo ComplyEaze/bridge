@@ -1165,10 +1165,14 @@ impl Server {
                     "live_evidence": live_evidence(&line.vouchers),
                     "verification_preflight": verification_preflight,
                     "identity_scheme": line.identity_scheme,
-                    // The bill-wise ledgers a person approved, each with the
-                    // digest the approval was tied to, and the catalogue
-                    // response the flags came from (#1234).
-                    "on_account_approved": line.on_account_approved,
+                    // The bill-wise ledgers a person approved, each name
+                    // marked as a party name, with the digest the approval
+                    // was tied to, and the catalogue response the flags came
+                    // from (#1234).
+                    "on_account_approved": line
+                        .on_account_approved
+                        .as_deref()
+                        .map(bill_wise::approved_json),
                     "bill_wise_response_sha256": [catalogue_evidence.response_sha256.clone()],
                     // The fifth element of §9.13's identity tuple. It is
                     // recorded on the batch and compared on dispatch, but a

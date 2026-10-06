@@ -41,7 +41,7 @@ vouchers is off by default. This page is the short path; the
 5. **Fill in its settings.** Keep **Tally host** as `localhost`. Set **Tally
    port** to the gateway port from step 1. Read the Terms of Use linked in the
    settings, then turn on **I accept the ComplyEaze Bridge Terms of Use (version
-   2026-10)**:
+   2026-10.1)**:
    until you do, every tool call is refused and nothing is read from
    TallyPrime.
 6. **Restart Claude Desktop.** Save the settings, quit Claude Desktop

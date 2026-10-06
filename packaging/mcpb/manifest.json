@@ -16,7 +16,7 @@
     "mcp_config": {
       "command": "${__dirname}/bin/bridge_mcp",
       "env": {
-        "BRIDGE_TERMS_ACCEPTED": "${user_config.accept_terms_2026_10}",
+        "BRIDGE_TERMS_ACCEPTED": "${user_config.accept_terms_2026_10_1}",
         "BRIDGE_TALLY_HOST": "${user_config.host}",
         "BRIDGE_TALLY_PORT": "${user_config.port}",
         "BRIDGE_AGENT_REDACTION": "${user_config.redaction}",
@@ -26,9 +26,9 @@
     }
   },
   "user_config": {
-    "accept_terms_2026_10": {
+    "accept_terms_2026_10_1": {
       "type": "boolean",
-      "title": "I accept the ComplyEaze Bridge Terms of Use (version 2026-10)",
+      "title": "I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)",
       "description": "Required: ComplyEaze Bridge refuses every tool call until you accept. Terms: https://bridge.complyeaze.com/terms. Privacy: https://bridge.complyeaze.com/privacy.",
       "required": true,
       "default": false
@@ -56,7 +56,7 @@
     "enable_writes": {
       "type": "boolean",
       "title": "Allow voucher posting (Journal, Payment, Receipt, Contra)",
-      "description": "Off by default. When on, ComplyEaze Bridge can post one Journal, Payment, Receipt or Contra into Tally at a time, each only after you approve it in a native dialog. Leave it off unless you accept four known limits. 1) Tally picks the company by name. ComplyEaze Bridge checks just before the post that exactly one open company has the target's GUID and name and no other has the same name ignoring case and spacing (bridge#607), but a company renamed to, or opened under, that name (or one differing only in case or spacing) right after the check could still receive the voucher. It may flag this afterwards, but cannot always say where the voucher went, and cannot prevent it (bridge#574). 2) A ledger renamed and replaced in that same moment can receive the post instead. This is marked for reconciliation when seen, but not every such change is seen (bridge#623). 3) There is no undo: a wrong post must be corrected by hand in Tally (bridge#579). 4) The approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it. This setting also lets you record, in a separate native dialog, that you reviewed a posted voucher whose ledgers changed master; that writes nothing to Tally. Reading, bank-statement parsing and voucher file preparation work either way.",
+      "description": "Off by default. When on, ComplyEaze Bridge can post one Journal, Payment, Receipt or Contra into Tally at a time, each only after you approve it in a separate window. Leave it off unless you accept the known limits in Terms of Use section 9.2 (Posting), including these four: 1) Tally picks the company by name. A company renamed to, or opened under, that name (or one differing only in capitals or spaces) right after the last check could still receive the voucher. ComplyEaze Bridge may flag it afterwards, but cannot always say where the voucher went, and cannot prevent it. 2) A ledger renamed and replaced in that same moment can receive the post instead. It is marked for checking when seen, but not every such change is seen. 3) There is no undo: a wrong post must be corrected by hand in Tally. 4) The approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it. You can also record, in another window, that you reviewed a voucher marked for checking; that writes nothing to Tally. Reading, bank-statement parsing and voucher file preparation work either way.",
       "default": false
     }
   }

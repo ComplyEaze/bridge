@@ -110,7 +110,7 @@ whose ledger now points to a different master.
   identifier, and a fingerprint of what was asked and of what came back,
   written whether the call succeeds or is refused.
 - **You accept the Terms of Use first.** The extension asks you to accept the
-  ComplyEaze Bridge Terms of Use (version 2026-10) in its settings, and every
+  ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings, and every
   tool refuses with `terms_not_accepted` until you do.
 - **Open source** under Apache-2.0.
 

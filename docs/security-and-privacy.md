@@ -172,7 +172,7 @@ settings (section 4).
   count of the rest. The second records that the response was written out. It
   holds no row values.
 - **A terms record** (`terms-acceptance.jsonl`): the extension asks you to
-  accept the ComplyEaze Bridge Terms of Use (version 2026-10) in its settings,
+  accept the ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings,
   and every tool refuses with `terms_not_accepted` until you do. When the
   server starts with the setting on, it appends a line with the terms version,
   the time, and that the acceptance came through the setting (once per

@@ -281,7 +281,12 @@ fn nothing_else_dispatches_an_mcp_tool_call() {
 fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
     let manifest: Value =
         serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
-    let key = format!("accept_terms_{}", TERMS_VERSION.replace('-', "_"));
+    let key = format!("accept_terms_{}", TERMS_VERSION.replace(['-', '.'], "_"));
+    assert!(
+        key.bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_'),
+        "{key}"
+    );
     assert_eq!(manifest["manifest_version"], "0.2");
     assert_eq!(
         manifest["privacy_policies"],

@@ -57,6 +57,15 @@ These changes are in source and not yet in a published build.
   with what Tally created. `alter_id_delta` gains `from` (`pre_post_mark`, or
   `build_mark` for a file imported by hand, which has no POST of its own);
   `pre_import_mark` still reports the build-time mark (#1087).
+- The posting setting is shorter and names its four known limits in plainer
+  words, and Terms of Use section 9.2 (version 2026-10.1, effective 7 October
+  2026) now lists the same limits and more: a company or ledger renamed or opened
+  at the moment of a post, another Tally connector that can change entries
+  without the approval window, and that dealing with a voucher that reaches the
+  wrong company remains yours. The setting that accepts the Terms is now named
+  for version 2026-10.1, so the next build asks you to accept the Terms once
+  more; version 2026-10 stays published for the builds that asked for it
+  (#1010).
 
 ## [0.4.2] - 2026-10-03
 

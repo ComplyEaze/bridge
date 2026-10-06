@@ -241,12 +241,12 @@ class BundleSmokeTests(unittest.TestCase):
         self.assertEqual(smoke.resolve_environment(manifest)["BRIDGE_TERMS_ACCEPTED"], "false")
         for field, value in (("default", True), ("required", False), ("type", "string")):
             broken = json.loads(template.read_text(encoding="utf-8"))
-            broken["user_config"]["accept_terms_2026_10"][field] = value
+            broken["user_config"]["accept_terms_2026_10_1"][field] = value
             with self.subTest(field=field), self.assertRaisesRegex(
                     smoke.SmokeError, "terms_setting_must_be_required_and_off"):
                 smoke.resolve_environment(broken)
         broken = json.loads(template.read_text(encoding="utf-8"))
-        del broken["user_config"]["accept_terms_2026_10"]
+        del broken["user_config"]["accept_terms_2026_10_1"]
         with self.assertRaisesRegex(smoke.SmokeError, "terms_setting_must_be_required_and_off"):
             smoke.resolve_environment(broken)
         for mapping in ("true", "${user_config.enable_writes}"):

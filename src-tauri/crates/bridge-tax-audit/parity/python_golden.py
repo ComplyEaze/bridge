@@ -118,6 +118,17 @@ def _related_parties_cl23(c):
     return related_parties_cl23, related_parties_cl23.run(c.eng, c.rules, related_parties_config(c.cfg))
 
 
+def _specified_persons_40a2b(c):
+    from types import SimpleNamespace
+    from tae.audit_tests import related_parties_cl23, specified_persons_40a2b
+    from tae.config import related_parties_config
+    rp = related_parties_config(c.cfg)
+    cl23 = related_parties_cl23.run(c.eng, c.rules, rp)
+    mod = SimpleNamespace(TEST_ID=specified_persons_40a2b.TEST_ID, check_invariants=lambda e, res:
+                          specified_persons_40a2b.check_invariants(e, c.rules, rp, cl23, res))
+    return mod, specified_persons_40a2b.run(c.eng, c.rules, rp, cl23)
+
+
 def _trial_balance(c):
     from tae.audit_tests import trial_balance
     return trial_balance, trial_balance.run(c.eng, c.rules)
@@ -462,6 +473,7 @@ RUNNERS = {
     "party_monthly": _party_monthly,
     "read_scope": _read_scope,
     "related_parties_cl23": _related_parties_cl23,
+    "specified_persons_40a2b": _specified_persons_40a2b,
     "stale_balances_41_1": _stale_balances_41_1,
     "statutory_dues_43b": _statutory_dues_43b,
     "stock": _stock,

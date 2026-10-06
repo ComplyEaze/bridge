@@ -9638,5 +9638,165 @@
   "file": "src/binding.rs",
   "from": "            *v = toml::Value::Array(\n                lbinder\n                    .bind_list(&names, &location)?",
   "to": "            *v = toml::Value::Array(\n                names"
+ },
+ {
+  "id": "SP-01",
+  "by": "author",
+  "what": "specified_persons_40a2b: the gate opens only past one person",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "Value::Text(if persons.is_empty() { \"no\" } else { \"yes\" }.into())",
+  "to": "Value::Text(if persons.len() <= 1 { \"no\" } else { \"yes\" }.into())"
+ },
+ {
+  "id": "SP-02",
+  "by": "author",
+  "what": "specified_persons_40a2b: a nature with an empty list is still looked at",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": ".is_none_or(Vec::is_empty)",
+  "to": ".is_none()"
+ },
+ {
+  "id": "SP-03",
+  "by": "author",
+  "what": "specified_persons_40a2b: a zero amount still gets a finding",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "        if amount == 0 {\n            continue;\n        }",
+  "to": "        if amount == 0 && false {\n            continue;\n        }"
+ },
+ {
+  "id": "SP-04",
+  "by": "author",
+  "what": "specified_persons_40a2b: a negative amount is skipped",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "        if amount == 0 {\n            continue;\n        }",
+  "to": "        if amount <= 0 {\n            continue;\n        }"
+ },
+ {
+  "id": "SP-05",
+  "by": "author",
+  "what": "specified_persons_40a2b: a zero rate opens the s.40(b) rule",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "rules.s40b_interest_rate_bp(entity_type)? > 0;",
+  "to": "rules.s40b_interest_rate_bp(entity_type)? >= 0;"
+ },
+ {
+  "id": "SP-06",
+  "by": "author",
+  "what": "specified_persons_40a2b: the relationship is not stripped",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "support::py_lower(support::py_strip(&person.relationship))",
+  "to": "support::py_lower(&person.relationship)"
+ },
+ {
+  "id": "SP-07",
+  "by": "author",
+  "what": "specified_persons_40a2b: the relationship is stripped as Rust trims, not as Python strips",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "support::py_lower(support::py_strip(&person.relationship))",
+  "to": "support::py_lower(person.relationship.trim())"
+ },
+ {
+  "id": "SP-08",
+  "by": "author",
+  "what": "specified_persons_40a2b: the relationship is not lower-cased",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "support::py_lower(support::py_strip(&person.relationship))",
+  "to": "support::py_strip(&person.relationship).to_string()"
+ },
+ {
+  "id": "SP-09",
+  "by": "author",
+  "what": "specified_persons_40a2b: s.40(b) governs every nature of a partner",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "open && partner && S40B_NATURES.contains(&nature)",
+  "to": "open && partner"
+ },
+ {
+  "id": "SP-10",
+  "by": "author",
+  "what": "specified_persons_40a2b: s.40(b) governs anyone's salary and interest",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "open && partner && S40B_NATURES.contains(&nature)",
+  "to": "open && S40B_NATURES.contains(&nature)"
+ },
+ {
+  "id": "SP-11",
+  "by": "author",
+  "what": "specified_persons_40a2b: the rate is looked up only for salary and interest",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "let open = rules.s40b_interest_rate_bp(entity_type)? > 0;",
+  "to": "let open = S40B_NATURES.contains(&nature) && rules.s40b_interest_rate_bp(entity_type)? > 0;"
+ },
+ {
+  "id": "SP-12",
+  "by": "author",
+  "what": "specified_persons_40a2b: a finding cites no evidence",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "evidence: figure.evidence.clone(),",
+  "to": "evidence: Vec::new(),"
+ },
+ {
+  "id": "SP-13",
+  "by": "author",
+  "what": "specified_persons_40a2b: the limits text renders the relationship stripped, not as written",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "confirmation, not as a settled fact.\",\n                    support::py_repr_str(&pair.person.relationship)",
+  "to": "confirmation, not as a settled fact.\",\n                    support::py_repr_str(support::py_strip(&pair.person.relationship))"
+ },
+ {
+  "id": "SP-14",
+  "by": "author",
+  "what": "specified_persons_40a2b: a missing related-party figure is skipped, not refused",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "        let Some((figure, amount)) = pair.figure else {\n            return Err(",
+  "to": "        let Some((figure, amount)) = pair.figure else {\n            continue;\n            return Err("
+ },
+ {
+  "id": "SP-15",
+  "by": "author",
+  "what": "specified_persons_40a2b: SPD-1 checks a pair with no amount figure",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "if pair.figure.is_none_or(|(_, amount)| amount == 0) {",
+  "to": "if pair.figure.is_some_and(|(_, amount)| amount == 0) {"
+ },
+ {
+  "id": "SP-16",
+  "by": "author",
+  "what": "specified_persons_40a2b: SPD-1 checks a zero amount",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "if pair.figure.is_none_or(|(_, amount)| amount == 0) {",
+  "to": "if pair.figure.is_none() {"
+ },
+ {
+  "id": "SP-17",
+  "by": "author",
+  "what": "specified_persons_40a2b: SPD-1 never reports both kinds",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "let detail = if has(&governed_id) && has(&comparable_id) {",
+  "to": "let detail = if has(&governed_id) && has(&comparable_id) && false {"
+ },
+ {
+  "id": "SP-18",
+  "by": "author",
+  "what": "specified_persons_40a2b: SPD-1 never reports a missing governed finding",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "} else if governs && !has(&governed_id) {",
+  "to": "} else if false && governs && !has(&governed_id) {"
+ },
+ {
+  "id": "SP-19",
+  "by": "author",
+  "what": "specified_persons_40a2b: SPD-1 never reports a missing comparable finding",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "} else if !governs && !has(&comparable_id) {",
+  "to": "} else if false && !governs && !has(&comparable_id) {"
+ },
+ {
+  "id": "SP-20",
+  "by": "author",
+  "what": "specified_persons_40a2b: SPD-1 renders the key unquoted",
+  "file": "src/specified_persons_40a2b.rs",
+  "from": "            support::py_repr_str(pair.key),\n",
+  "to": "            pair.key.to_string(),\n"
  }
 ]

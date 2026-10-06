@@ -1,0 +1,656 @@
+{
+ "comment": "LLP entity, so the s.40(b) rule is open. Fourteen persons, each with one moving salary ledger, differ only in the relationship text. Governed by s.40(b): PARTNER; partner padded with spaces; Working Partner between a tab and a newline; Partner in the firm between a no-break space and an ideographic space; partner between the control characters U+001F and U+001C (whitespace to Python's strip, not to Rust's trim); WORKING PARTNER spelled with the Kelvin sign U+212A, which lower-cases to k. Asking for a comparable: working partner with two inner spaces; partner followed by a zero-width space; sleeping partner; partners; PARTNER IN THE FIRM spelled with U+0130 (dotted capital I), which lower-cases to two characters; no relationship key; partner in full-width letters; partner's son. Person L01 also has a moving interest ledger, governed too.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_labels-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-sp_labels-001"
+  },
+  {
+   "name": "Person L01 Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-002"
+  },
+  {
+   "name": "Person L01 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-003"
+  },
+  {
+   "name": "Person L02 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-004"
+  },
+  {
+   "name": "Person L03 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-005"
+  },
+  {
+   "name": "Person L04 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-006"
+  },
+  {
+   "name": "Person L05 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-007"
+  },
+  {
+   "name": "Person L06 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-008"
+  },
+  {
+   "name": "Person L07 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-009"
+  },
+  {
+   "name": "Person L08 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-010"
+  },
+  {
+   "name": "Person L09 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-011"
+  },
+  {
+   "name": "Person L10 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-012"
+  },
+  {
+   "name": "Person L11 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-013"
+  },
+  {
+   "name": "Person L12 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-014"
+  },
+  {
+   "name": "Person L13 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-015"
+  },
+  {
+   "name": "Person L15 Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_labels-016"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_labels-017"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-sp_labels-018"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 20000000,
+   "credit": 10500000,
+   "closing": 59500000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50010000,
+   "debit": 0,
+   "credit": 450000,
+   "closing": -50460000
+  },
+  {
+   "ledger": "Person L01 Interest",
+   "opening": 0,
+   "debit": 450000,
+   "credit": 0,
+   "closing": 450000
+  },
+  {
+   "ledger": "Person L01 Remuneration",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 0,
+   "closing": 100000
+  },
+  {
+   "ledger": "Person L02 Remuneration",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 0,
+   "closing": 200000
+  },
+  {
+   "ledger": "Person L03 Remuneration",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 0,
+   "closing": 300000
+  },
+  {
+   "ledger": "Person L04 Remuneration",
+   "opening": 0,
+   "debit": 400000,
+   "credit": 0,
+   "closing": 400000
+  },
+  {
+   "ledger": "Person L05 Remuneration",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Person L06 Remuneration",
+   "opening": 0,
+   "debit": 600000,
+   "credit": 0,
+   "closing": 600000
+  },
+  {
+   "ledger": "Person L07 Remuneration",
+   "opening": 0,
+   "debit": 700000,
+   "credit": 0,
+   "closing": 700000
+  },
+  {
+   "ledger": "Person L08 Remuneration",
+   "opening": 0,
+   "debit": 800000,
+   "credit": 0,
+   "closing": 800000
+  },
+  {
+   "ledger": "Person L09 Remuneration",
+   "opening": 0,
+   "debit": 900000,
+   "credit": 0,
+   "closing": 900000
+  },
+  {
+   "ledger": "Person L10 Remuneration",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Person L11 Remuneration",
+   "opening": 0,
+   "debit": 1100000,
+   "credit": 0,
+   "closing": 1100000
+  },
+  {
+   "ledger": "Person L12 Remuneration",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 0,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Person L13 Remuneration",
+   "opening": 0,
+   "debit": 1300000,
+   "credit": 0,
+   "closing": 1300000
+  },
+  {
+   "ledger": "Person L15 Remuneration",
+   "opening": 0,
+   "debit": 1400000,
+   "credit": 0,
+   "closing": 1400000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 10000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 10000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 20000000,
+   "closing": -20000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Sales",
+     -20000000
+    ],
+    [
+     "Bank A",
+     20000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L01 Remuneration",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L02 Remuneration",
+     200000
+    ],
+    [
+     "Bank A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2025-07-13",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L03 Remuneration",
+     300000
+    ],
+    [
+     "Bank A",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2025-08-14",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L04 Remuneration",
+     400000
+    ],
+    [
+     "Bank A",
+     -400000
+    ]
+   ]
+  },
+  {
+   "guid": "p05",
+   "date": "2025-09-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L05 Remuneration",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "p06",
+   "date": "2025-10-16",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L06 Remuneration",
+     600000
+    ],
+    [
+     "Bank A",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "p07",
+   "date": "2025-11-17",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L07 Remuneration",
+     700000
+    ],
+    [
+     "Bank A",
+     -700000
+    ]
+   ]
+  },
+  {
+   "guid": "p08",
+   "date": "2025-12-18",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L08 Remuneration",
+     800000
+    ],
+    [
+     "Bank A",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "p09",
+   "date": "2025-04-19",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L09 Remuneration",
+     900000
+    ],
+    [
+     "Bank A",
+     -900000
+    ]
+   ]
+  },
+  {
+   "guid": "p10",
+   "date": "2025-05-20",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L10 Remuneration",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "p11",
+   "date": "2025-06-21",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L11 Remuneration",
+     1100000
+    ],
+    [
+     "Bank A",
+     -1100000
+    ]
+   ]
+  },
+  {
+   "guid": "p12",
+   "date": "2025-07-22",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L12 Remuneration",
+     1200000
+    ],
+    [
+     "Bank A",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "p13",
+   "date": "2025-08-23",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L13 Remuneration",
+     1300000
+    ],
+    [
+     "Bank A",
+     -1300000
+    ]
+   ]
+  },
+  {
+   "guid": "p14",
+   "date": "2025-09-24",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person L15 Remuneration",
+     1400000
+    ],
+    [
+     "Bank A",
+     -1400000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Person L01 Interest",
+     450000
+    ],
+    [
+     "Capital",
+     -450000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23",
+  "specified_persons_40a2b"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "llp",
+ "related_parties": {
+  "Person L01": {
+   "relationship": "PARTNER",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L01 Remuneration"
+    ],
+    "interest": [
+     "Person L01 Interest"
+    ]
+   }
+  },
+  "Person L02": {
+   "relationship": "  partner  ",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L02 Remuneration"
+    ]
+   }
+  },
+  "Person L03": {
+   "relationship": "\tWorking Partner\n",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L03 Remuneration"
+    ]
+   }
+  },
+  "Person L04": {
+   "relationship": "\u00a0Partner in the firm\u3000",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L04 Remuneration"
+    ]
+   }
+  },
+  "Person L05": {
+   "relationship": "\u001fpartner\u001c",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L05 Remuneration"
+    ]
+   }
+  },
+  "Person L06": {
+   "relationship": "WOR\u212aING PARTNER",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L06 Remuneration"
+    ]
+   }
+  },
+  "Person L07": {
+   "relationship": "working  partner",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L07 Remuneration"
+    ]
+   }
+  },
+  "Person L08": {
+   "relationship": "partner\u200b",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L08 Remuneration"
+    ]
+   }
+  },
+  "Person L09": {
+   "relationship": "sleeping partner",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L09 Remuneration"
+    ]
+   }
+  },
+  "Person L10": {
+   "relationship": "partners",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L10 Remuneration"
+    ]
+   }
+  },
+  "Person L11": {
+   "relationship": "PARTNER \u0130N THE F\u0130RM",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L11 Remuneration"
+    ]
+   }
+  },
+  "Person L12": {
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L12 Remuneration"
+    ]
+   }
+  },
+  "Person L13": {
+   "relationship": "ｐａｒｔｎｅｒ",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L13 Remuneration"
+    ]
+   }
+  },
+  "Person L15": {
+   "relationship": "partner's son",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person L15 Remuneration"
+    ]
+   }
+  }
+ }
+}

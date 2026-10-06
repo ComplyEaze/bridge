@@ -2100,6 +2100,20 @@ fn a_short_word_typed_must_match_too_so_a_wrong_rate_ledger_is_not_lifted() {
 }
 
 #[test]
+fn a_short_word_is_held_in_the_case_it_is_typed_in() {
+    // The catalogue holds `OD` in capitals and the request is typed `od`: the
+    // short words are kept from the lowercased key, as the typed ones are, so
+    // the ledger holding `OD` still counts as holding the word.
+    let catalog = ledgers(&["Zed Cash", "Zed Bank OD"]);
+    let binding = bind_one_name(&catalog, "Zed od");
+    assert_eq!(
+        rule_of(&binding, "Zed Bank OD"),
+        CandidateRule::SharedEveryDistinctiveToken
+    );
+    assert_eq!(rule_of(&binding, "Zed Cash"), CandidateRule::SharedToken);
+}
+
+#[test]
 fn a_decimal_rate_is_one_word_so_five_does_not_match_inside_two_point_five() {
     // `2.5` must not be read as `2` and `5`: typed "Input CGST 5%" would
     // otherwise match the 2.5% ledger on its short words and lift it.

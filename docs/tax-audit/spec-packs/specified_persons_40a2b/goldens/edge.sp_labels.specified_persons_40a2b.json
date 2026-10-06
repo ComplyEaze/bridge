@@ -339,9 +339,9 @@
       ],
       "title_sha256_16": "3dde0f5097537ce3",
       "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 0c05ee00) -- s.40(b) governs instead (confirm)",
-      "limits_sha256_16": "1a1a8142e73a5ea8",
+      "limits_sha256_16": "6e0b090584d26105",
       "limits_text": [
-        "Related person (tag 0c05ee00) is recorded with relationship '\\x1fpartner\\x1c', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+        "Related person (tag 0c05ee00) is recorded with relationship 'partner', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
       ],
       "ask_client_sha256_16": "5826bab93282b266",
       "ask_client_text": [
@@ -375,9 +375,9 @@
       ],
       "title_sha256_16": "0376528728dc88ac",
       "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 0ceecd7a) -- s.40(b) governs instead (confirm)",
-      "limits_sha256_16": "4b3f978df3b94966",
+      "limits_sha256_16": "db22f05ca2e972a7",
       "limits_text": [
-        "Related person (tag 0ceecd7a) is recorded with relationship '  partner  ', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+        "Related person (tag 0ceecd7a) is recorded with relationship 'partner', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
       ],
       "ask_client_sha256_16": "5826bab93282b266",
       "ask_client_text": [
@@ -411,9 +411,9 @@
       ],
       "title_sha256_16": "aa55e948063ed6c0",
       "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 3e0265a9) -- s.40(b) governs instead (confirm)",
-      "limits_sha256_16": "886ed5e7a5037e58",
+      "limits_sha256_16": "92fb7f8a27ba4b9d",
       "limits_text": [
-        "Related person (tag 3e0265a9) is recorded with relationship '\\tWorking Partner\\n', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+        "Related person (tag 3e0265a9) is recorded with relationship 'Working Partner', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
       ],
       "ask_client_sha256_16": "5826bab93282b266",
       "ask_client_text": [
@@ -447,9 +447,9 @@
       ],
       "title_sha256_16": "3ae04e78eb9152b5",
       "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 64909c92) -- s.40(b) governs instead (confirm)",
-      "limits_sha256_16": "12a220b081576da3",
+      "limits_sha256_16": "32066476f68e7ea6",
       "limits_text": [
-        "Related person (tag 64909c92) is recorded with relationship '\\xa0Partner in the firm\\u3000', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+        "Related person (tag 64909c92) is recorded with relationship 'Partner in the firm', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
       ],
       "ask_client_sha256_16": "5826bab93282b266",
       "ask_client_text": [

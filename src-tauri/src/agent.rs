@@ -45,7 +45,10 @@ mod changes;
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
 mod ledger_candidates;
-use ledger_candidates::resolve_ledger_or_refuse;
+use ledger_candidates::{
+    ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
+    CatalogueLedger,
+};
 #[path = "agent_ledgers.rs"]
 mod ledgers;
 #[path = "agent_masters.rs"]
@@ -2402,13 +2405,16 @@ enum LedgerRefusal {
     NotFound,
     /// More than one ledger is that close, sorted: the set the user chooses from.
     Ambiguous(Vec<String>),
+    /// The exact spelling typed is the row spelling or the stored name of more
+    /// than one ledger, sorted (#1085).
+    SharedSpelling(Vec<String>),
 }
 
 impl LedgerRefusal {
     fn code(&self) -> &'static str {
         match self {
             Self::NotFound => "ledger_not_found",
-            Self::Ambiguous(_) => "ledger_ambiguous",
+            Self::Ambiguous(_) | Self::SharedSpelling(_) => "ledger_ambiguous",
         }
     }
 }

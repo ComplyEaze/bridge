@@ -869,13 +869,14 @@ impl Server {
         unallocated: &[UnallocatedParty],
         limits: DetailLimits,
     ) -> Result<(Value, Evidence), ToolFailure> {
-        let (catalogue, mut evidence) = self.read_ledger_catalogue(identity, &company.name).await?;
-        let resolved = resolve_ledger_or_refuse(
-            catalogue.iter().map(String::as_str),
+        let (catalogue, mut evidence) = self
+            .read_resolvable_ledgers(identity, &company.name)
+            .await?;
+        let (resolved, party) = resolve_catalogue_ledger_or_refuse(
+            &catalogue,
             party_argument,
             self.settings.redaction,
         )?;
-        let party = resolved.name().to_string();
         let books_from = company
             .books_from
             .clone()
@@ -931,7 +932,7 @@ impl Server {
         )
         .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
         detail["party"] = party_json;
-        detail["ledger_match"] = resolved.to_json(self.settings.redaction);
+        detail["ledger_match"] = ledger_match_json(&resolved, &party, self.settings.redaction);
         detail["as_of"] = json!(as_of);
         detail["window"] = window;
         Ok((detail, evidence))

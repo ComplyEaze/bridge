@@ -483,15 +483,16 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             server.drop_voucher_page(key)?;
         }
         let selected_catalogue = if let Some(requested) = requested_ledger {
-            let (ledgers, catalogue_evidence) =
-                server.read_ledger_catalogue(&identity, &company.name).await?;
+            let (ledgers, catalogue_evidence) = server
+                .read_resolvable_ledgers(&identity, &company.name)
+                .await?;
             accumulate_evidence(&mut accumulated, catalogue_evidence);
-            let resolved = resolve_ledger_or_refuse(
-                ledgers.iter().map(String::as_str),
+            let (resolved, row_spelling) = resolve_catalogue_ledger_or_refuse(
+                &ledgers,
                 &requested,
                 server.settings.redaction,
             )?;
-            Some((resolved, ledgers))
+            Some((resolved, row_spelling, ledgers.iter().map(CatalogueLedger::row).map(str::to_string).collect::<Vec<_>>()))
         } else {
             None
         };
@@ -544,7 +545,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         // Corroborate actual source emptiness before any client-side selector.
         let mut ledger_match = None;
         let mut selected_ledger = None;
-        if let Some((ledger, catalogue)) = selected_catalogue {
+        if let Some((ledger, row_spelling, catalogue)) = selected_catalogue {
             let (corroboration, catalogue_evidence) =
                 server.read_ledger_catalogue(&identity, &company.name).await?;
             accumulate_evidence(&mut accumulated, catalogue_evidence);
@@ -558,9 +559,13 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             {
                 return Err("ledger_snapshot_drifted".to_string().into());
             }
-            rows = filter_voucher_rows_for_ledger(rows, ledger.name());
-            ledger_match = Some(ledger.to_json(server.settings.redaction));
-            selected_ledger = Some(ledger.name().to_string());
+            rows = filter_voucher_rows_for_ledger(rows, &row_spelling);
+            ledger_match = Some(ledger_match_json(
+                &ledger,
+                &row_spelling,
+                server.settings.redaction,
+            ));
+            selected_ledger = Some(row_spelling);
         }
         let mut voucher_types = None;
         if let Some(selector) = &type_selector {

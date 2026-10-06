@@ -1,0 +1,310 @@
+{
+ "comment": "clause44: the post-dated reconciling item. The Trial Balance includes two post-dated vouchers' movement, as the reference found on real data, so the total ties only with population_excluded_expense_paise added; an optional and a cancelled voucher with expense lines are in neither (the TB leaves them out too). One post-dated voucher carries two expense lines and a nil one, and a third repeats the second's GUID (the reference cites the GUID once, labelled by the last). GSTINs invented (fourteenth character Y).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Fixed Assets": null,
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Direct Incomes": null,
+  "Indirect Incomes": null,
+  "Carriage Inward": "Direct Expenses",
+  "Office Costs": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-c44_excluded-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_excluded-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_excluded-002"
+  },
+  {
+   "name": "Input CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_excluded-003"
+  },
+  {
+   "name": "Input SGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_excluded-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c44_excluded-005"
+  },
+  {
+   "name": "Hardware Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-c44_excluded-006"
+  },
+  {
+   "name": "Office Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_excluded-007"
+  },
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_excluded-008",
+   "gstin": "27ALPHA1111A1Y1"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 528457,
+   "credit": 0,
+   "closing": 528457
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Input CGST",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Input SGST",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 594442,
+   "closing": -594442
+  },
+  {
+   "ledger": "Hardware Purchases",
+   "opening": 0,
+   "debit": 212419,
+   "credit": 0,
+   "closing": 212419
+  },
+  {
+   "ledger": "Office Expenses",
+   "opening": 0,
+   "debit": 133027,
+   "credit": 0,
+   "closing": 133027
+  },
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 279461,
+   "closing": -279461
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "x01",
+   "date": "2025-04-10",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Hardware Purchases",
+     105722
+    ],
+    [
+     "Alpha Traders",
+     -105722
+    ]
+   ],
+   "number": "P-1"
+  },
+  {
+   "guid": "x02",
+   "date": "2026-03-30",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Hardware Purchases",
+     106697
+    ],
+    [
+     "Office Expenses",
+     67042
+    ],
+    [
+     "Office Expenses",
+     0
+    ],
+    [
+     "Alpha Traders",
+     -173739
+    ]
+   ],
+   "number": "P-2",
+   "status": "postdated"
+  },
+  {
+   "guid": "x03",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Office Expenses",
+     5870
+    ],
+    [
+     "Bank A",
+     -5870
+    ]
+   ],
+   "number": "J-1",
+   "status": "postdated"
+  },
+  {
+   "guid": "x04",
+   "date": "2025-09-01",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Hardware Purchases",
+     24845
+    ],
+    [
+     "Alpha Traders",
+     -24845
+    ]
+   ],
+   "number": "P-3",
+   "status": "optional"
+  },
+  {
+   "guid": "x05",
+   "date": "2025-09-02",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Hardware Purchases",
+     90197
+    ],
+    [
+     "Alpha Traders",
+     -90197
+    ]
+   ],
+   "number": "P-4",
+   "status": "cancelled"
+  },
+  {
+   "guid": "x03",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Office Expenses",
+     60115
+    ],
+    [
+     "Bank A",
+     -60115
+    ]
+   ],
+   "number": "J-2",
+   "status": "postdated"
+  },
+  {
+   "guid": "x06",
+   "date": "2025-04-01",
+   "base_type": "Receipt",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Bank A",
+     594442
+    ],
+    [
+     "Sales",
+     -594442
+    ]
+   ],
+   "number": "BR-1"
+  }
+ ],
+ "clause44": {
+  "tax_ledgers": {
+   "cgst": [
+    "Input CGST"
+   ],
+   "sgst": [
+    "Input SGST"
+   ]
+  },
+  "round_off_ledgers": []
+ },
+ "tests": [
+  "clause44"
+ ],
+ "cash": [],
+ "bank": []
+}

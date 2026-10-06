@@ -118,6 +118,21 @@ def _related_parties_cl23(c):
     return related_parties_cl23, related_parties_cl23.run(c.eng, c.rules, related_parties_config(c.cfg))
 
 
+def _clause44(c):
+    from tae.audit_tests import clause44
+    from tae.config import (clause44_money_category_by_ledger, depreciation_config, gst_registration_type_by_ledger,
+                            role_ledger_set, tax_ledgers_by_head)
+    # As tae/pack.py reads them: tax_ledgers, round_off_ledgers and the depreciation table before any test, then the
+    # three clause44 keys.
+    tax_ledgers = tax_ledgers_by_head(c.cfg)
+    round_off_ledgers = role_ledger_set(c.cfg, "round_off_ledgers")
+    dep_expense_ledgers = depreciation_config(c.cfg)[2]
+    return clause44, clause44.run(
+        c.eng, c.rules, dep_expense_ledgers, gst_registration_type_by_ledger(c.cfg), tax_ledgers,
+        role_ledger_set(c.cfg, "no_supplier_expense_ledgers"), round_off_ledgers,
+        clause44_money_category_by_ledger(c.cfg))
+
+
 def _trial_balance(c):
     from tae.audit_tests import trial_balance
     return trial_balance, trial_balance.run(c.eng, c.rules)
@@ -450,6 +465,7 @@ RUNNERS = {
     "cash_44ab": _cash_44ab,
     "cash_book_integrity": _cash_book_integrity,
     "cash_payments_40a3": _cash_payments_40a3,
+    "clause44": _clause44,
     "counter_cheques_40a3": _counter_cheques_40a3,
     "creditor_ageing_43bh": _creditor_ageing_43bh,
     "depreciation": _depreciation,

@@ -1,0 +1,379 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "clause44",
+  "test_version": "2",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "c10c20d7a6fc1216",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded): every debit-side line on a ledger under Purchase Accounts, Direct Expenses or Indirect Expenses (the expense groups of the financial statements' profit and loss account), attributed to the voucher's own PARTYLEDGERNAME. Expenditure-group lines on POST-DATED excluded vouchers are reported separately as population_excluded_expense_paise (optional/cancelled vouchers are NOT -- see that figure's own definition), never silently dropped from the TB tie (CL44-1).",
+  "figures": [
+    {
+      "id": "clause44.exempt_or_non_gst_supply_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "974c7a36d9344882",
+      "definition_text": "Expense lines classified 'exempt_or_non_gst_supply'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "t01",
+          "label": "Purchase P-1 on 2025-04-10"
+        }
+      ]
+    },
+    {
+      "id": "clause44.exempt_or_non_gst_supply_paise",
+      "value": 170786,
+      "unit": "paise",
+      "definition_sha256_16": "c09808b2acff12ca",
+      "definition_text": "Sum of expenditure, category 'exempt_or_non_gst_supply'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.interest_individual_no_gstin_lines_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "2c50ab393cdecc0f",
+      "definition_text": "Population expenditure lines on a ledger classified as interest to an individual lender with no GSTIN, counted through the ordinary GSTIN-derived bucket rule above (normally 'unregistered') -- not pulled out.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.interest_individual_no_gstin_lines_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "262c2716ef997fc5",
+      "definition_text": "Sum of the lines above; already included in total_expenditure_paise via its own bucket, not a separate addition.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.money_category_forced_lines_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "b86f5a98255490a6",
+      "definition_text": "Population expenditure lines whose column was FORCED by a client-configured money-category classification (interest or discount to a bank/NBFC, or bank charges/fees) rather than derived from the voucher's own GSTIN/tax-line signals -- CL44-3 excludes every voucher named here from its own GSTIN-precedence re-derivation (module docstring).",
+      "evidence": []
+    },
+    {
+      "id": "clause44.money_category_forced_lines_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "816493fcd894ece8",
+      "definition_text": "Sum of the lines above; already included in total_expenditure_paise via its own forced bucket, not a separate addition.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_depreciation_or_provision_expense_ledger_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "a68267fe7a4b3dee",
+      "definition_text": "Expense lines outside the four GST-registration columns, reason 'depreciation_or_provision_expense_ledger'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_depreciation_or_provision_expense_ledger_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "5060ba117720673f",
+      "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'depreciation_or_provision_expense_ledger'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_judgement_required_money_item_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "c877c27a7c2d3a0f",
+      "definition_text": "Expense lines outside the four GST-registration columns, reason 'judgement_required_money_item'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_judgement_required_money_item_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "e126c86f9bc6fe50",
+      "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'judgement_required_money_item'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_no_party_ledger_on_voucher_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "5c69174d85190531",
+      "definition_text": "Expense lines outside the four GST-registration columns, reason 'no_party_ledger_on_voucher'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_no_party_ledger_on_voucher_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "9f86a20a0460f84c",
+      "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'no_party_ledger_on_voucher'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_non_supply_expense_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "31bf63648e7134d9",
+      "definition_text": "Expense lines outside the four GST-registration columns, reason 'non_supply_expense'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_non_supply_expense_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3123c969094dd783",
+      "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'non_supply_expense'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_party_ledger_is_itself_a_pl_ledger_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "0bb1b1d29406c393",
+      "definition_text": "Expense lines outside the four GST-registration columns, reason 'party_ledger_is_itself_a_pl_ledger'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_party_ledger_is_itself_a_pl_ledger_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "ed8e485fbd541e4f",
+      "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'party_ledger_is_itself_a_pl_ledger'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_unclassified_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "784183c3dbed1e63",
+      "definition_text": "Expense lines outside the four GST-registration columns, reason 'unclassified'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.no_supplier_unclassified_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2e6c560529afc1ee",
+      "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'unclassified'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.population_excluded_expense_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "16f563a87c2b2d51",
+      "definition_text": "Expenditure-group lines on POST-DATED vouchers (excluded from the books population) -- a named reconciling item: the raw TB export is not always population-filtered for a post-dated voucher (see check CL44-1), so these must be added back before tying to the TB. Optional and cancelled vouchers are NOT included here -- checked on data, the TB excludes both just as the books population does, so adding them back would overstate this figure.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.population_excluded_expense_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "6dbce00c1853eabb",
+      "definition_text": "Sum of expenditure-group lines on post-dated, population-excluded vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.registered_composition_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "93bcbbddaec5c154",
+      "definition_text": "Expense lines classified 'registered_composition'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.registered_composition_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1f4730c630a671d8",
+      "definition_text": "Sum of expenditure, category 'registered_composition'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.registered_other_than_composition_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "93ef4dd569fb0737",
+      "definition_text": "Expense lines classified 'registered_other_than_composition'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.registered_other_than_composition_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "39a002038f56f019",
+      "definition_text": "Sum of expenditure, category 'registered_other_than_composition'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.total_expenditure_paise",
+      "value": 170786,
+      "unit": "paise",
+      "definition_sha256_16": "073b6e286df50c91",
+      "definition_text": "Sum of every bucket and no-supplier/judgement-reason figure above (books-POPULATION only); tied in check_invariants (CL44-1), TOGETHER WITH population_excluded_expense_paise below, to the financial_statements test's own TB-based expenditure definition (purchases + direct_expenses + indirect_expenses), independent of this walk.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.unregistered_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "70e8c2734ce8f94c",
+      "definition_text": "Expense lines classified 'unregistered'.",
+      "evidence": []
+    },
+    {
+      "id": "clause44.unregistered_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "594f33d4e0f14407",
+      "definition_text": "Sum of expenditure, category 'unregistered'.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "clause44/breakup",
+      "clauses": [
+        "3CD-44"
+      ],
+      "confidence": "indicative",
+      "facts": [
+        {
+          "name": "exempt_or_non_gst_supply_count",
+          "figure_id": "clause44.exempt_or_non_gst_supply_count"
+        },
+        {
+          "name": "exempt_or_non_gst_supply_paise",
+          "figure_id": "clause44.exempt_or_non_gst_supply_paise"
+        },
+        {
+          "name": "no_supplier_depreciation_or_provision_expense_ledger_count",
+          "figure_id": "clause44.no_supplier_depreciation_or_provision_expense_ledger_count"
+        },
+        {
+          "name": "no_supplier_depreciation_or_provision_expense_ledger_paise",
+          "figure_id": "clause44.no_supplier_depreciation_or_provision_expense_ledger_paise"
+        },
+        {
+          "name": "no_supplier_judgement_required_money_item_count",
+          "figure_id": "clause44.no_supplier_judgement_required_money_item_count"
+        },
+        {
+          "name": "no_supplier_judgement_required_money_item_paise",
+          "figure_id": "clause44.no_supplier_judgement_required_money_item_paise"
+        },
+        {
+          "name": "no_supplier_no_party_ledger_on_voucher_count",
+          "figure_id": "clause44.no_supplier_no_party_ledger_on_voucher_count"
+        },
+        {
+          "name": "no_supplier_no_party_ledger_on_voucher_paise",
+          "figure_id": "clause44.no_supplier_no_party_ledger_on_voucher_paise"
+        },
+        {
+          "name": "no_supplier_non_supply_expense_count",
+          "figure_id": "clause44.no_supplier_non_supply_expense_count"
+        },
+        {
+          "name": "no_supplier_non_supply_expense_paise",
+          "figure_id": "clause44.no_supplier_non_supply_expense_paise"
+        },
+        {
+          "name": "no_supplier_party_ledger_is_itself_a_pl_ledger_count",
+          "figure_id": "clause44.no_supplier_party_ledger_is_itself_a_pl_ledger_count"
+        },
+        {
+          "name": "no_supplier_party_ledger_is_itself_a_pl_ledger_paise",
+          "figure_id": "clause44.no_supplier_party_ledger_is_itself_a_pl_ledger_paise"
+        },
+        {
+          "name": "no_supplier_unclassified_count",
+          "figure_id": "clause44.no_supplier_unclassified_count"
+        },
+        {
+          "name": "no_supplier_unclassified_paise",
+          "figure_id": "clause44.no_supplier_unclassified_paise"
+        },
+        {
+          "name": "post_dated_voucher_expense_count",
+          "figure_id": "clause44.population_excluded_expense_count"
+        },
+        {
+          "name": "post_dated_voucher_expense_paise",
+          "figure_id": "clause44.population_excluded_expense_paise"
+        },
+        {
+          "name": "registered_composition_count",
+          "figure_id": "clause44.registered_composition_count"
+        },
+        {
+          "name": "registered_composition_paise",
+          "figure_id": "clause44.registered_composition_paise"
+        },
+        {
+          "name": "registered_other_than_composition_count",
+          "figure_id": "clause44.registered_other_than_composition_count"
+        },
+        {
+          "name": "registered_other_than_composition_paise",
+          "figure_id": "clause44.registered_other_than_composition_paise"
+        },
+        {
+          "name": "total_expenditure_paise",
+          "figure_id": "clause44.total_expenditure_paise"
+        },
+        {
+          "name": "unregistered_count",
+          "figure_id": "clause44.unregistered_count"
+        },
+        {
+          "name": "unregistered_paise",
+          "figure_id": "clause44.unregistered_paise"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "t01",
+          "label": "Purchase P-1 on 2025-04-10"
+        }
+      ],
+      "title_sha256_16": "6ca5bdb4e1a6a5cb",
+      "title_text": "Break-up of total expenditure by GST registration status of the supplier",
+      "limits_sha256_16": "8ae9df60efe087bc",
+      "limits_text": [
+        "A voucher's party field names only the first party on a multi-party voucher (same limit as the GST-ITC-vs-2B test); clause 44 is defined per voucher here, so a voucher with more than one true counterparty is attributed wholly to its named party.",
+        "'Exempt or non-GST supply' is a books-only indicator for a GSTIN-derived row (GSTIN present, no input-tax line on the voucher); the books cannot show whether the supply was exempt, nil-rated, non-GST-rated, or simply a registered supplier who did not charge GST it should have. A row FORCED into this column because it is interest or discount paid to a bank or NBFC is not a proxy: it is exempt by N12 entry 27(a) regardless of what the voucher's own GSTIN/tax-line signals show.",
+        "Composition status comes from a caller-supplied ledger map read off the ledger master's own GSTREGISTRATIONTYPE; a ledger missing from that map is treated as not composition (the overwhelmingly common case), which can only move a row within the registered total, never out of it.",
+        "Total expenditure is NOT reduced for depreciation or other non-cash items -- GN 79.2: depreciation and bad debts are not divided across columns 3 to 7 but stay 'included in the amount reported in column 2'.",
+        "The expense ledgers treated as having no GST supplier by nature (salary/wages to employees, interest/late fees on taxes and similar) are listed for this client; a ledger of that kind not on the list is classified by its GSTIN instead and can appear as 'unregistered' rather than 'no supplier'. Review the list.",
+        "Money-category classification (2026-09-17 correction, from our review of clause 44's money items): interest/discount to a bank or NBFC is FORCED to column 3 (N12 entry 27(a), exempt) and bank charges/fees are FORCED to column 5 (N12 para 2(zk), taxable) -- a ledger of either kind not on that list instead falls through to the ordinary GSTIN-derived path, which can misclassify it (e.g. a bank ledger with no GSTIN in the master would otherwise read 'unregistered'). A ledger mixing interest and charges that cannot be shown separately from the books, and partners' interest/remuneration, are NEVER placed in column 3 or 5 -- see the judgement finding below."
+      ],
+      "ask_client_sha256_16": "e1e252273150b5f9",
+      "ask_client_text": [
+        "Confirmation of GST registration status (regular / composition / unregistered) for every supplier in the 'unregistered' and 'exempt or non-GST supply' columns.",
+        "For any row where the PARTY LEDGER itself carries no GSTIN and registration rests entirely on the voucher's own recorded PARTYGSTIN (a cash-party purchase, most visibly on GTA/freight-under-RCM ledgers, where an unregistered transporter is common) -- confirm that transaction GSTIN is a genuine, currently-active registration for that specific supplier; the books alone cannot verify it."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "clause44.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

@@ -1,0 +1,795 @@
+{
+ "comment": "clause44: the four columns and the closed reasons. A supplier's GSTIN from its ledger, and from the voucher's own PARTYGSTIN (padded and lower case, which the reference strips and upper-cases) on a cash purchase and on a purchase from a ledger with none; composition from the client's map (padded, mixed case, a no-break space; 'Regular' is not composition; a composition ledger with no GSTIN stays unregistered); a voucher with input tax is 'other than composition', one without (or with a nil tax line) is 'exempt or non-GST'; a debit note's credit lines reduce the column; a nil expense line is no line; round-off rides with a voucher's real line and, alone or beside only salary, has no supplier; salary (configured as no supplier), depreciation, a journal with no party and one whose party is an income ledger; a party named on no ledger master; and a round-off line beside a real line on a journal with no party, which rides into the GSTIN rule and reads 'unregistered' while its sibling is 'no party'. Every GSTIN is invented (fourteenth character Y).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Fixed Assets": null,
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Direct Incomes": null,
+  "Indirect Incomes": null,
+  "Carriage Inward": "Direct Expenses",
+  "Office Costs": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-c44_core-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_core-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_core-002"
+  },
+  {
+   "name": "Input CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_core-003"
+  },
+  {
+   "name": "Input SGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_core-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c44_core-005"
+  },
+  {
+   "name": "Hardware Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-c44_core-006"
+  },
+  {
+   "name": "Freight Inward",
+   "chain": [
+    "Carriage Inward",
+    "Direct Expenses"
+   ],
+   "guid": "edge-c44_core-007"
+  },
+  {
+   "name": "Office Expenses",
+   "chain": [
+    "Office Costs",
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_core-008"
+  },
+  {
+   "name": "Staff Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_core-009"
+  },
+  {
+   "name": "Depreciation",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_core-010"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_core-011"
+  },
+  {
+   "name": "Scrap Sales",
+   "chain": [
+    "Indirect Incomes"
+   ],
+   "guid": "edge-c44_core-012"
+  },
+  {
+   "name": "Furniture",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-c44_core-013"
+  },
+  {
+   "name": "Outstanding Expenses",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_core-014"
+  },
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_core-015",
+   "gstin": "27ALPHA1111A1Y1"
+  },
+  {
+   "name": "Beta Composition Co",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_core-016",
+   "gstin": "27BETAC2222B1Y2"
+  },
+  {
+   "name": "Theta Composition Co",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_core-017",
+   "gstin": "27THETA7777T1Y7"
+  },
+  {
+   "name": "Iota Regular Co",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_core-018",
+   "gstin": "27IOTAR8888I1Y8"
+  },
+  {
+   "name": "Zeta Composition Co",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_core-019",
+   "gstin": ""
+  },
+  {
+   "name": "Gamma Works",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_core-020",
+   "gstin": ""
+  },
+  {
+   "name": "Delta Mart",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_core-021",
+   "gstin": "29DELTA3333D1Y3"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 1386504,
+   "credit": 0,
+   "closing": 1386504
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 219289,
+   "closing": -219289
+  },
+  {
+   "ledger": "Input CGST",
+   "opening": 0,
+   "debit": 239321,
+   "credit": 0,
+   "closing": 239321
+  },
+  {
+   "ledger": "Input SGST",
+   "opening": 0,
+   "debit": 345718,
+   "credit": 0,
+   "closing": 345718
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2098001,
+   "closing": -2098001
+  },
+  {
+   "ledger": "Hardware Purchases",
+   "opening": 0,
+   "debit": 1859669,
+   "credit": 0,
+   "closing": 1859669
+  },
+  {
+   "ledger": "Freight Inward",
+   "opening": 0,
+   "debit": 163450,
+   "credit": 0,
+   "closing": 163450
+  },
+  {
+   "ledger": "Office Expenses",
+   "opening": 0,
+   "debit": 221730,
+   "credit": 0,
+   "closing": 221730
+  },
+  {
+   "ledger": "Staff Salary",
+   "opening": 0,
+   "debit": 598137,
+   "credit": 0,
+   "closing": 598137
+  },
+  {
+   "ledger": "Depreciation",
+   "opening": 0,
+   "debit": 187316,
+   "credit": 0,
+   "closing": 187316
+  },
+  {
+   "ledger": "Round Off",
+   "opening": 0,
+   "debit": 280679,
+   "credit": 0,
+   "closing": 280679
+  },
+  {
+   "ledger": "Scrap Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 43542,
+   "closing": -43542
+  },
+  {
+   "ledger": "Furniture",
+   "opening": 0,
+   "debit": 0,
+   "credit": 187316,
+   "closing": -187316
+  },
+  {
+   "ledger": "Outstanding Expenses",
+   "opening": 0,
+   "debit": 0,
+   "credit": 155825,
+   "closing": -155825
+  },
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1096426,
+   "closing": -1096426
+  },
+  {
+   "ledger": "Beta Composition Co",
+   "opening": 0,
+   "debit": 0,
+   "credit": 414900,
+   "closing": -414900
+  },
+  {
+   "ledger": "Theta Composition Co",
+   "opening": 0,
+   "debit": 0,
+   "credit": 131943,
+   "closing": -131943
+  },
+  {
+   "ledger": "Iota Regular Co",
+   "opening": 0,
+   "debit": 0,
+   "credit": 311678,
+   "closing": -311678
+  },
+  {
+   "ledger": "Zeta Composition Co",
+   "opening": 0,
+   "debit": 0,
+   "credit": 142430,
+   "closing": -142430
+  },
+  {
+   "ledger": "Gamma Works",
+   "opening": 0,
+   "debit": 0,
+   "credit": 233723,
+   "closing": -233723
+  },
+  {
+   "ledger": "Delta Mart",
+   "opening": 0,
+   "debit": 0,
+   "credit": 247451,
+   "closing": -247451
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "c01",
+   "date": "2025-04-10",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Hardware Purchases",
+     1000987
+    ],
+    [
+     "Input CGST",
+     92579
+    ],
+    [
+     "Input SGST",
+     161624
+    ],
+    [
+     "Round Off",
+     82297
+    ],
+    [
+     "Alpha Traders",
+     -1337487
+    ]
+   ],
+   "number": "P-1"
+  },
+  {
+   "guid": "c02",
+   "date": "2025-04-12",
+   "base_type": "Purchase",
+   "party": "Delta Mart",
+   "lines": [
+    [
+     "Hardware Purchases",
+     247451
+    ],
+    [
+     "Delta Mart",
+     -247451
+    ]
+   ],
+   "number": "P-2"
+  },
+  {
+   "guid": "c03",
+   "date": "2025-04-15",
+   "base_type": "Purchase",
+   "party": "Beta Composition Co",
+   "lines": [
+    [
+     "Hardware Purchases",
+     320377
+    ],
+    [
+     "Freight Inward",
+     94523
+    ],
+    [
+     "Beta Composition Co",
+     -414900
+    ]
+   ],
+   "number": "P-3"
+  },
+  {
+   "guid": "c04",
+   "date": "2025-04-20",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Office Expenses",
+     46513
+    ],
+    [
+     "Gamma Works",
+     -46513
+    ]
+   ],
+   "number": "P-4"
+  },
+  {
+   "guid": "c05",
+   "date": "2025-05-02",
+   "base_type": "Purchase",
+   "party": "Cash",
+   "lines": [
+    [
+     "Freight Inward",
+     68927
+    ],
+    [
+     "Input CGST",
+     41203
+    ],
+    [
+     "Input SGST",
+     54701
+    ],
+    [
+     "Cash",
+     -164831
+    ]
+   ],
+   "number": "P-5",
+   "party_gstin": " 27epsil4444e1y4 "
+  },
+  {
+   "guid": "c06",
+   "date": "2025-05-31",
+   "base_type": "Payment",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Staff Salary",
+     579143
+    ],
+    [
+     "Bank A",
+     -579143
+    ]
+   ],
+   "number": "BP-1"
+  },
+  {
+   "guid": "c07",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Depreciation",
+     187316
+    ],
+    [
+     "Furniture",
+     -187316
+    ]
+   ],
+   "number": "J-1"
+  },
+  {
+   "guid": "c08",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Office Expenses",
+     15281
+    ],
+    [
+     "Outstanding Expenses",
+     -15281
+    ]
+   ],
+   "number": "J-2"
+  },
+  {
+   "guid": "c09",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "party": "Scrap Sales",
+   "lines": [
+    [
+     "Office Expenses",
+     43542
+    ],
+    [
+     "Scrap Sales",
+     -43542
+    ]
+   ],
+   "number": "J-3"
+  },
+  {
+   "guid": "c10",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Round Off",
+     30758
+    ],
+    [
+     "Bank A",
+     -30758
+    ]
+   ],
+   "number": "BP-2"
+  },
+  {
+   "guid": "c11",
+   "date": "2025-06-15",
+   "base_type": "Debit Note",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Hardware Purchases",
+     -181621
+    ],
+    [
+     "Input CGST",
+     -33866
+    ],
+    [
+     "Input SGST",
+     -54152
+    ],
+    [
+     "Alpha Traders",
+     269639
+    ]
+   ],
+   "number": "DN-1"
+  },
+  {
+   "guid": "c12",
+   "date": "2025-06-20",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Office Expenses",
+     0
+    ],
+    [
+     "Hardware Purchases",
+     28578
+    ],
+    [
+     "Input CGST",
+     0
+    ],
+    [
+     "Alpha Traders",
+     -28578
+    ]
+   ],
+   "number": "P-6"
+  },
+  {
+   "guid": "c13",
+   "date": "2025-07-01",
+   "base_type": "Purchase",
+   "party": "Walk-in Vendor",
+   "lines": [
+    [
+     "Hardware Purchases",
+     54458
+    ],
+    [
+     "Cash",
+     -54458
+    ]
+   ],
+   "number": ""
+  },
+  {
+   "guid": "c14",
+   "date": "2025-07-05",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Office Expenses",
+     60872
+    ],
+    [
+     "Input CGST",
+     46505
+    ],
+    [
+     "Input SGST",
+     79833
+    ],
+    [
+     "Gamma Works",
+     -187210
+    ]
+   ],
+   "number": "P-7",
+   "party_gstin": "27GAMMA5555G1Y5"
+  },
+  {
+   "guid": "c15",
+   "date": "2025-07-10",
+   "base_type": "Receipt",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Bank A",
+     2098001
+    ],
+    [
+     "Sales",
+     -2098001
+    ]
+   ],
+   "number": "BR-1"
+  },
+  {
+   "guid": "c16",
+   "date": "2025-07-31",
+   "base_type": "Journal",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Staff Salary",
+     18994
+    ],
+    [
+     "Round Off",
+     82602
+    ],
+    [
+     "Bank A",
+     -101596
+    ]
+   ],
+   "number": "J-4"
+  },
+  {
+   "guid": "c17",
+   "date": "2025-08-01",
+   "base_type": "Purchase",
+   "party": "Theta Composition Co",
+   "lines": [
+    [
+     "Hardware Purchases",
+     131943
+    ],
+    [
+     "Theta Composition Co",
+     -131943
+    ]
+   ],
+   "number": "P-8"
+  },
+  {
+   "guid": "c18",
+   "date": "2025-08-02",
+   "base_type": "Purchase",
+   "party": "Iota Regular Co",
+   "lines": [
+    [
+     "Hardware Purchases",
+     115066
+    ],
+    [
+     "Input CGST",
+     92900
+    ],
+    [
+     "Input SGST",
+     103712
+    ],
+    [
+     "Iota Regular Co",
+     -311678
+    ]
+   ],
+   "number": "P-9"
+  },
+  {
+   "guid": "c19",
+   "date": "2025-08-03",
+   "base_type": "Purchase",
+   "party": "Zeta Composition Co",
+   "lines": [
+    [
+     "Hardware Purchases",
+     142430
+    ],
+    [
+     "Zeta Composition Co",
+     -142430
+    ]
+   ],
+   "number": "P-10"
+  },
+  {
+   "guid": "c20",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Office Expenses",
+     55522
+    ],
+    [
+     "Round Off",
+     85022
+    ],
+    [
+     "Outstanding Expenses",
+     -140544
+    ]
+   ],
+   "number": "J-5"
+  }
+ ],
+ "clause44": {
+  "tax_ledgers": {
+   "cgst": [
+    "Input CGST"
+   ],
+   "sgst": [
+    "Input SGST"
+   ]
+  },
+  "dep_expense_ledgers": [
+   "Depreciation"
+  ],
+  "no_supplier_expense_ledgers": [
+   "Staff Salary"
+  ],
+  "round_off_ledgers": [
+   "Round Off"
+  ],
+  "registration_type_by_ledger": {
+   "Beta Composition Co": " Composition\t",
+   "Theta Composition Co": " COMPOSITION",
+   "Iota Regular Co": "Regular",
+   "Zeta Composition Co": "composition"
+  }
+ },
+ "tests": [
+  "clause44"
+ ],
+ "cash": [],
+ "bank": []
+}

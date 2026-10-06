@@ -19,7 +19,7 @@
 //! fact and never called an opening. A [`BillTrail`] exists only for a bill
 //! that tied (its constructor is private).
 use super::*;
-use bridge_tally_core::ExactDecimal;
+use bridge_tally_core::{ExactDecimal, TallyDate};
 use std::collections::BTreeMap;
 
 /// A refusal to build a trail: the rows are not shaped as a trail needs, and a
@@ -829,7 +829,7 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &TallyCompany,
-        as_of: &str,
+        as_of: &TallyDate,
         party_argument: &str,
         kind: DetailKind,
         reference: Option<&str>,
@@ -861,7 +861,7 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &TallyCompany,
-        as_of: &str,
+        as_of: &TallyDate,
         party_argument: &str,
         kind: DetailKind,
         reference: Option<&str>,
@@ -891,19 +891,16 @@ impl Server {
         let refused = |failure: ToolFailure| {
             with_evidence(window_too_large(failure, kind, reference), &evidence)
         };
-        // The window comes from the book (a bill date or the books' start) and
-        // the outstandings' as-of date: it is parsed here, where it enters the
-        // window layer.
-        let (from, as_of) = match (parse_window_date(&from), parse_window_date(as_of)) {
-            (Ok(from), Ok(as_of)) => (from, as_of),
-            (Err(failure), _) | (_, Err(failure)) => return Err(refused(failure)),
-        };
+        // The window's start comes from the book (a bill date or the books'
+        // start): it is parsed here, where it enters the window layer. Its end
+        // is the outstandings' as-of date, already a `TallyDate`.
+        let from = parse_window_date(&from).map_err(refused)?;
         let read = self
             .read_voucher_window(
                 identity,
                 &company.name,
                 &from,
-                &as_of,
+                as_of,
                 VoucherReadShape::EntryWildcard,
                 WindowPlanSource::Estimate { known_marks: None },
                 limits.window,

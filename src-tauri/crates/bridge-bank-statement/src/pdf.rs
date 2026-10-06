@@ -27,15 +27,15 @@
 //!   catch that depends on what the difference reaches. The balance replay
 //!   proves amounts, and for SBI and HDFC so do the printed control totals
 //!   (Union Bank prints none). The date parse refuses a date cell holding
-//!   anything but one well-formed date, and the account-number line and the
-//!   page footer have refusals of their own. Nothing proves narration or
-//!   reference text: words a grouping difference moves into a narration or
-//!   reference cell change the row's transaction identity (which hashes the
-//!   narration) and can change the party or reference read from the row, and
-//!   no amount check sees it. In #1310 the statement-period line was refused
-//!   only because two of its words fell in the date column; the same line's
-//!   dates entering the narration went unseen. Embedded fonts were not
-//!   measured.
+//!   anything but one well-formed date, the account-number line has a refusal
+//!   of its own, and so does Union Bank's page footer. Nothing proves narration
+//!   or reference text: words a grouping difference moves into a narration
+//!   change the row's transaction identity (which hashes the narration); words
+//!   moved into a narration or a reference cell can change the party or
+//!   reference read from the row; and no amount check sees either. In #1310
+//!   the statement-period line was refused only because two of its words fell
+//!   in the date column; the same line's dates entering the narration went
+//!   unseen. Embedded fonts were not measured.
 //!
 //! Coordinates are converted to the top-left page space of `pdftotext`,
 //! relative to the crop box (or the media box when a page has no crop box).

@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company WR2 Unicode Lab through the raw serial sender of a lab sitting that made reads only: no import and no write",
+  "observed_date": "2026-10-06",
+  "source_response_bytes": 14018,
+  "source_response_sha256": "1e1a7c84fdf8bf1ba8b0b9ab2e1dc7d20317ed9fbe9ceeb93aaeee0b7db89b02",
+  "source_request_bytes": 2104,
+  "source_request_sha256": "d2b302014d0bacac2befd5888e5c3b5d3e9ce1a1b2bf79bfaa847ae8b2015b39",
+  "request_rendered_by": "ReadOnlyProfile::StandardLedgerCatalogV2 { company }.render() (V1's request plus the one NativeMethod line IsBillWiseOn)",
+  "fixture_bytes": 14018,
+  "fixture_sha256": "1e1a7c84fdf8bf1ba8b0b9ab2e1dc7d20317ed9fbe9ceeb93aaeee0b7db89b02",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "The import family's ledger catalogue as the V2 profile reads it: 9 ledgers with name, GUID, parent, the company GUID and name computes, and ISBILLWISEON on every row (2 Yes, 7 No).",
+  "provenance_limit": "One synthetic book on one build, read once (not a paired read). It shows how Tally answers this request for these shapes; it is not evidence about a client's book or a large book. The book may have changed since its 6 Sep V1 capture of the same name.",
+  "sensitivity_review": "Synthetic company, synthetic ledger names and GUIDs; no client, GSTIN, address or credential.",
+  "observed_at_utc": "2026-10-06T11:18Z"
+}

@@ -27,8 +27,12 @@ These changes are in source and not yet in a published build.
   zero from a counted window is a checked zero. A narration phrase is refused
   where narrations are withheld from the assistant. A summary sums post-dated
   vouchers (counted, with the vouchers Tally sent no flag for counted apart) and any
-  non-posting voucher type a book uses, and says so in the result. Not measured
-  against a live book yet (#1230).
+  non-posting voucher type a book uses, and says so in the result. Checked once
+  against a live TallyPrime 7.1 on a synthetic book of 67 vouchers: every bucket
+  equalled the sums over the listed vouchers, the ledger buckets equalled
+  `trial_balance` for the same year, and each search returned what the same
+  criterion selects from the listing; it did not cover a large book, a memorandum,
+  a reversing journal or a voucher withheld for a foreign-currency amount (#1230).
 
 **Safer or fixed**
 
@@ -72,6 +76,18 @@ These changes are in source and not yet in a published build.
   with what Tally created. `alter_id_delta` gains `from` (`pre_post_mark`, or
   `build_mark` for a file imported by hand, which has no POST of its own);
   `pre_import_mark` still reports the build-time mark (#1087).
+- `build_import_xml` now refuses a batch that names a ledger which keeps bills in
+  Tally, as `bill_wise_party_unapproved`, until the person approves each such
+  party (the build is repeated with `on_account_approvals`): an entry on it carries no bill allocation, so Tally lands it On Account
+  and the person must match it to a bill by hand. Before, the build only printed a
+  warning. `post_import` and the queue admission read the flag again, from the
+  ledger list they already read, and refuse `import_bill_wise_changed` for a
+  ledger that became bill-wise since the build. A batch built before this change
+  is refused for posting as `import_batch_predates_bill_wise_record` and is
+  rebuilt (check first whether its file was already imported by hand). The
+  approval is the assistant's word, not proof that a person said yes, and a hand
+  import of the file is not checked. Not measured: a large book, and the bills
+  of a ledger whose flag reads No (#1234).
 - The posting setting is shorter and names its four known limits in plainer
   words, and Terms of Use section 9.2 (version 2026-10.1, effective 7 October
   2026) now lists the same limits and more: a company or ledger renamed or opened

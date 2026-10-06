@@ -87,6 +87,10 @@ impl DesktopJournalError {
                 "ComplyEaze Bridge cannot post a Journal file that specifies a voucher number.",
                 "Import it manually, or choose an unnumbered Journal. A previously dispatched Journal remains available only for reconciliation.",
             ),
+            "import_batch_predates_bill_wise_record" => (
+                "This saved Journal was built before ComplyEaze Bridge began checking bill-wise ledgers, so it cannot be posted from here.",
+                "First check in Tally that this Journal was not already entered by hand, then build it again and choose the new file. Do not post this one, and do not import it in Tally without checking its ledgers: an entry on a ledger that keeps bills would land On Account.",
+            ),
             "file_picker_failed" => (
                 "ComplyEaze Bridge could not open the native file picker.",
                 "Close any modal dialogs and choose the Journal file again.",
@@ -208,6 +212,20 @@ mod tests {
         assert!(refused.message.contains("amends an earlier batch"));
         assert!(refused.remediation.contains("promptly"));
         assert!(refused.remediation.contains("overwritten"));
+    }
+
+    #[test]
+    fn a_journal_saved_before_bill_wise_records_says_to_build_it_again() {
+        let refused = DesktopJournalError::refused("import_batch_predates_bill_wise_record");
+        let fallback = DesktopJournalError::refused("some_unmapped_code");
+        assert_ne!(refused.message, fallback.message);
+        assert_ne!(refused.remediation, fallback.remediation);
+        assert!(refused.message.contains("bill-wise"));
+        assert!(refused.remediation.contains("build it again"));
+        assert!(refused.remediation.contains("not already entered"));
+        // The generic advice, to choose the unchanged original file, would
+        // send the person round a loop that fixes nothing.
+        assert!(!refused.remediation.contains("original Journal file"));
     }
 
     #[test]

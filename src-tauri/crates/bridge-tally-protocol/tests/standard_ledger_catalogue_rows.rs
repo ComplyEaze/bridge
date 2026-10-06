@@ -106,3 +106,175 @@ fn the_same_capture_is_refused_for_a_different_expected_company_name() {
     .expect_err("a different expected company name must be refused");
     assert_eq!(error, StandardLedgerCatalogError::CompanyIdentityMismatch);
 }
+
+// ---- The V2 catalogue on captures of a live Tally (#1234) ------------------------------------------
+//
+// Four synthetic books answered Bridge's own `StandardLedgerCatalogV2` request on 6 Oct 2026: V1's rows, each with
+// the ledger's `ISBILLWISEON`. Each provenance file records the request that was sent and the response's hash.
+
+use bridge_tally_protocol::{
+    encode_tally_xml_request_utf16le, parse_standard_ledger_catalog_v2_with_identities,
+    xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
+    BillWiseFlag,
+};
+use sha2::{Digest, Sha256};
+
+fn sha256(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+struct V2Capture {
+    company: &'static str,
+    guid: &'static str,
+    xml: &'static [u8],
+    provenance: &'static str,
+    ledgers: usize,
+    bill_wise: usize,
+}
+
+const V2_CAPTURES: [V2Capture; 4] = [
+    V2Capture {
+        company: "BRIDGE OUTSTANDINGS LAB",
+        guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
+        xml: include_bytes!(
+            "fixtures/agent/native-outstandings-detail-ledger-catalogue-v2.utf16le.xml"
+        ),
+        provenance: include_str!(
+            "fixtures/agent/native-outstandings-detail-ledger-catalogue-v2.json"
+        ),
+        ledgers: 17,
+        bill_wise: 10,
+    },
+    V2Capture {
+        company: "BRIDGE AMEND LAB",
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536",
+        xml: include_bytes!("fixtures/agent/d3-amend-lab-ledger-catalogue-v2.utf16le.xml"),
+        provenance: include_str!("fixtures/agent/d3-amend-lab-ledger-catalogue-v2.json"),
+        ledgers: 19,
+        bill_wise: 4,
+    },
+    V2Capture {
+        company: "BRIDGE SHAPE LAB",
+        guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+        xml: include_bytes!("fixtures/agent/native-shape-lab-ledger-catalogue-v2.utf16le.xml"),
+        provenance: include_str!("fixtures/agent/native-shape-lab-ledger-catalogue-v2.json"),
+        ledgers: 44,
+        bill_wise: 18,
+    },
+    V2Capture {
+        company: "WR2 Unicode Lab",
+        guid: "61c6de69-1748-461c-ad3f-162cb949df9f",
+        xml: include_bytes!("fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"),
+        provenance: include_str!("fixtures/agent/native-ledger-catalogue-v2.json"),
+        ledgers: 9,
+        bill_wise: 2,
+    },
+];
+
+fn decoded(bytes: &[u8]) -> String {
+    decode_tally_xml_response_bytes_limited(
+        bytes,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        bytes.len(),
+    )
+    .expect("captured BOM-less UTF-16LE response decodes")
+    .text
+}
+
+#[test]
+fn every_ledger_of_each_v2_capture_carries_a_flag() {
+    for capture in &V2_CAPTURES {
+        let catalogue = parse_standard_ledger_catalog_v2_with_identities(
+            &decoded(capture.xml),
+            capture.company,
+            capture.guid,
+        )
+        .unwrap_or_else(|error| panic!("{}: {error}", capture.company));
+        let flags = catalogue
+            .bill_wise_flags()
+            .map(|(_, _, flag)| flag)
+            .collect::<Vec<_>>();
+        assert_eq!(flags.len(), capture.ledgers, "{}", capture.company);
+        assert_eq!(
+            flags
+                .iter()
+                .filter(|flag| **flag == BillWiseFlag::On)
+                .count(),
+            capture.bill_wise,
+            "{}",
+            capture.company
+        );
+        // The same body is not a V1 answer: the V1 parser refuses the new field.
+        assert_eq!(
+            parse_standard_ledger_catalog_with_identities(
+                &decoded(capture.xml),
+                capture.company,
+                capture.guid
+            )
+            .unwrap_err(),
+            StandardLedgerCatalogError::MalformedResponse
+        );
+    }
+}
+
+#[test]
+fn each_v2_capture_is_the_answer_to_the_request_the_profile_renders() {
+    for capture in &V2_CAPTURES {
+        let provenance: serde_json::Value = serde_json::from_str(capture.provenance).unwrap();
+        let company = ValidatedCompanyName::new(capture.company).unwrap();
+        let request = ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render();
+        assert_eq!(
+            provenance["source_request_sha256"].as_str().unwrap(),
+            sha256(&encode_tally_xml_request_utf16le(&request)),
+            "{}",
+            capture.company
+        );
+        assert_eq!(
+            provenance["source_response_sha256"].as_str().unwrap(),
+            sha256(capture.xml),
+            "{}",
+            capture.company
+        );
+        assert_eq!(
+            provenance["fixture_sha256"],
+            provenance["source_response_sha256"]
+        );
+        assert_eq!(provenance["transformation"], serde_json::json!([]));
+    }
+}
+
+/// A ledger whose name ends in a carriage return and line feed (the case the
+/// separate outstandings snapshot could not read) comes back in the V2
+/// catalogue as an escaped attribute, with a flag like any other. One of the
+/// four is bill-wise (`Yes`), the case the approval's ledger name must carry.
+#[test]
+fn ledger_names_ending_in_crlf_carry_a_flag_in_the_v2_catalogue() {
+    let mut crlf = Vec::new();
+    for capture in [&V2_CAPTURES[1], &V2_CAPTURES[2]] {
+        let catalogue = parse_standard_ledger_catalog_v2_with_identities(
+            &decoded(capture.xml),
+            capture.company,
+            capture.guid,
+        )
+        .unwrap();
+        crlf.extend(
+            catalogue
+                .bill_wise_flags()
+                .filter(|(name, _, _)| name.ends_with("\r\n"))
+                .map(|(name, _, flag)| (name.to_string(), flag)),
+        );
+    }
+    assert_eq!(
+        crlf,
+        [
+            ("LF708 A\r\n".to_string(), BillWiseFlag::Off),
+            ("LF708 B\r\n".to_string(), BillWiseFlag::Off),
+            ("lf708 c\r\n".to_string(), BillWiseFlag::Off),
+            ("CRLF Supplier\r\n".to_string(), BillWiseFlag::On),
+        ]
+    );
+}

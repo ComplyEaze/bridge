@@ -349,7 +349,7 @@ async fn paired_transport_refusal_retains_completed_catalogue_through_tool_and_h
 #[tokio::test]
 async fn divergent_paired_read_refusal_names_its_cause_and_identical_halves_pass() {
     for diverge in [true, false] {
-        let mut plans = import_cycle_plans()[..10].to_vec();
+        let mut plans = import_family_cycle_plans()[..10].to_vec();
         if diverge {
             let first = plans[5].fixture.body().into_owned();
             let second = first.replacen("Cash", "Changed Cash", 1);

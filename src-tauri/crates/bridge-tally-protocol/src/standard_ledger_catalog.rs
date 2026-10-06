@@ -7,8 +7,9 @@ use quick_xml::{events::Event, Reader};
 
 use crate::{
     attr_value, configured_reader, normalized_standard_company_guid, normalized_standard_value,
-    path_eq, pop_expected_path, read_identifier_text, read_required_text, validate_export_response,
-    validate_only_attributes, PartyLedgerMasterFieldObservation, TallyLedger,
+    path_eq, pop_expected_path, read_identifier_text, read_optional_text, read_required_text,
+    validate_export_response, validate_only_attributes, PartyLedgerMasterFieldObservation,
+    TallyLedger,
 };
 
 /// Rows either parser in this file will hold from one `List of Ledgers`
@@ -49,6 +50,13 @@ pub enum StandardLedgerCatalogError {
     CompanyIdentityMismatch,
     DuplicateIdentity,
     BoundsViolation,
+    /// A V2 catalogue row carried no `ISBILLWISEON`. A V1 body, which has none,
+    /// fails V2 here and nowhere else: the flag is never defaulted.
+    BillWiseFlagMissing,
+    /// A V2 catalogue row's `ISBILLWISEON` was empty or neither `Yes` nor `No`.
+    BillWiseFlagInvalid,
+    /// A V2 catalogue row carried `ISBILLWISEON` more than once.
+    BillWiseFlagRepeated,
 }
 
 impl std::fmt::Display for StandardLedgerCatalogError {
@@ -61,6 +69,11 @@ impl std::fmt::Display for StandardLedgerCatalogError {
             }
             Self::DuplicateIdentity => "standard ledger catalog contained a duplicate identity",
             Self::BoundsViolation => "standard ledger catalog exceeded a safety bound",
+            Self::BillWiseFlagMissing => "standard ledger catalog row had no bill-wise flag",
+            Self::BillWiseFlagInvalid => {
+                "standard ledger catalog row had an unusable bill-wise flag"
+            }
+            Self::BillWiseFlagRepeated => "standard ledger catalog row repeated its bill-wise flag",
         })
     }
 }
@@ -77,6 +90,9 @@ impl StandardLedgerCatalogError {
             Self::CompanyIdentityMismatch => "ledger_catalogue_identity_mismatch",
             Self::DuplicateIdentity => "ledger_catalogue_duplicate_identity",
             Self::BoundsViolation => "ledger_catalogue_bounds_exceeded",
+            Self::BillWiseFlagMissing => "ledger_catalogue_bill_wise_flag_missing",
+            Self::BillWiseFlagInvalid => "ledger_catalogue_bill_wise_flag_invalid",
+            Self::BillWiseFlagRepeated => "ledger_catalogue_bill_wise_flag_repeated",
         }
     }
 }
@@ -114,7 +130,8 @@ pub fn parse_standard_ledger_identity_observation(
                         "standard ledger identity collection exceeded the safe row limit"
                     );
                 }
-                let observed = parse_standard_ledger_identity_row(&mut reader, &element, false)?;
+                let observed =
+                    parse_standard_ledger_identity_row(&mut reader, &element, false, false)?;
                 if observed.company_name != expected_company_name {
                     anyhow::bail!(
                         "standard ledger identity collection did not confirm the requested company"
@@ -231,6 +248,82 @@ impl StandardLedgerCatalog {
     }
 }
 
+/// A ledger's `ISBILLWISEON`: maintained bill by bill, or not. Two states and no default: a row that does not say is refused, so
+/// "not maintained bill by bill" is never what an absent or unreadable flag turns into.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BillWiseFlag {
+    On,
+    Off,
+}
+
+impl BillWiseFlag {
+    fn parse(text: &str) -> Result<Self, StandardLedgerCatalogError> {
+        // After the reader's trimming, exactly the two spellings observed live
+        // (§12a.15); any other is refused until a capture shows Tally uses it (P1).
+        if text == "Yes" {
+            Ok(Self::On)
+        } else if text == "No" {
+            Ok(Self::Off)
+        } else {
+            Err(StandardLedgerCatalogError::BillWiseFlagInvalid)
+        }
+    }
+}
+
+/// One validated `StandardLedgerCatalogV2` answer: the V1 catalogue plus every
+/// ledger's [`BillWiseFlag`], from the one row. Only
+/// [`parse_standard_ledger_catalog_v2_with_identities`] makes one, so every
+/// ledger here has a flag.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StandardLedgerCatalogV2 {
+    catalog: StandardLedgerCatalog,
+    /// `flags[i]` is the flag of `catalog.entries[i]`.
+    flags: Vec<BillWiseFlag>,
+}
+
+impl StandardLedgerCatalogV2 {
+    /// The names, GUIDs and parents, exactly as a V1 answer would give them.
+    pub fn catalog(&self) -> &StandardLedgerCatalog {
+        &self.catalog
+    }
+
+    /// Each ledger's name, GUID and bill-wise flag, in response order.
+    pub fn bill_wise_flags(&self) -> impl Iterator<Item = (&str, &str, BillWiseFlag)> {
+        self.catalog
+            .entries
+            .iter()
+            .zip(&self.flags)
+            .map(|(entry, flag)| (entry.name.as_str(), entry.guid.as_str(), *flag))
+    }
+}
+
+/// [`parse_standard_ledger_catalog_with_identities`] for the V2 request: the
+/// same checks, and in addition exactly one `ISBILLWISEON` per row, `Yes` or
+/// `No`. A V1 body has none and is refused ([`StandardLedgerCatalogError::BillWiseFlagMissing`]).
+pub fn parse_standard_ledger_catalog_v2_with_identities(
+    xml: &str,
+    expected_company_name: &str,
+    expected_company_guid: &str,
+) -> Result<StandardLedgerCatalogV2, StandardLedgerCatalogError> {
+    let rows = parse_standard_ledger_catalog_rows(
+        xml,
+        expected_company_name,
+        expected_company_guid,
+        true,
+    )?;
+    let flags = rows
+        .iter()
+        .map(|row| {
+            row.bill_wise
+                .ok_or(StandardLedgerCatalogError::BillWiseFlagMissing)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(StandardLedgerCatalogV2 {
+        catalog: catalog_from_rows(rows),
+        flags,
+    })
+}
+
 /// Opaque selected-master identities from one validated standard catalog.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StandardLedgerCatalogBinding {
@@ -289,9 +382,17 @@ pub fn parse_standard_ledger_catalog_with_identities(
     expected_company_name: &str,
     expected_company_guid: &str,
 ) -> Result<StandardLedgerCatalog, StandardLedgerCatalogError> {
-    let rows =
-        parse_standard_ledger_catalog_rows(xml, expected_company_name, expected_company_guid)?;
-    Ok(StandardLedgerCatalog {
+    let rows = parse_standard_ledger_catalog_rows(
+        xml,
+        expected_company_name,
+        expected_company_guid,
+        false,
+    )?;
+    Ok(catalog_from_rows(rows))
+}
+
+fn catalog_from_rows(rows: Vec<StandardLedgerCatalogRow>) -> StandardLedgerCatalog {
+    StandardLedgerCatalog {
         entries: rows
             .into_iter()
             .map(|row| StandardLedgerCatalogEntry {
@@ -305,7 +406,7 @@ pub fn parse_standard_ledger_catalog_with_identities(
                 parent_unsupported: row.parent_unsupported,
             })
             .collect(),
-    })
+    }
 }
 
 /// Parses the documented `List of Ledgers` collection as a deliberately
@@ -316,12 +417,15 @@ pub fn parse_standard_ledger_catalog(
     expected_company_name: &str,
     expected_company_guid: &str,
 ) -> Result<Vec<TallyLedger>, StandardLedgerCatalogError> {
-    Ok(
-        parse_standard_ledger_catalog_rows(xml, expected_company_name, expected_company_guid)?
-            .into_iter()
-            .map(|row| row.ledger)
-            .collect(),
-    )
+    Ok(parse_standard_ledger_catalog_rows(
+        xml,
+        expected_company_name,
+        expected_company_guid,
+        false,
+    )?
+    .into_iter()
+    .map(|row| row.ledger)
+    .collect())
 }
 
 /// The ledger GUIDs of one slice of the census (`crate::ledger_census`): the
@@ -473,12 +577,15 @@ struct StandardLedgerCatalogRow {
     ledger: TallyLedger,
     guid: String,
     parent_unsupported: bool,
+    /// `None` for V1; a V2 parse refuses a row without one in the row parser.
+    bill_wise: Option<BillWiseFlag>,
 }
 
 fn parse_standard_ledger_catalog_rows(
     xml: &str,
     expected_company_name: &str,
     expected_company_guid: &str,
+    read_bill_wise: bool,
 ) -> Result<Vec<StandardLedgerCatalogRow>, StandardLedgerCatalogError> {
     // The one rule every Tally read applies first (§1.1(d)): ledger names and
     // parents here must spell a forbidden reference exactly as the voucher
@@ -513,13 +620,14 @@ fn parse_standard_ledger_catalog_rows(
                 // every failure to "malformed": a refused ledger name is not a
                 // malformed response, and saying so sent a previous diagnosis
                 // at the transport for three rounds.
-                let observed = parse_standard_ledger_identity_row(&mut reader, &element, true)
-                    .map_err(|error| {
-                        error
-                            .downcast_ref::<StandardLedgerCatalogError>()
-                            .copied()
-                            .unwrap_or(StandardLedgerCatalogError::MalformedResponse)
-                    })?;
+                let observed =
+                    parse_standard_ledger_identity_row(&mut reader, &element, true, read_bill_wise)
+                        .map_err(|error| {
+                            error
+                                .downcast_ref::<StandardLedgerCatalogError>()
+                                .copied()
+                                .unwrap_or(StandardLedgerCatalogError::MalformedResponse)
+                        })?;
                 if observed.company_name != expected_company_name
                     || !observed
                         .company_guid
@@ -547,6 +655,7 @@ fn parse_standard_ledger_catalog_rows(
                     },
                     guid: ledger_guid,
                     parent_unsupported: observed.parent_unsupported,
+                    bill_wise: observed.bill_wise,
                 });
             }
             Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
@@ -573,12 +682,17 @@ struct StandardLedgerIdentityRow {
     ledger_guid: Option<String>,
     parent: PartyLedgerMasterFieldObservation,
     parent_unsupported: bool,
+    bill_wise: Option<BillWiseFlag>,
 }
 
+/// `read_bill_wise` is the V2 shape: the row must carry one `ISBILLWISEON`.
+/// Without it, that element is as unexpected as any other field, so a V2 body
+/// fails the V1 parse as surely as a V1 body fails the V2 one.
 fn parse_standard_ledger_identity_row(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
     include_ledger_name: bool,
+    read_bill_wise: bool,
 ) -> anyhow::Result<StandardLedgerIdentityRow> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
     let mut ledger_name = include_ledger_name
@@ -593,11 +707,25 @@ fn parse_standard_ledger_identity_row(
     let mut parent = PartyLedgerMasterFieldObservation::NotObserved;
     let mut parent_seen = false;
     let mut parent_unsupported = false;
+    let mut bill_wise = None::<BillWiseFlag>;
     loop {
         match reader.read_event()? {
             Event::Start(child) => {
                 let child_name = child.name().as_ref().to_ascii_uppercase();
                 match child_name.as_slice() {
+                    b"ISBILLWISEON" if read_bill_wise => {
+                        validate_only_attributes(&child, &[b"TYPE"])?;
+                        // Every flag seen live is a Logical (§12a.15): a flag of
+                        // another type, or with no type, is not read as one.
+                        if attr_value(reader, &child, b"TYPE").as_deref() != Some("Logical") {
+                            return Err(StandardLedgerCatalogError::BillWiseFlagInvalid.into());
+                        }
+                        let text = read_optional_text(reader, child.name())?
+                            .ok_or(StandardLedgerCatalogError::BillWiseFlagInvalid)?;
+                        if bill_wise.replace(BillWiseFlag::parse(&text)?).is_some() {
+                            return Err(StandardLedgerCatalogError::BillWiseFlagRepeated.into());
+                        }
+                    }
                     b"NAME" if include_ledger_name => {
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         if ledger_name
@@ -706,6 +834,12 @@ fn parse_standard_ledger_identity_row(
                 parent_seen = true;
                 parent = PartyLedgerMasterFieldObservation::Returned(String::new());
             }
+            Event::Empty(child)
+                if read_bill_wise
+                    && child.name().as_ref().eq_ignore_ascii_case(b"ISBILLWISEON") =>
+            {
+                return Err(StandardLedgerCatalogError::BillWiseFlagInvalid.into());
+            }
             Event::Empty(_) => {
                 anyhow::bail!("standard ledger identity collection contained an empty row field")
             }
@@ -734,6 +868,7 @@ fn parse_standard_ledger_identity_row(
         ledger_guid,
         parent,
         parent_unsupported,
+        bill_wise,
     })
 }
 
@@ -879,3 +1014,7 @@ fn set_bootstrap_context_once(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "standard_ledger_catalog_v2_tests.rs"]
+mod v2_tests;

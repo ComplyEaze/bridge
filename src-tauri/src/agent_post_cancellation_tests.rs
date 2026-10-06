@@ -63,7 +63,7 @@ fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
         "endpoint_origin":"http://127.0.0.1:9",
         "company":{"name":"Synthetic Accounts","guid":"00000000-0000-4000-8000-000000000002","company_number":"100001","books_from":"20260401"},
         "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"test", "built_at":"2026-09-07T00:00:00Z", "status":"built",
+        "sha256":"test", "built_at":"2026-09-07T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal",
             "narration":"Synthetic test only","reference":"REF-1","entries":[

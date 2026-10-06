@@ -345,10 +345,14 @@ for more than it proves:
 
 **What it still does not do.** Two gaps, both stated here rather than left to be discovered.
 
-Nothing detects a party ledger configured for bill-wise accounting: the catalogue Bridge reads
-carries no such flag, and adding one would mean authoring a request shape with no live capture
-behind it. Every party amount therefore lands On Account, exactly as the measured import did,
-and every build naming a counterparty says so in its warnings.
+A party ledger configured for bill-wise accounting is now detected (6 Oct 2026, #1234): the ledger
+catalogue request carries one more native method and returns each ledger's `ISBILLWISEON`
+(§12a.15, live-captured), so the build refuses a batch naming such a ledger until each party is
+approved, and the post and the queue read the flag again. Every party amount on a bill-wise
+ledger still lands On Account, exactly as the measured import did; the approval only records that
+a person was asked, and a hand import of the file is not checked. *(Written before that change: "Nothing
+detects a party ledger configured for bill-wise accounting; every build naming a counterparty says so in its
+warnings.")*
 
 **Two written elements are not verified: `EFFECTIVEDATE` and `PARTYLEDGERNAME`.** *(Written before
 #467 and #469. `EFFECTIVEDATE` is now verified and `PARTYLEDGERNAME` is still not; see the two

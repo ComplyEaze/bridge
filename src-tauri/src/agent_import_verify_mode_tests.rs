@@ -153,6 +153,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
         let line = ImportLedgerLine {
             ledger_identities: None,
             cash_in_hand_ledgers: Some(Vec::new()),
+            on_account_approved: Some(Vec::new()),
             endpoint_origin: None,
             identity_scheme: None,
             amends_batch_id: None,

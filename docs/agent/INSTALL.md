@@ -1,4 +1,4 @@
-# Install Bridge for Claude Desktop
+# Install ComplyEaze Bridge for Claude Desktop
 
 Use the [Download page](https://bridge.complyeaze.com/download.html). It chooses
 the current GitHub Release asset for your operating system and gives the same

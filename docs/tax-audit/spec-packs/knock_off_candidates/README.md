@@ -154,11 +154,12 @@ part. While a token is read:
 - every other mark stays in its token: a Devanagari vowel sign or virama (`देव ट्रेडर्स` is two
   tokens, each with its signs), an accent on a Greek letter, a mark after a digit.
 
-Any other character ends a token: a space, punctuation, a symbol such as `™`, the zero-width space
-U+200B. The sharp s folds to `ss` and the `ﬁ` ligature to `fi`; the Kelvin sign decomposes to `K`,
-folded to `k`; the dotted capital I decomposes to `I` and a combining dot, folded to `i` and the
-dot, which is dropped (`ko_vocab`'s v44 to v48, README section 12). A part is cut on the text as written, so
-U+037E, which decomposes to `;`, ends a token but does not cut a part (README section 11).
+Any other character ends a token: a space, punctuation, a symbol such as the trade mark sign
+U+2122, the zero-width space U+200B. The sharp s folds to `ss` and the `ﬁ` ligature to `fi`; the
+Kelvin sign decomposes to `K`, folded to `k`; the dotted capital I decomposes to `I` and a
+combining dot, folded to `i` and the dot, which is dropped (`ko_vocab`'s v44 to v48, README
+section 12). A part is cut on the text as written, so U+037E, which decomposes to `;`, ends a
+token but does not cut a part (README section 11).
 
 **The names that can be found.** Each party ledger, taken in code-point order of its name, gives a
 key: the tokens of its whole name, read the same way but not cut into parts. A party is left out

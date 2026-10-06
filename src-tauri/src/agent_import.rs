@@ -1660,17 +1660,32 @@ impl Server {
         Ok(())
     }
 
-    /// The V1 ledger catalogue, for every read outside the import family
-    /// (presence, vouchers, the bill trail).
+    /// The V1 ledger catalogue, for the reads outside the import family that
+    /// need row spellings alone (presence, the drift re-read after a voucher
+    /// window); `read_resolvable_ledgers` serves the tools that resolve a name.
     pub(super) async fn read_ledger_catalogue(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
     ) -> Result<(Vec<String>, Evidence), ToolFailure> {
-        let (catalogue, evidence) = self
-            .read_standard_ledger_catalogue(identity, company_name)
-            .await?;
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
         Ok((catalogue.names().map(str::to_string).collect(), evidence))
+    }
+
+    /// The catalogue's ledgers as a request can reach them, for the tools that
+    /// resolve a typed ledger name (#1085). The same V1 read as
+    /// `read_ledger_catalogue`, which keeps the row spellings alone.
+    pub(super) async fn read_resolvable_ledgers(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(Vec<super::ledger_candidates::CatalogueLedger>, Evidence), ToolFailure> {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        let ledgers = catalogue
+            .spellings()
+            .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
+            .collect();
+        Ok((ledgers, evidence))
     }
 
     /// The same catalogue read, with each ledger's immediate parent group as Tally returned it
@@ -1680,17 +1695,33 @@ impl Server {
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
     ) -> Result<(Vec<(String, Option<String>)>, Evidence), ToolFailure> {
-        let (catalogue, evidence) = self
-            .read_standard_ledger_catalogue(identity, company_name)
-            .await?;
-        let parents = catalogue
-            .parents()
-            .map(|(ledger, parent)| (ledger.to_string(), parent.map(str::to_string)))
-            .collect();
-        Ok((parents, evidence))
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        Ok((owned_parents(&catalogue), evidence))
     }
 
-    async fn read_standard_ledger_catalogue(
+    /// One catalogue read that serves both a typed ledger name (the spellings it resolves against) and
+    /// the group placements (each ledger's parent), so a group summary with `ledger` reads the list once.
+    pub(super) async fn read_resolvable_ledgers_with_parents(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<
+        (
+            Vec<super::ledger_candidates::CatalogueLedger>,
+            Vec<(String, Option<String>)>,
+            Evidence,
+        ),
+        ToolFailure,
+    > {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        let ledgers = catalogue
+            .spellings()
+            .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
+            .collect();
+        Ok((ledgers, owned_parents(&catalogue), evidence))
+    }
+
+    async fn read_v1_catalogue(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
@@ -4076,3 +4107,13 @@ fn served_verification_page(persisted: &[u8], offset: usize) -> Result<(Value, V
 #[cfg(test)]
 #[path = "agent_import_file_tests.rs"]
 mod file_tests;
+
+/// Each ledger of a catalogue with its immediate parent group as Tally returned it (#1230).
+fn owned_parents(
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) -> Vec<(String, Option<String>)> {
+    catalogue
+        .parents()
+        .map(|(ledger, parent)| (ledger.to_string(), parent.map(str::to_string)))
+        .collect()
+}

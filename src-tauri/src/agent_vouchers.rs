@@ -568,21 +568,23 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let mut parents_before = None;
         let selected_catalogue = if let Some(requested) = requested_ledger {
             let (ledgers, catalogue_evidence) = if wants_placements {
-                let (parents, evidence) =
-                    server.read_ledger_parents(&identity, &company.name).await?;
-                let names = parents.iter().map(|(name, _)| name.clone()).collect();
+                let (ledgers, parents, evidence) = server
+                    .read_resolvable_ledgers_with_parents(&identity, &company.name)
+                    .await?;
                 parents_before = Some(parents);
-                (names, evidence)
+                (ledgers, evidence)
             } else {
-                server.read_ledger_catalogue(&identity, &company.name).await?
+                server
+                    .read_resolvable_ledgers(&identity, &company.name)
+                    .await?
             };
             accumulate_evidence(&mut accumulated, catalogue_evidence);
-            let resolved = resolve_ledger_or_refuse(
-                ledgers.iter().map(String::as_str),
+            let (resolved, row_spelling) = resolve_catalogue_ledger_or_refuse(
+                &ledgers,
                 &requested,
                 server.settings.redaction,
             )?;
-            Some((resolved, ledgers))
+            Some((resolved, row_spelling, ledgers.iter().map(CatalogueLedger::row).map(str::to_string).collect::<Vec<_>>()))
         } else {
             None
         };
@@ -667,7 +669,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         // Corroborate actual source emptiness before any client-side selector.
         let mut ledger_match = None;
         let mut selected_ledger = None;
-        if let Some((ledger, catalogue)) = selected_catalogue {
+        if let Some((ledger, row_spelling, catalogue)) = selected_catalogue {
             // A group grouping read the ledger list again after the window already, and refused if its
             // ledgers differed from the first read's (`same_ledgers` above): that read is this one.
             let corroboration = if placements.is_some() {
@@ -692,9 +694,13 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             {
                 return Err("ledger_snapshot_drifted".to_string().into());
             }
-            rows = filter_voucher_rows_for_ledger(rows, ledger.name());
-            ledger_match = Some(ledger.to_json(server.settings.redaction));
-            selected_ledger = Some(ledger.name().to_string());
+            rows = filter_voucher_rows_for_ledger(rows, &row_spelling);
+            ledger_match = Some(ledger_match_json(
+                &ledger,
+                &row_spelling,
+                server.settings.redaction,
+            ));
+            selected_ledger = Some(row_spelling);
         }
         let mut voucher_types = None;
         if let Some(selector) = &type_selector {

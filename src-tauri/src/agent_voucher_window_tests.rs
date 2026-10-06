@@ -6240,8 +6240,12 @@ async fn only_a_group_summary_carries_subtree_totals() {
     assert_eq!(result["subtree_totals_complete"], true);
     // A bucket and a subtree row of the same group say, each in its own row, what their figure covers.
     let buckets = buckets_of(&response);
-    let bucket_covers = buckets[0]["covers"].as_str().expect("a bucket says what it covers");
-    let subtree_covers = totals[0]["covers"].as_str().expect("a subtree row says what it covers");
+    let bucket_covers = buckets[0]["covers"]
+        .as_str()
+        .expect("a bucket says what it covers");
+    let subtree_covers = totals[0]["covers"]
+        .as_str()
+        .expect("a subtree row says what it covers");
     assert_ne!(bucket_covers, subtree_covers);
     let one = OneServer::spawn(group_summary_plans(masters(), masters()));
     let response = one.call(json!({"summarise_by": "primary_group"})).await;

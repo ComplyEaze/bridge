@@ -1660,8 +1660,9 @@ impl Server {
         Ok(())
     }
 
-    /// The V1 ledger catalogue, for every read outside the import family
-    /// (presence, vouchers, the bill trail).
+    /// The V1 ledger catalogue, for the reads outside the import family that
+    /// need row spellings alone (presence, the drift re-read after a voucher
+    /// window); `read_resolvable_ledgers` serves the tools that resolve a name.
     pub(super) async fn read_ledger_catalogue(
         &self,
         identity: &super::VerifiedCompanyIdentity,

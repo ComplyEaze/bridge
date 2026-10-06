@@ -10134,5 +10134,13 @@
   "file": "src/clause21a_candidates.rs",
   "from": ".any(|l| capital_ledgers.contains(&l.ledger) && l.amount_paise < 0);",
   "to": ".all(|l| capital_ledgers.contains(&l.ledger) && l.amount_paise < 0);"
+ },
+ {
+  "id": "CC21-63",
+  "by": "reviewer",
+  "what": "the candidates are cited by GUID first, then largest first",
+  "file": "src/clause21a_candidates.rs",
+  "from": "debits.sort_by(|x, y| y.3.cmp(&x.3).then_with(|| x.1.guid.cmp(&y.1.guid)));",
+  "to": "debits.sort_by(|x, y| x.1.guid.cmp(&y.1.guid).then_with(|| y.3.cmp(&x.3)));"
  }
 ]

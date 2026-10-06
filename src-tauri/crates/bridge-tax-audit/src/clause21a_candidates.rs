@@ -20,6 +20,9 @@
 //!
 //! One divergence in output from the reference, a refusal: a candidate or credit total past the
 //! 64-bit range is refused with a typed error, where the reference's unbounded integers print it.
+//! A second sits in the rules loader, not here, and cannot be reached with the vendored rules: a
+//! `[ledger_scrutiny]` table that lacks `large_entry_paise` is refused, where the reference falls
+//! back to its default.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -767,14 +770,15 @@ mod tests {
 
     /// The comparer re-sorts evidence, so no golden holds the order a figure and its finding cite
     /// their candidates in: largest first, then by GUID, then the books' order (two lines of one
-    /// voucher). Here the books' order is the reverse of the GUIDs', the voucher numbers run
-    /// against the GUIDs too, and the two lines of one voucher are not in ledger-name order, so
-    /// each rule is told from its neighbours. The labels are what the reference prints, in its own
+    /// voucher). Here the largest amount is on the last GUID, the books' order is the reverse of
+    /// the GUIDs', the voucher numbers run against the GUIDs too, and the two lines of one voucher
+    /// are not in ledger-name order, so each rule is told from its neighbours and from the two
+    /// keys taken the other way round. The labels are what the reference prints, in its own
     /// order, for this book.
     #[test]
     fn candidates_are_cited_largest_first_then_by_guid_then_in_the_books_order() {
         let book = penalty_book(&[
-            ("v-c", "7", &[("Misc Expenses", 10_000), ("Cash", -10_000)]),
+            ("v-c", "7", &[("Misc Expenses", 40_000), ("Cash", -40_000)]),
             ("v-b", "1", &[("Misc Expenses", 30_000), ("Cash", -30_000)]),
             (
                 "v-a",
@@ -789,17 +793,17 @@ mod tests {
         let rules = crate::rules::Rules::vendored().unwrap();
         let r = super::run(&book, &rules, &ExtraTerms::default(), &Default::default()).unwrap();
         let expected = [
+            "Journal 7 on 2025-06-01, Misc Expenses, ₹400",
             "Journal 2 on 2025-06-01, Penalty Paid, ₹300",
             "Journal 2 on 2025-06-01, Misc Expenses, ₹300",
             "Journal 1 on 2025-06-01, Misc Expenses, ₹300",
-            "Journal 7 on 2025-06-01, Misc Expenses, ₹100",
         ];
         let total = r
             .figures
             .iter()
             .find(|f| f.id == "clause21a_candidates.candidate_total_penalty_or_fine")
             .unwrap();
-        assert_eq!(total.value, crate::findings::Value::Int(100_000));
+        assert_eq!(total.value, crate::findings::Value::Int(130_000));
         let labels = |e: &[crate::findings::EvidenceRef]| -> Vec<String> {
             e.iter().map(|x| x.label.clone()).collect()
         };

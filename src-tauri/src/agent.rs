@@ -988,9 +988,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              names the ledger and `cause` says why: `no_parent` (the book gives it no parent \
              group, or one ComplyEaze Bridge will not carry: a name with a control character or \
              over 1,024 bytes), `group_absent` (its parent group is not in the group list), \
-             `group_name_repeated`, `cycle`, `reserved_name_missing`, `top_group_not_under_root` \
-             (the top group of its chain has no parent, or none that is the root) or \
-             `ledger_not_in_catalogue` (the ledger list does not hold it). Show the person the \
+             `group_name_repeated`, `cycle`, `exhausted` (its chain is longer than the walk allows), \
+             `reserved_name_missing`, `top_group_not_under_root` (the top group of its chain has \
+             no parent, or none that is the root) or `ledger_not_in_catalogue` (the ledger list \
+             does not hold it). Only the first such ledger is named: correct it and call again. Show the person the \
              ledger and the cause. Call ledger_masters for that ledger's `parent` and masters with \
              kind groups for the groups, and ask them to correct it in Tally; or summarise by \
              ledger, month or voucher_type instead. Retrying this call refuses again until the \
@@ -1006,10 +1007,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              and read ledger_masters for each ledger's group. Retrying this call refuses again.",
         ),
         "group_snapshot_drifted" | "ledger_snapshot_drifted" => Some(
-            "A ledger's group, a group's place or the set of ledgers changed in Tally while this \
-             window was being read, so the groups read before the window and after it differ and \
-             no group total was given. Nothing is wrong with the book: ask the person whether \
-             anyone is editing it, then call this again once they have stopped.",
+            "The ledgers, or the groups they sit in, changed in Tally while this call was being \
+             read, so the two reads of them differ and no figure was given. Nothing is wrong \
+             with the book: ask the person whether anyone is editing it, then call this again \
+             once they have stopped.",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(

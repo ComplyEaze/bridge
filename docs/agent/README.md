@@ -1157,8 +1157,8 @@ each other.
     `group_name_repeated`, `reserved_name_missing`, `cycle`, `exhausted`, `top_group_not_under_root`
     (the top group of the chain has no parent, or none that is the root) or `ledger_not_in_catalogue`
     (`no_parent` also covers a group name Tally returned that cannot be carried, one with control
-    characters or over 1,024 bytes); `ledger` names the ledger that could not be placed (masked
-    when parties are masked) and the group is not named: a group total that is short of an entry it could not place is the
+    characters or over 1,024 bytes); `ledger` names the first ledger that could not be placed (masked
+    when parties are masked; more may follow once it is corrected) and the group is not named: a group total that is short of an entry it could not place is the
     misleading answer, so there is no "unplaced" bucket. A ledger no voucher of the window touches
     does not matter. A voucher withheld for a foreign-currency amount is still in no bucket (the
     result is `partial`, as for every summary).

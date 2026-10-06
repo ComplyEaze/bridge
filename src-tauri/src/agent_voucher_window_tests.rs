@@ -6105,6 +6105,7 @@ async fn a_group_summary_names_the_ledger_it_could_not_place_and_masks_it_under_
     assert_eq!(refusal["code"], "summary_group_unresolved", "{refusal}");
     assert_eq!(refusal["cause"], "no_parent", "{refusal}");
     assert_eq!(refusal["ledger"], ledger, "{refusal}");
+    assert!(refusal["remediation"].is_string(), "{refusal}");
     let masked = OneServer::spawn_with(plans(), Redaction::MaskParties)
         .call(json!({"summarise_by": "primary_group"}))
         .await;
@@ -6151,6 +6152,7 @@ async fn the_group_modes_size_the_ledger_list_first_from_the_masters_mark() {
     assert_eq!(refusal["code"], "summary_group_book_too_large", "{refusal}");
     assert_eq!(refusal["size"]["master_alter_id"], limit + 1, "{refusal}");
     assert_eq!(refusal["size"]["limit_master_alter_id"], limit, "{refusal}");
+    assert!(refusal["remediation"].is_string(), "{refusal}");
     assert_eq!(one.requests(), total);
     // At the limit: read.
     for grouping in ["group", "primary_group"] {
@@ -6246,10 +6248,34 @@ async fn only_a_group_summary_carries_subtree_totals() {
     let subtree_covers = totals[0]["covers"]
         .as_str()
         .expect("a subtree row says what it covers");
-    assert_ne!(bucket_covers, subtree_covers);
+    assert_eq!(
+        bucket_covers,
+        "only the ledgers directly under the group, not its sub-groups"
+    );
+    assert_eq!(
+        subtree_covers,
+        "the group and everything under it, sub-groups included"
+    );
     let one = OneServer::spawn(group_summary_plans(masters(), masters()));
     let response = one.call(json!({"summarise_by": "primary_group"})).await;
     assert!(response["structuredContent"]["result"]
         .get("subtree_totals")
         .is_none());
+    assert_eq!(
+        buckets_of(&response)[0]["covers"],
+        "every ledger under the group"
+    );
+}
+
+#[test]
+fn a_ledger_name_with_colons_survives_the_trip_through_the_refusal_string() {
+    let failure = super::vouchers::summary_failure(
+        "summary_group_unresolved:no_parent:Acme: North, Ltd: Unit 2".to_string(),
+    );
+    assert_eq!(failure.code, "summary_group_unresolved");
+    assert_eq!(failure.cause, Some("no_parent"));
+    assert_eq!(
+        failure.read_detail.unwrap().unplaced_ledger.as_deref(),
+        Some("Acme: North, Ltd: Unit 2")
+    );
 }

@@ -250,11 +250,17 @@ pub(super) fn page_items(
 /// are the same as `ledger_movement`'s; the voucher types are not told apart.
 const SUMMARY_BASIS: &str = "every voucher the window, selectors and search selected that is not cancelled, optional or without accounting entries, as ledger_movement counts (a narrowed window is not a ledger's whole movement); post-dated vouchers are summed too: post_dated_included counts those Tally flagged Yes and post_dated_flag_absent those with no flag at all (Tally asserts the flag on every voucher the current read asks for, so that is expected to be 0; only when it is not is a zero in the first no proof that none are post-dated); a voucher type that does not post (a memorandum, a reversing journal, a sales or purchase order, a delivery or receipt note), if the book uses it and Tally exports it with ledger entries, is not told apart and is summed (none of the vouchers in the one window this was checked on were of those types; the book's voucher-type masters were not read)";
 
-/// The largest master-alteration mark a group summary reads the ledger list at: the mark is an upper bound on
-/// ledgers (every other master raises it), a ledger row of the standard list is about 1,400 bytes (the
-/// estimate the compliance ledger read uses), and one response must stay under 16 MiB, half the transport cap.
-const GROUP_LEDGER_LIST_BYTES_PER_LEDGER: u64 = 1_400;
+/// Rule: a group summary reads the whole ledger list only when its response is expected to stay under
+/// [`GROUP_LEDGER_LIST_LIMIT_BYTES`]; a larger response is cut off at the transport cap mid-read.
+/// 16 MiB is this code's own choice, half the transport cap (UNVERIFIED as a safe size for the gateway).
 const GROUP_LEDGER_LIST_LIMIT_BYTES: u64 = 16 * 1024 * 1024;
+/// A ledger row of the standard list is estimated at 1,400 bytes, the estimate the compliance ledger read
+/// uses; the rows measured so far were 1,104 to 1,221 bytes (PARTIAL: one synthetic book), so the
+/// estimate is high on purpose.
+const GROUP_LEDGER_LIST_BYTES_PER_LEDGER: u64 = 1_400;
+/// Rule: refuse above this master-alteration mark. The mark is an upper bound on ledgers (every other master
+/// raises it too), so a smaller book may be refused; the limit is the response limit over the per-ledger
+/// estimate.
 pub(super) const GROUP_LEDGER_LIST_MARK_LIMIT: u64 =
     GROUP_LEDGER_LIST_LIMIT_BYTES / GROUP_LEDGER_LIST_BYTES_PER_LEDGER;
 
@@ -264,7 +270,7 @@ pub(super) const GROUP_BASIS: &str = "groups are the book's masters read now (ea
 
 /// A refused summary as a failure: a ledger whose group chain could not be walked names the gap as
 /// the cause, so the answer says what to look at in the book's groups.
-fn summary_failure(code: String) -> ToolFailure {
+pub(super) fn summary_failure(code: String) -> ToolFailure {
     match code.strip_prefix("summary_group_unresolved:") {
         Some(rest) => {
             let (gap, ledger) = match rest.split_once(':') {

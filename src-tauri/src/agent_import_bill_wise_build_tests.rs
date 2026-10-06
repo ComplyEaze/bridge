@@ -92,6 +92,16 @@ fn digest_of_first_party(refusal: &ToolOutcome) -> String {
         .to_string()
 }
 
+/// The text a tool call answered with, as the assistant receives it.
+fn answered(response: &Value) -> Value {
+    serde_json::from_str(
+        response["content"][0]["text"]
+            .as_str()
+            .expect("a tool call answers with text"),
+    )
+    .expect("the answer is JSON")
+}
+
 fn party_name_of(value: &Value) -> &str {
     value["$bridge_agent_party_name"]
         .as_str()
@@ -198,11 +208,13 @@ async fn an_approved_party_builds_and_the_record_carries_the_approval() {
     let refused = server.build_import_xml(&build_args(None)).await.unwrap();
     let digest = digest_of_first_party(&refused);
     let approvals = json!([{"ledger": PARTY, "party_digest": digest}]);
-    let built = server
-        .build_import_xml(&build_args(Some(approvals)))
-        .await
-        .unwrap();
-    let result = &built.payload["result"];
+    // Through the tool call, as the assistant receives it with no masking set.
+    let built = answered(
+        &server
+            .call_tool("build_import_xml", build_args(Some(approvals)))
+            .await,
+    );
+    let result = &built["result"];
     assert_eq!(
         result["on_account_approved"],
         json!([{"ledger": PARTY, "party_digest": digest}])
@@ -233,7 +245,9 @@ async fn an_approved_party_builds_and_the_record_carries_the_approval() {
 /// With party names masked the refusal's ledger reads like `Br…R4` to the
 /// assistant, so the approval cannot repeat the name: it passes the digest the
 /// refusal listed, with the masked name beside it or none, and the build records
-/// the party's real name.
+/// the party's real name. The build's own answer, taken through the tool call
+/// as the assistant receives it, lists the approved party under the same
+/// masked name and holds the real one nowhere.
 #[tokio::test]
 async fn an_approval_by_digest_builds_when_party_names_are_masked() {
     let yes = || journal_plans(&[PARTY]);
@@ -258,11 +272,16 @@ async fn an_approval_by_digest_builds_when_party_names_are_masked() {
         } else {
             json!({"party_digest": digest})
         };
-        let built = server
-            .build_import_xml(&build_args(Some(json!([approval]))))
-            .await
-            .unwrap();
-        assert!(built.payload["result"]["batch_id"].is_string());
+        let response = server
+            .call_tool("build_import_xml", build_args(Some(json!([approval]))))
+            .await;
+        let built = answered(&response);
+        assert!(built["result"]["batch_id"].is_string(), "{built}");
+        assert_eq!(
+            built["result"]["on_account_approved"],
+            json!([{"ledger": masked_name, "party_digest": digest}])
+        );
+        assert!(!response.to_string().contains(PARTY), "{response}");
         let saved = server.import_ledger().unwrap().pop().unwrap();
         assert_eq!(
             saved.on_account_approved,
@@ -540,7 +559,7 @@ async fn a_bank_batch_names_its_bill_wise_counterparty_and_builds_once_approved(
     args["on_account_approvals"] = json!([{"ledger": PARTY, "party_digest": digest}]);
     let built = server.build_import_xml(&args).await.unwrap();
     assert_eq!(
-        built.payload["result"]["on_account_approved"][0]["ledger"],
+        party_name_of(&built.payload["result"]["on_account_approved"][0]["ledger"]),
         PARTY
     );
     simulator.cancel();

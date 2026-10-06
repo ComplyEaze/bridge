@@ -291,6 +291,21 @@ pub(super) struct OnAccountApproved {
     pub(super) party_digest: String,
 }
 
+/// The approved parties as a build result lists them: each ledger name marked
+/// as a party name, so the list follows the masking setting as the refusal's
+/// does. The saved record keeps the real name.
+pub(super) fn approved_json(approved: &[OnAccountApproved]) -> Vec<Value> {
+    approved
+        .iter()
+        .map(|item| {
+            json!({
+                "ledger": party_name(item.ledger.clone()),
+                "party_digest": item.party_digest,
+            })
+        })
+        .collect()
+}
+
 /// One approval as the caller passes it. Only the digest is read: it hashes the
 /// party's exact ledger name with the batch, so it names one party of one batch.
 /// `ledger` is accepted because a refusal lists it beside the digest, and is

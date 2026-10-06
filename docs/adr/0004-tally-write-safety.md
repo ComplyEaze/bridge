@@ -361,7 +361,14 @@ same two points (#815): the build records it, and a post refuses with
 `cash_ledger_not_cash_in_hand` when it now reaches another group. The leg
 classification cannot see that move, since a cash ledger under Bank Accounts is
 still money. A batch recorded before that record refuses with
-`import_batch_predates_cash_ledger_record` and is rebuilt.
+`import_batch_predates_cash_ledger_record` and is rebuilt. A ledger that keeps bills in
+Tally takes an entry On Account when the voucher carries no bill allocation, so the build
+reads each named ledger's `ISBILLWISEON` from the same ledger-list read it already makes
+(§12a.15), refuses until each such party is approved, and records the approved ledgers; the
+post and the queue admission read the flag again and refuse `import_bill_wise_changed` for a
+ledger that became bill-wise since. A batch recorded before that record refuses with
+`import_batch_predates_bill_wise_record` and is rebuilt. The approval is the assistant's word,
+not proof that a person said yes; the native dialog lists each voucher of a small batch but does not mark which entries land On Account (#1234).
 The queued re-read is not the last request before the POST: the mode and
 company re-admission and the two duplicate-absence reads follow it, because
 duplicate absence stays the final source check. A regroup in Tally during those

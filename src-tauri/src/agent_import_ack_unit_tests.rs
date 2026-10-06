@@ -275,7 +275,7 @@ fn posted_line() -> ImportLedgerLine {
         "batch_id":BATCH, "identity_scheme":"batch_v1",
         "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
         "txn_ids":["T1"],"date_from":"20260907","date_to":"20260907",
-        "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":7},
         "vouchers":[{"bridge_txn_id":"T1","date":"20260907","voucher_type":"Journal",
             "narration":null,"reference":null,"voucher_number":null,

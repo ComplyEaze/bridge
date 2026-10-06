@@ -1826,9 +1826,9 @@ fn d3_catalogue_read(catalogue: String) -> Vec<ScenarioPlan> {
 }
 
 /// The post path's catalogue request for the D3 company: the one the capture
-/// answered (its sidecar's `source_request_sha256`).
+/// answered (its V2 sidecar's `source_request_sha256`).
 const D3_CATALOGUE_REQUEST: &str =
-    "589566214e5ab516d415e7a9ea3e143ed63452a8a732de0d50d6cb857c0aef2c";
+    "841a085465f36a1586acbd68e5a74e3271b429b77226fddc26c4fa3bc6579b5b";
 
 /// How many of `observed` are that catalogue request.
 fn catalogue_requests(observed: &[tally_protocol_simulator::ObservedRequest]) -> usize {
@@ -1840,7 +1840,7 @@ fn catalogue_requests(observed: &[tally_protocol_simulator::ObservedRequest]) ->
 
 fn d3_catalogue() -> String {
     captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-amend-lab-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-amend-lab-ledger-catalogue-v2.utf16le.xml"
     ))
 }
 

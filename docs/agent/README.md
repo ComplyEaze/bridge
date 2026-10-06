@@ -1210,7 +1210,10 @@ The four rest on different observations, and each build reports its own in
   both sides is a `Contra`, and an unresolvable group is refused too. A money group is admitted only where a captured ledger sits under
   it, so a ledger under `Bank OCC A/c`, which no capture carries, is
   refused on either side until one is captured. Bill-wise allocation is not supported: every party amount lands On
-  Account, and a build that names a counterparty warns so.
+  Account. A build that names a ledger which keeps bills in Tally (`ISBILLWISEON` Yes)
+  is refused as `bill_wise_party_unapproved` until each such party is approved with
+  `on_account_approvals` (see the tool text), and the post and the queue refuse
+  with `import_bill_wise_changed` a ledger that became bill-wise since.
 
 Historical batch records remain readable. None of this qualifies every host,
 licence mode, or manually imported file. In the MCPB extension an unnumbered
@@ -1382,7 +1385,12 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    would move the cash from bank to bank (#815). A batch built before ComplyEaze
    Bridge recorded those ledgers is refused with
    `import_batch_predates_cash_ledger_record`, before any Tally request; build it
-   again. Every post, of any type, is refused with
+   again. A batch built before ComplyEaze Bridge recorded which bill-wise ledgers
+   a person approved is refused with `import_batch_predates_bill_wise_record`;
+   first check in Tally whether its file was already imported by hand. A named
+   ledger that is bill-wise now and was not approved at the build is refused with
+   `import_bill_wise_changed`, from the same ledger-list read, before approval and
+   again in the queue. Every post, of any type, is refused with
    `import_multi_currency_unsupported` if the company defines more than one
    currency: Bridge does not post into multi-currency books yet. This is checked
    before approval and again inside the queue. A Currency read that names no

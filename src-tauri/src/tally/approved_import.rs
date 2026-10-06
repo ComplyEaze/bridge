@@ -379,6 +379,16 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// answers named as cash in hand, so there is nothing to check (#815).
     #[error("import_batch_predates_cash_ledger_record")]
     CashLedgersNotRecorded,
+    /// The batch was recorded before Bridge stored which bill-wise ledgers a
+    /// person approved to receive entries On Account, so there is nothing to
+    /// check (#1234).
+    #[error("import_batch_predates_bill_wise_record")]
+    BillWiseNotRecorded,
+    /// A ledger the batch names is bill-wise now and was not approved: it was
+    /// switched to bill-wise after the build, so an entry on it would land On
+    /// Account unseen (#1234).
+    #[error("import_bill_wise_changed")]
+    BillWiseChanged,
     /// A named ledger now folds equal to another live ledger, which Tally's
     /// import lookup could take for it (bridge#626).
     #[error("ledger_has_folded_twin")]

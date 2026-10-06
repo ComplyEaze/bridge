@@ -1478,6 +1478,31 @@ balance for its reference beside it, rather than netting allocations on an unver
 
 ---
 
+### 12a.15 The ledger catalogue can carry each ledger's `ISBILLWISEON`
+
+**PARTIAL: VERIFIED on five synthetic licensed 7.1 Silver books (`BRIDGE OUTSTANDINGS LAB`, `BRIDGE GST RECON LAB`,
+`BRIDGE AMEND LAB`, `BRIDGE SHAPE LAB`, `WR2 Unicode Lab`), reads only, 6 Oct 2026; not measured on a large book.** The request is
+`StandardLedgerCatalogV2`: the `StandardLedgerCatalogV1` request (`List of Ledgers`, NATIVEMETHOD `Name`, `GUID`,
+`Parent`, the two company computes) plus one more line, `<NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>`, rendered by
+Bridge's own profile code and sent over the gateway by a reads-only sitting. What was observed:
+
+- Every ledger row carried exactly one `<ISBILLWISEON TYPE="Logical">` element, `Yes` or `No`: 17 of 17 and 43 of 43
+  rows on the first two books, 19 of 19, 44 of 44 and 9 of 9 on the other three.
+- The rows (GUID, name, parent) were the V1 answer's rows, and the flags equalled, by name, the flags of the same book's
+  outstandings ledger snapshot (10 `Yes` of 17 and 10 of 43).
+- Ledgers under groups where bill-wise tracking is not offered (cash, bank, duties, income, expense, purchase, sales and
+  the root) answered `No`, never an empty element: 6 of 17 and 26 of 43 rows.
+- Four ledgers whose names end in a carriage return and line feed (three on the amend book, one on the shape book) came
+  back with the name as an escaped attribute and a flag: `No` for the three on the amend book, `Yes` for the one on
+  the shape book (pinned by a protocol test).
+- The same request sent twice answered with byte-identical bodies on the first two books. The answer was about 8 to 9
+  percent larger than V1's and took under 0.4 s.
+- A flag in a form other than `Yes` or `No` was not seen; Bridge's parser accepts only those two and refuses a row with
+  no flag, so a V1 answer is never read as "no ledger keeps bills".
+
+Not shown: a book above a few thousand ledgers (size and time), or a ledger whose flag reads `No` yet holds bills
+(company-wide bill-wise settings, §12a.5).
+
 ## 13. Open questions
 
 | Question | Why it matters |
@@ -1537,3 +1562,4 @@ balance for its reference beside it, rather than netting allocations on an unver
 | 2026-10-02 | §11f: how long Claude Desktop (chat app, macOS, bundle version 2.19675.0) waited on one tool call: silent calls of 20, 55, 75 and 130 s were answered, a 250 s call was cancelled at 240 s with `Request timed out` in two runs and the server was not stopped within a minute of the cancel; no `progressToken` was offered on six calls, so the effect of progress is unanswered; no Tally request. PARTIAL, one run per case |
 | 2026-10-02 | §12a.13: `NUMSTOCKITEMS` against the item rows after create, create-on-existing, rename, alias, move to another group, an inventory purchase and two bulk imports of 20 items on one synthetic licensed 7.1 Silver company: equal at every point; this alias was not counted as an item and added a name entry to the row; a Create on an existing item changed no field of those read; a parent-only Alter changed, of the fields read, only the parent. For a ledger, §9.4g records (one run, PARTIAL) that a Create on an existing name with a changed parent, bill-wise flag and opening balance replaced all three, also answering `CREATED=0, ALTERED=1`: the two master types gave different results here, and neither result is generalised to the other. PARTIAL, one item each, once; not measured: screen-created items, delete with vouchers, merge, a reload. |
 | 2026-10-03 | §12a.3: a whole `outstandings` call (release build from master 7b994e65) on the book of the 1-Dec-2108 due date: state `complete`, 52 requests with none refused, 4.0 s, 1,498 open bills in a page of 500 and a 181,044-byte result. PARTIAL, one run, one book; not measured: the 2108 bill's row in a live response (not on the page: the page runs oldest-due first and the bill is not yet due), the later pages, other books or directions. |
+| 2026-10-06 | §12a.15: the ledger catalogue request with one more native method (`IsBillWiseOn`) returned exactly one `Yes` or `No` `ISBILLWISEON` on every ledger of five synthetic licensed 7.1 Silver books, equal, on the two books where it was compared, to the outstandings snapshot's flags, with the cash, bank and duty ledgers answering `No` and four CR LF ledger names answering a flag (three `No`, one `Yes`). VERIFIED for those books (the captures of four are committed; the GST RECON LAB answer is not); no large book |

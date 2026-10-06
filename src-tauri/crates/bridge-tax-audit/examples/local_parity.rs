@@ -99,7 +99,8 @@ fn vendored_blocks_are_verbatim(source: &str) -> bool {
 /// keys, `loans.loan_ledgers`'s keys, each loan's `interest_ledger`, `loans.shared_interest_ledgers`,
 /// `depreciation.block_by_ledger`'s keys,
 /// `depreciation.dep_expense_ledgers`, every `partners.*` entry's `capital_ledgers`, `interest_ledger`
-/// and `remuneration_ledger`, `tds_tcs_26as`'s three ledger
+/// and `remuneration_ledger`, every `related_parties.*` entry's `ledgers_by_nature` lists,
+/// `tds_tcs_26as`'s three ledger
 /// lists and its `deductor_aliases` values) use, so
 /// `Engagement::bind`'s `BIND-ID-UNUSED` check never refuses over a label a real client TOML
 /// binds only for a role this port does not implement (see this file's doc comment and `docs/tax-audit/config-identity-binding-v1.md` section 4).
@@ -212,6 +213,19 @@ fn narrow_identity_tables(cfg: &mut toml::Table, base: &Path) -> Result<(), Stri
             for key in ["interest_ledger", "remuneration_ledger"] {
                 if let Some(label) = partner.get(key).and_then(toml::Value::as_str) {
                     ledger_labels.insert(label.to_string());
+                }
+            }
+        }
+    }
+    // Every [related_parties.*] entry's `ledgers_by_nature` lists, as `Engagement::bind` binds them.
+    if let Some(persons) = cfg.get("related_parties").and_then(toml::Value::as_table) {
+        for person in persons.values().filter_map(toml::Value::as_table) {
+            if let Some(natures) = person
+                .get("ledgers_by_nature")
+                .and_then(toml::Value::as_table)
+            {
+                for v in natures.values() {
+                    ledger_labels.extend(strs(v));
                 }
             }
         }

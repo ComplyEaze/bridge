@@ -30,9 +30,9 @@ use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
     cash_book_integrity, cash_payments_40a3, counter_cheques_40a3, creditor_ageing_43bh,
     entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t,
-    party_identity, party_monthly, read_scope, stale_balances_41_1, statutory_dues_43b, stock,
-    stock_read, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
-    Tds26asConfig, TdsConfig,
+    party_identity, party_monthly, read_scope, related_parties_cl23, stale_balances_41_1,
+    statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as, trial_balance,
+    twentysixas_receipts, PartnersConfig, RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -415,6 +415,17 @@ fn toml_of(v: &Value) -> toml::Value {
     }
 }
 
+/// The `related_parties` table of an edge book (absent meaning `{}`), as the engagement's TOML
+/// `[related_parties]` table would give it, before binding (the edge books are not bound).
+fn related_parties(s: &Value) -> RelatedPartiesConfig {
+    RelatedPartiesConfig {
+        persons: s["related_parties"]
+            .as_object()
+            .map(|m| m.iter().map(|(k, v)| (k.clone(), toml_of(v))).collect())
+            .unwrap_or_default(),
+    }
+}
+
 /// The `partners` and `deed` `parity/edge_golden.py` passes `partners_40b_194t`, as a bound
 /// `[partners]` table.
 fn partners(s: &Value) -> PartnersConfig {
@@ -629,6 +640,11 @@ fn check(name: &str) {
                 )));
                 assert_eq!(order, want, "{name}: trial_balance row order");
                 let c = trial_balance::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "related_parties_cl23" => {
+                let r = related_parties_cl23::run(&book, &rules, &related_parties(&s)).unwrap();
+                let c = related_parties_cl23::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
             "stale_balances_41_1" => {
@@ -997,7 +1013,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 22] = [
+const EDGE_TESTS: [&str; 23] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1013,6 +1029,7 @@ const EDGE_TESTS: [&str; 22] = [
     "partners_40b_194t",
     "party_monthly",
     "read_scope",
+    "related_parties_cl23",
     "stale_balances_41_1",
     "statutory_dues_43b",
     "stock",

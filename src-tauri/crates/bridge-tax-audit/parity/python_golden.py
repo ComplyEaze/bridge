@@ -112,6 +112,12 @@ def _read_scope(c):
     return read_scope, read_scope.run(c.eng, c.rules)
 
 
+def _related_parties_cl23(c):
+    from tae.audit_tests import related_parties_cl23
+    from tae.config import related_parties_config
+    return related_parties_cl23, related_parties_cl23.run(c.eng, c.rules, related_parties_config(c.cfg))
+
+
 def _trial_balance(c):
     from tae.audit_tests import trial_balance
     return trial_balance, trial_balance.run(c.eng, c.rules)
@@ -455,6 +461,7 @@ RUNNERS = {
     "partners_40b_194t": _partners_40b_194t,
     "party_monthly": _party_monthly,
     "read_scope": _read_scope,
+    "related_parties_cl23": _related_parties_cl23,
     "stale_balances_41_1": _stale_balances_41_1,
     "statutory_dues_43b": _statutory_dues_43b,
     "stock": _stock,

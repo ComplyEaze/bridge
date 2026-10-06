@@ -57,6 +57,7 @@ pub mod party_monthly;
 pub mod read;
 pub mod read_scope;
 pub mod registry;
+pub mod related_parties_cl23;
 pub mod rules;
 pub mod stale_balances_41_1;
 pub mod statutory_dues_43b;
@@ -177,6 +178,9 @@ pub struct Engagement {
     pub loans: LoansConfig,
     /// `[partners]`, bound by [`Engagement::bind`]; empty before binding. See [`PartnersConfig`].
     pub partners: PartnersConfig,
+    /// `related_parties_cl23`-only: `[related_parties]`, bound by [`Engagement::bind`]; empty
+    /// before binding. See [`RelatedPartiesConfig`].
+    pub related_parties: RelatedPartiesConfig,
     /// `creditor_ageing_43bh`-only: the optional `[creditor_ageing_43bh]` table. Filled by
     /// [`Engagement::bind`]; see [`CreditorAgeingConfig`] for what is typed when.
     pub creditor_ageing: CreditorAgeingConfig,
@@ -249,6 +253,19 @@ pub struct PartnersConfig {
     pub partners: BTreeMap<String, toml::Value>,
     /// `[partners].deed` as written; `None` when absent.
     pub deed: Option<toml::Value>,
+}
+
+/// `[related_parties]` from the client config: the related persons the client confirmed, keyed
+/// as the client wrote them.
+///
+/// **Typed lazily**, as [`PartnersConfig`] is: [`Engagement::bind`] binds each
+/// `ledgers_by_nature` list; everything else is kept as written and typed when
+/// `related_parties_cl23` runs ([`related_parties_cl23::related_persons`]).
+#[derive(Debug, Clone, Default)]
+pub struct RelatedPartiesConfig {
+    /// `[related_parties.<key>]` for every person key, as written with its ledger lists bound.
+    /// Empty when the config has no `[related_parties]` table.
+    pub persons: BTreeMap<String, toml::Value>,
 }
 
 /// `[creditor_ageing_43bh]` from the client config, every key optional: the reference's
@@ -953,6 +970,7 @@ not YYYY-MM-DD"
             trade_creditors_source: roles.get("trade_creditors_source").cloned(),
             loans: LoansConfig::default(),
             partners: PartnersConfig::default(),
+            related_parties: RelatedPartiesConfig::default(),
             creditor_ageing: CreditorAgeingConfig::default(),
             statutory_dues: StatutoryDuesConfig::default(),
             base_dir: base_dir.map_or_else(PathBuf::new, Path::to_path_buf),
@@ -1864,6 +1882,19 @@ pub fn partners_40b_194t_on(
         &tds_payable_ledgers(&bound)?,
     )?;
     canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `related_parties_cl23` on an already-built book: its canonical parity dump, with its
+/// module check (SUM-1, XCL-1).
+pub fn related_parties_cl23_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let result = related_parties_cl23::run(book, rules, &bound.related_parties)?;
+    let module_check = related_parties_cl23::check_invariants(book, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
 /// Read, verify, build the book, run `tds_payees` and return its canonical parity dump.

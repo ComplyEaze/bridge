@@ -1,0 +1,225 @@
+{
+ "comment": "related_parties_cl23: a person whose ledger sets move nothing in the books population. The rent set's only in-books voucher nets to zero across its two ledgers; its other voucher is optional. The salary payable ledger's only other voucher is cancelled. The salary payable ledger carries an opening and closing balance but no movement. The interest ledger has a master but no Trial Balance row and only a post-dated voucher; interest is payable, so its payable figures are all 0. Every figure is still emitted; no finding is raised.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Indirect Incomes": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Sundry Creditors": "Current Liabilities"
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_quiet-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-rp_quiet-001"
+  },
+  {
+   "name": "Quiet Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_quiet-002"
+  },
+  {
+   "name": "Quiet Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rp_quiet-003"
+  },
+  {
+   "name": "Quiet Rent Deposit",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-rp_quiet-004"
+  },
+  {
+   "name": "Quiet Salary Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-rp_quiet-005"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-rp_quiet-006"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 1000000,
+   "debit": 5000000,
+   "credit": 0,
+   "closing": 6000000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -800000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -800000
+  },
+  {
+   "ledger": "Quiet Rent",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 0,
+   "closing": 100000
+  },
+  {
+   "ledger": "Quiet Rent Deposit",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "Quiet Salary Payable",
+   "opening": -200000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -200000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 5000000,
+   "closing": -5000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-15",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     5000000
+    ],
+    [
+     "Sales",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Quiet Rent",
+     100000
+    ],
+    [
+     "Quiet Rent Deposit",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "o01",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "status": "optional",
+   "lines": [
+    [
+     "Quiet Rent",
+     600000
+    ],
+    [
+     "Bank A",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "c01",
+   "date": "2025-08-01",
+   "base_type": "Payment",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Quiet Salary Payable",
+     200000
+    ],
+    [
+     "Bank A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "d01",
+   "date": "2026-03-01",
+   "base_type": "Journal",
+   "status": "postdated",
+   "lines": [
+    [
+     "Quiet Interest",
+     300000
+    ],
+    [
+     "Bank A",
+     -300000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ],
+ "related_parties": {
+  "Person Q": {
+   "relationship": "father of the proprietor",
+   "ledgers_by_nature": {
+    "salary": [
+     "Quiet Salary Payable"
+    ],
+    "rent": [
+     "Quiet Rent",
+     "Quiet Rent Deposit"
+    ],
+    "interest": [
+     "Quiet Interest"
+    ]
+   },
+   "payable_natures": [
+    "salary",
+    "interest"
+   ]
+  }
+ }
+}

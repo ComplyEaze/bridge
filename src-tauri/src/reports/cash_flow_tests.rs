@@ -340,6 +340,20 @@ fn money_ledgers_with_only_empty_amounts_and_an_empty_cash_flow_have_nothing_to_
 }
 
 #[test]
+fn one_zero_net_against_a_non_zero_net_is_a_difference_not_nothing_to_compare() {
+    // Tally printed a zero closing; the cash ledger moved by 100.00.
+    let rows = vec![row("Cash", "Cash-in-Hand", "-100.00", "")];
+    match check(rows, &typed_cash_flow("0.00")) {
+        CashFlowCheck::Differs {
+            tally_amounts,
+            ledger_amounts,
+            ..
+        } => assert!(tally_amounts && ledger_amounts),
+        other => panic!("expected a difference, got {other:?}"),
+    }
+}
+
+#[test]
 fn a_ledger_that_prints_zero_against_an_empty_cash_flow_is_not_a_tie() {
     // Tally's Cash Flow printed no amount: an empty side is not a zero, so nothing ties.
     let rows = vec![row("Cash", "Cash-in-Hand", "0.00", "")];

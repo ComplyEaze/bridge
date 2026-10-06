@@ -468,6 +468,42 @@ fn only_the_measured_shape_leaves_the_unmeasured_list_empty() {
 }
 
 #[tokio::test]
+async fn a_tie_that_holds_a_credit_amount_is_observed_but_flagged_and_its_lead_says_so() {
+    // synthetic: April carries a credit amount beside the debit; the closings still add up to the ledger.
+    let changed = cash_flow("-4950.00").replace(
+        "<DSPCRAMT><DSPCRAMTA></DSPCRAMTA></DSPCRAMT>",
+        "<DSPCRAMT><DSPCRAMTA>1.00</DSPCRAMTA></DSPCRAMT>",
+    );
+    assert_ne!(
+        changed,
+        cash_flow("-4950.00"),
+        "the credit column was not found"
+    );
+    let (response, sent, expected) = call(
+        plans_with_report(xml(changed), |report| report),
+        "2026-04-01",
+        "2026-06-30",
+    )
+    .await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["state"], "observed", "{result}");
+    assert_eq!(
+        result["unmeasured_in_this_answer"],
+        json!(["credit_amount_present"])
+    );
+    let lead = lead(&response);
+    assert!(
+        lead.contains("treat each month's figure as unverified"),
+        "{lead}"
+    );
+    assert!(
+        !lead.contains("No month with an outflow has been measured"),
+        "{lead}"
+    );
+}
+
+#[tokio::test]
 async fn the_request_on_the_wire_is_the_cash_flow_of_this_company_and_window() {
     // The simulator keeps a hash of each request body: the production call site must have sent
     // Tally's `Cash Flow` for the verified company and the whole-month window, twice (the paired read).

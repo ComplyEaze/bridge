@@ -1,6 +1,6 @@
 # Spec pack: `knock_off_candidates` (settlements through another party; may bear on Form 3CD clauses 31 and 21(d))
 
-The goldens in this pack were produced by the reference engine at commit `4df1cc43` and are the
+The goldens in this pack were produced by the reference engine at commit `742f67fc` and are the
 contract; this note explains them and cites [`docs/tax-audit/parity-spec-v1.md`](../../parity-spec-v1.md)
 (sections 1, 2.2, 3.1, 4, 4.1, 5, 6, 7 and 11, as relevant); where the note and a golden differ, the golden wins and the
 reference's maintainers should be told on the pull request or issue.
@@ -26,8 +26,8 @@ different party. It has two lists:
 - **T1**, a journal settlement: a voucher of any type with nonzero lines on two or more different
   party ledgers and no nonzero line on a bank or cash ledger.
 - **T2**, a narration naming another party: a voucher with a nonzero bank or cash line whose
-  narration spells out, word for word, the full name of a party ledger that has no line on the
-  voucher. When the only place a party's name appears is next to a further name-like word, the
+  narration spells out, word for word, the full name of a party ledger that has no nonzero line on
+  the voucher (a zero line posts nothing). When the only place a party's name appears is next to a further name-like word, the
   voucher goes to a third list, **T2 embedded**, instead.
 
 Every voucher that fits is listed, whatever its size or apparent purpose. The test reaches no
@@ -43,8 +43,8 @@ Read from the engagement's book, as the crate's `src/book.rs` holds it:
 
 - **Ledger masters**: each ledger's name, its group chain (parent first, primary group last) and its
   GUID. The chain decides whether a ledger is a party or a bank or cash ledger (README section 3.1);
-  the GUID only gives the tag in two figure ids (README section 4.7). Every ledger master also
-  counts when the test looks for names two masters share (README section 3.3).
+  the GUID only gives the tag in two figure ids (README section 4.7). Every ledger master whose name
+  yields a token also counts when the test looks for names two masters share (README section 3.3).
 - **Vouchers**: GUID, date, voucher type name, number, narration, status and lines; each line is a
   ledger name and an integer amount in paise, debit positive, credit negative.
 - **The books population**: vouchers whose status is regular (`Book::population`). Optional,
@@ -139,22 +139,34 @@ A population voucher is read for names when it has a nonzero bank or cash line a
 not the empty string. A narration of spaces only is read and yields no token (`ko_quiet`'s q08). T1
 and T2 never overlap: one needs a bank or cash line and the other forbids it.
 
-**Tokens and parts.** The narration is cut into parts at the separators (README section 2.5). Each
-part is first case-folded with Python 3.13's `str.casefold()` (the crate's `support::py_casefold`;
-parity spec section 4.1 on the Unicode version), and only then are its tokens taken: the maximal runs
-of ASCII `a` to `z` and `0` to `9` in the case-folded text. Tokens are numbered across the whole
-narration, and each remembers its part. A character whose case-fold is still not an ASCII letter or
-digit (an accented letter such as `é`, a combining mark, any Devanagari) ends a token. A character
-whose case-fold is ASCII forms or extends one: the sharp s folds to `ss`, the Kelvin sign to `k`, the
-`ﬁ` ligature to `fi`, and the dotted capital I to `i` followed by a combining dot, which then ends the
-token (`ko_vocab`, README section 12).
+**Tokens and parts.** The narration is cut into parts at the separators (README section 2.5), on the
+text as written. Each part is then decomposed (Unicode NFD), then case-folded with Python 3.13's
+`str.casefold()` (the crate's `support::py_casefold`; parity spec section 4.1 on the Unicode
+version), and only then are its tokens taken: the maximal runs of letters, numbers and combining
+marks of any alphabet, that is of characters whose general category is a letter (`L*`), a number
+(`N*`) or a mark (`M*`). Tokens are numbered across the whole narration, and each remembers its
+part. While a token is read:
+
+- a mark that follows a letter `a` to `z` is dropped, so an accented Latin letter reads as its plain
+  letter: `Café`, composed or decomposed, gives `cafe`;
+- a mark that would start a token is dropped, and so are U+200C, U+200D and U+00AD (the zero-width
+  non-joiner and joiner and the soft hyphen), which neither end a token nor stay in it;
+- every other mark stays in its token: a Devanagari vowel sign or virama (`देव ट्रेडर्स` is two
+  tokens, each with its signs), an accent on a Greek letter, a mark after a digit.
+
+Any other character ends a token: a space, punctuation, a symbol such as `™`, the zero-width space
+U+200B. The sharp s folds to `ss` and the `ﬁ` ligature to `fi`; the Kelvin sign decomposes to `K`,
+folded to `k`; the dotted capital I decomposes to `I` and a combining dot, folded to `i` and the
+dot, which is dropped (`ko_vocab`'s v44 to v48, README section 12). A part is cut on the text as written, so
+U+037E, which decomposes to `;`, ends a token but does not cut a part (README section 11).
 
 **The names that can be found.** Each party ledger, taken in code-point order of its name, gives a
-key: the tokens of its whole name, case-folded the same way but not cut into parts. A party is left
-out when its key is empty (`ko_t2`: a Devanagari name). A key is **shared** when any other ledger
-master, of any group, has the same tokens in the same order, whatever its case, punctuation or
-spacing; masters are counted over every group, and a key with more than one master is bound to no
-one: the narration cannot say which master it means, so it is listed for none. That other master may
+key: the tokens of its whole name, read the same way but not cut into parts. A party is left out
+when its key is empty, which a name made only of punctuation or symbols gives (no book has one). A
+key is **shared** when any other ledger master, of any group, has the same tokens in the same order,
+whatever its case, punctuation or spacing, or an accent on a letter `a` to `z` (`Café Corner` and
+`Cafe Corner` would share one); masters are counted over every group, and a key with more than one
+master is bound to no one: the narration cannot say which master it means, so it is listed for none. That other master may
 be a party (`ko_t2`: `Omega Mart` and `OMEGA MART`, so b07 names neither; `Kappa Traders` and
 `Kappa-Traders`, so b06 is not listed) or not (`ko_t2`: the party `Sigma Stores` and the expense
 `sigma stores`). A shared key stays in the index as a name the narration holds, so a shorter name
@@ -166,15 +178,18 @@ a separator is found (`ko_nested`'s n18). A found span lying inside another foun
 to it, is dropped (`ko_nested`'s n01: `Rho` inside `Rho Transport`). Spans that merely overlap are
 all kept (`ko_nested`'s n03 and n04). The same name found twice is one name (`ko_t2`'s b14).
 
-**Skipping the voucher's own ledgers.** A kept span whose ledger has any line on the voucher, a
-zero-amount line included, is not reported (`ko_t2`'s b12; `ko_nested`'s n02 and n19). It still
-counts as a kept span in README section 3.4.
+**Skipping the voucher's own ledgers.** A kept span whose ledger has a nonzero line on the voucher
+is not reported (`ko_nested`'s n02 and n19). A zero-amount line posts nothing, so a party on the
+voucher only through one is reported like any other (`ko_t2`'s b12 is listed for `Gamma Supplies`).
+A span not reported still counts as a kept span in README section 3.4.
 
-Matching examples from the books: `CAFÉ CORNER` finds `Café Corner` but `Cafe Corner` does not
-(`ko_t2`'s b09 and b10), because the name and the narration both fold `é` to a non-ASCII letter and
-keep the token `caf`; `ZOE CRAFTS` finds a ledger whose name is written with a combining diaeresis
-(`ko_tags`' k06); `Unit 7 Supplies` is found with its digit (`ko_t2`'s b08); `AlphaTraders` and
-`Alpha` alone do not find `Alpha Traders` (`ko_quiet`'s q10).
+Matching examples from the books: `CAFÉ CORNER` and `Cafe Corner` both find `Café Corner` (`ko_t2`'s
+b09 and b10), as the accent on `e` is dropped from the name and the narration alike; `ZOE CRAFTS`
+finds a ledger whose name is written with a combining diaeresis (`ko_tags`' k06); `Unit 7 Supplies`
+is found with its digit (`ko_t2`'s b08); the Devanagari narration of `ko_t2`'s b11 finds the
+Devanagari party `देव ट्रेडर्स`; `AlphaTraders` and `Alpha` alone do not find `Alpha Traders`
+(`ko_quiet`'s q10). An accent on any other letter is kept, so a Greek word written with an accent and
+the same word written without it are different tokens, and neither finds the other.
 
 ### 3.4 Plain or inside a longer name
 
@@ -190,8 +205,11 @@ of these:
 3. it is in the same part as the span's own first token (for the token before) or the span's own
    last token (for the token after; `ko_vocab`'s v43 writes `LAMBDA-TRADERS ZED`, where the two
    differ); and
-4. it is name-like: only letters, at least two of them, and not in the word list of README section
-   2.5.
+4. it is name-like: only the letters `a` to `z`, read as in README section 3.3 (so an accent on them
+   is already dropped, and `ZOË` beside a name is name-like), at least two of them, and not in the
+   word list of README section 2.5. A token holding a digit or any other character is never
+   name-like, so a Devanagari or full-width word beside a name leaves it plain: the word list is in
+   English only.
 
 Otherwise it is **plain**. A name plain anywhere in the narration is plain for the voucher, and its
 inside occurrences are forgotten (`ko_nested`'s n15). The voucher is a T2 row when it has at least one
@@ -204,6 +222,30 @@ after it in one part (n08 and n09, inside); `LTD`, `X`, `42` and `B2` beside it 
 party's span included); overlapping names (n03) and a chain of three (n04), all inside. `ko_vocab`
 repeats the test for every word of the list (plain) and for every separator (plain) and
 non-separator (inside) character.
+
+### 3.5 Traps for a port
+
+- **Take token characters by general category, not by Rust's `char::is_alphabetic`.** That method is
+  the Unicode Alphabetic property, which counts some marks as letters and not others: the
+  Devanagari vowel signs U+093E and U+0947 are Alphabetic, the virama U+094D and the combining acute
+  U+0301 are not. Built on it, a Devanagari word breaks at its virama, and a vowel sign that starts a
+  token or follows a letter `a` to `z` is kept as a letter where README section 3.3 drops it. The
+  rule is `L*`, `N*` or `M*`; Rust's `char::is_numeric` is the `N*` categories, of Rust's own
+  Unicode version.
+- **Do not reuse Python's `\w`** (the crate's `support::py_is_word` and `support::py_isalnum`). It
+  rejects every mark, so `देव` reads as two one-letter tokens, and the dotted capital I as `i` and
+  `ota`. One rule built on it changes `ko_vocab` (HASHES.md).
+- **Decompose, then case-fold, with Python 3.13's Unicode 15.1 tables.** Without the decomposition a
+  precomposed letter keeps its accent (`ko_t2` changes). Measured over every code point, alone, after
+  `a` and before U+0301: leaving the decomposition out reads 13,080 code points differently,
+  decomposing with NFKD instead of NFD reads 3,575 differently, and folding before decomposing reads
+  64 differently (the Greek iota subscript before another mark). Only the first is pinned by a
+  golden. The crate's `unicode-normalization` dependency, used today for NFC in `canonical.rs`,
+  carries Unicode 17.0 tables (`support.rs` asserts that version), not 15.1.
+- **Cut the shown part from the narration as written** (README section 4.2), at the parts' own
+  boundaries. The reference's boundaries are character positions in the original text, so a port
+  must never apply them as byte offsets, nor take them from the decomposed or case-folded text,
+  whose length differs.
 
 ## 4. Outputs
 
@@ -233,10 +275,14 @@ lines net to zero (`ko_t1`'s t08 adds the ₹2,000 debit line of `Alpha Traders`
 between money ledgers and counts the larger side of its money lines once (`ko_t2`'s b04 adds its
 amount once); every other voucher sums the absolute value of each of its bank and cash lines; a voucher that is both a T2 and a T2 embedded row is in both totals (`ko_nested`'s n16); a T2
 row naming two parties counts once in `t2_row_count` and once in each name's figures, so
-`t2_named_pair_count` exceeds `t2_row_count` (`ko_t2`: 11 and 10).
+`t2_named_pair_count` exceeds `t2_row_count` (`ko_t2`: 14 and 13).
 
-Each definition is a fixed sentence; the two per-name definitions carry the tag. Take them from the
-goldens: they are compared by hash (parity spec section 4).
+Each definition is a fixed sentence; the two per-name definitions carry the tag. The definitions of
+`t2_row_count` and `t2_named_count_<tag>` say the named party has no amount on the voucher, and
+those of the three T2 totals each end with one sentence saying that a Contra, or a voucher whose
+every line with an amount is on a bank or cash ledger, counts the larger side of its money lines
+once. Take them from the goldens: they are compared by hash (parity spec section
+4).
 
 ### 4.2 Evidence labels
 
@@ -258,17 +304,21 @@ when shorter (`ko_t1`'s t05 and t03). Then, with `<narration>` as in README sect
   ledger, written as in README section 4.3; entries are joined by `; `.
 - `<ledgers>`: the distinct ledgers with a **nonzero** line that are not bank or cash ledgers, in
   code-point order, joined by `, ` (`ko_t2`'s b13 shows two; `ko_vocab`'s v49 leaves out its zero line
-  on `Sales`); when there is none, the text `no other ledger` (`ko_t2`'s b04).
+  on `Sales`, and `ko_t2`'s b12 its zero line on `Gamma Supplies`); when there is none, the text
+  `no other ledger` (`ko_t2`'s b04).
 - `<names>`: the row's plain names (T2) or its inside names that are not plain (embedded), in
   code-point order of the names as the book writes them, before any normalisation, joined by `, `
   (`ko_vocab`'s v51: the decomposed `Ze` + U+0301 + `ro Mart` sorts before the composed `Zéro
   Bazaar`, although after normalisation it would sort after it).
-- `<parts>`: the distinct parts recorded for those inside names (never a part recorded for a name
-  that is also plain on the voucher: `ko_vocab`'s v50), each written with its whitespace collapsed
-  (README section 4.4, without the cut), sorted in code-point order, joined by ` | `, and the whole
-  rendered by Python's `repr()` (`ko_nested`'s n17; `ko_text`'s b02 in double quotes). The part
-  recorded is the one holding the name's first token, so a name written across a separator shows only
-  its first part (`ko_nested`'s n18: `'ZED LAMBDA'`; `ko_vocab`'s v43: `'LAMBDA'`).
+- `<parts>`: for each inside occurrence of those names (never one recorded for a name that is also
+  plain on the voucher: `ko_vocab`'s v50), the narration as written from the start of the part
+  holding the name's first token to the end of the part holding its last token, separators
+  included, with its whitespace collapsed (README section 4.4, without the cut). The distinct texts
+  are sorted in code-point order, each is rendered by Python's `repr()` on its own, and they are
+  joined by `, ` (`ko_nested`'s n17: `'LAMBDA TRADERS YOD', 'ZED LAMBDA TRADERS'`; `ko_text`'s b02 in
+  double quotes). A name written across a separator so shows every part it spans (`ko_nested`'s
+  n18: `'ZED LAMBDA-TRADERS'`; `ko_vocab`'s v43: `'LAMBDA-TRADERS ZED'`); a name within one part
+  shows that part alone (`ko_nested`'s n08: `'ZED LAMBDA TRADERS'`).
 
 Ledger refs (on the findings only) have kind `ledger`, the ledger's name as id, and the labels given in
 README section 4.5. Every label and id is NFC-normalised in the dump (parity spec section 2.2): `ko_tags`
@@ -369,9 +419,11 @@ None. The test has no check of its own: `module_invariants_evaluated` is `[]` an
 
 ## 7. Book and result checks in the dumps
 
-Every golden carries the book-level and result-level reports of parity spec section 5, and every
-report is empty: each book's vouchers tie to its Trial Balance, every line's ledger has a master, and
-the result checks cannot fire on this test's output, because every fact names one of its own
+Every golden carries the book-level and result-level reports of parity spec section 5. In every
+edge golden every report is empty (the synthetic golden of README section 14 carries the synthetic
+read's own book-level violations, MAP-1, POP-1, POP-2 and POP-3, which do not come from this test,
+and an empty result-level report): each edge book's vouchers tie to its Trial Balance, every line's
+ledger has a master, and the result checks cannot fire on this test's output, because every fact names one of its own
 figures (REND-0), every voucher ref is a population voucher and every ledger ref a master (EVID-1,
 POP-4).
 
@@ -395,7 +447,10 @@ part of the contract.
 - It never reads the Trial Balance, a party's PAN, GSTIN or bill-wise details, or the party field.
   Besides the book it reads only the rules version and `party_groups`.
 - It never matches a name loosely: no partial names, abbreviations, transliteration or spelling
-  variants, and no name that yields no token (a name in Devanagari).
+  variants. A name in Devanagari is found only where the narration writes it in Devanagari, with the
+  same letters and signs. Nothing is read alike beyond what README section 3.3 reads alike (case,
+  spacing and punctuation, a character written composed or decomposed, an accent on a letter `a`
+  to `z`, and the characters it drops). A name that yields no token is never found.
 
 ## 10. Not covered by any golden
 
@@ -423,23 +478,31 @@ Reachable in the module but in no book:
 Rules no golden can pin: the word `a` in the never-name-like list. Removing it changes nothing,
 because a one-letter word already fails the two-letter test of README section 3.4. Every other
 word, every separator and non-separator, and each rule HASHES.md lists changes at least one golden
-when it alone is changed (measured by changing the reference one rule at a time and re-running every
-book).
+when it alone is changed (measured at reference commit `742f67fc` by changing the reference one rule
+at a time and re-running every book).
+
+Rules of README sections 3.3 and 3.4 that no book reaches, so that changing any one of them alone
+changes no golden (measured the same way); a port follows them from this note:
+
+- NFKD in place of NFD, or case-folding before decomposing (README section 3.5);
+- a mark that starts a token kept, or U+200C, U+200D and U+00AD made to end a token;
+- marks, or digits, not counted as token characters (no book has Devanagari words that differ only
+  in their signs, nor names that differ only in a digit);
+- a token in another alphabet counted as name-like.
 
 ## 11. Behaviour that may look like a defect
 
-Reproduce these as the goldens show them, and raise them on the pull request rather than fixing them
-in the port:
+Reproduce these as the goldens and this note show them, and raise them on the pull request rather
+than fixing them in the port. The four behaviours an earlier form of this section listed were
+changed in the reference (README section 13.1); these remain:
 
-- **Letters that fold to non-ASCII cut a token** (`ko_t2`'s b09 and b10, `ko_tags`' k06):
-  `Café Corner` is keyed as `caf corner`, so `CAFE CORNER` misses it and `CAF CORNER` finds it
-  (measured on an invented voucher; no book has it).
-- **Zero lines are on the voucher for T2 but not for T1** (`ko_t2`'s b12 against `ko_t1`'s t05), and
-  not in `<ledgers>` either (`ko_vocab`'s v49).
-- **The part shown for a name written across a separator** is only its first part (`ko_nested`'s
-  n18, `ko_vocab`'s v43).
-- **The shared limit** says "the candidate total is a candidate total, not a reportable amount": the
-  repeated words are in the reference's text and in every hash.
+- **An accent is ignored only on a letter `a` to `z`.** On any other letter it stays (README section
+  3.3), and two names differing only by an accent on `a` to `z` share their tokens, so both are bound
+  to no one.
+- **U+037E, which decomposes to `;`, ends a token but does not cut a part** (README section 3.3),
+  because parts are cut on the text as written. Measured on invented vouchers: `ZED`, U+037E,
+  `LAMBDA TRADERS` puts the name inside, `ZED;LAMBDA TRADERS` leaves it plain; the dump shows both
+  labels with `;`, as it NFC-normalises them.
 
 ## 12. The books
 
@@ -452,14 +515,14 @@ read from Tally. Each book's `comment` says what it reaches, voucher by voucher.
 | `ko_empty` | No vouchers: seven zero figures, no finding; golden byte-identical to `ko_quiet`'s. |
 | `ko_t1` | T1: debtor against creditor; a ledger under a sub-group of `Loans (Liability)` against a ledger directly under `Loans & Advances (Asset)`; a credit note and a sales voucher; three parties in code-point order; a zero bank line; a party netting to zero; empty numbers with short and long GUIDs; a five-lakh amount; a cash line that blocks. |
 | `ko_text` | Label text: narrations of 80, 81 and over 80 Devanagari characters, collapsed whitespace, quotes, a zero-width space, a backslash, no narration; amounts from 1 paise; a 1-paise bank line that blocks; a name found across the cut; an inside part with a quote. All three findings. |
-| `ko_t2` | T2: names in parts and in lower case, two names in one narration, a contra with no other ledger, a cash payment, two booked ledgers, two bank ledgers, a name found twice, a digit in a name, an accented name; names not read (two parties sharing a name in different case, a party and an expense master sharing one, Devanagari, an unaccented spelling, a party on a zero line); two parties whose names differ only in punctuation (`Kappa Traders`, `Kappa-Traders`: a shared name, README section 13). |
+| `ko_t2` | T2: names in parts and in lower case, two names in one narration, a contra with no other ledger, a cash payment, two booked ledgers, two bank ledgers, a name found twice, a digit in a name, an accented name written with and without its accent, a Devanagari name in a Devanagari narration, a party on a zero line only (all listed); names not read (two parties sharing a name in different case, a party and an expense master sharing one); two parties whose names differ only in punctuation (`Kappa Traders`, `Kappa-Traders`: a shared name, README section 13.2). |
 | `ko_nested` | Nested, overlapping and chained names; plain and inside decided by a separator, a legal suffix, a single letter, a number, a letter-and-digit word and a two-letter word; parties written back to back; plain winning over inside; one voucher in both lists; two inside parts; a name across a separator; own party skipped. |
-| `ko_vocab` | One voucher per rule: all 55 never-name-like words (two per voucher, one on the last), the nine separators and five non-separators, the token after a name spread over two parts, the sharp s in a narration and in a name, the `ﬁ` ligature, the Kelvin sign, the dotted capital I, a zero line left out of `<ledgers>`, the parts of a plain name left out, and two names sorted as written rather than as normalised. |
+| `ko_vocab` | One voucher per rule: all 55 never-name-like words (two per voucher, one on the last), the nine separators and five non-separators, the token after a name spread over two parts, the sharp s in a narration and in a name, the `ﬁ` ligature, the Kelvin sign, the dotted capital I (found, its dot dropped), a zero line left out of `<ledgers>`, the parts of a plain name left out, and two names sorted as written rather than as normalised. |
 | `ko_shared` | A name two masters share stays in the index: `Sigma Trading` (a creditor) and `SIGMA-TRADING` (a debtor) share their words, so the name is bound to no one, and the shorter party `Sigma` inside it is dropped as nested (s01 is not listed); s02 names only `Sigma` and is listed. |
 | `ko_transfer` | A bank-to-cash transfer booked as a Payment with no line on any other ledger counts its larger side once (t01: 500,000 paise); a Journal with the same money lines and a charge line counts both money lines (t02: 990,000 paise). |
 | `ko_groups` | `party_identity.party_groups` with a custom group under `Capital Account`, a repeated default, `Cash-in-Hand` and a name no group has: T1 through a partner's ledger; an overdraft ledger that is both party and bank; a cash ledger and a partner's ledger named as parties. |
 | `ko_groups_off` | The same book with no `party_identity` table: only the overdraft and the debtor are found, with the same tags as in `ko_groups`. |
-| `ko_tags` | Every tag shape of README section 4.7. |
+| `ko_tags` | Every tag shape of README section 4.7; the decomposed name is found by a narration that writes it without its mark (k06). |
 | `ko_status` | Optional, cancelled and post-dated vouchers that would be listed if regular; only the regular one is. |
 
 ## 13. Running the books
@@ -474,10 +537,40 @@ no runner for this test yet: the runner that produced these goldens extends it a
 reference's maintainers, outside this pack (HASHES.md says how it calls the test). A porter does not
 write one. The goldens are regenerated only by the reference's maintainers.
 
-## 13. Re-pin note: the reference's fix of two behaviours (reference commit `66e842e7`)
+### 13.1 Re-pin note: names in any alphabet, zero lines and plainer texts (reference commit `742f67fc`)
+
+The goldens were regenerated from reference commit `742f67fc` (Python 3.13, the pack's own books).
+As a control, the same generator at reference commit `98ee6e71`, which precedes the change,
+reproduced all fourteen goldens of the previous pin byte for byte. All fourteen change:
+
+- **Texts, in every golden.** The definitions now read as README section 4.1 says. Every finding's
+  first limit no longer says "the candidate total is a candidate total", and the `t2` limit is
+  reworded to say what a name match misses.
+- **Tokens (README section 3.3).** They were the runs of ASCII `a` to `z` and `0` to `9` after
+  case-folding, so any other letter or mark cut them: `Café Corner` was keyed `caf corner`, a
+  Devanagari name had no key, and the dotted capital I cut its word in two. `ko_t2` now lists b10
+  (`Cafe Corner deposit`) and b11 (Devanagari), and `ko_vocab` lists v48 (`İOTA WORKS`).
+- **Zero lines (README section 3.3).** A party with only a zero line on the voucher counted as on it
+  for T2, so it was not reported; it now is, as T1 and `<ledgers>` already read such a line.
+  `ko_t2` now lists b12.
+- **The part shown (README section 4.2).** It was the part holding the name's first token, and all
+  the parts sat inside one quote, joined by ` | `. It now runs to the part holding the last token,
+  and each is quoted on its own (`ko_nested`'s n17 and n18, `ko_vocab`'s v43).
+- **Figures.** `ko_t2`: `t2_row_count` 13 (was 10), `t2_named_pair_count` 14 (was 11),
+  `t2_candidate_total_paise` 2,880,000 (was 2,760,000); `Café Corner` named in 2 vouchers, ₹1,000
+  (was 1, ₹600); `Gamma Supplies` in 5, ₹20,500 (was 4, ₹20,000); a new group for `देव ट्रेडर्स`,
+  1 voucher, ₹300. `ko_vocab`: `t2_row_count` 45 (was 44), `t2_named_pair_count` 46 (was 45),
+  `t2_candidate_total_paise` 4,500,000 (was 4,400,000); a new group for `Iota Works`, 1 voucher,
+  ₹1,000. No other golden changes a value or the vouchers it lists.
+- **Books.** None was added. The comments of `ko_t2` (b10, b11, b12) and `ko_vocab` (v48) were
+  corrected to match; the goldens do not read a comment.
+
+### 13.2 Re-pin note: the reference's fix of two behaviours (reference commit `66e842e7`)
+
+The figures in this note are those of that commit; README section 13.1 gives what changed after it.
 
 An earlier form of this pack documented two reference behaviours as defects. The reference has since
-fixed both, and the goldens here were regenerated from it (reference commit `66e842e7`, Python 3.13, the
+fixed both, and the goldens were then regenerated from it (reference commit `66e842e7`, Python 3.13, the
 pack's own books; each of the eleven goldens of the earlier pack was regenerated and compared). Exactly one golden
 changed, `ko_t2`; the other ten are byte-identical. Two books were added with their goldens, `ko_shared` and
 `ko_transfer`, one for each rule below that no earlier book pinned.

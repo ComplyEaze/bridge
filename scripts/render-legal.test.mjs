@@ -40,7 +40,7 @@ const noRawMarkdown = (html) => {
 };
 
 test("the published documents carry no unresolved marker and render as they stand", () => {
-  for (const name of ["privacy.md", "terms.md"]) {
+  for (const name of ["privacy.md", "terms.md", "terms-2026-10.md"]) {
     const source = realDoc(name);
     assert.notEqual(source, undefined, `${name} is missing`);
     for (const marker of UNRESOLVED_MARKERS) assert.ok(!source.includes(marker), `${name} still holds ${marker}`);

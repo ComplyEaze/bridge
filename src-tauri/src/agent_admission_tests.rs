@@ -898,10 +898,11 @@ fn the_vouchers_description_does_not_say_a_capture_showed_post_dated_omitted() {
     );
 }
 
-/// The extension's "Allow voucher posting" setting is the risk disclosure the Terms (9.2) point to:
-/// "you accept the known limits described in the extension settings", so each limit, the approval
-/// gate and the sentence that ties the setting to the Terms are pinned by a short phrase on its
-/// own (#1010), never the whole text. The setting can be shortened as long as every phrase stays
+/// The extension's "Allow voucher posting" setting is a risk disclosure the Terms (9.2) point to:
+/// "you accept the known limits below, and any further known limits described in the extension
+/// settings", and the setting points back to 9.2. So each limit, the approval gate and the two
+/// sentences that tie the setting to the Terms are pinned by a short phrase on its own (#1010),
+/// never the whole text. The setting can be shortened as long as every phrase stays
 /// or its pin changes in the same commit, where a reviewer sees it. A phrase that only means
 /// something with its neighbour ("it", "such change") is pinned together with that neighbour. A
 /// renamed key panics rather than passing silently.
@@ -919,7 +920,11 @@ fn the_posting_setting_keeps_each_known_limit() {
             "the sentence that ties the setting to the Terms: the person accepts the limits by turning it on",
         ),
         (
-            "each only after you approve it in a native dialog",
+            "Terms of Use section 9.2",
+            "the sentence that names the Terms section holding the full list of known limits",
+        ),
+        (
+            "each only after you approve it in a separate window",
             "every post waits for the person's approval",
         ),
         (

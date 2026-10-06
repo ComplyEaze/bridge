@@ -28,7 +28,7 @@ use bridge_tax_audit::rules::Rules;
 use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
-    cash_book_integrity, cash_payments_40a3, counter_cheques_40a3, creditor_ageing_43bh,
+    cash_book_integrity, cash_payments_40a3, clause44, counter_cheques_40a3, creditor_ageing_43bh,
     entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t,
     party_identity, party_monthly, read_scope, related_parties_cl23, stale_balances_41_1,
     statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as, trial_balance,
@@ -195,6 +195,10 @@ fn build(s: &Value) -> Book {
                     .collect(),
                 narration: text("narration", ""),
                 party_field: text("party", ""),
+                party_gstin: typed(v, "party_gstin", false, "text", |p| {
+                    p.as_str().map(str::to_string)
+                })
+                .unwrap_or_default(),
                 reference: typed(v, "reference", false, "text", |r| {
                     r.as_str().map(str::to_string)
                 })
@@ -466,6 +470,33 @@ fn tds_26as_config(s: &Value) -> Tds26asConfig {
     }
 }
 
+/// `clause44`'s inputs from the spec's `clause44` table, as `parity/edge_golden.py` passes them:
+/// every key optional and empty when absent, `tax_ledgers` every head's ledgers, and the two maps
+/// typed by the crate's own reader.
+fn clause44_inputs(s: &Value) -> clause44::Inputs {
+    let c = &s["clause44"];
+    let set = |k: &str| strs(&c[k]).into_iter().collect();
+    let map = |k: &str| -> BTreeMap<String, toml::Value> {
+        c[k].as_object()
+            .map(|m| m.iter().map(|(l, v)| (l.clone(), toml_of(v))).collect())
+            .unwrap_or_default()
+    };
+    clause44::Inputs {
+        dep_expense_ledgers: set("dep_expense_ledgers"),
+        tax_ledgers: c["tax_ledgers"]
+            .as_object()
+            .map(|heads| heads.values().flat_map(strs).collect())
+            .unwrap_or_default(),
+        no_supplier_expense_ledgers: set("no_supplier_expense_ledgers"),
+        round_off_ledgers: set("round_off_ledgers"),
+        ..clause44::Inputs::new(
+            &map("registration_type_by_ledger"),
+            &map("money_category_by_ledger"),
+        )
+        .unwrap()
+    }
+}
+
 /// `book_keeping_quality`'s inputs from the spec's `book_keeping_quality` table, as
 /// `parity/edge_golden.py` passes them: every key optional and empty when absent, `tax_ledgers`
 /// flattened to ledger -> head.
@@ -640,6 +671,11 @@ fn check(name: &str) {
                 )));
                 assert_eq!(order, want, "{name}: trial_balance row order");
                 let c = trial_balance::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "clause44" => {
+                let r = clause44::run(&book, &rules, &clause44_inputs(&s)).unwrap();
+                let c = clause44::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
             "related_parties_cl23" => {
@@ -1013,13 +1049,14 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 23] = [
+const EDGE_TESTS: [&str; 24] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
     "books_examined",
     "cash_book_integrity",
     "cash_payments_40a3",
+    "clause44",
     "counter_cheques_40a3",
     "creditor_ageing_43bh",
     "entity_269st_gap",

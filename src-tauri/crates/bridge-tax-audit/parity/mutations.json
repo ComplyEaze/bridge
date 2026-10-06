@@ -9638,5 +9638,405 @@
   "file": "src/binding.rs",
   "from": "            *v = toml::Value::Array(\n                lbinder\n                    .bind_list(&names, &location)?",
   "to": "            *v = toml::Value::Array(\n                names"
+ },
+ {
+  "id": "CL44-01",
+  "by": "author",
+  "what": "clause44: a nil expense line is a line",
+  "file": "src/clause44.rs",
+  "from": "    amount_paise != 0 && primary_in(book, ledger, &EXPENDITURE_GROUPS)",
+  "to": "    primary_in(book, ledger, &EXPENDITURE_GROUPS)"
+ },
+ {
+  "id": "CL44-02",
+  "by": "author",
+  "what": "clause44: the primary group is read from the parent end of the chain",
+  "file": "src/clause44.rs",
+  "from": "        .and_then(|l| l.chain.last())",
+  "to": "        .and_then(|l| l.chain.first())"
+ },
+ {
+  "id": "CL44-03",
+  "by": "author",
+  "what": "clause44: the party ledger's GSTIN is never read",
+  "file": "src/clause44.rs",
+  "from": "            .map_or_else(String::new, |l| norm_gstin(&l.gstin))",
+  "to": "            .map_or_else(String::new, |_| String::new())"
+ },
+ {
+  "id": "CL44-04",
+  "by": "author",
+  "what": "clause44: the voucher's own PARTYGSTIN is never read",
+  "file": "src/clause44.rs",
+  "from": "        if !v.party_gstin.is_empty() {\n            return norm_gstin(&v.party_gstin);",
+  "to": "        if false {\n            return norm_gstin(&v.party_gstin);"
+ },
+ {
+  "id": "CL44-05",
+  "by": "author",
+  "what": "clause44: the voucher's PARTYGSTIN is not stripped",
+  "file": "src/clause44.rs",
+  "from": "            return norm_gstin(&v.party_gstin);",
+  "to": "            return v.party_gstin.clone();"
+ },
+ {
+  "id": "CL44-06",
+  "by": "author",
+  "what": "clause44: a PARTYGSTIN of only spaces falls back to the ledger's",
+  "file": "src/clause44.rs",
+  "from": "        if !v.party_gstin.is_empty() {\n            return norm_gstin",
+  "to": "        if !norm_gstin(&v.party_gstin).is_empty() {\n            return norm_gstin"
+ },
+ {
+  "id": "CL44-07",
+  "by": "author",
+  "what": "clause44: a nil tax line counts as input tax",
+  "file": "src/clause44.rs",
+  "from": "            .any(|l| l.amount_paise != 0 && inputs.tax_ledgers.contains(&l.ledger))",
+  "to": "            .any(|l| inputs.tax_ledgers.contains(&l.ledger))"
+ },
+ {
+  "id": "CL44-08",
+  "by": "author",
+  "what": "clause44: composition is decided before the GSTIN",
+  "file": "src/clause44.rs",
+  "from": "                            let bucket = if supplier_gstin(v).is_empty() {\n                                Bucket::Unregistered\n                            } else if inputs.composition_ledgers.contains(&v.party_field) {",
+  "to": "                            let bucket = if inputs.composition_ledgers.contains(&v.party_field) {\n                                Bucket::Composition\n                            } else if supplier_gstin(v).is_empty() {\n                                Bucket::Unregistered\n                            } else if false {"
+ },
+ {
+  "id": "CL44-09",
+  "by": "author",
+  "what": "clause44: input tax sends a line to the exempt column",
+  "file": "src/clause44.rs",
+  "from": "                            } else if has_gst(v) {",
+  "to": "                            } else if !has_gst(v) {"
+ },
+ {
+  "id": "CL44-10",
+  "by": "author",
+  "what": "clause44: salary beside round-off counts as a real line",
+  "file": "src/clause44.rs",
+  "from": "                && !inputs.no_supplier_expense_ledgers.contains(&l.ledger)\n                && !inputs.round_off_ledgers.contains(&l.ledger)\n        });",
+  "to": "                && !inputs.round_off_ledgers.contains(&l.ledger)\n        });"
+ },
+ {
+  "id": "CL44-11",
+  "by": "author",
+  "what": "clause44: round-off alone keeps the GSTIN rule",
+  "file": "src/clause44.rs",
+  "from": "                || (round_off && !has_real_line)",
+  "to": "                || (round_off && !has_real_line && false)"
+ },
+ {
+  "id": "CL44-12",
+  "by": "author",
+  "what": "clause44: round-off beside a real line takes the voucher's reason",
+  "file": "src/clause44.rs",
+  "from": "            } else if round_off {\n                None",
+  "to": "            } else if round_off && false {\n                None"
+ },
+ {
+  "id": "CL44-13",
+  "by": "author",
+  "what": "clause44: a judgement category comes before a depreciation ledger",
+  "file": "src/clause44.rs",
+  "from": "            let reason = if inputs.dep_expense_ledgers.contains(&l.ledger) {\n                Some(Reason::DepreciationLedger)\n            } else if category.is_some_and(MoneyCategory::is_judgement) {\n                Some(Reason::JudgementMoneyItem)",
+  "to": "            let reason = if category.is_some_and(MoneyCategory::is_judgement) {\n                Some(Reason::JudgementMoneyItem)\n            } else if inputs.dep_expense_ledgers.contains(&l.ledger) {\n                Some(Reason::DepreciationLedger)"
+ },
+ {
+  "id": "CL44-14",
+  "by": "author",
+  "what": "clause44: the no-supplier list comes before a judgement category",
+  "file": "src/clause44.rs",
+  "from": "            } else if category.is_some_and(MoneyCategory::is_judgement) {\n                Some(Reason::JudgementMoneyItem)\n            } else if inputs.no_supplier_expense_ledgers.contains(&l.ledger)\n",
+  "to": "            } else if category.is_some_and(MoneyCategory::is_judgement)\n                && !inputs.no_supplier_expense_ledgers.contains(&l.ledger)\n            {\n                Some(Reason::JudgementMoneyItem)\n            } else if inputs.no_supplier_expense_ledgers.contains(&l.ledger)\n"
+ },
+ {
+  "id": "CL44-15",
+  "by": "author",
+  "what": "clause44: a forced category comes before the no-supplier list",
+  "file": "src/clause44.rs",
+  "from": "            } else if inputs.no_supplier_expense_ledgers.contains(&l.ledger)\n",
+  "to": "            } else if (inputs.no_supplier_expense_ledgers.contains(&l.ledger)\n                && category.and_then(MoneyCategory::forced).is_none())\n"
+ },
+ {
+  "id": "CL44-16",
+  "by": "author",
+  "what": "clause44: a forced category comes before 'no party'",
+  "file": "src/clause44.rs",
+  "from": "            } else if v.party_field.is_empty() {",
+  "to": "            } else if v.party_field.is_empty() && category.and_then(MoneyCategory::forced).is_none() {"
+ },
+ {
+  "id": "CL44-17",
+  "by": "author",
+  "what": "clause44: an income ledger as party is not a P&L party",
+  "file": "src/clause44.rs",
+  "from": "            } else if primary_in(book, &v.party_field, &PL_LEDGER_GROUPS) {",
+  "to": "            } else if primary_in(book, &v.party_field, &EXPENDITURE_GROUPS) {"
+ },
+ {
+  "id": "CL44-18",
+  "by": "author",
+  "what": "clause44: a forced column is not marked forced",
+  "file": "src/clause44.rs",
+  "from": "                        Some(bucket) => (bucket, true),",
+  "to": "                        Some(bucket) => (bucket, false),"
+ },
+ {
+  "id": "CL44-19",
+  "by": "author",
+  "what": "clause44: bank interest is forced to 'other than composition'",
+  "file": "src/clause44.rs",
+  "from": "            Self::InterestBankNbfc => Some(Bucket::ExemptNonGst),",
+  "to": "            Self::InterestBankNbfc => Some(Bucket::OtherRegistered),"
+ },
+ {
+  "id": "CL44-20",
+  "by": "author",
+  "what": "clause44: bank charges are forced to the exempt column",
+  "file": "src/clause44.rs",
+  "from": "            Self::BankCharges => Some(Bucket::OtherRegistered),",
+  "to": "            Self::BankCharges => Some(Bucket::ExemptNonGst),"
+ },
+ {
+  "id": "CL44-21",
+  "by": "author",
+  "what": "clause44: the individual-interest overlay skips a line with a reason",
+  "file": "src/clause44.rs",
+  "from": "            if category == Some(MoneyCategory::InterestIndividualNoGstin) {",
+  "to": "            if category == Some(MoneyCategory::InterestIndividualNoGstin)\n                && !inputs.dep_expense_ledgers.contains(&l.ledger)\n            {"
+ },
+ {
+  "id": "CL44-22",
+  "by": "author",
+  "what": "clause44: individual interest is a judgement item",
+  "file": "src/clause44.rs",
+  "from": "            Self::PartnerInterestOrRemuneration | Self::MixedInterestAndCharges",
+  "to": "            Self::PartnerInterestOrRemuneration | Self::MixedInterestAndCharges | Self::InterestIndividualNoGstin"
+ },
+ {
+  "id": "CL44-23",
+  "by": "author",
+  "what": "clause44: a padded money category is recognised",
+  "file": "src/clause44.rs",
+  "from": "            if let Some(category) = MoneyCategory::parse(text) {",
+  "to": "            if let Some(category) = MoneyCategory::parse(support::py_strip(text)) {"
+ },
+ {
+  "id": "CL44-24",
+  "by": "author",
+  "what": "clause44: composition is not stripped",
+  "file": "src/clause44.rs",
+  "from": "            if support::py_casefold(support::py_strip(text)) == \"composition\" {",
+  "to": "            if support::py_casefold(text) == \"composition\" {"
+ },
+ {
+  "id": "CL44-25",
+  "by": "author",
+  "what": "clause44: composition is not case-folded",
+  "file": "src/clause44.rs",
+  "from": "            if support::py_casefold(support::py_strip(text)) == \"composition\" {",
+  "to": "            if support::py_strip(text) == \"composition\" {"
+ },
+ {
+  "id": "CL44-26",
+  "by": "author",
+  "what": "clause44: a registration type that is not text is read as none",
+  "file": "src/clause44.rs",
+  "from": "                .ok_or_else(|| shape_error(\"roles.gst_registration_type_by_ledger\", ledger))?;",
+  "to": "                .unwrap_or(\"\");"
+ },
+ {
+  "id": "CL44-27",
+  "by": "author",
+  "what": "clause44: a money category that is not text is read as none",
+  "file": "src/clause44.rs",
+  "from": "                .ok_or_else(|| shape_error(\"clause44.money_category_by_ledger\", ledger))?;",
+  "to": "                .unwrap_or(\"\");"
+ },
+ {
+  "id": "CL44-28",
+  "by": "author",
+  "what": "clause44: the reconciling item takes optional and cancelled vouchers",
+  "file": "src/clause44.rs",
+  "from": "        if v.status != VoucherStatus::Postdated {",
+  "to": "        if v.status == VoucherStatus::Regular {"
+ },
+ {
+  "id": "CL44-29",
+  "by": "author",
+  "what": "clause44: an excluded voucher is labelled by its first line",
+  "file": "src/clause44.rs",
+  "from": "        excluded_by_guid.insert(v.guid.as_str(), v);",
+  "to": "        excluded_by_guid.entry(v.guid.as_str()).or_insert(v);"
+ },
+ {
+  "id": "CL44-30",
+  "by": "author",
+  "what": "clause44: a voucher is cited once per line",
+  "file": "src/clause44.rs",
+  "from": "        .filter(|row| pred(row) && seen.insert(row.voucher.guid.as_str()))",
+  "to": "        .filter(|row| pred(row) && (seen.insert(row.voucher.guid.as_str()) || true))"
+ },
+ {
+  "id": "CL44-31",
+  "by": "author",
+  "what": "clause44: the total leaves out the reasons",
+  "file": "src/clause44.rs",
+  "from": "    for (_, paise) in bucket_totals.values().chain(reason_totals.values()) {",
+  "to": "    for (_, paise) in bucket_totals.values() {"
+ },
+ {
+  "id": "CL44-32",
+  "by": "author",
+  "what": "clause44: the walk reads every voucher",
+  "file": "src/clause44.rs",
+  "from": "    for v in book.population()? {",
+  "to": "    for v in book.vouchers.iter() {"
+ },
+ {
+  "id": "CL44-33",
+  "by": "author",
+  "what": "clause44: CL44-1 fires at the tolerance against the Trial Balance",
+  "file": "src/clause44.rs",
+  "from": "        if (reconciled - fs_expenditure).abs() > TIE_TOLERANCE_PAISE {",
+  "to": "        if (reconciled - fs_expenditure).abs() >= TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "CL44-34",
+  "by": "author",
+  "what": "clause44: CL44-1 misses a negative difference",
+  "file": "src/clause44.rs",
+  "from": "        if (reconciled - fs_expenditure).abs() > TIE_TOLERANCE_PAISE {",
+  "to": "        if (reconciled - fs_expenditure) > TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "CL44-35",
+  "by": "author",
+  "what": "clause44: CL44-1 leaves out the reconciling item",
+  "file": "src/clause44.rs",
+  "from": "        let reconciled = total + excluded;",
+  "to": "        let reconciled = total;"
+ },
+ {
+  "id": "CL44-36",
+  "by": "author",
+  "what": "clause44: CL44-1 fires at the tolerance against the columns",
+  "file": "src/clause44.rs",
+  "from": "        if (col_sum - total).abs() > TIE_TOLERANCE_PAISE {",
+  "to": "        if (col_sum - total).abs() >= TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "CL44-37",
+  "by": "author",
+  "what": "clause44: CL44-2 lets two unclassified lines pass",
+  "file": "src/clause44.rs",
+  "from": "    if let Some(n) = unclassified.filter(|n| *n != 0) {",
+  "to": "    if let Some(n) = unclassified.filter(|n| *n > 2) {"
+ },
+ {
+  "id": "CL44-38",
+  "by": "author",
+  "what": "clause44: CL44-3 checks a forced column",
+  "file": "src/clause44.rs",
+  "from": "            if e.kind != \"voucher\" || forced.contains(e.id.as_str()) {",
+  "to": "            if e.kind != \"voucher\" {"
+ },
+ {
+  "id": "CL44-39",
+  "by": "author",
+  "what": "clause44: CL44-3 reads the first voucher with a GUID",
+  "file": "src/clause44.rs",
+  "from": "        by_guid.insert(v.guid.as_str(), v);",
+  "to": "        by_guid.entry(v.guid.as_str()).or_insert(v);"
+ },
+ {
+  "id": "CL44-40",
+  "by": "author",
+  "what": "clause44: CL44-3 never falls back to the ledger's GSTIN",
+  "file": "src/clause44.rs",
+  "from": "            if gstin.is_empty() {\n                if let Some(l) = book.ledgers.get(&v.party_field) {",
+  "to": "            if false {\n                if let Some(l) = book.ledgers.get(&v.party_field) {"
+ },
+ {
+  "id": "CL44-41",
+  "by": "author",
+  "what": "clause44: CL44-3 flags an unregistered voucher with no GSTIN",
+  "file": "src/clause44.rs",
+  "from": "            if bucket == Bucket::Unregistered && !gstin.is_empty() {",
+  "to": "            if bucket == Bucket::Unregistered && gstin.is_empty() {"
+ },
+ {
+  "id": "CL44-42",
+  "by": "author",
+  "what": "clause44: the individual-interest finding is always raised",
+  "file": "src/clause44.rs",
+  "from": "    if d.judgement_candidate.0 > 0 {",
+  "to": "    if true {"
+ },
+ {
+  "id": "CL44-43",
+  "by": "author",
+  "what": "clause44: the judgement money-item finding is always raised",
+  "file": "src/clause44.rs",
+  "from": "    if d.reason_totals[&judgement_money].0 > 0 {",
+  "to": "    if true {"
+ },
+ {
+  "id": "CL44-44",
+  "by": "author",
+  "what": "clause44: a voucher's PARTYGSTIN is not read",
+  "file": "src/book.rs",
+  "from": "            party_gstin: v.child_text(\"PARTYGSTIN\").to_string(),",
+  "to": "            party_gstin: String::new(),"
+ },
+ {
+  "id": "CL44-45",
+  "by": "author",
+  "what": "clause44: the no-supplier ledgers are not bound",
+  "file": "src/binding.rs",
+  "from": "            Some(lbinder.bind_list(&names_at(value, location)?, location)?)\n        }\n    };\n    // `[roles].bank_reconciliation_ledger`",
+  "to": "            Some(names_at(value, location)?)\n        }\n    };\n    // `[roles].bank_reconciliation_ledger`"
+ },
+ {
+  "id": "CL44-46",
+  "by": "author",
+  "what": "clause44: the registration types are not bound",
+  "file": "src/binding.rs",
+  "from": "            &[\"roles\", \"gst_registration_type_by_ledger\"],",
+  "to": "            &[\"roles\", \"gst_registration_type_by_ledger_unbound\"],"
+ },
+ {
+  "id": "CL44-47",
+  "by": "author",
+  "what": "clause44: the money categories are not bound",
+  "file": "src/binding.rs",
+  "from": "            &[\"clause44\", \"money_category_by_ledger\"],",
+  "to": "            &[\"clause44\", \"money_category_by_ledger_unbound\"],"
+ },
+ {
+  "id": "CL44-48",
+  "by": "author",
+  "what": "clause44: a missing round-off list is not refused",
+  "file": "src/lib.rs",
+  "from": "    if !round_off_present {",
+  "to": "    if false && !round_off_present {"
+ },
+ {
+  "id": "CL44-49",
+  "by": "author",
+  "what": "clause44: the tax ledgers are one head's",
+  "file": "src/lib.rs",
+  "from": "                .iter()\n                .flat_map(|(_, ledgers)| ledgers.iter().cloned())",
+  "to": "                .iter()\n                .take(1)\n                .flat_map(|(_, ledgers)| ledgers.iter().cloned())"
+ },
+ {
+  "id": "CL44-50",
+  "by": "author",
+  "what": "clause44: a total wraps instead of refusing",
+  "file": "src/clause44.rs",
+  "from": "    a.checked_add(b).ok_or_else(|| support::overflow(TEST_ID))",
+  "to": "    Ok(a.wrapping_add(b))"
  }
 ]

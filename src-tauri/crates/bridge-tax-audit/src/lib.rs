@@ -37,6 +37,7 @@ pub mod canonical;
 pub mod cash_44ab;
 pub mod cash_book_integrity;
 pub mod cash_payments_40a3;
+pub mod clause44;
 pub mod compare;
 pub mod counter_cheques_40a3;
 pub mod creditor_ageing_43bh;
@@ -207,6 +208,9 @@ pub struct Engagement {
     /// `book_keeping_quality`-only: its `[roles]` name locations, bound. Filled by
     /// [`Engagement::bind`]; see [`BookKeepingQualityConfig`] for what is typed when.
     pub book_keeping_quality: BookKeepingQualityConfig,
+    /// `clause44`-only: its three name locations, bound. Filled by [`Engagement::bind`]; see
+    /// [`Clause44Config`].
+    pub clause44: Clause44Config,
     /// The parsed config, kept only so [`Engagement::bind`] can read `[ledger_ids]`/
     /// `[group_ids]` (`binding::bind`) without re-parsing the source text. Not part of this
     /// struct's public contract: a field a caller should read directly (`cash_groups` and the
@@ -440,6 +444,19 @@ impl BookKeepingQualityConfig {
             writeoff_discount_ledgers,
         })
     }
+}
+
+/// `clause44`'s own name locations, bound by [`Engagement::bind`]; empty before binding. The two
+/// maps' values are kept as written and typed when the test runs ([`clause44::Inputs::new`]).
+#[derive(Debug, Clone, Default)]
+pub struct Clause44Config {
+    /// `[roles].no_supplier_expense_ledgers`; `None` when absent, and the test then refuses, as the
+    /// reference's `role_ledger_set` requires the key.
+    pub no_supplier_expense_ledgers: Option<Vec<String>>,
+    /// `[roles.gst_registration_type_by_ledger]`, keyed by each ledger's bound name.
+    pub registration_type_by_ledger: BTreeMap<String, toml::Value>,
+    /// `[clause44].money_category_by_ledger`, keyed by each ledger's bound name.
+    pub money_category_by_ledger: BTreeMap<String, toml::Value>,
 }
 
 /// `[depreciation]` from the client config: see [`Engagement::depreciation`].
@@ -948,6 +965,7 @@ not YYYY-MM-DD"
             tds_tcs_26as_missing,
             tds,
             book_keeping_quality: BookKeepingQualityConfig::default(),
+            clause44: Clause44Config::default(),
             client_state: tds_payees::read_client_state(client)?,
             deductor_activity: tds_payees::read_deductor_activity(&cfg)?,
             entity_type: client
@@ -1834,6 +1852,22 @@ pub(crate) fn tds_payable_ledgers(bound: &Engagement) -> Result<BTreeSet<String>
         .collect())
 }
 
+/// Every `[roles].tax_ledgers` ledger, whatever its GST head; `None` when the table is absent.
+fn all_tax_ledgers(bound: &Engagement) -> Result<Option<BTreeSet<String>>> {
+    match &bound.book_keeping_quality.tax_ledgers {
+        None => Ok(None),
+        Some(TaxLedgers::NotATable) => Err(AuditError::Config(
+            "[roles].tax_ledgers is not a table".to_string(),
+        )),
+        Some(TaxLedgers::Heads(heads)) => Ok(Some(
+            heads
+                .iter()
+                .flat_map(|(_, ledgers)| ledgers.iter().cloned())
+                .collect(),
+        )),
+    }
+}
+
 /// What the reference's `pack._tds_payees` passes `tds_payees.run()` from tables other than
 /// `[tds]`/`[tds_payees]`, from a bound engagement: the ledgers `[statutory_dues]` classifies as
 /// `tds_payable`, every `[roles].tax_ledgers` ledger (none when the table is absent, the module's
@@ -1841,18 +1875,7 @@ pub(crate) fn tds_payable_ledgers(bound: &Engagement) -> Result<BTreeSet<String>
 /// keys, `[client].state` and `[deductor].activity`.
 pub(crate) fn tds_payees_inputs(bound: &Engagement) -> Result<tds_payees::Inputs> {
     let tds_ledgers = tds_payable_ledgers(bound)?;
-    let gst_ledgers = match &bound.book_keeping_quality.tax_ledgers {
-        None => BTreeSet::new(),
-        Some(TaxLedgers::NotATable) => {
-            return Err(AuditError::Config(
-                "[roles].tax_ledgers is not a table".to_string(),
-            ))
-        }
-        Some(TaxLedgers::Heads(heads)) => heads
-            .iter()
-            .flat_map(|(_, ledgers)| ledgers.iter().cloned())
-            .collect(),
-    };
+    let gst_ledgers = all_tax_ledgers(bound)?.unwrap_or_default();
     Ok(tds_payees::Inputs {
         tds_ledgers,
         gst_ledgers,
@@ -1882,6 +1905,57 @@ pub fn partners_40b_194t_on(
         &tds_payable_ledgers(&bound)?,
     )?;
     canonical::canonical_test_result(book, &result, None)
+}
+
+/// `clause44`'s inputs from a bound engagement. Of the keys this test takes, `[roles].tax_ledgers`
+/// (every head's ledgers), `[roles].round_off_ledgers`, `[depreciation]` and
+/// `[roles].no_supplier_expense_ledgers` are required, refused in the order the reference's pack
+/// reads them; the two ledger maps are optional. Keys the pack reads for other tests are not
+/// required here, as for every other test in this crate.
+fn clause44_inputs(bound: &Engagement) -> Result<clause44::Inputs> {
+    let missing =
+        |key: &str| AuditError::Config(format!("client config missing required key '{key}'"));
+    let tax_ledgers = all_tax_ledgers(bound)?.ok_or_else(|| missing("roles.tax_ledgers"))?;
+    let round_off_present = bound
+        .raw_cfg
+        .get("roles")
+        .and_then(toml::Value::as_table)
+        .is_some_and(|roles| roles.contains_key("round_off_ledgers"));
+    if !round_off_present {
+        return Err(missing("roles.round_off_ledgers"));
+    }
+    let dep = bound
+        .depreciation
+        .as_ref()
+        .ok_or_else(|| missing("depreciation"))?;
+    let no_supplier = bound
+        .clause44
+        .no_supplier_expense_ledgers
+        .as_ref()
+        .ok_or_else(|| missing("roles.no_supplier_expense_ledgers"))?;
+    Ok(clause44::Inputs {
+        dep_expense_ledgers: dep.dep_expense_ledgers.clone(),
+        tax_ledgers,
+        no_supplier_expense_ledgers: no_supplier.iter().cloned().collect(),
+        round_off_ledgers: bound.round_off_ledgers.iter().cloned().collect(),
+        ..clause44::Inputs::new(
+            &bound.clause44.registration_type_by_ledger,
+            &bound.clause44.money_category_by_ledger,
+        )?
+    })
+}
+
+/// Run `clause44` on an already-built book: its canonical parity dump, with its module check
+/// (CL44-1 to CL44-3).
+pub fn clause44_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let result = clause44::run(book, rules, &clause44_inputs(&bound)?)?;
+    let module_check = clause44::check_invariants(book, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
 /// Run `related_parties_cl23` on an already-built book: its canonical parity dump, with its
@@ -2028,6 +2102,124 @@ mod py_int_tests {
         assert_eq!(
             py_int_value(&Value::Float(f64::INFINITY)),
             Err(PyIntError::Invalid)
+        );
+    }
+}
+
+#[cfg(test)]
+mod clause44_inputs_tests {
+    use super::*;
+
+    fn bound(roles: &str, tables: &str) -> Engagement {
+        let text = format!(
+            "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
+             start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
+             bank_groups = []\n{roles}\n{tables}"
+        );
+        let e = Engagement::from_toml_for_read(&text).unwrap();
+        e.bind(&book::Book::default()).unwrap().0
+    }
+
+    fn missing(err: AuditError) -> String {
+        match err {
+            AuditError::Config(m) => m,
+            other => panic!("not a config refusal: {other}"),
+        }
+    }
+
+    /// Each required key is refused in the order the reference's pack reads it, and the two maps
+    /// are optional.
+    #[test]
+    fn clause44_refuses_each_missing_required_key_in_the_packs_order() {
+        let dep = "[depreciation]\nblock_by_ledger = {}\nopening_wdv_paise = {}\n\
+                   dep_expense_ledgers = []\n";
+        let cases = [
+            ("", "", "roles.tax_ledgers"),
+            ("tax_ledgers = {}", "", "roles.round_off_ledgers"),
+            (
+                "tax_ledgers = {}\nround_off_ledgers = []",
+                "",
+                "depreciation",
+            ),
+            (
+                "tax_ledgers = {}\nround_off_ledgers = []",
+                dep,
+                "roles.no_supplier_expense_ledgers",
+            ),
+        ];
+        for (roles, tables, key) in cases {
+            let err = clause44_inputs(&bound(roles, tables)).unwrap_err();
+            assert_eq!(
+                missing(err),
+                format!("client config missing required key '{key}'"),
+                "{roles:?}"
+            );
+        }
+        let all = bound(
+            "tax_ledgers = {}\nround_off_ledgers = []\nno_supplier_expense_ledgers = []",
+            dep,
+        );
+        assert!(clause44_inputs(&all).is_ok());
+        let not_a_table = bound(
+            "tax_ledgers = []\nround_off_ledgers = []\nno_supplier_expense_ledgers = []",
+            dep,
+        );
+        assert_eq!(
+            missing(clause44_inputs(&not_a_table).unwrap_err()),
+            "[roles].tax_ledgers is not a table"
+        );
+    }
+
+    /// Every required key reaches its own input, bound, and the tax ledgers are every head's.
+    #[test]
+    fn clause44_inputs_carry_each_configured_ledger_to_its_own_input() {
+        let names = [
+            "Igst", "Cgst", "Round", "Dep", "Salary", "Comp", "Bank Int", "Other",
+        ];
+        let book = book::Book {
+            ledgers: names
+                .iter()
+                .map(|n| {
+                    let ledger = book::Ledger {
+                        name: (*n).to_string(),
+                        parent: "Indirect Expenses".to_string(),
+                        chain: vec!["Indirect Expenses".to_string()],
+                        chain_complete: true,
+                        master_opening_paise: 0,
+                        pan: String::new(),
+                        gstin: String::new(),
+                        guid: String::new(),
+                        masterid: None,
+                    };
+                    ((*n).to_string(), ledger)
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let text = "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
+                    start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
+                    bank_groups = []\ntax_ledgers = { igst = [\"Igst\"], cgst = [\"Cgst\"] }\n\
+                    round_off_ledgers = [\"Round\"]\nno_supplier_expense_ledgers = [\"Salary\"]\n\
+                    gst_registration_type_by_ledger = { \"Comp\" = \"Composition\", \"Other\" = \"Regular\" }\n\
+                    \n[depreciation]\nblock_by_ledger = {}\nopening_wdv_paise = {}\n\
+                    dep_expense_ledgers = [\"Dep\"]\n\n[clause44]\n\
+                    money_category_by_ledger = { \"Bank Int\" = \"interest_bank_nbfc\" }\n";
+        let e = Engagement::from_toml_for_read(text).unwrap();
+        let inputs = clause44_inputs(&e.bind(&book).unwrap().0).unwrap();
+        let set = |names: &[&str]| -> BTreeSet<String> {
+            names.iter().map(|n| (*n).to_string()).collect()
+        };
+        assert_eq!(inputs.tax_ledgers, set(&["Igst", "Cgst"]));
+        assert_eq!(inputs.round_off_ledgers, set(&["Round"]));
+        assert_eq!(inputs.no_supplier_expense_ledgers, set(&["Salary"]));
+        assert_eq!(inputs.dep_expense_ledgers, set(&["Dep"]));
+        assert_eq!(inputs.composition_ledgers, set(&["Comp"]));
+        assert_eq!(
+            inputs.money_category_by_ledger,
+            BTreeMap::from([(
+                "Bank Int".to_string(),
+                clause44::MoneyCategory::InterestBankNbfc
+            )])
         );
     }
 }

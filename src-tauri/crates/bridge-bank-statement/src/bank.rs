@@ -165,8 +165,11 @@ impl Bank {
     pub fn top_anchors(self) -> Anchors {
         match self {
             Self::Sbi => &[&["Txn"]],
-            // page 1 repeats the column header; later pages only the period line
-            Self::Hdfc => &[&["Narration"], &["Statement", "account"]],
+            // page 1 repeats the column header; later pages only the period line, which
+            // prints "Statement of account" and, a hair below it in a smaller font,
+            // "From : <date> To : <date>". A reader that groups those into two lines would
+            // leave the second one below the anchor, so it anchors too.
+            Self::Hdfc => &[&["Narration"], &["From", "To"], &["Statement", "account"]],
             // the column header is repeated on every page
             Self::Ubi => &[UBI_HEADER],
         }

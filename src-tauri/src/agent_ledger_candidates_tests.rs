@@ -320,23 +320,33 @@ fn a_dropped_symbol_no_longer_resolves_and_is_offered() {
     assert_eq!(items[0]["rule"], "lookup_key_equal");
 }
 
-/// Names that differ only in an Indic virama or vowel sign once read as one
-/// ledger, because the loose key drops every mark that is not a letter or a
-/// digit (#1076). They are different spellings, so each asks and offers the
-/// ledger, and none is chosen. The first drops the virama (a key match, the
-/// rule that offers the old loose match); the second drops the vowel sign, so
-/// it is also a prefix of the ledger's name.
+/// Names that differ only in an Indic virama (U+094D) or nukta (U+093C) once
+/// read as one ledger, because the loose key keeps letters and digits and drops
+/// every other character, and those two marks are not alphanumeric to it. (A
+/// dependent vowel sign such as U+093E is alphanumeric there, so a name that
+/// drops one was never read as the same ledger: it is a different key.) They
+/// are different spellings, so each asks and offers the ledger under the old
+/// loose match's rule, and none is chosen.
 /// Mutant killed: resolving on the loose key again.
 #[test]
-fn a_dropped_virama_or_vowel_sign_asks_and_offers_the_ledger() {
-    for requested in ["खरचा", "खर्च"] {
-        let (code, miss, items) = refusal(&["खर्चा", "Cash"], requested, Redaction::None);
+fn a_dropped_virama_or_nukta_asks_and_offers_the_ledger() {
+    // (ledger, request): the virama dropped, and the nukta dropped.
+    for (ledger, requested) in [
+        (
+            "\u{0916}\u{0930}\u{094D}\u{091A}\u{093E}",
+            "\u{0916}\u{0930}\u{091A}\u{093E}",
+        ),
+        (
+            "\u{092B}\u{093C}\u{093E}\u{0930}\u{094D}\u{092E}",
+            "\u{092B}\u{093E}\u{0930}\u{094D}\u{092E}",
+        ),
+    ] {
+        let (code, miss, items) = refusal(&[ledger, "Cash"], requested, Redaction::None);
         assert_eq!(code, "ledger_not_found", "{requested}");
         assert_eq!(miss.listing, Listing::Listed, "{requested}");
-        assert_eq!(listed_names(&items), ["खर्चा"], "{requested}");
+        assert_eq!(listed_names(&items), [ledger], "{requested}");
+        assert_eq!(items[0]["rule"], "lookup_key_equal", "{requested}");
     }
-    let (_, _, items) = refusal(&["खर्चा", "Cash"], "खरचा", Redaction::None);
-    assert_eq!(items[0]["rule"], "lookup_key_equal");
 }
 
 /// The measured wrong ledger: a truncated `Input Cess (` read `Input Cess`,

@@ -2693,12 +2693,7 @@ fn invoice_review_preview(
         return Err("import_review_format_text".into());
     }
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
-    let party = voucher
-        .entries
-        .iter()
-        .find(|entry| {
-            entry.side == EntrySide::Dr && Some(&entry.ledger) != detail.round_off_ledger.as_ref()
-        })
+    let party = super::invoice::party_entry(voucher)
         .map(|entry| entry.ledger.as_str())
         .ok_or("import_invoice_not_observed")?;
     let registration = match observed.party_gstin.as_deref() {

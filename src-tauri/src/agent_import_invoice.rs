@@ -862,12 +862,7 @@ fn invoice_readback_differences(
         return vec!["invoice_not_observed".to_string()];
     };
     let number = expected.voucher_number.as_deref().unwrap_or_default();
-    let party = expected
-        .entries
-        .iter()
-        .find(|entry| {
-            entry.side == EntrySide::Dr && Some(&entry.ledger) != detail.round_off_ledger.as_ref()
-        })
+    let party = party_entry(expected)
         .map(|entry| entry.ledger.as_str())
         .unwrap_or_default();
     let want = |field: &str, value: Option<&str>, diffs: &mut Vec<String>| {
@@ -1127,13 +1122,18 @@ pub(super) fn new_ref_party(voucher: &ImportVoucher) -> Option<&str> {
     if !detail.observed.as_ref()?.party_bill_wise {
         return None;
     }
+    party_entry(voucher).map(|entry| entry.ledger.as_str())
+}
+
+/// The party's entry of an invoice: the debit that is not the round off (a
+/// Sales invoice's customer). One rule, asked by the build, the render, the
+/// read-back, the On Account exemption and the approval text.
+pub(super) fn party_entry(voucher: &ImportVoucher) -> Option<&ImportEntry> {
+    let round_off = voucher.invoice.as_ref()?.round_off_ledger.as_deref();
     voucher
         .entries
         .iter()
-        .find(|entry| {
-            entry.side == EntrySide::Dr && Some(&entry.ledger) != detail.round_off_ledger.as_ref()
-        })
-        .map(|entry| entry.ledger.as_str())
+        .find(|entry| entry.side == EntrySide::Dr && Some(entry.ledger.as_str()) != round_off)
 }
 
 /// The financial year (1 April to 31 March) a YYYYMMDD date falls in.
@@ -1188,11 +1188,7 @@ impl super::super::Server {
             .as_str()
             .to_string();
         let type_name = detail.voucher_type_name.clone();
-        let round_off = detail.round_off_ledger.clone();
-        let party_name = voucher
-            .entries
-            .iter()
-            .find(|entry| entry.side == EntrySide::Dr && Some(&entry.ledger) != round_off.as_ref())
+        let party_name = party_entry(voucher)
             .map(|entry| entry.ledger.clone())
             .ok_or_else(|| refused(refuse("invoice_party_missing")))?;
 
@@ -1395,10 +1391,7 @@ pub(super) fn render_sales_invoice_xml(
     let detail = voucher.invoice.as_ref()?;
     let observed = detail.observed.as_ref()?;
     let number = voucher.voucher_number.as_deref()?;
-    let party_entry = voucher.entries.iter().find(|entry| {
-        entry.side == EntrySide::Dr
-            && Some(entry.ledger.as_str()) != detail.round_off_ledger.as_deref()
-    })?;
+    let party_entry = party_entry(voucher)?;
     let leg = |entry: &ImportEntry, bill: bool| {
         let signed = match entry.side {
             EntrySide::Dr => format!("-{}", entry.amount),

@@ -401,7 +401,7 @@ month-wise movement of the cash and bank ledgers. It is not a cash flow
 statement under AS 3. The window must be whole months: `from` the 1st of a month,
 `to` the last day of a month, at most twelve months, so that each row Tally prints
 (a month name, with no year) can be placed in its year. Otherwise the call is
-refused before any report is requested (`cash_flow_window_not_month_start`,
+refused before any trial balance or report request, after the status and company reads (`cash_flow_window_not_month_start`,
 `cash_flow_window_not_month_end`, `cash_flow_window_too_many_months`). Education
 mode and a book with several currency masters are refused, as for the statements.
 
@@ -419,20 +419,27 @@ The top-level `state` is `observed` when the months are returned and
 - `cash_flow_money_group_unmeasured`: a ledger under Bank OD A/c or Bank OCC A/c
   has movement in the window, and whether Tally's Cash Flow counts such a ledger
   has not been measured. `months` is `null`.
+- `cash_flow_no_money_ledger`: the trial balance holds no ledger under Cash-in-Hand
+  or Bank Accounts and Tally's Cash Flow is empty, so nothing was compared. `months`
+  is `null`.
 
-`checks` says per field what was `checked`, `not_checked` or `withheld`: the net
-total is checked; the split into months is Tally's own and is not checked (a total
+`checks` says per field what was `checked`, `differs` (compared, and the figures
+disagree), `not_checked` or `withheld`: the net total is checked; the split into months is Tally's own and is not checked (a total
 can tie while one month is wrong); Tally's debit and credit columns are read but
 not returned, because how a contra is counted in them is not measured. A month
-Tally printed with no amounts is returned with an empty `net`, which is not zero.
+Tally printed with no amounts is returned with an empty `closing`, which is not zero.
 A negative amount is a debit: cash and bank grew.
 
 An unknown report name, a reported failure, an empty answer and rows for other
-months than the window holds are each refused (`cash_flow_report_unknown`,
-`cash_flow_tally_reported_failure`, `cash_flow_empty_envelope`,
-`cash_flow_months_unexpected`), classified by the structure of the answer.
+months than the window holds are each refused, classified by the structure of the
+answer: on licensed 7.1 an unknown name is answered in band (`STATUS` 0 with a
+`LINEERROR`) and is refused as `cash_flow_tally_reported_failure`; only a bare
+`RESPONSE` (an earlier build) is `cash_flow_report_unknown`; the others are
+`cash_flow_empty_envelope` and `cash_flow_months_unexpected`. A change between the
+two paired Cash Flow reads is `native_cash_flow_changed`.
 
-Measured on one synthetic company on licensed TallyPrime 7.1 (inflows into one bank
+The tool itself has not yet been run against Tally. Tally's Cash Flow answers were captured
+with a lab script on one synthetic company on licensed TallyPrime 7.1 (inflows into one bank
 and one cash ledger only): the net total of three windows tied to the trial balance to
 the paisa. Not measured: an outflow, a contra, a Bank OD A/c ledger, a month with
 both an inflow and an outflow, a book with several currencies, and a large book.

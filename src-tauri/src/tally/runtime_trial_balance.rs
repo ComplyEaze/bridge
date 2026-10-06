@@ -531,7 +531,7 @@ impl TallyRuntime {
                                 let (xml, bytes, hash) = client
                                     .fetch_native_report_paired(request.clone())
                                     .await?
-                                    .require_stable(PairedReadValidationError::NativeStatement)?;
+                                    .require_stable(PairedReadValidationError::NativeCashFlow)?;
                                 evidence = evidence
                                     .clone()
                                     .combine(RuntimeReadEvidence::paired(&request, hash, bytes));

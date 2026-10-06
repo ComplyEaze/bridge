@@ -523,3 +523,52 @@ fn each_reason_has_its_own_next_step() {
         );
     }
 }
+
+// ---- cash flow ----
+
+fn cash_flow_basis(outcome: CashFlowOutcome) -> CashFlowBasis {
+    CashFlowBasis::new(date("20250401"), date("20260331"), outcome)
+}
+
+#[test]
+fn a_tied_cash_flow_says_what_was_checked_and_what_was_not() {
+    let lead = cash_flow_basis(CashFlowOutcome::Tied)
+        .headline(&CompanyName::new("Lab Co"))
+        .lead;
+    assert!(
+        lead.starts_with("Cash flow for \u{201c}Lab Co\u{201d}, 1 Apr 2025 to 31 Mar 2026:"),
+        "{lead}"
+    );
+    assert!(lead.contains("equals the cash and bank ledgers"), "{lead}");
+    assert!(lead.contains("has not been checked"), "{lead}");
+    assert!(
+        lead.contains("not a cash flow statement under AS 3"),
+        "{lead}"
+    );
+}
+
+#[test]
+fn every_cash_flow_state_that_is_not_established_leads_with_it_and_withholds_the_months() {
+    for (outcome, words) in [
+        (
+            CashFlowOutcome::Differs,
+            "differs from the cash and bank ledgers",
+        ),
+        (
+            CashFlowOutcome::MoneyGroupUnmeasured,
+            "Bank OD A/c or Bank OCC A/c",
+        ),
+        (CashFlowOutcome::NothingToCompare, "nothing was checked"),
+    ] {
+        let basis = cash_flow_basis(outcome);
+        let lead = basis.headline(&company()).lead;
+        assert!(
+            lead.starts_with("Not established: the cash flow for"),
+            "{lead}"
+        );
+        assert!(lead.contains(words), "{lead}");
+        assert!(lead.contains("the months are withheld"), "{lead}");
+        assert!(basis.months_withheld());
+    }
+    assert!(!cash_flow_basis(CashFlowOutcome::Tied).months_withheld());
+}

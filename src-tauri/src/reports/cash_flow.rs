@@ -7,8 +7,11 @@
 //! check is on the **net**, and only the net: the sum of the months' closing
 //! amounts must equal the sum of `debit + credit` over every ledger whose
 //! predefined group is Cash-in-Hand or Bank Accounts (a debit negative, a
-//! credit positive, protocol reference §5.6). A contra between two such ledgers
-//! moves both and nets to nothing, so it cannot make the tie fail or pass.
+//! credit positive: the trial balance's convention, protocol reference §5.6; the
+//! sign and meaning of the Cash Flow's own credit column are not measured, and
+//! its closing figure was measured only where the credit column was empty). A
+//! contra between two such ledgers moves both and nets to nothing, so it cannot
+//! make the tie fail or pass.
 //!
 //! What it deliberately does not do:
 //! - **Bank OD A/c and Bank OCC A/c.** Whether Tally's Cash Flow counts a
@@ -61,6 +64,9 @@ pub(crate) enum CashFlowCheck {
     /// A ledger under Bank OD A/c or Bank OCC A/c has movement in the window,
     /// and whether Tally's Cash Flow counts it is not measured.
     MoneyGroupUnmeasured { ledgers: usize },
+    /// The trial balance holds no ledger under Cash-in-Hand or Bank Accounts and
+    /// Tally's Cash Flow is empty: both sides are zero, and nothing was compared.
+    NothingToCompare,
 }
 
 impl CashFlowCheck {
@@ -70,6 +76,7 @@ impl CashFlowCheck {
             Self::Tied { .. } => None,
             Self::Differs { .. } => Some("cash_flow_differs_from_trial_balance"),
             Self::MoneyGroupUnmeasured { .. } => Some("cash_flow_money_group_unmeasured"),
+            Self::NothingToCompare => Some("cash_flow_no_money_ledger"),
         }
     }
 }
@@ -176,6 +183,10 @@ pub(crate) fn check_cash_flow(
     }
     let tally_net = at_scale(tally_net, scale)?;
     let ledger_net = at_scale(ledger_net, scale)?;
+    // Two zeros over no ledger at all agree about nothing: it is not a tie.
+    if money_ledgers == 0 && tally_net.is_zero() {
+        return Ok(CashFlowCheck::NothingToCompare);
+    }
     if tally_net.numeric_eq(&ledger_net) {
         Ok(CashFlowCheck::Tied {
             net: tally_net,

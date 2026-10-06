@@ -87,14 +87,29 @@ fn plans_to_the_boundary() -> Vec<ScenarioPlan> {
 /// A whole call: identity, then the Trial Balance bracket with the group tree
 /// and Tally's Cash Flow inside it.
 fn plans(april: &str) -> Vec<ScenarioPlan> {
+    plans_with(april, |report| report)
+}
+
+/// The same call with the Trial Balance changed by `change`, to reach a branch
+/// the capture does not: the cash ledger moved to another group.
+fn plans_with(april: &str, change: impl Fn(String) -> String) -> Vec<ScenarioPlan> {
+    plans_with_report(xml(cash_flow(april)), change)
+}
+
+fn plans_with_report(
+    cash_flow: ScenarioPlan,
+    change: impl Fn(String) -> String,
+) -> Vec<ScenarioPlan> {
     let companies = xml(companies());
     let currency = decode(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
     ));
-    let report = include_str!(
-        "../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
-    )
-    .to_string();
+    let report = change(
+        include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
+        )
+        .to_string(),
+    );
     let mut plans = plans_to_the_boundary();
     // The opening identity bracket.
     plans.push(companies.clone());
@@ -102,7 +117,7 @@ fn plans(april: &str) -> Vec<ScenarioPlan> {
     pair(&mut plans, xml(currency));
     pair(&mut plans, xml(report));
     pair(&mut plans, xml(groups()));
-    pair(&mut plans, xml(cash_flow(april)));
+    pair(&mut plans, cash_flow);
     pair(&mut plans, xml(extents()));
     plans.extend([companies.clone(), status(), companies]);
     plans
@@ -158,14 +173,18 @@ async fn a_net_that_ties_returns_the_months_and_says_what_was_checked() {
     assert_eq!(months.len(), 3);
     assert_eq!(months[0]["month"], "2026-04");
     assert_eq!(
-        months[0]["net"],
+        months[0]["closing"],
         json!({"state": "present", "value": "-4950.00"})
     );
     // An empty month stays empty: not zero.
     assert_eq!(months[1]["month"], "2026-05");
-    assert_eq!(months[1]["net"], json!({"state": "empty"}));
+    assert_eq!(months[1]["closing"], json!({"state": "empty"}));
     assert_eq!(result["net_total"]["state"], "checked");
     assert_eq!(result["net_total"]["value"], "-4950.00");
+    assert_eq!(
+        result["basis"],
+        "tally_native_cash_flow_checked_against_trial_balance"
+    );
     assert_eq!(result["net_total"]["money_ledgers"], 1);
     assert_eq!(
         result["checks"],
@@ -183,6 +202,14 @@ async fn a_net_that_ties_returns_the_months_and_says_what_was_checked() {
         "{lead}"
     );
     assert!(lead.contains("has not been checked"), "{lead}");
+    assert!(
+        lead.contains("debit and credit columns are not shown"),
+        "{lead}"
+    );
+    assert!(
+        lead.contains("no month with an outflow has been measured"),
+        "{lead}"
+    );
     assert!(
         lead.contains("not a cash flow statement under AS 3"),
         "{lead}"
@@ -203,7 +230,10 @@ async fn a_net_that_differs_withholds_the_months_and_names_both_figures() {
     assert_eq!(net["use"], "investigation_only");
     assert_eq!(net["tally_cash_flow_months_added"], "-4949.00");
     assert_eq!(net["trial_balance_cash_and_bank_ledgers"], "-4950.00");
-    assert_eq!(result["checks"]["net_total"], "not_checked");
+    // Compared, and the figures disagree: not "not checked"; the months go with it.
+    assert_eq!(result["checks"]["net_total"], "differs");
+    assert_eq!(result["checks"]["month_split"], "withheld");
+    assert_eq!(result["basis"], "tally_native_cash_flow_withheld");
     let lead = lead(&response);
     assert!(
         lead.starts_with("Not established: the cash flow for \u{201c}"),
@@ -211,6 +241,82 @@ async fn a_net_that_differs_withholds_the_months_and_names_both_figures() {
     );
     assert!(lead.contains("so the months are withheld"), "{lead}");
     assert!(lead.contains("open Cash Flow in Tally"), "{lead}");
+}
+
+/// The captured trial balance with its cash ledger under another group.
+fn cash_under(group: &'static str) -> impl Fn(String) -> String {
+    move |report| {
+        let changed = report.replace(
+            "<PARENT TYPE=\"String\">Cash-in-Hand</PARENT>",
+            &format!("<PARENT TYPE=\"String\">{group}</PARENT>"),
+        );
+        assert_ne!(changed, report, "the cash ledger's group was not found");
+        changed
+    }
+}
+
+#[tokio::test]
+async fn a_bank_od_ledger_with_movement_refuses_the_result_and_says_why() {
+    // synthetic: the cash ledger moved under Bank OD A/c, so it carries movement there.
+    let (response, sent, expected) = call(
+        plans_with("-4950.00", cash_under("Bank OD A/c")),
+        "2026-04-01",
+        "2026-06-30",
+    )
+    .await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["state"], "not_established", "{result}");
+    assert_eq!(result["reason"], "cash_flow_money_group_unmeasured");
+    assert!(result["months"].is_null(), "{result}");
+    assert_eq!(result["net_total"]["state"], "not_checked");
+    assert_eq!(result["net_total"]["ledgers"], 1);
+    assert_eq!(result["checks"]["net_total"], "not_checked");
+    assert_eq!(result["checks"]["month_split"], "withheld");
+    assert_eq!(result["basis"], "tally_native_cash_flow_withheld");
+    let lead = lead(&response);
+    assert!(
+        lead.starts_with("Not established: the cash flow for \u{201c}"),
+        "{lead}"
+    );
+    assert!(lead.contains("Bank OD A/c or Bank OCC A/c"), "{lead}");
+    assert!(lead.contains("has to be read in Tally"), "{lead}");
+}
+
+#[tokio::test]
+async fn a_book_with_no_cash_or_bank_ledger_and_an_empty_cash_flow_is_not_called_checked() {
+    // synthetic: the cash ledger moved under Sundry Debtors; Tally's Cash Flow is all empty.
+    let (response, sent, expected) = call(
+        plans_with("", cash_under("Sundry Debtors")),
+        "2026-04-01",
+        "2026-06-30",
+    )
+    .await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["state"], "not_established", "{result}");
+    assert_eq!(result["reason"], "cash_flow_no_money_ledger");
+    assert!(result["months"].is_null(), "{result}");
+    assert_eq!(result["net_total"]["state"], "not_checked");
+    assert_eq!(result["checks"]["net_total"], "not_checked");
+    let lead = lead(&response);
+    assert!(lead.contains("nothing was checked"), "{lead}");
+    assert!(!lead.contains("equals the cash and bank ledgers"), "{lead}");
+}
+
+#[tokio::test]
+async fn an_answer_that_is_refused_by_the_parser_names_its_own_cause() {
+    // Tally's Cash Flow came back as an empty envelope: a report that was not rendered.
+    let mut plans = plans_with_report(xml("<ENVELOPE></ENVELOPE>".to_string()), |report| report);
+    // The call stops at the refused answer: the closing extent pair (four requests) and
+    // the closing identity bracket (three) are never sent, and an unsent plan is a hang.
+    plans.truncate(plans.len() - 7);
+    let (response, sent, expected) = call(plans, "2026-04-01", "2026-06-30").await;
+    assert_eq!(sent, expected);
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "cash_flow_read_failed", "{response}");
+    assert_eq!(error["cause"], "cash_flow_empty_envelope", "{response}");
 }
 
 #[tokio::test]

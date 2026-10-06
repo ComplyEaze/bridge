@@ -18,7 +18,7 @@
 //! The parser is closed: anything other than well-formed rows of the expected
 //! shape is refused, and a failure, an unknown report, an empty answer and a
 //! different set of months each have their own error.
-use bridge_tally_primitives::{ExactDecimal, TallyDate};
+use bridge_tally_primitives::TallyDate;
 use quick_xml::{
     events::{BytesStart, Event},
     Reader,
@@ -180,33 +180,12 @@ pub struct NativeCashFlow {
     pub rows: Vec<NativeCashFlowRow>,
 }
 
-impl NativeCashFlow {
-    /// The debits added up, counting only the amounts present.
-    pub fn total_debit(&self) -> Result<ExactDecimal, NativeCashFlowError> {
-        sum_present(self.rows.iter().map(|row| &row.debit))
-    }
-}
-
-fn sum_present<'a>(
-    amounts: impl Iterator<Item = &'a NativeStatementAmount>,
-) -> Result<ExactDecimal, NativeCashFlowError> {
-    let mut sum = ExactDecimal::zero();
-    for amount in amounts {
-        if let NativeStatementAmount::Present(value) = amount {
-            sum = sum
-                .checked_add(value)
-                .map_err(|_| NativeCashFlowError::InvalidResponse("cash_flow_sum_invalid"))?;
-        }
-    }
-    Ok(sum)
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeCashFlowError {
     /// A `STATUS` or `LINEERROR` in the response: Tally reported failure.
-    /// Tally 7.1 answers an unknown report this way (`STATUS 0` and a
-    /// `LINEERROR` inside HEADER, BODY and DATA); the text differs by build, so
-    /// the structure is what is classified.
+    /// Tally 7.1 answers an unknown report this way (`STATUS 0` in a HEADER and a
+    /// `LINEERROR` inside BODY and DATA); the text differs by build, so the
+    /// structure is what is classified.
     TallyReportedFailure,
     /// A bare `RESPONSE`: Tally did not recognise the report name (§12a.1).
     UnknownReport,
@@ -338,7 +317,12 @@ pub fn parse_native_cash_flow(
             Event::Empty(element) => {
                 let name = element.name().as_ref().to_ascii_uppercase();
                 if !root_seen {
-                    return Err(invalid("cash_flow_root_not_envelope"));
+                    // A self-closed root is the same empty answer as an empty pair.
+                    return Err(if name.as_slice() == b"ENVELOPE" {
+                        NativeCashFlowError::EmptyEnvelope
+                    } else {
+                        invalid("cash_flow_root_not_envelope")
+                    });
                 }
                 if is_failure_signal(&name) {
                     return Err(NativeCashFlowError::TallyReportedFailure);

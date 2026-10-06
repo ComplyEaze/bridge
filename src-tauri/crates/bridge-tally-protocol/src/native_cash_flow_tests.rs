@@ -2,7 +2,7 @@ use super::*;
 use crate::text_encoding::{
     decode_tally_xml_response_bytes_limited, decode_xml_bytes, ExpectedTallyTextEncoding,
 };
-use bridge_tally_primitives::TallyDate;
+use bridge_tally_primitives::{ExactDecimal, TallyDate};
 
 use crate::outstandings_shared::DateBoundaryProfile;
 
@@ -226,19 +226,26 @@ fn a_months_closing_is_its_own_figure_not_a_running_one() {
     assert_eq!(may.closing, present("-1786801.00"));
 }
 
+/// The debits of a parsed answer added up, in the test: the figure the capture
+/// carries, which the check in `reports::cash_flow` compares with the trial balance.
+fn debit_sum(parsed: &NativeCashFlow) -> ExactDecimal {
+    let mut sum = ExactDecimal::zero();
+    for row in &parsed.rows {
+        if let NativeStatementAmount::Present(value) = &row.debit {
+            sum = sum.checked_add(value).unwrap();
+        }
+    }
+    sum
+}
+
 #[test]
-fn the_year_debits_add_up_to_the_cash_and_bank_debits_of_the_trial_balance() {
-    // The tie measured on 6 Oct 2026 (provenance note): Cash 5,500.00 plus a
-    // bank ledger's 17,970,481.22, read by trial_balance for the same window.
+fn the_captured_year_debits_add_up_to_the_figure_measured_against_the_trial_balance() {
+    // Cash 5,500.00 plus a bank ledger's 17,970,481.22: the totals were read by
+    // `trial_balance` for the same window (provenance note); the tie itself is
+    // checked in `reports::cash_flow`.
     let parsed =
         parse_native_cash_flow(&response(CASH_FLOW_FY), &window("20250401", "20260331")).unwrap();
-    assert!(
-        parsed
-            .total_debit()
-            .unwrap()
-            .numeric_eq(&dec("-17975981.22")),
-        "sum of the twelve rows"
-    );
+    assert!(debit_sum(&parsed).numeric_eq(&dec("-17975981.22")));
 }
 
 #[test]
@@ -252,10 +259,7 @@ fn a_three_month_window_and_a_one_month_window_parse_to_their_own_rows() {
         quarter.rows.iter().map(|r| r.month).collect::<Vec<_>>(),
         vec![month(2025, 4), month(2025, 5), month(2025, 6)]
     );
-    assert!(quarter
-        .total_debit()
-        .unwrap()
-        .numeric_eq(&dec("-7263013.22")));
+    assert!(debit_sum(&quarter).numeric_eq(&dec("-7263013.22")));
     let june =
         parse_native_cash_flow(&response(CASH_FLOW_JUNE), &window("20250601", "20250630")).unwrap();
     assert_eq!(june.rows.len(), 1);
@@ -293,11 +297,19 @@ fn an_empty_envelope_is_refused_because_cash_flow_always_prints_its_rows() {
 
 #[test]
 fn an_unknown_report_name_is_a_reported_failure_by_structure() {
-    // Tally 7.1 answered `STATUS 0` and a `LINEERROR` inside HEADER, BODY and
+    // Tally 7.1 answered `STATUS 0` in a HEADER and a `LINEERROR` inside BODY and
     // DATA, not the bare RESPONSE of an earlier build; classify by structure.
     assert_eq!(
         parse_native_cash_flow(&response(UNKNOWN_REPORT), &window("20250401", "20260331")),
         Err(NativeCashFlowError::TallyReportedFailure)
+    );
+}
+
+#[test]
+fn a_self_closed_root_is_an_empty_envelope() {
+    assert_eq!(
+        parse_native_cash_flow("<ENVELOPE/>", &window("20250401", "20260331")),
+        Err(NativeCashFlowError::EmptyEnvelope)
     );
 }
 
@@ -376,10 +388,12 @@ fn a_row_missing_one_of_its_three_columns_is_refused() {
         "<DSPCLAMT><DSPCLAMTA>-3864.02</DSPCLAMTA></DSPCLAMT>",
         "",
     );
-    assert!(matches!(
+    assert_eq!(
         parse_year(&xml),
-        Err(NativeCashFlowError::InvalidResponse(_))
-    ));
+        Err(NativeCashFlowError::InvalidResponse(
+            "cash_flow_column_missing"
+        ))
+    );
 }
 
 #[test]
@@ -389,25 +403,34 @@ fn a_repeated_column_inside_a_row_is_refused() {
         "<DSPDRAMT><DSPDRAMTA>-3864.02</DSPDRAMTA></DSPDRAMT>",
         "<DSPDRAMT><DSPDRAMTA>-3864.02</DSPDRAMTA></DSPDRAMT><DSPDRAMT><DSPDRAMTA>1.00</DSPDRAMTA></DSPDRAMT>",
     );
-    assert!(matches!(
+    assert_eq!(
         parse_year(&xml),
-        Err(NativeCashFlowError::InvalidResponse(_))
-    ));
+        Err(NativeCashFlowError::InvalidResponse(
+            "cash_flow_duplicate_column"
+        ))
+    );
 }
 
 #[test]
 fn a_period_without_its_row_and_a_row_without_its_period_are_refused() {
-    let without_row = mutate(&year(), "<DSPPERIOD>April</DSPPERIOD>", "");
-    assert!(parse_year(&without_row).is_err());
+    let without_period = mutate(&year(), "<DSPPERIOD>April</DSPPERIOD>", "");
+    assert_eq!(
+        parse_year(&without_period),
+        Err(NativeCashFlowError::InvalidResponse(
+            "cash_flow_row_without_period"
+        ))
+    );
     let doubled = mutate(
         &year(),
         "<DSPPERIOD>April</DSPPERIOD>",
         "<DSPPERIOD>April</DSPPERIOD><DSPPERIOD>April</DSPPERIOD>",
     );
-    assert!(matches!(
+    assert_eq!(
         parse_year(&doubled),
-        Err(NativeCashFlowError::InvalidResponse(_))
-    ));
+        Err(NativeCashFlowError::InvalidResponse(
+            "cash_flow_period_without_row"
+        ))
+    );
 }
 
 #[test]
@@ -429,34 +452,42 @@ fn a_period_left_without_a_row_at_the_end_is_refused() {
 #[test]
 fn an_element_outside_the_known_grammar_is_refused() {
     let xml = mutate(&year(), "</ENVELOPE>", "<DSPEXTRA>1</DSPEXTRA></ENVELOPE>");
-    assert!(matches!(
+    assert_eq!(
         parse_year(&xml),
-        Err(NativeCashFlowError::InvalidResponse(_))
-    ));
+        Err(NativeCashFlowError::InvalidResponse(
+            "cash_flow_unexpected_element"
+        ))
+    );
 }
 
 #[test]
 fn stray_text_and_trailing_content_are_refused() {
     let xml = mutate(&year(), "<DSPPERIOD>April", "stray<DSPPERIOD>April");
-    assert!(matches!(
+    assert_eq!(
         parse_year(&xml),
-        Err(NativeCashFlowError::InvalidResponse(_))
-    ));
-    let xml = format!("{}<ENVELOPE/>", year());
-    assert!(matches!(
+        Err(NativeCashFlowError::InvalidResponse("cash_flow_stray_text"))
+    );
+    // A second root, and a start element after the root has closed.
+    let xml = format!("{}<DSPPERIOD>April</DSPPERIOD>", year());
+    assert_eq!(
         parse_year(&xml),
-        Err(NativeCashFlowError::InvalidResponse(_))
-    ));
+        Err(NativeCashFlowError::InvalidResponse(
+            "cash_flow_trailing_content"
+        ))
+    );
 }
 
 #[test]
 fn a_truncated_response_is_refused_not_read_as_what_was_received() {
-    let full = year();
-    let cut = &full[..full.len() / 2];
-    assert!(matches!(
-        parse_year(cut),
-        Err(NativeCashFlowError::InvalidResponse(_))
-    ));
+    // Cut between elements, after the first row: the root never closes.
+    let full = mutate(&year(), "", "");
+    let end = full.find("</DSPACCINFO>").unwrap() + "</DSPACCINFO>".len();
+    assert_eq!(
+        parse_year(&full[..end]),
+        Err(NativeCashFlowError::InvalidResponse(
+            "cash_flow_envelope_unterminated"
+        ))
+    );
 }
 
 #[test]
@@ -476,10 +507,12 @@ fn a_failure_signal_anywhere_beats_the_rows() {
 fn a_wrapper_with_no_failure_signal_is_not_read_as_a_report() {
     let xml =
         "<ENVELOPE><HEADER><VERSION>1</VERSION></HEADER><BODY><DATA></DATA></BODY></ENVELOPE>";
-    assert!(matches!(
+    assert_eq!(
         parse_year(xml),
-        Err(NativeCashFlowError::InvalidResponse(_))
-    ));
+        Err(NativeCashFlowError::InvalidResponse(
+            "cash_flow_wrapper_without_failure_signal"
+        ))
+    );
 }
 
 #[test]

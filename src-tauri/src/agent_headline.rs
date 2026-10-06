@@ -515,6 +515,9 @@ pub(super) enum CashFlowOutcome {
     /// A Bank OD A/c or Bank OCC A/c ledger has movement in the period, and
     /// whether Tally's Cash Flow counts it is not measured.
     MoneyGroupUnmeasured,
+    /// No cash or bank ledger in the trial balance and an empty Cash Flow:
+    /// nothing was compared.
+    NothingToCompare,
 }
 
 /// What a cash flow read covered and found, held for its headline.
@@ -550,7 +553,7 @@ impl CashFlowBasis {
         );
         let lead = match self.outcome {
             CashFlowOutcome::Tied => format!(
-                "{}: Tally's net cash and bank movement for the whole period equals the cash and bank ledgers of its trial balance. The split into months is Tally's own and has not been checked. This is Tally's month-wise cash and bank movement, not a cash flow statement under AS 3.",
+                "{}: Tally's net cash and bank movement for the whole period equals the cash and bank ledgers of its trial balance. The split into months is Tally's own and has not been checked. Tally's debit and credit columns are not shown, a negative amount is a debit (cash and bank growing), and no month with an outflow has been measured. This is Tally's month-wise cash and bank movement, not a cash flow statement under AS 3.",
                 capitalised(&subject)
             ),
             CashFlowOutcome::Differs => format!(
@@ -558,6 +561,9 @@ impl CashFlowBasis {
             ),
             CashFlowOutcome::MoneyGroupUnmeasured => format!(
                 "Not established: the {subject}. A ledger under Bank OD A/c or Bank OCC A/c has movement in the period, and whether Tally's Cash Flow counts such a ledger has not been measured, so the months are withheld. Tell the user that cash flow for this period has to be read in Tally."
+            ),
+            CashFlowOutcome::NothingToCompare => format!(
+                "Not established: the {subject}. The trial balance holds no ledger under Cash-in-Hand or Bank Accounts to compare Tally's Cash Flow with, so nothing was checked and the months are withheld. Tell the user that this book keeps no cash or bank ledger ComplyEaze Bridge can check, and that cash flow for this period has to be read in Tally."
             ),
         };
         Headline {

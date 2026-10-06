@@ -24,9 +24,10 @@ These changes are in source and not yet in a published build.
   trial balance's cash and bank ledgers and found equal; the split into months is
   Tally's own and is not checked, and Tally's debit and credit columns are not
   returned. A ledger under Bank OD A/c or Bank OCC A/c with movement refuses the
-  result, since whether Tally counts it is not measured. Measured on one
-  synthetic company, inflows only; an outflow, a contra and a large book are not
-  measured.
+  result, since whether Tally counts it is not measured. Tally's Cash Flow
+  answers were captured with a lab script on one synthetic company, inflows only;
+  the tool itself has not yet been run against Tally, and an outflow, a contra
+  and a large book are not measured.
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
   `amount`), and can add a window up by ledger, month or voucher type

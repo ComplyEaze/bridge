@@ -277,10 +277,39 @@ fn a_ledger_that_cannot_be_classified_is_counted_when_the_tie_fails() {
 }
 
 #[test]
-fn a_book_with_no_cash_or_bank_ledger_and_an_empty_cash_flow_ties_at_zero_over_no_ledgers() {
-    // synthetic: nothing to compare is stated as zero ledgers, never as a checked figure.
+fn a_book_with_no_cash_or_bank_ledger_and_an_empty_cash_flow_has_nothing_to_compare() {
+    // synthetic: two zeros over no ledger agree about nothing, and are not called a tie.
     let rows = vec![row("A Debtor", "Sundry Debtors", "-10.00", "")];
-    assert_tied(&check(rows, &typed_cash_flow("")), "0.00", 0);
+    assert_eq!(
+        check(rows, &typed_cash_flow("")),
+        CashFlowCheck::NothingToCompare
+    );
+}
+
+#[test]
+fn a_book_with_no_cash_or_bank_ledger_and_a_cash_flow_with_a_figure_differs() {
+    // synthetic: Tally printed a figure the trial balance's money ledgers cannot account for.
+    let rows = vec![row("A Debtor", "Sundry Debtors", "-10.00", "")];
+    match check(rows, &typed_cash_flow("-10.00")) {
+        CashFlowCheck::Differs {
+            money_ledgers,
+            tally_net,
+            ledger_net,
+            ..
+        } => {
+            assert_eq!(money_ledgers, 0);
+            assert!(tally_net.numeric_eq(&decimal("-10.00")));
+            assert!(ledger_net.is_zero());
+        }
+        other => panic!("expected a difference, got {other:?}"),
+    }
+}
+
+#[test]
+fn money_ledgers_with_no_movement_and_an_empty_cash_flow_tie_at_zero() {
+    // A checked "no movement": both sides were compared and both are empty.
+    let rows = vec![row("Cash", "Cash-in-Hand", "", "")];
+    assert_tied(&check(rows, &typed_cash_flow("")), "0", 1);
 }
 
 #[test]
@@ -308,9 +337,13 @@ fn the_refusal_codes_are_stable_and_distinct() {
         differs.refusal_code(),
         Some("cash_flow_differs_from_trial_balance")
     );
+    assert_eq!(
+        CashFlowCheck::NothingToCompare.refusal_code(),
+        Some("cash_flow_no_money_ledger")
+    );
     let tied = CashFlowCheck::Tied {
         net: decimal("0"),
-        money_ledgers: 0,
+        money_ledgers: 1,
     };
     assert_eq!(tied.refusal_code(), None);
 }

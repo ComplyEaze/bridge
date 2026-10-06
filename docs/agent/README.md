@@ -1683,14 +1683,24 @@ Existing batch files and proofs keep their formats; new journal fields are
 optional on read, and no database migration or background queue is introduced.
 Disabling the switch and restarting the connector removes posting from tool
 availability without deleting reconciliation evidence.
-**Keep this connector version for recovery.** The journal reader refuses any
-record carrying a field it does not know. So after a native post, an older
-connector refuses the whole journal, including reconciliation of batches it
+**Keep this connector version for recovery.** The journal reader refuses a
+dispatch or status record, or a voucher, carrying a field it does not know; a
+saved batch's own record can carry fields an older connector does not read. So
+after a native post attempted with 0.4.2 or later, a connector older than 0.4.2
+refuses the whole journal, including reconciliation of batches it
 wrote itself. Since bridge#579, each native dispatch intent records the
-REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post made
-with this version, the dispatch intent also records the pre-POST voucher mark and
-the journal a binding record, which an older connector refuses: do not downgrade
-after posting with it. A downgrade before that first post is harmless.
+REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post attempted
+with 0.4.2 or later, the dispatch intent also records the pre-POST voucher mark and
+the journal a binding record, which a connector older than 0.4.2 refuses: do not
+downgrade after posting with it. A downgrade before that first post leaves the
+journal readable, and versions 0.3.0 to 0.4.2 then refuse to post a batch this
+version built (`import_batch_predates_ledger_binding`, nothing posted): they
+cannot make the cash-in-hand and bill-wise checks it was built with. Their
+message for that refusal says "Build the batch again"; it was written for
+batches older than they are, and for a batch this version built it is the wrong
+step. Reinstall this version (or a newer one) and post the batch from it. What
+an older version builds and posts itself, the same batch built again included,
+has neither check.
 
 This is a bounded first posting slice, not blanket host/licence qualification.
 A ledger mapper is unnecessary for exact existing names: `validate_masters`

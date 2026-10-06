@@ -297,8 +297,13 @@ impl PartyLedgerMasterSourceValidationError {
                     "ledger_span_identity_mismatch"
                 }
                 StandardLedgerCatalogError::BoundsViolation => "ledger_span_slice_over_bound",
+                // The census slice has no bill-wise flag to be missing, so the
+                // flag errors cannot arrive here; they read as malformed.
                 StandardLedgerCatalogError::MalformedResponse
-                | StandardLedgerCatalogError::LedgerNameUnusable => "ledger_span_slice_malformed",
+                | StandardLedgerCatalogError::LedgerNameUnusable
+                | StandardLedgerCatalogError::BillWiseFlagMissing
+                | StandardLedgerCatalogError::BillWiseFlagInvalid
+                | StandardLedgerCatalogError::BillWiseFlagRepeated => "ledger_span_slice_malformed",
             },
             Self::LedgerSpanSliceResponseTooLarge { .. } => "ledger_span_slice_response_too_large",
             Self::LedgerCountDiffers { .. } => "ledger_count_differs",

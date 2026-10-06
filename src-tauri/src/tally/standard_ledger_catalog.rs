@@ -58,6 +58,10 @@ impl From<StandardLedgerCatalogError> for StandardLedgerCatalogReadError {
             // is that a log or a debugger now names the half of the system at
             // fault instead of pointing every reader at the transport.
             StandardLedgerCatalogError::LedgerNameUnusable => Self::MalformedResponse,
+            // The V1 read this error type serves never parses a flag.
+            StandardLedgerCatalogError::BillWiseFlagMissing
+            | StandardLedgerCatalogError::BillWiseFlagInvalid
+            | StandardLedgerCatalogError::BillWiseFlagRepeated => Self::MalformedResponse,
             StandardLedgerCatalogError::CompanyIdentityMismatch => Self::CompanyIdentityMismatch,
             StandardLedgerCatalogError::DuplicateIdentity => Self::DuplicateIdentity,
             StandardLedgerCatalogError::BoundsViolation => Self::BoundsViolation,

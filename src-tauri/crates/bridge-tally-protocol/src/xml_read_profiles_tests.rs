@@ -3,13 +3,14 @@ use super::*;
 fn profiles<'a>(
     company: &'a ValidatedCompanyName,
     range: &'a ValidatedDateRange,
-) -> [ReadOnlyProfile<'a>; 7] {
+) -> [ReadOnlyProfile<'a>; 8] {
     [
         ReadOnlyProfile::CompanyListV1,
         ReadOnlyProfile::CompanyListV2,
         ReadOnlyProfile::CompanyBookExtentV2 { company },
         ReadOnlyProfile::StandardLedgerIdentityV1 { company },
         ReadOnlyProfile::StandardLedgerCatalogV1 { company },
+        ReadOnlyProfile::StandardLedgerCatalogV2 { company },
         ReadOnlyProfile::LedgersV1 { company },
         ReadOnlyProfile::VouchersV2 { company, range },
     ]
@@ -196,6 +197,10 @@ fn profile_ids_and_template_hashes_are_stable() {
         (
             ReadOnlyProfileId::StandardLedgerCatalogV1,
             "3f38d58a88c8bb99180290b2fb17a3057d6149f78d81e08ba3d9bfc2d595dd95",
+        ),
+        (
+            ReadOnlyProfileId::StandardLedgerCatalogV2,
+            "e93bbf843455db2a4c9f77991c52b16f10b16bbb792af5ecae4909a48216a62e",
         ),
         (
             ReadOnlyProfileId::LedgersV1,
@@ -646,6 +651,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
             | ReadOnlyProfileId::CompanyBookExtentV2
             | ReadOnlyProfileId::StandardLedgerIdentityV1
             | ReadOnlyProfileId::StandardLedgerCatalogV1
+            | ReadOnlyProfileId::StandardLedgerCatalogV2
             | ReadOnlyProfileId::LedgersV1
             | ReadOnlyProfileId::VouchersV2
             | ReadOnlyProfileId::AuditCompanyObjectV1
@@ -666,6 +672,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         ReadOnlyProfileId::CompanyBookExtentV2,
         ReadOnlyProfileId::StandardLedgerIdentityV1,
         ReadOnlyProfileId::StandardLedgerCatalogV1,
+        ReadOnlyProfileId::StandardLedgerCatalogV2,
         ReadOnlyProfileId::LedgersV1,
         ReadOnlyProfileId::VouchersV2,
         ReadOnlyProfileId::AuditCompanyObjectV1,
@@ -738,4 +745,26 @@ fn a_spaced_function_argument_is_read_as_the_hazard_script_reads_it() {
     ] {
         assert_eq!(first_spaced_function_argument(&tdl), hit, "{tdl}");
     }
+}
+
+/// V2 is V1 and one more native method, so the same ledger rows come back with
+/// one more field, and V1's own bytes are not touched.
+#[test]
+fn the_v2_catalogue_request_is_v1_plus_the_bill_wise_method() {
+    let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
+    let v1 = ReadOnlyProfile::StandardLedgerCatalogV1 { company: &company }.render();
+    let v2 = ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render();
+    let method = "<NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>";
+    assert_eq!(v2.matches(method).count(), 1);
+    assert!(!v1.contains(method));
+    assert_eq!(
+        v2.lines()
+            .filter(|line| !line.contains(method))
+            .collect::<Vec<_>>(),
+        v1.lines().collect::<Vec<_>>()
+    );
+    assert_ne!(
+        ReadOnlyProfileId::StandardLedgerCatalogV1.template_sha256(),
+        ReadOnlyProfileId::StandardLedgerCatalogV2.template_sha256()
+    );
 }

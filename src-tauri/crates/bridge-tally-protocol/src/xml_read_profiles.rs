@@ -114,6 +114,7 @@ pub enum ReadOnlyProfileId {
     LedgerOpeningCoverageV1,
     StandardLedgerIdentityV1,
     StandardLedgerCatalogV1,
+    StandardLedgerCatalogV2,
     LedgersV1,
     VouchersV2,
     #[cfg(feature = "voucher-scan")]
@@ -137,6 +138,7 @@ impl ReadOnlyProfileId {
             Self::LedgerOpeningCoverageV1 => "ledger_opening_coverage_v1",
             Self::StandardLedgerIdentityV1 => "standard_ledger_identity_v1",
             Self::StandardLedgerCatalogV1 => "standard_ledger_catalog_v1",
+            Self::StandardLedgerCatalogV2 => "standard_ledger_catalog_v2",
             Self::LedgersV1 => "ledgers_v1",
             Self::VouchersV2 => "vouchers_v2",
             #[cfg(feature = "voucher-scan")]
@@ -183,6 +185,7 @@ impl ReadOnlyProfileId {
             Self::LedgerOpeningCoverageV1 => render_ledger_opening_coverage(TEMPLATE_COMPANY),
             Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
+            Self::StandardLedgerCatalogV2 => render_standard_ledger_catalog_v2(TEMPLATE_COMPANY),
             Self::LedgersV1 => render_ledgers(TEMPLATE_COMPANY),
             Self::VouchersV2 => render_vouchers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO),
             #[cfg(feature = "voucher-scan")]
@@ -294,6 +297,13 @@ pub enum ReadOnlyProfile<'a> {
     StandardLedgerCatalogV1 {
         company: &'a ValidatedCompanyName,
     },
+    /// V1's request with each ledger's `ISBILLWISEON` fetched in the same row,
+    /// so the import family learns which ledgers keep bills in Tally from the
+    /// catalogue read it already makes. Not for `source_draft`, presence or
+    /// the voucher and bill reads, which keep V1.
+    StandardLedgerCatalogV2 {
+        company: &'a ValidatedCompanyName,
+    },
     LedgersV1 {
         company: &'a ValidatedCompanyName,
     },
@@ -345,6 +355,7 @@ impl ReadOnlyProfile<'_> {
             Self::LedgerOpeningCoverageV1 { .. } => ReadOnlyProfileId::LedgerOpeningCoverageV1,
             Self::StandardLedgerIdentityV1 { .. } => ReadOnlyProfileId::StandardLedgerIdentityV1,
             Self::StandardLedgerCatalogV1 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV1,
+            Self::StandardLedgerCatalogV2 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV2,
             Self::LedgersV1 { .. } => ReadOnlyProfileId::LedgersV1,
             Self::VouchersV2 { .. } => ReadOnlyProfileId::VouchersV2,
             #[cfg(feature = "voucher-scan")]
@@ -381,6 +392,9 @@ impl ReadOnlyProfile<'_> {
             }
             Self::StandardLedgerCatalogV1 { company } => {
                 render_standard_ledger_identity(company.as_str())
+            }
+            Self::StandardLedgerCatalogV2 { company } => {
+                render_standard_ledger_catalog_v2(company.as_str())
             }
             Self::LedgersV1 { company } => render_ledgers(company.as_str()),
             Self::VouchersV2 { company, range } => {
@@ -553,6 +567,18 @@ fn render_company_list_v2() -> String {
 }
 
 fn render_standard_ledger_identity(company: &str) -> String {
+    render_standard_ledger_collection(company, "")
+}
+
+/// V1's request with `ISBILLWISEON` as one more native method.
+fn render_standard_ledger_catalog_v2(company: &str) -> String {
+    render_standard_ledger_collection(
+        company,
+        "\n                        <NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>",
+    )
+}
+
+fn render_standard_ledger_collection(company: &str, extra_methods: &str) -> String {
     format!(
         r#"
 <ENVELOPE>
@@ -573,7 +599,7 @@ fn render_standard_ledger_identity(company: &str) -> String {
                     <COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">
                         <NATIVEMETHOD>Name</NATIVEMETHOD>
                         <NATIVEMETHOD>GUID</NATIVEMETHOD>
-                        <NATIVEMETHOD>Parent</NATIVEMETHOD>
+                        <NATIVEMETHOD>Parent</NATIVEMETHOD>{}
                         <COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>
                         <COMPUTE>BRIDGECOMPANYNAME:##SVCurrentCompany</COMPUTE>
                     </COLLECTION>
@@ -583,7 +609,8 @@ fn render_standard_ledger_identity(company: &str) -> String {
     </BODY>
 </ENVELOPE>
 "#,
-        xml_escape(company)
+        xml_escape(company),
+        extra_methods
     )
     .trim()
     .to_string()

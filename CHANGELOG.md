@@ -45,7 +45,7 @@ These changes are in source and not yet in a published build.
   `pre_import_mark` still reports the build-time mark (#1087).
 - `build_import_xml` now refuses a batch that names a ledger which keeps bills in
   Tally, as `bill_wise_party_unapproved`, until the person approves each such
-  party: an entry on it carries no bill allocation, so Tally lands it On Account
+  party (the build is repeated with `on_account_approvals`): an entry on it carries no bill allocation, so Tally lands it On Account
   and the person must match it to a bill by hand. Before, the build only printed a
   warning. `post_import` and the queue admission read the flag again, from the
   ledger list they already read, and refuse `import_bill_wise_changed` for a

@@ -33,9 +33,9 @@ pub(super) const BILL_WISE_NOT_RECORDED: &str = "import_batch_predates_bill_wise
 
 /// Each named ledger's `ISBILLWISEON`, by exact name, as the ledger catalogue
 /// read said it (#1234: the flag rides the catalogue the build
-/// already reads). A V2 catalogue holds a typed flag for every ledger, so a
-/// ledger never lacks one here; a name that was not asked for is treated as
-/// bill-wise, the refusing direction.
+/// already reads). A V2 catalogue holds a typed flag for every ledger; a name
+/// that was not asked for, or that the catalogue lacks, is treated as bill-wise,
+/// the refusing direction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ObservedBillWise {
     flags: BTreeMap<String, BillWiseFlag>,
@@ -43,8 +43,9 @@ pub(super) struct ObservedBillWise {
 
 impl ObservedBillWise {
     /// Only the requested ledgers are kept. The build has already refused a
-    /// name the catalogue does not hold exactly (`masters_for_payload`), and a
-    /// name missing here would count as bill-wise anyway, the refusing direction.
+    /// name the catalogue does not hold exactly (`masters_for_payload` and
+    /// `bind_selected`), and a name missing here would count as bill-wise anyway,
+    /// the refusing direction.
     pub(super) fn from_catalogue<'a>(
         catalogue: &StandardLedgerCatalogV2,
         requested: impl IntoIterator<Item = &'a str>,

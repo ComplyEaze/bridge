@@ -209,12 +209,15 @@ fn every_ledger_of_each_v2_capture_carries_a_flag() {
             capture.company
         );
         // The same body is not a V1 answer: the V1 parser refuses the new field.
-        assert!(parse_standard_ledger_catalog_with_identities(
-            &decoded(capture.xml),
-            capture.company,
-            capture.guid
-        )
-        .is_err());
+        assert_eq!(
+            parse_standard_ledger_catalog_with_identities(
+                &decoded(capture.xml),
+                capture.company,
+                capture.guid
+            )
+            .unwrap_err(),
+            StandardLedgerCatalogError::MalformedResponse
+        );
     }
 }
 
@@ -246,27 +249,32 @@ fn each_v2_capture_is_the_answer_to_the_request_the_profile_renders() {
 
 /// A ledger whose name ends in a carriage return and line feed (the case the
 /// separate outstandings snapshot could not read) comes back in the V2
-/// catalogue as an escaped attribute, with a flag like any other.
+/// catalogue as an escaped attribute, with a flag like any other. One of the
+/// four is bill-wise (`Yes`), the case the approval's ledger name must carry.
 #[test]
 fn ledger_names_ending_in_crlf_carry_a_flag_in_the_v2_catalogue() {
-    let amend = &V2_CAPTURES[1];
-    let catalogue = parse_standard_ledger_catalog_v2_with_identities(
-        &decoded(amend.xml),
-        amend.company,
-        amend.guid,
-    )
-    .unwrap();
-    let crlf = catalogue
-        .bill_wise_flags()
-        .filter(|(name, _, _)| name.ends_with("\r\n"))
-        .map(|(name, _, flag)| (name.to_string(), flag))
-        .collect::<Vec<_>>();
+    let mut crlf = Vec::new();
+    for capture in [&V2_CAPTURES[1], &V2_CAPTURES[2]] {
+        let catalogue = parse_standard_ledger_catalog_v2_with_identities(
+            &decoded(capture.xml),
+            capture.company,
+            capture.guid,
+        )
+        .unwrap();
+        crlf.extend(
+            catalogue
+                .bill_wise_flags()
+                .filter(|(name, _, _)| name.ends_with("\r\n"))
+                .map(|(name, _, flag)| (name.to_string(), flag)),
+        );
+    }
     assert_eq!(
         crlf,
         [
             ("LF708 A\r\n".to_string(), BillWiseFlag::Off),
             ("LF708 B\r\n".to_string(), BillWiseFlag::Off),
             ("lf708 c\r\n".to_string(), BillWiseFlag::Off),
+            ("CRLF Supplier\r\n".to_string(), BillWiseFlag::On),
         ]
     );
 }

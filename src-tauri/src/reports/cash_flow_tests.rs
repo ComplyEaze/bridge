@@ -202,6 +202,24 @@ fn a_ledger_under_a_user_created_group_inside_bank_accounts_counts_as_bank() {
 }
 
 #[test]
+fn a_net_is_shown_at_the_scale_of_its_terms_not_with_its_trailing_zeros_dropped() {
+    let rows = vec![row("Bank", "Bank Accounts", "-100.00", "")];
+    match check(rows, &typed_cash_flow("-100.00")) {
+        CashFlowCheck::Tied { net, .. } => assert_eq!(net.as_str(), "-100.00"),
+        other => panic!("expected a tie, got {other:?}"),
+    }
+    // A zero net carries the scale too.
+    let rows = vec![
+        row("Cash", "Cash-in-Hand", "", "2000.50"),
+        row("Bank", "Bank Accounts", "-2000.50", ""),
+    ];
+    match check(rows, &typed_cash_flow("")) {
+        CashFlowCheck::Tied { net, .. } => assert_eq!(net.as_str(), "0.00"),
+        other => panic!("expected a tie, got {other:?}"),
+    }
+}
+
+#[test]
 fn a_contra_between_two_money_ledgers_counts_on_both_sides_and_nets_to_nothing() {
     // synthetic: cash to bank 2,000.00 moves both ledgers and nothing leaves the money set.
     let rows = vec![

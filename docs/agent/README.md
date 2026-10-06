@@ -83,6 +83,7 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 The ordinary default tools, in name order:
 
 - `balance_sheet`
+- `cash_flow`
 - `egress_log`
 - `ledger_masters`
 - `ledger_movement`
@@ -105,7 +106,7 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `local_data_report` (also
+0.4.2. `cash_flow` is in source and not yet in a published build. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -392,6 +393,49 @@ are masked like a party name, because a job-work godown or a supplier-named
 stock group can carry a party's name; Tally's reserved root as a parent is a
 fixed marker and is left as it is. Voucher-type, unit and account-group names
 are not masked: they are configuration labels, not counterparties.
+
+### Cash Flow
+
+Use `cash_flow` with `company_guid`, `from` and `to` for Tally's own Cash Flow: the
+month-wise movement of the cash and bank ledgers. It is not a cash flow
+statement under AS 3. The window must be whole months: `from` the 1st of a month,
+`to` the last day of a month, at most twelve months, so that each row Tally prints
+(a month name, with no year) can be placed in its year. Otherwise the call is
+refused before any report is requested (`cash_flow_window_not_month_start`,
+`cash_flow_window_not_month_end`, `cash_flow_window_too_many_months`). Education
+mode and a book with several currency masters are refused, as for the statements.
+
+The months are returned only once the **net total** of the whole window has been
+compared with the trial balance read for the same window and found equal: the
+months' closing amounts added up, against the debit and credit totals of every
+ledger under Cash-in-Hand or Bank Accounts (a group a user made inside one counts).
+The top-level `state` is `observed` when the months are returned and
+`not_established` otherwise, with `reason`:
+
+- `cash_flow_differs_from_trial_balance`: the two figures differ. `months` is
+  `null`; `net_total` carries both figures for investigation only (`use` says so),
+  and a count of ledgers with movement whose group could not be resolved, which is
+  where to look. Neither figure is the cash movement.
+- `cash_flow_money_group_unmeasured`: a ledger under Bank OD A/c or Bank OCC A/c
+  has movement in the window, and whether Tally's Cash Flow counts such a ledger
+  has not been measured. `months` is `null`.
+
+`checks` says per field what was `checked`, `not_checked` or `withheld`: the net
+total is checked; the split into months is Tally's own and is not checked (a total
+can tie while one month is wrong); Tally's debit and credit columns are read but
+not returned, because how a contra is counted in them is not measured. A month
+Tally printed with no amounts is returned with an empty `net`, which is not zero.
+A negative amount is a debit: cash and bank grew.
+
+An unknown report name, a reported failure, an empty answer and rows for other
+months than the window holds are each refused (`cash_flow_report_unknown`,
+`cash_flow_tally_reported_failure`, `cash_flow_empty_envelope`,
+`cash_flow_months_unexpected`), classified by the structure of the answer.
+
+Measured on one synthetic company on licensed TallyPrime 7.1 (inflows into one bank
+and one cash ledger only): the net total of three windows tied to the trial balance to
+the paisa. Not measured: an outflow, a contra, a Bank OD A/c ledger, a month with
+both an inflow and an outflow, a book with several currencies, and a large book.
 
 ### Stock Summary
 

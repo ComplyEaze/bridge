@@ -87,6 +87,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     // published.
     const READ_TOOLS: &[&str] = &[
         "balance_sheet",
+        "cash_flow",
         "changed_since",
         "egress_log",
         "ledger_masters",

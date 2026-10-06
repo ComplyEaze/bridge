@@ -497,11 +497,3 @@ fn every_error_has_its_own_stable_code() {
     assert_eq!(unique.len(), codes.len());
     assert!(codes.iter().all(|code| code.starts_with("cash_flow_")));
 }
-
-#[test]
-fn a_totals_sum_with_an_empty_amount_counts_only_the_amounts_present() {
-    // The year has seven rows with an empty debit: the total is the five
-    // present ones, and `empty_debit_count` says how many were left out.
-    let parsed = parse_year(&year()).unwrap();
-    assert_eq!(parsed.empty_debit_count(), 7);
-}

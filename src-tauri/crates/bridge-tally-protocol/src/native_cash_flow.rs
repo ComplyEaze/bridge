@@ -185,19 +185,6 @@ impl NativeCashFlow {
     pub fn total_debit(&self) -> Result<ExactDecimal, NativeCashFlowError> {
         sum_present(self.rows.iter().map(|row| &row.debit))
     }
-
-    /// The credits added up, counting only the amounts present.
-    pub fn total_credit(&self) -> Result<ExactDecimal, NativeCashFlowError> {
-        sum_present(self.rows.iter().map(|row| &row.credit))
-    }
-
-    /// How many rows printed no debit, so a total can say what it left out.
-    pub fn empty_debit_count(&self) -> usize {
-        self.rows
-            .iter()
-            .filter(|row| row.debit == NativeStatementAmount::Empty)
-            .count()
-    }
 }
 
 fn sum_present<'a>(

@@ -96,11 +96,35 @@ fn has_movement(row: &NativeTrialBalanceRow) -> bool {
     present_nonzero(&row.debit) || present_nonzero(&row.credit)
 }
 
-fn add(sum: &mut ExactDecimal, value: &ExactDecimal) -> Result<(), CashFlowCheckError> {
+fn decimals(text: &str) -> usize {
+    text.split_once('.')
+        .map_or(0, |(_, fraction)| fraction.len())
+}
+
+/// Adds `value` to `sum`, keeping the most decimals any term carried.
+fn add(
+    sum: &mut ExactDecimal,
+    scale: &mut usize,
+    value: &ExactDecimal,
+) -> Result<(), CashFlowCheckError> {
+    *scale = (*scale).max(decimals(value.as_str()));
     *sum = sum
         .checked_add(value)
         .map_err(|_| CashFlowCheckError::SumInvalid)?;
     Ok(())
+}
+
+/// A sum shown at the scale of its terms: the arithmetic drops trailing zeros,
+/// and a money total reads as `-4950.00`, not `-4950`.
+fn at_scale(sum: ExactDecimal, scale: usize) -> Result<ExactDecimal, CashFlowCheckError> {
+    let text = sum.as_str();
+    let missing = scale.saturating_sub(decimals(text));
+    if missing == 0 {
+        return Ok(sum);
+    }
+    let point = if text.contains('.') { "" } else { "." };
+    ExactDecimal::parse(format!("{text}{point}{}", "0".repeat(missing)))
+        .map_err(|_| CashFlowCheckError::SumInvalid)
 }
 
 /// Checks Tally's Cash Flow for a window against the Trial Balance and group
@@ -112,6 +136,7 @@ pub(crate) fn check_cash_flow(
 ) -> Result<CashFlowCheck, CashFlowCheckError> {
     let index = GroupIndex::build(groups.iter().cloned());
     let mut ledger_net = ExactDecimal::zero();
+    let mut scale = 0_usize;
     let mut money_ledgers = 0_usize;
     let mut unmeasured = 0_usize;
     let mut unclassified_with_movement = 0_usize;
@@ -121,7 +146,7 @@ pub(crate) fn check_cash_flow(
                 money_ledgers += 1;
                 for amount in [&row.debit, &row.credit] {
                     if let NativeTrialBalanceAmount::Present(value) = amount {
-                        add(&mut ledger_net, value)?;
+                        add(&mut ledger_net, &mut scale, value)?;
                     }
                 }
             }
@@ -146,9 +171,11 @@ pub(crate) fn check_cash_flow(
     let mut tally_net = ExactDecimal::zero();
     for row in &cash_flow.rows {
         if let NativeStatementAmount::Present(value) = &row.closing {
-            add(&mut tally_net, value)?;
+            add(&mut tally_net, &mut scale, value)?;
         }
     }
+    let tally_net = at_scale(tally_net, scale)?;
+    let ledger_net = at_scale(ledger_net, scale)?;
     if tally_net.numeric_eq(&ledger_net) {
         Ok(CashFlowCheck::Tied {
             net: tally_net,

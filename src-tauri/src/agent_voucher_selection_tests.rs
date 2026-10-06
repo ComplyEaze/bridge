@@ -982,6 +982,41 @@ async fn call_vouchers_with(plans: Vec<ScenarioPlan>, extra: Value) -> Value {
     response
 }
 
+/// #1029: the one window nothing counts is a nonempty one read from a company
+/// whose mark says it never held a voucher (no census is sent for a mark of
+/// zero). `vouchers` then labels it `partial`, never `complete`: the same
+/// reason a small book carried before it was counted, now reachable only here.
+/// Mutant killed: counting, or labelling `complete`, a window whose mark is zero.
+#[tokio::test]
+async fn a_nonempty_window_of_a_company_whose_mark_is_zero_is_partial_and_uncounted() {
+    let words = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+    )
+    .chunks_exact(2)
+    .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+    .collect::<Vec<_>>();
+    let vouchers = ScenarioPlan::new(Fixture::SyntheticXml(String::from_utf16(&words).unwrap()))
+        .with_encoding(WireEncoding::Utf16Le)
+        .with_framing(ResponseFraming::ContentLength);
+    let cycle = import_cycle_plans();
+    let mut plans = cycle[..4].to_vec();
+    plans.extend(cycle[10..16].iter().cloned());
+    for plan in &mut plans {
+        let body = plan
+            .fixture
+            .body()
+            .replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>0</ALTVCHID>");
+        plan.fixture = Fixture::SyntheticXml(body);
+    }
+    // No census leg: the window is read once.
+    plans.extend(paired_with(&cycle, &vouchers));
+    let response = call_vouchers_with(plans, json!({})).await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(result["reason"], "nonempty_window_unqualified", "{result}");
+}
+
 #[tokio::test]
 async fn a_composite_voucher_is_withheld_and_the_rest_of_the_window_is_returned() {
     let response =

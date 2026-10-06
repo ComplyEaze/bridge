@@ -878,12 +878,8 @@ impl super::super::Server {
             .map(|entry| entry.ledger.clone())
             .ok_or_else(|| refused("invoice_party_missing", ""))?;
 
-        // 0. The whole ledger compliance listing is read three times for one
-        // invoice (build, before the dialog, after it): refuse a book whose
-        // master mark says it may be large. On 24 Sep 2026 the same read on a
-        // book of about 9,400 ledgers returned 35 MB in 44 s and left a lab
-        // gateway answering with empty replies. The mark is an upper bound on
-        // the ledger count (section 8 of the ledger-count note), cheap to read.
+        // 0. Refuse large books: the whole ledger compliance listing is read
+        // three times for one invoice (build, before the dialog, after it).
         let (mark, mark_evidence) = self
             .pre_import_mark(company, identity)
             .await

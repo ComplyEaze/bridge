@@ -298,7 +298,9 @@ pub(super) struct ImportLedgerLine {
     /// one refusal of a record they cannot check. They do not read the two
     /// records below, so without this they would post a batch this build
     /// saved, with neither check. The old name is still read, for a batch one
-    /// of them saved. When a record is added to or removed from a saved
+    /// of them saved. No writer may write both names: a record carrying both
+    /// does not parse, and the journal reader refuses the whole history on a
+    /// record it cannot parse. When a record is added to or removed from a saved
     /// batch, write this one under a new name again and keep every earlier
     /// name as an alias: `a_saved_batch_holds_exactly_these_records` stops
     /// compiling, or fails, until that is looked at.

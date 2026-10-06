@@ -95,7 +95,8 @@ These changes are in source and not yet in a published build.
   because a batch built again on an older version has neither check. A batch an
   earlier version saved is read as before. Which versions can read the import
   history is unchanged: from the first post attempted with 0.4.2 or later,
-  only 0.4.2 and later read it (#1234).
+  only 0.4.2 and later read it. 0.2.0 and earlier have no such refusal: do not
+  run them over a data folder this version has built in (#1234).
 - The posting setting is shorter and names its four known limits in plainer
   words, and Terms of Use section 9.2 (version 2026-10.1, effective 7 October
   2026) now lists the same limits and more: a company or ledger renamed or opened

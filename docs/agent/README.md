@@ -1700,7 +1700,8 @@ message for that refusal says "Build the batch again"; it was written for
 batches older than they are, and for a batch this version built it is the wrong
 step. Reinstall this version (or a newer one) and post the batch from it. What
 an older version builds and posts itself, the same batch built again included,
-has neither check.
+has neither check. 0.2.0 and earlier have no such refusal: do not run them over a
+data folder this version has built in.
 
 This is a bounded first posting slice, not blanket host/licence qualification.
 A ledger mapper is unnecessary for exact existing names: `validate_masters`

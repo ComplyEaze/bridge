@@ -20,6 +20,8 @@ HDFC profiles were calibrated on, which is already public in
 | `scan-image-only.pdf` | 1,481 | `ac3f526b32c6e7883e7cd665503f88af96b4c4117e07400ff0c4b5c66382bb6a` |
 | `print-to-pdf-vector-glyphs.pdf` | 21,643 | `08a3722a9e27975eb8547e0d11973f760fab7a2993554ccf8392923f7e54ade9` |
 | `scan-with-visible-stamp.pdf` | 1,256 | `ae4bc131732ad8808db287097ddaf363bbc1add12ba510e51f2413a66cbf5008` |
+| `scan-with-hidden-ocr-text.pdf` | 3,210 | `96d7945735aafcd7ab6c68b079880510649a73172282c733e4c1e8c8742cb5d1` |
+| `hdfc-with-hidden-line.pdf` | 3,077 | `63ad359f0ec6188503c1b5fa016cef657c8f7e5d2286877bfdaa319ffba31eca` |
 | `hdfc-logo-and-watermark.pdf` | 3,260 | `d82ea459eb763263af46482c5adea1250e08866ba63778d08680e59f054332c3` |
 
 - `hdfc-synthetic.pdf` — three pages, user password `synthetic-user-4321`. A
@@ -59,7 +61,17 @@ HDFC profiles were calibrated on, which is already public in
   `pdftotext -bbox` reports 72 words, as for page 1 of `hdfc-synthetic.pdf`
   (measured 2026-10-07).
 
-**Limits.** None of these four was made by a scanner or a printer driver: they
+- `scan-with-hidden-ocr-text.pdf` — the scan image under the HDFC page 1 lines in
+  text render mode 3 (invisible), the shape of a scanner app's OCR layer.
+  `pdftotext -bbox` reports 72 words (it reads invisible text; the reader
+  drops it, which is a divergence from poppler on invisible text, measured
+  2026-10-07: PDFium reports these characters with render mode Invisible).
+- `hdfc-with-hidden-line.pdf` — the HDFC page 1 lines as real text plus two
+  invisible lines with digits in the margin (render modes 3 and 7).
+  `pdftotext -bbox` reports 78 words (72 plus the hidden lines' 6); the reader
+  returns the 72.
+
+**Limits.** None of these six was made by a scanner or a printer driver: they
 are shaped like what those tools write, not captured from them.
 
 Encryption is RC4 128-bit (standard security handler revision 3);

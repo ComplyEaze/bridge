@@ -108,11 +108,15 @@ def pdf_string(text):
     return "(" + text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)") + ")"
 
 
-def content(height, lines):
+def content(height, lines, render_mode=None):
     """`lines` are (top, [(x, text), ...]) in the top-left coordinates
     `pdftotext -bbox-layout` reports. The baseline sits below the top by
-    Courier's ascent (629/1000 em)."""
+    Courier's ascent (629/1000 em). `render_mode` is the PDF text render mode
+    (3 is invisible); it is written only when given, so the other fixtures'
+    bytes do not change."""
     ops = [f"BT /F1 {FONT_SIZE:g} Tf"]
+    if render_mode is not None:
+        ops.append(f"{render_mode} Tr")
     for top, cells in lines:
         baseline = height - top - 0.629 * FONT_SIZE
         for x, text in cells:
@@ -408,6 +412,16 @@ SCAN_STAMP = (
 )
 
 
+# Lines a producer may hide in a statement, in the margin: invisible (render
+# mode 3) and invisible-and-added-to-the-clip (mode 7).
+HIDDEN_LINE = (
+    (30, [(28, "TRACKING 000000000000 NOT-A-ROW")]),
+)
+CLIPPED_LINE = (
+    (42, [(28, "CLIPPED 111111111111 NOT-A-ROW")]),
+)
+
+
 FIXTURES = {
     # opened with the user password
     "hdfc-synthetic.pdf": dict(
@@ -443,6 +457,21 @@ FIXTURES = {
                      image=True)],
         width=638, height=842,
         user="synthetic-user-4321", owner="synthetic-owner-unused-f", seed="stamp"),
+    # The scan with an OCR layer over it: the HDFC page 1 lines in text render
+    # mode 3 (invisible), as a scanner app lays them
+    "scan-with-hidden-ocr-text.pdf": dict(
+        pages=[Drawn(full_page_image(638, 842) + "\n"
+                     + content(842, HDFC_PAGE_1, render_mode=3).decode("latin-1"),
+                     image=True)],
+        width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-h", seed="ocr"),
+    # A genuine text page that also carries two invisible lines with digits
+    "hdfc-with-hidden-line.pdf": dict(
+        pages=[Drawn(content(842, HDFC_PAGE_1).decode("latin-1") + "\n"
+                     + content(842, HIDDEN_LINE, render_mode=3).decode("latin-1") + "\n"
+                     + content(842, CLIPPED_LINE, render_mode=7).decode("latin-1"))],
+        width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-i", seed="hiddenline"),
     # Real text, with a logo image and a light path watermark: must still read
     "hdfc-logo-and-watermark.pdf": dict(
         pages=[Drawn("q 40 0 0 40 20 770 cm /Im1 Do Q\n"

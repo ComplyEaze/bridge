@@ -608,7 +608,7 @@ impl Server {
         Ok(ToolOutcome {
             payload: json!({"result": {"schema": schema, "rules": [
                 "bridge_txn_id is client-supplied, unique within this batch, 1-64 ASCII characters from [A-Za-z0-9_-]",
-                "new files accept Journal, Payment, Receipt, Contra and Sales, the voucher types with recorded live import/readback evidence",
+                "new files accept Journal, Payment, Receipt and Contra, the voucher types with recorded live import/readback evidence, and Sales, whose invoice shape rests on reads of hand-keyed invoices and on hand imports and has not yet been posted and read back by ComplyEaze Bridge",
                 "a Sales voucher is one GST invoice per build: voucher_number is the invoice number (required), `invoice` names the voucher type by its display name and the place of supply (the company's state), and the entries are one debit to a Sundry Debtors customer, one credit to a Sales Accounts ledger, and one CGST and one state-tax credit of equal amount at a slab rate, with an optional round off under 1.00; the customer is registered with a valid GSTIN in force or unregistered; the voucher type's series must be Manual; a New Ref is written only when the customer is bill-wise; IGST, cess, items, credit notes, new ledgers, a reference and amendments are refused",
                 "a Journal takes any balanced set of entries and may carry a voucher_number",
                 "Payment, Receipt and Contra take two or more entries with at least one debit and one credit, no ledger on both sides (for more than two entries, one three-entry Receipt built by ComplyEaze Bridge has been imported over the gateway and verified; no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu), and neither voucher_number nor reference: neither element's fate on these types has been observed, and the bank's own reference belongs in the narration, which survives",
@@ -619,7 +619,7 @@ impl Server {
                 "dates must be within the selected company's BOOKSFROM through today",
                 "ledger names must exactly match the live catalogue; validate_masters before build_import_xml",
                 "a batch may contain at most 100 distinct ledger names of at most 1024 characters each"
-            ], "limits": {"import_mode_qualification": "New files require freshly observed supported TallyPrime product and licence mode before and after the build reads. Release and licence tier are reported as observed facts. Journal, Payment, Receipt, Contra and Sales are the voucher types with recorded import/readback evidence, each only in the exact file shape this schema admits (a Sales invoice rests on 38 hand-imported invoices and 39 hand-keyed ones read back from one client book, not yet on a Bridge-posted one), except that a Payment, Receipt or Contra with more than two entries (bridge#466) rests on narrower evidence: hand-built files of that shape were imported and read back over the gateway (a Contra only with a repeated ledger) and one three-entry Receipt built by ComplyEaze Bridge was imported over the gateway and verified, but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu, and its build reports live_evidence hand_built_gateway_readback; every other voucher type is refused. A single-voucher batch is eligible for post_import (and, when BRIDGE_AGENT_ENABLE_BATCH_POST is on, a batch of 2 to 50 such vouchers): an unnumbered Journal, or a Payment, Receipt or Contra, whose legs post_import classifies again before approval and after approval inside the endpoint queue, before the final duplicate check and the post."}}}),
+            ], "limits": {"import_mode_qualification": "New files require freshly observed supported TallyPrime product and licence mode before and after the build reads. Release and licence tier are reported as observed facts. Journal, Payment, Receipt and Contra are the voucher types with recorded import/readback evidence, each only in the exact file shape this schema admits, and a Sales invoice is admitted on the weaker evidence of 38 hand-imported invoices and 39 hand-keyed ones read back from client books, with none yet posted and read back by ComplyEaze Bridge (its build reports live_evidence hand_keyed_reads_and_hand_imports_not_bridge_posted), except that a Payment, Receipt or Contra with more than two entries (bridge#466) rests on narrower evidence: hand-built files of that shape were imported and read back over the gateway (a Contra only with a repeated ledger) and one three-entry Receipt built by ComplyEaze Bridge was imported over the gateway and verified, but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu, and its build reports live_evidence hand_built_gateway_readback; every other voucher type is refused. A single-voucher batch is eligible for post_import (and, when BRIDGE_AGENT_ENABLE_BATCH_POST is on, a batch of 2 to 50 such vouchers): an unnumbered Journal, or a Payment, Receipt or Contra, whose legs post_import classifies again before approval and after approval inside the endpoint queue, before the final duplicate check and the post, or a numbered Sales invoice, whose masters post_import reads again before the dialog and again after it is answered, before the approval is spent (not inside the queue's lock)."}}}),
             evidence: local_evidence("voucher_schema"),
             company_guid: None,
             truncated: false,
@@ -818,7 +818,7 @@ impl Server {
             // the voucher. A journal-only or bank batch never takes this path.
             if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice()) {
                 match self
-                    .admit_sales_invoice(&identity, &company.name, &mut payload.vouchers[0], &ledger_masters)
+                    .admit_sales_invoice(&identity, &company, &mut payload.vouchers[0], &ledger_masters)
                     .await
                 {
                     Ok(evidence) => {
@@ -1205,6 +1205,7 @@ impl Server {
                 line.vouchers.iter().any(|voucher| {
                     voucher.voucher_type.bank_shape().is_some() && voucher.entries.len() > 2
                 }),
+                line.vouchers.iter().any(|voucher| invoice::new_ref_party(voucher).is_some()),
             );
             let next_step = match &amendment {
                 Some(_) => {
@@ -1528,14 +1529,23 @@ impl Server {
                     })
                     .cloned();
                 if let Some(matched) = matched {
-                    let (mut differences, alter_id, evidence) = self
+                    let (mut differences, alter_id, guid, evidence) = self
                         .read_back_sales_invoice(&identity, &company.name, invoice_voucher)
                         .await?;
                     accumulated = combine_evidence(accumulated.clone(), evidence);
                     // The voucher found by type and number must be the one the
-                    // standard readback attributed to this batch.
-                    if let (Some(read), Some(matched)) = (alter_id.as_deref(), matched["alter_id"].as_u64()) {
-                        if read.trim().parse::<u64>().ok() != Some(matched) {
+                    // standard readback attributed to this batch: its GUID and
+                    // its AlterID must both come back and both agree. A value
+                    // that did not come back is a difference, never a pass.
+                    if differences.is_empty() {
+                        if guid.as_deref().map(str::to_ascii_lowercase)
+                            != matched["guid"].as_str().map(str::to_ascii_lowercase)
+                        {
+                            differences.push("guid".to_string());
+                        }
+                        if alter_id.as_deref().and_then(|read| read.trim().parse::<u64>().ok())
+                            != matched["alter_id"].as_u64()
+                        {
                             differences.push("alter_id".to_string());
                         }
                     }
@@ -2485,6 +2495,7 @@ fn approval_invalid(error: bill_wise::ApprovalError) -> ToolFailure {
 
 const BILL_WISE_UNAPPROVED_NEXT_STEP: &str = "No file was written. Each party listed is a ledger that keeps bills in Tally. An entry on it with no bill allocation lands On Account, and the person must then match it to a bill in Tally by hand. Show the person each party with its row_count, its debit_total and credit_total, and the rows listed, and say how many more rows there are (rows_omitted, refused_parties_omitted); raise BRIDGE_AGENT_MAX_BYTES to list them all. Ask whether each party's entries may be posted On Account, one party per question. Only for the parties the person says yes to, build again with on_account_approvals: a list with one {party_digest} for each, the digest copied from this answer (a ledger copied beside it is not read, so a masked name does no harm). The digest ties the approval to this exact batch, this company and this endpoint, and changing any row changes every party's digest, so the person is asked again. It does not prove that a person said yes, and a hand import of the file is not checked at all: never approve on the person's behalf. The native approval dialog lists each voucher of a small batch but does not mark which entries land On Account. If this batch amends an earlier one, importing it also replaces any bill allocations the person made in Tally.";
 
+const INVOICE_NEW_REF_NOTE: &str = "The customer on this invoice is a bill-wise ledger, as read from Tally's ledger list during this build: its entry is written with a New Ref named by the invoice number, so it does not land On Account, and verify_import reads the allocation back. Every other ledger this batch names is not bill-wise. ComplyEaze Bridge reads the invoice's masters again before the approval dialog and again before the approval is spent, and refuses the post if any changed. A hand import of the file is not checked at all.";
 const BILL_WISE_NONE_NOTE: &str = "Checked: none of the ledgers this batch names is a bill-wise ledger, as read from Tally in the ledger list during this build. ComplyEaze Bridge reads the ledger list again before posting and refuses the post (import_bill_wise_changed) if a named ledger has become bill-wise since. This reads each ledger's own bill-wise setting, not the company's bill-wise feature. A hand import of the file is not checked at all.";
 
 const BILL_WISE_APPROVED_NOTE: &str = "Entries on the bill-wise ledgers listed in on_account_approved carry no bill allocation, so each amount lands On Account and must be matched to bills in Tally afterwards. Each has an approval digest that matches this batch; ComplyEaze Bridge cannot tell whether a person said yes, and the native approval dialog lists each voucher of a small batch but does not mark which entries land On Account. Any other ledger this batch names that has become bill-wise by the time of posting is refused (import_bill_wise_changed).";
@@ -2525,6 +2536,7 @@ fn build_import_guidance(
     bank_types: bool,
     on_account_approved: bool,
     multi_entry_bank: bool,
+    new_ref_invoice: bool,
 ) -> (Value, &'static str) {
     let preflight_warning =
         "The preflight observes the current verification window. The import or subsequent changes can make later readback exceed the source limits.";
@@ -2566,6 +2578,8 @@ fn build_import_guidance(
     );
     let allocation_warning = if on_account_approved {
         BILL_WISE_APPROVED_NOTE
+    } else if new_ref_invoice {
+        INVOICE_NEW_REF_NOTE
     } else {
         BILL_WISE_NONE_NOTE
     };
@@ -2626,7 +2640,7 @@ fn live_evidence(vouchers: &[ImportVoucher]) -> Vec<Value> {
     for voucher in vouchers {
         let source = match voucher.voucher_type.bank_shape() {
             None if voucher.voucher_type.is_invoice() => (
-                "client_book_hand_import_readback",
+                "hand_keyed_reads_and_hand_imports_not_bridge_posted",
                 "docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md",
             ),
             None => (

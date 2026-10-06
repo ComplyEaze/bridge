@@ -356,16 +356,14 @@ pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
     ReadRequest(agent_import::invoice::render_voucher_types_request(company))
 }
 
-/// The vouchers of one type (by GUID) carrying one invoice number in one
-/// financial year, for the duplicate-number check.
+/// The Sales vouchers of any Sales-class type carrying one invoice number in
+/// one financial year, for the duplicate-number check.
 pub(super) fn invoice_number_read(
     company: &str,
-    type_guid: &str,
     number: &str,
     window: (&str, &str),
 ) -> Option<ReadRequest> {
-    agent_import::invoice::render_invoice_number_request(company, type_guid, number, window)
-        .map(ReadRequest)
+    agent_import::invoice::render_invoice_number_request(company, number, window).map(ReadRequest)
 }
 
 /// A posted invoice read back by type and number, every field the build wrote.

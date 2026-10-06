@@ -246,6 +246,12 @@ fn paise(amount: &str) -> Option<i128> {
     whole.checked_mul(100)?.checked_add(fraction)
 }
 
+/// The largest company master mark (an upper bound on its ledgers) a v0
+/// invoice is built or posted on. Each invoice reads the whole compliance
+/// listing three times; above this the read is refused rather than risk a
+/// large book's gateway. A client sample book on the lab sits at 1,604.
+const INVOICE_MAX_MASTER_MARK: u64 = 5_000;
+
 /// The GST slab rates an invoice's tax may be, in percent.
 const SLAB_RATES: &[i128] = &[5, 12, 18, 28, 40];
 
@@ -253,15 +259,17 @@ const SLAB_RATES: &[i128] = &[5, 12, 18, 28, 40];
 /// paise of per-line rounding on a multi-line bill, never a rupee.
 const TAX_LEG_TOLERANCE_PAISE: i128 = 5;
 
-/// The alphabet of an invoice number: letters, digits, space, slash, hyphen,
-/// period and underscore, 1 to 32 characters, not blank, no edge space.
+/// The alphabet of an invoice number, as GST rule 46(b) allows it: at most 16
+/// characters, letters and digits and the two characters hyphen and slash. A
+/// number outside it is rejected by the GSTR-1 upload, so it is refused here,
+/// and it is also a closed alphabet for the TDL literal the duplicate check
+/// puts it in.
 pub(super) fn invoice_number_safe(number: &str) -> bool {
     !number.is_empty()
-        && number.chars().count() <= 32
-        && number == number.trim()
+        && number.chars().count() <= 16
         && number
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '/' | '-' | '.' | '_'))
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '-'))
 }
 
 /// What Tally returned is the build's to record, never the caller's: refused
@@ -477,15 +485,24 @@ pub(super) fn classify_sales_invoice(
     if cgst_amount != state_amount {
         return Err(vec![refuse("invoice_cgst_and_state_tax_differ", "")]);
     }
-    let tax = cgst_amount + state_amount;
+    let Some(base) = taxable
+        .checked_add(cgst_amount)
+        .and_then(|sum| sum.checked_add(state_amount))
+    else {
+        return Err(vec![refuse("invoice_amount_invalid", "")]);
+    };
     // Each leg is half the tax at one slab rate, to within a few paise: a
-    // 10.00 sale carrying 0.02 of tax is not 5 percent.
+    // 10.00 sale carrying 0.02 of tax is not 5 percent. Checked arithmetic: an
+    // amount too large to multiply matches no rate.
     if !SLAB_RATES.iter().any(|rate| {
-        (cgst_amount * 200 - taxable * rate).abs() <= TAX_LEG_TOLERANCE_PAISE * 200
+        cgst_amount
+            .checked_mul(200)
+            .zip(taxable.checked_mul(*rate))
+            .and_then(|(left, right)| left.checked_sub(right))
+            .is_some_and(|difference| difference.abs() <= TAX_LEG_TOLERANCE_PAISE * 200)
     }) {
         return Err(vec![refuse("invoice_tax_matches_no_slab_rate", "")]);
     }
-    let base = taxable + tax;
     let round = match round_off {
         None => 0,
         Some(index) => {
@@ -502,7 +519,7 @@ pub(super) fn classify_sales_invoice(
     if round.abs() >= 100 {
         return Err(vec![refuse("invoice_round_off_too_large", "")]);
     }
-    if party_amount != base + round {
+    if base.checked_add(round) != Some(party_amount) {
         return Err(vec![refuse("invoice_party_amount_does_not_close", "")]);
     }
     Ok(InvoiceRoles {
@@ -544,25 +561,77 @@ impl super::super::Server {
     pub(super) async fn recheck_sales_invoice(
         &self,
         identity: &super::super::VerifiedCompanyIdentity,
-        company_name: &str,
+        company: &bridge_tally_protocol::TallyCompany,
         saved: &ImportVoucher,
         catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
     ) -> Result<super::super::Evidence, super::super::ToolFailure> {
         let mut fresh = saved.clone();
         let recorded = fresh.invoice.as_mut().and_then(|detail| detail.observed.take());
         let changed = || super::super::ToolFailure::from("import_invoice_masters_changed".to_string());
-        let evidence = match self.admit_sales_invoice(identity, company_name, &mut fresh, catalogue).await {
+        let evidence = match self.admit_sales_invoice(identity, company, &mut fresh, catalogue).await {
             Ok(evidence) => evidence,
             Err(InvoiceAdmission::Failed(failure)) => return Err(failure),
-            // The refusal names the master that moved; the post says only that
-            // something did, so the code points at a rebuild, not at a guess.
-            Err(InvoiceAdmission::Refused(_)) => return Err(changed()),
+            // The refusal's own code is the answer: a number now in use is not
+            // "a master changed", and a rebuild would only be refused again.
+            Err(InvoiceAdmission::Refused(refusals)) => {
+                return Err(match refusals.first() {
+                    Some(first) => super::super::ToolFailure::from(first.code.to_string()),
+                    None => changed(),
+                });
+            }
         };
         let now = fresh.invoice.as_ref().and_then(|detail| detail.observed.clone());
         if recorded.is_none() || now != recorded {
             return Err(changed());
         }
         Ok(evidence)
+    }
+}
+
+/// Every field of an invoice's detail, one length-prefixed value each, for the
+/// approval digest: written out field by field, never serde output, so a
+/// serializer change cannot move a digest and a new field cannot be left out
+/// (the destructurings are exhaustive).
+pub(super) fn encode_detail(field: &mut dyn FnMut(&[u8]), detail: &InvoiceDetail) {
+    let InvoiceDetail {
+        voucher_type_name,
+        place_of_supply,
+        round_off_ledger,
+        observed,
+    } = detail;
+    field(voucher_type_name.as_bytes());
+    field(place_of_supply.as_bytes());
+    match round_off_ledger {
+        Some(ledger) => {
+            field(b"1");
+            field(ledger.as_bytes());
+        }
+        None => field(b"0"),
+    }
+    match observed {
+        None => field(b"0"),
+        Some(InvoiceObserved {
+            voucher_type_guid,
+            party_gstin,
+            party_state,
+            party_registration_type,
+            party_bill_wise,
+            company_state,
+        }) => {
+            field(b"1");
+            field(voucher_type_guid.as_bytes());
+            match party_gstin {
+                Some(gstin) => {
+                    field(b"1");
+                    field(gstin.as_bytes());
+                }
+                None => field(b"0"),
+            }
+            field(party_state.as_bytes());
+            field(party_registration_type.as_bytes());
+            field(if *party_bill_wise { b"1" } else { b"0" });
+            field(company_state.as_bytes());
+        }
     }
 }
 
@@ -682,9 +751,9 @@ impl super::super::Server {
         identity: &super::super::VerifiedCompanyIdentity,
         company_name: &str,
         voucher: &ImportVoucher,
-    ) -> Result<(Vec<String>, Option<String>, super::super::Evidence), super::super::ToolFailure> {
+    ) -> Result<(Vec<String>, Option<String>, Option<String>, super::super::Evidence), super::super::ToolFailure> {
         let Some(observed) = voucher.invoice.as_ref().and_then(|detail| detail.observed.as_ref()) else {
-            return Ok((vec!["invoice_not_observed".to_string()], None, super::local_evidence("invoice_readback")));
+            return Ok((vec!["invoice_not_observed".to_string()], None, None, super::local_evidence("invoice_readback")));
         };
         let number = voucher.voucher_number.clone().unwrap_or_default();
         let date = super::super::normalized_date(&voucher.date)
@@ -700,14 +769,24 @@ impl super::super::Server {
             (&year.0, &year.1),
         )
         .ok_or_else(|| super::super::ToolFailure::from("invoice_number_invalid".to_string()))?;
-        let (xml, evidence) = self.post_read(identity, request).await?;
-        let read = wire::parse_invoice_readback(&xml)
-            .map_err(|code| super::super::ToolFailure::from(code.to_string()))?;
-        Ok(match read {
-            None => (vec!["invoice_not_found".to_string()], None, evidence),
-            Some(read) => {
+        // A failed or unreadable invoice read after a real post is a difference
+        // the caller can reconcile, never an error that hides the post's own
+        // verification.
+        let Ok((xml, evidence)) = self.post_read(identity, request).await else {
+            return Ok((vec!["invoice_readback_failed".to_string()], None, None, super::local_evidence("invoice_readback")));
+        };
+        Ok(match wire::parse_invoice_readback(&xml) {
+            // Two vouchers of this type and number: the number is not unique,
+            // which a post must surface, never hide behind a generic error.
+            Err("invoice_readback_several_vouchers") => {
+                (vec!["invoice_number_not_unique".to_string()], None, None, evidence)
+            }
+            Err(_) => (vec!["invoice_readback_unreadable".to_string()], None, None, evidence),
+            Ok(None) => (vec!["invoice_not_found".to_string()], None, None, evidence),
+            Ok(Some(read)) => {
                 let alter_id = read.fields.get("ALTERID").cloned();
-                (invoice_readback_differences(voucher, &read, &date), alter_id, evidence)
+                let guid = read.fields.get("GUID").cloned();
+                (invoice_readback_differences(voucher, &read, &date), alter_id, guid, evidence)
             }
         })
     }
@@ -715,7 +794,7 @@ impl super::super::Server {
 
 /// A ledger's bill-wise flag as the V2 ledger catalogue read it: `None` when
 /// the catalogue holds the name zero times or more than once.
-fn party_bill_wise_in(
+pub(super) fn party_bill_wise_in(
     catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
     ledger: &str,
 ) -> Option<bool> {
@@ -778,10 +857,11 @@ impl super::super::Server {
     pub(super) async fn admit_sales_invoice(
         &self,
         identity: &super::super::VerifiedCompanyIdentity,
-        company_name: &str,
+        company: &bridge_tally_protocol::TallyCompany,
         voucher: &mut ImportVoucher,
         catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
     ) -> Result<super::super::Evidence, InvoiceAdmission> {
+        let company_name = company.name.as_str();
         let Some(detail) = voucher.invoice.as_ref() else {
             return Err(refused("invoice_detail_required", ""));
         };
@@ -798,6 +878,24 @@ impl super::super::Server {
             .map(|entry| entry.ledger.clone())
             .ok_or_else(|| refused("invoice_party_missing", ""))?;
 
+        // 0. The whole ledger compliance listing is read three times for one
+        // invoice (build, before the dialog, after it): refuse a book whose
+        // master mark says it may be large. On 24 Sep 2026 the same read on a
+        // book of about 9,400 ledgers returned 35 MB in 44 s and left a lab
+        // gateway answering with empty replies. The mark is an upper bound on
+        // the ledger count (section 8 of the ledger-count note), cheap to read.
+        let (mark, mark_evidence) = self
+            .pre_import_mark(company, identity)
+            .await
+            .map_err(InvoiceAdmission::Failed)?;
+        match mark.master_value {
+            Some(value) if value <= INVOICE_MAX_MASTER_MARK => {}
+            Some(value) => {
+                return Err(refused("invoice_book_too_large", format!("master mark {value}")));
+            }
+            None => return Err(refused("invoice_book_size_unknown", "")),
+        }
+
         // 1. The compliance listing.
         let today = bridge_tally_core::TallyDate::parse(super::super::tally_host_today())
             .map_err(|_| failed("current_date_invalid"))?;
@@ -808,7 +906,10 @@ impl super::super::Server {
             .map_err(|error| {
                 super::super::ToolFailure::from_runtime("party_ledger_master_read_failed", error)
             })?;
-        let mut evidence = super::super::evidence_from_runtime_read(listing.evidence.clone());
+        let mut evidence = super::super::combine_evidence(
+            mark_evidence,
+            super::super::evidence_from_runtime_read(listing.evidence.clone()),
+        );
         let index = bridge_tally_protocol::group_ancestry::GroupIndex::build(listing.groups.clone());
         let mut facts = BTreeMap::new();
         for entry in &voucher.entries {
@@ -879,7 +980,6 @@ impl super::super::Server {
             .ok_or_else(|| failed("invoice_date_invalid"))?;
         let request = super::super::invoice_number_read(
             company_name,
-            &resolved.guid,
             &number,
             (&year.0, &year.1),
         )

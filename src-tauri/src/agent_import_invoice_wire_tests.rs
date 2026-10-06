@@ -102,17 +102,29 @@ fn an_answer_that_is_not_tallys_success_is_never_read_as_no_rows() {
 }
 
 #[test]
-fn the_number_read_carries_only_closed_alphabet_literals_and_the_financial_year() {
-    let guid = "9da2ed7d-dc75-413d-9260-29deeef6eb8c-00000193";
-    let request = render_invoice_number_request("Co", guid, "000 - 461", ("20250401", "20260331")).unwrap();
-    assert!(request.contains("$VoucherNumber = \"000 - 461\" AND $GUID:VoucherType:$VoucherTypeName = \""));
+fn the_number_read_is_class_wide_dated_and_carries_only_closed_alphabet_literals() {
+    let request = render_invoice_number_request("Co", "INV/26-27/0042", ("20250401", "20260331")).unwrap();
+    assert!(request.contains("$VoucherNumber = \"INV/26-27/0042\" AND $$IsSales:$VoucherTypeName"));
+    // SVFROMDATE and SVTODATE do not limit a collection: the window is a formula too.
+    assert!(request.contains("$Date &gt;= $$Date:\"20250401\" AND $Date &lt;= $$Date:\"20260331\""));
     assert!(request.contains("<SVFROMDATE TYPE=\"Date\">20250401</SVFROMDATE><SVTODATE TYPE=\"Date\">20260331</SVTODATE>"));
     assert!(request.contains("<TYPE>Voucher</TYPE>") && !request.contains("IMPORTDATA"));
-    for bad_number in ["A\"B", "A\\B", "", " A", "A$B", "x OR y; \"", "\u{e9}"] {
-        assert!(render_invoice_number_request("Co", guid, bad_number, ("20250401", "20260331")).is_none(), "{bad_number:?}");
+    // GST rule 46(b): 16 characters, letters, digits, hyphen, slash.
+    for bad_number in ["A\"B", "A\\B", "", " A", "A B", "A_B", "A.B", "A$B", "x OR y; \"", "\u{e9}", "12345678901234567"] {
+        assert!(render_invoice_number_request("Co", bad_number, ("20250401", "20260331")).is_none(), "{bad_number:?}");
     }
-    assert!(render_invoice_number_request("Co", "g\"", "1", ("20250401", "20260331")).is_none());
-    assert!(render_invoice_number_request("Co", guid, "1", ("2025-04-01", "20260331")).is_none());
+    assert!(render_invoice_number_request("Co", "1234567890123456", ("20250401", "20260331")).is_some());
+    assert!(render_invoice_number_request("Co", "1", ("2025-04-01", "20260331")).is_none());
+}
+
+#[test]
+fn the_readback_read_is_dated_and_by_type_guid_and_number() {
+    let guid = "9da2ed7d-dc75-413d-9260-29deeef6eb8c-00000193";
+    let request = render_invoice_readback_request("Co", guid, "278", ("20250401", "20260331")).unwrap();
+    assert!(request.contains("$Date &gt;= $$Date:\"20250401\" AND $Date &lt;= $$Date:\"20260331\" AND $VoucherNumber = \"278\" AND $GUID:VoucherType:$VoucherTypeName = \""));
+    assert!(request.contains("ALLLEDGERENTRIES.*"));
+    assert!(render_invoice_readback_request("Co", "g\"", "278", ("20250401", "20260331")).is_none());
+    assert!(render_invoice_readback_request("Co", guid, "A B", ("20250401", "20260331")).is_none());
 }
 
 #[test]

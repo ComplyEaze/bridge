@@ -234,7 +234,7 @@ pub(super) fn batch_content_digest(vouchers: &[ImportVoucher]) -> [u8; 32] {
         // every other voucher is the bytes it always was.
         if let Some(detail) = invoice {
             encoder.field(b"invoice");
-            encoder.field(serde_json::to_string(detail).unwrap_or_default().as_bytes());
+            super::invoice::encode_detail(&mut |bytes| encoder.field(bytes), detail);
         }
         encoder.count(entries.len());
         for entry in entries {

@@ -841,7 +841,7 @@ impl Server {
                 let evidence = self
                     .recheck_sales_invoice(
                         &identity,
-                        &company.name,
+                        &company,
                         &line.vouchers[0],
                         &catalogue_identities,
                     )
@@ -991,12 +991,20 @@ impl Server {
                     // The dialog may have stayed open: an invoice's masters are
                     // read once more before the approval is spent.
                     if line.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice()) {
+                        // The catalogue read before the dialog is as old as the
+                        // dialog: read it again, so the party's bill-wise flag
+                        // is read after the answer too.
+                        let (_, fresh_catalogue, _, catalogue_read) = self
+                            .read_import_ledger_catalogue(&identity, &company.name)
+                            .await
+                            .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
+                        accumulated = combine_evidence(accumulated.clone(), catalogue_read);
                         let evidence = self
                             .recheck_sales_invoice(
                                 &identity,
-                                &company.name,
+                                &company,
                                 &line.vouchers[0],
-                                &catalogue_identities,
+                                &fresh_catalogue,
                             )
                             .await
                             .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
@@ -2007,11 +2015,26 @@ fn recheck_import_admission(
     // Account unseen: only the ledgers the person approved may be bill-wise
     // now. The same catalogue read carries the flags (#1234).
     let approved = line.on_account_approved.as_deref().unwrap_or_default();
-    if !super::bill_wise::flags_still_as_approved(
-        &catalogue,
-        &named.iter().map(String::as_str).collect(),
-        approved,
-    ) {
+    // An invoice's New Ref party is not judged by the On Account approval (its
+    // entry carries an allocation), but it must still be bill-wise: a ledger
+    // switched off since the build would have Tally drop the New Ref unseen.
+    let bill_named = line
+        .vouchers
+        .iter()
+        .flat_map(|voucher| {
+            let allocated = super::invoice::new_ref_party(voucher);
+            voucher
+                .entries
+                .iter()
+                .filter(move |entry| Some(entry.ledger.as_str()) != allocated)
+        })
+        .map(|entry| entry.ledger.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    if !super::bill_wise::flags_still_as_approved(&catalogue, &bill_named, approved)
+        || line.vouchers.iter().filter_map(super::invoice::new_ref_party).any(|party| {
+            super::invoice::party_bill_wise_in(&catalogue, party) != Some(true)
+        })
+    {
         return Err(ApprovedImportAdmissionError::BillWiseChanged.into());
     }
     // The binding above compares each ledger's name and GUID, not its parent,

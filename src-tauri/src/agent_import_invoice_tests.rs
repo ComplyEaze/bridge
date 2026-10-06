@@ -111,7 +111,11 @@ fn structure_admits_the_plain_invoice_and_refuses_each_defect() {
     assert_eq!(refuse_supplied_observed(&[voucher()]), Ok(()));
     assert_eq!(mutated(&|v| v.voucher_number = Some("A\"B".into())), "invoice_number_invalid");
     assert_eq!(mutated(&|v| v.voucher_number = Some(" 278".into())), "invoice_number_invalid");
-    assert_eq!(validate_invoice_voucher(&{ let mut v = voucher(); v.voucher_number = Some("INV-2026/27 0042".into()); v }), Ok(()));
+    assert_eq!(validate_invoice_voucher(&{ let mut v = voucher(); v.voucher_number = Some("INV-26/27-0042".into()); v }), Ok(()));
+    // Outside GST rule 46(b): a space, a period, an underscore, over 16 characters.
+    for bad in ["INV 0042", "INV.0042", "INV_0042", "12345678901234567"] {
+        assert_eq!(mutated(&|v| v.voucher_number = Some(bad.into())), "invoice_number_invalid", "{bad}");
+    }
     assert_eq!(mutated(&|v| v.voucher_number = None), "invoice_number_required");
     assert_eq!(mutated(&|v| v.reference = Some("r".into())), "invoice_reference_not_for_sales");
     assert_eq!(
@@ -445,4 +449,114 @@ fn a_matched_invoice_whose_fields_differ_stops_being_posted_verified() {
     assert_eq!(result["vouchers"][0]["diffs"][0]["invoice_fields"][0], "PARTYGSTIN");
     assert_eq!(result["counts"]["posted_verified"], 0);
     assert_eq!(result["counts"]["posted_divergent"], 1);
+}
+
+#[test]
+fn a_new_ref_party_is_not_named_to_the_on_account_gate_and_every_other_leg_still_is() {
+    use crate::agent::agent_import::bill_wise::named_ledgers;
+    let payload = |bill_wise: bool| {
+        let mut v = voucher();
+        let mut seen = observed();
+        seen.party_bill_wise = bill_wise;
+        v.invoice.as_mut().unwrap().observed = Some(seen);
+        crate::agent::agent_import::ImportPayload {
+            company_guid: "g".into(),
+            vouchers: vec![v],
+            amends_batch_id: None,
+        }
+    };
+    let bill_wise = payload(true);
+    let named = named_ledgers(&bill_wise);
+    assert!(!named.contains("Customer A"), "the New Ref party carries an allocation, not On Account");
+    assert!(named.contains("Sales") && named.contains("Output CGST") && named.contains("Output SGST"));
+    // A party that is not bill-wise is named as every ledger is (the gate then finds it Off).
+    assert!(named_ledgers(&payload(false)).contains("Customer A"));
+    assert_eq!(new_ref_party(&bill_wise.vouchers[0]), Some("Customer A"));
+    assert_eq!(new_ref_party(&payload(false).vouchers[0]), None);
+    let mut journal = voucher();
+    journal.voucher_type = VoucherType::Journal;
+    journal.invoice = None;
+    assert_eq!(new_ref_party(&journal), None, "no other voucher is exempt");
+}
+
+#[test]
+fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone() {
+    use crate::agent::agent_import::bill_wise::batch_content_digest;
+    let base = observed_voucher();
+    let digest = |v: &ImportVoucher| batch_content_digest(std::slice::from_ref(v));
+    type Change = Box<dyn Fn(&mut ImportVoucher)>;
+    let mut changes: Vec<Change> = vec![
+        Box::new(|v| v.invoice.as_mut().unwrap().voucher_type_name = "Sales Acc".into()),
+        Box::new(|v| v.invoice.as_mut().unwrap().place_of_supply = "Haryana".into()),
+        Box::new(|v| v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into())),
+        Box::new(|v| v.invoice.as_mut().unwrap().observed = None),
+    ];
+    for field in 0..6 {
+        changes.push(Box::new(move |v| {
+            let seen = v.invoice.as_mut().unwrap().observed.as_mut().unwrap();
+            match field {
+                0 => seen.voucher_type_guid = "other".into(),
+                1 => seen.party_gstin = None,
+                2 => seen.party_state = "Haryana".into(),
+                3 => seen.party_registration_type = "Unregistered/Consumer".into(),
+                4 => seen.party_bill_wise = false,
+                _ => seen.company_state = "Haryana".into(),
+            }
+        }));
+    }
+    for change in &changes {
+        let mut changed = base.clone();
+        change(&mut changed);
+        assert_ne!(digest(&base), digest(&changed));
+    }
+    // A voucher with no invoice detail hashes as before this field existed.
+    let mut plain = voucher();
+    plain.voucher_type = VoucherType::Journal;
+    plain.invoice = None;
+    let again = plain.clone();
+    assert_eq!(digest(&plain), digest(&again));
+}
+
+/// A voucher as Tally's export returns it, written out by hand from the shape of a
+/// real hand-keyed invoice read back on the lab (tags, order, an empty allocation
+/// container on every leg, TYPE attributes, leading spaces in numbers), not
+/// produced by this module's renderer: the comparison is checked against Tally's
+/// own layout, not only against itself. Names and numbers are synthetic.
+#[test]
+fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
+    let xml = format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO><COMPANY>0</COMPANY></CMPINFO></DESC><DATA><COLLECTION>\
+<VOUCHER REMOTEID=\"22222222-2222-2222-2222-222222222222\" VCHKEY=\"k\" VCHTYPE=\"Sales\" OBJVIEW=\"Invoice Voucher View\">\
+<DATE TYPE=\"Date\">20260310</DATE><EFFECTIVEDATE TYPE=\"Date\">20260310</EFFECTIVEDATE><REFERENCEDATE TYPE=\"Date\">20260310</REFERENCEDATE>\
+<GUID TYPE=\"String\">g-1</GUID><PARTYGSTIN TYPE=\"String\">{GSTIN_RJ}</PARTYGSTIN><STATENAME TYPE=\"String\">Rajasthan</STATENAME>\
+<PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY><VOUCHERTYPENAME TYPE=\"String\">Sales</VOUCHERTYPENAME><PARTYLEDGERNAME TYPE=\"String\">Customer A</PARTYLEDGERNAME>\
+<VOUCHERNUMBER TYPE=\"String\">278</VOUCHERNUMBER><REFERENCE TYPE=\"String\">278</REFERENCE><GSTREGISTRATIONTYPE TYPE=\"String\">Regular</GSTREGISTRATIONTYPE>\
+<ISINVOICE>Yes</ISINVOICE><ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED><ISOPTIONAL TYPE=\"Logical\">No</ISOPTIONAL><ALTERID TYPE=\"Number\"> 77</ALTERID>\
+<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Customer A</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">Yes</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">-11200.00</AMOUNT>\
+<BILLALLOCATIONS.LIST><NAME TYPE=\"String\">278</NAME><BILLTYPE TYPE=\"String\">New Ref</BILLTYPE><AMOUNT TYPE=\"Amount\">-11200.00</AMOUNT></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
+<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
+<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">600.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
+<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">600.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
+</VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
+    );
+    let v = observed_voucher();
+    assert_eq!(differences(&v, &xml), Vec::<String>::new());
+    // An allocation whose amount did not come back is a difference, not an absence.
+    let no_amount = xml.replace("<BILLTYPE TYPE=\"String\">New Ref</BILLTYPE><AMOUNT TYPE=\"Amount\">-11200.00</AMOUNT>", "<BILLTYPE TYPE=\"String\">New Ref</BILLTYPE>");
+    assert_eq!(differences(&v, &no_amount), vec!["bill_allocation"]);
+    // A stray allocation name on a leg that should carry none shows too.
+    let stray = xml.replace("<LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST>", "<LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST><NAME TYPE=\"String\">X</NAME></BILLALLOCATIONS.LIST>");
+    assert_eq!(differences(&v, &stray), vec!["bill_allocation"]);
+}
+
+#[test]
+fn an_amount_too_large_to_multiply_matches_no_rate_instead_of_overflowing() {
+    let mut v = voucher();
+    let huge = "9".repeat(36) + ".00";
+    v.entries[0].amount = huge.clone();
+    v.entries[1].amount = huge.clone();
+    v.entries[2].amount = huge.clone();
+    v.entries[3].amount = huge;
+    let result = classify_sales_invoice(&v, &good_facts(), RAJ);
+    assert!(result.is_err(), "must refuse, not panic or wrap");
 }

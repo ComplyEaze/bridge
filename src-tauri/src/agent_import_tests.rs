@@ -2828,7 +2828,7 @@ fn refusal_reason_states_the_current_voucher_limit() {
     assert!(too_large.contains("(50)"), "{too_large}");
     // An unlisted code keeps its own name in the warning and a neutral reason.
     let (warnings, _) =
-        build_import_guidance(true, Some("import_something_new"), 1, false, false, false);
+        build_import_guidance(true, Some("import_something_new"), 1, false, false, false, false);
     assert!(warnings[0]
         .as_str()
         .unwrap()

@@ -12,7 +12,8 @@
 //! NUMBERINGMETHOD and, inside `VOUCHERNUMBERSERIES.LIST`, the series-level
 //! one that decides what an import's supplied number does. A `Ledger` row
 //! returns `ISBILLWISEON` as Yes or No. The company-state read is NOT yet
-//! measured and is refused until it has been.
+//! measured: until a lab read shows its answer, an answer that does not carry a
+//! known state name fails the build (`invoice_company_state_unreadable`).
 
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use quick_xml::events::Event;
@@ -306,24 +307,27 @@ pub(super) fn guid_literal_safe(guid: &str) -> bool {
         && guid.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
 }
 
-/// Whether a voucher of the type (by its GUID) already carries this number in
-/// the financial year the invoice falls in. Both literals have closed
-/// alphabets (hex and hyphen; the invoice-number alphabet). The window is the
-/// whole financial year because a number is unique within a type and a year.
+/// Whether any Sales voucher, of whatever Sales-class type, already carries
+/// this number in the financial year: GST requires an invoice number to be
+/// unique within the year across every series, and a book can hold several
+/// Sales types. The class is `$$IsSales:$VoucherTypeName`, measured as a
+/// per-row compute for the vouchers read (bridge#625). SVFROMDATE and SVTODATE
+/// do not limit which vouchers a collection returns (IMPLEMENTATION_GUIDE), so
+/// the window is also a `$Date` formula on literal dates. NOT YET MEASURED as a
+/// filter: the rehearsal must run it against a known existing invoice and see
+/// one row before a zero is believed.
 pub(in crate::agent) fn render_invoice_number_request(
     company: &str,
-    type_guid: &str,
     number: &str,
     (from, to): (&str, &str),
 ) -> Option<String> {
-    if !guid_literal_safe(type_guid)
-        || !super::invoice_number_safe(number)
+    if !super::invoice_number_safe(number)
         || ![from, to].iter().all(|date| date.len() == 8 && date.bytes().all(|b| b.is_ascii_digit()))
     {
         return None;
     }
     Some(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED</FETCH><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $$IsSales:$VoucherTypeName</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED</FETCH><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
     ))
 }
@@ -347,7 +351,7 @@ pub(in crate::agent) fn render_invoice_readback_request(
         return None;
     }
     Some(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
     ))
 }
@@ -393,12 +397,18 @@ pub(super) fn parse_invoice_readback(xml: &str) -> Result<Option<ReadInvoice>, &
         let names = entry.all("BILLALLOCATIONS.LIST/NAME").map(str::to_string).collect::<Vec<_>>();
         let kinds = entry.all("BILLALLOCATIONS.LIST/BILLTYPE").map(str::to_string).collect::<Vec<_>>();
         let amounts = entry.all("BILLALLOCATIONS.LIST/AMOUNT").map(str::to_string).collect::<Vec<_>>();
-        // An allocation is read only when its amount is: a name or type with
-        // no amount beside it is not a readable allocation.
-        let allocations = amounts
-            .iter()
-            .enumerate()
-            .map(|(index, amount)| (names.get(index).cloned(), kinds.get(index).cloned(), amount.clone()))
+        // One allocation per index of the longest of the three lists: a name or a
+        // type with no amount beside it is a (blank-amount) allocation, which
+        // never equals what was written, instead of being dropped from view.
+        let count = names.len().max(kinds.len()).max(amounts.len());
+        let allocations = (0..count)
+            .map(|index| {
+                (
+                    names.get(index).cloned(),
+                    kinds.get(index).cloned(),
+                    amounts.get(index).cloned().unwrap_or_default(),
+                )
+            })
             .collect();
         legs.push(ReadLeg {
             ledger: entry.one("LEDGERNAME")?.ok_or("invoice_readback_leg_unnamed")?.to_string(),

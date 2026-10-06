@@ -1003,6 +1003,7 @@ fn three_a_read() -> WindowReadLimits {
         budget_bytes: budget,
         default_bytes_per_voucher: budget,
         max_reads: MAX_PLANNED_READS,
+        small_books: SmallBooks::Skip,
     }
 }
 
@@ -1202,6 +1203,7 @@ async fn a_single_voucher_over_budget_is_refused_before_any_read() {
                 budget_bytes: 1000,
                 default_bytes_per_voucher: 1001,
                 max_reads: MAX_PLANNED_READS,
+                small_books: SmallBooks::Skip,
             },
             |xml| parse_agent_rows(xml, GUID),
         )
@@ -1327,6 +1329,84 @@ async fn a_book_whose_mark_fits_one_census_is_counted_in_one_date_census() {
             .unwrap(),
         ],
     );
+}
+
+/// #1029: a book whose mark alone shows it fits one request is counted only by
+/// a read that asks for it. The limits a tool is given decide, so the posting
+/// read-back and the movement read, which do not ask, send the one request
+/// they always did.
+#[tokio::test]
+async fn a_small_book_is_counted_only_when_the_read_asks_for_it() {
+    let skipping = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+    assert_eq!(skipping.small_books, SmallBooks::Skip);
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(three_vouchers())),
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(3)),
+        },
+        skipping,
+    )
+    .await;
+    assert!(!outcome.unwrap().counted());
+    assert_eq!(observed.len(), 6);
+
+    let counting = skipping.counting_small_books();
+    assert_eq!(counting.small_books, SmallBooks::Count);
+    // The census is answered from the window's own rows, as a large book's is.
+    let mut plans = paired(&xml_plan(three_vouchers()));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(3)),
+        },
+        counting,
+    )
+    .await;
+    assert!(outcome.unwrap().counted());
+    assert_eq!(observed.len(), 12);
+    assert_requests(
+        &observed,
+        &[1, 7],
+        &[
+            render_agent_voucher_census(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260801"),
+                None,
+            )
+            .unwrap(),
+            render_agent_vouchers(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260801"),
+                None,
+            )
+            .unwrap(),
+        ],
+    );
+}
+
+/// #1029: a company whose mark is zero has never held a voucher, so there is
+/// nothing to count, whatever the read asks for.
+#[tokio::test]
+async fn a_book_that_never_held_a_voucher_is_not_counted_even_when_the_read_asks() {
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(empty_collection())),
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(0)),
+        },
+        WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).counting_small_books(),
+    )
+    .await;
+    assert!(!outcome.unwrap().counted());
+    assert_eq!(observed.len(), 6);
 }
 
 #[tokio::test]
@@ -1602,6 +1682,7 @@ async fn a_census_the_transport_refuses_is_not_divided_but_refused() {
         budget_bytes: 3 * one,
         default_bytes_per_voucher: one,
         max_reads: MAX_PLANNED_READS,
+        small_books: SmallBooks::Skip,
     };
     assert!(limits.census_capacity() >= 4);
     let (outcome, observed) = read_window(
@@ -1895,11 +1976,14 @@ async fn a_supplied_count_of_another_window_is_refused_before_any_read() {
 }
 
 #[tokio::test]
-async fn a_small_book_sends_the_same_voucher_request_as_before_the_bound() {
-    // Through the vouchers tool: the only new read is the high-water mark, and
-    // the window read that follows is the request the tool sent before.
+async fn the_vouchers_tool_counts_a_small_book_before_reading_its_window() {
+    // Through the vouchers tool (#1029): a book whose mark alone shows it fits
+    // one request is still counted. The reads are the high-water mark, one
+    // census of the window, then the window read, which is the same request
+    // the tool sent before the bound existed.
     let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
     plans.extend(paired(&mark(3)));
+    plans.extend(paired(&xml_plan(three_vouchers())));
     plans.extend(paired(&xml_plan(three_vouchers())));
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -1916,13 +2000,32 @@ async fn a_small_book_sends_the_same_voucher_request_as_before_the_bound() {
             .map(Vec::len),
         Some(3)
     );
+    assert_eq!(
+        response["structuredContent"]["result"]["state"], "complete",
+        "{response}"
+    );
     let observed = simulator.finish().unwrap();
-    assert_eq!(observed.len(), 16);
+    // 4 prelude legs, then three paired reads of six legs: marks, census, window.
+    assert_eq!(observed.len(), 22);
     assert_requests(
         &observed,
-        &[5, 11, 13],
+        &[5, 11, 13, 17, 19],
         &[
             render_agent_company_high_water(&company()),
+            render_agent_voucher_census(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260831"),
+                None,
+            )
+            .unwrap(),
+            render_agent_voucher_census(
+                &company(),
+                &tally_date("20260801"),
+                &tally_date("20260831"),
+                None,
+            )
+            .unwrap(),
             render_agent_vouchers(
                 &company(),
                 &tally_date("20260801"),
@@ -1959,6 +2062,7 @@ async fn a_lighter_part_never_loosens_the_plan_for_the_rest() {
         budget_bytes: 3 * heavy_len,
         default_bytes_per_voucher: 2 * heavy_len,
         max_reads: MAX_PLANNED_READS,
+        small_books: SmallBooks::Skip,
     };
     let census = WindowCensus::from_rows(
         [
@@ -2062,6 +2166,7 @@ async fn a_light_first_part_does_not_widen_the_next_beyond_the_floor() {
         budget_bytes: 4 * one,
         default_bytes_per_voucher: 4 * one,
         max_reads: MAX_PLANNED_READS,
+        small_books: SmallBooks::Skip,
     };
     let census = WindowCensus::from_rows([
         (day("20260801"), 1),
@@ -2226,6 +2331,7 @@ async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
         budget_bytes: 16 * 1024,
         default_bytes_per_voucher: 16 * 1024,
         max_reads: MAX_PLANNED_READS,
+        small_books: SmallBooks::Skip,
     };
     let mut plans = vec![
         company_plan(),
@@ -2315,6 +2421,7 @@ async fn a_read_divided_only_by_date_is_bracketed_too() {
         budget_bytes: 2 * heavy_len,
         default_bytes_per_voucher: 2 * heavy_len,
         max_reads: MAX_PLANNED_READS,
+        small_books: SmallBooks::Skip,
     };
     // One census: AlterIDs 2 and 3, one on each day.
     let two = vouchers_kept(2);
@@ -2622,6 +2729,7 @@ async fn the_read_allowance_is_spent_at_dispatch_including_reactive_splits() {
     for (allowance, expect_ok) in [(3, true), (2, false)] {
         let limits = WindowReadLimits {
             max_reads: allowance,
+            small_books: SmallBooks::Skip,
             ..WindowReadLimits::for_shape(shape)
         };
         let mut plans = oversized();
@@ -3038,7 +3146,9 @@ fn education_paired(body: &ScenarioPlan) -> Vec<ScenarioPlan> {
 /// captured empty collection, and the tool reported an empty window marked
 /// `partial / empty_uncorroborated` after 28 requests. Now the mark read's own
 /// identity bracket reports Education, and the plan is refused by name before
-/// anything of the part is sent.
+/// anything of the part is sent. A small book is counted first (#1029), so the
+/// refusal now comes from the census request at the transport guard, one request
+/// later, and still before any part is sent.
 #[tokio::test]
 async fn education_refuses_a_window_starting_on_an_unaccepted_day_before_sending_it() {
     let mut plans = vec![
@@ -3048,6 +3158,9 @@ async fn education_refuses_a_window_starting_on_an_unaccepted_day_before_sending
         status_plan(),
     ];
     plans.extend(education_paired(&mark(3)));
+    // The census of a small book (#1029) is a read of the same window, so it
+    // is refused the same way: only its opening identity leg is spent.
+    plans.extend(education_paired(&education_empty_part_plan()));
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
@@ -3069,7 +3182,19 @@ async fn education_refuses_a_window_starting_on_an_unaccepted_day_before_sending
         "window_part_boundary_unsupported_in_education",
         "{response}"
     );
-    assert_eq!(observed.len(), 10);
+    // 4 prelude legs, the marks read (six), then the census's opening identity
+    // leg alone: the census is refused before its request is sent.
+    assert_eq!(observed.len(), 11);
+    let census = render_agent_voucher_census(
+        &company(),
+        &tally_date("20260405"),
+        &tally_date("20260405"),
+        None,
+    )
+    .unwrap();
+    assert!(observed
+        .iter()
+        .all(|request| request.request_body_sha256 != request_sha(&census)));
     let part = [
         render_agent_vouchers(
             &company(),
@@ -3098,6 +3223,9 @@ async fn a_licensed_endpoint_still_reads_a_window_starting_on_any_day() {
     let empty = education_empty_part_plan();
     let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
     plans.extend(paired(&mark(3)));
+    // The census (#1029), the window read, the corroboration's wider read, and
+    // its marks read: the census is the one read more than before.
+    plans.extend(paired(&empty));
     plans.extend(paired(&empty));
     plans.extend(paired(&empty));
     plans.extend(paired(&mark(3)));
@@ -3117,7 +3245,7 @@ async fn a_licensed_endpoint_still_reads_a_window_starting_on_any_day() {
         .iter()
         .filter(|request| !request.method.is_empty())
         .count();
-    assert_eq!(sent, 28);
+    assert_eq!(sent, 34);
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{response}");
     assert_eq!(result["reason"], "empty_uncorroborated");
@@ -3439,36 +3567,33 @@ async fn call_vouchers_over(plans: Vec<ScenarioPlan>) -> Value {
     response
 }
 
-/// #985: one rule labels the window. A window the census counted is
-/// `complete`; one the marks alone proved small was counted by nothing, so it
-/// is `partial` and says why.
+/// #985, #1029: one rule labels the window. A window the census counted is
+/// `complete`, and the `vouchers` tool counts every book that has held a
+/// voucher, including one whose mark alone shows it fits a request, so both
+/// are `complete`.
 #[tokio::test]
-async fn vouchers_labels_a_window_complete_only_when_a_census_counted_it() {
-    let counted =
+async fn vouchers_labels_a_window_complete_whether_the_book_is_large_or_small() {
+    let large =
         call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
-    assert_eq!(counted["isError"], false, "{counted}");
-    let result = &counted["structuredContent"]["result"];
+    assert_eq!(large["isError"], false, "{large}");
+    let result = &large["structuredContent"]["result"];
     assert_eq!(result["state"], "complete", "{result}");
     assert_eq!(result["reason"], Value::Null);
     assert_eq!(result["total"], 3);
-    assert_eq!(
-        counted["structuredContent"]["evidence"]["state"],
-        "complete"
-    );
+    assert_eq!(large["structuredContent"]["evidence"]["state"], "complete");
 
+    // A mark of 3 fits one request, yet the census still counts the window.
     let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
     plans.extend(paired(&mark(3)));
     plans.extend(paired(&xml_plan(three_vouchers())));
-    let uncounted = call_vouchers_over(plans).await;
-    assert_eq!(uncounted["isError"], false, "{uncounted}");
-    let result = &uncounted["structuredContent"]["result"];
-    assert_eq!(result["state"], "partial", "{result}");
-    assert_eq!(result["reason"], NONEMPTY_WINDOW_UNQUALIFIED);
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    let small = call_vouchers_over(plans).await;
+    assert_eq!(small["isError"], false, "{small}");
+    let result = &small["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["reason"], Value::Null);
     assert_eq!(result["total"], 3);
-    assert_eq!(
-        uncounted["structuredContent"]["evidence"]["state"],
-        "partial"
-    );
+    assert_eq!(small["structuredContent"]["evidence"]["state"], "complete");
 }
 
 /// #985: a window read whole after a census is admitted against it, so a read
@@ -3951,6 +4076,7 @@ async fn the_audit_reader_plans_later_parts_at_the_cost_the_agent_reader_measure
         budget_bytes: 2 * per_voucher,
         default_bytes_per_voucher: per_voucher,
         max_reads: MAX_PLANNED_READS,
+        small_books: SmallBooks::Skip,
     };
     let census = || {
         WindowCensus::from_rows([
@@ -4332,6 +4458,7 @@ fn one_read_of(per_read: u64) -> WindowReadLimits {
         budget_bytes: WINDOW_READ_BUDGET_BYTES,
         default_bytes_per_voucher: WINDOW_READ_BUDGET_BYTES / per_read,
         max_reads: 1,
+        small_books: SmallBooks::Skip,
     }
 }
 
@@ -4397,6 +4524,7 @@ async fn a_census_at_what_the_allowed_reads_can_hold_is_finished_and_read() {
 fn reads_of(per_read: u64, allowed: usize) -> WindowReadLimits {
     WindowReadLimits {
         max_reads: allowed,
+        small_books: SmallBooks::Skip,
         ..one_read_of(per_read)
     }
 }
@@ -4523,6 +4651,7 @@ async fn a_replan_refusal_counts_the_requests_already_sent() {
         budget_bytes: 3 * one,
         default_bytes_per_voucher: one / 2,
         max_reads: 2,
+        small_books: SmallBooks::Skip,
     };
     // Day one's voucher is its own part; day two's six are the second.
     let census = WindowCensus::from_rows([
@@ -4894,15 +5023,21 @@ fn a_held_window_is_found_by_its_own_question_only() {
 
 #[tokio::test]
 async fn a_partial_window_is_not_held_and_a_named_snapshot_of_it_refuses() {
+    // A small book is counted now (#1029), so its window is complete and held.
+    // The partial window here is one that withholds a composite voucher, which
+    // the census still counts (marks, census, then the window).
+    let composite = xml_plan(with_first_voucher_composite(&three_vouchers()));
     let mut plans = identity_plans();
     plans.extend(paired(&mark(3)));
-    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&composite));
+    plans.extend(paired(&composite));
     let first_len = plans.len();
     // The second page of a window nothing is held for: no marks read for
     // nothing, then the window afresh.
     plans.extend(identity_plans());
     plans.extend(paired(&mark(3)));
-    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&composite));
+    plans.extend(paired(&composite));
     // The third, naming a snapshot there is none of: refused after the identity read alone.
     plans.extend(identity_plans());
     let total = plans.len();

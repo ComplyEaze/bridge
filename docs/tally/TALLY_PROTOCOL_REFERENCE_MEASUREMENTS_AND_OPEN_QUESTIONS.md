@@ -429,6 +429,14 @@ budget. That is
 a mark of 43 or more for the `vouchers` and `voucher_presence` shape (384 KiB a voucher) and 171 or
 more for the import-verification shape (96 KiB a voucher) that the read-back after a post uses.
 
+**Deviation, 6 Oct 2026 (#1029).** The two paragraphs above, and rule 2 of §11c.3 ("sent undivided,
+exactly as before"), describe the build the table below was measured on. Since #1029 `vouchers`,
+`voucher_presence` and the registers read a census on a small book as well, whatever its mark (a mark
+of zero is never counted), so the "no census" rows below describe the earlier build for those tools.
+`ledger_movement`, the read-back after a post, `outstandings` and the widened read that corroborates an
+empty window still read a small book undivided and uncounted. The 22 and 34 request counts for a small
+book come from scripted doubles; a small-book census through Bridge is **unverified** until the lab run.
+
 | Call | Book | Window label | Verdicts | Requests |
 | --- | --- | --- | --- | --- |
 | `vouchers`, a day with one voucher | census read | `complete`, total 1 | | 22 |

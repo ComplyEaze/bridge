@@ -21,15 +21,17 @@ is a Tally read of any real assessee, and no figure, name or narration comes fro
 
 ## Which rules the goldens pin
 
-Each rule below was changed alone, in memory, in the reference test, and every book was run again; the
-books named are those whose golden then changed. A port that gets one of these rules wrong fails at
+Each rule below was changed alone, in memory, in the reference test at commit `742f67fc`, and every
+book was run again; the books named are those whose golden then changed (the unchanged reference,
+run the same way first, reproduced every golden). A port that gets one of these rules wrong fails at
 least one golden.
 
 | Rule changed | Goldens that change |
 | --- | --- |
-| a name shared by more than one master binds to the last party master (the reference before its fix) | `ko_t2` |
+| a name shared by more than one master bound to the last party master (the reference before `66e842e7`) | `ko_shared`, `ko_t2` |
+| a name shared by more than one master bound to the first party master | `ko_shared`, `ko_t2` |
 | sharing counted over party masters only (a party and an expense sharing a name stays bound) | `ko_t2` |
-| every voucher sums both of its bank and cash lines (a contra counts both) | `ko_t2` |
+| every voucher sums every bank and cash line (a contra counts both sides) | `ko_t2`, `ko_transfer` |
 | a pure money transfer counts its larger side once only when it is a non-Contra voucher | `ko_t2` |
 | a shared name dropped from the index instead of being bound to no one | `ko_shared` |
 | only a Contra counts its larger side once (a transfer booked as another type counts both) | `ko_transfer` |
@@ -40,19 +42,28 @@ least one golden.
 | the token after a span compared with the part of its first token | `ko_vocab` |
 | the token before a span compared with the part of its last token | `ko_nested` |
 | `casefold()` replaced by `lower()`, or by ASCII-only lower-casing | `ko_vocab` |
-| zero lines kept in `<ledgers>` | `ko_vocab` |
+| no decomposition (NFD) before case-folding | `ko_t2` |
+| a mark after a letter `a` to `z` kept in its token | `ko_t2`, `ko_tags`, `ko_vocab` |
+| tokens taken as Python's `\w` runs, after decomposing and case-folding | `ko_vocab` |
+| zero lines kept in `<ledgers>` | `ko_t2`, `ko_vocab` |
 | parts of a name that is also plain kept in `<parts>` | `ko_vocab` |
+| the part shown only the one holding the name's first token | `ko_nested`, `ko_vocab` |
+| the parts shown joined by ` \| ` inside one quote | `ko_nested` |
 | names sorted after NFC normalisation | `ko_vocab` |
-| zero lines ignored when deciding whether a party is on the voucher (T2) | `ko_t2` |
+| zero lines counted when deciding whether a party is on the voucher (T2) | `ko_t2` |
 | zero lines counted for T1 | `ko_quiet`, `ko_t1` |
-| the earlier of two same-key names kept | `ko_t2` |
-| nested spans kept | `ko_nested` |
+| nested spans kept | `ko_nested`, `ko_shared` |
 | the shown narration allowed 81 characters | `ko_text` |
 | name-like words needing three letters | `ko_nested` |
 
+Changed the same way, these rules change no golden (README section 10): NFKD in place of NFD;
+case-folding before decomposing; a mark that starts a token kept; U+200C, U+200D and U+00AD made
+to end a token; marks, or digits, not counted as token characters; a token in another alphabet
+counted as name-like.
+
 ## How the goldens were produced
 
-At the reference engine (a private repository), commit `4df1cc43`, under Python 3.13, with the
+At the reference engine (a private repository), commit `742f67fc`, under Python 3.13, with the
 crate's `parity/edge_golden.py`, which is in this repository under its Apache-2.0 licence and has no
 runner for this test. The goldens were made with that file extended by one runner, which the
 reference's maintainers hold outside this repository; it is not part of this pack. The runner passes
@@ -68,7 +79,11 @@ refuse a malformed one, a port's reader should refuse it instead (README section
         BOOK.json OUTDIR
 
 Each run writes `OUTDIR/edge.<book>.knock_off_candidates.json`. Running every book a second time,
-into a new directory, reproduced every golden byte for byte.
+into a new directory, reproduced every golden byte for byte. The synthetic golden comes from the
+crate's `parity/python_golden.py` extended by the runner README section 14 shows, run on
+`tests/fixtures/synthetic-engagement.toml` with `--test knock_off_candidates`. As a control, the
+same two files at reference commit `98ee6e71`, which precedes the change README section 13.1
+describes, reproduced the previous pin's fourteen goldens byte for byte.
 
 ## Bytes
 
@@ -81,23 +96,23 @@ into a new directory, reproduced every golden byte for byte.
 | `ko_quiet.json` | 5,641 | `ec7b1c8bf4931e0ddfec33f3fbf7ff5859e32cc3a7223c4b4cb5088bcbd26b36` | `books/ko_quiet.json` |
 | `ko_status.json` | 3,035 | `35c4ecc190c738a847b4443e000e3871e16e83793b7e7bf4cbd6e80679c18fb4` | `books/ko_status.json` |
 | `ko_t1.json` | 6,809 | `f4b9001fb4159c95535ca39af67d214b52a855d9168fdb329054b254bd5f0dd8` | `books/ko_t1.json` |
-| `ko_t2.json` | 9,403 | `98cac365385a89943321b0b7a24eb16664ba845427bdd1986d00ebfc21fa46db` | `books/ko_t2.json` |
+| `ko_t2.json` | 9,559 | `210804c9d247b4ddfcf18cd1fb28ab1dfd3239ee9c6ee90c9ee79c6aaa641817` | `books/ko_t2.json` |
 | `ko_tags.json` | 4,678 | `5755e52427a9e3a6bf27801bf3d7ec39e92227da75585776d7c904128adce9f8` | `books/ko_tags.json` |
 | `ko_text.json` | 5,831 | `a7239ad59fb580a1c0514dbedb1651d09dcc556da1e8451d2555c7fbe814fb99` | `books/ko_text.json` |
-| `ko_vocab.json` | 16,700 | `ec28c7fb06dce0300e213cad4e8c484d509f5dfe507e21bac75ff4b63aa93817` | `books/ko_vocab.json` |
+| `ko_vocab.json` | 16,711 | `24cb4a7e1ca220e4820005b9925c644a0c602f55e55011b94872900669b58852` | `books/ko_vocab.json` |
 | `ko_shared.json` | 2,846 | `9f37b1242c5fbbac624c835af6cd4d62102e8e87feacd4e13136397deb5f0c20` | `books/ko_shared.json` |
 | `ko_transfer.json` | 2,620 | `72ba98baa3d79606e97db46c48c66ee70ffdd0c1271fe3ded2bb361ec6ab1086` | `books/ko_transfer.json` |
-| `edge.ko_empty.knock_off_candidates.json` | 3,255 | `b8f0e7dce45acd2075c1ea5a0a9801e21ce42e0a123b9d968ecfddb1535607a1` | `goldens/edge.ko_empty.knock_off_candidates.json` |
-| `edge.ko_groups.knock_off_candidates.json` | 12,137 | `f9a5ce70c916c1a558e74420842d06d6b9495e1f5da1a1d0afaafb6fb0cf4985` | `goldens/edge.ko_groups.knock_off_candidates.json` |
-| `edge.ko_groups_off.knock_off_candidates.json` | 7,553 | `bf17ffb904d3ae2ded6219512f120eb8dd395c3918ec104f9d4c75b01ca0882a` | `goldens/edge.ko_groups_off.knock_off_candidates.json` |
-| `edge.ko_nested.knock_off_candidates.json` | 17,943 | `7b33cafd8f2f7f78e0f441ff2e1da9dafaec579d19741722af4490ab256e4477` | `goldens/edge.ko_nested.knock_off_candidates.json` |
-| `edge.ko_quiet.knock_off_candidates.json` | 3,255 | `b8f0e7dce45acd2075c1ea5a0a9801e21ce42e0a123b9d968ecfddb1535607a1` | `goldens/edge.ko_quiet.knock_off_candidates.json` |
-| `edge.ko_status.knock_off_candidates.json` | 5,222 | `49617a1f72e954ee289254be6a7051428f83273d1ca4efa5769ac1e376b9ef9e` | `goldens/edge.ko_status.knock_off_candidates.json` |
-| `edge.ko_t1.knock_off_candidates.json` | 7,814 | `0128b94c9f5beb7a0a322f8ae344f03f7ccf9fc577264e1f91b1a7a1a7d2b738` | `goldens/edge.ko_t1.knock_off_candidates.json` |
-| `edge.ko_t2.knock_off_candidates.json` | 13,505 | `7bbee3909791a9f8606a18c6c0eb472fd3ea81f4ea0f3e9291ff47af400a8635` | `goldens/edge.ko_t2.knock_off_candidates.json` |
-| `edge.ko_tags.knock_off_candidates.json` | 12,570 | `16cff631d29e7e91c8f52b25f00224cc65841fc93fdfe413cdcff20e0c742d3b` | `goldens/edge.ko_tags.knock_off_candidates.json` |
-| `edge.ko_text.knock_off_candidates.json` | 14,392 | `5e4e6cb65155f010a491af989751e59f5c54d52a0cdca26543c62454c3a1a873` | `goldens/edge.ko_text.knock_off_candidates.json` |
-| `edge.ko_vocab.knock_off_candidates.json` | 33,299 | `efc998f0766521ee19e9082e352649d2bd235c4d00d6b4086de433cab1b2eba4` | `goldens/edge.ko_vocab.knock_off_candidates.json` |
-| `edge.ko_shared.knock_off_candidates.json` | 6,224 | `e735cdb0d08bdfe2670678e0632fea0d4725ac6fb3ff955561f3ae3171db2a1a` | `goldens/edge.ko_shared.knock_off_candidates.json` |
-| `edge.ko_transfer.knock_off_candidates.json` | 6,633 | `53d1c9197bc69edb9de37b8459c454c57f16226e2f9f2a5f3bb744b653f7dd5d` | `goldens/edge.ko_transfer.knock_off_candidates.json` |
-| `synthetic.knock_off_candidates.json` | 3,811 | `fff7236ed95a37a0d83107db0ab8e9ba5056518b14301ba0b9697ead7b2118cf` | `goldens/synthetic.knock_off_candidates.json` |
+| `edge.ko_empty.knock_off_candidates.json` | 3,561 | `7467dc7d2a4ae999fbad76f01f2eff01968c0886ab600104ffb6a8fe59c98844` | `goldens/edge.ko_empty.knock_off_candidates.json` |
+| `edge.ko_groups.knock_off_candidates.json` | 13,275 | `cb74f3e433fab80c4fe9c273f7215fd930646903b80af62f218a005215897725` | `goldens/edge.ko_groups.knock_off_candidates.json` |
+| `edge.ko_groups_off.knock_off_candidates.json` | 8,404 | `65f951e162261a0dd4cef35efa5eb7695f7be114367d58c066dc0d45558b20c5` | `goldens/edge.ko_groups_off.knock_off_candidates.json` |
+| `edge.ko_nested.knock_off_candidates.json` | 19,099 | `66653a670cd3c14693d2affaeabfc98897b1d85f67791887734f561907dfdb68` | `goldens/edge.ko_nested.knock_off_candidates.json` |
+| `edge.ko_quiet.knock_off_candidates.json` | 3,561 | `7467dc7d2a4ae999fbad76f01f2eff01968c0886ab600104ffb6a8fe59c98844` | `goldens/edge.ko_quiet.knock_off_candidates.json` |
+| `edge.ko_status.knock_off_candidates.json` | 5,509 | `58486067fa7b74221cc9cf508592fea0e735e01852f671fd9eed2e2ab9baa782` | `goldens/edge.ko_status.knock_off_candidates.json` |
+| `edge.ko_t1.knock_off_candidates.json` | 8,101 | `f57b5ad79070f3598b4505bbf6c176ce94c02434dc2024a1f6f2405490f5661e` | `goldens/edge.ko_t1.knock_off_candidates.json` |
+| `edge.ko_t2.knock_off_candidates.json` | 17,027 | `f400f9e9acfcaaa5e83f5cdde1691b50df6fa347812c895e13f18b4d68c61872` | `goldens/edge.ko_t2.knock_off_candidates.json` |
+| `edge.ko_tags.knock_off_candidates.json` | 14,033 | `396e33a426c1cce79c6cdb365f513c0b7eeddac284e1792e7724367970076382` | `goldens/edge.ko_tags.knock_off_candidates.json` |
+| `edge.ko_text.knock_off_candidates.json` | 15,052 | `11e2d20ee1bea419be22b74eaab200a7443c4ca545f26feec6e24e1a8e9c9bb8` | `goldens/edge.ko_text.knock_off_candidates.json` |
+| `edge.ko_vocab.knock_off_candidates.json` | 36,477 | `4c4e74613bfb9e778a4a45afcccb33acc1f686b9a8d2dcb66212c2062e9bc73d` | `goldens/edge.ko_vocab.knock_off_candidates.json` |
+| `edge.ko_shared.knock_off_candidates.json` | 6,922 | `6668237665bf24a8df569706d51ceab7fdd7bb8f0279beb1960852bcbbcbcd41` | `goldens/edge.ko_shared.knock_off_candidates.json` |
+| `edge.ko_transfer.knock_off_candidates.json` | 7,331 | `28f12db8f7cdd5527ad9b7bc53aed8a455bbe7eb80f84691fd225fb1bf9cd2ec` | `goldens/edge.ko_transfer.knock_off_candidates.json` |
+| `synthetic.knock_off_candidates.json` | 4,117 | `bab0b914b24aea4014b2aa125f95ad2ce7d975eb6c2b15887bb344eb19051276` | `goldens/synthetic.knock_off_candidates.json` |

@@ -17,7 +17,7 @@ fn batch() -> (ImportLedgerLine, TallyEndpointConfig) {
         "endpoint_origin":super::super::super::canonical_loopback_origin(&endpoint).unwrap(),
         "company":{"name":"Synthetic Accounts","guid":"00000000-0000-4000-8000-000000000002","company_number":"100001","books_from":"20260401"},
         "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"", "built_at":"2026-09-07T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-07T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal",
             "narration":"Synthetic test only","reference":"REF-1","entries":[
@@ -1318,8 +1318,9 @@ fn a_journal_recording_a_cash_in_hand_ledger_is_refused_by_the_queue() {
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
     ));
     let catalogue = decode(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     ));
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
     let single_currency = captured_currencies(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
     ));
@@ -1329,7 +1330,7 @@ fn a_journal_recording_a_cash_in_hand_ledger_is_refused_by_the_queue() {
         "identity_scheme":"batch_v1", "company_guid":company_guid,
         "txn_ids":["TWIN-1","TWIN-2"],
         "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
-        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[{"bridge_txn_id":"TWIN-2","ledger":"Cash"}],
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[{"bridge_txn_id":"TWIN-2","ledger":"Cash"}], "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
         "vouchers":[
             {"bridge_txn_id":"TWIN-1","date":"20260907","voucher_type":"Journal",
@@ -1353,7 +1354,7 @@ fn a_journal_recording_a_cash_in_hand_ledger_is_refused_by_the_queue() {
         ["Bridge Nested Debtor WR4", "Café Naïve Traders", "Cash"],
         "every voucher's ledgers"
     );
-    let ledger_binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue,
         "WR2 Unicode Lab",
         company_guid,
@@ -1397,8 +1398,9 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
     ));
     let catalogue = decode(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     ));
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
     let single_currency = captured_currencies(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
     ));
@@ -1408,7 +1410,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         "identity_scheme":"batch_v1", "company_guid":company_guid,
         "txn_ids":["TWIN-1","TWIN-2"],
         "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
-        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[],
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[], "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
         "vouchers":[
             {"bridge_txn_id":"TWIN-1","date":"20260907","voucher_type":"Journal",
@@ -1432,7 +1434,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         ["Bridge Nested Debtor WR4", "Café Naïve Traders", "Cash"],
         "every voucher's ledgers"
     );
-    let ledger_binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue,
         "WR2 Unicode Lab",
         company_guid,
@@ -1462,7 +1464,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     );
     let twinned = catalogue.replace("WR2 Sales", "Cash&#13;&#10;");
     // Before approval, the post checks the names requested across the batch.
-    let twinned_parents = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let twinned_parents = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &twinned,
         "WR2 Unicode Lab",
         company_guid,
@@ -1474,6 +1476,116 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     assert!(matches!(
         error.downcast_ref::<ApprovedImportAdmissionError>(),
         Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+    ));
+}
+
+/// #1234: the catalogue the queue re-reads after approval carries
+/// each ledger's flag, so a named ledger switched to bill-wise since the build,
+/// with no approval for it, is refused before the post; an approved one passes
+/// whether it stays bill-wise or is switched off.
+#[test]
+fn a_named_ledger_switched_to_bill_wise_since_the_build_is_refused_by_the_queue() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    ));
+    let capture = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    ));
+    let flagged = |bill_wise: &[&str]| {
+        crate::agent::agent_import::tests::with_bill_wise_flags(&capture, bill_wise)
+    };
+    let single_currency = captured_currencies(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let line_with = |approved: serde_json::Value| -> ImportLedgerLine {
+        serde_json::from_value(json!({
+            "batch_id":"bridge-00000000-0000-4000-8000-000000001234",
+            "identity_scheme":"batch_v1", "company_guid":company_guid,
+            "txn_ids":["BW-1"],
+            "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
+            "built_at":"2026-10-06T00:00:00Z", "status":"built", "cash_in_hand_ledgers":[],
+            "on_account_approved": approved,
+            "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+            "vouchers":[
+                {"bridge_txn_id":"BW-1","date":"20260907","voucher_type":"Journal",
+                 "narration":"first","reference":null,"voucher_number":null,
+                 "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"3.00","side":"Dr"},
+                    {"ledger":"Cash","amount":"3.00","side":"Cr"}]}]
+        }))
+        .unwrap()
+    };
+    let none_approved = line_with(json!([]));
+    let party_approved =
+        line_with(json!([{"ledger":"Bridge Nested Debtor WR4","party_digest":"a".repeat(64)}]));
+    let payload = ImportPayload {
+        company_guid: company_guid.into(),
+        vouchers: none_approved.vouchers.clone(),
+        amends_batch_id: None,
+    };
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &flagged(&[]),
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(requested_ledger_names(&payload))
+    .unwrap();
+    let recheck = |line: &ImportLedgerLine, catalogue: &str| {
+        recheck_import_admission(
+            line,
+            company_guid,
+            "WR2 Unicode Lab",
+            &captured,
+            &captured,
+            catalogue,
+            None,
+            &single_currency,
+            &ledger_binding,
+        )
+    };
+    // Control: nothing bill-wise at the build and nothing now.
+    recheck(&none_approved, &flagged(&[])).expect("no change, so the queued batch is admitted");
+    // Switched to bill-wise since the build, with no approval for it.
+    let error = recheck(&none_approved, &flagged(&["Bridge Nested Debtor WR4"]))
+        .expect_err("a ledger that became bill-wise unseen must refuse the batch");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::BillWiseChanged)
+    );
+    // Another ledger of the book switching is not this batch's concern.
+    recheck(&none_approved, &flagged(&["Café Naïve Traders"])).expect("an unnamed ledger");
+    // An approval for a different ledger does not cover the named one.
+    let other_approved = line_with(json!([{"ledger":"Cash","party_digest":"a".repeat(64)}]));
+    let error = recheck(&other_approved, &flagged(&["Bridge Nested Debtor WR4"]))
+        .expect_err("an approval for another ledger");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::BillWiseChanged)
+    );
+    // Approved at the build: bill-wise still, or switched off, both pass.
+    recheck(&party_approved, &flagged(&["Bridge Nested Debtor WR4"]))
+        .expect("an approved party that is still bill-wise");
+    recheck(&party_approved, &flagged(&[])).expect("an approved party switched off");
+    // A V1 answer has no flag: the recheck cannot read it, never as "off".
+    let v1 = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+    ));
+    let error = recheck(&none_approved, &v1).expect_err("a catalogue without the flag");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::CatalogueUnreadable(
+            bridge_tally_protocol::StandardLedgerCatalogError::BillWiseFlagMissing
+        ))
     ));
 }
 
@@ -1497,7 +1609,7 @@ fn a_record_without_cash_in_hand_ledgers_is_refused_by_the_queue() {
     .unwrap();
     assert_eq!(line.cash_in_hand_ledgers, None);
     let bytes = include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     );
     let catalogue = String::from_utf16(
         &bytes
@@ -1506,7 +1618,8 @@ fn a_record_without_cash_in_hand_ledgers_is_refused_by_the_queue() {
             .collect::<Vec<_>>(),
     )
     .unwrap();
-    let ledger_binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue,
         "WR2 Unicode Lab",
         company_guid,
@@ -1533,6 +1646,79 @@ fn a_record_without_cash_in_hand_ledgers_is_refused_by_the_queue() {
     );
 }
 
+/// #1234: the queue refuses a record written before its bill-wise approvals
+/// were, by its own typed variant and not the cash one, before reading
+/// anything it was handed.
+#[test]
+fn a_record_without_bill_wise_approvals_is_refused_by_the_queue() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-00000000-0000-4000-8000-000000001234",
+        "identity_scheme":"batch_v1", "company_guid":company_guid,
+        "txn_ids":["contra-1234"],
+        "date_from":"20260901", "date_to":"20260901", "sha256":"",
+        "built_at":"2026-10-05T00:00:00Z", "status":"built", "cash_in_hand_ledgers":[],
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+        "vouchers":[{"bridge_txn_id":"contra-1234","date":"20260901","voucher_type":"Contra",
+            "entries":[{"ledger":"Cash","amount":"5.00","side":"Dr"},
+                {"ledger":"WR2 Sales","amount":"5.00","side":"Cr"}]}]
+    }))
+    .unwrap();
+    assert_eq!(line.cash_in_hand_ledgers, Some(Vec::new()));
+    assert_eq!(line.on_account_approved, None);
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    );
+    let catalogue = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(vec!["Cash".to_string(), "WR2 Sales".to_string()])
+    .unwrap();
+    let error = recheck_import_admission(
+        &line,
+        company_guid,
+        "WR2 Unicode Lab",
+        "",
+        "",
+        "",
+        None,
+        "",
+        &ledger_binding,
+    )
+    .expect_err("a record without the field must be refused");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::BillWiseNotRecorded)
+    );
+}
+
+/// #1234: only a batch about to be posted is refused for the missing record.
+/// Reconciling one that was already sent stays possible, since the integrity
+/// check does not look at it.
+#[test]
+fn a_saved_batch_without_bill_wise_approvals_is_refused_to_post_but_not_to_reconcile() {
+    let (mut line, endpoint) = batch();
+    assert!(line.on_account_approved.is_some());
+    assert!(admit_saved_journal(&line, &endpoint).is_ok());
+    line.on_account_approved = None;
+    assert_eq!(
+        admit_saved_journal(&line, &endpoint).unwrap_err(),
+        "import_batch_predates_bill_wise_record"
+    );
+    assert!(admit_saved_journal_integrity(&line, &endpoint).is_ok());
+}
+
 #[test]
 fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candidate() {
     let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
@@ -1551,7 +1737,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         "identity_scheme":"batch_v1", "company_guid":company_guid,
         "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],
         "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
-        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[],
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[], "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
         "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1","date":"20260907",
             "voucher_type":"Journal","narration":"Bridge MCP batch namespace qualification",
@@ -1561,7 +1747,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     }))
     .unwrap();
     let catalogue_bytes = include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     );
     let catalogue = String::from_utf16(
         &catalogue_bytes
@@ -1570,10 +1756,11 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
             .collect::<Vec<_>>(),
     )
     .unwrap();
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
     let single_currency = captured_currencies(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
     ));
-    let ledger_binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue,
         "WR2 Unicode Lab",
         company_guid,
@@ -2145,9 +2332,10 @@ fn a_multi_currency_refusal_names_the_masters_in_plain_words_only_when_nothing_w
 /// The captured catalogue's binding of `names`, as a post binds them.
 fn captured_binding(names: &[&str]) -> bridge_tally_protocol::StandardLedgerCatalogBinding {
     let catalogue = captured_currencies(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     ));
-    bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
+    crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue,
         "WR2 Unicode Lab",
         "61c6de69-1748-461c-ad3f-162cb949df9f",

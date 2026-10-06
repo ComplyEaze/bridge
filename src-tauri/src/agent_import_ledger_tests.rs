@@ -4,6 +4,7 @@ fn batch() -> ImportLedgerLine {
     ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,

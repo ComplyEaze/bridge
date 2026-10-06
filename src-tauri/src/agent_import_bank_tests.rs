@@ -30,7 +30,7 @@ fn captured_groups() -> Vec<TallyNamedMaster> {
 
 fn captured_ledger_parents() -> Vec<(String, Option<String>)> {
     let bytes = include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     );
     let xml = String::from_utf16(
         &bytes
@@ -39,11 +39,15 @@ fn captured_ledger_parents() -> Vec<(String, Option<String>)> {
             .collect::<Vec<_>>(),
     )
     .expect("captured native catalogue");
-    parse_standard_ledger_catalog_response(&xml, "WR2 Unicode Lab", CAPTURED_GUID)
-        .expect("captured catalogue rows")
-        .parents()
-        .map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))
-        .collect()
+    crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &xml,
+        "WR2 Unicode Lab",
+        CAPTURED_GUID,
+    )
+    .expect("captured catalogue rows")
+    .parents()
+    .map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))
+    .collect()
 }
 
 fn observed(
@@ -491,7 +495,7 @@ fn group_read_plans() -> Vec<ScenarioPlan> {
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-groups.utf16le.xml"
     );
     let groups = captured_group_collection();
-    let mut plans = import_cycle_plans()[4..10].to_vec();
+    let mut plans = import_family_cycle_plans()[4..10].to_vec();
     for index in [1, 3] {
         plans[index].fixture = Fixture::SyntheticXml(groups.clone());
         plans[index].encoding = WireEncoding::Utf16LeNoBom;
@@ -506,8 +510,8 @@ fn group_read_plans() -> Vec<ScenarioPlan> {
 
 /// The build request sequence for a payload that carries a cash/bank voucher:
 /// the Journal cycle plus a paired group read after each catalogue read.
-fn bank_build_plans() -> Vec<ScenarioPlan> {
-    let cycle = import_cycle_plans();
+pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
+    let cycle = import_family_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
     [
         probe.clone(),
@@ -522,7 +526,7 @@ fn bank_build_plans() -> Vec<ScenarioPlan> {
     .concat()
 }
 
-fn captured_bank_payload() -> ImportPayload {
+pub(super) fn captured_bank_payload() -> ImportPayload {
     serde_json::from_value(json!({"company_guid":CAPTURED_GUID,"vouchers":[
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Payment","narration":"Settled on account",
          "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"12.50","side":"Dr"},
@@ -534,7 +538,7 @@ fn captured_bank_payload() -> ImportPayload {
     .expect("captured bank payload")
 }
 
-fn bank_server(directory: &std::path::Path, port: u16) -> Server {
+pub(super) fn bank_server(directory: &std::path::Path, port: u16) -> Server {
     Server::new(crate::agent::Settings {
         endpoint: TallyEndpointConfig {
             host: "127.0.0.1".into(),
@@ -765,14 +769,17 @@ fn utf16le(bytes: &[u8]) -> String {
 
 fn captured_shape_lab_masters() -> (Vec<(String, Option<String>)>, Vec<TallyNamedMaster>) {
     let catalogue = utf16le(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-ledger-catalogue-v2.utf16le.xml"
     ));
-    let ledgers =
-        parse_standard_ledger_catalog_response(&catalogue, "BRIDGE SHAPE LAB", SHAPE_LAB_GUID)
-            .expect("captured Shape Lab catalogue rows")
-            .parents()
-            .map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))
-            .collect();
+    let ledgers = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue,
+        "BRIDGE SHAPE LAB",
+        SHAPE_LAB_GUID,
+    )
+    .expect("captured Shape Lab catalogue rows")
+    .parents()
+    .map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))
+    .collect();
     let groups = bridge_tally_protocol::native_outstandings::parse_native_group_snapshot(
         &utf16le(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-groups.utf16le.xml"
@@ -791,7 +798,7 @@ fn a_captured_ledger_under_bank_od_is_established_as_bank() {
     // an overdraft or cash-credit account needed before it could fund a
     // Payment or sit in a Contra.
     let (ledgers, groups) = captured_shape_lab_masters();
-    assert_eq!(ledgers.len(), 43, "the whole captured catalogue is swept");
+    assert_eq!(ledgers.len(), 44, "the whole captured catalogue is swept");
     assert!(ledgers
         .iter()
         .any(|(name, parent)| name == "HDFC CC" && parent.as_deref() == Some("Bank OD A/c")));
@@ -811,8 +818,14 @@ fn a_captured_ledger_under_bank_od_is_established_as_bank() {
         .collect::<Vec<_>>();
     assert_eq!(
         money,
-        ["Bank of Baroda CA", "Cash", "HDFC CC"],
-        "no other captured ledger of the 43 is admitted as money"
+        [
+            "Bank of Baroda CA",
+            "Cash",
+            "HDFC CC",
+            // A probe ledger a lab reparent test left under a bank group.
+            "Shape Reparent Probe 20260922"
+        ],
+        "no other captured ledger of the 44 is admitted as money"
     );
     for (voucher_type, dr, cr) in [
         ("Contra", "HDFC CC", "Bank of Baroda CA"),
@@ -1321,6 +1334,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
         let line = ImportLedgerLine {
             ledger_identities: None,
             cash_in_hand_ledgers: Some(Vec::new()),
+            on_account_approved: Some(Vec::new()),
             endpoint_origin: None,
             identity_scheme: None,
             amends_batch_id: None,
@@ -2404,9 +2418,12 @@ fn a_multi_entry_voucher_with_a_repeated_ledger_pairs_as_a_multiset() {
 // which holds a ledger stored as `CRLF Supplier` plus CR LF.
 
 fn captured_shape_lab_catalogue() -> String {
-    utf16le(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-ledger-catalogue.utf16le.xml"
-    ))
+    crate::agent::agent_import::tests::with_bill_wise_flags(
+        &utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-ledger-catalogue-v2.utf16le.xml"
+        )),
+        &[],
+    )
 }
 
 /// The captured catalogue with `Chem Supplier 4` renamed `CRLF Supplier`, so

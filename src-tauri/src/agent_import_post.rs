@@ -366,6 +366,7 @@ impl Server {
                     .iter()
                     .filter(|(name, guid)| {
                         catalogue
+                            .catalog()
                             .bind_selected([name.clone()])
                             .ok()
                             .and_then(|now| {
@@ -624,6 +625,11 @@ impl Server {
             if line.cash_in_hand_ledgers.is_none() {
                 return Err(CASH_LEDGERS_NOT_RECORDED.to_string().into());
             }
+            // Nor one saved before the build recorded which bill-wise ledgers a
+            // person approved to receive entries On Account (#1234).
+            if line.on_account_approved.is_none() {
+                return Err(super::bill_wise::BILL_WISE_NOT_RECORDED.to_string().into());
+            }
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
             let redeeming = match scope {
@@ -789,13 +795,14 @@ impl Server {
             // appeared or before the build checked for one.
             if !folded_twins(
                 &requested_ledger_names(&payload),
-                catalogue_identities.parents(),
+                catalogue_identities.catalog().parents(),
             )
             .is_empty()
             {
                 return Err("ledger_has_folded_twin".to_string().into());
             }
             let ledger_binding = catalogue_identities
+                .catalog()
                 .bind_selected(requested_ledger_names(&payload))
                 .map_err(|_| "import_masters_changed".to_string())?;
             // The same ledgers must still carry the GUIDs the build bound them
@@ -809,6 +816,17 @@ impl Server {
                     ToolFailure::from(refusal.code().to_string())
                 },
             )?;
+            // A ledger switched to bill-wise since the build would take an entry
+            // On Account unseen: only the ledgers the person approved may be
+            // bill-wise now. Judged after the identity binding, so a ledger
+            // replaced under its old name is reported as that, not as a flag.
+            if !super::bill_wise::flags_still_as_approved(
+                &catalogue_identities,
+                &super::bill_wise::named_ledgers(&payload),
+                line.on_account_approved.as_deref().unwrap_or_default(),
+            ) {
+                return Err("import_bill_wise_changed".to_string().into());
+            }
             // A Payment, Receipt or Contra is only the right type while every
             // leg classifies as its build found it. The build's own check is
             // stale by now, so classify again before approval from this
@@ -818,7 +836,8 @@ impl Server {
                 let (groups, evidence) =
                     self.read_group_collection(&identity, &company.name).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence);
-                let observed = ObservedMasters::new(catalogue_identities.parents(), groups);
+                let observed =
+                    ObservedMasters::new(catalogue_identities.catalog().parents(), groups);
                 if cash_bank_refusals(&payload, &observed, RECHECK_REFUSAL_BUDGET).is_refused() {
                     return Err("import_bank_classification_changed".to_string().into());
                 }
@@ -1147,6 +1166,20 @@ impl Server {
                     )
                 }) {
                     CASH_LEDGERS_NOT_RECORDED
+                } else if error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                        Some(ApprovedImportAdmissionError::BillWiseNotRecorded)
+                    )
+                }) {
+                    super::bill_wise::BILL_WISE_NOT_RECORDED
+                } else if error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                        Some(ApprovedImportAdmissionError::BillWiseChanged)
+                    )
+                }) {
+                    "import_bill_wise_changed"
                 } else if error.chain().any(|cause| {
                     matches!(
                         cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -1902,6 +1935,9 @@ fn recheck_import_admission(
         .cash_in_hand_ledgers
         .as_deref()
         .ok_or(ApprovedImportAdmissionError::CashLedgersNotRecorded)?;
+    if line.on_account_approved.is_none() {
+        return Err(ApprovedImportAdmissionError::BillWiseNotRecorded.into());
+    }
     let observed = parse_import_vouchers(first, company_guid).map_err(anyhow::Error::msg)?;
     let corroboration = parse_import_vouchers(second, company_guid).map_err(anyhow::Error::msg)?;
     corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)
@@ -1913,14 +1949,16 @@ fn recheck_import_admission(
         "import_preexisting_identity" => ApprovedImportAdmissionError::PreexistingIdentity.into(),
         _ => anyhow::Error::msg(code),
     })?;
-    if !ledger_binding
-        .matches(catalogue, company_name, company_guid)
-        .map_err(ApprovedImportAdmissionError::CatalogueUnreadable)?
-    {
+    let catalogue = crate::tally::standard_ledger_catalog::parse_import_ledger_catalog_response(
+        catalogue,
+        company_name,
+        company_guid,
+    )
+    .map_err(ApprovedImportAdmissionError::CatalogueUnreadable)?;
+    if !ledger_binding.matches_catalog(catalogue.catalog()) {
         return Err(ApprovedImportAdmissionError::LedgerIdentityChanged.into());
     }
-    let parents = parse_standard_ledger_catalog_response(catalogue, company_name, company_guid)
-        .map_err(ApprovedImportAdmissionError::CatalogueUnreadable)?;
+    let parents = catalogue.catalog();
     // Nor can the binding see a ledger added since approval that folds equal to
     // a named one, which Tally's import lookup could take for it (bridge#626).
     let named = line
@@ -1933,6 +1971,17 @@ fn recheck_import_admission(
         .collect::<Vec<_>>();
     if !folded_twins(&named, parents.parents()).is_empty() {
         return Err(ApprovedImportAdmissionError::LedgerFoldedTwin.into());
+    }
+    // A ledger switched to bill-wise since the build would take an entry On
+    // Account unseen: only the ledgers the person approved may be bill-wise
+    // now. The same catalogue read carries the flags (#1234).
+    let approved = line.on_account_approved.as_deref().unwrap_or_default();
+    if !super::bill_wise::flags_still_as_approved(
+        &catalogue,
+        &named.iter().map(String::as_str).collect(),
+        approved,
+    ) {
+        return Err(ApprovedImportAdmissionError::BillWiseChanged.into());
     }
     // The binding above compares each ledger's name and GUID, not its parent,
     // so it cannot see a ledger or a group re-parented since approval. A bank
@@ -2120,6 +2169,26 @@ fn explain_unbound_batch(payload: &mut Value) {
             "This batch was built before ComplyEaze Bridge recorded which of its ledgers must stay \
              under Cash-in-Hand, so it cannot be checked. Nothing was posted. Build the batch \
              again, then post the new batch."
+        );
+    }
+    if payload["result"]["error"]["code"] == json!(super::bill_wise::BILL_WISE_NOT_RECORDED)
+        && payload["result"]["attempt_recorded"] == json!(false)
+    {
+        payload["result"]["error"]["message"] = json!(
+            "This batch was built before ComplyEaze Bridge began checking ledgers that keep \
+             bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally \
+             whether its file was already imported by hand, since posting the rebuilt batch would import it a second time. \
+             Then build the batch again and post the new batch."
+        );
+    }
+    if payload["result"]["error"]["code"] == json!("import_bill_wise_changed")
+        && payload["result"]["attempt_recorded"] == json!(false)
+    {
+        payload["result"]["error"]["message"] = json!(
+            "A ledger in this batch now keeps bills in Tally, and the person did not approve \
+             entries on it going On Account. Nothing was posted. Build the batch again: the \
+             new build lists the ledger, and the person is asked whether its entries may post \
+             On Account."
         );
     }
     if payload["result"]["error"]["code"] == json!("import_batch_predates_ledger_binding")
@@ -2354,7 +2423,16 @@ pub(super) fn admit_saved_voucher(
     max_vouchers: usize,
 ) -> Result<(String, String), String> {
     let xml = admit_saved_voucher_integrity(line, endpoint, scope, max_vouchers)?;
-    Ok((xml, review_preview_for(line, endpoint, scope)?))
+    let preview = review_preview_for(line, endpoint, scope)?;
+    // A batch about to be posted, not one only to be reconciled: saved before
+    // the build recorded its bill-wise approvals, it is rebuilt (#1234). The
+    // integrity check above does not include this, so a dispatched batch of an
+    // older build can still be reconciled. Content refusals above win, so a
+    // rebuild is never advised for a batch that would be refused again.
+    if line.on_account_approved.is_none() {
+        return Err(super::bill_wise::BILL_WISE_NOT_RECORDED.into());
+    }
+    Ok((xml, preview))
 }
 
 /// What the approval must show about a bank voucher's legs: which side had to

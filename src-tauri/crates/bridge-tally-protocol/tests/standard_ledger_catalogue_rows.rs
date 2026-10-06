@@ -109,7 +109,7 @@ fn the_same_capture_is_refused_for_a_different_expected_company_name() {
 
 // ---- The V2 catalogue on captures of a live Tally (#1234) ------------------------------------------
 //
-// Three synthetic books answered Bridge's own `StandardLedgerCatalogV2` request on 6 Oct 2026: V1's rows, each with
+// Four synthetic books answered Bridge's own `StandardLedgerCatalogV2` request on 6 Oct 2026: V1's rows, each with
 // the ledger's `ISBILLWISEON`. Each provenance file records the request that was sent and the response's hash.
 
 use bridge_tally_protocol::{
@@ -135,7 +135,7 @@ struct V2Capture {
     bill_wise: usize,
 }
 
-const V2_CAPTURES: [V2Capture; 3] = [
+const V2_CAPTURES: [V2Capture; 4] = [
     V2Capture {
         company: "BRIDGE OUTSTANDINGS LAB",
         guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
@@ -163,6 +163,14 @@ const V2_CAPTURES: [V2Capture; 3] = [
         provenance: include_str!("fixtures/agent/native-shape-lab-ledger-catalogue-v2.json"),
         ledgers: 44,
         bill_wise: 18,
+    },
+    V2Capture {
+        company: "WR2 Unicode Lab",
+        guid: "61c6de69-1748-461c-ad3f-162cb949df9f",
+        xml: include_bytes!("fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"),
+        provenance: include_str!("fixtures/agent/native-ledger-catalogue-v2.json"),
+        ledgers: 9,
+        bill_wise: 2,
     },
 ];
 

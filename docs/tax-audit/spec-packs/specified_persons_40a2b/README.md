@@ -1,6 +1,6 @@
 # Spec pack: `specified_persons_40a2b` (Form 3CD clause 23 family, s.40A(2)(b) and s.40(b))
 
-The goldens in this pack were produced by the reference engine at commit `4df1cc43` and are the
+The goldens in this pack were produced by the reference engine at commit `ed9a29af` and are the
 contract; this note explains them and cites [`docs/tax-audit/parity-spec-v1.md`](../../parity-spec-v1.md)
 (sections 1, 2, 2.2, 3, 3.1, 4, 4.1, 5, 6 and 7, as relevant); where the note and a golden differ, the
 golden wins and the reference's maintainers should be told on the pull request or issue.
@@ -130,8 +130,9 @@ crate's `support::hash8`; `sp_keys`). `<nature>` is a vocabulary name.
 ### 3.1 The gate and the only figure
 
 The test has exactly one figure, `specified_persons_40a2b.applicable`: `"yes"` when the table has at
-least one person key, whatever the values hold (`sp_empty`: one key whose value is an empty object
-makes it `"yes"`, with no finding), and `"no"` for an absent or empty table (`sp_none`). Unit
+least one person key, whatever else the values hold (`sp_empty`: one key whose value is an empty
+object makes it `"yes"`, with no finding), unless the table is refused first (two keys with one tag,
+or a relationship that is not text: section 8), and `"no"` for an absent or empty table (`sp_none`). Unit
 `text`, no evidence; its definition is a fixed sentence (`definition_text` in any golden). The gate
 reads the table, not the related-party test's own gate; the two agree because both read the same
 table.
@@ -217,10 +218,15 @@ Both kinds carry:
   around the nature's comparable phrase, the second a fixed sentence. `sp_core` carries all five
   natures.
 - `s40b_governs`: the title is a fixed sentence with the tag substituted; the asks are one fixed
-  sentence; the limits are one sentence with the tag and the **relationship as Python's `repr()`
-  renders it** substituted: the raw text, not stripped or lower-cased, in quotes, with control and
-  other non-printable characters escaped (`'\tWorking Partner\n'`, `'\xa0Partner in the firm\u3000'`,
-  `'\x1fpartner\x1c'` in `sp_labels`). The crate's `support::py_repr_str` reproduces it.
+  sentence; the limits are one sentence with the tag and the **relationship as written** substituted:
+  split on whitespace and joined with single spaces (so padding goes, and each run of spaces, tabs,
+  newlines and other whitespace becomes one space), in single quotes, not lower-cased and with no
+  escaping (`'Working Partner'`, `'Partner in the firm'`, `'partner'` in `sp_labels`, where the raw
+  texts carry tabs, newlines, no-break and ideographic spaces and the control characters U+001F and
+  U+001C). The split is Python's `str.split()`, so the whitespace set is the one of section 3.3,
+  **including U+001C to U+001F**: a join over Rust's `split_whitespace()` differs on those four
+  characters. The crate's `support::py_split` splits on Python's whitespace set; build the join from
+  it, not from `split_whitespace()`.
 - Every text then goes through the dump's NFC normalisation before it is written and hashed (parity
   spec section 4), so the Kelvin sign in a relationship appears as a plain `K` in `limits_text`
   (`sp_labels`).
@@ -240,23 +246,25 @@ two possible finding ids in the result. It never fires on the test's own output,
 violation. Each violation is `{"invariant": "specified_persons_40a2b.check_invariants", "subject":
 "specified_persons_40a2b", "detail": <text>}`.
 
-The conditions are tried in this order and the first that holds gives the message; `<key>`,
-`<nature>` and `<relationship>` are Python `repr()` renderings (quoted, as in section 3.4; the
-relationship raw), `<governed id>` and `<comparable id>` are the two finding ids for the pair:
+The conditions are tried in this order and the first that holds gives the message; each message names
+what was emitted. `<key>`, `<nature>` and `<relationship>` are Python `repr()` renderings (quoted; the
+`repr()` of the unmodified relationship text, not the whitespace-joined form of section 3.4; the
+crate's `support::py_repr_str` renders it), `<governed id>` and `<comparable id>` are the two finding
+ids for the pair:
 
-1. both ids present:
+a. both ids present:
    `SPD-1: <key> nature <nature> has BOTH <governed id> and <comparable id> -- exactly one must be emitted`
-2. the rule holds and the governed id is absent:
-   `SPD-1: <key> nature <nature> should be governed by s.40(b) (relationship <relationship>, entity rules gate open) but <governed id> is missing`
-3. the rule does not hold and the comparable id is absent:
-   `SPD-1: <key> nature <nature> should ask for a comparable but <comparable id> is missing`
-4. the rule holds and the comparable id is present:
-   `SPD-1: <key> nature <nature> should be governed by s.40(b) but a comparable-required finding <comparable id> was emitted instead`
-5. the rule does not hold and the governed id is present:
-   `SPD-1: <key> nature <nature> should ask for a comparable but a s.40(b)-governs finding <governed id> was emitted instead`
+b. the rule holds and the governed id is absent: the message begins
+   `SPD-1: <key> nature <nature> should be governed by s.40(b) (relationship <relationship>, entity rules gate open) but `
+   and ends `a comparable-required finding <comparable id> was emitted instead` when the comparable id is
+   present, else `<governed id> is missing`
+c. the rule does not hold and the comparable id is absent: the message begins
+   `SPD-1: <key> nature <nature> should ask for a comparable but `
+   and ends `a s.40(b)-governs finding <governed id> was emitted instead` when the governed id is
+   present, else `<comparable id> is missing`
 
-Messages 4 and 5 can never be produced: every case they describe is already caught by message 1, 2
-or 3 above them. The check does not look at findings for pairs it skips, so it does not notice a
+Each message describes a result that has drifted from the rule; none fires on the test's own output,
+so no golden shows one. The check does not look at findings for pairs it skips, so it does not notice a
 finding raised for a zero amount or for a nature with no list.
 
 ## 5. Book and result checks in the dumps
@@ -299,22 +307,26 @@ group in tag order. Clause lists keep their authored order (parity spec section 
 - **A related-party result that lacks a figure the table implies.** The reference stops with an
   error (measured by calling the test with an empty related-party result: it raises rather than
   returning a result). The reference's pack cannot reach this, because both tests get the same
-  table, and the edge harness cannot either. A port should refuse with a typed error; ask for its
-  exact form before choosing one.
-- **Two person keys with the same tag.** The related-party test stops first, on its duplicate figure
-  id, so this test never runs (measured with the invented keys `Person PXD` and `Person ACOW`, which
-  share tag `773442d1`: the run stops with a duplicate-figure error for
-  `related_parties_cl23.relationship_773442d1`).
-- **A relationship that is not text.** This test converts it to text the way Python's `str()` does
-  (a number to its digits, a JSON null to `None`), while the related-party test copies it as it is.
-  No golden covers it; ask before choosing a behaviour.
+  table, and the edge harness cannot either. A port should refuse with a typed error; the exact form
+  is the port's own.
+- **Two person keys with the same tag.** For a non-empty table the reference refuses it, in both
+  tests, with a typed error that names the tag and every key sharing it, sorted (measured with the
+  invented keys `Person PXD` and `Person ACOW`, which share tag `773442d1`). The test returns no
+  result and no golden is possible. The exact refusal form is the port's own.
+- **A relationship that is not text.** For a non-empty table the reference refuses it, in both this
+  test and the related-party test, with a typed error that names the person key (a person whose
+  `relationship` key is absent has the text `""`, not a refusal). The keys are checked in sorted
+  order, each for text before the tags are compared, so a table with both a non-text relationship
+  and a tag collision gets the non-text refusal. No golden is possible; the exact refusal form is
+  the port's own. (An empty table is not refused: both tests return `applicable` `no` first.)
 - **A table value of the wrong shape** (a person value that is not an object, a nature value that is
   not a list: a non-empty string would count as a non-empty list here).
-- **Rules with no `[entity]` table at all.** The reference fails only when it first looks up the rate,
-  which it does for every pair with a nonzero amount, whatever its nature (the lookup comes before the
-  partner-label and nature tests, and SPD-1 repeats it); a zero amount never looks it up. The crate's
-  `Rules::s40b_interest_rate_bp` refuses on any call. A port should look the rate up only where the
-  reference does, in that order, or ask first.
+- **Rules with no `[entity]` table at all.** For a non-empty table the reference looks the rate up
+  once, after the tag-collision and non-text refusals and before it reads any person's natures, so such rules fail on
+  every such run, whatever the amounts; an empty table returns `applicable` `no` without looking
+  anything up. The rate is looked up again for each person and nature with a nonzero amount, and by
+  SPD-1. The crate's `Rules::s40b_interest_rate_bp` refuses on any call, so a port must make that
+  call only where the reference does.
 - Any SPD-1 message (section 4).
 
 ## 9. The books
@@ -327,7 +339,7 @@ it reaches, and each names both tests.
 | `sp_none` | `firm` | No table: gate `"no"`, one figure, no finding; ledgers named like a partner's remuneration and interest move and do not matter. |
 | `sp_core` | `individual` | Five natures of one non-partner, each a `comparable_required` finding with its own comparable phrase; a negative `other`; an ignored non-vocabulary nature that moves; a recorded partner whose salary and interest ask for a comparable because the rule is closed; a voucher label with an empty number and a voucher type other than its base type. |
 | `sp_firm` | `firm` | The rule open: a partner's salary and interest governed, rent, purchases and other not; one ledger under two natures; a ledger shared by a partner and a non-partner (governed for one, comparable for the other); a negative governed amount (`working partner`); a non-partner's salary under an open rule. |
-| `sp_labels` | `llp` | Fourteen relationship texts on a moving salary: six match (case, padding, tab and newline, no-break and ideographic spaces, U+001F and U+001C, the Kelvin sign), eight do not (inner double space, zero-width space, `sleeping partner`, `partners`, U+0130, absent, full-width, `partner's son`); repr escapes in the limits text. |
+| `sp_labels` | `llp` | Fourteen relationship texts on a moving salary: six match (case, padding, tab and newline, no-break and ideographic spaces, U+001F and U+001C, the Kelvin sign), eight do not (inner double space, zero-width space, `sleeping partner`, `partners`, U+0130, absent, full-width, `partner's son`); the limits text shows the relationship as written, whitespace joined. |
 | `sp_zero` | `firm` | Zero amounts with no finding (vouchers only outside the population, netting to zero across two vouchers, a zero-net transfer inside one set, a ledger that never moves, a person with nothing nonzero); 1 paise governed; minus 1 paise asking for a comparable. |
 | `sp_shapes` | `firm` | Persons with no `ledgers_by_nature`, an empty object, only `payable_natures`, only non-vocabulary or capitalised natures and an empty list (nothing for any of them); one ledger listed twice (one finding). |
 | `sp_empty` | `firm` | One key with an empty object: gate `"yes"`, no finding, although a ledger named for that person moves. |

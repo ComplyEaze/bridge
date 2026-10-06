@@ -655,7 +655,7 @@ dropped symbol or accent, words run together) is not read: the ledger it would r
 the candidates with the rule `lookup_key_equal`, listed first, and the user is asked. Both refusals can carry
 `candidates`, from the catalogue
 already read, so no request is added: each is `{name, rule}`, with no score, none marked best (the
-order is by rule strength and then name, not by likelihood), and none is ever chosen for the caller.
+order is by rule strength and then name, not by likelihood), and none is ever chosen for the caller. A candidate with the rule `shared_every_distinctive_token` holds every word the user typed, including words that more than a tenth of the ledgers in a book of 20 or more share (such as `input`), every typed word of under three characters (such as a GST rate like `5`) and every typed decimal (`2.5` is one word); `shared_token` holds some of them. That is a fact about the words, not a recommendation.
 `candidates_listing` says what the list means: `listed`; `truncated` (more were found than fit, with the
 full count in `candidates_total`, and `candidates_total_is_lower_bound` when that count is a floor;
 `candidates_truncated` is true for it and for `withheld`); `withheld` (a whole family of ledgers

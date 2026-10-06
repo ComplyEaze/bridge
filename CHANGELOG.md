@@ -66,6 +66,13 @@ These changes are in source and not yet in a published build.
   for version 2026-10.1, so the next build asks you to accept the Terms once
   more; version 2026-10 stays published for the builds that asked for it
   (#1010).
+- When a ledger name you gave is not in the book, the candidates now list ahead
+  of the others the ledgers that hold every word you typed
+  (`rule`: `shared_every_distinctive_token`), then those that share only some;
+  a ledger matched by a stronger rule still comes first. The same ledgers are
+  found and counted as before and none is chosen for you; when more than 25 are
+  found, the ones left off the list are the ledgers holding only some of the
+  words before those holding all of them (#1076).
 
 ## [0.4.2] - 2026-10-03
 

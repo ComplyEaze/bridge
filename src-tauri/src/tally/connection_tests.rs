@@ -246,6 +246,53 @@ fn party_master_opening_balance_comparison_rejects_an_unparseable_master_value()
     .is_err());
 }
 
+/// A `/status` read that fails is reported by the transport's own safe code (#1299): an HTTP
+/// 500 is `http_status_failure`, not the generic `endpoint_unreachable`. The connection check
+/// reports it; so does the probe, while its XML reads find no company list (a list found
+/// replaces the code with `status_heuristic_unavailable`).
+#[tokio::test]
+async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
+    let failed_status =
+        b"HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            .to_vec();
+    // Not a company list in either discovery shape.
+    let no_list = utf16_xml_response("<ENVELOPE></ENVELOPE>");
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        for response in [
+            failed_status.clone(),
+            failed_status,
+            no_list.clone(),
+            no_list,
+        ] {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let request = read_complete_http_request(&mut socket).await;
+            assert!(!request.is_empty());
+            socket.write_all(&response).await.unwrap();
+        }
+    });
+    let client = TallyClient::new(TallyConfig {
+        host: address.ip().to_string(),
+        port: address.port(),
+    })
+    .unwrap();
+    let status = client.check_connection().await.unwrap();
+    assert_eq!(
+        (status.reachable, status.error.as_deref()),
+        (false, Some("http_status_failure"))
+    );
+    let (probe, _) = client.probe_with_wire_evidence().await.unwrap();
+    server.await.unwrap();
+    assert_eq!(
+        (
+            probe.connection.reachable,
+            probe.connection.error.as_deref()
+        ),
+        (false, Some("http_status_failure"))
+    );
+}
+
 fn utf16_xml_response(body: impl AsRef<str>) -> Vec<u8> {
     let body = bridge_tally_protocol::encode_tally_xml_request_utf16le(body.as_ref());
     let headers = format!(

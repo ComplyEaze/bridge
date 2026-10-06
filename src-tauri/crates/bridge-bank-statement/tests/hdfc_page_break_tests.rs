@@ -7,8 +7,9 @@
 //! word and a colon. Every page opens with `Statement of account` and, a little below it in a smaller font,
 //! `From : <date> To : <date>`. The capture puts the two 2.4 pt apart, inside the 3 pt that `geometry::lines`
 //! groups into one visual line, so the period line is skipped with the anchor line. A reader that puts the
-//! second line further down (PDFium, on that print) makes it a line of its own below the anchor, which was
-//! read as a continuation of the open row: `From :` in the date cell, both dates in the narration.
+//! second line 3 pt or more down makes it a line of its own below the anchor, which was read as a continuation
+//! of the open row: `From :` in the date cell, both dates in the narration. That the real print's reader does
+//! this is inferred from the shape of the refusal and the capture's geometry, not measured on its words.
 
 mod common;
 
@@ -115,7 +116,7 @@ const NOTHING_BELOW: Below<'static> = Below {
 
 #[test]
 fn a_period_line_below_the_anchor_line_is_not_part_of_the_last_row() {
-    // 5 pt: its own visual line under the anchor, the shape PDFium gave on the real print.
+    // 5 pt: its own visual line under the anchor, the shape the refusal on the real print implies.
     let parsed = rows(5.0, &NOTHING_BELOW);
     assert_eq!(
         parsed[0].get("date"),
@@ -149,7 +150,9 @@ fn a_split_rows_tail_after_the_period_line_still_reaches_its_row() {
         tail: Some("ZETA"),
         margin_stray: None,
     };
-    for gap in [2.4, 5.0] {
+    // -5.0 puts the period line above the anchor line: the anchor's own words then sit below the top, in
+    // columns the row never reads from a continuation line.
+    for gap in [-5.0, 2.4, 5.0] {
         let parsed = rows(gap, &below);
         assert_eq!(parsed[0].get("date"), "01/08/26", "gap {gap}");
         assert_eq!(
@@ -168,8 +171,9 @@ fn a_split_rows_tail_after_the_period_line_still_reaches_its_row() {
 
 #[test]
 fn a_date_column_word_below_a_row_still_reaches_its_date_cell_and_the_date_refuses() {
-    // The fix is the page's top anchor, not a rule that drops date-column words: a stray word under a row
-    // stays in that row's date cell, where the date parse refuses it loudly.
+    // Guards against fixing this by row-scoping the date column: the fix is the page's top anchor, so a stray
+    // word under a row stays in that row's date cell, where the date parse refuses it loudly. It passes on
+    // master too; it is a guard, not the regression check.
     let below = Below {
         tail: None,
         margin_stray: Some("Zzzz"),

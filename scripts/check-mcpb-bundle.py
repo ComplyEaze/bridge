@@ -238,10 +238,10 @@ def resolve_environment(manifest):
             "unexpected_environment_mapping")
     # The Terms of Use are accepted by the user, never by default: the setting is required and
     # off, and the server refuses every tool until it is on (see agent_terms.rs).
-    terms = manifest["user_config"].get("accept_terms_2026_10", {})
+    terms = manifest["user_config"].get("accept_terms_2026_10_1", {})
     require(terms.get("type") == "boolean" and terms.get("required") is True
             and terms.get("default") is False, "terms_setting_must_be_required_and_off")
-    require(mappings["BRIDGE_TERMS_ACCEPTED"] == "${user_config.accept_terms_2026_10}",
+    require(mappings["BRIDGE_TERMS_ACCEPTED"] == "${user_config.accept_terms_2026_10_1}",
             "terms_environment_mapping_mismatch")
     require(mappings["BRIDGE_AGENT_ENABLE_IMPORT"] == "true", "import_environment_mapping_mismatch")
     writes = manifest["user_config"].get("enable_writes", {})

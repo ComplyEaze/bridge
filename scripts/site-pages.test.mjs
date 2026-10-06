@@ -6,7 +6,7 @@ const site = new URL("../site/", import.meta.url);
 const read = (name) => readFileSync(new URL(name, site), "utf8");
 // The deploy writes these from the tracked templates; a template is the page this test reads.
 const siteOrigin = "https://bridge.complyeaze.com/";
-const generated = new Set(["changelog.html", "privacy.html", "releases.json", "terms.html"]);
+const generated = new Set(["changelog.html", "privacy.html", "releases.json", "terms.html", "terms-2026-10.html"]);
 const pages = readdirSync(site).filter((name) => name.endsWith(".html") && !generated.has(name)).sort();
 
 function region(html, open, close) {

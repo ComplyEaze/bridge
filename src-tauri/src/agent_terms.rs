@@ -25,9 +25,10 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 /// The version of the Terms of Use this build asks the user to accept. The manifest's setting is
-/// named after it (`accept_terms_2026_10`), so new terms mean a new setting and a new prompt: an
-/// old "true" cannot stand for terms that changed. A test pins the manifest to this constant.
-pub(super) const TERMS_VERSION: &str = "2026-10";
+/// named after it (`accept_terms_2026_10_1`: `-` and `.` become `_`), so new terms mean a new
+/// setting and a new prompt: an old "true" cannot stand for terms that changed. A test pins the
+/// manifest to this constant.
+pub(super) const TERMS_VERSION: &str = "2026-10.1";
 /// The environment variable the manifest maps the accept-terms setting to.
 pub(super) const TERMS_ENV: &str = "BRIDGE_TERMS_ACCEPTED";
 const RECORD_FILE: &str = "terms-acceptance.jsonl";

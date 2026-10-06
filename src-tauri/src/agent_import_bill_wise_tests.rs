@@ -629,8 +629,17 @@ fn a_well_formed_approval_is_parsed() {
     let mut args = approvals_args(json!([{"ledger": "Party A", "party_digest": digest}]));
     assert_eq!(
         take_approvals(&mut args),
-        Ok(vec![OnAccountApproved {
-            ledger: "Party A".into(),
+        Ok(vec![OnAccountApproval {
+            ledger: Some("Party A".into()),
+            party_digest: digest.clone()
+        }])
+    );
+    // The digest alone is an approval: the ledger beside it is optional.
+    let mut bare = approvals_args(json!([{"party_digest": digest}]));
+    assert_eq!(
+        take_approvals(&mut bare),
+        Ok(vec![OnAccountApproval {
+            ledger: None,
             party_digest: digest
         }])
     );
@@ -643,9 +652,7 @@ fn a_malformed_approval_is_refused_not_dropped() {
         json!({"ledger": "Party A", "party_digest": good}),
         json!([["Party A", good]]),
         json!([{"ledger": "Party A"}]),
-        json!([{"party_digest": good}]),
         json!([{"ledger": "Party A", "party_digest": good, "extra": 1}]),
-        json!([{"ledger": "", "party_digest": good}]),
         json!([{"ledger": "Party A", "party_digest": "a".repeat(63)}]),
         json!([{"ledger": "Party A", "party_digest": "A".repeat(64)}]),
         json!([{"ledger": "Party A", "party_digest": "g".repeat(64)}]),
@@ -662,54 +669,61 @@ fn a_malformed_approval_is_refused_not_dropped() {
 }
 
 #[test]
-fn one_ledger_approved_twice_is_refused() {
+fn one_party_approved_twice_is_refused() {
     let digest = "a".repeat(64);
     let mut args = approvals_args(json!([
         {"ledger": "Party A", "party_digest": digest},
-        {"ledger": "Party A", "party_digest": "b".repeat(64)},
+        {"party_digest": digest},
     ]));
     assert_eq!(take_approvals(&mut args), Err(ApprovalError::Duplicate));
 }
 
+/// Under party masking the refusal's ledger is a masked name the caller cannot
+/// repeat, so the approval is read by its digest alone: any `ledger` beside it
+/// is not read, and the recorded ledger is the party's real name.
 #[test]
-fn a_ledger_that_differs_only_by_a_trailing_crlf_is_a_different_ledger() {
-    let digest = "a".repeat(64);
-    let mut args = approvals_args(json!([
-        {"ledger": "Party A", "party_digest": digest},
-        {"ledger": "Party A\r\n", "party_digest": digest},
-    ]));
-    assert_eq!(take_approvals(&mut args).unwrap().len(), 2);
+fn an_approval_is_read_by_its_digest_whatever_ledger_name_it_carries() {
+    let vouchers = batch();
+    let company = company();
+    let parties = bill_wise_parties(&vouchers, &observed(&ALL, &["Party A"]));
+    let digest = digest_of("Party A", &vouchers, &["Party A"]);
+    for ledger in [None, Some("Pa…rs"), Some("Party A"), Some("another ledger")] {
+        let approval = OnAccountApproval {
+            ledger: ledger.map(String::from),
+            party_digest: digest.clone(),
+        };
+        let verdict =
+            judge_approvals(&[approval], &parties, &context(&company, &vouchers)).unwrap();
+        assert!(verdict.unapproved.is_empty(), "{ledger:?}");
+        assert_eq!(
+            verdict.approved,
+            [OnAccountApproved {
+                ledger: "Party A".into(),
+                party_digest: digest.clone()
+            }],
+            "{ledger:?}"
+        );
+    }
 }
 
 #[test]
 fn an_approval_for_a_ledger_that_is_not_a_party_of_the_batch_is_refused() {
     let vouchers = batch();
     let company = company();
+    // Party B and Bank are ledgers of the batch, but only Party A is bill-wise:
+    // another ledger's digest is no party's digest.
     let parties = bill_wise_parties(&vouchers, &observed(&ALL, &["Party A"]));
-    let approval = OnAccountApproved {
-        ledger: "Party B".into(),
-        party_digest: "a".repeat(64),
-    };
-    assert_eq!(
-        judge_approvals(&[approval], &parties, &context(&company, &vouchers)).err(),
-        Some(ApprovalError::UnknownLedger)
-    );
-}
-
-#[test]
-fn an_approval_that_names_a_party_whose_ledger_is_not_bill_wise_is_refused() {
-    let vouchers = batch();
-    let company = company();
-    // Bank is a ledger of the batch, but not bill-wise, so not a party.
-    let parties = bill_wise_parties(&vouchers, &observed(&ALL, &["Party A"]));
-    let approval = OnAccountApproved {
-        ledger: "Bank".into(),
-        party_digest: "a".repeat(64),
-    };
-    assert_eq!(
-        judge_approvals(&[approval], &parties, &context(&company, &vouchers)).err(),
-        Some(ApprovalError::UnknownLedger)
-    );
+    for ledger in ["Party B", "Bank"] {
+        let approval = OnAccountApproval {
+            ledger: Some(ledger.into()),
+            party_digest: "a".repeat(64),
+        };
+        assert_eq!(
+            judge_approvals(&[approval], &parties, &context(&company, &vouchers)).err(),
+            Some(ApprovalError::DigestDiffers),
+            "{ledger}"
+        );
+    }
 }
 
 #[test]
@@ -717,8 +731,8 @@ fn an_approval_with_another_digest_is_refused() {
     let vouchers = batch();
     let company = company();
     let parties = bill_wise_parties(&vouchers, &observed(&ALL, &["Party A"]));
-    let approval = OnAccountApproved {
-        ledger: "Party A".into(),
+    let approval = OnAccountApproval {
+        ledger: Some("Party A".into()),
         party_digest: "a".repeat(64),
     };
     assert_eq!(
@@ -732,8 +746,8 @@ fn an_approval_made_for_another_company_or_an_edited_batch_does_not_carry() {
     let vouchers = batch();
     let company = company();
     let parties = bill_wise_parties(&vouchers, &observed(&ALL, &["Party A"]));
-    let approval = OnAccountApproved {
-        ledger: "Party A".into(),
+    let approval = OnAccountApproval {
+        ledger: Some("Party A".into()),
         party_digest: digest_of("Party A", &vouchers, &["Party A"]),
     };
     // A year-end split gives the child its parent's GUID but another number.
@@ -775,8 +789,8 @@ fn a_party_without_an_approval_is_unapproved_and_the_rest_are_recorded_sorted() 
     )];
     let both = ["Party A", "Party B"];
     let parties = bill_wise_parties(&vouchers, &observed(&ALL, &both));
-    let approval_b = OnAccountApproved {
-        ledger: "Party B".into(),
+    let approval_b = OnAccountApproval {
+        ledger: Some("Party B".into()),
         party_digest: digest_of("Party B", &vouchers, &both),
     };
     let verdict = judge_approvals(
@@ -785,7 +799,11 @@ fn a_party_without_an_approval_is_unapproved_and_the_rest_are_recorded_sorted() 
         &context(&company, &vouchers),
     )
     .unwrap();
-    assert_eq!(verdict.approved, std::slice::from_ref(&approval_b));
+    let recorded = |ledger: &str, approval: &OnAccountApproval| OnAccountApproved {
+        ledger: ledger.into(),
+        party_digest: approval.party_digest.clone(),
+    };
+    assert_eq!(verdict.approved, [recorded("Party B", &approval_b)]);
     assert_eq!(verdict.unapproved.len(), 1);
     assert_eq!(verdict.unapproved[0].0.ledger, "Party A");
     assert_eq!(
@@ -793,8 +811,8 @@ fn a_party_without_an_approval_is_unapproved_and_the_rest_are_recorded_sorted() 
         digest_of("Party A", &vouchers, &both)
     );
 
-    let approval_a = OnAccountApproved {
-        ledger: "Party A".into(),
+    let approval_a = OnAccountApproval {
+        ledger: Some("Party A".into()),
         party_digest: digest_of("Party A", &vouchers, &both),
     };
     let all = judge_approvals(
@@ -804,7 +822,13 @@ fn a_party_without_an_approval_is_unapproved_and_the_rest_are_recorded_sorted() 
     )
     .unwrap();
     assert!(all.unapproved.is_empty());
-    assert_eq!(all.approved, [approval_a, approval_b]);
+    assert_eq!(
+        all.approved,
+        [
+            recorded("Party A", &approval_a),
+            recorded("Party B", &approval_b)
+        ]
+    );
 }
 
 #[test]

@@ -282,7 +282,8 @@ pub(super) fn party_digest(context: &DigestContext<'_>, party: &BillWiseParty) -
     hex(&encoder.finish())
 }
 
-/// One party the person approved, as recorded on the saved batch.
+/// One party the person approved, as recorded on the saved batch: the real
+/// ledger name of the party the approval's digest matched.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(super) struct OnAccountApproved {
@@ -290,16 +291,29 @@ pub(super) struct OnAccountApproved {
     pub(super) party_digest: String,
 }
 
+/// One approval as the caller passes it. Only the digest is read: it hashes the
+/// party's exact ledger name with the batch, so it names one party of one batch.
+/// `ledger` is accepted because a refusal lists it beside the digest, and is
+/// not read: under party masking it is a masked name the caller cannot repeat.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(super) struct OnAccountApproval {
+    #[serde(default)]
+    #[allow(dead_code)]
+    ledger: Option<String>,
+    pub(super) party_digest: String,
+}
+
 /// Why an approval argument was refused. Carries no data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ApprovalError {
-    /// Not an array of `{ledger, party_digest}` with a 64-hex digest.
+    /// Not an array of `{party_digest}` objects (an optional `ledger` beside
+    /// it) with a 64-hex digest.
     Malformed,
-    /// One ledger approved twice.
+    /// One party approved twice.
     Duplicate,
-    /// The ledger is not a bill-wise party of this batch.
-    UnknownLedger,
-    /// The digest is not the one this batch's party has.
+    /// The digest is not any bill-wise party's digest of this batch: another
+    /// batch, company or endpoint, an edited row, or a ledger that is not a party.
     DigestDiffers,
 }
 
@@ -308,7 +322,6 @@ impl ApprovalError {
         match self {
             Self::Malformed => "malformed",
             Self::Duplicate => "duplicate",
-            Self::UnknownLedger => "unknown_ledger",
             Self::DigestDiffers => "digest_differs",
         }
     }
@@ -317,7 +330,7 @@ impl ApprovalError {
 /// Removes `on_account_approvals` from `args` and parses it. The key must go
 /// before the payload is parsed, which refuses unknown fields. A missing key
 /// is no approvals.
-pub(super) fn take_approvals(args: &mut Value) -> Result<Vec<OnAccountApproved>, ApprovalError> {
+pub(super) fn take_approvals(args: &mut Value) -> Result<Vec<OnAccountApproval>, ApprovalError> {
     let Some(value) = args
         .as_object_mut()
         .and_then(|map| map.remove(APPROVALS_KEY))
@@ -327,24 +340,27 @@ pub(super) fn take_approvals(args: &mut Value) -> Result<Vec<OnAccountApproved>,
     let Value::Array(items) = value else {
         return Err(ApprovalError::Malformed);
     };
-    let mut approvals = Vec::<OnAccountApproved>::with_capacity(items.len());
+    let mut approvals = Vec::<OnAccountApproval>::with_capacity(items.len());
     for item in items {
         // serde's derived `Deserialize` also reads a struct from a JSON array,
         // so the shape is checked first: only an object is an approval.
         if !item.is_object() {
             return Err(ApprovalError::Malformed);
         }
-        let approved: OnAccountApproved =
+        let approved: OnAccountApproval =
             serde_json::from_value(item).map_err(|_| ApprovalError::Malformed)?;
         let hex_digest = approved.party_digest.len() == 64
             && approved
                 .party_digest
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
-        if !hex_digest || approved.ledger.is_empty() {
+        if !hex_digest {
             return Err(ApprovalError::Malformed);
         }
-        if approvals.iter().any(|seen| seen.ledger == approved.ledger) {
+        if approvals
+            .iter()
+            .any(|seen| seen.party_digest == approved.party_digest)
+        {
             return Err(ApprovalError::Duplicate);
         }
         approvals.push(approved);
@@ -360,33 +376,34 @@ pub(super) struct ApprovalVerdict<'a> {
 }
 
 pub(super) fn judge_approvals<'a>(
-    approvals: &[OnAccountApproved],
+    approvals: &[OnAccountApproval],
     parties: &'a [BillWiseParty],
     context: &DigestContext<'_>,
 ) -> Result<ApprovalVerdict<'a>, ApprovalError> {
     let digests = parties
         .iter()
-        .map(|party| (party.ledger.as_str(), party_digest(context, party)))
-        .collect::<BTreeMap<_, _>>();
+        .map(|party| (party_digest(context, party), party))
+        .collect::<Vec<_>>();
+    let mut approved = Vec::with_capacity(approvals.len());
     for approval in approvals {
-        match digests.get(approval.ledger.as_str()) {
-            None => return Err(ApprovalError::UnknownLedger),
-            Some(digest) if *digest != approval.party_digest => {
-                return Err(ApprovalError::DigestDiffers)
-            }
-            Some(_) => {}
-        }
+        let (_, party) = digests
+            .iter()
+            .find(|(digest, _)| *digest == approval.party_digest)
+            .ok_or(ApprovalError::DigestDiffers)?;
+        approved.push(OnAccountApproved {
+            ledger: party.ledger.clone(),
+            party_digest: approval.party_digest.clone(),
+        });
     }
-    let unapproved = parties
+    let unapproved = digests
         .iter()
-        .filter(|party| {
+        .filter(|(digest, _)| {
             !approvals
                 .iter()
-                .any(|approval| approval.ledger == party.ledger)
+                .any(|approval| &approval.party_digest == digest)
         })
-        .map(|party| (party, digests[party.ledger.as_str()].clone()))
+        .map(|(digest, party)| (*party, digest.clone()))
         .collect();
-    let mut approved = approvals.to_vec();
     approved.sort_by(|left, right| left.ledger.cmp(&right.ledger));
     Ok(ApprovalVerdict {
         approved,

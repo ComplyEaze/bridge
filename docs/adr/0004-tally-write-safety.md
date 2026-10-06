@@ -368,7 +368,7 @@ reads each named ledger's `ISBILLWISEON` from the same ledger-list read it alrea
 post and the queue admission read the flag again and refuse `import_bill_wise_changed` for a
 ledger that became bill-wise since. A batch recorded before that record refuses with
 `import_batch_predates_bill_wise_record` and is rebuilt. The approval is the assistant's word,
-not proof that a person said yes; the native dialog does not yet show these entries (#1234).
+not proof that a person said yes; the native dialog lists each voucher of a small batch but does not mark which entries land On Account (#1234).
 The queued re-read is not the last request before the POST: the mode and
 company re-admission and the two duplicate-absence reads follow it, because
 duplicate absence stays the final source check. A regroup in Tally during those

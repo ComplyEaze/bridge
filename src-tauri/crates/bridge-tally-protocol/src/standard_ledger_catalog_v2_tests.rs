@@ -105,6 +105,15 @@ fn the_flag_is_exactly_yes_or_no_after_trimming_and_nothing_else() {
             "{text:?}"
         );
     }
+    // The flag is a Logical: another type, or none, is not a flag.
+    for typed in ["TYPE=\"String\"", "TYPE=\"logical\"", ""] {
+        let retyped = three_rows(Some("Yes")).replacen("TYPE=\"Logical\"", typed, 1);
+        assert_eq!(
+            parse_v2(&retyped).unwrap_err(),
+            StandardLedgerCatalogError::BillWiseFlagInvalid,
+            "{typed}"
+        );
+    }
     let empty_element = body(&[row("Debtor A", "02", "Sundry Debtors", None).replace(
         "<BRIDGECOMPANYGUID",
         "<ISBILLWISEON TYPE=\"Logical\"/><BRIDGECOMPANYGUID",

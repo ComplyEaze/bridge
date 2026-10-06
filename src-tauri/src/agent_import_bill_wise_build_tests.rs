@@ -150,7 +150,7 @@ async fn an_unapproved_bill_wise_party_refuses_the_build_and_lists_its_rows() {
         "never approve on the person's behalf",
         "one party per question",
         "hand import of the file is not checked at all",
-        "The native approval dialog does not yet show these entries",
+        "does not mark which entries land On Account",
         "importing it also replaces any bill allocations",
     ] {
         assert!(next_step.contains(phrase), "{phrase}");
@@ -230,6 +230,50 @@ async fn an_approved_party_builds_and_the_record_carries_the_approval() {
     );
 }
 
+/// With party names masked the refusal's ledger reads like `Br…R4` to the
+/// assistant, so the approval cannot repeat the name: it passes the digest the
+/// refusal listed, with the masked name beside it or none, and the build records
+/// the party's real name.
+#[tokio::test]
+async fn an_approval_by_digest_builds_when_party_names_are_masked() {
+    let yes = || journal_plans(&[PARTY]);
+    let plans = [yes()[..REFUSAL_REQUESTS].to_vec(), yes()].concat();
+    for with_masked_name in [true, false] {
+        let simulator = SequenceSimulator::spawn(plans.clone()).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let mut server = server(directory.path(), simulator.address().port(), 200_000);
+        server.settings.redaction = crate::agent::Redaction::MaskParties;
+        let refused = server.build_import_xml(&build_args(None)).await.unwrap();
+        // What the assistant is shown.
+        let seen = crate::agent::redact_value(
+            refused.payload["result"].clone(),
+            crate::agent::Redaction::MaskParties,
+        );
+        let listed = &seen["refused_parties"][0];
+        let masked_name = listed["ledger"].as_str().expect("a masked name is text");
+        assert_ne!(masked_name, PARTY);
+        let digest = listed["party_digest"].as_str().unwrap().to_string();
+        let approval = if with_masked_name {
+            json!({"ledger": masked_name, "party_digest": digest})
+        } else {
+            json!({"party_digest": digest})
+        };
+        let built = server
+            .build_import_xml(&build_args(Some(json!([approval]))))
+            .await
+            .unwrap();
+        assert!(built.payload["result"]["batch_id"].is_string());
+        let saved = server.import_ledger().unwrap().pop().unwrap();
+        assert_eq!(
+            saved.on_account_approved,
+            Some(vec![bill_wise::OnAccountApproved {
+                ledger: PARTY.into(),
+                party_digest: digest,
+            }])
+        );
+    }
+}
+
 #[tokio::test]
 async fn approving_one_of_two_parties_refuses_the_other() {
     let both = || journal_plans(&[PARTY, SALES])[..REFUSAL_REQUESTS].to_vec();
@@ -291,7 +335,7 @@ async fn an_approval_that_is_malformed_or_repeated_is_refused_before_any_read() 
     assert_eq!(invalid_approval(json!("nope"), 2).await, ("malformed", 0));
     assert_eq!(
         invalid_approval(
-            json!([{"ledger": PARTY, "party_digest": digest}, {"ledger": PARTY, "party_digest": digest}]),
+            json!([{"ledger": PARTY, "party_digest": digest}, {"party_digest": digest}]),
             2
         )
         .await,
@@ -300,25 +344,22 @@ async fn an_approval_that_is_malformed_or_repeated_is_refused_before_any_read() 
 }
 
 #[tokio::test]
-async fn an_approval_for_a_ledger_that_is_not_a_party_or_with_another_digest_is_refused() {
+async fn an_approval_with_a_digest_that_is_no_partys_is_refused() {
     let digest = "a".repeat(64);
-    // `Cash` is in the batch but is not bill-wise, so it is not a party.
-    assert_eq!(
-        invalid_approval(
-            json!([{"ledger": "Cash", "party_digest": digest}]),
-            REFUSAL_REQUESTS
-        )
-        .await,
-        ("unknown_ledger", REFUSAL_REQUESTS)
-    );
-    assert_eq!(
-        invalid_approval(
-            json!([{"ledger": PARTY, "party_digest": digest}]),
-            REFUSAL_REQUESTS
-        )
-        .await,
-        ("digest_differs", REFUSAL_REQUESTS)
-    );
+    // The ledger beside the digest is not read: a bill-wise party's own name
+    // and a ledger that is no party (`Cash` is in the batch, not bill-wise) are
+    // refused alike, for the digest.
+    for ledger in [PARTY, "Cash"] {
+        assert_eq!(
+            invalid_approval(
+                json!([{"ledger": ledger, "party_digest": digest}]),
+                REFUSAL_REQUESTS
+            )
+            .await,
+            ("digest_differs", REFUSAL_REQUESTS),
+            "{ledger}"
+        );
+    }
 }
 
 /// A ledger switched to or from bill-wise between the build's two catalogue
@@ -511,20 +552,12 @@ fn the_schema_admits_an_approval_list_and_the_build_strips_it_before_parsing() {
     let approvals = &schema["properties"]["on_account_approvals"];
     assert_eq!(approvals["type"], "array");
     assert_eq!(approvals["items"]["additionalProperties"], false);
-    assert_eq!(
-        approvals["items"]["required"],
-        json!(["ledger", "party_digest"])
-    );
+    // The digest alone is an approval; the ledger beside it is optional.
+    assert_eq!(approvals["items"]["required"], json!(["party_digest"]));
+    assert_eq!(approvals["items"]["properties"]["ledger"]["type"], "string");
     assert_eq!(
         approvals["items"]["properties"]["party_digest"]["pattern"],
         "^[0-9a-f]{64}$"
-    );
-    // The approval's ledger is held to the entry ledger's own pattern, so a
-    // name ending in CR LF can be approved.
-    assert_eq!(
-        approvals["items"]["properties"]["ledger"],
-        schema["properties"]["vouchers"]["items"]["properties"]["entries"]["items"]["properties"]
-            ["ledger"]
     );
     // The payload itself still refuses the key.
     let mut args = build_args(Some(json!([])));
@@ -544,7 +577,7 @@ fn the_tool_text_says_what_the_digest_does_not_prove_and_where_the_gate_is() {
     for phrase in [
         "it does NOT prove that a person said yes",
         "never approve on the person's behalf",
-        "The native approval dialog does not yet list these entries",
+        "does not mark which entries land On Account",
         "a hand import of the file is not checked at all",
         "is refused at post as import_bill_wise_changed",
         "bill_wise_party_unapproved",

@@ -715,6 +715,11 @@ fn parse_standard_ledger_identity_row(
                 match child_name.as_slice() {
                     b"ISBILLWISEON" if read_bill_wise => {
                         validate_only_attributes(&child, &[b"TYPE"])?;
+                        // Every flag seen live is a Logical (§12a.15): a flag of
+                        // another type, or with no type, is not read as one.
+                        if attr_value(reader, &child, b"TYPE").as_deref() != Some("Logical") {
+                            return Err(StandardLedgerCatalogError::BillWiseFlagInvalid.into());
+                        }
                         let text = read_optional_text(reader, child.name())?
                             .ok_or(StandardLedgerCatalogError::BillWiseFlagInvalid)?;
                         if bill_wise.replace(BillWiseFlag::parse(&text)?).is_some() {

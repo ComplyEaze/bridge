@@ -94,12 +94,12 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
             },
             super::bill_wise::APPROVALS_KEY:{
                 "type":"array", "maxItems":MAX_MASTER_NAMES,
-                "description":"One entry per bill-wise ledger the person agreed may receive this batch's entries On Account, copied from a bill_wise_party_unapproved refusal of the same batch: the ledger's exact name and its party_digest. Leave it out on the first build. A ledger that is not a bill-wise party of this batch, one named twice, or a digest that is not the batch's own is refused as on_account_approval_invalid (cause unknown_ledger, duplicate, digest_differs or malformed): nothing is accepted and dropped. The digest ties an approval to this exact batch, company and endpoint; it does not prove that a person said yes.",
+                "description":"One entry per bill-wise party the person agreed may receive this batch's entries On Account, copied from a bill_wise_party_unapproved refusal of the same batch: its party_digest, which alone says which party is approved (ledger may be copied beside it, and is not read: with party names masked it is a masked name). Leave it out on the first build. A digest that is not one of this batch's parties' digests, or one given twice, is refused as on_account_approval_invalid (cause digest_differs, duplicate or malformed): nothing is accepted and dropped. The digest ties an approval to this exact batch, company, endpoint and ledger; it does not prove that a person said yes.",
                 "items":{
                     "type":"object", "additionalProperties":false,
-                    "required":["ledger","party_digest"],
+                    "required":["party_digest"],
                     "properties":{
-                        "ledger":ledger,
+                        "ledger":{"type":"string"},
                         "party_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"}
                     }
                 }

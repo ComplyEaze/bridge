@@ -24,13 +24,18 @@
 //!   poppler uses the standard AFM metrics. A shift that is uniform within a
 //!   font changes neither line grouping nor anchors; a line mixing two
 //!   non-embedded fonts could group differently from `pdftotext`. What would
-//!   catch that depends on what the difference reaches: the balance replay and
-//!   the control totals prove amounts, the date parse proves the date column,
-//!   and nothing proves narration text. A difference that moves words into a
-//!   narration (the statement-period line did, #1310) changes the row's
-//!   transaction identity and can change its party, and no amount check sees it.
-//!   A grouping difference is therefore caught only when it reaches a date or an
-//!   amount. Embedded fonts were not measured.
+//!   catch that depends on what the difference reaches. The balance replay
+//!   proves amounts, and for SBI and HDFC so do the printed control totals
+//!   (Union Bank prints none). The date parse refuses a date cell holding
+//!   anything but one well-formed date, and the account-number line and the
+//!   page footer have refusals of their own. Nothing proves narration or
+//!   reference text: words a grouping difference moves into a narration or
+//!   reference cell change the row's transaction identity (which hashes the
+//!   narration) and can change the party or reference read from the row, and
+//!   no amount check sees it. In #1310 the statement-period line was refused
+//!   only because two of its words fell in the date column; the same line's
+//!   dates entering the narration went unseen. Embedded fonts were not
+//!   measured.
 //!
 //! Coordinates are converted to the top-left page space of `pdftotext`,
 //! relative to the crop box (or the media box when a page has no crop box).

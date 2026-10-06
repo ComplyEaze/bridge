@@ -221,7 +221,7 @@ fn a_net_is_shown_at_the_scale_of_its_terms_not_with_its_trailing_zeros_dropped(
 
 #[test]
 fn a_contra_between_two_money_ledgers_counts_on_both_sides_and_nets_to_nothing() {
-    // synthetic: cash to bank 2,000.00 moves both ledgers and nothing leaves the money set.
+    // synthetic: cash to bank 2,000.00 moves both ledgers and nothing drops out of the money set.
     let rows = vec![
         row("Cash", "Cash-in-Hand", "", "2000.00"),
         row("Bank", "Bank Accounts", "-2000.00", ""),

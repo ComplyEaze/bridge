@@ -244,7 +244,36 @@ pub fn extract_pages(engine: &PdfEngine, pdf: &[u8], password: &str) -> Result<V
         });
         out.push(assemble_words(glyphs));
     }
+    require_readable_text(&out)?;
     Ok(out)
+}
+
+/// Refuse a document whose words carry no numeric character at all: a scan, a
+/// printout with glyphs drawn as paths, or a scan with only a scanner app's
+/// stamp. Such a document would otherwise be refused further on under a name
+/// that points at the wrong fix (`no_account_number_line` or
+/// `page_sequence_unproven`).
+///
+/// Judged on the whole document, so an image-only terms page inside a bank PDF
+/// does not trigger it. A numeric character (Unicode Nd, Nl or No, a superset of
+/// what the account check's `\d` reads) is the test because every statement that
+/// gets past `parse::require_account_match` has one (its account-number line), so
+/// this renames a refusal that was certain; it cannot refuse a statement that is
+/// read today. Residual: a scan whose text layer carries a digit (an OCR layer, or a
+/// stamp that prints a date) is not caught here and is still refused or read as
+/// before, by the balance chain and the account check.
+fn require_readable_text(pages: &[Page]) -> Result<(), Refusal> {
+    let has_figures = pages
+        .iter()
+        .flatten()
+        .any(|word| word.text.chars().any(char::is_numeric));
+    if has_figures {
+        return Ok(());
+    }
+    Err(Refusal::new(
+        "no_readable_text",
+        "the PDF has no readable text with figures in it: it is a scan, a printed copy or an image",
+    ))
 }
 
 #[cfg(test)]

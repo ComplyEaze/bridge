@@ -133,7 +133,7 @@ fn assert_tied(check: &CashFlowCheck, net: &str, money_ledgers: usize) {
 // ---- the measured tie ----
 
 #[test]
-fn the_captured_year_ties_to_the_cash_and_bank_ledgers_of_the_trial_balance() {
+fn the_captured_year_ties_to_trial_balance_rows_typed_from_the_recorded_totals() {
     let rows = vec![
         row("Cash", "Cash-in-Hand", "-5500.00", ""),
         row("RO Bank", "Bank Accounts", "", ""),
@@ -151,7 +151,7 @@ fn the_captured_year_ties_to_the_cash_and_bank_ledgers_of_the_trial_balance() {
 }
 
 #[test]
-fn the_captured_quarter_and_month_tie_to_the_bank_ledger_alone() {
+fn the_captured_quarter_and_month_tie_to_a_typed_bank_ledger_row_alone() {
     let quarter = check(
         vec![row("W1 Bank", "Bank Accounts", "-7263013.22", "")],
         &captured(CASH_FLOW_APR_JUN, "20250401", "20250630"),
@@ -216,10 +216,11 @@ fn a_net_is_shown_at_the_scale_of_its_terms_not_with_its_trailing_zeros_dropped(
         row("Cash", "Cash-in-Hand", "", "2000.50"),
         row("Bank", "Bank Accounts", "-2000.50", ""),
     ];
-    match check(rows, &typed_cash_flow("0.00")) {
-        CashFlowCheck::Tied { net, .. } => assert_eq!(net.as_str(), "0.00"),
-        other => panic!("expected a tie, got {other:?}"),
-    }
+    // Both nets are zero: equal under any convention, so not a tie.
+    assert_eq!(
+        check(rows, &typed_cash_flow("0.00")),
+        CashFlowCheck::NothingToCompare
+    );
 }
 
 #[test]
@@ -229,7 +230,10 @@ fn a_contra_between_two_money_ledgers_counts_on_both_sides_and_nets_to_nothing()
         row("Cash", "Cash-in-Hand", "", "2000.00"),
         row("Bank", "Bank Accounts", "-2000.00", ""),
     ];
-    assert_tied(&check(rows, &typed_cash_flow("0.00")), "0.00", 2);
+    assert_eq!(
+        check(rows, &typed_cash_flow("0.00")),
+        CashFlowCheck::NothingToCompare
+    );
 }
 
 #[test]
@@ -250,6 +254,23 @@ fn a_bank_od_ledger_with_movement_is_refused_until_it_has_been_measured() {
         check(rows, &typed_cash_flow("-100.00")),
         CashFlowCheck::MoneyGroupUnmeasured { ledgers: 1 }
     );
+}
+
+#[test]
+fn a_ledger_under_bank_occ_by_reserved_name_with_movement_is_refused_too() {
+    // synthetic: a build that names the group `Bank OCC A/c` as its reserved name.
+    let mut groups = groups();
+    let mut occ = groups
+        .iter()
+        .find(|group| group.name == "Bank OD A/c")
+        .cloned()
+        .expect("the captured tree holds Bank OD A/c");
+    occ.name = "Bank OCC A/c".into();
+    occ.reserved_name = Some("Bank OCC A/c".into());
+    groups.push(occ);
+    let rows = vec![row("Cash Credit", "Bank OCC A/c", "-10.00", "")];
+    let result = check_cash_flow(&admitted(rows), &groups, &typed_cash_flow("-10.00")).unwrap();
+    assert_eq!(result, CashFlowCheck::MoneyGroupUnmeasured { ledgers: 1 });
 }
 
 #[test]

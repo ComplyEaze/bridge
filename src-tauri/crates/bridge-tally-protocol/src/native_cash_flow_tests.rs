@@ -614,6 +614,16 @@ fn a_column_without_its_amount_element_is_refused_and_a_self_closed_amount_is_em
 }
 
 #[test]
+fn a_second_amount_element_in_one_column_is_refused_not_last_value_wins() {
+    let two = mutate(
+        &year(),
+        "<DSPDRAMT><DSPDRAMTA>-3864.02</DSPDRAMTA></DSPDRAMT>",
+        "<DSPDRAMT><DSPDRAMTA>-3864.02</DSPDRAMTA><DSPDRAMTA>1.00</DSPDRAMTA></DSPDRAMT>",
+    );
+    assert_eq!(parse_year(&two), invalid_response("cash_flow_column_shape"));
+}
+
+#[test]
 fn swapped_and_repeated_months_are_not_the_windows_months() {
     for xml in [
         // April twice, May gone.

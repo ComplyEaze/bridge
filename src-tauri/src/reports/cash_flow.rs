@@ -78,10 +78,10 @@ pub(crate) enum CashFlowCheck {
     /// A ledger under Bank OD A/c or Bank OCC A/c has movement in the window,
     /// and whether Tally's Cash Flow counts it is not measured.
     MoneyGroupUnmeasured { ledgers: usize },
-    /// Neither side carries an amount: the trial balance has no ledger under
-    /// Cash-in-Hand or Bank Accounts, or none of them has an amount, and every
-    /// month of Tally's Cash Flow is empty. An empty amount is not zero (§7), so
-    /// nothing was compared.
+    /// Nothing to tie: neither side carries an amount (no cash or bank ledger
+    /// with an amount, and every month of Tally's Cash Flow empty; an empty
+    /// amount is not zero, §7), or both sides net to zero, which would be equal
+    /// under any sign convention and any meaning of the columns.
     NothingToCompare,
 }
 
@@ -212,7 +212,13 @@ pub(crate) fn check_cash_flow(
     // A tie needs an amount on both sides: an empty side is not a zero, and months
     // that net to zero over no cash or bank ledger at all (no ledger amount) are
     // Tally printing figures nothing accounts for.
-    if tally_observed > 0 && ledger_observed > 0 && tally_net.numeric_eq(&ledger_net) {
+    let both_sides_have_amounts = tally_observed > 0 && ledger_observed > 0;
+    // Two zero nets are equal under any sign convention and any meaning of the
+    // columns, so they show nothing about either: not a tie.
+    if both_sides_have_amounts && tally_net.is_zero() && ledger_net.is_zero() {
+        return Ok(CashFlowCheck::NothingToCompare);
+    }
+    if both_sides_have_amounts && tally_net.numeric_eq(&ledger_net) {
         Ok(CashFlowCheck::Tied {
             net: tally_net,
             money_ledgers,

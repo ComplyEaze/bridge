@@ -13,6 +13,7 @@
 //! check's arithmetic is proven in `reports::cash_flow`, and the parser's
 //! refusals in `native_cash_flow`.
 use super::super::*;
+use super::unmeasured_shape;
 use tally_protocol_simulator::{
     Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -132,6 +133,15 @@ fn plans_ending_at_the_cash_flow(mut plans: Vec<ScenarioPlan>) -> Vec<ScenarioPl
 }
 
 async fn call(plans: Vec<ScenarioPlan>, from: &str, to: &str) -> (Value, usize, usize) {
+    let (response, observed, expected) = call_observed(plans, from, to).await;
+    (response, observed.len(), expected)
+}
+
+async fn call_observed(
+    plans: Vec<ScenarioPlan>,
+    from: &str,
+    to: &str,
+) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, usize) {
     let expected = plans.len();
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -154,7 +164,7 @@ async fn call(plans: Vec<ScenarioPlan>, from: &str, to: &str) -> (Value, usize, 
             json!({"company_guid": GUID, "from": from, "to": to}),
         )
         .await;
-    (response, simulator.finish().unwrap().len(), expected)
+    (response, simulator.finish().unwrap(), expected)
 }
 
 fn result(response: &Value) -> &Value {
@@ -189,6 +199,8 @@ async fn a_net_that_ties_returns_the_months_and_says_what_was_checked() {
     assert_eq!(months[1]["closing"], json!({"state": "empty"}));
     assert_eq!(result["net_total"]["state"], "checked");
     assert_eq!(result["net_total"]["value"], "-4950.00");
+    // Debit-only months in one year: the measured shape, so nothing is flagged.
+    assert_eq!(result["unmeasured_in_this_answer"], json!([]));
     assert_eq!(
         result["basis"],
         "tally_native_cash_flow_net_checked_against_trial_balance"
@@ -215,7 +227,7 @@ async fn a_net_that_ties_returns_the_months_and_says_what_was_checked() {
         "{lead}"
     );
     assert!(
-        lead.contains("no month with an outflow has been measured"),
+        lead.contains("No month with an outflow has been measured"),
         "{lead}"
     );
     assert!(
@@ -343,7 +355,7 @@ async fn a_book_with_no_cash_or_bank_ledger_and_an_empty_cash_flow_is_not_called
     assert_eq!(result["net_total"]["state"], "not_checked");
     assert_eq!(result["checks"]["net_total"], "not_checked");
     let lead = lead(&response);
-    assert!(lead.contains("nothing was checked"), "{lead}");
+    assert!(lead.contains("Nothing could be tied"), "{lead}");
     assert!(!lead.contains("equals the cash and bank ledgers"), "{lead}");
 }
 
@@ -403,6 +415,79 @@ async fn a_cash_flow_that_changes_between_its_two_reads_is_refused_as_its_own_dr
     let error = &response["structuredContent"]["result"]["error"];
     assert_eq!(error["code"], "cash_flow_read_failed", "{response}");
     assert_eq!(error["cause"], "native_cash_flow_changed", "{response}");
+}
+
+fn row_with(
+    month: u8,
+    credit: Option<&str>,
+    closing: Option<&str>,
+) -> bridge_tally_protocol::native_cash_flow::NativeCashFlowRow {
+    use bridge_tally_protocol::native_statement_reports::NativeStatementAmount as Amount;
+    let amount = |value: Option<&str>| {
+        value.map_or(Amount::Empty, |text| {
+            Amount::Present(bridge_tally_core::ExactDecimal::parse(text).unwrap())
+        })
+    };
+    bridge_tally_protocol::native_cash_flow::NativeCashFlowRow {
+        month: bridge_tally_protocol::native_cash_flow::CashFlowMonth { year: 2026, month },
+        debit: Amount::Empty,
+        credit: amount(credit),
+        closing: amount(closing),
+    }
+}
+
+#[test]
+fn only_the_measured_shape_leaves_the_unmeasured_list_empty() {
+    use bridge_tally_protocol::native_cash_flow::NativeCashFlow;
+    let flow = |rows| NativeCashFlow { rows };
+    // Debit-only months, a negative closing, inside one March-to-March year: measured.
+    assert!(unmeasured_shape(&flow(vec![
+        row_with(4, None, Some("-10.00")),
+        row_with(5, None, None)
+    ]))
+    .is_empty());
+    // A printed zero credit or closing is not a credit or an outflow.
+    assert!(unmeasured_shape(&flow(vec![row_with(4, Some("0.00"), Some("0.00"))])).is_empty());
+    assert_eq!(
+        unmeasured_shape(&flow(vec![row_with(4, Some("5.00"), Some("-10.00"))])),
+        vec!["credit_amount_present"]
+    );
+    assert_eq!(
+        unmeasured_shape(&flow(vec![row_with(4, None, Some("5.00"))])),
+        vec!["positive_closing"]
+    );
+    assert_eq!(
+        unmeasured_shape(&flow(vec![
+            row_with(3, None, Some("-1.00")),
+            row_with(4, None, None)
+        ])),
+        vec!["window_runs_from_march_into_april"]
+    );
+    // March alone, or April then March of the next year, is not a March-into-April run.
+    assert!(unmeasured_shape(&flow(vec![row_with(3, None, None)])).is_empty());
+}
+
+#[tokio::test]
+async fn the_request_on_the_wire_is_the_cash_flow_of_this_company_and_window() {
+    // The simulator keeps a hash of each request body: the production call site must have sent
+    // Tally's `Cash Flow` for the verified company and the whole-month window, twice (the paired read).
+    use sha2::{Digest, Sha256};
+    let (response, observed, expected) =
+        call_observed(plans("-4950.00"), "2026-04-01", "2026-06-30").await;
+    assert_eq!(observed.len(), expected);
+    assert_ne!(response["isError"], true, "{response}");
+    let request = r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Cash Flow</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>Bridge Ageing Lab</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">20260401</SVFROMDATE><SVTODATE TYPE="Date">20260630</SVTODATE></STATICVARIABLES></DESC></BODY></ENVELOPE>"#;
+    let mut body = vec![0xFF, 0xFE];
+    body.extend(request.encode_utf16().flat_map(u16::to_le_bytes));
+    let sha: String = Sha256::digest(&body)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let sent = observed
+        .iter()
+        .filter(|request| request.request_body_sha256 == sha)
+        .count();
+    assert_eq!(sent, 2, "the Cash Flow request, read twice");
 }
 
 #[tokio::test]

@@ -527,7 +527,7 @@ fn each_reason_has_its_own_next_step() {
 // ---- cash flow ----
 
 fn cash_flow_basis(outcome: CashFlowOutcome) -> CashFlowBasis {
-    CashFlowBasis::new(date("20250401"), date("20260331"), outcome)
+    CashFlowBasis::new(date("20250401"), date("20260331"), outcome, false)
 }
 
 #[test]
@@ -558,7 +558,7 @@ fn every_cash_flow_state_that_is_not_established_leads_with_it_and_withholds_the
             CashFlowOutcome::MoneyGroupUnmeasured,
             "Bank OD A/c or Bank OCC A/c",
         ),
-        (CashFlowOutcome::NothingToCompare, "nothing was checked"),
+        (CashFlowOutcome::NothingToCompare, "Nothing could be tied"),
     ] {
         let basis = cash_flow_basis(outcome);
         let lead = basis.headline(&company()).lead;
@@ -567,8 +567,40 @@ fn every_cash_flow_state_that_is_not_established_leads_with_it_and_withholds_the
             "{lead}"
         );
         assert!(lead.contains(words), "{lead}");
-        assert!(lead.contains("the months are withheld"), "{lead}");
+        assert!(lead.contains("months are withheld"), "{lead}");
         assert!(basis.months_withheld());
     }
     assert!(!cash_flow_basis(CashFlowOutcome::Tied).months_withheld());
+}
+
+#[test]
+fn a_tied_cash_flow_with_an_unmeasured_shape_says_so_in_its_lead() {
+    let measured = CashFlowBasis::new(
+        date("20250401"),
+        date("20260331"),
+        CashFlowOutcome::Tied,
+        false,
+    )
+    .headline(&company())
+    .lead;
+    assert!(
+        measured.contains("No month with an outflow has been measured"),
+        "{measured}"
+    );
+    let unmeasured = CashFlowBasis::new(
+        date("20250401"),
+        date("20260331"),
+        CashFlowOutcome::Tied,
+        true,
+    )
+    .headline(&company())
+    .lead;
+    assert!(
+        unmeasured.contains("treat each month's figure as unverified"),
+        "{unmeasured}"
+    );
+    assert!(
+        !unmeasured.contains("No month with an outflow"),
+        "{unmeasured}"
+    );
 }

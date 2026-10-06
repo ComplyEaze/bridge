@@ -24,6 +24,37 @@ fn checks(check: &CashFlowCheck) -> Value {
     })
 }
 
+/// What this Cash Flow answer holds that has not been measured against Tally. The
+/// measured shape is debit-only months, a negative closing and a window inside one
+/// March-to-March year; anything else is named here, so the result says so itself
+/// and not only the fixed `limitations`.
+fn unmeasured_shape(
+    cash_flow: &bridge_tally_protocol::native_cash_flow::NativeCashFlow,
+) -> Vec<&'static str> {
+    use bridge_tally_protocol::native_statement_reports::NativeStatementAmount::Present;
+    let mut found = Vec::new();
+    if cash_flow
+        .rows
+        .iter()
+        .any(|row| matches!(&row.credit, Present(value) if !value.is_zero()))
+    {
+        found.push("credit_amount_present");
+    }
+    if cash_flow.rows.iter().any(
+        |row| matches!(&row.closing, Present(value) if !value.is_zero() && !value.as_str().starts_with('-')),
+    ) {
+        found.push("positive_closing");
+    }
+    if cash_flow
+        .rows
+        .windows(2)
+        .any(|pair| pair[0].month.month == 3 && pair[1].month.month == 4)
+    {
+        found.push("window_runs_from_march_into_april");
+    }
+    found
+}
+
 impl Server {
     pub(super) async fn cash_flow(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
         let guid = required_string(args, "company_guid")?;
@@ -89,10 +120,12 @@ impl Server {
                 }),
             ),
         };
+        let unmeasured = unmeasured_shape(&read.cash_flow);
         let basis = headline::CashFlowBasis::new(
             trial_balance.from.clone(),
             trial_balance.to.clone(),
             outcome,
+            !unmeasured.is_empty(),
         );
         // One decision: the months are withheld exactly when the headline says so.
         let months = (!basis.months_withheld()).then(|| {
@@ -126,6 +159,9 @@ impl Server {
             "currency": trial_balance.currency, "read_at": trial_balance.read_at,
             "months": months,
             "net_total": net_total,
+            // What this answer holds that was never measured against Tally: empty when it
+            // has only the measured shape (debit-only months inside one March-to-March year).
+            "unmeasured_in_this_answer": unmeasured,
             "checks": checks(&read.check),
             "verification": VERIFICATION,
             "limitations": [

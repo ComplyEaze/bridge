@@ -403,9 +403,8 @@ statement under AS 3. The window must be whole months: `from` the 1st of a month
 (a month name, with no year) can be placed in its year. Otherwise the call is
 refused before any trial balance or report request, after the status and company reads (`cash_flow_window_not_month_start`,
 `cash_flow_window_not_month_end`, `cash_flow_window_too_many_months`; a window starting
-before the book is `trial_balance_before_books`, and `cash_flow_window_reversed` and
-`cash_flow_window_unsupported_boundary` are the other window refusals). Education
-mode and a book with several currency masters are refused, as for the statements.
+before the book is `trial_balance_before_books`; a reversed window is `invalid_date_range`).
+Education mode and a book with several currency masters are refused, as for the statements.
 
 The months are returned only once the **net total** of the whole window has been
 compared with the trial balance read for the same window and found equal: the
@@ -423,11 +422,22 @@ The top-level `state` is `observed` when the months are returned and
 - `cash_flow_money_group_unmeasured`: a ledger under Bank OD A/c or Bank OCC A/c
   has movement in the window, and whether Tally's Cash Flow counts such a ledger
   has not been measured. `months` is `null`.
-- `cash_flow_nothing_to_compare`: neither the cash and bank ledgers of the trial
-  balance nor Tally's Cash Flow carry an amount for the window (no such ledger, or
-  none with an amount, and every month empty), so nothing was compared. An empty
-  amount is not a zero. `months` is `null`. Months that net to zero over no cash or
-  bank ledger at all are `cash_flow_differs_from_trial_balance`, not a tie.
+- `cash_flow_nothing_to_compare`: nothing could be tied. Either neither the cash and
+  bank ledgers of the trial balance nor Tally's Cash Flow carry an amount for the
+  window (an empty amount is not a zero), or both sides net to zero, which would be
+  equal under any sign convention and any meaning of the columns. `months` is
+  `null`. Months that net to zero over no cash or bank ledger at all are
+  `cash_flow_differs_from_trial_balance`, not a tie.
+
+`unmeasured_in_this_answer` lists, in the result itself, what this answer holds that
+has never been measured against Tally: `credit_amount_present` (a non-zero credit
+column), `positive_closing` (a closing on the credit side, an outflow) and
+`window_runs_from_march_into_april` (a window across a financial year of the usual
+April-to-March kind). It is empty only for the measured shape (debit-only months in
+one year), and when it is not empty the lead says to treat each month's figure as
+unverified and compare it with Tally's own Cash Flow. A bank ledger placed under
+another group, a liability one for example, is not counted as cash or bank: if Tally
+counts it the net total differs and the result is `not_established`.
 
 `checks` says per field what was `checked`, `differs` (compared, and the figures
 disagree), `not_checked` or `withheld`: the net total is checked; the split into months is Tally's own and is not checked (a total

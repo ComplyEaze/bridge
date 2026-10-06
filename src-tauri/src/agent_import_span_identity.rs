@@ -327,7 +327,9 @@ pub(super) fn bind(
 /// amount that does not parse is a difference, never a match.
 fn content_differences(voucher: &ImportVoucher, row: &ReadVoucher) -> Vec<&'static str> {
     let mut fields = Vec::new();
-    let date = normalized_date(&voucher.date).ok();
+    let date = normalized_date(&voucher.date)
+        .ok()
+        .map(|date| date.as_str().to_string());
     if date.is_none() || row.date != date {
         fields.push("date");
     }
@@ -385,7 +387,7 @@ fn content_differences(voucher: &ImportVoucher, row: &ReadVoucher) -> Vec<&'stat
         }
         _ => fields.push("entries"),
     }
-    let sent_narration = voucher.narration.as_deref().unwrap_or("").trim();
+    let sent_narration = super::posted_narration(voucher).unwrap_or("");
     if row.narration.as_deref().unwrap_or("") != sent_narration {
         fields.push("narration");
     }

@@ -728,9 +728,11 @@ pub struct RuntimeReadEvidence {
 tokio::task_local! {
     /// The cancellation of the one agent tool call running in this task, when
     /// its caller can withdraw it (an MCP `notifications/cancelled`, or the host
-    /// closing its input). Checked before each queued operation starts, never
-    /// during one: an operation already sent to Tally runs to completion, since
-    /// abandoning a request does not stop Tally (protocol reference §11b.2).
+    /// closing its input). Checked before each queued operation starts. Within
+    /// an operation it is checked only by the queued post's reads before its
+    /// intent (#778), and only before each request starts: a request already
+    /// sent to Tally runs to completion, since abandoning a request does not
+    /// stop Tally (protocol reference §11b.2).
     pub(crate) static TOOL_CANCELLATION: CancellationToken;
 }
 
@@ -773,15 +775,29 @@ pub(crate) async fn with_operation_wire_budget_of<F: Future>(
         .await
 }
 
+/// What the enclosing operation's shared wire-wait budget has left, or `None`
+/// when no runtime operation of it has drawn on one yet, so the next would
+/// start a fresh one at the policy's total (#893).
+pub(crate) fn operation_wire_budget_remaining() -> Option<std::time::Duration> {
+    OPERATION_WIRE_BUDGET
+        .try_with(|shared| shared.get().map(WireWaitBudget::remaining))
+        .ok()
+        .flatten()
+}
+
 /// A failed pre-intent read as the typed admission refusal, with the transport
 /// failure as context (a context value is not reachable by `downcast_ref`). A
 /// wire refusal stays the error itself: it says the port was busy, with a
-/// retry time, and nothing was sent.
+/// retry time, and nothing was sent. So does a send the call withdrew before
+/// it started (#778): it names the withdrawal, and nothing was sent.
 fn unconfirmed_unless_wire_refused(
     error: anyhow::Error,
     unconfirmed: super::approved_import::ApprovedImportAdmissionError,
 ) -> anyhow::Error {
-    if crate::endpoint_wire::wire_refusal(&error).is_some() {
+    let withdrawn = error.chain().any(|cause| {
+        cause.downcast_ref::<TallyTransportError>() == Some(&TallyTransportError::SendWithdrawn)
+    });
+    if withdrawn || crate::endpoint_wire::wire_refusal(&error).is_some() {
         return error;
     }
     anyhow::Error::new(unconfirmed).context(format!("{error:#}"))
@@ -2110,6 +2126,8 @@ fn outstandings_read_failure_reason(error: &anyhow::Error) -> &'static str {
                 "segment_response_encoding_invalid"
             }
             TallyTransportError::WireRefused { refusal } => refusal.safe_code(),
+            // Only the queued post gates its sends (#778); named all the same.
+            TallyTransportError::SendWithdrawn => "request_cancelled",
         };
     }
     let deadline_exceeded = error.chain().any(|cause| {
@@ -2669,8 +2687,9 @@ impl TallyRuntime {
         F: FnMut(TallyClient) -> Fut,
         Fut: Future<Output = anyhow::Result<T>>,
     {
-        // The only point a withdrawn agent tool call stops: before this
-        // operation is queued, so nothing further is sent. Never mid-operation.
+        // A withdrawn agent tool call stops here, before this operation is
+        // queued, so nothing further is sent. The one exception is the queued
+        // post's reads before its intent, which stop between requests (#778).
         if TOOL_CANCELLATION
             .try_with(CancellationToken::is_cancelled)
             .unwrap_or(false)
@@ -2999,6 +3018,8 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::None,
+            // Left retrying: no agent tool calls this read, only tests, so the
+            // single-attempt rule for agent catalogue reads does not reach it (#937).
             ReadRetryPolicy::transient_default(),
         )
         .await
@@ -3023,7 +3044,10 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::SingleInrMaster,
-            ReadRetryPolicy::transient_default(),
+            // Sent once, as the movement catalogue is: a catalogue that outlived
+            // its deadline is abandoned, and sending it again queues more work
+            // behind a gateway still building the response (#485, #937).
+            ReadRetryPolicy::SINGLE_ATTEMPT,
         )
         .await
         .map(|read| read.listing)
@@ -3046,7 +3070,8 @@ impl TallyRuntime {
                 None,
                 true,
                 LedgerCurrencyGate::SingleInrMaster,
-                ReadRetryPolicy::transient_default(),
+                // Sent once, as above (#485, #937).
+                ReadRetryPolicy::SINGLE_ATTEMPT,
             )
             .await?;
         let Some(groups) = read.groups else {
@@ -3782,6 +3807,8 @@ impl TallyRuntime {
     {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
+        // The calling tool's withdrawal, when it can be withdrawn (#778).
+        let withdrawal = TOOL_CANCELLATION.try_with(Clone::clone).ok();
         self.execute(
             config,
             ReadOperation::Import,
@@ -3789,6 +3816,14 @@ impl TallyRuntime {
             |client| {
                 let identity = identity.clone();
                 let request = request.clone();
+                // Every read before the intent goes through `reads`: a
+                // withdrawn call finishes the read in flight and starts no
+                // other (#778). The POST keeps `client`, so nothing gated can
+                // stand between the intent and its send.
+                let reads = match &withdrawal {
+                    Some(token) => client.withdrawable(token.clone()),
+                    None => client.clone(),
+                };
                 let xml = request.xml().to_string();
                 let recheck_admission = &recheck_admission;
                 let before_dispatch = &before_dispatch;
@@ -3804,8 +3839,8 @@ impl TallyRuntime {
                         // stale during queued source reads, so the same admission is
                         // repeated after the catalogue, before the final absence reads.
                         let (opening_profile, opening_mode_evidence) =
-                            observe_read_boundary(&client).await?;
-                        let (opening_companies, opening_company_evidence) = client
+                            observe_read_boundary(&reads).await?;
+                        let (opening_companies, opening_company_evidence) = reads
                             .fetch_companies_with_wire_evidence()
                             .await
                             .map_err(|error| {
@@ -3833,7 +3868,7 @@ impl TallyRuntime {
                         // after the catalogue re-read below. As for the aim read, a
                         // failure is the typed refusal itself: nothing was sent.
                         let binding_marks_xml = request.company_marks_request().into_xml();
-                        let binding_marks = client
+                        let binding_marks = reads
                             .post_xml_raw(binding_marks_xml.clone())
                             .await
                             .map_err(|error| {
@@ -3851,7 +3886,7 @@ impl TallyRuntime {
                             binding_marks.encoded_body.len(),
                         ));
                         let (catalogue, catalogue_evidence) = fetch_admitted_agent_read(
-                            &client,
+                            &reads,
                             &identity,
                             request.ledger_catalogue_request(),
                         )
@@ -3865,7 +3900,7 @@ impl TallyRuntime {
                         let (groups, admission_evidence) = match request.group_collection_request() {
                             Some(group_request) => {
                                 let (groups, group_evidence) =
-                                    fetch_admitted_agent_read(&client, &identity, group_request)
+                                    fetch_admitted_agent_read(&reads, &identity, group_request)
                                         .await
                                         .map_err(|error| {
                                             with_read_evidence(error, admission_evidence.clone())
@@ -3878,15 +3913,15 @@ impl TallyRuntime {
                         // same brackets: it goes only into a book with exactly one
                         // (bridge#551), and one can be added while approval waits.
                         let (currencies, currency_evidence) =
-                            fetch_admitted_agent_read(&client, &identity, request.currency_request())
+                            fetch_admitted_agent_read(&reads, &identity, request.currency_request())
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
                         let admission_evidence = admission_evidence.combine(currency_evidence);
-                        let (profile, mode_evidence) = observe_read_boundary(&client)
+                        let (profile, mode_evidence) = observe_read_boundary(&reads)
                             .await
                             .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
                         let admission_evidence = admission_evidence.combine(mode_evidence);
-                        let (companies, company_evidence) = client
+                        let (companies, company_evidence) = reads
                             .fetch_companies_with_wire_evidence()
                             .await
                             .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3905,7 +3940,7 @@ impl TallyRuntime {
                         // the company-marks snapshot that aims the POST (#574)
                         // follows this verdict, and no profile or catalogue read.
                         let (first_read, first_evidence) = fetch_admitted_agent_read(
-                            &client,
+                            &reads,
                             &identity,
                             request.verification_request(),
                         )
@@ -3913,7 +3948,7 @@ impl TallyRuntime {
                         .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
                         let admission_evidence = admission_evidence.combine(first_evidence);
                         let (second_read, second_evidence) = fetch_admitted_agent_read(
-                            &client,
+                            &reads,
                             &identity,
                             request.verification_request(),
                         )
@@ -3930,7 +3965,7 @@ impl TallyRuntime {
                         // failure as context: a context value is not reachable by
                         // `downcast_ref` on the chain, and a failed read here means
                         // nothing was sent, never an unknown outcome.
-                        let before_marks = client.post_xml_raw(marks_xml.clone()).await.map_err(|error| {
+                        let before_marks = reads.post_xml_raw(marks_xml.clone()).await.map_err(|error| {
                             with_read_evidence(
                                 unconfirmed_unless_wire_refused(
                                     error,
@@ -5279,8 +5314,10 @@ fn classify_failure(error: &anyhow::Error) -> ReadFailureClass {
             | TallyTransportError::ClientInitializationFailed
             // A wire-gate refusal sent nothing: it is neither retried by the
             // read policy (the gate already waited its bound) nor a transport
-            // failure for the circuit breaker.
-            | TallyTransportError::WireRefused { .. },
+            // failure for the circuit breaker. Nor is a send its caller
+            // withdrew before it started (#778).
+            | TallyTransportError::WireRefused { .. }
+            | TallyTransportError::SendWithdrawn,
         ) => ReadFailureClass::Validation,
         None => ReadFailureClass::Validation,
     }

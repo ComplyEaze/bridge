@@ -266,6 +266,8 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
     let server = Server::new(settings.clone());
     let initial = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -441,6 +443,8 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -543,6 +547,8 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -631,6 +637,8 @@ fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -804,6 +812,8 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -838,6 +848,8 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1059,6 +1071,8 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1151,6 +1165,8 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1220,6 +1236,8 @@ fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
     duplicate.bridge_txn_id = "txn-duplicate".to_string();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1283,6 +1301,8 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
     duplicate.bridge_txn_id = "txn-duplicate".to_string();
     let mut line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1353,6 +1373,8 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1419,6 +1441,8 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     validate_payload(&input).expect("leading zeros satisfy the input contract");
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1479,6 +1503,8 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1886,6 +1912,69 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
     }
 }
 
+/// A V2 catalogue answer with every ledger's flag set here: the names in
+/// `bill_wise` Yes, every other No.
+///
+/// A REGRESSION DOUBLE over a live capture (AGENTS.md P1): only the flag column
+/// is rewritten; names, GUIDs, parents and layout are the capture's. It
+/// exercises the build's and the post's own rules. What Tally answers to the
+/// V2 request is pinned on the captures themselves
+/// (`agent_import_bill_wise_tests.rs`, `tests/standard_ledger_catalogue_rows.rs`).
+pub(super) fn with_bill_wise_flags(catalogue: &str, bill_wise: &[&str]) -> String {
+    const OPEN: &str = "<LEDGER NAME=\"";
+    const FLAG: &str = "<ISBILLWISEON TYPE=\"Logical\">";
+    let mut out = String::with_capacity(catalogue.len());
+    let mut rest = catalogue;
+    while let Some(start) = rest.find(OPEN) {
+        let after = &rest[start + OPEN.len()..];
+        let name = &after[..after.find('"').expect("a ledger name closes")];
+        let name = name
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#13;", "\r")
+            .replace("&#10;", "\n");
+        let row_end = after.find("</LEDGER>").expect("a ledger closes");
+        let flag_at = after[..row_end]
+            .find(FLAG)
+            .expect("a V2 row carries its flag")
+            + FLAG.len();
+        let flag_end = flag_at + after[flag_at..].find('<').expect("the flag closes");
+        out.push_str(&rest[..start + OPEN.len() + flag_at]);
+        out.push_str(if bill_wise.contains(&name.as_str()) {
+            "Yes"
+        } else {
+            "No"
+        });
+        out.push_str(&after[flag_end..row_end]);
+        rest = &after[row_end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The import cycle with its two ledger catalogue answers (offsets 5 and 7) the
+/// V2 answer the import family reads (#1234): the same book, each
+/// ledger's `ISBILLWISEON` in the row, none of them bill-wise. Every other
+/// reader of the cycle keeps the V1 answers.
+fn import_family_cycle_plans() -> Vec<ScenarioPlan> {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    );
+    let words = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+    let catalogue = with_bill_wise_flags(
+        &String::from_utf16(&words).expect("captured native V2 catalogue"),
+        &[],
+    );
+    let mut plans = import_cycle_plans();
+    for index in [5, 7] {
+        plans[index].fixture = Fixture::SyntheticXml(catalogue.clone());
+    }
+    plans
+}
+
 fn import_cycle_plans() -> Vec<ScenarioPlan> {
     let company = format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME=\"WR2 Unicode Lab\"><GUID>{CAPTURED_GUID}</GUID><COMPANYNUMBER>1</COMPANYNUMBER><BOOKSFROM>20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>");
     // Replay byte-exact live catalogue; only the simulator inputs adapt to it.
@@ -2277,6 +2366,235 @@ mod boundary_tests;
 #[path = "agent_import_multiplicity_tests.rs"]
 mod multiplicity_tests;
 
+/// The L1 capture's batch and verification rows (#806): L1A-050 was
+/// cancelled (voucher 352) and its content entered again by hand (353).
+fn l1_reentry_line_and_rows() -> (ImportLedgerLine, Vec<ReadVoucher>) {
+    let journal = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-journal.jsonl"
+    );
+    let line = serde_json::from_str(journal.lines().next().expect("the built batch")).unwrap();
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-import-verification.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let rows = parse_import_vouchers(&xml, "17a10910-773c-42c6-bd66-7bba9a392536")
+        .unwrap()
+        .rows;
+    (line, rows)
+}
+
+/// Only effective, unmarked rows that no batch voucher took are copies of a
+/// cancelled voucher (#806), and at most five are listed while the count stays
+/// exact. Each variant is the captured re-entry, 353, under another identity.
+#[test]
+fn only_effective_unmarked_rows_count_as_copies_of_a_cancelled_voucher() {
+    let (line, rows) = l1_reentry_line_and_rows();
+    let re_entry = rows
+        .iter()
+        .find(|row| row.alter_id == Some(1790))
+        .expect("the captured re-entry")
+        .clone();
+    let variant = |at: u64, change: fn(&mut ReadVoucher)| {
+        let mut row = re_entry.clone();
+        row.alter_id = Some(at);
+        row.master_id = Some(at.to_string());
+        row.guid = Some(format!("17a10910-773c-42c6-bd66-7bba9a392536-{at:08x}"));
+        row.remote_id = row.guid.clone();
+        change(&mut row);
+        row
+    };
+    let cancelled_item = |rows: &[ReadVoucher]| {
+        let verified = verify_observed_batch(&line, rows).unwrap();
+        let item = verified["vouchers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["bridge_txn_id"] == "L1A-050")
+            .unwrap()
+            .clone();
+        assert_eq!(item["status"], "posted_not_effective");
+        (
+            item,
+            verified["counts"]["cancelled_with_effective_copy"].clone(),
+        )
+    };
+    let (item, count) = cancelled_item(&rows);
+    assert_eq!(item["effective_copies_observed"]["count"], 1);
+    assert_eq!(count, 1);
+    for change in [
+        (|row: &mut ReadVoucher| {
+            row.narration =
+                Some("manual re-entry [BRIDGE:00000000-0000-4000-8000-000000000806]".into());
+        }) as fn(&mut ReadVoucher),
+        |row| row.cancelled = Some(true),
+        |row| row.optional = Some(true),
+    ] {
+        let mut more = rows.clone();
+        more.push(variant(3000, change));
+        let (item, count) = cancelled_item(&more);
+        assert_eq!(item["effective_copies_observed"]["count"], 1, "{item}");
+        assert_eq!(count, 1);
+    }
+    let mut many = rows.clone();
+    // Appended out of AlterID order, so the listed five are sorted, not as found.
+    many.extend((3001..=3006).rev().map(|at| variant(at, |_| {})));
+    let (item, count) = cancelled_item(&many);
+    let copies = &item["effective_copies_observed"];
+    assert_eq!(copies["count"], 7, "{item}");
+    assert_eq!(count, 1);
+    let alter_ids = copies["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["alter_id"].as_u64().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(alter_ids, [1790, 3001, 3002, 3003, 3004], "{item}");
+}
+
+/// A copy must carry the cancelled voucher's own content and be left over by
+/// the rest of the batch (#806, from #1221's review): a re-entry with another
+/// amount, sign, ledger or date is not one, a copy another batch voucher of
+/// the same content took is not one, and one below the pre-import mark is
+/// listed and flagged.
+#[test]
+fn a_copy_must_carry_the_cancelled_vouchers_own_content_left_unconsumed() {
+    let (line, rows) = l1_reentry_line_and_rows();
+    let re_entry = rows
+        .iter()
+        .find(|row| row.alter_id == Some(1790))
+        .expect("the captured re-entry")
+        .clone();
+    let variant = |at: u64, change: &dyn Fn(&mut ReadVoucher)| {
+        let mut row = re_entry.clone();
+        row.alter_id = Some(at);
+        // An identity no captured row holds, even where AlterID is below
+        // the captured range.
+        let id = 900_000 + at;
+        row.master_id = Some(id.to_string());
+        row.guid = Some(format!("17a10910-773c-42c6-bd66-7bba9a392536-{id:08x}"));
+        row.remote_id = row.guid.clone();
+        change(&mut row);
+        row
+    };
+    let item_of = |line: &ImportLedgerLine, rows: &[ReadVoucher], txn: &str| {
+        let verified = verify_observed_batch(line, rows).expect("verified");
+        let item = verified["vouchers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["bridge_txn_id"] == txn)
+            .unwrap()
+            .clone();
+        (item, verified["counts"].clone())
+    };
+    // Another amount, sign, ledger or date: the same voucher in every other
+    // respect, so only the fingerprint keeps it out.
+    let changes: [&dyn Fn(&mut ReadVoucher); 4] = [
+        &|row| {
+            for entry in &mut row.entries {
+                entry.amount = entry.amount.replace("50.00", "60.00");
+            }
+        },
+        &|row| {
+            for entry in &mut row.entries {
+                entry.amount = if entry.amount.starts_with('-') {
+                    entry.amount.trim_start_matches('-').to_string()
+                } else {
+                    format!("-{}", entry.amount)
+                };
+                entry.is_deemed_positive = if entry.is_deemed_positive == "Yes" {
+                    "No".into()
+                } else {
+                    "Yes".into()
+                };
+            }
+        },
+        &|row| {
+            for entry in &mut row.entries {
+                if entry.ledger == "Cash" {
+                    entry.ledger = "Petty Cash".into();
+                }
+            }
+        },
+        &|row| row.date = Some("20260618".into()),
+    ];
+    for change in changes {
+        let mut rows = rows.clone();
+        rows.retain(|row| row.alter_id != Some(1790));
+        rows.push(variant(3000, change));
+        let (item, counts) = item_of(&line, &rows, "L1A-050");
+        assert_eq!(item["effective_copies_observed"]["count"], 0, "{item}");
+        assert_eq!(counts["cancelled_with_effective_copy"], 0);
+    }
+    // Another batch voucher of the same content takes the copy first.
+    let mut twinned = line.clone();
+    let mut twin = twinned
+        .vouchers
+        .iter()
+        .find(|voucher| voucher.bridge_txn_id == "L1A-050")
+        .unwrap()
+        .clone();
+    twin.bridge_txn_id = "L1A-051".into();
+    twinned.vouchers.push(twin);
+    let (item, counts) = item_of(&twinned, &rows, "L1A-050");
+    assert_eq!(
+        item["effective_copies_observed"],
+        json!({"count":0,"entries":[],"attribution":"not_established","ambiguous_within_batch":true}),
+        "{item}"
+    );
+    assert_eq!(counts["cancelled_with_effective_copy"], 0);
+    let (took, _) = item_of(&twinned, &rows, "L1A-051");
+    assert_eq!(took["status"], "matching_content_observed", "{took}");
+    assert_eq!(
+        took["guid"],
+        "17a10910-773c-42c6-bd66-7bba9a392536-000006b8"
+    );
+    // A copy below the pre-import mark (1738) is listed and flagged.
+    let mut below = rows.clone();
+    below.push(variant(1700, &|_| {}));
+    let (item, _) = item_of(&line, &below, "L1A-050");
+    let entries = &item["effective_copies_observed"]["entries"];
+    assert_eq!(item["effective_copies_observed"]["count"], 2, "{item}");
+    assert_eq!(entries[0]["alter_id"], 1700, "{item}");
+    assert_eq!(entries[0]["before_pre_import_mark"], true, "{item}");
+    assert_eq!(entries[1]["before_pre_import_mark"], false, "{item}");
+    // A copy read with no AlterID cannot be placed against the mark. (With
+    // no mark at all nothing is attributed, so no item is cancelled.)
+    let mut no_alter_id = rows.clone();
+    no_alter_id.retain(|row| row.alter_id != Some(1790));
+    no_alter_id.push(variant(3000, &|row| row.alter_id = None));
+    let (item, _) = item_of(&line, &no_alter_id, "L1A-050");
+    assert_eq!(item["effective_copies_observed"]["count"], 1, "{item}");
+    assert_eq!(
+        item["effective_copies_observed"]["entries"][0]["before_pre_import_mark"],
+        Value::Null,
+        "{item}"
+    );
+    // An optional voucher is not cancelled: it keeps its entries and carries
+    // no copy field at all.
+    let mut optional = rows.clone();
+    let cancelled = optional
+        .iter_mut()
+        .find(|row| row.alter_id == Some(1789))
+        .unwrap();
+    cancelled.cancelled = Some(false);
+    cancelled.optional = Some(true);
+    cancelled.entries = re_entry.entries.clone();
+    let (item, _) = item_of(&line, &optional, "L1A-050");
+    assert_eq!(
+        item,
+        json!({"bridge_txn_id":"L1A-050","status":"posted_not_effective","marker":"narration_tag",
+            "reason":"voucher_optional","voucher_number":"352",
+            "guid":"17a10910-773c-42c6-bd66-7bba9a392536-000006b7","master_id":"1719","alter_id":1789})
+    );
+}
+
 fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Result<Value, String> {
     verify_batch(
         line,
@@ -2555,8 +2873,11 @@ mod qualification_tests;
 #[path = "agent_import_bank_tests.rs"]
 mod bank_tests;
 
+#[path = "agent_import_bill_wise_build_tests.rs"]
+mod bill_wise_build_tests;
+
 fn qualified_import_cycle_plans() -> Vec<ScenarioPlan> {
-    let cycle = import_cycle_plans();
+    let cycle = import_family_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
     [
         probe.clone(),
@@ -2606,9 +2927,13 @@ fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_per
     // Guard both production renderers against restoring that dependency; this
     // request test does not simulate or qualify Tally's date behavior.
     let (from, to) = ("20260815", "20260822");
+    let typed = (
+        &crate::agent::tally_date(from),
+        &crate::agent::tally_date(to),
+    );
     let requests = [
-        render_import_verification_read("Synthetic Book", from, to),
-        super::super::render_agent_vouchers("Synthetic Book", from, to, None).unwrap(),
+        render_import_verification_read("Synthetic Book", typed.0, typed.1),
+        super::super::render_agent_vouchers("Synthetic Book", typed.0, typed.1, None).unwrap(),
     ];
     for request in requests {
         let mut reader = quick_xml::Reader::from_str(&request);
@@ -2688,6 +3013,8 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         batch_id: "batch-dispatched-endpoint".into(),
         identity_scheme: Some(ImportIdentityScheme::BatchV1),
         amends_batch_id: None,
@@ -3650,6 +3977,8 @@ fn divergent_verification() -> Value {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -3878,6 +4207,36 @@ fn the_first_verification_page_masks_ledger_names_under_mask_parties() {
     }
 }
 
+/// The first line names Tally's rejection only when Tally's own answer
+/// reported every voucher of the post as not created; a partly created batch,
+/// or a post whose vouchers were found or are not attributed, keeps the
+/// `refused` line unchanged (#1108).
+#[test]
+fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_not_created() {
+    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+    let rejected =
+        "Tally reported that this post created none of its vouchers: follow each voucher's next step.";
+    let summary = |statuses: &[&str]| {
+        let vouchers = statuses
+            .iter()
+            .map(|status| json!({ "status": status }))
+            .collect::<Vec<_>>();
+        with_post_span_summary(json!({ "state": "refused" }), &json!(vouchers))["summary"].clone()
+    };
+    assert_eq!(summary(&["tally_reported_not_created"]), rejected);
+    assert_eq!(
+        summary(&["tally_reported_not_created", "tally_reported_not_created"]),
+        rejected
+    );
+    assert_eq!(
+        summary(&["tally_reported_not_created", "posted_verified"]),
+        refused
+    );
+    assert_eq!(summary(&["sent_not_attributed"]), refused);
+    assert_eq!(summary(&["posted_verified"]), refused);
+    assert_eq!(summary(&[]), refused);
+}
+
 #[test]
 fn each_post_span_binding_state_carries_its_own_plain_summary() {
     let states = [
@@ -3890,7 +4249,7 @@ fn each_post_span_binding_state_carries_its_own_plain_summary() {
     let summaries: BTreeSet<String> = states
         .iter()
         .map(|state| {
-            let report = with_post_span_summary(json!({ "state": state }));
+            let report = with_post_span_summary(json!({ "state": state }), &json!([]));
             let summary = report["summary"].as_str().unwrap_or_default();
             assert!(!summary.is_empty(), "{state}: {report}");
             summary.to_owned()
@@ -3899,6 +4258,7 @@ fn each_post_span_binding_state_carries_its_own_plain_summary() {
     assert_eq!(summaries.len(), states.len(), "{summaries:?}");
     let unobserved = with_post_span_summary(
         json!({ "state": "unsettled", "code": span_identity::BindUnsettled::EffectiveDateNotObserved.code() }),
+        &json!([]),
     );
     let unobserved = unobserved["summary"].as_str().unwrap_or_default();
     assert!(
@@ -3906,6 +4266,40 @@ fn each_post_span_binding_state_carries_its_own_plain_summary() {
         "{unobserved}"
     );
     assert!(!summaries.contains(unobserved), "{unobserved}");
-    let not_applicable = with_post_span_summary(json!({ "state": "not_applicable" }));
+    let not_applicable = with_post_span_summary(json!({ "state": "not_applicable" }), &json!([]));
     assert_eq!(not_applicable, json!({ "state": "not_applicable" }));
+}
+
+/// `record`'s bytes padded with trailing spaces to `size`, still valid JSON: a
+/// record past the bound would parse whole if it were read uncapped (#837).
+fn padded_record(record: &[u8], size: usize) -> Vec<u8> {
+    let mut bytes = record.to_vec();
+    bytes.resize(size, b' ');
+    bytes
+}
+
+/// A masters record larger than `MAX_RECORD_BYTES` reads as a pending check,
+/// the doubt an unreadable record is, never as its content; one at the bound
+/// reads whole (#837).
+#[test]
+fn a_masters_record_past_the_record_bound_reads_as_a_pending_check() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("masters.json");
+    let record = json!({"state": "verified"});
+    let text = record.to_string();
+    std::fs::write(
+        &path,
+        padded_record(text.as_bytes(), ledger::MAX_RECORD_BYTES),
+    )
+    .unwrap();
+    assert_eq!(read_masters_record(&path), Some(record));
+    std::fs::write(
+        &path,
+        padded_record(text.as_bytes(), ledger::MAX_RECORD_BYTES + 1),
+    )
+    .unwrap();
+    assert_eq!(
+        read_masters_record(&path),
+        Some(json!({"state": MASTERS_CHECK_PENDING}))
+    );
 }

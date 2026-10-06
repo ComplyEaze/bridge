@@ -37,3 +37,14 @@ What it shows (confidence: verified for this toolchain, on this crate):
   dependency that is not a workspace member.
 
 What it does not show: a proc-macro's expansion, or how the census behaves on Windows.
+
+## Integrity digest
+
+The row is the SHA-256 of the file's committed bytes, which
+`scripts/check-fixture-provenance.mjs` checks (#838). A digest pins the bytes as
+committed and claims nothing about where they came from: the Capture column
+repeats only what this note says above.
+
+| Fixture | Bytes | SHA-256 (integrity digest) | Capture |
+| --- | ---: | --- | --- |
+| `egress-census-probe-capture.jsonl` | 6,932 | `4fac918393c902145e65cab62de8232ac1729c467b7916de3bc6cae92d341e61` | clippy output with one path replaced, as above |

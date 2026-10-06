@@ -275,7 +275,7 @@ fn posted_line() -> ImportLedgerLine {
         "batch_id":BATCH, "identity_scheme":"batch_v1",
         "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
         "txn_ids":["T1"],"date_from":"20260907","date_to":"20260907",
-        "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":7},
         "vouchers":[{"bridge_txn_id":"T1","date":"20260907","voucher_type":"Journal",
             "narration":null,"reference":null,"voucher_number":null,
@@ -1161,4 +1161,26 @@ fn a_bound_voucher_is_reviewed_by_its_guid_not_a_tag() {
         marked_row(&line, std::slice::from_ref(&tagged), None),
         Some(&tagged)
     );
+}
+
+/// A masters record larger than `MAX_RECORD_BYTES` is unreadable, `Err(())`,
+/// never read as its content; one at the bound reads whole (#837).
+#[test]
+fn a_masters_record_past_the_record_bound_is_unreadable() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("masters.json");
+    let record = json!({"state": "verified"});
+    let padded = |size: usize| {
+        let mut bytes = record.to_string().into_bytes();
+        bytes.resize(size, b' ');
+        bytes
+    };
+    let at_bound = padded(ledger::MAX_RECORD_BYTES);
+    std::fs::write(&path, &at_bound).unwrap();
+    assert_eq!(
+        read_masters_record_raw(&path),
+        Ok(Some((at_bound, record.clone())))
+    );
+    std::fs::write(&path, padded(ledger::MAX_RECORD_BYTES + 1)).unwrap();
+    assert_eq!(read_masters_record_raw(&path), Err(()));
 }

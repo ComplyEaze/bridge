@@ -22,7 +22,7 @@ fn build(batch_id: &str, amends: Option<&str>, amount: &str, date: &str) -> Impo
         "endpoint_origin":origin(),
         "company":{"name":"Synthetic Accounts","guid":GUID,"company_number":"100001","books_from":"20260401"},
         "txn_ids":["txn-001"],"date_from":date,"date_to":date,
-        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"txn-001","date":date,"voucher_type":"Payment",
             "entries":[{"ledger":"Expense","amount":amount,"side":"Dr"},
@@ -306,6 +306,40 @@ fn a_voucher_still_as_any_build_wrote_it_is_admitted() {
     }
 }
 
+/// The amendment check expects the narration the import wrote, which has no
+/// outer whitespace (#1055): a book row carrying the trimmed text and the tag
+/// is still the version this build wrote, and is admitted.
+#[test]
+fn a_padded_saved_narration_is_compared_as_the_text_the_import_wrote() {
+    let mut original = build(ORIGINAL, None, "12.50", "20260901");
+    original.vouchers[0].narration = Some("  Paid rent\u{a0}".into());
+    original.sha256 = sha256_hex(
+        render_import_xml(
+            "Synthetic Accounts",
+            &original.vouchers,
+            original.identity_batch_id(),
+        )
+        .as_bytes(),
+    );
+    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
+    let proposal = build(AMENDMENT, None, "18.00", "20260901").vouchers;
+    let mut row = book_row(&original);
+    row.narration = Some(format!(
+        "Paid rent [BRIDGE:{}]",
+        original.attribution_tag(&original.vouchers[0])
+    ));
+    let admitted = lineage
+        .compare_and_swap(&proposal, &book(vec![row]), &verified_as_booked(&lineage))
+        .unwrap()
+        .expect("book holds the version this build wrote");
+    assert_eq!(
+        json!(admitted),
+        json!([{"bridge_txn_id":"txn-001","book_matches_batch_id":ORIGINAL,
+            "guid":format!("{GUID}-00000005"),"master_id":"5","alter_id":40,
+            "not_observed":["effective_date"]}])
+    );
+}
+
 #[test]
 fn an_edited_missing_or_cancelled_voucher_refuses_the_amendment() {
     let original = build(ORIGINAL, None, "12.50", "20260901");
@@ -432,7 +466,7 @@ fn an_amendment_is_never_eligible_for_native_posting() {
         "company_guid":GUID, "endpoint_origin":origin(),
         "company":{"name":"Synthetic Accounts","guid":GUID,"company_number":"100001","books_from":"20260401"},
         "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal",
             "entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},
@@ -564,7 +598,7 @@ fn seed_original(server: &Server) {
 fn seed_original_as(server: &Server, status: &str, txn_ids: [&str; 2]) -> ImportLedgerLine {
     let mut vouchers = captured_catalogue_payload().vouchers;
     for (voucher, txn_id) in vouchers.iter_mut().zip(txn_ids) {
-        voucher.date = normalized_date(&voucher.date).unwrap();
+        voucher.date = normalized_date(&voucher.date).unwrap().as_str().to_string();
         voucher.bridge_txn_id = txn_id.into();
     }
     let line: ImportLedgerLine = serde_json::from_value(json!({
@@ -709,9 +743,10 @@ async fn an_amendment_of_a_voucher_edited_in_tally_writes_nothing() {
 
 #[test]
 fn the_amendment_admission_module_stays_pinned() {
-    // A pin the branch itself added and then lost in a merge resolution is seen by nothing; one
-    // that existed at the base is a removed pin, which merge-gate.sh blocks without a
-    // `removed-pin:` line.
+    // A pin the branch itself added and then lost in a merge resolution is a withdrawn pin:
+    // check-surface-ack.mjs reads the branch history and requires a `removed-pin:` line for it
+    // (#1006); one that existed at the base is a removed pin, which merge-gate.sh blocks
+    // without a `removed-pin:` line.
     // This module decides what an import file may overwrite; its reason sits
     // beside MAX_SURFACE_FILES.
     let surface: Value = serde_json::from_str(include_str!(
@@ -859,6 +894,33 @@ fn a_verified_baseline_file_is_written_once_per_voucher() {
     )
     .unwrap();
     assert!(record_verified_baseline(directory.path(), ORIGINAL, &proof(42)).is_err());
+    assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
+}
+
+/// A baseline larger than `MAX_RECORD_BYTES` is no baseline, as an unreadable
+/// one is; one at the bound reads whole (#837).
+#[test]
+fn a_verified_baseline_past_the_record_bound_is_no_baseline() {
+    let directory = tempfile::tempdir().unwrap();
+    let proof =
+        json!({"vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":40}]});
+    record_verified_baseline(directory.path(), ORIGINAL, &proof).unwrap();
+    let path = verified_baseline_path(directory.path(), ORIGINAL);
+    let record = std::fs::read(&path).unwrap();
+    std::fs::write(
+        &path,
+        super::padded_record(&record, ledger::MAX_RECORD_BYTES),
+    )
+    .unwrap();
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([("txn-001".to_string(), 40)]))
+    );
+    std::fs::write(
+        &path,
+        super::padded_record(&record, ledger::MAX_RECORD_BYTES + 1),
+    )
+    .unwrap();
     assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
 }
 

@@ -245,11 +245,48 @@ for s.40A(3)).",
         )?;
     }
 
-    for row in over {
+    // A row's id is its date and a hash of its GUID and ledger. Two over-limit lines can share all three
+    // (two lines to one ledger on one voucher, or two blank-GUID payments on one day); each of those lines
+    // takes its place among them, in this stable sort's order (population, then line, order on a tie), as a
+    // suffix, so no id repeats and every other id is as before (#1195).
+    let mut over = over;
+    over.sort_by(|a, b| {
+        (&a.voucher.date, &a.voucher.guid, a.ledger).cmp(&(
+            &b.voucher.date,
+            &b.voucher.guid,
+            b.ledger,
+        ))
+    });
+    let mut base_ids = Vec::with_capacity(over.len());
+    for row in &over {
+        let v = row.voucher;
+        let tag = stable_ledger_tag(book, row.ledger)?;
+        base_ids.push(format!(
+            "{}_{}",
+            iso(&v.date),
+            hash8(&format!("{}|{tag}", v.guid))
+        ));
+    }
+    let mut seen: BTreeMap<&str, usize> = BTreeMap::new();
+    for b in &base_ids {
+        *seen.entry(b.as_str()).or_insert(0) += 1;
+    }
+    let repeated: BTreeSet<&str> = seen
+        .iter()
+        .filter(|(_, n)| **n > 1)
+        .map(|(b, _)| *b)
+        .collect();
+    let mut place: BTreeMap<&str, usize> = BTreeMap::new();
+    for (row, base) in over.iter().zip(&base_ids) {
         let v = row.voucher;
         let day = iso(&v.date);
-        let tag = stable_ledger_tag(book, row.ledger)?;
-        let rid = format!("{day}_{}", hash8(&format!("{}|{tag}", v.guid)));
+        let rid = if repeated.contains(base.as_str()) {
+            let k = place.entry(base.as_str()).or_insert(0);
+            *k += 1;
+            format!("{base}_{k}")
+        } else {
+            base.clone()
+        };
         let f_amt = r.fig(
             &format!("row_amount_{rid}"),
             Value::Int(row.paise),

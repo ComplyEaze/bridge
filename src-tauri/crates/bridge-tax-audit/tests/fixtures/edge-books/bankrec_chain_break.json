@@ -1,0 +1,219 @@
+{
+ "comment": "bank_reconciliation on a statement whose only fault is its running balance: a receipt dropped from the extraction (c02's, on 20 June) and the 5 June receipt repeated in its place, so the rows sum to the declared closing and both end balances tie, but two rows' balances do not follow the row before. Nothing unmatched is explained: the repeated row and a charge row are not computed (not not_found or a charge), c02 and c04 are not computed (not timing), and c03 is not searched as a part-settlement of rows 2 and 3; c01 and c05 stay matched.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_chain_break-000"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_chain_break-001"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-bankrec_chain_break-002"
+  },
+  {
+   "name": "Bank Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-bankrec_chain_break-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-bankrec_chain_break-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Edge Bank",
+   "opening": 500000,
+   "debit": 20000,
+   "credit": 14000,
+   "closing": 506000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "c01",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     10000
+    ],
+    [
+     "Customer A",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "c02",
+   "date": "2025-06-20",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     10000
+    ],
+    [
+     "Customer A",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "c03",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Edge Bank",
+     -6000
+    ],
+    [
+     "Supplier B",
+     6000
+    ]
+   ]
+  },
+  {
+   "guid": "c04",
+   "date": "2025-06-25",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Edge Bank",
+     -7000
+    ],
+    [
+     "Supplier B",
+     7000
+    ]
+   ]
+  },
+  {
+   "guid": "c05",
+   "date": "2025-06-28",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Edge Bank",
+     -1000
+    ],
+    [
+     "Supplier B",
+     1000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "bank_reconciliation"
+ ],
+ "bank_reconciliation_ledger": "Edge Bank",
+ "bank_charge_terms": [
+  "sms alert"
+ ],
+ "bank_statement": {
+  "doc_id": "bank:edge:chain_break",
+  "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "account_ref": "XXXXXX0009",
+  "bank": "Invented Bank",
+  "period": {
+   "start": "2025-06-01",
+   "end": "2025-06-30"
+  },
+  "opening_balance_paise": 500000,
+  "closing_balance_paise": 512500,
+  "rows": [
+   {
+    "doc": "bank:edge:chain_break",
+    "row": 0,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-05",
+    "narration": "NEFT CUSTOMER A",
+    "debit_paise": 0,
+    "credit_paise": 10000,
+    "balance_paise": 510000
+   },
+   {
+    "doc": "bank:edge:chain_break",
+    "row": 1,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-05",
+    "narration": "NEFT CUSTOMER A",
+    "debit_paise": 0,
+    "credit_paise": 10000,
+    "balance_paise": 510000
+   },
+   {
+    "doc": "bank:edge:chain_break",
+    "row": 2,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-12",
+    "narration": "CHQ 101 PART ONE",
+    "debit_paise": 2000,
+    "credit_paise": 0,
+    "balance_paise": 508000
+   },
+   {
+    "doc": "bank:edge:chain_break",
+    "row": 3,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-13",
+    "narration": "CHQ 101 PART TWO",
+    "debit_paise": 4000,
+    "credit_paise": 0,
+    "balance_paise": 504000
+   },
+   {
+    "doc": "bank:edge:chain_break",
+    "row": 4,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-15",
+    "narration": "SMS ALERT CHARGES",
+    "debit_paise": 500,
+    "credit_paise": 0,
+    "balance_paise": 503500
+   },
+   {
+    "doc": "bank:edge:chain_break",
+    "row": 5,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-28",
+    "narration": "CHQ 102",
+    "debit_paise": 1000,
+    "credit_paise": 0,
+    "balance_paise": 512500
+   }
+  ]
+ }
+}

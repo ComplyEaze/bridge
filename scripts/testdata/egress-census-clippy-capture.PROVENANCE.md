@@ -103,3 +103,14 @@ was generated from those printed rows (sorted, with each unresolved path counted
   Windows; the static half refuses those function names in src-tauri Rust instead.
 - The macOS native job on the same push passed its census against the macOS list, so that list matches a
   second, independent run.
+
+## Integrity digest
+
+The row is the SHA-256 of the file's committed bytes, which
+`scripts/check-fixture-provenance.mjs` checks (#838). A digest pins the bytes as
+committed and claims nothing about where they came from: the Capture column
+repeats only what this note says above.
+
+| Fixture | Bytes | SHA-256 (integrity digest) | Capture |
+| --- | ---: | --- | --- |
+| `egress-census-clippy-capture.jsonl` | 9,361 | `c60c4cdbc8819657ceb7d0cc1374c2351a082afa9c534abf4490d44694d6544c` | clippy output with one path replaced, as above |

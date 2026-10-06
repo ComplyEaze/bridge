@@ -23,6 +23,10 @@ fn caller(id: &str) -> CallerData {
                 registry::report_totals_from_json(&json("synthetic-report-totals.json")).unwrap(),
             );
         }
+        "books_examined" => {
+            c.documents_read =
+                registry::documents_read_from_json(&json("synthetic-documents-read.json")).unwrap();
+        }
         "applicability_44ab" => {
             c.turnover_inputs =
                 registry::turnover_inputs_from_json(&json("synthetic-turnover-inputs.json"))
@@ -156,4 +160,43 @@ fn the_registry_passes_a_refused_statement_reason_to_the_coverage_figure() {
         coverage(&c).contains(" only -- s.194N is an annual test"),
         "a supplied statement is read"
     );
+}
+
+/// `bank_reconciliation`, as the registry passes the caller's two statement inputs: a refused
+/// statement (no document) gives the module's refused result with the reader's reason, as the
+/// reference's pack gives it; neither, or both, is refused as a caller error.
+#[test]
+fn the_registry_passes_a_refused_statement_reason_to_bank_reconciliation() {
+    let e = common::engagement(&common::fixtures().join("synthetic-read"), false);
+    let rules = rules_for(&e).unwrap();
+    let run = |c: &CallerData| registry::run_canonical("bank_reconciliation", &e, &rules, c);
+    let mut c = CallerData::default();
+    assert!(matches!(
+        run(&c),
+        Err(bridge_tax_audit::error::AuditError::Config(_))
+    ));
+    c.bank_statement_refused = Some("declares no opening balance".to_string());
+    let dump = run(&c).unwrap();
+    let figures: Vec<(&str, &str)> = dump["figures"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| (f["id"].as_str().unwrap(), f["value"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        figures,
+        [(
+            "bank_reconciliation.statement_refused_reason",
+            "declares no opening balance"
+        )]
+    );
+    assert_eq!(
+        dump["findings"][0]["id"],
+        "bank_reconciliation/statement_refused"
+    );
+    c.bank_statement = caller("bank_reconciliation").bank_statement;
+    assert!(matches!(
+        run(&c),
+        Err(bridge_tax_audit::error::AuditError::Config(_))
+    ));
 }

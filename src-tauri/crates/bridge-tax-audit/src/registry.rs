@@ -5,16 +5,20 @@
 //! `compare::default_min_figures` and the registry-wide CI parity (`tests/registry.rs`) read
 //! this table instead of listing tests themselves.
 
+use std::collections::BTreeSet;
+
 use crate::applicability_44ab::{ComparisonTurnover, TurnoverInputs};
 use crate::book::Book;
+use crate::books_examined::DocumentRead;
 use crate::error::{AuditError, Result};
 use crate::financial_statements::ReportTotals;
 use crate::rules::Rules;
 use crate::Engagement;
 
 /// Data a test takes from its caller rather than from the book: Tally's own Profit & Loss report
-/// totals (`financial_statements`) and the comparison turnover (`applicability_44ab`). Empty is
-/// "none supplied", which each of those tests handles itself.
+/// totals (`financial_statements`), the comparison turnover (`applicability_44ab`) and the documents
+/// loaded with the read (`books_examined`). Empty is "none supplied", which each of those tests
+/// handles itself.
 #[derive(Debug, Clone, Default)]
 pub struct CallerData {
     pub report_totals: Option<ReportTotals>,
@@ -25,9 +29,12 @@ pub struct CallerData {
     /// A bank statement (`bank_reconciliation`, which refuses without one; `high_value_register`,
     /// whose s.194N section reports none supplied).
     pub bank_statement: Option<crate::documents::BankStatementDoc>,
-    /// The reader's plain-words reason a supplied statement was refused (`high_value_register`'s
-    /// s.194N coverage says so); `None` when none was supplied or it was read.
+    /// The reader's plain-words reason a supplied statement was refused (`bank_reconciliation`
+    /// gives its `refused` result; `high_value_register`'s s.194N coverage says so); `None` when
+    /// none was supplied or it was read.
     pub bank_statement_refused: Option<String>,
+    /// The documents loaded with the read (`books_examined`).
+    pub documents_read: BTreeSet<DocumentRead>,
 }
 
 /// One ported test.
@@ -48,12 +55,26 @@ pub const PORTED: &[PortedTest] = &[
     PortedTest {
         id: "bank_reconciliation",
         min_figures: 40,
-        run_on: |e, b, r, c| crate::bank_reconciliation_on(e, b, r, c.bank_statement.as_ref()),
+        run_on: |e, b, r, c| {
+            crate::bank_reconciliation_on(
+                e,
+                b,
+                r,
+                c.bank_statement.as_ref(),
+                c.bank_statement_refused.as_deref(),
+            )
+        },
     },
     PortedTest {
         id: "book_keeping_quality",
         min_figures: 12,
         run_on: |e, b, r, _| crate::book_keeping_quality_on(e, b, r),
+    },
+    PortedTest {
+        id: "books_examined",
+        // `books_maintained` and `books_examined`, on any book.
+        min_figures: 2,
+        run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read),
     },
     PortedTest {
         id: "cash_44ab",
@@ -140,6 +161,12 @@ pub const PORTED: &[PortedTest] = &[
         id: "read_scope",
         min_figures: 1,
         run_on: |_, b, r, _| crate::read_scope_on(b, r),
+    },
+    PortedTest {
+        id: "related_parties_cl23",
+        // `applicable` alone when no person is confirmed, as on the synthetic read.
+        min_figures: 1,
+        run_on: |e, b, r, _| crate::related_parties_cl23_on(e, b, r),
     },
     PortedTest {
         id: "stale_balances_41_1",
@@ -250,6 +277,30 @@ pub fn turnover_inputs_from_json(v: &serde_json::Value) -> Result<TurnoverInputs
     })
 }
 
+/// `books_examined`' documents from the JSON list `parity/python_golden.py --documents-read` reads:
+/// each a name the reference's pack gives, once, in the pack's order. Anything else is refused
+/// rather than read differently from the reference, which prints the names as given.
+pub fn documents_read_from_json(v: &serde_json::Value) -> Result<BTreeSet<DocumentRead>> {
+    let names = v
+        .as_array()
+        .ok_or_else(|| AuditError::Config("documents read: not a list".to_string()))?;
+    let mut out = BTreeSet::new();
+    for name in names {
+        let d = name.as_str().and_then(DocumentRead::parse).ok_or_else(|| {
+            AuditError::Config(format!(
+                "documents read: {name} is not a document the pack loads"
+            ))
+        })?;
+        if out.last().is_some_and(|last| *last >= d) {
+            return Err(AuditError::Config(format!(
+                "documents read: {name} is repeated or out of the pack's order"
+            )));
+        }
+        out.insert(d);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::PORTED;
@@ -297,6 +348,37 @@ mod tests {
             json!({"net_profit_paise": 3, "source": 9}),
         ] {
             assert!(report_totals_from_json(&bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn documents_read_are_the_packs_names_once_in_its_order() {
+        use super::documents_read_from_json;
+        use crate::books_examined::DocumentRead;
+        use crate::error::AuditError;
+        use serde_json::json;
+        assert!(documents_read_from_json(&json!([])).unwrap().is_empty());
+        let read =
+            documents_read_from_json(&json!(["GSTR-2B", "Form 26AS", "Draft Form 3CD"])).unwrap();
+        assert_eq!(
+            read.into_iter().collect::<Vec<_>>(),
+            [
+                DocumentRead::Gstr2b,
+                DocumentRead::Form26as,
+                DocumentRead::DraftForm3cd
+            ]
+        );
+        for bad in [
+            json!("GSTR-2B"),
+            json!(["GSTR-2B", 3]),
+            json!(["GSTR-2B", "GSTR-9"]),
+            json!(["GSTR-2B", "GSTR-2B"]),
+            json!(["Form 26AS", "GSTR-1"]),
+        ] {
+            assert!(
+                matches!(documents_read_from_json(&bad), Err(AuditError::Config(_))),
+                "{bad}"
+            );
         }
     }
 

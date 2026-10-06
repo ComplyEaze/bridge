@@ -111,7 +111,7 @@ jobs:
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/|\.github/actions/setup-windows-native/|rust-toolchain\.toml|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.py$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes\.py$|retain-macos-test-binaries\.py$))'; then
+          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/|\.github/actions/setup-windows-native/|rust-toolchain\.toml|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-|\.cargo/|\.gitattributes$|package\.json$|packaging/mcpb/manifest\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\.md$|docs/agent/README\.md$|docs/legal/terms\.md$|docs/tally/compatibility/compatibility-surface\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\.txt$|scripts/(fixtures/|fetch-pdfium\.py$|check-tally-request-builder-hazards\.mjs$|collect-macos-test-crashes\.py$|retain-macos-test-binaries\.py$))'; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
@@ -449,7 +449,7 @@ jobs:
           # Separate the Windows dependency artifacts from the former registry-only
           # cache. Keep Cargo/toolchain/profile fingerprints and cleanup defaults;
           # workspace binaries and incremental artifacts are not persisted.
-          key: ${{ runner.os == 'Windows' && format('native-deps-v1-{0}', hashFiles('.github/actions/setup-windows-native/action.yml')) || '' }}
+          shared-key: ${{ runner.os == 'Windows' && format('native-deps-v1-{0}', hashFiles('.github/actions/setup-windows-native/action.yml')) || '' }}
           env-vars: ${{ runner.os == 'Windows' && 'ImageOS ImageVersion OPENSSL LIBCLANG' || '' }}
           # PRs consume trusted base caches. Manual branch runs can measure cold
           # and warm reuse in their own scope before a change reaches master.
@@ -480,6 +480,7 @@ jobs:
           --wait-seconds ${{ steps.native-tests.outcome == 'failure' && '30' || '0' }}
       - name: Retain minimized macOS test crash stacks
         if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-crash-stacks-macos
@@ -567,42 +568,6 @@ jobs:
         run: |
           cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --lib --bins --message-format=json -- -A clippy::pedantic --force-warn clippy::disallowed_methods --force-warn clippy::disallowed_types > "$RUNNER_TEMP/egress-census.jsonl"
           node scripts/check-tally-egress-boundary.mjs --census "$RUNNER_TEMP/egress-census.jsonl" "$RUNNER_OS"
-      # The legacy voucher-scan runtime and the manual Unit A calibration harness
-      # are non-default features, so the workspace steps above never compile
-      # them. Each feature set carries tests the other lacks: the default-width
-      # invariant exists only without the harness, and the harness constructor
-      # tests only with it. The code is platform-neutral, so one platform runs it:
-      # Windows, whose runners rarely queue, not macOS, whose runners are the
-      # scarce ones the merge queue waits for. bash, not Windows' default pwsh, which
-      # reports only the last command's status, so a failing first command passes.
-      # The test step runs only tally:: and unit_a_live, where every gated test
-      # lives; the rest of the suite already ran above. The guard fails if a cfg
-      # on either feature appears anywhere else, so a gated test added outside
-      # the filter cannot pass unrun. bulk_party_statement.rs only gates a
-      # compile_fail doctest, which nextest never runs.
-      - name: Guard legacy feature test filter scope
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          outside=$(git grep -l -E 'feature *= *"(voucher-scan|live-calibration-harness)"' -- src-tauri/src src-tauri/tests \
-            | grep -v -x -E 'src-tauri/src/tally/.*|src-tauri/tests/unit_a_live\.rs|src-tauri/src/reports/bulk_party_statement\.rs' || true)
-          if [ -n "$outside" ]; then
-            echo "Feature-gated code outside the nextest filter; widen the filter below:"
-            echo "$outside"
-            exit 1
-          fi
-      - name: Test legacy voucher-scan and calibration harness features
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml -p bridge --features voucher-scan --no-fail-fast --retries 0 --test-threads num-cpus -E 'test(/^tally::/) | binary(unit_a_live)'
-          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml -p bridge --features live-calibration-harness --no-fail-fast --retries 0 --test-threads num-cpus -E 'test(/^tally::/) | binary(unit_a_live)'
-      - name: Lint legacy voucher-scan and calibration harness features
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          cargo clippy --locked --manifest-path src-tauri/Cargo.toml -p bridge --features voucher-scan --all-targets -- -D warnings -A clippy::pedantic
-          cargo clippy --locked --manifest-path src-tauri/Cargo.toml -p bridge --features live-calibration-harness --all-targets -- -D warnings -A clippy::pedantic
       - name: Lint Tally qualification tools workspace
         working-directory: tools
         run: cargo clippy --locked --workspace --all-targets -- -D warnings -A clippy::pedantic
@@ -615,12 +580,85 @@ jobs:
 
       - name: Retain native compiler timings
         if: ${{ always() }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-compiler-timings-${{ matrix.os }}
           path: src-tauri/target/cargo-timings/*.html
           if-no-files-found: warn
           retention-days: 7
+
+  # The legacy voucher-scan runtime and the manual Unit A calibration harness
+  # are non-default features, so native's workspace steps never compile them.
+  # Each feature set carries tests the other lacks: the default-width invariant
+  # exists only without the harness, and the harness constructor tests only
+  # with it. The code is platform-neutral, so one platform runs it: Windows,
+  # whose runners rarely queue, not macOS, whose runners are the scarce ones the
+  # merge queue waits for. It runs beside native, not inside it, because inside
+  # it these steps were the last 6.6 minutes of the slowest job. It restores
+  # native's Windows dependency cache (same shared-key and workspaces) and never
+  # saves: a second cache family would only compete for the repository's quota.
+  native-legacy:
+    name: Native legacy features (windows-latest)
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
+    runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    timeout-minutes: 50
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: 1.96.0
+          components: clippy
+      - name: Install pinned nextest
+        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        with:
+          tool: cargo-nextest@0.9.143
+          fallback: none
+      - name: Set up Windows native prerequisites
+        uses: ./.github/actions/setup-windows-native
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            src-tauri -> target
+            tools -> target
+          shared-key: ${{ format('native-deps-v1-{0}', hashFiles('.github/actions/setup-windows-native/action.yml')) }}
+          env-vars: ImageOS ImageVersion OPENSSL LIBCLANG
+          save-if: false
+      # bash, not Windows' default pwsh, which reports only the last command's
+      # status, so a failing first command passes. The test step runs only
+      # tally:: and unit_a_live, where every gated test lives; native runs the
+      # rest of the suite. The guard fails if a cfg on either feature appears
+      # anywhere else, so a gated test added outside the filter cannot pass
+      # unrun. bulk_party_statement.rs only gates a compile_fail doctest, which
+      # nextest never runs.
+      - name: Guard legacy feature test filter scope
+        shell: bash
+        run: |
+          outside=$(git grep -l -E 'feature *= *"(voucher-scan|live-calibration-harness)"' -- src-tauri/src src-tauri/tests \
+            | grep -v -x -E 'src-tauri/src/tally/.*|src-tauri/tests/unit_a_live\.rs|src-tauri/src/reports/bulk_party_statement\.rs' || true)
+          if [ -n "$outside" ]; then
+            echo "Feature-gated code outside the nextest filter; widen the filter below:"
+            echo "$outside"
+            exit 1
+          fi
+      - name: Test legacy voucher-scan and calibration harness features
+        shell: bash
+        run: |
+          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml -p bridge --features voucher-scan --no-fail-fast --retries 0 --test-threads num-cpus -E 'test(/^tally::/) | binary(unit_a_live)'
+          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml -p bridge --features live-calibration-harness --no-fail-fast --retries 0 --test-threads num-cpus -E 'test(/^tally::/) | binary(unit_a_live)'
+      - name: Lint legacy voucher-scan and calibration harness features
+        shell: bash
+        run: |
+          cargo clippy --locked --manifest-path src-tauri/Cargo.toml -p bridge --features voucher-scan --all-targets -- -D warnings -A clippy::pedantic
+          cargo clippy --locked --manifest-path src-tauri/Cargo.toml -p bridge --features live-calibration-harness --all-targets -- -D warnings -A clippy::pedantic
 
   bundle-smoke:
     name: Bundle smoke (${{ matrix.os }})
@@ -739,6 +777,7 @@ jobs:
           df -h . > package-diagnostics/disk-space.txt 2>&1
       - name: Retain macOS package diagnostics
         if: ${{ always() && runner.os == 'macOS' && (steps.macos-bundle.outcome == 'success' || steps.macos-bundle.outcome == 'failure') }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: macos-package-diagnostics
@@ -826,6 +865,7 @@ jobs:
           JS
       - name: Upload package compiler cache statistics
         if: ${{ always() && steps.package-sccache-start.outcome == 'success' }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-compiler-cache-${{ matrix.os }}
@@ -981,7 +1021,7 @@ jobs:
     # bridge-tax-audit change merges only with its selected mutations proven on
     # the merged tree. Skipped on other pull requests, which is a pass here.
     if: ${{ always() }}
-    needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, seam-control, compiler-cache-retention, tax-audit-mutations]
+    needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, native-legacy, bundle-smoke, seam-control, compiler-cache-retention, tax-audit-mutations]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

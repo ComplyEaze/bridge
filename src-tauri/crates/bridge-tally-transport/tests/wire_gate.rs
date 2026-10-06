@@ -213,12 +213,26 @@ async fn an_unusable_lock_is_not_waited_for() {
     assert_eq!(simulator.received(), 0);
 }
 
+/// Waits until the simulator has read `count` requests. Bounded, so a send that
+/// never arrives fails the test instead of hanging it.
+async fn until_received(simulator: &SequenceSimulator, count: usize) {
+    for _ in 0..5_000 {
+        if simulator.received() >= count {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    panic!("the simulator never read request {count}");
+}
+
 /// Two sends at once through one gate: the second waits out the first, and the
 /// lock never has two holders.
 #[tokio::test]
 async fn concurrent_sends_take_turns() {
+    // The first send stays in flight for 1 s, so only a stall that long can let it finish
+    // before the second one tries the lock; the 2 s retry budget covers the wait.
     let simulator = SequenceSimulator::spawn(vec![
-        xml().with_delivery(Delivery::SlowHeaders(Duration::from_millis(300))),
+        xml().with_delivery(Delivery::SlowHeaders(Duration::from_secs(1))),
         xml(),
     ])
     .unwrap();
@@ -227,8 +241,11 @@ async fn concurrent_sends_take_turns() {
         WireRetryPolicy::new(Duration::from_millis(10), Duration::from_secs(2)).unwrap(),
     );
     let first = transport.post_xml("<ENVELOPE/>".into());
+    // The second send starts once the first is in flight (the simulator has its
+    // request), not after a fixed 50 ms: a stall let the first finish first and the
+    // second never wait (#1255).
     let second = async {
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        until_received(&simulator, 1).await;
         transport.post_xml("<ENVELOPE/>".into()).await
     };
     let (first, second) = tokio::join!(first, second);
@@ -239,12 +256,13 @@ async fn concurrent_sends_take_turns() {
     assert_eq!(simulator.finish().unwrap().len(), 2);
 }
 
-/// While a send is in flight, the lock is held: each of the four send paths,
-/// probed from outside with the response delayed, so that dropping the guard
-/// before the send (a `let _ = ...` in place of a bound guard) fails here.
+/// While a send is in flight (its response headers delayed), the lock is held: each
+/// of the four send paths, watched across the whole send, so that a guard dropped
+/// before the send (a `let _ = ...` in place of a bound guard), or once the request is
+/// written but before the headers arrive, shows as 0 (#1255).
 #[tokio::test]
 async fn every_send_path_holds_the_lock_while_the_send_is_in_flight() {
-    let slow = Duration::from_millis(250);
+    let slow = Duration::from_millis(600);
     let simulator = SequenceSimulator::spawn(vec![
         xml().with_delivery(Delivery::SlowHeaders(slow)),
         xml().with_delivery(Delivery::SlowHeaders(slow)),
@@ -253,75 +271,86 @@ async fn every_send_path_holds_the_lock_while_the_send_is_in_flight() {
     ])
     .unwrap();
     let (transport, record) = gated(&simulator, quick(0));
-    let probe = |record: &Arc<Record>| {
-        let record = Arc::clone(record);
-        async move {
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            record.held.load(Ordering::SeqCst)
-        }
-    };
-    let (sent, held) = tokio::join!(transport.post_xml("<ENVELOPE/>".into()), probe(&record));
+    let (sent, lowest) = lowest_held_while(&record, transport.post_xml("<ENVELOPE/>".into())).await;
     sent.unwrap();
-    assert_eq!(held, 1, "post_xml");
-    let (sent, held) = tokio::join!(
-        transport.post_xml_decoded("<ENVELOPE/>".into()),
-        probe(&record)
-    );
+    assert_eq!(lowest, 1, "post_xml");
+    let (sent, lowest) =
+        lowest_held_while(&record, transport.post_xml_decoded("<ENVELOPE/>".into())).await;
     sent.unwrap();
-    assert_eq!(held, 1, "post_xml_decoded");
-    let (sent, held) = tokio::join!(transport.get_status(), probe(&record));
+    assert_eq!(lowest, 1, "post_xml_decoded");
+    let (sent, lowest) = lowest_held_while(&record, transport.get_status()).await;
     sent.unwrap();
-    assert_eq!(held, 1, "get_status");
-    let (sent, held) = tokio::join!(transport.get_status_decoded(), probe(&record));
+    assert_eq!(lowest, 1, "get_status");
+    let (sent, lowest) = lowest_held_while(&record, transport.get_status_decoded()).await;
     sent.unwrap();
-    assert_eq!(held, 1, "get_status_decoded");
+    assert_eq!(lowest, 1, "get_status_decoded");
     assert_eq!(record.held.load(Ordering::SeqCst), 0);
     assert_eq!(simulator.finish().unwrap().len(), 4);
 }
 
+/// Runs `send` and watches the held count every 5 ms from the first sample
+/// (taken as the send starts, once its lock is taken) until it returns. The
+/// lowest count seen is the answer: a lock released while the send is still
+/// pending shows as 0. One sample at a fixed time could miss that when the
+/// sampling task is starved; this needs a stall across the whole send (#1255).
+async fn lowest_held_while<T>(
+    record: &Arc<Record>,
+    send: impl std::future::Future<Output = T>,
+) -> (T, usize) {
+    let done = std::sync::atomic::AtomicBool::new(false);
+    let watch = async {
+        let mut lowest = usize::MAX;
+        while !done.load(Ordering::SeqCst) {
+            lowest = lowest.min(record.held.load(Ordering::SeqCst));
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        lowest
+    };
+    let send = async {
+        let sent = send.await;
+        done.store(true, Ordering::SeqCst);
+        sent
+    };
+    // `biased`: the send is polled first, so it has taken its lock (synchronously, before
+    // its first suspension) when the watch takes its first sample.
+    let (sent, lowest) = tokio::join!(biased; send, watch);
+    (sent, lowest)
+}
+
 /// The lock is held until the body has been read, not only until the headers
 /// arrive: the headers here come at once and the body in slow chunks, so a
-/// guard dropped once the head is in fails at the probe.
+/// guard dropped once the head is in shows as 0 while the body is arriving.
 #[tokio::test]
 async fn every_send_path_holds_the_lock_until_the_body_is_read() {
     let slow_xml = || {
         xml().with_delivery(Delivery::SlowBody {
             chunk_bytes: 32,
-            delay: Duration::from_millis(40),
+            delay: Duration::from_millis(80),
         })
     };
     let slow_status = || {
         status().with_delivery(Delivery::SlowBody {
             chunk_bytes: 8,
-            delay: Duration::from_millis(60),
+            delay: Duration::from_millis(120),
         })
     };
     let simulator =
         SequenceSimulator::spawn(vec![slow_xml(), slow_xml(), slow_status(), slow_status()])
             .unwrap();
     let (transport, record) = gated(&simulator, quick(0));
-    let probe = |record: &Arc<Record>| {
-        let record = Arc::clone(record);
-        async move {
-            tokio::time::sleep(Duration::from_millis(120)).await;
-            record.held.load(Ordering::SeqCst)
-        }
-    };
-    let (sent, held) = tokio::join!(transport.post_xml("<ENVELOPE/>".into()), probe(&record));
+    let (sent, lowest) = lowest_held_while(&record, transport.post_xml("<ENVELOPE/>".into())).await;
     sent.unwrap();
-    assert_eq!(held, 1, "post_xml");
-    let (sent, held) = tokio::join!(
-        transport.post_xml_decoded("<ENVELOPE/>".into()),
-        probe(&record)
-    );
+    assert_eq!(lowest, 1, "post_xml");
+    let (sent, lowest) =
+        lowest_held_while(&record, transport.post_xml_decoded("<ENVELOPE/>".into())).await;
     sent.unwrap();
-    assert_eq!(held, 1, "post_xml_decoded");
-    let (sent, held) = tokio::join!(transport.get_status(), probe(&record));
+    assert_eq!(lowest, 1, "post_xml_decoded");
+    let (sent, lowest) = lowest_held_while(&record, transport.get_status()).await;
     sent.unwrap();
-    assert_eq!(held, 1, "get_status");
-    let (sent, held) = tokio::join!(transport.get_status_decoded(), probe(&record));
+    assert_eq!(lowest, 1, "get_status");
+    let (sent, lowest) = lowest_held_while(&record, transport.get_status_decoded()).await;
     sent.unwrap();
-    assert_eq!(held, 1, "get_status_decoded");
+    assert_eq!(lowest, 1, "get_status_decoded");
     assert_eq!(record.held.load(Ordering::SeqCst), 0);
     assert_eq!(simulator.finish().unwrap().len(), 4);
 }
@@ -352,22 +381,20 @@ async fn a_held_lock_is_spent_on_one_send() {
 }
 
 /// A lock taken ahead of a send stays held while that send is in flight: the
-/// response is delayed, and a probe from outside sees the lock still taken, so
-/// a guard dropped before the send fails here.
+/// response is delayed and the lock is watched across the whole send, so a guard
+/// dropped before the send shows as 0.
 #[tokio::test]
 async fn a_lock_taken_ahead_of_a_send_is_held_while_that_send_is_in_flight() {
-    let slow = Duration::from_millis(250);
+    let slow = Duration::from_millis(600);
     let simulator =
         SequenceSimulator::spawn(vec![xml().with_delivery(Delivery::SlowHeaders(slow))]).unwrap();
     let (transport, record) = gated(&simulator, quick(0));
     let held = transport.acquire_wire_lock().await.unwrap();
-    let probe = async {
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        record.held.load(Ordering::SeqCst)
-    };
-    let (sent, during) = tokio::join!(held.post_xml_decoded("<ENVELOPE/>".into()), probe);
+    // Watched across the whole send, not sampled once at 100 ms (#1255).
+    let (sent, lowest) =
+        lowest_held_while(&record, held.post_xml_decoded("<ENVELOPE/>".into())).await;
     sent.unwrap();
-    assert_eq!(during, 1);
+    assert_eq!(lowest, 1);
     assert_eq!(record.held.load(Ordering::SeqCst), 0);
     assert_eq!(simulator.finish().unwrap().len(), 1);
 }

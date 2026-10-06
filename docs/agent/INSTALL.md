@@ -1,9 +1,9 @@
-# Install Bridge for Claude Desktop
+# Install ComplyEaze Bridge for Claude Desktop
 
-Use the Bridge install page when it is deployed. It chooses the current GitHub
-Release asset for your operating system and gives the same setup steps without
-developer configuration. This guide is the fallback when that page is
-unavailable.
+Use the [Download page](https://bridge.complyeaze.com/download.html). It chooses
+the current GitHub Release asset for your operating system and gives the same
+setup steps without developer configuration. This guide is the fallback when that
+page is unavailable.
 
 ## If a package is published
 
@@ -22,6 +22,14 @@ test data first and keep current backups. It is not yet code-signed or
 notarized. Each archive has a same-named `.sha256` file and
 a small provenance record on its release so an organization can identify the
 downloaded bytes and source commit.
+
+## At a glance, release 0.4.2
+
+- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range, and one ledger's movement.
+- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, values only, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, and it has not yet been run on a real bank statement.
+- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, and tax-audit flags.
+
+"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.4.2 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
 ## Before you install
 
@@ -63,8 +71,8 @@ actually on.
    while every call is still refused. In a new chat, use **Connectors** to confirm Bridge is connected.
 
 Voucher file preparation and bank-statement parsing are available by default;
-they write nothing to Tally. **Voucher posting is off by default** while three
-known limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post (bridge#607). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, bridge#574). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected (bridge#623). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet (bridge#579, bridge#582).
+they write nothing to Tally. **Voucher posting is off by default** while four
+known limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post (bridge#607). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, bridge#574). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected (bridge#623). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet (bridge#579, bridge#582). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it.
 Turning on **Allow voucher posting (Journal, Payment, Receipt, Contra)** in the
 extension settings adds posting; every new posting still requires your approval in a separate Bridge
 dialog. Leave it off unless you accept those risks. If you installed an earlier

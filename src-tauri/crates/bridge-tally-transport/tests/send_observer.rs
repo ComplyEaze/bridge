@@ -150,19 +150,25 @@ async fn a_send_the_wire_gate_refused_is_recorded_as_refused_and_sent_nothing() 
     assert_eq!(simulator.received(), 0);
 }
 
+/// The positive control (#944) is an observed transport beside the plain one,
+/// on the same endpoint: it records its own send, a status, and nothing of the
+/// plain one's post.
 #[tokio::test]
 async fn a_transport_without_an_observer_records_nothing_and_works() {
-    let simulator = SequenceSimulator::spawn(vec![xml()]).unwrap();
-    let transport = TallyHttpTransport::new(TallyEndpointConfig {
+    let simulator = SequenceSimulator::spawn(vec![xml(), status()]).unwrap();
+    let plain = TallyHttpTransport::new(TallyEndpointConfig {
         host: simulator.address().ip().to_string(),
         port: simulator.address().port(),
     })
     .unwrap();
-    transport
-        .post_xml_decoded("<ENVELOPE/>".into())
-        .await
-        .unwrap();
-    simulator.finish().unwrap();
+    let (control, collect) = observed(&simulator, None);
+    plain.post_xml_decoded("<ENVELOPE/>".into()).await.unwrap();
+    control.get_status_decoded().await.unwrap();
+    let records = collect.0.lock().unwrap().clone();
+    assert_eq!(records.len(), 1, "{records:?}");
+    assert_eq!(records[0].kind, SendKind::Status);
+    assert_eq!(records[0].outcome, "answered");
+    assert_eq!(simulator.finish().unwrap().len(), 2);
 }
 
 #[tokio::test]
@@ -191,17 +197,30 @@ async fn a_held_lock_refusal_and_a_held_lock_send_are_recorded() {
 #[tokio::test]
 async fn a_send_whose_future_is_dropped_is_recorded_as_abandoned() {
     let simulator = SequenceSimulator::spawn(vec![
-        xml().with_delivery(Delivery::SlowHeaders(Duration::from_millis(800)))
+        xml().with_delivery(Delivery::SlowHeaders(Duration::from_secs(3)))
     ])
     .unwrap();
     let (transport, collect) = observed(&simulator, None);
-    // The caller gives up (a cancelled call drops the send mid-flight).
-    let dropped = tokio::time::timeout(
-        Duration::from_millis(150),
-        transport.post_xml_decoded("<ENVELOPE/>".into()),
-    )
-    .await;
-    assert!(dropped.is_err(), "the send should still be in flight");
+    // The caller gives up (a cancelled call drops the send mid-flight): once the
+    // request has reached the simulator and been held 150 ms. Both waits only
+    // lengthen under a stall, so `held_ms >= 100` holds however late the request
+    // starts, and the 3 s slow headers keep the send in flight (#1255).
+    let mut send = Box::pin(transport.post_xml_decoded("<ENVELOPE/>".into()));
+    let gives_up = async {
+        while simulator.received() == 0 {
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(150)).await;
+    };
+    // `biased`, giving up first: if a long stall made both ready, the send must not win.
+    let answered = tokio::select! {
+        biased;
+        () = gives_up => None,
+        sent = &mut send => Some(sent),
+    };
+    assert!(answered.is_none(), "the send should still be in flight");
+    drop(send);
+    simulator.cancel();
     let records = collect.0.lock().unwrap().clone();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].outcome, "send_abandoned");

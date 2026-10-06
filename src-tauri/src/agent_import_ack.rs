@@ -226,8 +226,7 @@ fn read_masters_record_raw(path: &Path) -> Result<Option<(Vec<u8>, Value)>, ()> 
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(_) => return Err(()),
     };
-    let mut bytes = Vec::new();
-    std::io::Read::read_to_end(&mut file, &mut bytes).map_err(|_| ())?;
+    let bytes = read_capped_record(&mut file).ok_or(())?;
     let value = serde_json::from_slice(&bytes).map_err(|_| ())?;
     Ok(Some((bytes, value)))
 }

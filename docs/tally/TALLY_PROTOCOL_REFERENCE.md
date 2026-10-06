@@ -390,6 +390,9 @@ base revision.
 <a id="12a14-one-partys-bill-trail-tied-to-the-native-balance"></a>
 
 [12a.14 One party's bill trail, tied to the native balance](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a14-one-partys-bill-trail-tied-to-the-native-balance)
+<a id="12a15-the-ledger-catalogue-can-carry-each-ledgers-isbillwiseon"></a>
+
+[12a.15 The ledger catalogue can carry each ledger's `ISBILLWISEON`](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a15-the-ledger-catalogue-can-carry-each-ledgers-isbillwiseon)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

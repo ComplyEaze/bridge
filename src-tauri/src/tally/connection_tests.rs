@@ -246,6 +246,53 @@ fn party_master_opening_balance_comparison_rejects_an_unparseable_master_value()
     .is_err());
 }
 
+/// A `/status` read that fails is reported by the transport's own safe code (#1299): an HTTP
+/// 500 is `http_status_failure`, not the generic `endpoint_unreachable`. The connection check
+/// reports it; so does the probe, while its XML reads find no company list (a list found
+/// replaces the code with `status_heuristic_unavailable`).
+#[tokio::test]
+async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
+    let failed_status =
+        b"HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            .to_vec();
+    // Not a company list in either discovery shape.
+    let no_list = utf16_xml_response("<ENVELOPE></ENVELOPE>");
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        for response in [
+            failed_status.clone(),
+            failed_status,
+            no_list.clone(),
+            no_list,
+        ] {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let request = read_complete_http_request(&mut socket).await;
+            assert!(!request.is_empty());
+            socket.write_all(&response).await.unwrap();
+        }
+    });
+    let client = TallyClient::new(TallyConfig {
+        host: address.ip().to_string(),
+        port: address.port(),
+    })
+    .unwrap();
+    let status = client.check_connection().await.unwrap();
+    assert_eq!(
+        (status.reachable, status.error.as_deref()),
+        (false, Some("http_status_failure"))
+    );
+    let (probe, _) = client.probe_with_wire_evidence().await.unwrap();
+    server.await.unwrap();
+    assert_eq!(
+        (
+            probe.connection.reachable,
+            probe.connection.error.as_deref()
+        ),
+        (false, Some("http_status_failure"))
+    );
+}
+
 fn utf16_xml_response(body: impl AsRef<str>) -> Vec<u8> {
     let body = bridge_tally_protocol::encode_tally_xml_request_utf16le(body.as_ref());
     let headers = format!(
@@ -606,7 +653,7 @@ async fn tally_requests_ignore_configured_proxy() {
     });
 
     let proxy_server = tokio::spawn(async move {
-        match tokio::time::timeout(Duration::from_millis(750), proxy_listener.accept()).await {
+        match tokio::time::timeout(Duration::from_millis(1000), proxy_listener.accept()).await {
             Ok(Ok((mut socket, _))) => {
                 let response =
                     "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
@@ -1079,7 +1126,7 @@ async fn invalid_book_extent_stops_ledger_export_without_a_date_fallback() {
                 .expect("write extent response");
         }
         assert!(
-            tokio::time::timeout(Duration::from_millis(200), listener.accept())
+            tokio::time::timeout(Duration::from_millis(1000), listener.accept())
                 .await
                 .is_err(),
             "an invalid extent must stop before any native ledger request"
@@ -1142,7 +1189,7 @@ async fn education_profile_rejects_an_unsupported_books_from_before_ledger_expor
                 .expect("write extent response");
         }
         assert!(
-            tokio::time::timeout(Duration::from_millis(200), listener.accept())
+            tokio::time::timeout(Duration::from_millis(1000), listener.accept())
                 .await
                 .is_err(),
             "an Education-invalid BOOKSFROM must stop before the native ledger request"
@@ -1343,7 +1390,7 @@ async fn non_empty_voucher_response_issues_no_extra_request() {
 
         // A non-empty response must not pay for the extent bracket: no
         // further connection should ever arrive.
-        let extra = tokio::time::timeout(Duration::from_millis(300), listener.accept()).await;
+        let extra = tokio::time::timeout(Duration::from_millis(1000), listener.accept()).await;
         assert!(
             extra.is_err(),
             "non-empty voucher fetch issued an unexpected extra request"

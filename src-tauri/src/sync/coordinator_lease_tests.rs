@@ -51,7 +51,7 @@ async fn snapshot_worker_holds_posting_lease_until_cancellation_settles() {
     );
     assert!(coordinator.jobs.lock().unwrap().is_empty());
     assert!(store.load(&plan.resume_key).await.unwrap().is_none());
-    assert!(timeout(Duration::from_millis(50), listener.accept())
+    assert!(timeout(Duration::from_millis(1000), listener.accept())
         .await
         .is_err());
     drop(posting_lease);

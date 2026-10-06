@@ -285,15 +285,6 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
             true,
             "Load the intended company in Tally, probe again, and reselect its observed identity.",
         )
-    } else if lower.contains("queue deadline") {
-        (
-            "tally_runtime_temporarily_unavailable",
-            "Operation",
-            "The local Tally request queue deadline was exceeded.",
-            "safe",
-            true,
-            "Refresh runtime status before retrying; the failed queue operation was recorded in local runtime health.",
-        )
     } else if lower.contains("capacity")
         || lower.contains("circuit")
         || lower.contains("registry")

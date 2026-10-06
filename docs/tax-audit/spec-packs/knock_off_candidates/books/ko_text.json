@@ -1,0 +1,300 @@
+{
+ "comment": "How a listed voucher is written. Every x voucher is a journal between Alpha Traders and Beta Stores, amounts in paise from 1 to 12345. x01's narration is exactly 80 characters (shown whole); x02's is 81 (cut to 79 and an ellipsis); x03's has a tab, a newline, repeated and no-break spaces (collapsed); x04 holds a single quote, x05 both quotes, x06 a zero-width space and a Devanagari word, x07 a Devanagari narration over 80 characters, x08 a backslash; x09, of type Adjustment Journal, has no narration and moves 1 paise. x10 has two parties and a bank line of minus 1 paise, so it is not a journal settlement, and having no narration it is not listed at all. b01 and b02 are bank payments whose narrations name Alpha Traders: b01's narration is 96 characters and the cut falls inside the name, so it is found though not shown whole; b02 holds the name inside a longer name, in a part holding a single quote.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_text-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_text-001"
+  },
+  {
+   "name": "Beta Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_text-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-ko_text-cap-4"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_text-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 22597,
+   "credit": 5,
+   "closing": 22592
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 13123,
+   "closing": -13123
+  },
+  {
+   "ledger": "Beta Stores",
+   "opening": 0,
+   "debit": 12350,
+   "credit": 22596,
+   "closing": -10246
+  },
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 777,
+   "credit": 0,
+   "closing": 777
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "x01",
+   "date": "2025-04-15",
+   "base_type": "Journal",
+   "narration": "Adjusted the balance of Alpha Traders against Beta Stores as agreed on the call.",
+   "lines": [
+    [
+     "Alpha Traders",
+     12345
+    ],
+    [
+     "Beta Stores",
+     -12345
+    ]
+   ]
+  },
+  {
+   "guid": "x02",
+   "date": "2025-04-02",
+   "base_type": "Journal",
+   "narration": "Adjusted the balance of Alpha Traders against Beta Stores as agreed on the calls.",
+   "lines": [
+    [
+     "Alpha Traders",
+     -5
+    ],
+    [
+     "Beta Stores",
+     5
+    ]
+   ]
+  },
+  {
+   "guid": "x03",
+   "date": "2025-04-03",
+   "base_type": "Journal",
+   "narration": "  Set\toff\nagainst   Beta Stores  ",
+   "lines": [
+    [
+     "Alpha Traders",
+     50
+    ],
+    [
+     "Beta Stores",
+     -50
+    ]
+   ]
+  },
+  {
+   "guid": "x04",
+   "date": "2025-04-04",
+   "base_type": "Journal",
+   "narration": "Beta Stores' dues adjusted",
+   "lines": [
+    [
+     "Alpha Traders",
+     100
+    ],
+    [
+     "Beta Stores",
+     -100
+    ]
+   ]
+  },
+  {
+   "guid": "x05",
+   "date": "2025-04-05",
+   "base_type": "Journal",
+   "narration": "Alpha's \"final\" set off",
+   "lines": [
+    [
+     "Alpha Traders",
+     1000
+    ],
+    [
+     "Beta Stores",
+     -1000
+    ]
+   ]
+  },
+  {
+   "guid": "x06",
+   "date": "2025-04-06",
+   "base_type": "Journal",
+   "narration": "Set​off समायोजन",
+   "lines": [
+    [
+     "Alpha Traders",
+     2000
+    ],
+    [
+     "Beta Stores",
+     -2000
+    ]
+   ]
+  },
+  {
+   "guid": "x07",
+   "date": "2025-04-07",
+   "base_type": "Journal",
+   "narration": "देय राशि समायोजित की गई और शेष राशि अगले माह के बिल में ली जाएगी, कृपया पुष्टि करें धन्यवाद सहित",
+   "lines": [
+    [
+     "Alpha Traders",
+     3000
+    ],
+    [
+     "Beta Stores",
+     -3000
+    ]
+   ]
+  },
+  {
+   "guid": "x08",
+   "date": "2025-04-08",
+   "base_type": "Journal",
+   "narration": "Ref A\\B adjusted",
+   "lines": [
+    [
+     "Alpha Traders",
+     4000
+    ],
+    [
+     "Beta Stores",
+     -4000
+    ]
+   ]
+  },
+  {
+   "guid": "x09",
+   "date": "2025-04-09",
+   "base_type": "Journal",
+   "vtype": "Adjustment Journal",
+   "lines": [
+    [
+     "Alpha Traders",
+     1
+    ],
+    [
+     "Beta Stores",
+     -1
+    ]
+   ]
+  },
+  {
+   "guid": "x10",
+   "date": "2025-04-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Alpha Traders",
+     101
+    ],
+    [
+     "Beta Stores",
+     -100
+    ],
+    [
+     "Bank A",
+     -1
+    ]
+   ]
+  },
+  {
+   "guid": "b01",
+   "date": "2025-04-11",
+   "base_type": "Payment",
+   "narration": "Paid to Beta Stores; the balance of this bill is to be settled later on by Alpha Traders in full",
+   "lines": [
+    [
+     "Beta Stores",
+     12345
+    ],
+    [
+     "Bank A",
+     -12345
+    ]
+   ]
+  },
+  {
+   "guid": "b02",
+   "date": "2025-04-12",
+   "base_type": "Payment",
+   "narration": "Rent / Omicron's shop Alpha Traders",
+   "lines": [
+    [
+     "Office Rent",
+     777
+    ],
+    [
+     "Bank A",
+     -777
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ]
+}

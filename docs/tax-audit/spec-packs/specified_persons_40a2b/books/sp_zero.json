@@ -1,0 +1,442 @@
+{
+ "comment": "Firm entity. Zero and one-paise boundaries. Partner Z (\"partner\"): the salary ledger moves only on optional, cancelled and post-dated vouchers, so its amount is 0 and no finding is raised; interest is 1 paise, governed by s.40(b). Person Y (\"brother of Partner Z\"): rent nets to 0 across two vouchers (both cited by the amount figure, no finding); purchases has only a voucher moving 30,000 paise between two ledgers of its set (net 0, dropped, no finding); other is minus 1 paise (a finding); salary names a ledger that never moves (0, no finding). Person X (\"cousin of Partner Z\") has two natures that both net to 0, so no finding at all, while the gate stays \"yes\".",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_zero-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-sp_zero-001"
+  },
+  {
+   "name": "Partner Z Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_zero-002"
+  },
+  {
+   "name": "Partner Z Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_zero-003"
+  },
+  {
+   "name": "Person X Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_zero-004"
+  },
+  {
+   "name": "Person X Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_zero-005"
+  },
+  {
+   "name": "Person Y Goods",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-sp_zero-006"
+  },
+  {
+   "name": "Person Y Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_zero-007"
+  },
+  {
+   "name": "Person Y Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_zero-008"
+  },
+  {
+   "name": "Person Y Stores",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-sp_zero-009"
+  },
+  {
+   "name": "Person Y Sundry",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_zero-010"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_zero-011"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-sp_zero-012"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 9600000,
+   "credit": 1100000,
+   "closing": 58500000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50010000,
+   "debit": 500000,
+   "credit": 0,
+   "closing": -49510000
+  },
+  {
+   "ledger": "Partner Z Interest",
+   "opening": 0,
+   "debit": 1,
+   "credit": 0,
+   "closing": 1
+  },
+  {
+   "ledger": "Partner Z Remuneration",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Person X Fees",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Person X Rent",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 500000,
+   "closing": 0
+  },
+  {
+   "ledger": "Person Y Goods",
+   "opening": 0,
+   "debit": 0,
+   "credit": 30000,
+   "closing": -30000
+  },
+  {
+   "ledger": "Person Y Rent",
+   "opening": 0,
+   "debit": 600000,
+   "credit": 600000,
+   "closing": 0
+  },
+  {
+   "ledger": "Person Y Salary",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Person Y Stores",
+   "opening": 0,
+   "debit": 30000,
+   "credit": 0,
+   "closing": 30000
+  },
+  {
+   "ledger": "Person Y Sundry",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1,
+   "closing": -1
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 10000,
+   "debit": 1,
+   "credit": 1,
+   "closing": 10000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 9000000,
+   "closing": -9000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Sales",
+     -9000000
+    ],
+    [
+     "Bank A",
+     9000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-06-30",
+   "base_type": "Payment",
+   "status": "optional",
+   "lines": [
+    [
+     "Partner Z Remuneration",
+     1200000
+    ],
+    [
+     "Bank A",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-07-31",
+   "base_type": "Payment",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Partner Z Remuneration",
+     1200000
+    ],
+    [
+     "Bank A",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2026-03-25",
+   "base_type": "Payment",
+   "status": "postdated",
+   "lines": [
+    [
+     "Partner Z Remuneration",
+     1200000
+    ],
+    [
+     "Bank A",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Partner Z Interest",
+     1
+    ],
+    [
+     "Petty Cash",
+     -1
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person Y Rent",
+     600000
+    ],
+    [
+     "Bank A",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "r02",
+   "date": "2025-05-20",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Person Y Rent",
+     -600000
+    ],
+    [
+     "Bank A",
+     600000
+    ]
+   ]
+  },
+  {
+   "guid": "j02",
+   "date": "2025-08-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Person Y Stores",
+     30000
+    ],
+    [
+     "Person Y Goods",
+     -30000
+    ]
+   ]
+  },
+  {
+   "guid": "j03",
+   "date": "2025-12-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Petty Cash",
+     1
+    ],
+    [
+     "Person Y Sundry",
+     -1
+    ]
+   ]
+  },
+  {
+   "guid": "p06",
+   "date": "2025-11-11",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person X Rent",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "j04",
+   "date": "2025-11-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Capital",
+     500000
+    ],
+    [
+     "Person X Rent",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "p07",
+   "date": "2025-12-12",
+   "base_type": "Payment",
+   "status": "optional",
+   "lines": [
+    [
+     "Person X Fees",
+     700000
+    ],
+    [
+     "Bank A",
+     -700000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23",
+  "specified_persons_40a2b"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "related_parties": {
+  "Partner Z": {
+   "relationship": "partner",
+   "ledgers_by_nature": {
+    "salary": [
+     "Partner Z Remuneration"
+    ],
+    "interest": [
+     "Partner Z Interest"
+    ]
+   }
+  },
+  "Person Y": {
+   "relationship": "brother of Partner Z",
+   "ledgers_by_nature": {
+    "rent": [
+     "Person Y Rent"
+    ],
+    "purchases": [
+     "Person Y Goods",
+     "Person Y Stores"
+    ],
+    "other": [
+     "Person Y Sundry"
+    ],
+    "salary": [
+     "Person Y Salary"
+    ]
+   }
+  },
+  "Person X": {
+   "relationship": "cousin of Partner Z",
+   "ledgers_by_nature": {
+    "rent": [
+     "Person X Rent"
+    ],
+    "other": [
+     "Person X Fees"
+    ]
+   }
+  }
+ }
+}

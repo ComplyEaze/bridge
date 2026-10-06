@@ -49,3 +49,14 @@ company labels belong to the repository's synthetic validation corpus. The
 source and fixture copies compared byte-for-byte; `.gitattributes` disables
 text normalization and the fixture-byte-integrity gate protects committed
 objects.
+
+## Integrity digests
+
+Each row is the SHA-256 of the file's committed bytes, which
+`scripts/check-fixture-provenance.mjs` checks (#838). A digest pins the bytes as
+committed and claims nothing about where they came from: the Capture column
+repeats only what this note says above.
+
+| Fixture | Bytes | SHA-256 (integrity digest) | Capture |
+| --- | ---: | --- | --- |
+| `group_snapshot_validation_lab.xml` | 24,452 | `de722a9e6f0800279cc5fc9bf7d1f81a01d052de0f7f09433b55a2dfdd515840` | byte-exact capture, as above |

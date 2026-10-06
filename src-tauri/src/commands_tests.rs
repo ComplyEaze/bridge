@@ -35,7 +35,7 @@ fn a_paired_report_response_marker_does_not_change_the_command_code() {
     }
 }
 
-use super::all_clients::{
+use super::all_clients::migration::{
     load_client_group_labels_for_migration, prepare_client_group_label_migration_from_labels,
     ClientGroupLabelMigrationPreparationError,
 };
@@ -384,10 +384,19 @@ fn tally_runtime_error_serialization_is_stable_and_redacted() {
     assert_eq!(invalid_config.code, "endpoint_configuration_invalid");
     assert!(!invalid_config.local_state_changed);
 
-    let queue_deadline =
+    // Nothing emits this text (#1299): the queue deadline is classified only by its type (see
+    // `retained_wire_evidence_does_not_hide_typed_command_refusals`), so a string that merely
+    // reads like one gets the generic code.
+    let queue_deadline_text =
         tally_runtime_command_error(anyhow::anyhow!("endpoint queue deadline exceeded"));
-    assert_eq!(queue_deadline.code, "tally_runtime_temporarily_unavailable");
-    assert!(queue_deadline.local_state_changed);
+    assert_eq!(
+        (
+            queue_deadline_text.code,
+            queue_deadline_text.retry,
+            queue_deadline_text.local_state_changed
+        ),
+        ("endpoint_unreachable", "after_change", true)
+    );
 
     let deadline = tally_runtime_command_error(
         anyhow::Error::new(bridge_tally_transport::TallyTransportError::RequestTimedOut)
@@ -459,6 +468,19 @@ fn retained_wire_evidence_does_not_hide_typed_command_refusals() {
         assert_eq!(mapped.code, code);
         assert!(!mapped.message.contains("opening balances disagreed"));
     }
+    // The live queue deadline is the typed error, found through any context on top (#1299).
+    let queue_deadline = tally_runtime_command_error(
+        anyhow::Error::new(crate::tally::runtime::TallyRuntimeControlError::QueueDeadline)
+            .context("outstandings read failed"),
+    );
+    assert_eq!(
+        (
+            queue_deadline.code,
+            queue_deadline.retry,
+            queue_deadline.local_state_changed
+        ),
+        ("tally_runtime_temporarily_unavailable", "safe", true)
+    );
 }
 
 #[test]
@@ -849,11 +871,15 @@ fn party_master_export_withholds_and_names_the_ledgers_it_would_leave_out() {
 /// these files cannot bring the short name back.
 #[test]
 fn desktop_messages_name_the_product_in_full() {
-    const SOURCES: [(&str, &str); 6] = [
+    const SOURCES: [(&str, &str); 7] = [
         ("commands.rs", include_str!("commands.rs")),
         (
             "commands/all_clients.rs",
             include_str!("commands/all_clients.rs"),
+        ),
+        (
+            "commands/all_clients/migration.rs",
+            include_str!("commands/all_clients/migration.rs"),
         ),
         (
             "commands_trial_balance.rs",

@@ -1,9 +1,11 @@
 # Hang guard for the native test run (bridge#1000). Nextest reads this file from the
 # workspace root, which is src-tauri, not the repository root. It does one thing: a test
 # that deadlocks is terminated, and the run fails, instead of holding the job until its
-# time limit. The slowest real test takes about 47 s, and several tests wait out 20 to 40 s
-# deadlines on purpose, so a test is marked slow after 60 s and terminated after six such
-# periods (six minutes), more than seven times the slowest real test.
+# time limit. The slowest real tests take 41 to 69 s at the runner's own thread count (measured
+# 5 Oct 2026: 61 to 69 s on macOS, 41 to 44 s on Windows) and up to 90 s on Windows at twelve
+# threads, and several wait out 20 to 40 s deadlines on purpose, so a test is marked slow after
+# 60 s and terminated after six such periods (six minutes), at least four times the slowest real
+# test.
 #
 # There are deliberately no retries here. A retry could hide a real race in code that
 # posts to accounting books; CI passes `--retries 0` and the thread count on its own

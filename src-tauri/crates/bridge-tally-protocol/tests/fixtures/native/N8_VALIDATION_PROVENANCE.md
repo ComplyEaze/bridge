@@ -11,3 +11,17 @@ unchanged; no fixture was hand-edited.
 | `group_snapshot_wr2_with_identity.utf16le.xml` | `506dfe629d132b91a82c5d6c828c0c07e9d3434d5c2298a70464b81723099840` | 50,474 |
 | `group_snapshot_aarav_with_identity.utf16le.xml` | `af63dcf1d2ed658c67cd4c4098aab04f8cee7fe7ffe586462b203d4cb0a8eff7` | 48,904 |
 | `response-illegal-svtodate-bound-dropped-wr2.utf16le.xml` | `558773307605719d7ab15e9f18ca90c1d295737d0c2c102c5eb55043c4e3abdf` | 19,392 |
+
+## Integrity digests
+
+Each row is the SHA-256 of the file's committed bytes, which
+`scripts/check-fixture-provenance.mjs` checks (#838). A digest pins the bytes as
+committed and claims nothing about where they came from: the Capture column
+repeats only what this note says above.
+
+| Fixture | Bytes | SHA-256 (integrity digest) | Capture |
+| --- | ---: | --- | --- |
+| `empty_voucher_window_wr2.utf16le.xml` | 3,022 | `49d1cf0c7cf56220fbaa7e2f583a99835f6af74dda7ad807ad54a34277bbff7e` | verbatim UTF-16LE capture, as above |
+| `group_snapshot_wr2_with_identity.utf16le.xml` | 50,474 | `506dfe629d132b91a82c5d6c828c0c07e9d3434d5c2298a70464b81723099840` | verbatim UTF-16LE capture, as above |
+| `group_snapshot_aarav_with_identity.utf16le.xml` | 48,904 | `af63dcf1d2ed658c67cd4c4098aab04f8cee7fe7ffe586462b203d4cb0a8eff7` | verbatim UTF-16LE capture, as above |
+| `response-illegal-svtodate-bound-dropped-wr2.utf16le.xml` | 19,392 | `558773307605719d7ab15e9f18ca90c1d295737d0c2c102c5eb55043c4e3abdf` | verbatim UTF-16LE capture, as above |

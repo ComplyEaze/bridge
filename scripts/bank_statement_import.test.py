@@ -461,6 +461,37 @@ def test_parse_hdfc_page(m):
     assert first["ref"] == "0000123456789012"
 
 
+def test_hdfc_period_line_below_the_anchor_line_is_not_part_of_the_last_row(m):
+    """Every HDFC page opens with "Statement of account" and, in a smaller font a
+    hair below it, "From : <date> To : <date>". poppler groups the two (2.4 pt
+    apart on the capture); a reader that leaves the second one 3+ pt down would
+    otherwise append it to the previous page's last row: "From :" in the date
+    cell and both dates in the narration."""
+    first = page(
+        (100, [(5, 30, "Date"), (72, 120, "Narration"), (562, 600, "Closing")]),
+        (120, [(33.7, 62.1, "01/08/26"), (72, 200, "0000000001-TPT-RENT-ZEPHYR"),
+               (482, 540, "10,000.00"), (562, 620, "11,000.00")]),
+        (170, [(28, 60, "HDFC"), (62, 95, "BANK"), (97, 140, "LIMITED")]),
+    )
+    for gap in (2.4, 5.0):
+        second = page(
+            (213.9, [(340.2, 388.2, "Statement"), (391.2, 401.2, "of"),
+                     (404.2, 441.5, "account")]),
+            (213.9 + gap, [(34, 51.4, "From"), (55.4, 57.6, ":"),
+                           (61.6, 98.0, "02/08/2026"), (154, 162.9, "To"),
+                           (166.9, 169.1, ":"), (173.1, 209.6, "03/08/2026")]),
+            (232.4, [(74, 100.7, "ZETA")]),
+            (249.6, [(33.7, 62.1, "02/08/26"), (72, 200, "NEFT DR-ZZZZ0000001-ACME"),
+                     (402, 460, "2,500.00"), (562, 620, "8,500.00")]),
+        )
+        rows = m.parse_pages([first, second], m.HDFC())
+        assert len(rows) == 2, gap
+        assert rows[0]["date"] == "01/08/26", gap
+        # the split row's tail still reaches its row, whichever way the lines group
+        assert rows[0]["narr_spaced"] == "0000000001-TPT-RENT-ZEPHYR ZETA", gap
+        assert rows[1]["date"] == "02/08/26", gap
+
+
 def test_parse_sbi_page(m):
     """SBI's repeated three-line header sits below the anchor and must not be
     appended to the row in progress; the date is stacked over the year."""

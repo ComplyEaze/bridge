@@ -132,6 +132,34 @@ if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
   failures.push("seam-control must cover every platform bundle-smoke builds");
 }
 
+// native-legacy runs the legacy-feature guard, tests and lint beside native (they were native's last
+// steps). Its whole text is pinned: a changed line is a changed test or lint. It also restores native's
+// Windows dependency cache without saving it. rust-cache keys on shared-key, the workspaces, the env vars
+// it hashes and the CARGO* environment, so a difference in one of them is not a failure but a cold build
+// on every run. The shared-key expression, the workspaces, the env-var list and the two CARGO_PROFILE
+// lines are therefore required to appear in both jobs. (Other rust-cache inputs and step order are not
+// compared here; native's own digest pins its side, so changing them needs both digests edited on purpose.)
+const nativeJob = jobBlock(workflow, "native");
+const legacyJob = jobBlock(workflow, "native-legacy");
+// The block runs to the next job key, so comment lines that introduce the next job are trimmed off.
+const legacyDigest = sha256(legacyJob.replace(/(?:\n(?: {0,2}#.*)?)+$/, ""));
+if (legacyDigest !== "32585bd0ee2c51fc34de2f736facf3c3866659695e0f529ecf989a99c73a020d") {
+  failures.push(`native-legacy changed; its digest is now ${legacyDigest}`);
+}
+const cacheKey = (job) => job.match(/^          shared-key: .*?(format\('native-deps-v1-\{0\}', hashFiles\('[^']+'\)\))/m)?.[1];
+if (!cacheKey(nativeJob) || cacheKey(legacyJob) !== cacheKey(nativeJob)) {
+  failures.push("native-legacy must restore native's Windows dependency cache: its shared-key must use native's key expression");
+}
+for (const input of [
+  "          workspaces: |\n            src-tauri -> target\n            tools -> target",
+  "ImageOS ImageVersion OPENSSL LIBCLANG",
+  "      CARGO_PROFILE_DEV_DEBUG: '0'\n      CARGO_PROFILE_TEST_DEBUG: '0'",
+]) {
+  if (!nativeJob.includes(input) || !legacyJob.includes(input)) {
+    failures.push(`native-legacy and native must share this cache input: ${input.trim().split("\n")[0].trim()}`);
+  }
+}
+
 // A step that must run is pinned whole: a pinned command line alone still passes with a step-level
 // `if`, a `continue-on-error`, an `|| true`, or the command kept only in a comment. Everything that
 // runs in its job before it can also change what it sees, so each job is pinned too, by SHA-256
@@ -139,13 +167,22 @@ if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
 // even a whitespace or CRLF change trips it). Change a step and its copy, or a job and its digest, together
 // and deliberately; the failure prints the new digest for a reviewed change.
 const releaseWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/release-mcpb-preview.yml"), "utf8");
-jobIds(releaseWorkflow);
+// The release workflow's jobs are pinned by name: a job block is read up to the next `  name:` line, so an
+// unexpected job key would cut the previous job's block short.
+if (jobIds(releaseWorkflow).join(",") !== "release-admission,package,attest,publish-preview") {
+  failures.push("release-mcpb-preview.yml must have exactly the jobs release-admission, package, attest and publish-preview");
+}
+// Line-based readers split on \n (and \r\n); a lone \r, U+0085, U+2028 or U+2029 is a line break to other
+// YAML readers but not to them, so neither workflow may contain one.
+for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
+  if (/\r(?!\n)|[\u0085\u2028\u2029]/.test(source)) failures.push(`${name} must use only \\n or \\r\\n line breaks`);
+}
 for (const [source, job, expected, digest] of [
   [workflow, "native", [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "956e3337285aaa4880e97ac8cc4f0ee88889f90512143f45885e2e1e0126a533"],
+  ], "4a9face473d014c09afb50f1cd1ec95e5a0dd2e8d56f7a12237f09499c27c57e"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -156,7 +193,7 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "11471d580af5f7bbe5af1a6a080f97de8c946504de6e3772a3a2461fae4879c0"],
+  ], "bdd80e3bf24c8f565e9f34c266bcc6db7a12708b1555109c7ec1c0d4de01ad8c"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
@@ -169,6 +206,10 @@ for (const [source, job, expected, digest] of [
   }
   const actual = sha256(jobThrough(source, job, expected[0]));
   if (actual !== digest) failures.push(`${job} changed before "${expected[0].trim()}"; its digest is now ${actual}`);
+  // The digest covers the job only up to the pinned step. A job-level key (container, env, services,
+  // defaults, ...) written after the steps is outside it, so `steps:` must be the job's last key.
+  const jobKeys = jobBlock(source, job).split("\n").filter((line) => /^ {4}[^ \t#-]/.test(line));
+  if (jobKeys.at(-1)?.trimEnd() !== "    steps:") failures.push(`${job}: \`steps:\` must be the job's last key; a job-level key after the steps is outside its pinned text`);
 }
 // Each workflow's header (triggers, permissions, concurrency, env, defaults) applies to every job;
 // jobIds refuses a workflow-level key after the jobs map, so the header is all of them.
@@ -194,14 +235,83 @@ if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a85
 // The lookup that decides whether a master push may skip heavy jobs is pinned by its bytes: a change
 // to it is a change to what can be skipped, so it needs this file edited (and acknowledged) with it.
 const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/master-push-reuse.mjs"))).digest("hex");
-if (reuseScriptDigest !== "1cf4382fc71ab7339022544962a5ce55fd8128269fe7bf9f269b022a430d8854") {
+if (reuseScriptDigest !== "17b3627cbe5d369e2e53e8fff0fc09e4ccce2d471817ba96cfec40d19024b880") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
+// `continue-on-error` is refused everywhere (a failure would report success) except on these four
+// diagnostics-only artifact uploads. Each runs under `always()`, has no `id`, and nothing in this
+// repository downloads or reads its outcome; a GitHub service timeout in one of them (a merge-queue
+// entry was dropped on 3 Oct 2026 by `CreateArtifact ETIMEDOUT`) is not a failure of the code under
+// test. Left out on purpose: the qualification-smoke receipt, the failed-run executable evidence and
+// the unsigned bundle upload, whose absence or failure must stay visible. Each allowed step is pinned
+// whole (its job, its text and the upload action's SHA), so the flag cannot move to another step or
+// take an expression, and the count and exact line are checked below.
+const diagnosticUploads = [
+  ["native", [
+    "      - name: Retain minimized macOS test crash stacks",
+    "        if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: native-crash-stacks-macos",
+    "          path: ${{ runner.temp }}/bridge-native-crashes.json",
+    "          if-no-files-found: error",
+    "          retention-days: 7",
+  ]],
+  ["native", [
+    "      - name: Retain native compiler timings",
+    "        if: ${{ always() }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: native-compiler-timings-${{ matrix.os }}",
+    "          path: src-tauri/target/cargo-timings/*.html",
+    "          if-no-files-found: warn",
+    "          retention-days: 7",
+  ]],
+  ["bundle-smoke", [
+    "      - name: Retain macOS package diagnostics",
+    "        if: ${{ always() && runner.os == 'macOS' && (steps.macos-bundle.outcome == 'success' || steps.macos-bundle.outcome == 'failure') }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: macos-package-diagnostics",
+    "          path: |",
+    "            package-diagnostics/**",
+    "            src-tauri/target/release/bundle/dmg/bundle_dmg.sh",
+    "            src-tauri/target/cargo-timings/*.html",
+    "          if-no-files-found: warn",
+    "          retention-days: 7",
+  ]],
+  ["bundle-smoke", [
+    "      - name: Upload package compiler cache statistics",
+    "        if: ${{ always() && steps.package-sccache-start.outcome == 'success' }}",
+    "        continue-on-error: true",
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+    "        with:",
+    "          name: package-compiler-cache-${{ matrix.os }}",
+    "          path: package-compiler-cache.json",
+    "          if-no-files-found: error",
+    "          retention-days: 7",
+  ]],
+];
+for (const [job, lines] of diagnosticUploads) {
+  if (stepBlock(jobBlock(workflow, job), lines[0]) !== lines.join("\n")) {
+    failures.push(`${job}: diagnostics-only upload "${lines[0].trim()}" changed shape; review it and update diagnosticUploads`);
+  }
+}
+const flagLines = workflow.split("\n").filter((line) => line.includes("continue-on-error"));
+if (flagLines.length !== diagnosticUploads.length || flagLines.some((line) => line.replace(/\r$/, "") !== "        continue-on-error: true")) {
+  failures.push("ci.yml must not use continue-on-error except the one exact line in each pinned diagnostics-only upload: a failure would report success");
+}
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
-  if (source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);
+  if (name !== "ci.yml" && source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);
+  // A quoted key can spell a refused key with an escape, which the text rule above cannot read; refuse
+  // one at the start of a line. (Other YAML spellings of a key are not covered by this line.)
+  if (/^\s*(?:-\s+)?["'][^"'\n]*["']\s*:/m.test(source)) failures.push(`${name} must not start a line with a quoted mapping key: the continue-on-error rule reads keys as plain text`);
   // A step without its own `shell:` runs under the workflow's or job's defaults.
   if (/^\s*defaults\s*:/m.test(source)) failures.push(`${name} must not set defaults: they change how unpinned-shell steps run`);
 }
@@ -326,7 +436,7 @@ const expectedChanges = [
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
   "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
-  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.py$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes\\.py$|retain-macos-test-binaries\\.py$))'; then",
+  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.py$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes\\.py$|retain-macos-test-binaries\\.py$))'; then",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",

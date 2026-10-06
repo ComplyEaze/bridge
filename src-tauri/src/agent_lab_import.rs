@@ -1699,6 +1699,7 @@ fn render_accounting_voucher_xml(
     attribution_id: Uuid,
 ) -> Result<String, String> {
     let date = normalized_date(&voucher.date)?;
+    let date = date.as_str();
     let bank = is_bank_shape(&voucher.voucher_type);
     let mut lines: Vec<&BookLedgerLine> = voucher.ledger_lines.iter().collect();
     if bank {
@@ -1817,6 +1818,7 @@ fn render_invoice_voucher_xml(
     attribution_id: Uuid,
 ) -> Result<String, String> {
     let date = normalized_date(&voucher.date)?;
+    let date = date.as_str();
     let party = voucher
         .party
         .as_deref()
@@ -1883,11 +1885,14 @@ ALLLEDGERENTRIES.BILLALLOCATIONS.BILLTYPE,ALLLEDGERENTRIES.BILLALLOCATIONS.AMOUN
 
 pub(in crate::agent) fn render_voucher_window_request(
     company: &str,
-    from: &str,
-    to: &str,
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
 ) -> Result<String, String> {
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
+    // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
+    // protect it, since Tally decodes `&quot;` before evaluating (#861).
+    let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Lab Voucher Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeLabWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"</SYSTEM><COLLECTION NAME=\"Bridge Lab Voucher Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{}</FETCH><FILTERS>BridgeLabWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str()), ACCOUNTING_VOUCHER_FETCH
@@ -2106,7 +2111,9 @@ fn voucher_already_verified(expected: &BookVoucher, observed: &[ObservedVoucher]
     // observed row is always already in that form; the ledger amount must be
     // the *signed* wire amount (§9.13's Dr-negative convention), since
     // book.json stores an unsigned magnitude plus a side.
-    let expected_date = normalized_date(&expected.date).unwrap_or_else(|_| expected.date.clone());
+    let expected_date = normalized_date(&expected.date)
+        .map(|date| date.as_str().to_string())
+        .unwrap_or_else(|_| expected.date.clone());
     let expected_marker = lab_marker_id(&expected.source_guid).to_string();
     let expected_narration_text = narration_text(expected.narration.as_deref());
     observed.iter().any(|row| {
@@ -2146,7 +2153,9 @@ fn voucher_already_verified(expected: &BookVoucher, observed: &[ObservedVoucher]
 /// the 2026-09-14 rehearsal stop (`readback_mismatch`, no field-level
 /// detail available at all).
 fn voucher_mismatch_detail(expected: &BookVoucher, observed: &[ObservedVoucher]) -> Value {
-    let expected_date = normalized_date(&expected.date).unwrap_or_else(|_| expected.date.clone());
+    let expected_date = normalized_date(&expected.date)
+        .map(|date| date.as_str().to_string())
+        .unwrap_or_else(|_| expected.date.clone());
     let expected_marker = lab_marker_id(&expected.source_guid).to_string();
     let expected_narration_text = narration_text(expected.narration.as_deref());
     let expected_number = expected.voucher_number.as_deref().unwrap_or("(none)");
@@ -2297,8 +2306,17 @@ pub(in crate::agent) async fn lab_import_vouchers(
         let start = batch_index * MAX_VOUCHER_BATCH;
         let end = (start + MAX_VOUCHER_BATCH).min(vouchers.len());
         let batch = &vouchers[start..end];
-        let from = batch.first().map(|v| v.date.clone()).unwrap_or_default();
-        let to = batch.last().map(|v| v.date.clone()).unwrap_or_default();
+        // The window's dates go into a `$$Date:"…"` literal, so a voucher
+        // date that is not a date is refused before anything is read (#861).
+        let window_date = |voucher: Option<&BookVoucher>| {
+            bridge_tally_core::TallyDate::parse(voucher.map(|v| v.date.clone()).unwrap_or_default())
+                .map_err(|_| {
+                    ToolFailure::from("invalid_date".to_string())
+                        .with_prior_evidence(evidence.clone())
+                })
+        };
+        let from = window_date(batch.first())?;
+        let to = window_date(batch.last())?;
 
         // Resume pre-check (§9.3/§12a's discipline): never blind-retry. Read
         // the window this batch would occupy and check every voucher against

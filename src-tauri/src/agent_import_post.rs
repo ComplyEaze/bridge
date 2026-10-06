@@ -139,6 +139,22 @@ fn after_read_retry_budget(
     (left >= AFTER_READ_MIN_RETRY_WAIT).then(|| left.min(policy_total))
 }
 
+/// The wire wait a redeem-only pass may spend (#893): what the call's shared
+/// budget has left, cut so that the redeem measured live still fits under the
+/// call's ceiling from here. A pass with no time left waits for nothing: an
+/// admission read that meets a held lock is refused at once as
+/// `tally_endpoint_busy`, before the attempt is recorded and before anything is
+/// sent, rather than holding the call past its ceiling.
+fn redeem_pass_wire_budget(
+    elapsed: std::time::Duration,
+    shared_left: std::time::Duration,
+) -> std::time::Duration {
+    approval::CALL_CEILING
+        .saturating_sub(elapsed)
+        .saturating_sub(approval::MEASURED_REDEEM)
+        .min(shared_left)
+}
+
 /// Why the marks readback after a sent post failed: the transport's own safe
 /// code when it has one (a busy wire lock is `tally_endpoint_busy`), so a
 /// doubt says the read was held back and never that the step moved wrongly.
@@ -350,6 +366,7 @@ impl Server {
                     .iter()
                     .filter(|(name, guid)| {
                         catalogue
+                            .catalog()
                             .bind_selected([name.clone()])
                             .ok()
                             .and_then(|now| {
@@ -469,8 +486,40 @@ impl Server {
     }
 
     /// One pass of a post call: the whole post, or up to a Join that found a
-    /// click already made, which the caller then redeems in a second pass.
+    /// click already made, which the caller then redeems in a second pass. A
+    /// redeem-only pass runs on a wire-wait budget cut to what the call has
+    /// left (#893): its admission reads would otherwise wait on whatever the
+    /// call's shared budget still holds, past the call's ceiling.
     pub(in crate::agent) async fn post_import_entry(
+        &self,
+        args: &Value,
+        expected_sha256: Option<&str>,
+        scope: PostScope,
+        entry: Entry,
+    ) -> Result<Pass, ToolFailure> {
+        let Entry::RedeemOnly { call_started, .. } = &entry else {
+            return self
+                .post_import_pass(args, expected_sha256, scope, entry)
+                .await;
+        };
+        let shared_left = crate::tally::runtime::operation_wire_budget_remaining()
+            .unwrap_or_else(|| self.runtime.wire_gate_config().retry().total());
+        let elapsed = call_started.elapsed();
+        #[cfg(test)]
+        let elapsed = REDEEM_PASS_ELAPSED
+            .try_with(|scripted| *scripted)
+            .unwrap_or(elapsed);
+        let budget = redeem_pass_wire_budget(elapsed, shared_left);
+        #[cfg(test)]
+        let _ = REDEEM_WIRE_BUDGETS.try_with(|budgets| budgets.lock().unwrap().push(budget));
+        crate::tally::runtime::with_operation_wire_budget_of(
+            budget,
+            self.post_import_pass(args, expected_sha256, scope, entry),
+        )
+        .await
+    }
+
+    async fn post_import_pass(
         &self,
         args: &Value,
         expected_sha256: Option<&str>,
@@ -529,6 +578,9 @@ impl Server {
         let mut masters_verdict: Option<Value> = None;
         // The ledgers whose GUID changed since the build (#239).
         let mut ledgers_changed: Option<Vec<String>> = None;
+        // The recorded cash-in-hand ledgers no longer under Cash-in-Hand, as
+        // refusal rows, and how many were left out (#815).
+        let mut cash_in_hand_refused: Option<(Vec<Value>, usize)> = None;
         // The batch's own transaction ids found already in the book (#901).
         let mut preexisting_txn_ids: Option<Vec<String>> = None;
         let operation: Result<Step, ToolFailure> = async {
@@ -567,6 +619,16 @@ impl Server {
             // recorded its ledgers' GUIDs has nothing to check them against.
             if line.ledger_identities.is_none() {
                 return Err(BuildBindingRefusal::Unbound.code().to_string().into());
+            }
+            // Nor can a batch saved before Bridge recorded the ledgers its bank
+            // cash answers named as cash in hand: nothing to check again (#815).
+            if line.cash_in_hand_ledgers.is_none() {
+                return Err(CASH_LEDGERS_NOT_RECORDED.to_string().into());
+            }
+            // Nor one saved before the build recorded which bill-wise ledgers a
+            // person approved to receive entries On Account (#1234).
+            if line.on_account_approved.is_none() {
+                return Err(super::bill_wise::BILL_WISE_NOT_RECORDED.to_string().into());
             }
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
@@ -693,6 +755,12 @@ impl Server {
                 .map_err(|_| "voucher_date_invalid".to_string())?;
             let native = native_post_request(&line, remote_ids)?;
             let xml = native.xml.clone();
+            // The stored window is parsed here, where it enters a request,
+            // as the window read parses its own (#861).
+            let verification_date = |date: &str| {
+                bridge_tally_core::TallyDate::parse(date)
+                    .map_err(|_| "invalid_date_range".to_string())
+            };
             let verification_request = crate::tally::agent_read_request::AgentReadRequest::parse(
                 render_import_verification_read(
                     &line
@@ -700,8 +768,8 @@ impl Server {
                         .as_ref()
                         .ok_or_else(|| "import_post_company_missing".to_string())?
                         .name,
-                    &line.date_from,
-                    &line.date_to,
+                    &verification_date(&line.date_from)?,
+                    &verification_date(&line.date_to)?,
                 ),
             )
             .map_err(|error| error.to_string())?;
@@ -727,13 +795,14 @@ impl Server {
             // appeared or before the build checked for one.
             if !folded_twins(
                 &requested_ledger_names(&payload),
-                catalogue_identities.parents(),
+                catalogue_identities.catalog().parents(),
             )
             .is_empty()
             {
                 return Err("ledger_has_folded_twin".to_string().into());
             }
             let ledger_binding = catalogue_identities
+                .catalog()
                 .bind_selected(requested_ledger_names(&payload))
                 .map_err(|_| "import_masters_changed".to_string())?;
             // The same ledgers must still carry the GUIDs the build bound them
@@ -747,6 +816,17 @@ impl Server {
                     ToolFailure::from(refusal.code().to_string())
                 },
             )?;
+            // A ledger switched to bill-wise since the build would take an entry
+            // On Account unseen: only the ledgers the person approved may be
+            // bill-wise now. Judged after the identity binding, so a ledger
+            // replaced under its old name is reported as that, not as a flag.
+            if !super::bill_wise::flags_still_as_approved(
+                &catalogue_identities,
+                &super::bill_wise::named_ledgers(&payload),
+                line.on_account_approved.as_deref().unwrap_or_default(),
+            ) {
+                return Err("import_bill_wise_changed".to_string().into());
+            }
             // A Payment, Receipt or Contra is only the right type while every
             // leg classifies as its build found it. The build's own check is
             // stale by now, so classify again before approval from this
@@ -756,9 +836,23 @@ impl Server {
                 let (groups, evidence) =
                     self.read_group_collection(&identity, &company.name).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence);
-                let observed = ObservedMasters::new(catalogue_identities.parents(), groups);
+                let observed =
+                    ObservedMasters::new(catalogue_identities.catalog().parents(), groups);
                 if cash_bank_refusals(&payload, &observed, RECHECK_REFUSAL_BUDGET).is_refused() {
                     return Err("import_bank_classification_changed".to_string().into());
+                }
+                // A ledger a cash answer named as cash in hand must still be
+                // one: under Bank Accounts its Contra moves the cash bank to
+                // bank, which passes the gate above (#815).
+                // Bounded as the queue bounds them, so both answers list the
+                // same rows for one regroup.
+                if let Some(refused) = super::cash_in_hand_refusals(
+                    line.cash_in_hand_ledgers.as_deref().unwrap_or_default(),
+                    &observed,
+                    RECHECK_REFUSAL_BUDGET,
+                ) {
+                    cash_in_hand_refused = Some(refused);
+                    return Err("cash_ledger_not_cash_in_hand".to_string().into());
                 }
                 Some(
                     crate::tally::agent_read_request::AgentReadRequest::parse(
@@ -766,6 +860,15 @@ impl Server {
                     )
                     .map_err(|error| error.to_string())?,
                 )
+            } else if line
+                .cash_in_hand_ledgers
+                .as_deref()
+                .is_some_and(|recorded| !recorded.is_empty())
+            {
+                // A cash-in-hand ledger rides only on a business-cash Contra,
+                // a bank voucher: one recorded without one would skip the
+                // check above, so the record is refused as inconsistent (#815).
+                return Err("import_post_admission_inconsistent".to_string().into());
             } else {
                 None
             };
@@ -1013,6 +1116,10 @@ impl Server {
                     .chain()
                     .find_map(|cause| cause.downcast_ref::<ApprovedImportAdmissionError>())
                     .and_then(refused_currencies);
+                cash_in_hand_refused = error
+                    .chain()
+                    .find_map(|cause| cause.downcast_ref::<ApprovedImportAdmissionError>())
+                    .and_then(refused_cash_in_hand);
                 let code = if error.chain().any(|cause| {
                     cause.is::<crate::tally::approved_import::AmbiguousImportCompany>()
                 }) {
@@ -1045,6 +1152,34 @@ impl Server {
                     )
                 }) {
                     "import_bank_classification_changed"
+                } else if error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                        Some(ApprovedImportAdmissionError::CashLedgerNotCashInHand { .. })
+                    )
+                }) {
+                    "cash_ledger_not_cash_in_hand"
+                } else if error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                        Some(ApprovedImportAdmissionError::CashLedgersNotRecorded)
+                    )
+                }) {
+                    CASH_LEDGERS_NOT_RECORDED
+                } else if error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                        Some(ApprovedImportAdmissionError::BillWiseNotRecorded)
+                    )
+                }) {
+                    super::bill_wise::BILL_WISE_NOT_RECORDED
+                } else if error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                        Some(ApprovedImportAdmissionError::BillWiseChanged)
+                    )
+                }) {
+                    "import_bill_wise_changed"
                 } else if error.chain().any(|cause| {
                     matches!(
                         cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -1333,6 +1468,9 @@ impl Server {
                 if let Some(currencies) = currencies_seen {
                     name_refused_currencies(&mut outcome.payload, &currencies);
                 }
+                if let Some((refused, omitted)) = cash_in_hand_refused {
+                    name_refused_cash_ledgers(&mut outcome.payload, refused, omitted);
+                }
                 // Withheld under the remediation budget, as `cause` is. That is
                 // not a guarantee against the oversize answer just above it.
                 if let Some(ids) = preexisting_txn_ids {
@@ -1465,6 +1603,11 @@ fn refusal_cause(
 /// send (#697). Tally may or may not have accepted it; only the proof is missing.
 const BUSY_AFTER_POST_NEXT_STEP: &str = "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again.";
 
+/// What a caller does when the port was busy before any attempt was recorded
+/// (#869): nothing was sent, and an approval taken for this post has lapsed, so
+/// the next call asks the person again.
+const BUSY_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally's port was busy. Call post_import with this same batch again after retry_after_s seconds, once Tally is free. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
+
 /// The same, when whether the post was sent could not be observed.
 const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could not be observed. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again before it says the batch is not in Tally.";
 
@@ -1518,7 +1661,9 @@ fn reconciliation_failure_payload(
                 payload["result"]["error"]["next_step"] = json!(BUSY_AFTER_POST_NEXT_STEP)
             }
             None => payload["result"]["error"]["next_step"] = json!(BUSY_UNKNOWN_ATTEMPT_NEXT_STEP),
-            Some(false) => {}
+            Some(false) => {
+                payload["result"]["error"]["next_step"] = json!(BUSY_BEFORE_ATTEMPT_NEXT_STEP)
+            }
         }
     }
     payload
@@ -1784,6 +1929,15 @@ fn recheck_import_admission(
     currencies: &str,
     ledger_binding: &bridge_tally_protocol::StandardLedgerCatalogBinding,
 ) -> anyhow::Result<()> {
+    // The ledgers the build found under Cash-in-Hand (#815): a record without
+    // them predates the field and has nothing to check again.
+    let cash_in_hand = line
+        .cash_in_hand_ledgers
+        .as_deref()
+        .ok_or(ApprovedImportAdmissionError::CashLedgersNotRecorded)?;
+    if line.on_account_approved.is_none() {
+        return Err(ApprovedImportAdmissionError::BillWiseNotRecorded.into());
+    }
     let observed = parse_import_vouchers(first, company_guid).map_err(anyhow::Error::msg)?;
     let corroboration = parse_import_vouchers(second, company_guid).map_err(anyhow::Error::msg)?;
     corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)
@@ -1795,14 +1949,16 @@ fn recheck_import_admission(
         "import_preexisting_identity" => ApprovedImportAdmissionError::PreexistingIdentity.into(),
         _ => anyhow::Error::msg(code),
     })?;
-    if !ledger_binding
-        .matches(catalogue, company_name, company_guid)
-        .map_err(ApprovedImportAdmissionError::CatalogueUnreadable)?
-    {
+    let catalogue = crate::tally::standard_ledger_catalog::parse_import_ledger_catalog_response(
+        catalogue,
+        company_name,
+        company_guid,
+    )
+    .map_err(ApprovedImportAdmissionError::CatalogueUnreadable)?;
+    if !ledger_binding.matches_catalog(catalogue.catalog()) {
         return Err(ApprovedImportAdmissionError::LedgerIdentityChanged.into());
     }
-    let parents = parse_standard_ledger_catalog_response(catalogue, company_name, company_guid)
-        .map_err(ApprovedImportAdmissionError::CatalogueUnreadable)?;
+    let parents = catalogue.catalog();
     // Nor can the binding see a ledger added since approval that folds equal to
     // a named one, which Tally's import lookup could take for it (bridge#626).
     let named = line
@@ -1816,13 +1972,26 @@ fn recheck_import_admission(
     if !folded_twins(&named, parents.parents()).is_empty() {
         return Err(ApprovedImportAdmissionError::LedgerFoldedTwin.into());
     }
+    // A ledger switched to bill-wise since the build would take an entry On
+    // Account unseen: only the ledgers the person approved may be bill-wise
+    // now. The same catalogue read carries the flags (#1234).
+    let approved = line.on_account_approved.as_deref().unwrap_or_default();
+    if !super::bill_wise::flags_still_as_approved(
+        &catalogue,
+        &named.iter().map(String::as_str).collect(),
+        approved,
+    ) {
+        return Err(ApprovedImportAdmissionError::BillWiseChanged.into());
+    }
     // The binding above compares each ledger's name and GUID, not its parent,
     // so it cannot see a ledger or a group re-parented since approval. A bank
     // voucher's type rests on exactly that, so classify every leg again from
     // this catalogue's parents and the group collection read beside it.
     let bank = renders_bank_shape(&line.vouchers);
     match (bank, groups) {
-        (false, None) => {}
+        // A recorded cash-in-hand ledger without a bank voucher would skip the
+        // check below, so it is refused as a wiring fault too (#815).
+        (false, None) if cash_in_hand.is_empty() => {}
         (true, Some(groups)) => {
             let groups = parse_native_group_snapshot(groups, company_guid).map_err(|error| {
                 ApprovedImportAdmissionError::GroupExportInvalid {
@@ -1837,6 +2006,17 @@ fn recheck_import_admission(
             let observed = ObservedMasters::new(parents.parents(), groups);
             if cash_bank_refusals(&payload, &observed, RECHECK_REFUSAL_BUDGET).is_refused() {
                 return Err(ApprovedImportAdmissionError::BankClassificationChanged.into());
+            }
+            // Re-parenting a cash ledger under Bank Accounts keeps every leg
+            // money, so it passes the gate above (#815).
+            if let Some((refused, omitted)) =
+                super::cash_in_hand_refusals(cash_in_hand, &observed, RECHECK_REFUSAL_BUDGET)
+            {
+                return Err(ApprovedImportAdmissionError::CashLedgerNotCashInHand {
+                    refused,
+                    omitted,
+                }
+                .into());
             }
         }
         // A bank voucher without its group read, or a Journal with one, is a
@@ -1871,6 +2051,36 @@ fn admit_post_currency(currencies: &str) -> Result<(), ApprovedImportAdmissionEr
         })
     } else {
         Err(ApprovedImportAdmissionError::BaseCurrencyUndetermined)
+    }
+}
+
+/// The code refusing a batch recorded before its cash-in-hand ledgers were
+/// (#815). Like a batch built before ledger binding (#239), it is rebuilt.
+const CASH_LEDGERS_NOT_RECORDED: &str = "import_batch_predates_cash_ledger_record";
+
+fn refused_cash_in_hand(refusal: &ApprovedImportAdmissionError) -> Option<(Vec<Value>, usize)> {
+    match refusal {
+        ApprovedImportAdmissionError::CashLedgerNotCashInHand { refused, omitted } => {
+            Some((refused.clone(), *omitted))
+        }
+        _ => None,
+    }
+}
+
+/// List the recorded cash-in-hand ledgers that no longer reach Cash-in-Hand, as
+/// the build's refusal lists them, and, where no attempt is recorded, say in
+/// plain words what to do (#815). The message names no ledger itself.
+fn name_refused_cash_ledgers(payload: &mut Value, refused: Vec<Value>, omitted: usize) {
+    let error = &mut payload["result"]["error"];
+    error["refused_ledgers"] = Value::Array(refused);
+    error["refused_ledgers_omitted"] = json!(omitted);
+    if payload["result"]["attempt_recorded"] == json!(false) {
+        payload["result"]["error"]["message"] = json!(
+            "A ledger named as cash in hand when this batch was built (listed in \
+             error.refused_ledgers) is no longer under Cash-in-Hand: its group now reaches the \
+             reserved group shown. Nothing was posted. Put the ledger back under Cash-in-Hand, \
+             or build the batch again with the cash-in-hand ledger."
+        );
     }
 }
 
@@ -1949,8 +2159,38 @@ fn name_changed_ledgers(payload: &mut Value, ledgers: &[String]) {
 }
 
 /// Say plainly that a batch built before ledger identities were recorded must
-/// be rebuilt, where no attempt is recorded.
+/// be rebuilt, where no attempt is recorded. So must one built before its
+/// cash-in-hand ledgers were recorded (#815).
 fn explain_unbound_batch(payload: &mut Value) {
+    if payload["result"]["error"]["code"] == json!(CASH_LEDGERS_NOT_RECORDED)
+        && payload["result"]["attempt_recorded"] == json!(false)
+    {
+        payload["result"]["error"]["message"] = json!(
+            "This batch was built before ComplyEaze Bridge recorded which of its ledgers must stay \
+             under Cash-in-Hand, so it cannot be checked. Nothing was posted. Build the batch \
+             again, then post the new batch."
+        );
+    }
+    if payload["result"]["error"]["code"] == json!(super::bill_wise::BILL_WISE_NOT_RECORDED)
+        && payload["result"]["attempt_recorded"] == json!(false)
+    {
+        payload["result"]["error"]["message"] = json!(
+            "This batch was built before ComplyEaze Bridge began checking ledgers that keep \
+             bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally \
+             whether its file was already imported by hand, since posting the rebuilt batch would import it a second time. \
+             Then build the batch again and post the new batch."
+        );
+    }
+    if payload["result"]["error"]["code"] == json!("import_bill_wise_changed")
+        && payload["result"]["attempt_recorded"] == json!(false)
+    {
+        payload["result"]["error"]["message"] = json!(
+            "A ledger in this batch now keeps bills in Tally, and the person did not approve \
+             entries on it going On Account. Nothing was posted. Build the batch again: the \
+             new build lists the ledger, and the person is asked whether its entries may post \
+             On Account."
+        );
+    }
     if payload["result"]["error"]["code"] == json!("import_batch_predates_ledger_binding")
         && payload["result"]["attempt_recorded"] == json!(false)
     {
@@ -2005,6 +2245,12 @@ tokio::task_local! {
     /// for the first read, on the operation's own budget, and the retry's budget.
     pub(super) static MARKS_READS:
         std::sync::Arc<std::sync::Mutex<Vec<Option<std::time::Duration>>>>;
+    /// Test-only: the wire-wait budget each redeem-only pass ran on (#893).
+    pub(super) static REDEEM_WIRE_BUDGETS:
+        std::sync::Arc<std::sync::Mutex<Vec<std::time::Duration>>>;
+    /// Test-only: how far into its call a redeem-only pass takes itself to
+    /// start, so a test can reach the call's ceiling without waiting it out.
+    pub(super) static REDEEM_PASS_ELAPSED: std::time::Duration;
 }
 
 /// A fresh random REMOTEID for one native post.
@@ -2177,7 +2423,16 @@ pub(super) fn admit_saved_voucher(
     max_vouchers: usize,
 ) -> Result<(String, String), String> {
     let xml = admit_saved_voucher_integrity(line, endpoint, scope, max_vouchers)?;
-    Ok((xml, review_preview_for(line, endpoint, scope)?))
+    let preview = review_preview_for(line, endpoint, scope)?;
+    // A batch about to be posted, not one only to be reconciled: saved before
+    // the build recorded its bill-wise approvals, it is rebuilt (#1234). The
+    // integrity check above does not include this, so a dispatched batch of an
+    // older build can still be reconciled. Content refusals above win, so a
+    // rebuild is never advised for a batch that would be refused again.
+    if line.on_account_approved.is_none() {
+        return Err(super::bill_wise::BILL_WISE_NOT_RECORDED.into());
+    }
+    Ok((xml, preview))
 }
 
 /// What the approval must show about a bank voucher's legs: which side had to
@@ -2294,7 +2549,7 @@ fn review_preview_with(
     let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}\nReference: {}\nNarration: {}\n\n{}\n\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\n\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from,
         voucher.date, voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
-        optional(&voucher.reference), optional(&voucher.narration), entries, debit.as_str(), credit.as_str(), line.batch_id);
+        optional(&voucher.reference), super::posted_narration(voucher).map(quoted).unwrap_or_else(|| "(none)".into()), entries, debit.as_str(), credit.as_str(), line.batch_id);
     let preview = std::iter::once(preview)
         .chain(footer.iter().cloned())
         .collect::<Vec<_>>()
@@ -2318,11 +2573,191 @@ pub(super) const BATCH_REVIEW_MAX_CHARS: usize = 3_200;
 pub(super) const BATCH_REVIEW_MAX_LINE_CHARS: usize = 100;
 pub(super) const BATCH_REVIEW_MAX_BYTES: usize = 7_000;
 
+/// The most vouchers a batch's dialog lists one line each (#1063).
+pub(super) const BATCH_REVIEW_MAX_VOUCHER_LINES: usize = 10;
+/// The characters of a narration a voucher's line shows before it marks the
+/// cut. Characters, not graphemes: a cut can split a Devanagari conjunct, and
+/// the marker says so rather than hiding it (#1063).
+pub(super) const BATCH_REVIEW_NARRATION_CHARS: usize = 40;
+
+/// The line above a small batch's voucher lines.
+pub(super) const VOUCHER_LINES_HEADING: &str =
+    "Each voucher: type, date, amount, ledger, narration (references not shown):";
+/// The second heading line: what the quoted text ending each line is. The
+/// dialog wraps long lines, so a narration's tail can begin a row of its own
+/// (#1063 follow-up).
+pub(super) const VOUCHER_LINES_NARRATION_HEADING: &str =
+    "Each line ends with its narration, quoted exactly as it will be posted.";
+/// What a voucher's line shows in place of a narration that reads like a line
+/// of this dialog. It echoes none of the narration.
+pub(super) const NARRATION_WITHHELD: &str = "(narration withheld: it reads like a dialog line)";
+// Each sentence that stands in for the voucher lines takes the place of the
+// line a batch showed before #1063, and is no longer than it, so the
+// totals-only text never outgrows the caps a batch passed before.
+/// A batch of more than `BATCH_REVIEW_MAX_VOUCHER_LINES` vouchers.
+pub(super) const VOUCHER_LINES_OVER_LIMIT: &str =
+    "Per-voucher lines are not shown: this batch has over 10 vouchers.";
+/// A narration or reference holds a layout or format character; the reason
+/// never echoes the text.
+pub(super) const VOUCHER_LINES_UNSAFE: &str =
+    "Per-voucher lines are not shown: a narration/reference is unsafe.";
+/// The voucher lines would break one of the dialog's caps.
+pub(super) const VOUCHER_LINES_DO_NOT_FIT: &str =
+    "Per-voucher lines are not shown: they do not fit this dialog.";
+
+/// Whether `text` holds a shape a line of the batch dialog begins with, so
+/// that a wrapped tail of it could pass for one (#1063 follow-up). Matched
+/// case-insensitively anywhere: `\bdr\s+[0-9][0-9.,]*\s+cr\s+[0-9]` (a
+/// ledger line's two halves), `total\s+(debit|credit)\s*:` (any whitespace
+/// between the words, a no-break space included), `batch\s*:` and
+/// `create\s+\d`. Written out rather than with a regex crate: `\s` is any
+/// whitespace, `\d` any Unicode decimal digit, and `\b` sees a letter, digit
+/// or `_` as a word character. A bank narration with one of `DR`/`CR` and a
+/// reference number ("NEFT CR 000123456789") is not such a shape.
+pub(super) fn reads_like_a_dialog_line(text: &str) -> bool {
+    use icu_properties::{props::GeneralCategory, CodePointMapData};
+    let category = CodePointMapData::<GeneralCategory>::new();
+    let chars: Vec<char> = text.chars().map(|c| c.to_ascii_lowercase()).collect();
+    let word = |c: char| c.is_alphanumeric() || c == '_';
+    let literal = |at: usize, expected: &str| -> Option<usize> {
+        let mut at = at;
+        for wanted in expected.chars() {
+            (chars.get(at) == Some(&wanted)).then_some(())?;
+            at += 1;
+        }
+        Some(at)
+    };
+    let spaces = |at: usize, least: usize| -> Option<usize> {
+        let end = at
+            + chars
+                .get(at..)
+                .unwrap_or_default()
+                .iter()
+                .take_while(|c| c.is_whitespace())
+                .count();
+        (end - at >= least).then_some(end)
+    };
+    let ascii_digit = |at: usize| chars.get(at).is_some_and(char::is_ascii_digit);
+    let ledger_line = |at: usize| -> Option<()> {
+        (at == 0 || !word(chars[at - 1])).then_some(())?;
+        let at = spaces(literal(at, "dr")?, 1)?;
+        ascii_digit(at).then_some(())?;
+        let at = at
+            + chars[at..]
+                .iter()
+                .take_while(|c| c.is_ascii_digit() || matches!(c, '.' | ','))
+                .count();
+        let at = spaces(literal(spaces(at, 1)?, "cr")?, 1)?;
+        ascii_digit(at).then_some(())
+    };
+    let total = |at: usize| -> Option<()> {
+        let at = spaces(literal(at, "total")?, 1)?;
+        let at = literal(at, "debit").or_else(|| literal(at, "credit"))?;
+        (chars.get(spaces(at, 0)?) == Some(&':')).then_some(())
+    };
+    let batch = |at: usize| -> Option<()> {
+        (chars.get(spaces(literal(at, "batch")?, 0)?) == Some(&':')).then_some(())
+    };
+    let create = |at: usize| -> Option<()> {
+        chars
+            .get(spaces(literal(at, "create")?, 1)?)
+            .is_some_and(|c| category.get(*c) == GeneralCategory::DecimalNumber)
+            .then_some(())
+    };
+    (0..chars.len()).any(|at| {
+        ledger_line(at)
+            .or_else(|| total(at))
+            .or_else(|| batch(at))
+            .or_else(|| create(at))
+            .is_some()
+    })
+}
+
+/// One line per voucher of a small batch (#1063): its type and date, its
+/// value (the sum of its debits), the ledger a statement row names (a
+/// Receipt's first credit, any other type's first debit, in the batch file's
+/// order, with "+N" for the rest of that side) and its narration as posted,
+/// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` with the cut marked, or
+/// `NARRATION_WITHHELD` when it reads like a line of this dialog.
+/// `None` when a narration or reference holds a character the dialog cannot
+/// show as it is: nothing is stripped or altered.
+fn voucher_review_lines(vouchers: &[ImportVoucher]) -> Result<Option<Vec<String>>, String> {
+    let shown_text = vouchers.iter().flat_map(|voucher| {
+        super::posted_narration(voucher)
+            .into_iter()
+            .chain(voucher.reference.as_deref())
+    });
+    if shown_text.clone().any(|text| {
+        has_unsafe_review_layout_character(text) || has_unreviewable_format_character(text)
+    }) {
+        return Ok(None);
+    }
+    let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
+    let mut lines = Vec::with_capacity(vouchers.len());
+    for voucher in vouchers {
+        let mut value = ExactDecimal::zero();
+        for entry in voucher
+            .entries
+            .iter()
+            .filter(|entry| entry.side == EntrySide::Dr)
+        {
+            let amount = ExactDecimal::parse(entry.amount.clone())
+                .map_err(|_| "voucher_amount_invalid".to_string())?;
+            value = value
+                .checked_add(&amount)
+                .map_err(|_| "voucher_amount_overflow".to_string())?;
+        }
+        let side = if voucher.voucher_type == VoucherType::Receipt {
+            EntrySide::Cr
+        } else {
+            EntrySide::Dr
+        };
+        let named: Vec<&str> = voucher
+            .entries
+            .iter()
+            .filter(|entry| entry.side == side)
+            .map(|entry| entry.ledger.as_str())
+            .collect();
+        let ledger = match named.as_slice() {
+            [] => "(none)".to_string(),
+            [only] => quoted(only),
+            [first, rest @ ..] => format!("{} +{}", quoted(first), rest.len()),
+        };
+        let narration = match super::posted_narration(voucher) {
+            None => "(none)".to_string(),
+            Some(text) if reads_like_a_dialog_line(text) => NARRATION_WITHHELD.to_string(),
+            Some(text) => {
+                let length = text.chars().count();
+                if length > BATCH_REVIEW_NARRATION_CHARS {
+                    let kept: String = text.chars().take(BATCH_REVIEW_NARRATION_CHARS).collect();
+                    format!(
+                        "{}… (+{} characters)",
+                        quoted(&kept),
+                        length - BATCH_REVIEW_NARRATION_CHARS
+                    )
+                } else {
+                    quoted(text)
+                }
+            }
+        };
+        lines.push(format!(
+            "{} {}  {}  {ledger}  {narration}",
+            voucher.voucher_type.as_str(),
+            voucher.date,
+            value.as_str(),
+        ));
+    }
+    Ok(Some(lines))
+}
+
 /// The approval text for a batch: a summary a person can read in one native
-/// dialog, never a listing. Every ledger's debit and credit totals and entry
-/// count, the totals by voucher type, the money the types themselves fix as
-/// moving in or out, and the standing cautions. Narrations and references
-/// are not shown; the amounts and ledgers are what the approval binds.
+/// dialog. Every ledger's debit and credit totals and entry count, the totals
+/// by voucher type, the money the types themselves fix as moving in or out,
+/// and the standing cautions; and for a batch of at most
+/// `BATCH_REVIEW_MAX_VOUCHER_LINES`, one line per voucher (#1063). When those
+/// lines cannot be shown, the summary says why in their place, and a batch is
+/// never refused for them. References are not shown; the amounts and ledgers
+/// are what the approval binds.
 fn batch_review_text(
     line: &ImportLedgerLine,
     company: &ImportCompanyTuple,
@@ -2382,7 +2817,7 @@ fn batch_review_text(
         dates.max().unwrap_or_default(),
     );
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
-    let mut text = vec![
+    let head = vec![
         format!(
             "Create {} vouchers in {}",
             line.vouchers.len(),
@@ -2403,9 +2838,8 @@ fn batch_review_text(
                 .join(", ")
         ),
         format!("Dates: {first} to {last}  Voucher numbers: Tally assigns them"),
-        "Not shown here: each voucher's own date, narration and reference.".into(),
-        String::new(),
     ];
+    let mut text = vec![String::new()];
     for (ledger, (dr, cr, count)) in &ledgers {
         text.push(format!(
             "Dr {}  Cr {}  {count} {}  {}",
@@ -2451,17 +2885,38 @@ fn batch_review_text(
     );
     text.push("After a timeout, reconcile this batch; do not rebuild or resend it.".into());
     text.extend(footer.iter().cloned());
-    let preview = text.join("\n");
-    if text.len() > BATCH_REVIEW_MAX_LINES
-        || preview.chars().count() > BATCH_REVIEW_MAX_CHARS
-        || preview.len() > BATCH_REVIEW_MAX_BYTES
-        || text
-            .iter()
-            .any(|line| line.chars().count() > BATCH_REVIEW_MAX_LINE_CHARS)
-    {
+    let fits = |lines: &[String]| {
+        let preview = lines.join("\n");
+        lines.len() <= BATCH_REVIEW_MAX_LINES
+            && preview.chars().count() <= BATCH_REVIEW_MAX_CHARS
+            && preview.len() <= BATCH_REVIEW_MAX_BYTES
+            && lines
+                .iter()
+                .all(|line| line.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS)
+    };
+    let whole = |middle: Vec<String>| [head.clone(), middle, text.clone()].concat();
+    let reason = if line.vouchers.len() > BATCH_REVIEW_MAX_VOUCHER_LINES {
+        VOUCHER_LINES_OVER_LIMIT
+    } else if let Some(vouchers) = voucher_review_lines(&line.vouchers)? {
+        let listed = whole(
+            [VOUCHER_LINES_HEADING, VOUCHER_LINES_NARRATION_HEADING]
+                .map(str::to_string)
+                .into_iter()
+                .chain(vouchers)
+                .collect(),
+        );
+        if fits(&listed) {
+            return Ok(listed.join("\n"));
+        }
+        VOUCHER_LINES_DO_NOT_FIT
+    } else {
+        VOUCHER_LINES_UNSAFE
+    };
+    let summary = whole(vec![reason.to_string()]);
+    if !fits(&summary) {
         return Err("import_review_too_large".into());
     }
-    Ok(preview)
+    Ok(summary.join("\n"))
 }
 
 pub(super) fn has_unsafe_review_layout_character(value: &str) -> bool {

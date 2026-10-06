@@ -1,0 +1,204 @@
+{
+ "comment": "high_value_register, two vouchers that share a GUID in one row (#1195): two blank-GUID cash receipts from one party on one day told apart by their numbers (a party-day row, and its voucher-grain row, which keys by GUID and stays one row); two blank-GUID cash purchases on one day (the unnamed payment-day row); two blank-GUID cash receipts from one party on two days sharing a reference (a single-transaction row), beside a blank-GUID receipt with no reference (not counted as unreferenced: that count is of distinct GUIDs, unchanged) and a unique-GUID one (counted). Each row cites both vouchers; the shares, lines and counts are keyed as before.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Capital Account": null,
+  "Fixed Assets": null,
+  "Loans & Advances (Asset)": "Current Assets",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_shared_guid_row-000"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_shared_guid_row-001"
+  },
+  {
+   "name": "Party Q",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_shared_guid_row-002"
+  },
+  {
+   "name": "Party S",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_shared_guid_row-003"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-hvr_shared_guid_row-004"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "number": "R1",
+   "lines": [
+    [
+     "Cash",
+     15000000
+    ],
+    [
+     "Party Q",
+     -15000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "number": "R2",
+   "lines": [
+    [
+     "Cash",
+     10000000
+    ],
+    [
+     "Party Q",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-07",
+   "base_type": "Payment",
+   "number": "B1",
+   "lines": [
+    [
+     "Cash",
+     -15000000
+    ],
+    [
+     "Purchases",
+     15000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-07",
+   "base_type": "Payment",
+   "number": "B2",
+   "lines": [
+    [
+     "Cash",
+     -10000000
+    ],
+    [
+     "Purchases",
+     10000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "number": "T1",
+   "lines": [
+    [
+     "Cash",
+     15000000
+    ],
+    [
+     "Party S",
+     -15000000
+    ]
+   ],
+   "reference": "BILL-9"
+  },
+  {
+   "guid": "",
+   "date": "2025-07-02",
+   "base_type": "Receipt",
+   "number": "T2",
+   "lines": [
+    [
+     "Cash",
+     10000000
+    ],
+    [
+     "Party S",
+     -10000000
+    ]
+   ],
+   "reference": "BILL-9"
+  },
+  {
+   "guid": "",
+   "date": "2025-07-03",
+   "base_type": "Receipt",
+   "number": "N1",
+   "lines": [
+    [
+     "Cash",
+     10000
+    ],
+    [
+     "Party S",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "n02",
+   "date": "2025-07-04",
+   "base_type": "Receipt",
+   "number": "N2",
+   "lines": [
+    [
+     "Cash",
+     10000
+    ],
+    [
+     "Party S",
+     -10000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "high_value_register"
+ ]
+}

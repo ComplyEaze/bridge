@@ -1,0 +1,79 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "bank_reconciliation",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "df9f95607f861788",
+  "population_note_text": "The bank statement supplied for this engagement was refused, so the bank ledger is not reconciled.",
+  "figures": [
+    {
+      "id": "bank_reconciliation.statement_refused_reason",
+      "value": "declares no opening balance",
+      "unit": "text",
+      "definition_sha256_16": "b8b14014d79e1fbf",
+      "definition_text": "Why the bank statement supplied was refused.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "bank_reconciliation/statement_refused",
+      "clauses": [],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "reason",
+          "figure_id": "bank_reconciliation.statement_refused_reason"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "d682b5ff44812863",
+      "title_text": "The bank statement supplied was refused, so the bank ledger was not reconciled",
+      "limits_sha256_16": "48c08cf408a21c4a",
+      "limits_text": [
+        "Nothing is reconciled: no match, timing difference, charge or part-settlement is computed from a statement refused when it was read (the reason is shown)."
+      ],
+      "ask_client_sha256_16": "54e68227aba79373",
+      "ask_client_text": [
+        "Re-extract the bank statement with its declared opening and closing balances and its rows in the bank's own order with their running balance, or supply the bank's original statement."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "POP-1",
+      "subject": "Customer A",
+      "detail": "vouchers -1000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to 501000 paise"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "opening_paise",
+      "detail": "TB opening_paise sums to 500000 paise"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "bank_reconciliation.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

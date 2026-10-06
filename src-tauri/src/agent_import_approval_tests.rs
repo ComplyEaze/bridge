@@ -8,13 +8,12 @@ use crate::agent::agent_import::approval::{
     ApprovalBinding, Begin, Joined, PostApprovals, CALL_CEILING, MAX_KEPT_REFUSALS, MEASURED_POST,
     MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
 };
-use crate::agent::agent_protocol::{run_post, Framer};
-use crate::agent::ToolResponse;
+use crate::agent::agent_protocol::{run_post, serve_stdio, Framer, ToolCallEnd};
 use crate::tally::agent_read_request::AgentReadRequest;
 use crate::tally::approved_import::{
     Answered, ApprovedImport, PendingPostApproval, UnderLockRefusal,
 };
-use tokio::io::{AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 /// Bounds a wait on an event, only so that a hang fails instead of stalling
 /// the run: nothing here is paced by it.
@@ -997,7 +996,7 @@ async fn post_over_stdio(
     server: &Server,
     args: &Value,
     cancel: Option<(&SequenceSimulator, usize)>,
-) -> Option<ToolResponse> {
+) -> ToolCallEnd {
     let (client, source) = tokio::io::duplex(1 << 16);
     let (_client_read, mut client_write) = tokio::io::split(client);
     let (source_read, mut source_write) = tokio::io::split(source);
@@ -1031,23 +1030,24 @@ async fn post_over_stdio(
 }
 
 /// A cancellation that lands inside the queue's lease operation, through the
-/// stdio path every agent post takes (#725): that operation finishes its reads,
-/// every one served in full, with no cap cutting it short, and then, finding
-/// its approval revoked, writes no intent and sends no POST. The control, the
+/// stdio path every agent post takes (#725, #778): the read in flight is
+/// served in full, no later read of the operation is started, no intent is
+/// written and no POST is sent, and the approval lapses as cancelled. Run with
+/// each of the lease's reads before the POST held in turn. The control, the
 /// same run never cancelled, posts: so the cancellation is what stopped it.
 #[tokio::test]
-async fn a_cancel_inside_the_lease_finishes_its_reads_and_posts_nothing() {
-    for cancelled in [true, false] {
+async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
+    let lease_reads = after_approval(xml(created_one())).len() - 1;
+    for held_at in (0..lease_reads).map(Some).chain([None]) {
         let mut plans = before_approval();
         let lease_start = plans.len();
         let mut lease = after_approval(xml(created_one()));
-        // The lease opens with a probe (status, company list), the company
-        // list, and the marks at binding; then the ledger catalogue's pair,
-        // bracketed by the company list. Hold its first read.
-        let held_at = 5;
-        lease[held_at] =
-            xml(catalogue()).with_delivery(Delivery::SlowHeaders(Duration::from_millis(400)));
         let post_at = lease_start + lease.len() - 1;
+        if let Some(held_at) = held_at {
+            lease[held_at] = lease[held_at]
+                .clone()
+                .with_delivery(Delivery::SlowHeaders(Duration::from_millis(300)));
+        }
         plans.extend(lease);
         let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
         let directory = tempfile::tempdir().unwrap();
@@ -1056,29 +1056,157 @@ async fn a_cancel_inside_the_lease_finishes_its_reads_and_posts_nothing() {
         let outcome = post_over_stdio(
             &server,
             &args,
-            cancelled.then_some((&simulator, lease_start + held_at)),
+            held_at.map(|held_at| (&simulator, lease_start + held_at)),
         )
         .await;
         let observed = sent(simulator);
-        if cancelled {
-            assert!(outcome.is_none(), "answered as cancelled");
-            assert_eq!(intents(directory.path()), 0);
-            assert_eq!(observed.len(), post_at, "every lease read, and no POST");
+        if let Some(held_at) = held_at {
+            assert!(
+                matches!(outcome, ToolCallEnd::Withdrawn { .. }),
+                "{held_at}: answered as cancelled"
+            );
+            assert_eq!(intents(directory.path()), 0, "{held_at}");
+            assert_eq!(
+                observed.len(),
+                lease_start + held_at + 1,
+                "{held_at}: the held read is the last request, and there is no POST"
+            );
             assert!(
                 observed.iter().all(|request| request.request_processed
                     && !request.cancelled
                     && !request.client_stopped_reading_response),
-                "every started request was served in full, the held one too"
+                "{held_at}: every started request was served in full, the held one too"
             );
             assert_eq!(
                 server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
-                "request_cancelled"
+                "request_cancelled",
+                "{held_at}"
             );
         } else {
-            assert!(outcome.is_some());
+            assert!(matches!(outcome, ToolCallEnd::Answered(_)));
             assert_eq!(intents(directory.path()), 1, "the control posts");
             assert!(observed.len() > post_at);
         }
+    }
+}
+
+/// A post withdrawn inside the lease is answered as cancelled, and that
+/// answer's receipt carries the trail of the sends that did run (#944): one
+/// record per request the simulator served, in order, each answered, then the
+/// one read the withdrawal refused.
+/// Withdrawn with its input then closed (the post is finished on input's end)
+/// and with its input left open (the post is finished on its own).
+#[tokio::test]
+async fn a_withdrawn_post_s_receipt_carries_the_trail_of_the_sends_that_ran() {
+    for close_input in [true, false] {
+        let mut plans = before_approval();
+        let held = plans.len();
+        let mut lease = after_approval(xml(created_one()));
+        lease[0] = lease[0]
+            .clone()
+            .with_delivery(Delivery::SlowHeaders(Duration::from_millis(300)));
+        plans.extend(lease);
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (_, args) = saved_batch(&server);
+        let (client, source) = tokio::io::duplex(1 << 16);
+        let (client_read, mut client_write) = tokio::io::split(client);
+        let (source_read, mut source_write) = tokio::io::split(source);
+        let serve = SCRIPTED_APPROVAL.scope(
+            ScriptedApproval::approving(),
+            serve_stdio(server, BufReader::new(source_read), &mut source_write),
+        );
+        let client = async {
+            let call = json!({"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+                "params": {"name": "post_import", "arguments": args}});
+            let initialize = json!({"jsonrpc": "2.0", "id": 0, "method": "initialize",
+                "params": {"protocolVersion": "2025-06-18"}});
+            client_write
+                .write_all(format!("{initialize}\n{call}\n").as_bytes())
+                .await
+                .unwrap();
+            while simulator.received() <= held {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+            client_write.write_all(CANCEL_7).await.unwrap();
+            let mut lines = BufReader::new(client_read).lines();
+            if !close_input {
+                while let Some(line) = lines.next_line().await.unwrap() {
+                    if serde_json::from_str::<Value>(&line).unwrap()["id"] == 7 {
+                        break;
+                    }
+                }
+            }
+            client_write.shutdown().await.unwrap();
+        };
+        let (served, ()) = tokio::time::timeout(HANG_GUARD, async { tokio::join!(serve, client) })
+            .await
+            .unwrap();
+        served.unwrap();
+        let observed = sent(simulator);
+        assert_eq!(
+            observed.len(),
+            held + 1,
+            "{close_input}: the held read is the last"
+        );
+        let receipts =
+            String::from_utf8(std::fs::read(directory.path().join("agent-egress.jsonl")).unwrap())
+                .unwrap()
+                .lines()
+                .map(|line| serde_json::from_str::<Value>(line).unwrap())
+                .filter(|record| record["tool"] == "post_import")
+                .collect::<Vec<_>>();
+        assert_eq!(receipts.len(), 1, "{close_input}");
+        let receipt = &receipts[0];
+        assert_eq!(
+            receipt["error"]["code"], "request_cancelled",
+            "{close_input}"
+        );
+        // Each send, by the fields that name it: the requests the simulator
+        // served, at their places and answered, then the next read of the
+        // lease, refused by the withdrawal before it was sent (#778). Times and
+        // response sizes vary, and the refused read's size is not observable.
+        let mut expected = observed
+            .iter()
+            .enumerate()
+            .map(|(index, request)| {
+                let mut send = json!({"seq": index + 1, "outcome": "answered"});
+                if request.method == "GET" {
+                    send["kind"] = json!("status");
+                } else {
+                    send["kind"] = json!("post");
+                    send["request_bytes"] = json!(request.request_body_bytes);
+                }
+                send
+            })
+            .collect::<Vec<_>>();
+        expected.push(
+            json!({"seq": observed.len() + 1, "outcome": "request_cancelled",
+            "kind": "post"}),
+        );
+        let kept = expected.len().min(crate::request_trail::TRAIL_LAST);
+        let trail = &receipt["request_trail"];
+        assert_eq!(trail["sent"], expected.len(), "{close_input}");
+        assert_eq!(trail["omitted"], expected.len() - kept, "{close_input}");
+        assert_eq!(trail["failed"], 1, "{close_input}");
+        assert_eq!(trail["last_failed_seq"], expected.len(), "{close_input}");
+        let recorded = trail["last"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|send| {
+                let mut named = json!({"seq": send["seq"], "outcome": send["outcome"],
+                    "kind": send["kind"]});
+                if send["outcome"] == "answered" {
+                    if let Some(bytes) = send.get("request_bytes") {
+                        named["request_bytes"] = bytes.clone();
+                    }
+                }
+                named
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(recorded, expected[expected.len() - kept..], "{close_input}");
     }
 }
 
@@ -1253,7 +1381,7 @@ fn high_water_read() -> AgentReadRequest {
 }
 
 fn cash_binding() -> bridge_tally_protocol::StandardLedgerCatalogBinding {
-    bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue(),
         "WR2 Unicode Lab",
         GUID,
@@ -1304,7 +1432,7 @@ async fn granted(
 }
 
 fn binding_of(line: &ImportLedgerLine, preview: &str) -> ApprovalBinding {
-    let binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue(),
         "WR2 Unicode Lab",
         GUID,
@@ -1615,6 +1743,77 @@ fn a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits()
     assert!(!redeem_fits_in_call(Duration::MAX, 1));
 }
 
+/// The single-voucher dialog shows each narration exactly as the post sends
+/// it (#1055 point 5): without leading or trailing spaces, as one whole value.
+/// An absent narration stays `(none)`, and one made only of spaces is posted
+/// empty and shown as `""`. A batch's voucher lines show it the same way.
+#[test]
+fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = batch_server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let (one, _) = saved_batch(&server);
+    let endpoint = server.settings.endpoint.clone();
+    let narration_line = |line: &ImportLedgerLine| {
+        agent_review_preview(line, &endpoint)
+            .unwrap()
+            .lines()
+            .find(|text| text.starts_with("Narration: "))
+            .expect("a single voucher's dialog shows its narration")
+            .to_owned()
+    };
+    let posted = |line: &ImportLedgerLine| {
+        let xml = super::super::render_native_vouchers_xml(
+            "Synthetic company",
+            line.vouchers.iter().map(|voucher| (voucher, Uuid::nil())),
+        );
+        let start = xml.find("<NARRATION>").expect("a narration element") + "<NARRATION>".len();
+        let end = xml[start..].find("</NARRATION>").unwrap() + start;
+        xml[start..end].to_owned()
+    };
+    for (saved, shown, sent) in [
+        (
+            Some("  Rent for June  "),
+            "Narration: \"Rent for June\"",
+            "Rent for June",
+        ),
+        (
+            Some("Rent for June"),
+            "Narration: \"Rent for June\"",
+            "Rent for June",
+        ),
+        (Some("   "), "Narration: \"\"", ""),
+        (None, "Narration: (none)", ""),
+    ] {
+        let mut line = one.clone();
+        line.vouchers[0].narration = saved.map(str::to_owned);
+        assert_eq!(narration_line(&line), shown, "{saved:?}");
+        assert_eq!(posted(&line), sent, "{saved:?}");
+    }
+    let mut two = one.clone();
+    let mut second = two.vouchers[0].clone();
+    second.bridge_txn_id = "journal-583-2".into();
+    second.narration = Some("  Second rent  ".into());
+    two.vouchers.push(second);
+    let batch = agent_review_preview(&two, &endpoint).unwrap();
+    for shown in [
+        "Journal 20260901  12.5  \"WR2 Sales\"  \"Synthetic test only\"",
+        "Journal 20260901  12.5  \"WR2 Sales\"  \"Second rent\"",
+    ] {
+        assert!(batch.lines().any(|text| text == shown), "{shown}\n{batch}");
+    }
+    // Outer spaces no longer count against the dialog's 100-character line
+    // cap: an 87-character narration fills its line exactly, and two spaces
+    // each side would have put it at 104. The build's eligibility and the
+    // post read this same preview.
+    let text = "R".repeat(87);
+    let mut padded = one.clone();
+    padded.vouchers[0].narration = Some(format!("  {text}  "));
+    let preview = review_preview_for(&padded, &endpoint, PostScope::Vouchers).unwrap();
+    let shown = format!("Narration: \"{text}\"");
+    assert_eq!(shown.chars().count(), 100);
+    assert!(preview.lines().any(|line| line == shown), "{preview}");
+}
+
 /// The agent's dialog says when its post happens, in both preview shapes and
 /// inside the dialog's caps; the desktop's preview does not carry it.
 #[test]
@@ -1671,7 +1870,8 @@ fn the_agent_preview_says_when_the_post_happens() {
                 assert!(
                     [
                         "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
-                        "Not shown here: each voucher's own date, narration and reference.",
+                        "Each voucher: type, date, amount, ledger, narration (references not shown):",
+                        "Each line ends with its narration, quoted exactly as it will be posted.",
                     ]
                     .contains(&line),
                     "an unexpected line about narrations: {line:?}"
@@ -2128,6 +2328,122 @@ async fn a_redeem_only_pass_of_the_desktop_post_is_refused_and_asks_nobody() {
     assert!(scripted.counts().is_empty(), "no dialog was asked");
     assert!(observed.is_empty(), "nothing was sent to Tally");
     assert_eq!(intents(directory.path()), 0);
+}
+
+/// A whole post call whose Join finds the person's click and hands on a
+/// redeem-only pass (#725 slice 2.0), with another holder taking the
+/// endpoint's wire lock between the passes and a 2 s wire-wait policy (#893).
+/// `elapsed`, when given, is how far into the call the redeem pass takes
+/// itself to start. Returns the answer, the budget the pass ran on, how long
+/// the call took from the click, the batch line, the server and its data
+/// directory, which holds the approval's lapse note.
+async fn two_pass_call_with_the_wire_taken_between(
+    elapsed: Option<std::time::Duration>,
+) -> (
+    Value,
+    std::time::Duration,
+    std::time::Duration,
+    ImportLedgerLine,
+    Server,
+    tempfile::TempDir,
+) {
+    use crate::endpoint_wire::FileWireGate;
+    use bridge_tally_transport::{TallyWireGate, WireRetryPolicy};
+    use std::time::{Duration, Instant};
+    let (plans, _) = pending_then_posted_plans();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    let wire = crate::tally::TallyRuntime::default()
+        .wire_gate_config()
+        .clone()
+        .with_retry(
+            WireRetryPolicy::new(Duration::from_millis(50), Duration::from_secs(2)).unwrap(),
+        );
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(wire.clone());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
+    scripted.answer(true);
+    until_answered(&server, &line.batch_id).await;
+    let taken = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let hook: Between = {
+        let taken = std::sync::Arc::clone(&taken);
+        let gate = FileWireGate::new(wire.root().clone(), server.settings.endpoint.clone());
+        std::sync::Arc::new(move || {
+            *taken.lock().unwrap() = Some(gate.try_acquire().unwrap());
+        })
+    };
+    let budgets = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let call = REDEEM_WIRE_BUDGETS.scope(
+        std::sync::Arc::clone(&budgets),
+        BETWEEN_PASSES.scope(
+            hook,
+            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+        ),
+    );
+    let started = Instant::now();
+    let answer = match elapsed {
+        Some(elapsed) => REDEEM_PASS_ELAPSED.scope(elapsed, call).await,
+        None => call.await,
+    };
+    let took = started.elapsed();
+    drop(taken.lock().unwrap().take());
+    let _ = sent(simulator);
+    let budget = *budgets
+        .lock()
+        .unwrap()
+        .first()
+        .expect("the call reached its redeem-only pass");
+    (answer, budget, took, line, server, directory)
+}
+
+/// What a busy refusal of a redeem-only pass leaves: nothing recorded or sent,
+/// and the person's approval lapsed with a note that is not an approval, so
+/// the next call asks again (#893; the busy-lapse question is #869).
+fn assert_refused_busy_and_lapsed(answer: &Value, line: &ImportLedgerLine, server: &Server) {
+    let result = &answer["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "tally_endpoint_busy", "{answer}");
+    assert_eq!(result["attempt_recorded"], false, "{answer}");
+    assert!(!server.post_approvals.holds(&line.batch_id), "{answer}");
+    let note = server
+        .post_approvals
+        .lapse_note(&line.batch_id)
+        .expect("the approval lapsed with a note");
+    assert_eq!(note["reason"], "post_refused_before_intent", "{note}");
+    assert_eq!(note["redeemable"], false, "{note}");
+}
+
+/// A redeem-only pass that starts with no time left under the call's ceiling
+/// waits for nothing (#893): its first admission read meets the held lock and
+/// is refused at once as `tally_endpoint_busy`, before the attempt is recorded,
+/// rather than waiting on what the call's shared budget still holds.
+#[tokio::test]
+async fn a_redeem_pass_with_no_time_left_is_refused_busy_at_once() {
+    let (answer, budget, took, line, server, directory) =
+        two_pass_call_with_the_wire_taken_between(Some(std::time::Duration::from_secs(40))).await;
+    assert_eq!(budget, std::time::Duration::ZERO, "{answer}");
+    assert!(
+        took < std::time::Duration::from_secs(1),
+        "the 2 s policy budget was not waited: {took:?}"
+    );
+    assert_refused_busy_and_lapsed(&answer, &line, &server);
+    assert_eq!(intents(directory.path()), 0, "{answer}");
+}
+
+/// The control: a redeem-only pass with time left waits on what the call's
+/// shared budget has left, here the whole 2 s policy, before the same refusal.
+#[tokio::test]
+async fn a_redeem_pass_with_time_left_waits_the_shared_budget() {
+    let (answer, budget, took, line, server, directory) =
+        two_pass_call_with_the_wire_taken_between(None).await;
+    assert_eq!(budget, std::time::Duration::from_secs(2), "{answer}");
+    assert!(
+        took >= std::time::Duration::from_secs(2),
+        "the pass waited its budget: {took:?}"
+    );
+    assert_refused_busy_and_lapsed(&answer, &line, &server);
+    assert_eq!(intents(directory.path()), 0, "{answer}");
 }
 
 /// A person's click that landed while no call waited (#857): the dialog is still

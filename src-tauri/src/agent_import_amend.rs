@@ -268,7 +268,7 @@ impl Lineage {
 fn expected_narration(voucher: &ImportVoucher, tag: &str) -> String {
     format!(
         "{} [BRIDGE:{tag}]",
-        voucher.narration.as_deref().unwrap_or("").trim()
+        super::posted_narration(voucher).unwrap_or("")
     )
     .trim()
     .to_string()

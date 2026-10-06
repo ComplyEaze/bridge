@@ -21,3 +21,15 @@ JSONEX profile, company identity binding, date-range filtering, completeness,
 source atomicity, Education-mode availability, performance, or production
 support. Redistribution of the official DOCX assets is not required; this
 repository stores only independently authored synthetic test JSON.
+
+## Integrity digests
+
+Each row is the SHA-256 of the file's committed bytes, which
+`scripts/check-fixture-provenance.mjs` checks (#838). A digest pins the bytes as
+committed and claims nothing about where they came from: the Capture column
+repeats only what this note says above.
+
+| Fixture | Bytes | SHA-256 (integrity digest) | Capture |
+| --- | ---: | --- | --- |
+| `ledger_collection_sanitized.json` | 1,624 | `97c3267251ba59fb4acda1ae28c243f3406314b4a325d617b8fd8b16c9866925` | not a capture: a synthetic derivative, as above |
+| `voucher_collection_nested_sanitized.json` | 6,257 | `89290a024a3a32e00af088b14393f217c5ca838c51822c21b20cba29855a47b0` | not a capture: a synthetic derivative, as above |

@@ -17,7 +17,7 @@ fn batch() -> (ImportLedgerLine, TallyEndpointConfig) {
         "endpoint_origin":super::super::super::canonical_loopback_origin(&endpoint).unwrap(),
         "company":{"name":"Synthetic Accounts","guid":"00000000-0000-4000-8000-000000000002","company_number":"100001","books_from":"20260401"},
         "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"", "built_at":"2026-09-07T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-07T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal",
             "narration":"Synthetic test only","reference":"REF-1","entries":[
@@ -399,11 +399,14 @@ fn a_busy_readback_after_a_recorded_send_names_verify_import_never_a_rebuild() {
         error["next_step"],
         "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again."
     );
-    // Held back before any attempt was recorded: it says when to retry but
-    // offers no verify_import step.
+    // Held back before any attempt was recorded: it says when to try again,
+    // and that the person approves again, never a verify_import step (#869).
     let before =
         reconciliation_failure_payload("bridge-test", Some(false), None, "tally_endpoint_busy");
-    assert!(before["result"]["error"].get("next_step").is_none());
+    assert_eq!(
+        before["result"]["error"]["next_step"],
+        "Nothing was posted: Tally's port was busy. Call post_import with this same batch again after retry_after_s seconds, once Tally is free. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch."
+    );
     assert_eq!(
         before["result"]["error"]["retry_after_s"],
         bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
@@ -452,6 +455,22 @@ fn a_row_refusal_without_a_named_blocker_still_says_not_to_rebuild() {
     assert!(step.contains("and say which"), "{step}");
     assert!(step.contains("Never rename a statement row"), "{step}");
     assert!(error.get("blocking_batch_id").is_none());
+}
+
+/// A queued read the transport did not start because the call was withdrawn
+/// (#778) names the withdrawal, `request_cancelled`, as a call withdrawn
+/// before its operation started does, never the operation's read failure.
+#[test]
+fn a_send_withdrawn_before_the_intent_names_the_withdrawal() {
+    let withdrawn = || {
+        anyhow::Error::from(crate::tally::approved_import::PreIntentQueueRefusal {
+            source: anyhow::Error::new(bridge_tally_transport::TallyTransportError::SendWithdrawn),
+        })
+    };
+    assert_eq!(
+        ToolFailure::from_runtime("post_queue_read_failed", withdrawn()).code,
+        "request_cancelled"
+    );
 }
 
 /// A wire refusal replaces a generic failure code with the refusal's own, but
@@ -584,6 +603,36 @@ fn the_after_read_retry_budget_keeps_the_call_under_its_ceiling() {
     assert!(approval::CALL_CEILING + Duration::from_secs(10) <= Duration::from_secs(60));
 }
 
+/// A redeem-only pass waits on the call's shared budget only as far as the
+/// redeem measured live still fits under the ceiling (#893): the budget is
+/// never more than the shared one, and a pass that starts past the point where
+/// the redeem fits waits for nothing.
+#[test]
+fn the_redeem_pass_wire_budget_keeps_the_redeem_under_the_ceiling() {
+    use std::time::Duration;
+    let shared = bridge_tally_transport::WireRetryPolicy::DEFAULT.total();
+    assert_eq!(redeem_pass_wire_budget(Duration::ZERO, shared), shared);
+    assert_eq!(
+        redeem_pass_wire_budget(Duration::from_secs(20), shared),
+        Duration::from_millis(6_910)
+    );
+    for elapsed in [Duration::from_millis(26_910), Duration::from_secs(40)] {
+        assert_eq!(redeem_pass_wire_budget(elapsed, shared), Duration::ZERO);
+    }
+    assert_eq!(
+        redeem_pass_wire_budget(Duration::ZERO, Duration::from_millis(300)),
+        Duration::from_millis(300)
+    );
+    for millis in (0..=60_000).step_by(50) {
+        let elapsed = Duration::from_millis(millis);
+        let budget = redeem_pass_wire_budget(elapsed, shared);
+        assert!(budget <= shared);
+        if budget > Duration::ZERO {
+            assert!(elapsed + budget + approval::MEASURED_REDEEM <= approval::CALL_CEILING);
+        }
+    }
+}
+
 /// A busy wire lock on the marks readback after a sent post is tried once
 /// more, on a fresh wait budget (#884): a lock freed after the first budget
 /// but within the second is not a lasting doubt. A lock that stays held is
@@ -625,10 +674,10 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
     // lower bounds stay, because a wait can only add to elapsed time.
     async fn reads_of(
         server: &Server,
+        reads: std::sync::Arc<std::sync::Mutex<Vec<Option<Duration>>>>,
         request: crate::tally::agent_read_request::AgentReadRequest,
         call_started: Instant,
     ) -> (anyhow::Result<String>, Vec<Option<Duration>>) {
-        let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let result = MARKS_READS
             .scope(
                 std::sync::Arc::clone(&reads),
@@ -638,15 +687,34 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
         let reads = reads.lock().unwrap().clone();
         (result, reads)
     }
+    let no_reads = || std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
 
-    // Freed after the first budget, inside the second: the retry gets through.
+    // Freed once the retry has begun, not on a timer: the first read is refused
+    // for its whole budget however late it starts, and the retry then reaches a
+    // lock that is already released. A timer (budget plus 300 ms from the release
+    // task's first poll) let a first read that started more than 300 ms after
+    // that find the lock released and never retry (#1261). The wait is bounded,
+    // so a missing retry fails the asserts below rather than hanging.
     let held = hold();
-    let release = tokio::spawn(async move {
-        tokio::time::sleep(budget + Duration::from_millis(300)).await;
-        drop(held);
+    let first_reads = no_reads();
+    let release = tokio::spawn({
+        let reads = std::sync::Arc::clone(&first_reads);
+        async move {
+            for _ in 0..2000 {
+                if reads.lock().unwrap().len() >= 2 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+            // 300 ms into the retry's wait, as before: the retry must keep polling,
+            // not make one try. The wait budget is charged by pause length, so a
+            // stall cannot spend it before this fires.
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            drop(held);
+        }
     });
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
+    let (result, reads) = reads_of(&server, first_reads, request(), Instant::now()).await;
     assert!(started.elapsed() >= budget);
     assert!(!busy(&result), "the retry must reach the wire: {result:?}");
     assert_eq!(reads, [None, Some(budget)]);
@@ -655,7 +723,7 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
     // Held throughout: refused once, after both budgets, never a third read.
     let _held = hold();
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
+    let (result, reads) = reads_of(&server, no_reads(), request(), Instant::now()).await;
     assert!(busy(&result));
     assert!(started.elapsed() >= budget * 2);
     assert_eq!(reads, [None, Some(budget)], "exactly one retry");
@@ -665,7 +733,7 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
         .checked_sub(Duration::from_secs(44))
         .unwrap_or_else(Instant::now);
     let started = Instant::now();
-    let (result, reads) = reads_of(&server, request(), spent).await;
+    let (result, reads) = reads_of(&server, no_reads(), request(), spent).await;
     assert!(busy(&result));
     assert!(started.elapsed() >= budget);
     assert_eq!(reads, [None], "no retry");
@@ -1230,8 +1298,12 @@ fn native_post_refuses_supplied_numbers_without_disabling_manual_files() {
 /// twin is the same test-local rewrite of the capture as the single-voucher
 /// test (an unrelated ledger renamed `Cash` plus CR LF), no evidence of Tally
 /// behaviour.
+/// #815 (review P3): a cash-in-hand ledger rides only on a bank voucher, so a
+/// Journal recording one, which the queue would read with no group collection
+/// and so never check, is refused as a wiring fault. The captured reads are
+/// the folded-twin test's, which admit the same Journal recording none.
 #[test]
-fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
+fn a_journal_recording_a_cash_in_hand_ledger_is_refused_by_the_queue() {
     let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
     let decode = |bytes: &[u8]| {
         String::from_utf16(
@@ -1246,8 +1318,9 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
     ));
     let catalogue = decode(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     ));
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
     let single_currency = captured_currencies(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
     ));
@@ -1257,7 +1330,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         "identity_scheme":"batch_v1", "company_guid":company_guid,
         "txn_ids":["TWIN-1","TWIN-2"],
         "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
-        "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[{"bridge_txn_id":"TWIN-2","ledger":"Cash"}], "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
         "vouchers":[
             {"bridge_txn_id":"TWIN-1","date":"20260907","voucher_type":"Journal",
@@ -1281,7 +1354,87 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         ["Bridge Nested Debtor WR4", "Café Naïve Traders", "Cash"],
         "every voucher's ledgers"
     );
-    let ledger_binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(requested.clone())
+    .unwrap();
+    let recheck = |catalogue: &str| {
+        recheck_import_admission(
+            &line,
+            company_guid,
+            "WR2 Unicode Lab",
+            &captured,
+            &captured,
+            catalogue,
+            None,
+            &single_currency,
+            &ledger_binding,
+        )
+    };
+    let error = recheck(&catalogue).expect_err("a recorded cash ledger without a bank voucher");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::AdmissionInconsistent)
+    );
+}
+
+#[test]
+fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    ));
+    let catalogue = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    ));
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
+    let single_currency = captured_currencies(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    // Voucher 1 names no ledger with a twin; only voucher 2 names `Cash`.
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-00000000-0000-4000-8000-000000000626",
+        "identity_scheme":"batch_v1", "company_guid":company_guid,
+        "txn_ids":["TWIN-1","TWIN-2"],
+        "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[], "on_account_approved":[],
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+        "vouchers":[
+            {"bridge_txn_id":"TWIN-1","date":"20260907","voucher_type":"Journal",
+             "narration":"first","reference":null,"voucher_number":null,
+             "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"3.00","side":"Dr"},
+                {"ledger":"Café Naïve Traders","amount":"3.00","side":"Cr"}]},
+            {"bridge_txn_id":"TWIN-2","date":"20260907","voucher_type":"Journal",
+             "narration":"second","reference":null,"voucher_number":null,
+             "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"5.00","side":"Dr"},
+                {"ledger":"Cash","amount":"5.00","side":"Cr"}]}]
+    }))
+    .unwrap();
+    let payload = ImportPayload {
+        company_guid: company_guid.into(),
+        vouchers: line.vouchers.clone(),
+        amends_batch_id: None,
+    };
+    let requested = requested_ledger_names(&payload);
+    assert_eq!(
+        requested,
+        ["Bridge Nested Debtor WR4", "Café Naïve Traders", "Cash"],
+        "every voucher's ledgers"
+    );
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue,
         "WR2 Unicode Lab",
         company_guid,
@@ -1311,7 +1464,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     );
     let twinned = catalogue.replace("WR2 Sales", "Cash&#13;&#10;");
     // Before approval, the post checks the names requested across the batch.
-    let twinned_parents = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let twinned_parents = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &twinned,
         "WR2 Unicode Lab",
         company_guid,
@@ -1324,6 +1477,246 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         error.downcast_ref::<ApprovedImportAdmissionError>(),
         Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
     ));
+}
+
+/// #1234: the catalogue the queue re-reads after approval carries
+/// each ledger's flag, so a named ledger switched to bill-wise since the build,
+/// with no approval for it, is refused before the post; an approved one passes
+/// whether it stays bill-wise or is switched off.
+#[test]
+fn a_named_ledger_switched_to_bill_wise_since_the_build_is_refused_by_the_queue() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    ));
+    let capture = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    ));
+    let flagged = |bill_wise: &[&str]| {
+        crate::agent::agent_import::tests::with_bill_wise_flags(&capture, bill_wise)
+    };
+    let single_currency = captured_currencies(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let line_with = |approved: serde_json::Value| -> ImportLedgerLine {
+        serde_json::from_value(json!({
+            "batch_id":"bridge-00000000-0000-4000-8000-000000001234",
+            "identity_scheme":"batch_v1", "company_guid":company_guid,
+            "txn_ids":["BW-1"],
+            "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
+            "built_at":"2026-10-06T00:00:00Z", "status":"built", "cash_in_hand_ledgers":[],
+            "on_account_approved": approved,
+            "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+            "vouchers":[
+                {"bridge_txn_id":"BW-1","date":"20260907","voucher_type":"Journal",
+                 "narration":"first","reference":null,"voucher_number":null,
+                 "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"3.00","side":"Dr"},
+                    {"ledger":"Cash","amount":"3.00","side":"Cr"}]}]
+        }))
+        .unwrap()
+    };
+    let none_approved = line_with(json!([]));
+    let party_approved =
+        line_with(json!([{"ledger":"Bridge Nested Debtor WR4","party_digest":"a".repeat(64)}]));
+    let payload = ImportPayload {
+        company_guid: company_guid.into(),
+        vouchers: none_approved.vouchers.clone(),
+        amends_batch_id: None,
+    };
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &flagged(&[]),
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(requested_ledger_names(&payload))
+    .unwrap();
+    let recheck = |line: &ImportLedgerLine, catalogue: &str| {
+        recheck_import_admission(
+            line,
+            company_guid,
+            "WR2 Unicode Lab",
+            &captured,
+            &captured,
+            catalogue,
+            None,
+            &single_currency,
+            &ledger_binding,
+        )
+    };
+    // Control: nothing bill-wise at the build and nothing now.
+    recheck(&none_approved, &flagged(&[])).expect("no change, so the queued batch is admitted");
+    // Switched to bill-wise since the build, with no approval for it.
+    let error = recheck(&none_approved, &flagged(&["Bridge Nested Debtor WR4"]))
+        .expect_err("a ledger that became bill-wise unseen must refuse the batch");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::BillWiseChanged)
+    );
+    // Another ledger of the book switching is not this batch's concern.
+    recheck(&none_approved, &flagged(&["Café Naïve Traders"])).expect("an unnamed ledger");
+    // An approval for a different ledger does not cover the named one.
+    let other_approved = line_with(json!([{"ledger":"Cash","party_digest":"a".repeat(64)}]));
+    let error = recheck(&other_approved, &flagged(&["Bridge Nested Debtor WR4"]))
+        .expect_err("an approval for another ledger");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::BillWiseChanged)
+    );
+    // Approved at the build: bill-wise still, or switched off, both pass.
+    recheck(&party_approved, &flagged(&["Bridge Nested Debtor WR4"]))
+        .expect("an approved party that is still bill-wise");
+    recheck(&party_approved, &flagged(&[])).expect("an approved party switched off");
+    // A V1 answer has no flag: the recheck cannot read it, never as "off".
+    let v1 = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+    ));
+    let error = recheck(&none_approved, &v1).expect_err("a catalogue without the flag");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::CatalogueUnreadable(
+            bridge_tally_protocol::StandardLedgerCatalogError::BillWiseFlagMissing
+        ))
+    ));
+}
+
+/// #815: the queue refuses a record written before its cash-in-hand ledgers
+/// were, by its typed variant, before reading anything it was handed: there is
+/// nothing to check again, so the batch must be rebuilt.
+#[test]
+fn a_record_without_cash_in_hand_ledgers_is_refused_by_the_queue() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-00000000-0000-4000-8000-000000000815",
+        "identity_scheme":"batch_v1", "company_guid":company_guid,
+        "txn_ids":["contra-815"],
+        "date_from":"20260901", "date_to":"20260901", "sha256":"",
+        "built_at":"2026-10-05T00:00:00Z", "status":"built",
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+        "vouchers":[{"bridge_txn_id":"contra-815","date":"20260901","voucher_type":"Contra",
+            "entries":[{"ledger":"Cash","amount":"5.00","side":"Dr"},
+                {"ledger":"WR2 Sales","amount":"5.00","side":"Cr"}]}]
+    }))
+    .unwrap();
+    assert_eq!(line.cash_in_hand_ledgers, None);
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    );
+    let catalogue = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(vec!["Cash".to_string(), "WR2 Sales".to_string()])
+    .unwrap();
+    // Every read it is handed is empty: the refusal comes before any of them.
+    let error = recheck_import_admission(
+        &line,
+        company_guid,
+        "WR2 Unicode Lab",
+        "",
+        "",
+        "",
+        None,
+        "",
+        &ledger_binding,
+    )
+    .expect_err("a record without the field must be refused");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::CashLedgersNotRecorded)
+    );
+}
+
+/// #1234: the queue refuses a record written before its bill-wise approvals
+/// were, by its own typed variant and not the cash one, before reading
+/// anything it was handed.
+#[test]
+fn a_record_without_bill_wise_approvals_is_refused_by_the_queue() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-00000000-0000-4000-8000-000000001234",
+        "identity_scheme":"batch_v1", "company_guid":company_guid,
+        "txn_ids":["contra-1234"],
+        "date_from":"20260901", "date_to":"20260901", "sha256":"",
+        "built_at":"2026-10-05T00:00:00Z", "status":"built", "cash_in_hand_ledgers":[],
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+        "vouchers":[{"bridge_txn_id":"contra-1234","date":"20260901","voucher_type":"Contra",
+            "entries":[{"ledger":"Cash","amount":"5.00","side":"Dr"},
+                {"ledger":"WR2 Sales","amount":"5.00","side":"Cr"}]}]
+    }))
+    .unwrap();
+    assert_eq!(line.cash_in_hand_ledgers, Some(Vec::new()));
+    assert_eq!(line.on_account_approved, None);
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    );
+    let catalogue = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(vec!["Cash".to_string(), "WR2 Sales".to_string()])
+    .unwrap();
+    let error = recheck_import_admission(
+        &line,
+        company_guid,
+        "WR2 Unicode Lab",
+        "",
+        "",
+        "",
+        None,
+        "",
+        &ledger_binding,
+    )
+    .expect_err("a record without the field must be refused");
+    assert_eq!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::BillWiseNotRecorded)
+    );
+}
+
+/// #1234: only a batch about to be posted is refused for the missing record.
+/// Reconciling one that was already sent stays possible, since the integrity
+/// check does not look at it.
+#[test]
+fn a_saved_batch_without_bill_wise_approvals_is_refused_to_post_but_not_to_reconcile() {
+    let (mut line, endpoint) = batch();
+    assert!(line.on_account_approved.is_some());
+    assert!(admit_saved_journal(&line, &endpoint).is_ok());
+    line.on_account_approved = None;
+    assert_eq!(
+        admit_saved_journal(&line, &endpoint).unwrap_err(),
+        "import_batch_predates_bill_wise_record"
+    );
+    assert!(admit_saved_journal_integrity(&line, &endpoint).is_ok());
 }
 
 #[test]
@@ -1344,7 +1737,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         "identity_scheme":"batch_v1", "company_guid":company_guid,
         "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],
         "date_from":"20260907", "date_to":"20260907", "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
-        "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "cash_in_hand_ledgers":[], "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
         "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1","date":"20260907",
             "voucher_type":"Journal","narration":"Bridge MCP batch namespace qualification",
@@ -1354,7 +1747,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     }))
     .unwrap();
     let catalogue_bytes = include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     );
     let catalogue = String::from_utf16(
         &catalogue_bytes
@@ -1363,10 +1756,11 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
             .collect::<Vec<_>>(),
     )
     .unwrap();
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
     let single_currency = captured_currencies(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
     ));
-    let ledger_binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue,
         "WR2 Unicode Lab",
         company_guid,
@@ -1497,13 +1891,13 @@ fn the_whole_window_pre_post_request_is_admitted_on_the_verification_measurement
     };
     let divided = [
         crate::agent::WindowPart {
-            from: "20260801".into(),
-            to: "20260815".into(),
+            from: crate::agent::tally_date("20260801"),
+            to: crate::agent::tally_date("20260815"),
             span: None,
         },
         crate::agent::WindowPart {
-            from: "20260816".into(),
-            to: "20260831".into(),
+            from: crate::agent::tally_date("20260816"),
+            to: crate::agent::tally_date("20260831"),
             span: None,
         },
     ];
@@ -1938,9 +2332,10 @@ fn a_multi_currency_refusal_names_the_masters_in_plain_words_only_when_nothing_w
 /// The captured catalogue's binding of `names`, as a post binds them.
 fn captured_binding(names: &[&str]) -> bridge_tally_protocol::StandardLedgerCatalogBinding {
     let catalogue = captured_currencies(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     ));
-    bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
+    crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue,
         "WR2 Unicode Lab",
         "61c6de69-1748-461c-ad3f-162cb949df9f",
@@ -2478,7 +2873,7 @@ fn a_batch_approval_summarizes_every_ledger_and_the_money_the_types_move() {
         "Money out by Payment vouchers: 15",
         "Contra: moves between cash/bank ledgers, net zero",
         "Journals may also move cash/bank ledgers; see the per-ledger totals",
-        "Not shown here: each voucher's own date, narration and reference.",
+        "Each voucher: type, date, amount, ledger, narration (references not shown):",
         "After a timeout, reconcile this batch; do not rebuild or resend it.",
     ] {
         assert!(
@@ -2491,6 +2886,277 @@ fn a_batch_approval_summarizes_every_ledger_and_the_money_the_types_move() {
     assert!(admit_fresh_saved_voucher(&one, &endpoint)
         .unwrap()
         .starts_with("Create ONE Journal"));
+}
+
+/// The lines of `preview` from the one after its `Dates:` line, up to its first
+/// blank line: where a batch lists its vouchers, or says why it does not.
+fn voucher_block(preview: &str) -> Vec<&str> {
+    preview
+        .lines()
+        .skip_while(|line| !line.starts_with("Dates: "))
+        .skip(1)
+        .take_while(|line| !line.is_empty())
+        .collect()
+}
+
+/// A batch of at most ten lists each voucher on one line (#1063): its type,
+/// date, value, the ledger a statement row names (a Receipt's first credit,
+/// any other type's first debit, "+N" for the rest of that side) and its
+/// narration as posted, in the batch file's order.
+#[test]
+fn a_small_batch_lists_each_voucher_on_one_line() {
+    let (mut line, endpoint) = batch_of_every_type();
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview),
+        [
+            "Each voucher: type, date, amount, ledger, narration (references not shown):",
+            "Each line ends with its narration, quoted exactly as it will be posted.",
+            "Journal 20260901  12.5  \"Expense\"  \"Synthetic test only\"",
+            "Receipt 20260902  40  \"Party A\"  \"Synthetic test only\"",
+            "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
+            "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
+        ],
+        "{preview}"
+    );
+    // A second ledger on the named side is counted, never dropped; a Receipt
+    // names its first credit and its value is still the sum of its debits.
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Expense","amount":"10.00","side":"Dr"},
+        {"ledger":"Rent","amount":"2.50","side":"Dr"},
+        {"ledger":"Cash","amount":"12.50","side":"Cr"}]))
+    .unwrap();
+    line.vouchers[1].entries = serde_json::from_value(json!([
+        {"ledger":"Cash","amount":"40.00","side":"Dr"},
+        {"ledger":"Party C","amount":"30.00","side":"Cr"},
+        {"ledger":"Party A","amount":"10.00","side":"Cr"}]))
+    .unwrap();
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview)[2..4],
+        [
+            "Journal 20260901  12.5  \"Expense\" +1  \"Synthetic test only\"",
+            "Receipt 20260902  40  \"Party C\" +1  \"Synthetic test only\"",
+        ],
+        "{preview}"
+    );
+}
+
+/// A voucher's line shows its narration as the post sends it, quoted: a
+/// Devanagari and rupee narration whole, outer spaces dropped, none as
+/// `(none)`, and one longer than 40 characters cut there with the cut marked.
+/// The cut counts characters, so it can split a conjunct: here it keeps the
+/// क of क्ष and drops its virama, and the marker says 22 characters follow.
+#[test]
+fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
+    let (mut line, endpoint) = batch_of_every_type();
+    let narrations = [
+        Some("जुलाई का किराया ₹500"),
+        Some("  NEFT CR 000123456789 SYNTHETIC TRADERS RENT FOR JULY 2026  "),
+        Some("जुलाई महीने का किराया बिजली बिल भुगतान क्षेत्रीय कार्यालय ₹500"),
+        None,
+    ];
+    for (voucher, narration) in line.vouchers.iter_mut().zip(narrations) {
+        voucher.narration = narration.map(str::to_owned);
+    }
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview)[2..],
+        [
+            "Journal 20260901  12.5  \"Expense\"  \"जुलाई का किराया ₹500\"",
+            "Receipt 20260902  40  \"Party A\"  \"NEFT CR 000123456789 SYNTHETIC TRADERS R\"… (+17 characters)",
+            "Payment 20260902  15  \"Party B\"  \"जुलाई महीने का किराया बिजली बिल भुगतान क\"… (+22 characters)",
+            "Contra 20260902  5  \"Bank\"  (none)",
+        ],
+        "{preview}"
+    );
+}
+
+/// A narration or reference holding a layout or format character leaves the
+/// batch's totals and one line in place of the voucher lines (#1063). The
+/// batch is never refused for it, nothing is stripped, and the line does not
+/// echo the text.
+#[test]
+fn an_unsafe_narration_or_reference_leaves_the_totals_and_says_so() {
+    for (narration, reference) in [
+        (Some("rent \u{202e}evil"), None),
+        (Some("rent\nevil"), None),
+        (None, Some("REF\u{2028}evil")),
+        (None, Some("REF\u{200b}evil")),
+    ] {
+        let (mut line, endpoint) = batch_of_every_type();
+        line.vouchers[2].narration = narration.map(str::to_owned);
+        line.vouchers[2].reference = reference.map(str::to_owned);
+        let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+        assert_eq!(
+            voucher_block(&preview),
+            ["Per-voucher lines are not shown: a narration/reference is unsafe."],
+            "{narration:?} {reference:?}"
+        );
+        assert!(!preview.contains("evil"), "{preview}");
+        assert!(
+            preview.contains("Total debit: 72.5  Total credit: 72.5"),
+            "{preview}"
+        );
+    }
+}
+
+/// A narration holding a shape a line of this dialog begins with is withheld
+/// on its voucher's line (#1063 follow-up): the dialog wraps long lines, so its
+/// tail could begin a row that passes for a real one. Only that narration is
+/// withheld; ordinary bank narrations that hold DR or CR with a number, a
+/// doctor's name or a MICR code are listed.
+#[test]
+fn a_narration_that_reads_like_a_dialog_line_is_withheld_on_its_line() {
+    let withheld =
+        "Receipt 20260902  40  \"Party A\"  (narration withheld: it reads like a dialog line)";
+    for narration in [
+        "x Dr 500.00  Cr 0 y",
+        "ATM 1234 Total debit: 0  Total credit: 0",
+        "refund TOTAL CREDIT : 5",
+        "see batch: abc",
+        "please Create 4 vouchers",
+        "dr 1,234.50 cr 9",
+    ] {
+        let (mut line, endpoint) = batch_of_every_type();
+        line.vouchers[1].narration = Some(narration.into());
+        let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+        assert_eq!(voucher_block(&preview)[3], withheld, "{narration}");
+        // The other vouchers keep theirs.
+        assert_eq!(
+            voucher_block(&preview)[4],
+            "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
+            "{narration}"
+        );
+    }
+    for narration in [
+        "NEFT CR 000123456789",
+        "UPI CR 4567 ref",
+        "ATM DR 1234",
+        "Dr Sharma fees",
+        "MICR 400002",
+        "Created 4 entries",
+    ] {
+        let (mut line, endpoint) = batch_of_every_type();
+        line.vouchers[1].narration = Some(narration.into());
+        let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+        assert_eq!(
+            voucher_block(&preview)[3],
+            format!("Receipt 20260902  40  \"Party A\"  \"{narration}\""),
+            "{narration}"
+        );
+    }
+}
+
+/// Each of the four shapes matches on its own, in any case, and the rule's
+/// edges hold: a word character before `dr`, no space after `create`, and a
+/// digit of another script after `create`.
+#[test]
+fn each_dialog_line_shape_is_matched_and_its_edges_hold() {
+    for (text, matched) in [
+        ("Dr 5 Cr 6", true),
+        ("(dR 5,000 cR 6)", true),
+        ("xDr 500 Cr 0", false),
+        ("Dr500 Cr 1", false),
+        ("Dr 5 Cr x", false),
+        ("total debit:", true),
+        ("Total Credit   :", true),
+        // Any whitespace between the words: a no-break space renders as the dialog's own line.
+        ("Total\u{a0}debit: 0", true),
+        ("Total  credit: 5", true),
+        ("totaldebit:", false),
+        ("Batch:", true),
+        ("batch", false),
+        ("CREATE ४ vouchers", true),
+        ("create4", false),
+        ("subtotals", false),
+    ] {
+        assert_eq!(reads_like_a_dialog_line(text), matched, "{text:?}");
+    }
+}
+
+/// Ten vouchers are listed; an eleventh leaves the totals and says why.
+#[test]
+fn ten_vouchers_are_listed_and_eleven_are_summarised() {
+    let (mut line, endpoint) = batch();
+    for index in 1..10 {
+        let mut extra = line.vouchers[0].clone();
+        extra.bridge_txn_id = format!("journal-{index}");
+        line.vouchers.push(extra);
+    }
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    let block = voucher_block(&preview);
+    assert_eq!(block.len(), 12, "{preview}");
+    assert_eq!(
+        block[..2],
+        [
+            "Each voucher: type, date, amount, ledger, narration (references not shown):",
+            "Each line ends with its narration, quoted exactly as it will be posted.",
+        ]
+    );
+    let mut eleven = line.clone();
+    let mut extra = line.vouchers[0].clone();
+    extra.bridge_txn_id = "journal-10".into();
+    eleven.vouchers.push(extra);
+    let preview = review_preview_with(&eleven, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview),
+        ["Per-voucher lines are not shown: this batch has over 10 vouchers."],
+        "{preview}"
+    );
+}
+
+/// Voucher lines that would break a cap leave the totals and say why, so no
+/// batch that posted before #1063 is refused for them: a line over 100
+/// characters, and ten Journals over twenty ledgers. With the agent's footer
+/// the batch text has 17 fixed lines, one per ledger and one per money line;
+/// ten voucher lines fit while ledgers and money lines come to 13 or fewer.
+/// Here they come to 21: the totals take 38 lines and pass, and the listing
+/// would take 48.
+#[test]
+fn voucher_lines_that_do_not_fit_leave_the_totals_and_say_so() {
+    let (mut wide, endpoint) = batch_of_every_type();
+    wide.vouchers[1].entries[1].ledger = "P".repeat(60);
+    let preview = review_preview_with(&wide, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview),
+        ["Per-voucher lines are not shown: they do not fit this dialog."],
+        "{preview}"
+    );
+    let (mut many, endpoint) = batch();
+    let journal = many.vouchers[0].clone();
+    many.vouchers = (0..10)
+        .map(|index| {
+            let mut voucher = journal.clone();
+            voucher.bridge_txn_id = format!("journal-{index}");
+            voucher.entries[0].ledger = format!("Expense {index}");
+            voucher.entries[1].ledger = format!("Cash {index}");
+            voucher
+        })
+        .collect();
+    let preview = review_preview_with(&many, &endpoint, &agent_post_timing_lines()).unwrap();
+    assert_eq!(
+        voucher_block(&preview),
+        ["Per-voucher lines are not shown: they do not fit this dialog."],
+        "{preview}"
+    );
+    assert_eq!(preview.lines().count(), 38, "{preview}");
+}
+
+/// Each line that stands in for the voucher lines is no longer than the line
+/// a batch showed in its place before #1063, so the totals-only text never
+/// outgrows a cap a batch passed before.
+#[test]
+fn each_sentence_in_place_of_the_voucher_lines_is_no_longer_than_the_old_one() {
+    let old = "Not shown here: each voucher's own date, narration and reference.";
+    for sentence in [
+        VOUCHER_LINES_OVER_LIMIT,
+        VOUCHER_LINES_UNSAFE,
+        VOUCHER_LINES_DO_NOT_FIT,
+    ] {
+        assert!(sentence.len() <= old.len(), "{sentence}");
+        assert!(sentence.is_ascii(), "{sentence}");
+    }
 }
 
 /// A batch whose summary would not fit one dialog is refused, never cut;

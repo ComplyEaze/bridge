@@ -63,7 +63,7 @@ fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
         "endpoint_origin":"http://127.0.0.1:9",
         "company":{"name":"Synthetic Accounts","guid":"00000000-0000-4000-8000-000000000002","company_number":"100001","books_from":"20260401"},
         "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"test", "built_at":"2026-09-07T00:00:00Z", "status":"built",
+        "sha256":"test", "built_at":"2026-09-07T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal",
             "narration":"Synthetic test only","reference":"REF-1","entries":[
@@ -135,7 +135,7 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
         let polls_after_cancellation = polls.get();
         // While another admission holds the journal, whether the post wrote an
         // intent cannot be read, so it is not polled at all.
-        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         assert_eq!(polls.get(), polls_after_cancellation);
         drop(admission);
         // Keep stdin active more often than the classifier retry period. This
@@ -158,7 +158,7 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
     })
     .await
     .unwrap();
-    assert!(result.unwrap().is_none());
+    assert!(matches!(result.unwrap(), ToolCallEnd::Withdrawn { .. }));
     assert_eq!(
         post_dispatch_state(&server, &args),
         PostDispatchState::NotDispatched
@@ -227,7 +227,7 @@ async fn cancellation_after_intent_keeps_answering_ping_until_post_completes() {
     })
     .await
     .unwrap();
-    assert!(outcome.unwrap().is_some());
+    assert!(matches!(outcome.unwrap(), ToolCallEnd::Answered(_)));
 }
 
 #[tokio::test]
@@ -271,7 +271,7 @@ async fn ping_responds_before_pending_approval_and_keeps_tools_queued() {
             client_write.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n").await.unwrap();
         };
         let (result, _) = tokio::join!(serve, client);
-        assert!(result.unwrap().is_none());
+        assert!(matches!(result.unwrap(), ToolCallEnd::Withdrawn { .. }));
     };
     tokio::time::timeout(std::time::Duration::from_secs(2), exchange)
         .await
@@ -296,22 +296,24 @@ async fn cancellation_before_intent_withdraws_the_post() {
     client.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n").await.unwrap();
     // Withdrawn, the post is awaited until it stops, then answers as cancelled.
     let future = stand_in(cancellation.clone());
-    assert!(stops(await_post(
-        future,
-        PostRequest {
-            id: &json!(7),
-            args: &json!({}),
-            cancellation: &cancellation,
-        },
-        &server,
-        &mut reader,
-        &mut framer,
-        &mut pending,
-        &mut output,
-    ))
-    .await
-    .unwrap()
-    .is_none());
+    assert!(matches!(
+        stops(await_post(
+            future,
+            PostRequest {
+                id: &json!(7),
+                args: &json!({}),
+                cancellation: &cancellation,
+            },
+            &server,
+            &mut reader,
+            &mut framer,
+            &mut pending,
+            &mut output,
+        ))
+        .await
+        .unwrap(),
+        ToolCallEnd::Withdrawn { .. }
+    ));
 }
 
 #[tokio::test]
@@ -390,7 +392,7 @@ async fn queue_overflow_is_refused_in_band_and_waits_for_cancellation() {
         &mut output,
     ))
     .await;
-    assert!(result.unwrap().is_none());
+    assert!(matches!(result.unwrap(), ToolCallEnd::Withdrawn { .. }));
     assert_eq!(pending.len(), 8);
     let refusal: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(refusal["id"], 8);
@@ -430,7 +432,7 @@ async fn queue_overflow_refuses_an_oversized_id_without_ending_the_post_wait() {
         &mut output,
     ))
     .await;
-    assert!(result.unwrap().is_none());
+    assert!(matches!(result.unwrap(), ToolCallEnd::Withdrawn { .. }));
     assert_eq!(pending.len(), 8);
     assert!(output.len() <= 256);
     let refusal: Value = serde_json::from_slice(&output).unwrap();
@@ -450,22 +452,24 @@ async fn queue_overflow_tool_request_has_a_prepared_and_completed_refusal_receip
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let mut output = Vec::new();
-    assert!(stops(await_post(
-        stand_in(cancellation.clone()),
-        PostRequest {
-            id: &json!(7),
-            args: &json!({}),
-            cancellation: &cancellation,
-        },
-        &server,
-        &mut reader,
-        &mut Framer::default(),
-        &mut pending,
-        &mut output,
-    ))
-    .await
-    .unwrap()
-    .is_none());
+    assert!(matches!(
+        stops(await_post(
+            stand_in(cancellation.clone()),
+            PostRequest {
+                id: &json!(7),
+                args: &json!({}),
+                cancellation: &cancellation,
+            },
+            &server,
+            &mut reader,
+            &mut Framer::default(),
+            &mut pending,
+            &mut output,
+        ))
+        .await
+        .unwrap(),
+        ToolCallEnd::Withdrawn { .. }
+    ));
     let records = fs::read_to_string(directory.path().join("agent-egress.jsonl"))
         .unwrap()
         .lines()
@@ -539,7 +543,10 @@ async fn readable_queue_traffic_cannot_starve_the_pending_post() {
         ),
     )
     .await;
-    assert!(completed.unwrap().unwrap().is_some());
+    assert!(matches!(
+        completed.unwrap().unwrap(),
+        ToolCallEnd::Answered(_)
+    ));
 }
 
 /// A cancellation before the intent withdraws the post (#725): its token is

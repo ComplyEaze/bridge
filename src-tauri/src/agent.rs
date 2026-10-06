@@ -60,10 +60,16 @@ mod bill_trail;
 mod outstandings;
 #[path = "agent_presence.rs"]
 mod presence;
+#[path = "agent_voucher_search.rs"]
+mod voucher_search;
 #[path = "agent_vouchers.rs"]
 mod vouchers;
+use voucher_search::VoucherSearch;
+#[path = "agent_voucher_summary.rs"]
+mod voucher_summary;
 #[cfg(test)]
 use outstandings::*;
+use voucher_summary::{SummaryGroup, SummaryRequest};
 #[path = "agent_movement.rs"]
 mod movement;
 #[path = "agent_register.rs"]
@@ -91,6 +97,8 @@ use change_parse::*;
 #[path = "agent_read_profiles.rs"]
 mod read_profiles;
 use read_profiles::*;
+#[path = "agent_read_cost.rs"]
+mod read_cost;
 #[path = "agent_voucher_window.rs"]
 mod voucher_window;
 use voucher_window::*;
@@ -116,7 +124,7 @@ use bridge_tally_protocol::xml_read_profiles::{
 };
 use bridge_tally_protocol::{TallyCompany, TallyLedger};
 use bridge_tally_transport::{canonical_loopback_origin, TallyEndpointConfig};
-use chrono::{DateTime, Duration, Local, NaiveDate, TimeZone};
+use chrono::{DateTime, Local, NaiveDate, TimeZone};
 use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -667,6 +675,8 @@ fn unanswered_cause(error: &anyhow::Error) -> Option<Unanswered> {
                 | Transport::ResponseTooLarge { .. }
                 | Transport::ResponseTruncated
                 | Transport::ResponseReadFailed => None,
+                // The call was withdrawn (#778): not a Tally answer missing.
+                Transport::SendWithdrawn => None,
             };
         }
         match cause.downcast_ref::<Control>()? {
@@ -1237,9 +1247,21 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              (those three may share a batch). Split the vouchers into one batch of each kind \
              and build them separately; nothing was written or sent.",
         ),
+        // A date argument a caller can correct. `TallyDate` admits years 0001
+        // to 9999, and the edge codes come from widening an empty window past
+        // either end of that (#1268).
+        "invalid_date" | "invalid_date_range" | "tally_date_overflow" | "tally_date_underflow" => {
+            Some(DATE_REMEDIATION)
+        }
         _ => None,
     }
 }
+
+/// The one next step every date refusal gives (#1268).
+const DATE_REMEDIATION: &str = "Give each date as YYYYMMDD (YYYY-MM-DD also works), a real \
+     calendar day from 0001-01-01 to 9999-12-31, with from no later than to. A window that \
+     starts on 0001-01-01 or ends on 9999-12-31 cannot be widened to look for vouchers next \
+     to it, so read one inside those days.";
 
 /// A refused argument whose fix is to send it again in the right form, not to
 /// make a different read. Seen in use: "last month" sent as `from`, and a
@@ -1399,10 +1421,11 @@ impl ToolFailure {
             None
         };
         // A withdrawn call names the withdrawal, whatever operation it stopped.
-        let code = if error
-            .chain()
-            .any(|cause| cause.is::<crate::tally::runtime::ToolCancelled>())
-        {
+        let code = if error.chain().any(|cause| {
+            cause.is::<crate::tally::runtime::ToolCancelled>()
+                || cause.downcast_ref::<bridge_tally_transport::TallyTransportError>()
+                    == Some(&bridge_tally_transport::TallyTransportError::SendWithdrawn)
+        }) {
             "request_cancelled"
         } else if let Some(refusal) = crate::endpoint_wire::wire_refusal(&error)
             // Never in place of an unknown post outcome: that code is what
@@ -1866,6 +1889,18 @@ impl Server {
                     {
                         error["window"] =
                             window_timings_within(&timings, self.settings.max_bytes / 4);
+                        // Only `vouchers` says what the read cost; `outstandings`
+                        // reports its timings as before (bridge#1239).
+                        if name == "vouchers" {
+                            let len = error.to_string().len();
+                            read_cost::add_read_cost(
+                                &mut error["window"],
+                                len,
+                                &timings,
+                                read_cost::Ended::Stopped,
+                                self.settings.max_bytes,
+                            );
+                        }
                     }
                 }
                 ToolOutcome {
@@ -2206,8 +2241,8 @@ pub(crate) async fn desktop_selected_vouchers(
         &server,
         &json!({
             "company_guid": company_guid,
-            "from": normalized_from,
-            "to": normalized_to,
+            "from": normalized_from.as_str(),
+            "to": normalized_to.as_str(),
             "ledger": ledger,
             "offset": offset,
             "limit": limit,
@@ -2264,7 +2299,10 @@ fn page_is_truncated(total: usize, offset: usize, page_len: usize) -> bool {
     offset.saturating_add(page_len) < total
 }
 
-fn ensure_movement_window_within_books(from: &str, books_from: &str) -> Result<(), String> {
+fn ensure_movement_window_within_books(
+    from: &bridge_tally_core::TallyDate,
+    books_from: &bridge_tally_core::TallyDate,
+) -> Result<(), String> {
     (from >= books_from)
         .then_some(())
         .ok_or_else(|| "window_precedes_books_from".to_string())
@@ -2498,19 +2536,22 @@ fn row_in_window(row: &Value, from: &str, to: &str) -> bool {
         .is_some_and(|date| date >= from && date <= to)
 }
 
-fn widened_window(from: &str, to: &str) -> Result<(String, String), String> {
-    let from = NaiveDate::parse_from_str(from, "%Y%m%d").map_err(|_| "invalid_date".to_string())?;
-    let to = NaiveDate::parse_from_str(to, "%Y%m%d").map_err(|_| "invalid_date".to_string())?;
-    Ok((
-        from.checked_sub_signed(Duration::days(1))
-            .ok_or_else(|| "empty_uncorroborated".to_string())?
-            .format("%Y%m%d")
-            .to_string(),
-        to.checked_add_signed(Duration::days(1))
-            .ok_or_else(|| "empty_uncorroborated".to_string())?
-            .format("%Y%m%d")
-            .to_string(),
-    ))
+fn widened_window(
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
+) -> Result<(bridge_tally_core::TallyDate, bridge_tally_core::TallyDate), String> {
+    // A window at either end of the calendar has no day beyond it to read. It
+    // is refused by `TallyDate`'s own code (`tally_date_overflow`,
+    // `tally_date_underflow`) rather than sent on as a date that is not eight
+    // digits (#861).
+    let step = |stepped: Result<bridge_tally_core::TallyDate, bridge_tally_core::TallyError>| {
+        match stepped {
+            Ok(date) => Ok(date),
+            Err(bridge_tally_core::TallyError::InvalidData { code }) => Err(code),
+            Err(_) => Err("invalid_date".to_string()),
+        }
+    };
+    Ok((step(from.previous_day())?, step(to.next_day())?))
 }
 
 /// Tally is local to the Bridge host; accounting-day defaults therefore use
@@ -2607,10 +2648,11 @@ fn arg_positive_usize(args: &Value, key: &str, default: usize) -> Result<usize, 
         .then_some(value)
         .ok_or_else(|| "pagination_invalid".to_string())
 }
-fn normalized_date(value: &str) -> Result<String, String> {
-    let value = value.replace('-', "");
-    bridge_tally_core::TallyDate::parse(value.clone()).map_err(|_| "invalid_date".to_string())?;
-    Ok(value)
+/// A tool's date argument, parsed once at the boundary: every `-` is dropped, and
+/// the rest must be a valid `YYYYMMDD` date.
+fn normalized_date(value: &str) -> Result<bridge_tally_core::TallyDate, String> {
+    bridge_tally_core::TallyDate::parse(value.replace('-', ""))
+        .map_err(|_| "invalid_date".to_string())
 }
 
 fn add_decimal(left: &str, right: &str) -> Result<String, String> {

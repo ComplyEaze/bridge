@@ -827,6 +827,174 @@ fn each_tool_of_a_confusable_pair_points_to_the_other() {
     }
 }
 
+/// The `vouchers` description says what a bill allocation carries (#945). The
+/// parser returns `bill_date` and `credit_period` on an allocation when Tally
+/// sends them (`an_allocation_carries_its_bill_date_and_typed_credit_period_from_a_live_capture`);
+/// until the description named them an assistant reading only the tool list
+/// could not know the fields exist, or that their absence means Tally did not
+/// send them. The whole sentence is pinned, as the sentences above are.
+#[test]
+fn the_vouchers_description_names_the_bill_date_and_credit_period_of_an_allocation() {
+    const SENTENCE: &str = "Each ledger entry's `bill_allocations` carries `reference`, `bill_type` and `amount`; where Tally sends them it also carries `bill_date` (YYYYMMDD, the original bill's date for an Agst Ref) and `credit_period` (a `value` and a `unit` of days, weeks or months, or `unit` `unrecognised` with its `text` when the text cannot be read); an allocation Tally sent neither for has neither";
+    let tools = registered_tool_definitions(true, true);
+    let description = tools
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|tool| tool["name"] == "vouchers")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("vouchers is in the catalogue");
+    assert!(
+        description
+            .split(". ")
+            .any(|part| part.trim_end_matches('.') == SENTENCE),
+        "the vouchers description lacks the bill allocation sentence"
+    );
+}
+
+/// The `vouchers` description states the order of summary buckets, including the rule for a tie
+/// in movement (#1230): first counted in the window, never by name, which under `mask_parties`
+/// would show the alphabetical order of the real names.
+#[test]
+fn the_vouchers_description_states_the_tie_rule_of_summary_buckets() {
+    let tools = registered_tool_definitions(true, true);
+    let description = tools
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|tool| tool["name"] == "vouchers")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("vouchers is in the catalogue");
+    assert!(
+        description.contains(
+            "Buckets are ordered by the larger movement first (ledger, type), ties in movement keeping the order in which the bucket was first counted in the window, or by month."
+        ),
+        "the vouchers description lacks the bucket order and its tie rule"
+    );
+}
+
+/// The `vouchers` description says why `post_dated` can be absent (#1252). It used to say a real
+/// capture showed Tally omitting the tag, which is true only of one old capture taken before the
+/// tag was in the fetch list, so the tag was never asked for. Tally asserts it on every voucher when
+/// asked (protocol reference 8.2c); a source that does not report it leaves the key out.
+#[test]
+fn the_vouchers_description_does_not_say_a_capture_showed_post_dated_omitted() {
+    let tools = registered_tool_definitions(true, true);
+    let description = tools
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|tool| tool["name"] == "vouchers")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("vouchers is in the catalogue");
+    assert!(
+        !description.contains("a real capture has shown Tally omitting that tag"),
+        "the stale claim about the post_dated tag is back"
+    );
+    assert!(
+        description.contains(
+            "Tally asserts it on every voucher when the fetch list asks for it, and the key is left out only when a source does not report it"
+        ),
+        "the vouchers description lacks the post_dated sentence"
+    );
+}
+
+/// The extension's "Allow voucher posting" setting is a risk disclosure the Terms (9.2) point to:
+/// "you accept the known limits below, and any further known limits described in the extension
+/// settings", and the setting points back to 9.2. So each limit, the approval gate and the two
+/// sentences that tie the setting to the Terms are pinned by a short phrase on its own (#1010),
+/// never the whole text. The setting can be shortened as long as every phrase stays
+/// or its pin changes in the same commit, where a reviewer sees it. A phrase that only means
+/// something with its neighbour ("it", "such change") is pinned together with that neighbour. A
+/// renamed key panics rather than passing silently.
+#[test]
+fn the_posting_setting_keeps_each_known_limit() {
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    let writes = manifest["user_config"]["enable_writes"]["description"]
+        .as_str()
+        .expect("the enable_writes setting has a description");
+    const LIMITS: &[(&str, &str)] = &[
+        ("Off by default", "the setting says posting is off until the person turns it on"),
+        (
+            "Leave it off unless you accept",
+            "the sentence that ties the setting to the Terms: the person accepts the limits by turning it on",
+        ),
+        (
+            "Terms of Use section 9.2",
+            "the sentence that names the Terms section holding the full list of known limits",
+        ),
+        (
+            "each only after you approve it in a separate window",
+            "every post waits for the person's approval",
+        ),
+        (
+            "Tally picks the company by name",
+            "limit 1: Tally aims a post at a company by name",
+        ),
+        (
+            "could still receive the voucher",
+            "limit 1: a company renamed or opened under that name right after the check can still receive the post",
+        ),
+        (
+            "cannot always say where the voucher went",
+            "limit 1: a misdirected post may not be locatable",
+        ),
+        ("cannot prevent it", "limit 1: the misdirection cannot be prevented"),
+        (
+            "renamed and replaced in that same moment",
+            "limit 2: the premise, a ledger renamed and replaced at the moment of the post",
+        ),
+        (
+            "can receive the post instead",
+            "limit 2: a ledger renamed and replaced at that moment can receive the post",
+        ),
+        (
+            "not every such change is seen",
+            "limit 2: not every ledger change is noticed",
+        ),
+        ("There is no undo", "limit 3: no undo"),
+        (
+            "corrected by hand in Tally",
+            "limit 3: a wrong post is corrected by hand in Tally",
+        ),
+        (
+            "covers only ComplyEaze Bridge",
+            "limit 4: the approval window covers only this connector",
+        ),
+        (
+            "another Tally connector",
+            "limit 4: another Tally connector in the same Claude Desktop",
+        ),
+        (
+            "can do so without it",
+            "limit 4: that connector can change entries without the approval",
+        ),
+        (
+            "that writes nothing to Tally",
+            "recording a review in the separate dialog writes nothing to Tally",
+        ),
+        (
+            "work either way",
+            "reading, bank-statement parsing and voucher file preparation do not depend on the setting",
+        ),
+    ];
+    for (phrase, kept) in LIMITS {
+        assert!(
+            writes.contains(phrase),
+            "the posting setting lost {phrase:?}, which says: {kept}"
+        );
+    }
+    // What redaction cannot hide is part of the same disclosure.
+    let redaction = manifest["user_config"]["redaction"]["description"]
+        .as_str()
+        .expect("the redaction setting has a description");
+    assert!(
+        redaction.contains("Neither hides amounts"),
+        "the redaction setting lost its statement that amounts are not hidden"
+    );
+}
+
 /// The sentences an assistant relies on for safety, each pinned on its own so a
 /// shorter description cannot drop one unnoticed (#1010). Only the phrase is
 /// asserted, never a whole description, so the text around it can still be

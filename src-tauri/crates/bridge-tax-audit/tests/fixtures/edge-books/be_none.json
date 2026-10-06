@@ -1,0 +1,32 @@
+{
+ "comment": "books_examined on a book with one ledger and nothing else: no voucher, so no day book; no cash or bank ledger; no Trial Balance; no document loaded. The ledger count is not made singular.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-be_none-000"
+  }
+ ],
+ "tb": [],
+ "vouchers": [],
+ "entity_type": "individual",
+ "tests": [
+  "books_examined"
+ ],
+ "documents_read": []
+}

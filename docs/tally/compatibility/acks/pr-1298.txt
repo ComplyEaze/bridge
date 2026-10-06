@@ -1,0 +1,4 @@
+docs/tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md
+src-tauri/src/tally/mod.rs
+removed-pin: src-tauri/src/tally/serial_queue.rs
+reviewer: lamemustafa

@@ -32,6 +32,7 @@ pub mod bank_reconciliation;
 pub mod binding;
 pub mod book;
 pub mod book_keeping_quality;
+pub mod books_examined;
 pub mod canonical;
 pub mod cash_44ab;
 pub mod cash_book_integrity;
@@ -56,6 +57,7 @@ pub mod party_monthly;
 pub mod read;
 pub mod read_scope;
 pub mod registry;
+pub mod related_parties_cl23;
 pub mod rules;
 pub mod stale_balances_41_1;
 pub mod statutory_dues_43b;
@@ -176,6 +178,9 @@ pub struct Engagement {
     pub loans: LoansConfig,
     /// `[partners]`, bound by [`Engagement::bind`]; empty before binding. See [`PartnersConfig`].
     pub partners: PartnersConfig,
+    /// `related_parties_cl23`-only: `[related_parties]`, bound by [`Engagement::bind`]; empty
+    /// before binding. See [`RelatedPartiesConfig`].
+    pub related_parties: RelatedPartiesConfig,
     /// `creditor_ageing_43bh`-only: the optional `[creditor_ageing_43bh]` table. Filled by
     /// [`Engagement::bind`]; see [`CreditorAgeingConfig`] for what is typed when.
     pub creditor_ageing: CreditorAgeingConfig,
@@ -248,6 +253,19 @@ pub struct PartnersConfig {
     pub partners: BTreeMap<String, toml::Value>,
     /// `[partners].deed` as written; `None` when absent.
     pub deed: Option<toml::Value>,
+}
+
+/// `[related_parties]` from the client config: the related persons the client confirmed, keyed
+/// as the client wrote them.
+///
+/// **Typed lazily**, as [`PartnersConfig`] is: [`Engagement::bind`] binds each
+/// `ledgers_by_nature` list; everything else is kept as written and typed when
+/// `related_parties_cl23` runs ([`related_parties_cl23::related_persons`]).
+#[derive(Debug, Clone, Default)]
+pub struct RelatedPartiesConfig {
+    /// `[related_parties.<key>]` for every person key, as written with its ledger lists bound.
+    /// Empty when the config has no `[related_parties]` table.
+    pub persons: BTreeMap<String, toml::Value>,
 }
 
 /// `[creditor_ageing_43bh]` from the client config, every key optional: the reference's
@@ -952,6 +970,7 @@ not YYYY-MM-DD"
             trade_creditors_source: roles.get("trade_creditors_source").cloned(),
             loans: LoansConfig::default(),
             partners: PartnersConfig::default(),
+            related_parties: RelatedPartiesConfig::default(),
             creditor_ageing: CreditorAgeingConfig::default(),
             statutory_dues: StatutoryDuesConfig::default(),
             base_dir: base_dir.map_or_else(PathBuf::new, Path::to_path_buf),
@@ -1359,7 +1378,8 @@ pub fn trial_balance_on(
 
 /// Run `party_monthly` on a book and return its canonical parity dump, with the module's own
 /// PWM-1/PWM-2 check. Cash and bank are the engagement's cash and bank groups, as the reference's
-/// pack passes them; the period is the engagement's, and the top-parties cut is the module's own.
+/// pack passes them, to `run` and to the check alike; the period is the engagement's, and the
+/// top-parties cut is the module's own.
 pub fn party_monthly_on(
     engagement: &Engagement,
     book: &book::Book,
@@ -1376,7 +1396,7 @@ pub fn party_monthly_on(
         &bank,
         party_monthly::PARTY_TOP_N,
     )?;
-    let module_check = party_monthly::check_invariants(book, &bound.period, &result)?;
+    let module_check = party_monthly::check_invariants(book, &bound.period, &result, &cash, &bank)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
@@ -1419,20 +1439,38 @@ pub fn cash_book_integrity_on(
 /// parity dump. Refuses with `AuditError::Config` without a statement (the reference runs this
 /// test only when the engagement has one) or without `[roles].bank_reconciliation_ledger` (the
 /// reference's `require` raises). The statement's own rows feed BANK-1, as the reference sets
-/// `eng.bank` to them.
+/// `eng.bank` to them. `statement_refused` is the reader's reason when the engagement's statement
+/// was supplied but refused (then `statement` is `None`): the result is
+/// [`bank_reconciliation::refused`], as the reference's pack gives it, and BANK-1 has no rows.
 pub fn bank_reconciliation_on(
     engagement: &Engagement,
     book: &book::Book,
     rules: &Rules,
     statement: Option<&documents::BankStatementDoc>,
+    statement_refused: Option<&str>,
 ) -> Result<serde_json::Value> {
-    let statement = statement.ok_or_else(|| {
-        AuditError::Config(format!(
-            "{}: no bank statement was supplied (the reference runs this test only when the \
-             engagement has one)",
-            bank_reconciliation::TEST_ID
-        ))
-    })?;
+    let statement = match (statement, statement_refused) {
+        (Some(statement), None) => statement,
+        (None, Some(reason)) => {
+            engagement.bind(book)?;
+            let result = bank_reconciliation::refused(rules, reason)?;
+            let module_check = bank_reconciliation::check_invariants(&[], &result)?;
+            return canonical::canonical_test_result(book, &result, Some(module_check));
+        }
+        (Some(_), Some(_)) => {
+            return Err(AuditError::Config(format!(
+                "{}: a bank statement was supplied and also refused",
+                bank_reconciliation::TEST_ID
+            )))
+        }
+        (None, None) => {
+            return Err(AuditError::Config(format!(
+                "{}: no bank statement was supplied (the reference runs this test only when the \
+                 engagement has one)",
+                bank_reconciliation::TEST_ID
+            )))
+        }
+    };
     let (bound, _report) = engagement.bind(book)?;
     let ledger = bound.bank_reconciliation_ledger.as_deref().ok_or_else(|| {
         AuditError::Config(
@@ -1518,6 +1556,17 @@ pub fn entity_269st_gap_on(
     let result = entity_269st_gap::run(book, rules, &cash, &bank, &index, &round_off_ledgers)?;
     let module_check = entity_269st_gap::check_invariants(&result);
     canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `books_examined` on a book, with the documents the caller loaded, and return its canonical
+/// parity dump. The reference module has no `check_invariants`.
+pub fn books_examined_on(
+    book: &book::Book,
+    rules: &Rules,
+    documents_read: &BTreeSet<books_examined::DocumentRead>,
+) -> Result<serde_json::Value> {
+    let result = books_examined::run(book, rules, documents_read)?;
+    canonical::canonical_test_result(book, &result, None)
 }
 
 /// Run `read_scope` on a book and return its canonical parity dump. The reference module has no
@@ -1833,6 +1882,19 @@ pub fn partners_40b_194t_on(
         &tds_payable_ledgers(&bound)?,
     )?;
     canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `related_parties_cl23` on an already-built book: its canonical parity dump, with its
+/// module check (SUM-1, XCL-1).
+pub fn related_parties_cl23_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let result = related_parties_cl23::run(book, rules, &bound.related_parties)?;
+    let module_check = related_parties_cl23::check_invariants(book, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
 /// Read, verify, build the book, run `tds_payees` and return its canonical parity dump.

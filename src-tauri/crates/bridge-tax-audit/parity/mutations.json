@@ -3132,7 +3132,7 @@
   "by": "author (Lane E2)",
   "what": "TDS on a voucher that also posts to another loan is counted",
   "file": "src/loans_interest.rs",
-  "from": "                        .any(|l| other_loans.contains(l.ledger.as_str()))",
+  "from": "                        .any(|l| other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
   "to": "                        .any(|l| l.ledger.is_empty())"
  },
  {
@@ -3442,10 +3442,10 @@
  {
   "id": "LR-45",
   "by": "author",
-  "what": "the threshold is open whenever the interest crosses it with the listed interest",
+  "what": "the threshold is open whenever the most interest crosses it",
   "file": "src/loans_interest.rs",
-  "from": "        let threshold_open = !listed_194a.is_empty() && over_without != over_with;",
-  "to": "        let threshold_open = !listed_194a.is_empty() && over_with;"
+  "from": "(interest_least > threshold_194a) != (interest_most > threshold_194a)",
+  "to": "interest_most > threshold_194a"
  },
  {
   "id": "LR-46",
@@ -3498,10 +3498,10 @@
  {
   "id": "LR-52",
   "by": "author",
-  "what": "the open threshold's direction is read from the interest without the listed interest",
+  "what": "listed lines all reversals get the mixed-lines wording",
   "file": "src/loans_interest.rs",
-  "from": "                                if over_with {",
-  "to": "                                if over_without {"
+  "from": "} else if interest_most == interest_total {",
+  "to": "} else if false {"
  },
  {
   "id": "LR-53",
@@ -4412,8 +4412,8 @@
   "by": "reviewer-opus",
   "what": "a statement row dated outside its period is read",
   "file": "src/documents.rs",
-  "from": "if row.txn_date < start || row.txn_date > end {",
-  "to": "if false && (row.txn_date < start || row.txn_date > end) {"
+  "from": ".position(|r| !(start <= r.txn_date && r.txn_date <= end))",
+  "to": ".position(|r| false && !(start <= r.txn_date && r.txn_date <= end))"
  },
  {
   "id": "E2A-22",
@@ -4484,24 +4484,24 @@
   "by": "reviewer-opus",
   "what": "the charge pass runs over every unmatched statement row, splits included",
   "file": "src/bank_reconciliation.rs",
-  "from": "    for si in statement_order(stmt, remaining_stmt.clone()) {\n        let narration",
-  "to": "    for si in statement_order(stmt, unmatched_stmt.iter().copied()) {\n        let narration"
+  "from": "        for si in statement_order(stmt, remaining_stmt.clone()) {\n            let narration",
+  "to": "        for si in statement_order(stmt, unmatched_stmt.iter().copied()) {\n            let narration"
  },
  {
   "id": "E2A-31",
   "by": "reviewer-opus",
   "what": "the forward split pass runs in books index order",
   "file": "src/bank_reconciliation.rs",
-  "from": "    for bi in books_order(&book_rows, remaining_books.clone()) {\n        let b = &book_rows[bi];\n        let mut pool",
-  "to": "    for bi in remaining_books.clone() {\n        let b = &book_rows[bi];\n        let mut pool"
+  "from": "        books_order(&book_rows, remaining_books.clone())\n    } else {",
+  "to": "        remaining_books.iter().copied().collect()\n    } else {"
  },
  {
   "id": "E2A-32",
   "by": "reviewer-opus",
   "what": "the reverse split pass runs in statement index order",
   "file": "src/bank_reconciliation.rs",
-  "from": "    for si in statement_order(stmt, remaining_stmt.clone()) {\n        let s = &stmt[si];",
-  "to": "    for si in remaining_stmt.clone() {\n        let s = &stmt[si];"
+  "from": "        statement_order(stmt, remaining_stmt.clone())\n    } else {",
+  "to": "        remaining_stmt.iter().copied().collect()\n    } else {"
  },
  {
   "id": "E2A-33",
@@ -4516,8 +4516,8 @@
   "by": "reviewer-opus",
   "what": "a row dated before the period is read",
   "file": "src/documents.rs",
-  "from": "if row.txn_date < start || row.txn_date > end {",
-  "to": "if row.txn_date > end {"
+  "from": ".position(|r| !(start <= r.txn_date && r.txn_date <= end))",
+  "to": ".position(|r| r.txn_date > end)"
  },
  {
   "id": "E2A-35",
@@ -4622,6 +4622,270 @@
   "file": "src/bank_reconciliation.rs",
   "from": "            split_groups_rev.push(si);\n            remaining_stmt.remove(&si);",
   "to": "            split_groups_rev.push(si);"
+ },
+ {
+  "id": "E2A-48",
+  "by": "author",
+  "what": "the statement's sum against its declared closing is not checked",
+  "file": "src/bank_reconciliation.rs",
+  "from": "let mut tie_diffs = vec![arith_diff];",
+  "to": "let mut tie_diffs = vec![0];"
+ },
+ {
+  "id": "E2A-49",
+  "by": "author",
+  "what": "the first row's balance is not checked against the declared opening",
+  "file": "src/bank_reconciliation.rs",
+  "from": "        stmt_facts.push((\"statement_first_row_tie_diff_paise\".to_string(), id));\n        tie_diffs.push(d);",
+  "to": "        stmt_facts.push((\"statement_first_row_tie_diff_paise\".to_string(), id));"
+ },
+ {
+  "id": "E2A-50",
+  "by": "author",
+  "what": "the last row's balance is not checked against the declared closing",
+  "file": "src/bank_reconciliation.rs",
+  "from": "        stmt_facts.push((\"statement_last_row_tie_diff_paise\".to_string(), id));\n        tie_diffs.push(d);",
+  "to": "        stmt_facts.push((\"statement_last_row_tie_diff_paise\".to_string(), id));"
+ },
+ {
+  "id": "E2A-51",
+  "by": "author",
+  "what": "a break in the running balance does not mark the statement",
+  "file": "src/bank_reconciliation.rs",
+  "from": "let mut adds_up = breaks == 0;",
+  "to": "let mut adds_up = true;"
+ },
+ {
+  "id": "E2A-52",
+  "by": "author",
+  "what": "a statement check exactly Re 1 off marks the statement",
+  "file": "src/bank_reconciliation.rs",
+  "from": "adds_up &= d.checked_abs().ok_or_else(|| overflow(TEST_ID))? <= TOL_PAISE;",
+  "to": "adds_up &= d.checked_abs().ok_or_else(|| overflow(TEST_ID))? < TOL_PAISE;"
+ },
+ {
+  "id": "E2A-53",
+  "by": "author",
+  "what": "a running-balance step exactly Re 1 off is counted as a break",
+  "file": "src/bank_reconciliation.rs",
+  "from": "if distance(add(before, signed(pair[1])?)?, after)? > TOL_PAISE {",
+  "to": "if distance(add(before, signed(pair[1])?)?, after)? >= TOL_PAISE {"
+ },
+ {
+  "id": "E2A-54",
+  "by": "author",
+  "what": "the first row's tie leaves out that row's own movement",
+  "file": "src/bank_reconciliation.rs",
+  "from": "add(statement.opening_balance_paise, signed(first)?)?,",
+  "to": "add(statement.opening_balance_paise, 0)?,"
+ },
+ {
+  "id": "E2A-55",
+  "by": "author",
+  "what": "the arithmetic reads the closing as declared plus the rows",
+  "file": "src/bank_reconciliation.rs",
+  "from": "        add(statement.opening_balance_paise, stmt_net)?,\n        statement.closing_balance_paise,",
+  "to": "        statement.opening_balance_paise,\n        statement.closing_balance_paise,"
+ },
+ {
+  "id": "E2A-56",
+  "by": "author",
+  "what": "part-settlements are searched on a statement that does not add up",
+  "file": "src/bank_reconciliation.rs",
+  "from": "let searched_books = if adds_up {",
+  "to": "let searched_books = if true {"
+ },
+ {
+  "id": "E2A-57",
+  "by": "author",
+  "what": "statement-side part-settlements are searched on a statement that does not add up",
+  "file": "src/bank_reconciliation.rs",
+  "from": "let searched_stmt = if adds_up {",
+  "to": "let searched_stmt = if true {"
+ },
+ {
+  "id": "E2A-58",
+  "by": "author",
+  "what": "unmatched rows are explained on a statement that does not add up",
+  "file": "src/bank_reconciliation.rs",
+  "from": "    if !adds_up {\n        // Nothing unmatched is explained",
+  "to": "    if false {\n        // Nothing unmatched is explained"
+ },
+ {
+  "id": "E2A-59",
+  "by": "author",
+  "what": "the statement_does_not_add_up finding is not raised",
+  "file": "src/bank_reconciliation.rs",
+  "from": "    if !adds_up {\n        let mut evidence",
+  "to": "    if false {\n        let mut evidence"
+ },
+ {
+  "id": "E2A-60",
+  "by": "author",
+  "what": "only the books rows are cited on the statement_does_not_add_up finding",
+  "file": "src/bank_reconciliation.rs",
+  "from": "        for &i in &stmt_by_reason[REASON_NOT_COMPUTED] {",
+  "to": "        for &i in &Vec::<usize>::new() {"
+ },
+ {
+  "id": "E2A-61",
+  "by": "author",
+  "what": "the not-computed reason takes the earlier, shorter name",
+  "file": "src/bank_reconciliation.rs",
+  "from": "const REASON_NOT_COMPUTED: &str = \"not_computed_statement_does_not_add_up\";",
+  "to": "const REASON_NOT_COMPUTED: &str = \"not_computed\";"
+ },
+ {
+  "id": "E2A-62",
+  "by": "author",
+  "what": "the finding's limit vouches for every matched pair (the wording the reference withdrew)",
+  "file": "src/bank_reconciliation.rs",
+  "from": "Matched entries \\\n                 are paired by amount and date only: with a row dropped, a same-amount entry may \\\n                 be paired with the wrong row.",
+  "to": "Matched entries \\\n                 stand."
+ },
+ {
+  "id": "E2A-63",
+  "by": "author",
+  "what": "the refused result's limit says the statement could not be read as a whole (the wording the reference withdrew)",
+  "file": "src/bank_reconciliation.rs",
+  "from": "computed from a statement refused when it was read (the reason is shown).",
+  "to": "computed from a statement that could not be read as a whole."
+ },
+ {
+  "id": "E2A-64",
+  "by": "author",
+  "what": "the refused result names no reason figure on its finding",
+  "file": "src/bank_reconciliation.rs",
+  "from": "        facts: vec![(\"reason\".to_string(), f)],",
+  "to": "        facts: vec![],"
+ },
+ {
+  "id": "E2A-65",
+  "by": "author",
+  "what": "a date that steps back is read whatever the running balance",
+  "file": "src/documents.rs",
+  "from": "    check_order(&rows)?;\n",
+  "to": "\n"
+ },
+ {
+  "id": "E2A-66",
+  "by": "author",
+  "what": "a date on the same day as the row above counts as a step back",
+  "file": "src/documents.rs",
+  "from": "let Some(back) = (1..rows.len()).find(|&i| rows[i].txn_date < rows[i - 1].txn_date) else {",
+  "to": "let Some(back) = (1..rows.len()).find(|&i| rows[i].txn_date <= rows[i - 1].txn_date) else {"
+ },
+ {
+  "id": "E2A-67",
+  "by": "author",
+  "what": "a row with no balance is read as a zero balance by the order check",
+  "file": "src/documents.rs",
+  "from": "            None => return Err(refused(None)),",
+  "to": "            None => balances.push(0),"
+ },
+ {
+  "id": "E2A-68",
+  "by": "author",
+  "what": "the order chain refuses a step exactly Re 1 off",
+  "file": "src/documents.rs",
+  "from": "if (balances[i - 1] + moved - balances[i]).abs() > BALANCE_TOL_PAISE {",
+  "to": "if (balances[i - 1] + moved - balances[i]).abs() >= BALANCE_TOL_PAISE {"
+ },
+ {
+  "id": "E2A-69",
+  "by": "author",
+  "what": "the order reason names the back-step, not where the chain first breaks",
+  "file": "src/documents.rs",
+  "from": "            first_break: first_break.cloned(),",
+  "to": "            first_break: first_break.map(|_| rows[back].txn_date.clone()),"
+ },
+ {
+  "id": "E2A-70",
+  "by": "author",
+  "what": "the period end is exclusive",
+  "file": "src/documents.rs",
+  "from": ".position(|r| !(start <= r.txn_date && r.txn_date <= end))",
+  "to": ".position(|r| !(start <= r.txn_date && r.txn_date < end))"
+ },
+ {
+  "id": "E2A-71",
+  "by": "author",
+  "what": "the period start is exclusive",
+  "file": "src/documents.rs",
+  "from": ".position(|r| !(start <= r.txn_date && r.txn_date <= end))",
+  "to": ".position(|r| !(start < r.txn_date && r.txn_date <= end))"
+ },
+ {
+  "id": "E2A-72",
+  "by": "author",
+  "what": "the order is checked before the period",
+  "file": "src/documents.rs",
+  "from": "    // The reference reader's refusals, in its order.\n    if let Some(i) = rows",
+  "to": "    // The reference reader's refusals, in its order.\n    check_order(&rows)?;\n    if let Some(i) = rows"
+ },
+ {
+  "id": "E2A-73",
+  "by": "author",
+  "what": "the balances are checked before the order",
+  "file": "src/documents.rs",
+  "from": "    check_order(&rows)?;\n    let opening_balance_paise =\n        declared_balance(v, \"opening_balance_paise\", BalanceField::Opening)?;\n    let closing_balance_paise =\n        declared_balance(v, \"closing_balance_paise\", BalanceField::Closing)?;",
+  "to": "    let opening_balance_paise =\n        declared_balance(v, \"opening_balance_paise\", BalanceField::Opening)?;\n    let closing_balance_paise =\n        declared_balance(v, \"closing_balance_paise\", BalanceField::Closing)?;\n    check_order(&rows)?;"
+ },
+ {
+  "id": "E2A-74",
+  "by": "author",
+  "what": "the closing balance is checked before the opening",
+  "file": "src/documents.rs",
+  "from": "    let opening_balance_paise =\n        declared_balance(v, \"opening_balance_paise\", BalanceField::Opening)?;\n    let closing_balance_paise =\n        declared_balance(v, \"closing_balance_paise\", BalanceField::Closing)?;",
+  "to": "    let closing_balance_paise =\n        declared_balance(v, \"closing_balance_paise\", BalanceField::Closing)?;\n    let opening_balance_paise =\n        declared_balance(v, \"opening_balance_paise\", BalanceField::Opening)?;"
+ },
+ {
+  "id": "E2A-75",
+  "by": "author",
+  "what": "a null declared balance is malformed, not missing",
+  "file": "src/documents.rs",
+  "from": "        None | Some(Value::Null) => Err(AuditError::StatementRefused(",
+  "to": "        None => Err(AuditError::StatementRefused("
+ },
+ {
+  "id": "E2A-76",
+  "by": "author",
+  "what": "a date's day is written without its leading zero",
+  "file": "src/documents.rs",
+  "from": "format!(\"{}-{}-{}\", &s[6..8], MONTHS[month - 1], &s[0..4])",
+  "to": "format!(\"{}-{}-{}\", s[6..8].trim_start_matches('0'), MONTHS[month - 1], &s[0..4])"
+ },
+ {
+  "id": "E2A-77",
+  "by": "author",
+  "what": "a date's month is named one month late",
+  "file": "src/documents.rs",
+  "from": "format!(\"{}-{}-{}\", &s[6..8], MONTHS[month - 1], &s[0..4])",
+  "to": "format!(\"{}-{}-{}\", &s[6..8], MONTHS[month % 12], &s[0..4])"
+ },
+ {
+  "id": "E2A-78",
+  "by": "author",
+  "what": "the order reason with no balance says the rows carry none (one row is enough)",
+  "file": "src/documents.rs",
+  "from": "None => \"a row carries no running balance to show that order is the bank's\"",
+  "to": "None => \"the rows carry no running balance to show that order is the bank's\""
+ },
+ {
+  "id": "E2A-79",
+  "by": "author",
+  "what": "the registry's refused result drops the reader's reason",
+  "file": "src/lib.rs",
+  "from": "            let result = bank_reconciliation::refused(rules, reason)?;",
+  "to": "            let result = bank_reconciliation::refused(rules, \"\")?;"
+ },
+ {
+  "id": "E2A-80",
+  "by": "author",
+  "what": "the registry does not pass the refused-statement reason to bank_reconciliation",
+  "file": "src/registry.rs",
+  "from": "c.bank_statement_refused.as_deref(),\n            )\n        },\n    },\n    PortedTest {\n        id: \"book_keeping_quality\",",
+  "to": "None,\n            )\n        },\n    },\n    PortedTest {\n        id: \"book_keeping_quality\","
  },
  {
   "id": "E2B2-01",
@@ -5340,8 +5604,8 @@
   "by": "author",
   "what": "several parties go to the first party",
   "file": "src/party_monthly.rs",
-  "from": "let key = if named.len() == 1 {",
-  "to": "let key = if !named.is_empty() {"
+  "from": "} else if named.len() == 1 {",
+  "to": "} else if !named.is_empty() {"
  },
  {
   "id": "E4-06",
@@ -5444,8 +5708,8 @@
   "by": "author",
   "what": "no set of excluded vouchers ever matches",
   "file": "src/party_monthly.rs",
-  "from": "if abs(s)? <= TIE_TOLERANCE_PAISE {",
-  "to": "if abs(s)? < 0 {"
+  "from": "if s == 0 {",
+  "to": "if false && s == 0 {"
  },
  {
   "id": "E4-19",
@@ -5514,10 +5778,10 @@
  {
   "id": "E4-28",
   "by": "reviewer-opus",
-  "what": "excluded vouchers matching to exactly Re 1 do not match",
+  "what": "excluded vouchers a paisa off the difference match (the match's boundary is now exact)",
   "file": "src/party_monthly.rs",
-  "from": "if abs(s)? <= TIE_TOLERANCE_PAISE {",
-  "to": "if abs(s)? < TIE_TOLERANCE_PAISE {"
+  "from": "if s == 0 {",
+  "to": "if abs(s)? <= 1 {"
  },
  {
   "id": "E4-29",
@@ -5644,16 +5908,16 @@
   "by": "author",
   "what": "a voucher with an uncounted party ledger goes to cash or bank, or no party",
   "file": "src/party_monthly.rs",
-  "from": "            } else if !on_voucher.is_empty() {",
-  "to": "            } else if false && !on_voucher.is_empty() {"
+  "from": "    } else if !on_voucher.is_empty() && named.is_empty() {",
+  "to": "    } else if false && !on_voucher.is_empty() && named.is_empty() {"
  },
  {
   "id": "E4-45",
   "by": "author",
   "what": "amounts not attributed raise no finding",
   "file": "src/party_monthly.rs",
-  "from": "        if let Some(na) = rows.get(&Key::NotAttributed) {",
-  "to": "        if let Some(na) = rows.get(&Key::NotAttributed).filter(|_| false) {"
+  "from": "            let Some(idxs) = not_attributed.get(&reason) else {",
+  "to": "            let Some(idxs) = not_attributed.get(&reason).filter(|_| false) else {"
  },
  {
   "id": "E4-46",
@@ -5676,8 +5940,8 @@
   "by": "author",
   "what": "several statuses tried and none matching are listed without 'nor'",
   "file": "src/party_monthly.rs",
-  "from": "several.join(\", nor the \")",
-  "to": "several.join(\", \")"
+  "from": "head.join(\", the \")",
+  "to": "head.join(\", \")"
  },
  {
   "id": "E4-49",
@@ -5716,8 +5980,8 @@
   "by": "author",
   "what": "PWM-2 folds the not-attributed vouchers into the rows with no party",
   "file": "src/party_monthly.rs",
-  "from": "                (0, false) => Kind::NotAttributed,",
-  "to": "                (0, false) => Kind::Unnamed,"
+  "from": "(Some(_), _) => Kind::NotAttributed,",
+  "to": "(Some(_), _) => Kind::NoParty,"
  },
  {
   "id": "E4-54",
@@ -5734,6 +5998,414 @@
   "file": "src/party_monthly.rs",
   "from": "        out.extend(compare(\n            &format!(\"the {block} not-attributed row\"),",
   "to": "        drop(compare(\n            &format!(\"the {block} not-attributed row\"),"
+ },
+ {
+  "id": "E4-56",
+  "by": "author",
+  "what": "the money reason is never given",
+  "file": "src/party_monthly.rs",
+  "from": "} else if expense && !named.is_empty() && money_on_side {",
+  "to": "} else if false && expense && !named.is_empty() && money_on_side {"
+ },
+ {
+  "id": "E4-57",
+  "by": "author",
+  "what": "the money reason reads a cash or bank line on the other side from the lines",
+  "file": "src/party_monthly.rs",
+  "from": "&& (l.amount_paise > 0) == (block_net > 0)",
+  "to": "&& (l.amount_paise > 0) != (block_net > 0)"
+ },
+ {
+  "id": "E4-58",
+  "by": "author",
+  "what": "the money reason reads bank lines only",
+  "file": "src/party_monthly.rs",
+  "from": "let money: BTreeSet<&str> = cash.iter().chain(bank).map(String::as_str).collect();",
+  "to": "let money: BTreeSet<&str> = bank.iter().chain(bank).map(String::as_str).collect();"
+ },
+ {
+  "id": "E4-59",
+  "by": "author",
+  "what": "the money reason is skipped for several parties",
+  "file": "src/party_monthly.rs",
+  "from": "} else if expense && !named.is_empty() && money_on_side {",
+  "to": "} else if expense && named.len() == 1 && money_on_side {"
+ },
+ {
+  "id": "E4-60",
+  "by": "author",
+  "what": "the money reason is given in every block, not the expense blocks only",
+  "file": "src/party_monthly.rs",
+  "from": "let (named, reason) = attribute(v, &on_voucher, &scope, &money, expense)?;",
+  "to": "let (named, reason) = attribute(v, &on_voucher, &scope, &money, true)?;"
+ },
+ {
+  "id": "E4-61",
+  "by": "author",
+  "what": "the money reason nets the cash and bank lines instead of reading each one",
+  "file": "src/party_monthly.rs",
+  "from": "    let money_on_side = v.lines.iter().any(|l| {\n        money.contains(l.ledger.as_str())\n            && l.amount_paise != 0\n            && (l.amount_paise > 0) == (block_net > 0)\n    });",
+  "to": "    let money_on_side = {\n        let m = net_on(&|n| money.contains(n))?;\n        m != 0 && (m > 0) == (block_net > 0)\n    };"
+ },
+ {
+  "id": "E4-62",
+  "by": "author",
+  "what": "a nil cash or bank line counts as on the lines' side",
+  "file": "src/party_monthly.rs",
+  "from": "            && l.amount_paise != 0\n",
+  "to": ""
+ },
+ {
+  "id": "E4-63",
+  "by": "author",
+  "what": "block lines netting to nil are given the other-side reason",
+  "file": "src/party_monthly.rs",
+  "from": "Some(Reason::Nil)",
+  "to": "Some(Reason::OtherSide)"
+ },
+ {
+  "id": "E4-64",
+  "by": "author",
+  "what": "every not-attributed voucher is cited under every reason",
+  "file": "src/party_monthly.rs",
+  "from": "not_attributed.entry(reason).or_default().push(idx);",
+  "to": "let _ = reason;\n                for each in [Reason::Nil, Reason::OtherSide, Reason::Money] {\n                    not_attributed.entry(each).or_default().push(idx);\n                }"
+ },
+ {
+  "id": "E4-65",
+  "by": "author",
+  "what": "a reason's count is the whole row's voucher count",
+  "file": "src/party_monthly.rs",
+  "from": "count(TEST_ID, idxs.len())?,",
+  "to": "count(TEST_ID, rows[&Key::NotAttributed].vouchers.len())?,"
+ },
+ {
+  "id": "E4-66",
+  "by": "author",
+  "what": "the other-side finding gives the expense example in every block",
+  "file": "src/party_monthly.rs",
+  "from": "let other_eg = if expense {",
+  "to": "let other_eg = if true {"
+ },
+ {
+  "id": "E4-67",
+  "by": "author",
+  "what": "the row keeps its old label",
+  "file": "src/party_monthly.rs",
+  "from": "const NOT_ATTRIBUTED_LABEL: &str = \"Not attributed to a party\";",
+  "to": "const NOT_ATTRIBUTED_LABEL: &str = \"Not attributed: no party on the other side\";"
+ },
+ {
+  "id": "E4-68",
+  "by": "author",
+  "what": "the money finding drops the discount example",
+  "file": "src/party_monthly.rs",
+  "from": "\", for example bank charges deducted from a customer's receipt, or a discount allowed on it\";",
+  "to": "\", for example bank charges deducted from a customer's receipt\";"
+ },
+ {
+  "id": "E4-69",
+  "by": "author",
+  "what": "the money finding drops its round-off limit",
+  "file": "src/party_monthly.rs",
+  "from": "Total row. A round-off \\\non a receipt is listed here too. This applies",
+  "to": "Total row. This applies"
+ },
+ {
+  "id": "E4-70",
+  "by": "author",
+  "what": "the money title says 'the party' only",
+  "file": "src/party_monthly.rs",
+  "from": "attributed to the party (or parties) on the other side",
+  "to": "attributed to the party on the other side"
+ },
+ {
+  "id": "E4-71",
+  "by": "author",
+  "what": "the money limit says one party ledger only",
+  "file": "src/party_monthly.rs",
+  "from": "voucher) a party ledger, or more than one, is on the other side",
+  "to": "voucher) a party ledger is on the other side"
+ },
+ {
+  "id": "E4-72",
+  "by": "author",
+  "what": "the nil finding says the lines move no amount, not no net amount",
+  "file": "src/party_monthly.rs",
+  "from": "so they move no net amount on",
+  "to": "so they move no amount on"
+ },
+ {
+  "id": "E4-73",
+  "by": "author",
+  "what": "the other-side finding says 'the block's total', not its Total row",
+  "file": "src/party_monthly.rs",
+  "from": "lines are not that party's{other_eg}. They are shown in the row '{row_word}', not under any party, \\\nand are in the block's Total row.\"",
+  "to": "lines are not that party's{other_eg}. They are shown in the row '{row_word}', not under any party, \\\nand are in the block's total.\""
+ },
+ {
+  "id": "E4-74",
+  "by": "author",
+  "what": "excluded vouchers within a rupee of the difference match again",
+  "file": "src/party_monthly.rs",
+  "from": "if s == 0 {",
+  "to": "if abs(s)? <= TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "E4-75",
+  "by": "author",
+  "what": "the one-match limit says 'matches ... to within a rupee'",
+  "file": "src/party_monthly.rs",
+  "from": "on these ledgers accounts for the \\\ndifference exactly, so",
+  "to": "on these ledgers matches the \\\ndifference to within a rupee, so"
+ },
+ {
+  "id": "E4-76",
+  "by": "author",
+  "what": "the others-tried text says 'matches it'",
+  "file": "src/party_monthly.rs",
+  "from": "accounts for it; smaller groups of them were not tried.",
+  "to": "matches it; smaller groups of them were not tried."
+ },
+ {
+  "id": "E4-77",
+  "by": "author",
+  "what": "the one-status no-match text drops 'exactly'",
+  "file": "src/party_monthly.rs",
+  "from": "do not account for it \\\nexactly; smaller",
+  "to": "do not account for it; smaller"
+ },
+ {
+  "id": "E4-78",
+  "by": "author",
+  "what": "the several-matches limit drops its sign clause",
+  "file": "src/party_monthly.rs",
+  "from": "accounts for the difference exactly \\\n(amounts are {sense} on these ledgers): {}.",
+  "to": "accounts for the difference exactly: {}."
+ },
+ {
+  "id": "E4-79",
+  "by": "author",
+  "what": "the several-matches limit states one sign for every block",
+  "file": "src/party_monthly.rs",
+  "from": "(amounts are {sense} on these ledgers)",
+  "to": "(amounts are debits less credits on these ledgers)"
+ },
+ {
+  "id": "E4-80",
+  "by": "author",
+  "what": "the several-matches limit says 'to within a rupee'",
+  "file": "src/party_monthly.rs",
+  "from": "\"Each of these sets, taken as a whole, accounts for the difference exactly \\",
+  "to": "\"Each of these sets, taken as a whole, matches the difference to within a rupee \\"
+ },
+ {
+  "id": "E4-81",
+  "by": "author",
+  "what": "the several-matches figure definition says 'match the difference'",
+  "file": "src/party_monthly.rs",
+  "from": "one of several sets that each account for the difference exactly.",
+  "to": "one of several sets that each match the difference."
+ },
+ {
+  "id": "E4-82",
+  "by": "author",
+  "what": "the no-match list drops its last 'the'",
+  "file": "src/party_monthly.rs",
+  "from": "the {} and the {last} \\",
+  "to": "the {} and {last} \\"
+ },
+ {
+  "id": "E4-83",
+  "by": "author",
+  "what": "the no-match list is the old 'Neither ... nor' text",
+  "file": "src/party_monthly.rs",
+  "from": "\"None of the sets tried accounts for it exactly: the {} and the {last} \\",
+  "to": "\"Neither the {} nor the {last} \\"
+ },
+ {
+  "id": "E4-84",
+  "by": "author",
+  "what": "PWM-2 gives block lines netting to nil the other-side reason",
+  "file": "src/party_monthly.rs",
+  "from": "Some(\"nil\")",
+  "to": "Some(\"other_side\")"
+ },
+ {
+  "id": "E4-85",
+  "by": "author",
+  "what": "PWM-2 takes no cash or bank ledger",
+  "file": "src/party_monthly.rs",
+  "from": "let money: BTreeSet<&str> = cash.union(bank).map(String::as_str).collect();",
+  "to": "let money: BTreeSet<&str> = BTreeSet::new();"
+ },
+ {
+  "id": "E4-86",
+  "by": "author",
+  "what": "PWM-2 reads the bank ledgers as the cash ones too",
+  "file": "src/party_monthly.rs",
+  "from": "let money: BTreeSet<&str> = cash.union(bank).map(String::as_str).collect();",
+  "to": "let money: BTreeSet<&str> = bank.union(bank).map(String::as_str).collect();"
+ },
+ {
+  "id": "E4-87",
+  "by": "author",
+  "what": "PWM-2 gives the money reason in every block",
+  "file": "src/party_monthly.rs",
+  "from": "} else if cash_side && matches!(block, \"direct_expenses\" | \"indirect_expenses\") {",
+  "to": "} else if cash_side {"
+ },
+ {
+  "id": "E4-88",
+  "by": "author",
+  "what": "PWM-2 nets the cash and bank lines instead of reading each one",
+  "file": "src/party_monthly.rs",
+  "from": "                .filter(|l| money.contains(l.ledger.as_str()))\n                .any(|l| i128::from(l.amount_paise.signum()) * raw.signum() > 0);",
+  "to": "                .filter(|l| money.contains(l.ledger.as_str()))\n                .map(|l| i128::from(l.amount_paise))\n                .sum::<i128>()\n                .signum()\n                * raw.signum()\n                > 0;"
+ },
+ {
+  "id": "E4-89",
+  "by": "author",
+  "what": "PWM-2 does not compare a reason's count",
+  "file": "src/party_monthly.rs",
+  "from": "if published != n {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-90",
+  "by": "author",
+  "what": "PWM-2 does not report a reason with no finding",
+  "file": "src/party_monthly.rs",
+  "from": "            let [f] = found.as_slice() else {\n                out.push(format!(",
+  "to": "            let [f] = found.as_slice() else {\n                drop(format!("
+ },
+ {
+  "id": "E4-91",
+  "by": "author",
+  "what": "PWM-2 does not report a finding for a reason with no voucher",
+  "file": "src/party_monthly.rs",
+  "from": "if !found.is_empty() {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-92",
+  "by": "author",
+  "what": "PWM-2 does not compare which vouchers a finding cites",
+  "file": "src/party_monthly.rs",
+  "from": "if cited != expected || cited.len() != f.evidence.len() {",
+  "to": "if cited.len() != f.evidence.len() {"
+ },
+ {
+  "id": "E4-93",
+  "by": "author",
+  "what": "PWM-2 ignores a cited item that is not a voucher",
+  "file": "src/party_monthly.rs",
+  "from": "if cited != expected || cited.len() != f.evidence.len() {",
+  "to": "if cited != expected {"
+ },
+ {
+  "id": "E4-94",
+  "by": "author",
+  "what": "PWM-2 compares citations as a set",
+  "file": "src/party_monthly.rs",
+  "from": "if cited != expected || cited.len() != f.evidence.len() {",
+  "to": "if cited.iter().collect::<BTreeSet<_>>() != expected.iter().collect::<BTreeSet<_>>()\n                || cited.len() != f.evidence.len()\n            {"
+ },
+ {
+  "id": "E4-95",
+  "by": "author",
+  "what": "PWM-2 compares citations by GUID only",
+  "file": "src/party_monthly.rs",
+  "from": "if cited != expected || cited.len() != f.evidence.len() {",
+  "to": "if cited.iter().map(|c| &c.0).collect::<Vec<_>>() != expected.iter().map(|c| &c.0).collect::<Vec<_>>()\n                || cited.len() != f.evidence.len()\n            {"
+ },
+ {
+  "id": "E4-96",
+  "by": "author",
+  "what": "PWM-2 does not compare a finding's facts",
+  "file": "src/party_monthly.rs",
+  "from": "if f.facts != [(\"vouchers\".to_string(), fid.clone())] {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-97",
+  "by": "author",
+  "what": "PWM-2 ignores a not-attributed finding for a block the book does not carry",
+  "file": "src/party_monthly.rs",
+  "from": "if !stray.is_empty() {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-98",
+  "by": "author",
+  "what": "PWM-2 does not compare the cash-or-bank row",
+  "file": "src/party_monthly.rs",
+  "from": "        out.extend(compare(\n            &format!(\"the {block} cash-or-bank row\"),",
+  "to": "        drop(compare(\n            &format!(\"the {block} cash-or-bank row\"),"
+ },
+ {
+  "id": "E4-99",
+  "by": "author",
+  "what": "PWM-2 does not compare the no-party row",
+  "file": "src/party_monthly.rs",
+  "from": "        out.extend(compare(\n            &format!(\"the {block} no-party row\"),",
+  "to": "        drop(compare(\n            &format!(\"the {block} no-party row\"),"
+ },
+ {
+  "id": "E4-100",
+  "by": "author",
+  "what": "the registry runs PWM-2 with the bank ledgers for cash",
+  "file": "src/lib.rs",
+  "from": "party_monthly::check_invariants(book, &bound.period, &result, &cash, &bank)?",
+  "to": "party_monthly::check_invariants(book, &bound.period, &result, &bank, &bank)?"
+ },
+ {
+  "id": "E4-101",
+  "by": "author",
+  "what": "the money reason is given with no party on the voucher",
+  "file": "src/party_monthly.rs",
+  "from": "} else if expense && !named.is_empty() && money_on_side {",
+  "to": "} else if expense && money_on_side {"
+ },
+ {
+  "id": "E4-102",
+  "by": "author",
+  "what": "block lines netting to nil are not attributed with no party on the voucher",
+  "file": "src/party_monthly.rs",
+  "from": "let reason = if !on_voucher.is_empty() && block_net == 0 {",
+  "to": "let reason = if block_net == 0 {"
+ },
+ {
+  "id": "E4-103",
+  "by": "author",
+  "what": "PWM-2 gives an invoice-class voucher a not-attributed reason",
+  "file": "src/party_monthly.rs",
+  "from": "let reason = if invoice || present.is_empty() {",
+  "to": "let reason = if present.is_empty() {"
+ },
+ {
+  "id": "E4-104",
+  "by": "author",
+  "what": "PWM-2 never gives the other-side reason",
+  "file": "src/party_monthly.rs",
+  "from": "} else if named.is_empty() {\n                Some(\"other_side\")",
+  "to": "} else if false {\n                Some(\"other_side\")"
+ },
+ {
+  "id": "E4-105",
+  "by": "author",
+  "what": "PWM-2 gives a cash-or-bank row to every block",
+  "file": "src/party_monthly.rs",
+  "from": "if matches!(block, \"sales\" | \"purchases\")",
+  "to": "if true"
+ },
+ {
+  "id": "E4-106",
+  "by": "author",
+  "what": "the money reason's scope is indirect expenses only",
+  "file": "src/party_monthly.rs",
+  "from": "let expense = block == \"direct_expenses\" || block == \"indirect_expenses\";",
+  "to": "let expense = block == \"indirect_expenses\";"
  },
  {
   "id": "TR-01",
@@ -6940,8 +7612,8 @@
   "by": "author",
   "what": "a finding id ignores the voucher",
   "file": "src/counter_cheques_40a3.rs",
-  "from": "let rid = format!(\"{day}_{}\", hash8(&format!(\"{}|{tag}\", v.guid)));",
-  "to": "let rid = format!(\"{day}_{}\", hash8(&format!(\"{tag}\")));"
+  "from": "hash8(&format!(\"{}|{tag}\", v.guid))",
+  "to": "hash8(&format!(\"{tag}\"))"
  },
  {
   "id": "CQ-17",
@@ -7380,8 +8052,8 @@
   "by": "author",
   "what": "the registry does not pass the caller's refused-statement reason",
   "file": "src/registry.rs",
-  "from": "c.bank_statement_refused.as_deref(),",
-  "to": "None,"
+  "from": "c.bank_statement_refused.as_deref(),\n                &c.traces.ais,",
+  "to": "None,\n                &c.traces.ais,"
  },
  {
   "id": "CP-01",
@@ -8302,5 +8974,669 @@
   "file": "src/counter_cheques_40a3.rs",
   "from": "refs.into_iter()",
   "to": "refs.into_iter().filter({ let mut seen = BTreeSet::new(); move |(g, _)| seen.insert(*g) })"
+ },
+ {
+  "id": "LR-67",
+  "by": "author",
+  "what": "a transfer between two loans carrying TDS is read as a TDS journal again (bridge#803)",
+  "file": "src/loans_interest.rs",
+  "from": "            && !opposite_loan\n",
+  "to": "\n"
+ },
+ {
+  "id": "LR-68",
+  "by": "author",
+  "what": "another loan on the same side, not the opposite one, makes a transfer",
+  "file": "src/loans_interest.rs",
+  "from": "&& i128::from(l.amount_paise).signum() * loan_amt.signum() < 0",
+  "to": "&& i128::from(l.amount_paise).signum() * loan_amt.signum() > 0"
+ },
+ {
+  "id": "LR-69",
+  "by": "author",
+  "what": "the first interest date counts interest reversals too",
+  "file": "src/loans_interest.rs",
+  "from": ".filter(|row| row.4 && row.3 == \"taken\")",
+  "to": ".filter(|row| row.4)"
+ },
+ {
+  "id": "LR-70",
+  "by": "author",
+  "what": "a repayment on the day of the first interest does not count as made once interest was credited",
+  "file": "src/loans_interest.rs",
+  "from": "first_interest.is_some_and(|d| pop[at].date >= *d)",
+  "to": "first_interest.is_some_and(|d| pop[at].date > *d)"
+ },
+ {
+  "id": "LR-71",
+  "by": "author",
+  "what": "a repayment made once interest was credited is never recorded (bridge#802 never fires)",
+  "file": "src/loans_interest.rs",
+  "from": "repaid_since_interest = true;",
+  "to": "repaid_since_interest = false;"
+ },
+ {
+  "id": "LR-72",
+  "by": "author",
+  "what": "a taken row the principal alone makes reportable is also listed as interest-first",
+  "file": "src/loans_interest.rs",
+  "from": "if verdict_b.0 && !verdict_p.0 {",
+  "to": "if verdict_b.0 {"
+ },
+ {
+  "id": "LR-73",
+  "by": "author",
+  "what": "an interest-first loan taken in cash is not counted as a possible s.269SS",
+  "file": "src/loans_interest.rs",
+  "from": "n.possible_count += usize::from(verdict_b.1);",
+  "to": "n.possible_count += 0;"
+ },
+ {
+  "id": "LR-74",
+  "by": "author",
+  "what": "the least interest leaves out the listed reversal lines (the old net reading)",
+  "file": "src/loans_interest.rs",
+  "from": ".filter(|x| **x < 0)",
+  "to": ".filter(|_| false)"
+ },
+ {
+  "id": "LR-75",
+  "by": "author",
+  "what": "the most interest leaves out the listed credit lines",
+  "file": "src/loans_interest.rs",
+  "from": ".filter(|x| **x > 0)",
+  "to": ".filter(|_| false)"
+ },
+ {
+  "id": "LR-76",
+  "by": "author",
+  "what": "the least interest at the threshold counts as over it",
+  "file": "src/loans_interest.rs",
+  "from": "(interest_least > threshold_194a) != (interest_most > threshold_194a)",
+  "to": "(interest_least >= threshold_194a) != (interest_most > threshold_194a)"
+ },
+ {
+  "id": "LR-77",
+  "by": "author",
+  "what": "listed lines all credits get the mixed-lines wording",
+  "file": "src/loans_interest.rs",
+  "from": "if interest_least == interest_total {",
+  "to": "if interest_least != interest_total {"
+ },
+ {
+  "id": "LR-78",
+  "by": "author",
+  "what": "a loan taken, not only a repayment, marks the rows after it as made once interest was credited",
+  "file": "src/loans_interest.rs",
+  "from": "if direction == \"repaid\" && first_interest.is_some_and(",
+  "to": "if first_interest.is_some_and("
+ },
+ {
+  "id": "LR-79",
+  "by": "author",
+  "what": "the first interest date is read from every taken row, not only interest credited",
+  "file": "src/loans_interest.rs",
+  "from": ".filter(|row| row.4 && row.3 == \"taken\")",
+  "to": ".filter(|row| row.3 == \"taken\")"
+ },
+ {
+  "id": "LR-80",
+  "by": "author",
+  "what": "a nil line on another loan counts as the opposite side",
+  "file": "src/loans_interest.rs",
+  "from": "&& i128::from(l.amount_paise).signum() * loan_amt.signum() < 0",
+  "to": "&& i128::from(l.amount_paise).signum() * loan_amt.signum() <= 0"
+ },
+ {
+  "id": "E2A-81",
+  "by": "author",
+  "what": "a step back is read whatever the running balance shows (the chain is never checked)",
+  "file": "src/documents.rs",
+  "from": "return Err(refused(Some(&rows[i].txn_date)));",
+  "to": "return Ok(());"
+ },
+ {
+  "id": "E2A-82",
+  "by": "author",
+  "what": "only the statement rows are cited on the statement_does_not_add_up finding",
+  "file": "src/bank_reconciliation.rs",
+  "from": "let mut evidence: Vec<EvidenceRef> = books_by_reason[REASON_NOT_COMPUTED]",
+  "to": "let mut evidence: Vec<EvidenceRef> = Vec::<usize>::new()"
+ },
+ {
+  "id": "EG-63",
+  "by": "author",
+  "what": "a finding and its figures are keyed by the raw PAN, not its tag",
+  "file": "src/entity_269st_gap.rs",
+  "from": "let rid = format!(\"{day_text}_{}\", hash8(pan));",
+  "to": "let rid = format!(\"{day_text}_{pan}\");"
+ },
+ {
+  "id": "EG-65",
+  "by": "author",
+  "what": "a gap finding does not cite the PAN",
+  "file": "src/entity_269st_gap.rs",
+  "from": "        evidence.push(EvidenceRef::new(\"pan\", &binding.pan));\n",
+  "to": ""
+ },
+ {
+  "id": "EG-66",
+  "by": "author",
+  "what": "the pan evidence ref carries the tag, not the PAN",
+  "file": "src/entity_269st_gap.rs",
+  "from": "EvidenceRef::new(\"pan\", &binding.pan)",
+  "to": "EvidenceRef::new(\"pan\", &hash8(&binding.pan))"
+ },
+ {
+  "id": "EG-67",
+  "by": "author",
+  "what": "the PAN is cited as a ledger name",
+  "file": "src/entity_269st_gap.rs",
+  "from": "EvidenceRef::new(\"pan\", &binding.pan)",
+  "to": "EvidenceRef::new(\"ledger\", &binding.pan)"
+ },
+ {
+  "id": "EG-68",
+  "by": "author",
+  "what": "the PAN is lower-cased before it is hashed",
+  "file": "src/entity_269st_gap.rs",
+  "from": "hash8(pan)",
+  "to": "hash8(&pan.to_lowercase())"
+ },
+ {
+  "id": "LR-81",
+  "by": "author",
+  "what": "a nil line on another loan counts as a posting to it (the pre-#1201 coverage exclusion)",
+  "file": "src/loans_interest.rs",
+  "from": "other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
+  "to": "other_loans.contains(l.ledger.as_str()))"
+ },
+ {
+  "id": "LR-82",
+  "by": "author",
+  "what": "only a positive line on another loan stops its voucher counting for coverage",
+  "file": "src/loans_interest.rs",
+  "from": "other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
+  "to": "other_loans.contains(l.ledger.as_str()) && l.amount_paise > 0)"
+ },
+ {
+  "id": "CP-48",
+  "by": "author",
+  "what": "cash_payments_40a3 keys a row's vouchers by GUID alone (the pre-#1195 row map)",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        self.vouchers.insert((v.guid.clone(), voucher_label(v)), v);",
+  "to": "        self.vouchers.insert((v.guid.clone(), String::new()), v);"
+ },
+ {
+  "id": "HV-30",
+  "by": "author",
+  "what": "high_value_register keys a row's vouchers by GUID alone (the pre-#1195 row map)",
+  "file": "src/high_value_register.rs",
+  "from": "        self.vouchers.insert((v.guid.clone(), voucher_label(v)), v);",
+  "to": "        self.vouchers.insert((v.guid.clone(), String::new()), v);"
+ },
+ {
+  "id": "HV-31",
+  "by": "author",
+  "what": "the referenced-voucher count reads the labels of the referenced vouchers' keys, not their GUIDs",
+  "file": "src/high_value_register.rs",
+  "from": "    let with_ref: BTreeSet<&String> = rows\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))",
+  "to": "    let with_ref: BTreeSet<&String> = rows\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(_, l)| l))"
+ },
+ {
+  "id": "HV-32",
+  "by": "author",
+  "what": "the all-vouchers side of the no-reference count reads labels, not GUIDs",
+  "file": "src/high_value_register.rs",
+  "from": "    let all_guids: BTreeSet<&String> = with_money_leg\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))",
+  "to": "    let all_guids: BTreeSet<&String> = with_money_leg\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(_, l)| l))"
+ },
+ {
+  "id": "EG-69",
+  "by": "author",
+  "what": "the gap row's refs are keyed by GUID and label, so two vouchers sharing a GUID are cited twice",
+  "file": "src/entity_269st_gap.rs",
+  "from": "        for ((g, _), v) in &data.vouchers {\n            slot.vouchers.insert(g.clone(), v);",
+  "to": "        for ((g, l), v) in &data.vouchers {\n            slot.vouchers.insert(format!(\"{g}|{l}\"), v);"
+ },
+ {
+  "id": "CQ-33",
+  "by": "author",
+  "what": "a repeated counter-cheque row id never takes a suffix",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "        let rid = if repeated.contains(base.as_str()) {",
+  "to": "        let rid = if false && repeated.contains(base.as_str()) {"
+ },
+ {
+  "id": "CQ-34",
+  "by": "author",
+  "what": "every counter-cheque row id takes a suffix, even a unique one",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "        let rid = if repeated.contains(base.as_str()) {",
+  "to": "        let rid = if true {"
+ },
+ {
+  "id": "CQ-35",
+  "by": "author",
+  "what": "a repeated counter-cheque row id's suffix counts from 0",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            format!(\"{base}_{k}\")",
+  "to": "            format!(\"{base}_{}\", *k - 1)"
+ },
+ {
+  "id": "CQ-36",
+  "by": "author",
+  "what": "a repeated counter-cheque row id's suffixes are given in reverse reading order",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "    for (row, base) in over.iter().zip(&base_ids) {",
+  "to": "    for (row, base) in over.iter().rev().zip(base_ids.iter().rev()) {"
+ },
+ {
+  "id": "LR-83",
+  "by": "author",
+  "what": "a nil line on the loan being tested counts as a posting to it (the pre-#1259 coverage filter)",
+  "file": "src/loans_interest.rs",
+  "from": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise != 0)",
+  "to": "                        .any(|l| l.ledger == *loan_ledger)"
+ },
+ {
+  "id": "LR-84",
+  "by": "author",
+  "what": "only a positive line on the loan being tested counts as a posting to it",
+  "file": "src/loans_interest.rs",
+  "from": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise != 0)",
+  "to": "                        .any(|l| l.ledger == *loan_ledger && l.amount_paise > 0)"
+ },
+ {
+  "id": "BE-01",
+  "by": "author",
+  "what": "the day book counts voucher types by their own name, not their base type",
+  "file": "src/books_examined.rs",
+  "from": "*counts.entry(v.base_type.as_str()).or_default() += 1;",
+  "to": "*counts.entry(v.vtype.as_str()).or_default() += 1;"
+ },
+ {
+  "id": "BE-02",
+  "by": "author",
+  "what": "the day book counts every voucher, not the books population",
+  "file": "src/books_examined.rs",
+  "from": "for v in book.population()? {",
+  "to": "for v in book.vouchers.iter() {"
+ },
+ {
+  "id": "BE-03",
+  "by": "author",
+  "what": "a type of the CA's order with no voucher is listed with 0",
+  "file": "src/books_examined.rs",
+  "from": ".filter_map(|t| counts.get(t).map(|n| format!(\"{t} {n}\")))",
+  "to": ".map(|t| format!(\"{t} {}\", counts.get(t).copied().unwrap_or(0)))"
+ },
+ {
+  "id": "BE-04",
+  "by": "author",
+  "what": "a type outside the CA's order is not listed",
+  "file": "src/books_examined.rs",
+  "from": ".filter(|(t, _)| !VOUCHER_ORDER.contains(*t))",
+  "to": ".filter(|_| false)"
+ },
+ {
+  "id": "BE-05",
+  "by": "author",
+  "what": "a type of the CA's order is listed again among the other types",
+  "file": "src/books_examined.rs",
+  "from": ".filter(|(t, _)| !VOUCHER_ORDER.contains(*t))",
+  "to": ".filter(|_| true)"
+ },
+ {
+  "id": "BE-06",
+  "by": "author",
+  "what": "every type is listed by name, without the CA's order",
+  "file": "src/books_examined.rs",
+  "from": "    let order: Vec<String> = VOUCHER_ORDER\n        .iter()\n        .filter_map(|t| counts.get(t).map(|n| format!(\"{t} {n}\")))\n        .chain(\n            counts\n                .iter()\n                .filter(|(t, _)| !VOUCHER_ORDER.contains(*t))\n                .map(|(t, n)| format!(\"{t} {n}\")),\n        )\n        .collect();",
+  "to": "    let order: Vec<String> = counts.iter().map(|(t, n)| format!(\"{t} {n}\")).collect();"
+ },
+ {
+  "id": "BE-07",
+  "by": "author",
+  "what": "a day book is listed when the books have no voucher",
+  "file": "src/books_examined.rs",
+  "from": "    if !order.is_empty() {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-08",
+  "by": "author",
+  "what": "a cash book is listed when no ledger is under Cash-in-Hand",
+  "file": "src/books_examined.rs",
+  "from": "    if cash > 0 {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-09",
+  "by": "author",
+  "what": "bank books are listed when no ledger is under a bank group",
+  "file": "src/books_examined.rs",
+  "from": "    if bank > 0 {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-10",
+  "by": "author",
+  "what": "one cash or bank ledger is made plural",
+  "file": "src/books_examined.rs",
+  "from": "if n == 1 { \"\" } else { \"s\" }",
+  "to": "\"s\""
+ },
+ {
+  "id": "BE-11",
+  "by": "author",
+  "what": "several cash or bank ledgers are made singular",
+  "file": "src/books_examined.rs",
+  "from": "if n == 1 { \"\" } else { \"s\" }",
+  "to": "\"\""
+ },
+ {
+  "id": "BE-12",
+  "by": "author",
+  "what": "a ledger under both bank groups is counted twice",
+  "file": "src/books_examined.rs",
+  "from": "let bank = under(&BANK_GROUPS);",
+  "to": "let bank = under(&BANK_GROUPS[..1]) + under(&BANK_GROUPS[1..]);"
+ },
+ {
+  "id": "BE-13",
+  "by": "author",
+  "what": "only ledgers under Bank Accounts are bank ledgers",
+  "file": "src/books_examined.rs",
+  "from": "let bank = under(&BANK_GROUPS);",
+  "to": "let bank = under(&BANK_GROUPS[..1]);"
+ },
+ {
+  "id": "BE-14",
+  "by": "author",
+  "what": "only ledgers under Bank OD A/c are bank ledgers",
+  "file": "src/books_examined.rs",
+  "from": "let bank = under(&BANK_GROUPS);",
+  "to": "let bank = under(&BANK_GROUPS[1..]);"
+ },
+ {
+  "id": "BE-15",
+  "by": "author",
+  "what": "one ledger account is made singular, as the reference does not",
+  "file": "src/books_examined.rs",
+  "from": "parts.push(format!(\"ledger ({} ledger accounts)\", book.ledgers.len()));",
+  "to": "parts.push(format!(\"ledger ({})\", plural(book.ledgers.len(), \"ledger account\")));"
+ },
+ {
+  "id": "BE-16",
+  "by": "author",
+  "what": "a Trial Balance is listed when the read has none",
+  "file": "src/books_examined.rs",
+  "from": "    if !book.tb.is_empty() {",
+  "to": "    if true {"
+ },
+ {
+  "id": "BE-17",
+  "by": "author",
+  "what": "the Trial Balance is never listed",
+  "file": "src/books_examined.rs",
+  "from": "    if !book.tb.is_empty() {",
+  "to": "    if false {"
+ },
+ {
+  "id": "BE-18",
+  "by": "author",
+  "what": "no document loaded is written as an empty list",
+  "file": "src/books_examined.rs",
+  "from": "    let docs = if documents_read.is_empty() {",
+  "to": "    let docs = if false {"
+ },
+ {
+  "id": "BE-19",
+  "by": "author",
+  "what": "documents loaded are written as none",
+  "file": "src/books_examined.rs",
+  "from": "    let docs = if documents_read.is_empty() {",
+  "to": "    let docs = if true {"
+ },
+ {
+  "id": "BE-20",
+  "by": "author",
+  "what": "the documents are written in reverse of the pack's order",
+  "file": "src/books_examined.rs",
+  "from": "            .iter()\n            .map(|d| d.name())",
+  "to": "            .iter()\n            .rev()\n            .map(|d| d.name())"
+ },
+ {
+  "id": "BE-21",
+  "by": "author",
+  "what": "GSTR-1 is ordered before GSTR-2B",
+  "file": "src/books_examined.rs",
+  "from": "    Gstr2b,\n    Gstr1,\n    Form26as,",
+  "to": "    Gstr1,\n    Gstr2b,\n    Form26as,"
+ },
+ {
+  "id": "BE-22",
+  "by": "author",
+  "what": "the Profit & Loss report is named otherwise than the pack names it",
+  "file": "src/books_examined.rs",
+  "from": "Self::ProfitAndLossReport => \"Tally Profit & Loss report export\",",
+  "to": "Self::ProfitAndLossReport => \"Tally Profit and Loss report export\","
+ },
+ {
+  "id": "BE-23",
+  "by": "author",
+  "what": "a document name is matched ignoring case",
+  "file": "src/books_examined.rs",
+  "from": "Self::ALL.into_iter().find(|d| d.name() == name)",
+  "to": "Self::ALL.into_iter().find(|d| d.name().eq_ignore_ascii_case(name))"
+ },
+ {
+  "id": "BE-24",
+  "by": "author",
+  "what": "the finding is computed, not for the CA's judgement",
+  "file": "src/books_examined.rs",
+  "from": "confidence: Confidence::JudgementRequired,",
+  "to": "confidence: Confidence::NeedsDocument,"
+ },
+ {
+  "id": "BE-25",
+  "by": "author",
+  "what": "a caller's list out of the pack's order is read, reordered",
+  "file": "src/registry.rs",
+  "from": "if out.last().is_some_and(|last| *last >= d) {",
+  "to": "if out.last().is_some_and(|last| *last == d) {"
+ },
+ {
+  "id": "BE-26",
+  "by": "author",
+  "what": "a caller's list that repeats a document is read",
+  "file": "src/registry.rs",
+  "from": "if out.last().is_some_and(|last| *last >= d) {",
+  "to": "if out.last().is_some_and(|last| *last > d) {"
+ },
+ {
+  "id": "BE-27",
+  "by": "author",
+  "what": "the registry runs books_examined with no documents whatever the caller loaded",
+  "file": "src/registry.rs",
+  "from": "run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read),",
+  "to": "run_on: |_, b, r, _| crate::books_examined_on(b, r, &Default::default()),"
+ },
+ {
+  "id": "BE-28",
+  "by": "author",
+  "what": "the cash book part is listed on the bank ledger count (counted inline)",
+  "file": "src/books_examined.rs",
+  "from": "    if cash > 0 {",
+  "to": "    if under(&BANK_GROUPS) > 0 {"
+ },
+ {
+  "id": "BE-29",
+  "by": "author",
+  "what": "the bank books part is listed on the cash ledger count",
+  "file": "src/books_examined.rs",
+  "from": "    if bank > 0 {",
+  "to": "    if cash > 0 {"
+ },
+ {
+  "id": "RP-01",
+  "by": "author",
+  "what": "related_parties_cl23: the gate opens only past one person",
+  "file": "src/related_parties_cl23.rs",
+  "from": "    if persons.is_empty() {",
+  "to": "    if persons.len() <= 1 {"
+ },
+ {
+  "id": "RP-02",
+  "by": "author",
+  "what": "related_parties_cl23: a nature with an empty list still gets its figures",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            if set.is_empty() {\n                continue;\n            }",
+  "to": "            if set.is_empty() && false {\n                continue;\n            }"
+ },
+ {
+  "id": "RP-03",
+  "by": "author",
+  "what": "related_parties_cl23: a voucher netting to zero on the set is still an entry",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if net != 0 {\n            entries.insert(",
+  "to": "        if true {\n            entries.insert("
+ },
+ {
+  "id": "RP-04",
+  "by": "author",
+  "what": "related_parties_cl23: a later voucher sharing a GUID does not replace the earlier entry",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            entries.insert(v.guid.as_str(), (net, v));",
+  "to": "            entries.entry(v.guid.as_str()).or_insert((net, v));"
+ },
+ {
+  "id": "RP-05",
+  "by": "author",
+  "what": "related_parties_cl23: every configured nature is a payable nature once any is",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            if !person.payable_natures.iter().any(|p| p == nature) {",
+  "to": "            if person.payable_natures.is_empty() {"
+ },
+ {
+  "id": "RP-06",
+  "by": "author",
+  "what": "related_parties_cl23: opening payable keeps the TB sign",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                    opening.checked_neg().ok_or_else(overflow)?,",
+  "to": "                    opening.checked_add(0).ok_or_else(overflow)?,"
+ },
+ {
+  "id": "RP-07",
+  "by": "author",
+  "what": "related_parties_cl23: accrued reads the debit column",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                    \"accrued\",\n                    credit,",
+  "to": "                    \"accrued\",\n                    debit,"
+ },
+ {
+  "id": "RP-08",
+  "by": "author",
+  "what": "related_parties_cl23: a finding needs a nonzero total, not a nature that moved",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if !any_nonzero {",
+  "to": "        if total == 0 {"
+ },
+ {
+  "id": "RP-09",
+  "by": "author",
+  "what": "related_parties_cl23: the total adds each nature without its sign",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            total = total.checked_add(amount).ok_or_else(overflow)?;",
+  "to": "            total = total.checked_add(amount.abs()).ok_or_else(overflow)?;"
+ },
+ {
+  "id": "RP-10",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1 fires at the tolerance",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            if excess > TOLERANCE_PAISE {",
+  "to": "            if excess >= TOLERANCE_PAISE {"
+ },
+ {
+  "id": "RP-11",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1 compares the walk with the signed TB movement",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                .and_then(|v| v.checked_sub(movement.checked_abs()?))",
+  "to": "                .and_then(|v| v.checked_sub(movement))"
+ },
+ {
+  "id": "RP-12",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 fires at the tolerance",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if gap > TOLERANCE_PAISE {",
+  "to": "        if gap >= TOLERANCE_PAISE {"
+ },
+ {
+  "id": "RP-13",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 adds the paid figure where the accrued belongs",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            .checked_add(accrued)\n            .and_then(|v| v.checked_sub(closing))",
+  "to": "            .checked_add(paid)\n            .and_then(|v| v.checked_sub(closing))"
+ },
+ {
+  "id": "RP-14",
+  "by": "author",
+  "what": "related_parties_cl23: two keys sharing a tag are not refused",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if let Some(first) = by_tag.insert(tag.clone(), key) {",
+  "to": "        if let Some(first) = by_tag.insert(tag.clone(), key).filter(|_| false) {"
+ },
+ {
+  "id": "RP-15",
+  "by": "author",
+  "what": "related_parties_cl23: a relationship that is not text is read as empty",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                .ok_or_else(|| shape_error(key, \"relationship\", \"text\"))?\n                .to_string(),",
+  "to": "                .unwrap_or_default()\n                .to_string(),"
+ },
+ {
+  "id": "RP-16",
+  "by": "author",
+  "what": "related_parties_cl23: payable natures of the wrong shape are read as none",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            Some(v) => texts(v, key, \"payable_natures\")?,",
+  "to": "            Some(_) => Vec::new(),"
+ },
+ {
+  "id": "RP-17",
+  "by": "author",
+  "what": "related_parties_cl23: an amount cites no voucher",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            evidence.extend(entries.values().map(",
+  "to": "            evidence.extend(entries.values().take(0).map("
+ },
+ {
+  "id": "RP-18",
+  "by": "author",
+  "what": "related_parties_cl23: the walk reads every voucher, not the population",
+  "file": "src/related_parties_cl23.rs",
+  "from": "    let population = book.population()?;",
+  "to": "    let population: Vec<&Voucher> = book.vouchers.iter().collect();"
+ },
+ {
+  "id": "RP-19",
+  "by": "author",
+  "what": "related_parties_cl23: a ledger list item that is not text is skipped",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            item.as_str()\n                .map(str::to_string)\n                .ok_or_else(|| shape_error(key, field, expected))",
+  "to": "            Some(item.as_str().unwrap_or_default().to_string())\n                .ok_or_else(|| shape_error(key, field, expected))"
+ },
+ {
+  "id": "RP-20",
+  "by": "author",
+  "what": "related_parties_cl23: related-party ledger names are not bound",
+  "file": "src/binding.rs",
+  "from": "            *v = toml::Value::Array(\n                lbinder\n                    .bind_list(&names, &location)?",
+  "to": "            *v = toml::Value::Array(\n                names"
  }
 ]

@@ -13,7 +13,7 @@ Every book here is invented, with round figures and plain names: no fixture is a
 
 ## How they were produced
 
-At the reference engine (a private repository), commit `c62a4ab4`, under Python 3.13, where its `counter_cheques_40a3.py` was the blob `803b0b7e` (last changed by the reference's commit `499e0b2e`). The reference has since changed that module's invariants (`df4af35e`, ported here for #1121) and its docstring (`da9e2d3d`, where it is the blob `ab7f62ee`); the three goldens below regenerate byte-identical at `c62a4ab4`, at the earlier `6c2d6be2` and at `da9e2d3d` (checked 3 Oct 2026), because the canonical dump carries a module invariant's text only when it fires, and none fires on these books:
+At the reference engine (a private repository), commit `c62a4ab4`, under Python 3.13, where its `counter_cheques_40a3.py` was the blob `803b0b7e` (last changed by the reference's commit `499e0b2e`). The reference has since changed that module's invariants (`df4af35e`, ported here for #1121) and its docstring (`da9e2d3d`, where it is the blob `ab7f62ee`); the four goldens below regenerate byte-identical at `c62a4ab4`, at the earlier `6c2d6be2` and at `da9e2d3d` (checked 5 Oct 2026), because the canonical dump carries a module invariant's text only when it fires, and none fires on these books:
 
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
         --with striprtf --with pdfplumber python parity/python_golden.py ENGINE \
@@ -23,14 +23,14 @@ At the reference engine (a private repository), commit `c62a4ab4`, under Python 
         --with striprtf --with pdfplumber python parity/edge_golden.py ENGINE \
         tests/fixtures/edge-books/cc_NAME.json tests/fixtures/golden
 
-The three edge books are hand-written scenarios, not generated from any data. `cc_shared_guid`'s golden was produced at `da9e2d3d` only (5 Oct 2026), by the same command.
+The three edge books are hand-written scenarios, not generated from any data. `cc_shared_guid`'s golden was first produced at `da9e2d3d` (5 Oct 2026), by the same command.
 
 ## Bytes
 
 | File | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
 | `cc_terms.json` | 9,260 | `06f931f49dff7e4e000b40fb4d1d2c600259aaf8596b1e144169cae20cf408b2` | `edge-books/cc_terms.json` |
-| `cc_shared_guid.json` | 2,257 | `37c503b39d997e6746d7be718ded8746f68e8e932b7ed833dcfe36d34a1b8ce9` | `edge-books/cc_shared_guid.json` |
+| `cc_shared_guid.json` | 2,298 | `552a3d2909fdfdc6d24f282fdc46d4157f54f31a6948e85caaf77828e28e8001` | `edge-books/cc_shared_guid.json` |
 | `cc_unconfigured.json` | 8,072 | `4e644f9aa4402a81121cca78e85b61c1482f4b1c44d54047519d6da804ea52b2` | `edge-books/cc_unconfigured.json` |
 | `edge.cc_shared_guid.counter_cheques_40a3.json` | 13,851 | `283b3ba37a904f1e97ca6f005dc5ace2ba1580bdc19ff9c2cf84a50b9652184b` | `golden/edge.cc_shared_guid.counter_cheques_40a3.json` |
 | `edge.cc_terms.counter_cheques_40a3.json` | 24,863 | `a185c4e766c0dbbb2a2cd5c1d9ebc8f16bd278e6e9998158d741731db1df65d8` | `golden/edge.cc_terms.counter_cheques_40a3.json` |

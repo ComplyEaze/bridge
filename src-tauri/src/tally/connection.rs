@@ -297,8 +297,13 @@ impl PartyLedgerMasterSourceValidationError {
                     "ledger_span_identity_mismatch"
                 }
                 StandardLedgerCatalogError::BoundsViolation => "ledger_span_slice_over_bound",
+                // The census slice has no bill-wise flag to be missing, so the
+                // flag errors cannot arrive here; they read as malformed.
                 StandardLedgerCatalogError::MalformedResponse
-                | StandardLedgerCatalogError::LedgerNameUnusable => "ledger_span_slice_malformed",
+                | StandardLedgerCatalogError::LedgerNameUnusable
+                | StandardLedgerCatalogError::BillWiseFlagMissing
+                | StandardLedgerCatalogError::BillWiseFlagInvalid
+                | StandardLedgerCatalogError::BillWiseFlagRepeated => "ledger_span_slice_malformed",
             },
             Self::LedgerSpanSliceResponseTooLarge { .. } => "ledger_span_slice_response_too_large",
             Self::LedgerCountDiffers { .. } => "ledger_count_differs",
@@ -1047,6 +1052,22 @@ impl TallyClient {
         }
     }
 
+    /// A clone whose sends start only while `token` is not cancelled (#778):
+    /// a withdrawn call finishes the send in flight and starts no other. Each
+    /// send asks before it takes the wire lock and again once it holds it.
+    pub(crate) fn withdrawable(&self, token: tokio_util::sync::CancellationToken) -> Self {
+        struct NotWithdrawn(tokio_util::sync::CancellationToken);
+        impl bridge_tally_transport::SendAdmission for NotWithdrawn {
+            fn admits(&self) -> bool {
+                !self.0.is_cancelled()
+            }
+        }
+        Self {
+            http: self.http.with_send_admission(Arc::new(NotWithdrawn(token))),
+            ..self.clone()
+        }
+    }
+
     pub fn canonical_origin(&self) -> anyhow::Result<String> {
         canonical_loopback_origin(&self.config)
     }
@@ -1089,27 +1110,28 @@ impl TallyClient {
     }
 
     pub async fn check_connection(&self) -> anyhow::Result<ConnectionStatus> {
-        match self.check_connection_strict().await {
-            Ok(status) => Ok(status),
+        match self.check_connection_strict_with_wire_evidence().await {
+            Ok((status, _)) => Ok(status),
             Err(error) => Ok(ConnectionStatus {
                 reachable: false,
                 compatible: false,
                 server_text: String::new(),
                 product: TallyProduct::Unknown,
-                error: Some(safe_connection_failure_code(&error).to_string()),
+                error: Some(error.safe_code().to_string()),
             }),
         }
     }
 
     pub(crate) async fn check_connection_strict(&self) -> anyhow::Result<ConnectionStatus> {
-        self.check_connection_strict_with_wire_evidence()
-            .await
-            .map(|(status, _)| status)
+        let (status, _) = self.check_connection_strict_with_wire_evidence().await?;
+        Ok(status)
     }
 
+    /// The `/status` read. Its one failure is the transport's own, so a caller
+    /// reports it by the transport's safe code, never by matching its text.
     async fn check_connection_strict_with_wire_evidence(
         &self,
-    ) -> anyhow::Result<(ConnectionStatus, RuntimeReadEvidence)> {
+    ) -> Result<(ConnectionStatus, RuntimeReadEvidence), TallyTransportError> {
         let response = self.http.get_status_decoded().await?;
         let wire_evidence = RuntimeReadEvidence {
             // GET /status has an empty request body. This is a body commitment,
@@ -1164,7 +1186,7 @@ impl TallyClient {
                         compatible: false,
                         server_text: String::new(),
                         product: TallyProduct::Unknown,
-                        error: Some(safe_connection_failure_code(&error).to_string()),
+                        error: Some(error.safe_code().to_string()),
                     },
                     RuntimeReadEvidence::empty(),
                 ),
@@ -2984,26 +3006,6 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
-}
-
-fn safe_connection_failure_code(error: &anyhow::Error) -> &'static str {
-    if let Some(transport) = error.downcast_ref::<TallyTransportError>() {
-        return transport.safe_code();
-    }
-    let message = error.to_string().to_ascii_lowercase();
-    if message.contains("cancel") {
-        "request_cancelled"
-    } else if message.contains("queue deadline") {
-        "endpoint_queue_deadline_exceeded"
-    } else if message.contains("circuit") {
-        "endpoint_circuit_open"
-    } else if message.contains("response exceeded") {
-        "response_size_limit_exceeded"
-    } else if message.contains("decode") || message.contains("utf") {
-        "response_encoding_invalid"
-    } else {
-        "endpoint_unreachable"
-    }
 }
 
 pub(crate) fn canonical_loopback_origin(config: &TallyConfig) -> anyhow::Result<String> {

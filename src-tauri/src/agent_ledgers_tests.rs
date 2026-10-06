@@ -2826,6 +2826,80 @@ mod through_the_tool {
         }
     }
 
+    /// A `ledger_masters` catalogue export that outlives its deadline is sent
+    /// once, as the movement catalogue is (#937): a 2 s deadline, a 5 s stall,
+    /// and a wait past both. A whole second read is held behind the stalled
+    /// export, so a retry would find plans to answer it and `received` would
+    /// count them. Returns the response and how many requests were received.
+    async fn ledger_masters_with_a_stalled_export(
+        args: Value,
+        groups: Option<String>,
+    ) -> (Value, usize) {
+        const EXPORT: usize = 15;
+        let busy = std::time::Duration::from_millis(5_000);
+        let captured = period_opening();
+        let mut plans = basic_plans_reading(captured.clone(), groups.clone());
+        plans[EXPORT] = plans[EXPORT]
+            .clone()
+            .with_delivery(tally_protocol_simulator::Delivery::SlowHeaders(busy));
+        let stalled = EXPORT + 1;
+        plans.truncate(stalled);
+        // Everything after the identity read: what a retried read sends next.
+        plans.extend(basic_plans_reading(captured, groups).into_iter().skip(4));
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let mut server = Server::new(Settings {
+            endpoint: TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().into(),
+            max_rows: 500,
+            max_bytes: 200_000,
+            redaction: Redaction::None,
+            import_enabled: false,
+            writes_enabled: false,
+            batch_post_enabled: false,
+        });
+        server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
+            bridge_tally_transport::TransportPolicy {
+                request_timeout: std::time::Duration::from_millis(2_000),
+                ..Default::default()
+            },
+        );
+        let response = server.call_tool("ledger_masters", args).await;
+        // Past the stalled response and any retry that would have queued behind it.
+        tokio::time::sleep(busy + std::time::Duration::from_millis(3_000)).await;
+        let received = simulator.received();
+        simulator.cancel();
+        assert_eq!(
+            received, stalled,
+            "nothing was sent after the export that timed out: {response}"
+        );
+        (response, received)
+    }
+
+    #[tokio::test]
+    async fn a_basic_ledger_masters_catalogue_that_times_out_is_sent_once() {
+        let (response, _) =
+            ledger_masters_with_a_stalled_export(json!({"company_guid":GUID}), None).await;
+        let error = refusal(&response);
+        assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+        assert_eq!(error["cause"], "request_deadline_exceeded", "{response}");
+    }
+
+    #[tokio::test]
+    async fn a_group_filtered_ledger_masters_catalogue_that_times_out_is_sent_once() {
+        let (response, _) = ledger_masters_with_a_stalled_export(
+            json!({"company_guid":GUID, "group":"Sundry Debtors"}),
+            Some(groups()),
+        )
+        .await;
+        let error = refusal(&response);
+        assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+        assert_eq!(error["cause"], "request_deadline_exceeded", "{response}");
+    }
+
     /// As `basic_plans`, with the ledger export given and, when `groups` is
     /// supplied, the paired group collection a `group` filter adds inside the
     /// same extent and identity bracket.

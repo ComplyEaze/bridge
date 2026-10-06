@@ -15,6 +15,16 @@
 //! `MAX_SPLIT_POOL` is not searched); then a statement row is a charge by its narration terms or
 //! else not found, and a books row a timing difference by sign.
 //!
+//! All of that only when the statement adds up: its declared opening plus its rows' credits less
+//! debits must be its declared closing, its first and last rows' balances (where they carry one)
+//! must agree with them, and no row's balance may differ from the row before's plus its own
+//! movement (rows that both carry a balance), each within `TOL_PAISE`. Otherwise a dropped,
+//! repeated or reordered row could be why an entry is unmatched, so no split is searched, every
+//! unmatched row on both sides is `not_computed_statement_does_not_add_up`, and the finding
+//! `statement_does_not_add_up` lists them; matched pairs stand. The rows are read in the listed
+//! order, which the reader confirms ([`crate::documents::bank_statement_from_json`]); a statement
+//! that reader refuses is reported by [`refused`], with its reason, and nothing is reconciled.
+//!
 //! Python's orders are kept where they decide a result:
 //! * the reference iterates `set`s of small list indices, which CPython yields in ascending order
 //!   (measured up to n = 100,000 with removals); `BTreeSet<usize>` iterates the same way;
@@ -59,13 +69,16 @@ const REASON_DEPOSIT_NOT_CREDITED: &str = "deposit_not_credited";
 const REASON_BANK_ONLY_CHARGE: &str = "bank_only_charge_or_interest";
 const REASON_SPLIT_SETTLEMENT: &str = "split_settlement";
 const REASON_NOT_FOUND: &str = "not_found";
+/// Any unmatched row while the statement does not add up: not explained (see the module docs).
+const REASON_NOT_COMPUTED: &str = "not_computed_statement_does_not_add_up";
 const REASON_UNCLASSIFIED: &str = "unclassified";
-const REASONS: [&str; 6] = [
+const REASONS: [&str; 7] = [
     REASON_CHEQUE_NOT_PRESENTED,
     REASON_DEPOSIT_NOT_CREDITED,
     REASON_BANK_ONLY_CHARGE,
     REASON_SPLIT_SETTLEMENT,
     REASON_NOT_FOUND,
+    REASON_NOT_COMPUTED,
     REASON_UNCLASSIFIED,
 ];
 
@@ -401,9 +414,9 @@ pub fn run(
                 .to_string(),
             facts: vec![
                 ("books_opening_paise".to_string(), f_books_open),
-                ("statement_opening_paise".to_string(), f_stmt_open),
+                ("statement_opening_paise".to_string(), f_stmt_open.clone()),
                 ("books_closing_paise".to_string(), f_books_close),
-                ("statement_closing_paise".to_string(), f_stmt_close),
+                ("statement_closing_paise".to_string(), f_stmt_close.clone()),
             ],
             evidence: Vec::new(),
             confidence: Confidence::NeedsDocument,
@@ -418,6 +431,95 @@ pub fn run(
                     .to_string(),
             ],
         });
+    }
+
+    // ------------------------------------------------------------ the statement's own arithmetic
+    // Before matching: a dropped or repeated row leaves an entry unmatched that the reasons below
+    // would otherwise explain, so the statement is checked against itself, rows in `row` order.
+    let mut ordered: Vec<&BankStatementRow> = stmt.iter().collect();
+    ordered.sort_by_key(|s| s.row);
+    let mut stmt_net = 0_i64;
+    for s in &ordered {
+        stmt_net = add(stmt_net, signed(s)?)?;
+    }
+    let arith_diff = sub(
+        add(statement.opening_balance_paise, stmt_net)?,
+        statement.closing_balance_paise,
+    )?;
+    let f_net = r.fig(
+        "statement_net_movement_paise",
+        Value::Int(stmt_net),
+        Unit::Paise,
+        "The statement's own rows in this window: credits less debits.",
+        vec![],
+    )?;
+    let f_arith = r.fig(
+        "statement_arithmetic_diff_paise",
+        Value::Int(arith_diff),
+        Unit::Paise,
+        "The statement's declared opening balance plus its rows' credits less debits, less its \
+         declared closing balance; reported even when zero.",
+        vec![],
+    )?;
+    let mut tie_diffs = vec![arith_diff];
+    let mut stmt_facts = vec![
+        ("statement_opening_paise".to_string(), f_stmt_open),
+        ("statement_net_movement_paise".to_string(), f_net),
+        ("statement_closing_paise".to_string(), f_stmt_close),
+        ("statement_arithmetic_diff_paise".to_string(), f_arith),
+    ];
+    if let Some((first, Some(balance))) = ordered.first().map(|s| (s, s.balance_paise)) {
+        let d = sub(
+            balance,
+            add(statement.opening_balance_paise, signed(first)?)?,
+        )?;
+        let id = r.fig(
+            "statement_first_row_tie_diff_paise",
+            Value::Int(d),
+            Unit::Paise,
+            "The statement's first row balance, less its declared opening balance plus that \
+             row's credit less its debit; reported even when zero.",
+            vec![],
+        )?;
+        stmt_facts.push(("statement_first_row_tie_diff_paise".to_string(), id));
+        tie_diffs.push(d);
+    }
+    if let Some(Some(balance)) = ordered.last().map(|s| s.balance_paise) {
+        let d = sub(balance, statement.closing_balance_paise)?;
+        let id = r.fig(
+            "statement_last_row_tie_diff_paise",
+            Value::Int(d),
+            Unit::Paise,
+            "The statement's last row balance, less its declared closing balance; reported even \
+             when zero.",
+            vec![],
+        )?;
+        stmt_facts.push(("statement_last_row_tie_diff_paise".to_string(), id));
+        tie_diffs.push(d);
+    }
+    // A repeated row standing in for a dropped row of the same amount leaves the sum and both end
+    // balances tying; only the row-by-row chain (BANK-1's rule) shows it.
+    let mut breaks = 0_usize;
+    for pair in ordered.windows(2) {
+        if let (Some(before), Some(after)) = (pair[0].balance_paise, pair[1].balance_paise) {
+            if distance(add(before, signed(pair[1])?)?, after)? > TOL_PAISE {
+                breaks += 1;
+            }
+        }
+    }
+    let id = r.fig(
+        "statement_balance_chain_break_count",
+        count(TEST_ID, breaks)?,
+        Unit::Count,
+        "Statement transactions whose own balance is not the balance after the statement's \
+         preceding transaction plus this one's credit less its debit (counted where both carry a \
+         balance).",
+        vec![],
+    )?;
+    stmt_facts.push(("statement_balance_chain_break_count".to_string(), id));
+    let mut adds_up = breaks == 0;
+    for d in &tie_diffs {
+        adds_up &= d.checked_abs().ok_or_else(|| overflow(TEST_ID))? <= TOL_PAISE;
     }
 
     r.fig(
@@ -474,7 +576,14 @@ pub fn run(
     let mut remaining_books: BTreeSet<usize> = unmatched_books.iter().copied().collect();
     let mut remaining_stmt: BTreeSet<usize> = unmatched_stmt.iter().copied().collect();
 
-    for bi in books_order(&book_rows, remaining_books.clone()) {
+    // A statement that does not add up is not searched for part-settlements: with a row dropped,
+    // two unrelated rows can sum to the missing one.
+    let searched_books = if adds_up {
+        books_order(&book_rows, remaining_books.clone())
+    } else {
+        Vec::new()
+    };
+    for bi in searched_books {
         let b = &book_rows[bi];
         let mut pool = Vec::new();
         for &si in &remaining_stmt {
@@ -493,7 +602,12 @@ pub fn run(
         }
     }
 
-    for si in statement_order(stmt, remaining_stmt.clone()) {
+    let searched_stmt = if adds_up {
+        statement_order(stmt, remaining_stmt.clone())
+    } else {
+        Vec::new()
+    };
+    for si in searched_stmt {
         let s = &stmt[si];
         let mut pool = Vec::new();
         for &bi in &remaining_books {
@@ -513,22 +627,29 @@ pub fn run(
     }
 
     // ------------------------------------------------------------ narration / direction pass
-    for si in statement_order(stmt, remaining_stmt.clone()) {
-        let narration = py_upper(&stmt[si].narration);
-        if terms.iter().any(|t| narration.contains(t.as_str())) {
-            reason_stmt.insert(si, REASON_BANK_ONLY_CHARGE);
+    if !adds_up {
+        // Nothing unmatched is explained while the statement does not add up: a repeated charge
+        // is not an unbooked charge, nor a repeated payment one not found.
+        reason_books.extend(remaining_books.iter().map(|&bi| (bi, REASON_NOT_COMPUTED)));
+        reason_stmt.extend(remaining_stmt.iter().map(|&si| (si, REASON_NOT_COMPUTED)));
+    } else {
+        for si in statement_order(stmt, remaining_stmt.clone()) {
+            let narration = py_upper(&stmt[si].narration);
+            if terms.iter().any(|t| narration.contains(t.as_str())) {
+                reason_stmt.insert(si, REASON_BANK_ONLY_CHARGE);
+            }
         }
-    }
-    for bi in books_order(&book_rows, remaining_books.clone()) {
-        let reason = if book_rows[bi].amount_paise < 0 {
-            REASON_CHEQUE_NOT_PRESENTED
-        } else {
-            REASON_DEPOSIT_NOT_CREDITED
-        };
-        reason_books.insert(bi, reason);
-    }
-    for si in statement_order(stmt, remaining_stmt.clone()) {
-        reason_stmt.entry(si).or_insert(REASON_NOT_FOUND);
+        for bi in books_order(&book_rows, remaining_books.clone()) {
+            let reason = if book_rows[bi].amount_paise < 0 {
+                REASON_CHEQUE_NOT_PRESENTED
+            } else {
+                REASON_DEPOSIT_NOT_CREDITED
+            };
+            reason_books.insert(bi, reason);
+        }
+        for si in statement_order(stmt, remaining_stmt.clone()) {
+            reason_stmt.entry(si).or_insert(REASON_NOT_FOUND);
+        }
     }
 
     // ------------------------------------------------------------ figures: reasons
@@ -631,6 +752,50 @@ pub fn run(
         vec![],
     )?;
 
+    if !adds_up {
+        let mut evidence: Vec<EvidenceRef> = books_by_reason[REASON_NOT_COMPUTED]
+            .iter()
+            .map(|&i| EvidenceRef::with_label("voucher", &book_rows[i].guid, &book_rows[i].label))
+            .collect();
+        for &i in &stmt_by_reason[REASON_NOT_COMPUTED] {
+            let (s, cut) = (&stmt[i], prefix_chars(&stmt[i].narration, 60));
+            evidence.push(EvidenceRef::with_label(
+                "document_row",
+                &format!("{}#{}", s.doc, s.row),
+                &cut,
+            ));
+        }
+        r.findings.push(Finding {
+            id: format!("{TEST_ID}/statement_does_not_add_up"),
+            clauses: Vec::new(),
+            title: "The extracted bank statement does not add up: its opening balance plus its \
+                    credits less its debits is not its own closing balance, or a balance \
+                    disagrees with the statement's preceding transaction or with the declared \
+                    opening or closing"
+                .to_string(),
+            facts: stmt_facts,
+            evidence,
+            confidence: Confidence::NeedsDocument,
+            limits: vec![
+                "A row dropped from the extracted statement, repeated in it or out of order, or a \
+                 balance column that is not a running balance, makes the statement disagree with \
+                 itself. A dropped row leaves a books entry unmatched although the bank cleared \
+                 it, and a repeated row leaves a statement entry that never happened. So no \
+                 unmatched entry is explained here (as a timing difference, a bank-only charge, a \
+                 part-settlement or not found): each is listed as not computed. Matched entries \
+                 are paired by amount and date only: with a row dropped, a same-amount entry may \
+                 be paired with the wrong row."
+                    .to_string(),
+            ],
+            ask_client: vec![
+                "The statement does not add up for this window: re-extract it with every row \
+                 once, in the bank's own order and with its running balance, or supply the \
+                 bank's original statement."
+                    .to_string(),
+            ],
+        });
+    }
+
     let fid = |name: &str| format!("{TEST_ID}.{name}");
     if !books_by_reason[REASON_NOT_FOUND].is_empty() || !stmt_by_reason[REASON_NOT_FOUND].is_empty()
     {
@@ -709,6 +874,44 @@ pub fn run(
         });
     }
 
+    Ok(r)
+}
+
+/// The reference's `refused`: the statement the engagement supplied was refused by its reader
+/// ([`crate::documents::StatementRefusal`], whose `reason` this takes), so nothing is reconciled,
+/// and the CA is told why and asked once.
+pub fn refused(rules: &Rules, reason: &str) -> Result<TestResult> {
+    let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
+    r.population_note = "The bank statement supplied for this engagement was refused, so the bank \
+                         ledger is not reconciled."
+        .to_string();
+    let f = r.fig(
+        "statement_refused_reason",
+        Value::Text(reason.to_string()),
+        Unit::Text,
+        "Why the bank statement supplied was refused.",
+        vec![],
+    )?;
+    r.findings.push(Finding {
+        id: format!("{TEST_ID}/statement_refused"),
+        clauses: Vec::new(),
+        title: "The bank statement supplied was refused, so the bank ledger was not reconciled"
+            .to_string(),
+        facts: vec![("reason".to_string(), f)],
+        evidence: Vec::new(),
+        confidence: Confidence::NeedsDocument,
+        limits: vec![
+            "Nothing is reconciled: no match, timing difference, charge or part-settlement is \
+             computed from a statement refused when it was read (the reason is shown)."
+                .to_string(),
+        ],
+        ask_client: vec![
+            "Re-extract the bank statement with its declared opening and closing balances and its \
+             rows in the bank's own order with their running balance, or supply the bank's \
+             original statement."
+                .to_string(),
+        ],
+    });
     Ok(r)
 }
 
@@ -899,6 +1102,7 @@ mod tests {
         }
     }
 
+    /// A March statement opening at 0 and closing at its rows' net, so that it adds up.
     fn march_statement(rows: Vec<BankStatementRow>) -> BankStatementDoc {
         BankStatementDoc {
             doc_id: "bank:unit".to_string(),
@@ -908,7 +1112,7 @@ mod tests {
             start: date("20260301"),
             end: date("20260331"),
             opening_balance_paise: 0,
-            closing_balance_paise: 0,
+            closing_balance_paise: rows.iter().map(|s| s.credit_paise - s.debit_paise).sum(),
             rows,
         }
     }
@@ -1118,6 +1322,243 @@ mod tests {
             match_rows(&by_date, &one, TOL_PAISE, MATCH_MAX_DAYS).unwrap(),
             vec![(1, 0)]
         );
+    }
+
+    /// A statement row of `amount_paise` (signed as `stmt_row`'s) with its running balance.
+    fn row_bal(
+        row: i64,
+        on: &str,
+        amount_paise: i64,
+        balance: Option<i64>,
+        narration: &str,
+    ) -> BankStatementRow {
+        BankStatementRow {
+            balance_paise: balance,
+            ..stmt_row(row, on, amount_paise, narration)
+        }
+    }
+
+    /// `run` over a June 2025 statement of `rows`, declaring `opening` and `closing`, against a
+    /// book opening at `opening` with `vouchers`, and the "CHARGES" charge term.
+    fn run_june(
+        vouchers: Vec<Voucher>,
+        rows: Vec<BankStatementRow>,
+        opening: i64,
+        closing: i64,
+    ) -> TestResult {
+        let statement = BankStatementDoc {
+            start: date("20250601"),
+            end: date("20250630"),
+            opening_balance_paise: opening,
+            closing_balance_paise: closing,
+            ..march_statement(rows)
+        };
+        let terms = BTreeSet::from(["CHARGES".to_string()]);
+        let rules = Rules::vendored().unwrap();
+        let book = book_of(vouchers, opening);
+        run(
+            &book,
+            &rules,
+            &year(),
+            &statement,
+            "Bank",
+            &terms,
+            MATCH_MAX_DAYS,
+        )
+        .unwrap()
+    }
+
+    fn figure(r: &TestResult, name: &str) -> Option<i64> {
+        figure_int(r, &format!("{TEST_ID}.{name}"))
+    }
+
+    fn finding<'r>(r: &'r TestResult, name: &str) -> Option<&'r Finding> {
+        r.findings
+            .iter()
+            .find(|f| f.id == format!("{TEST_ID}/{name}"))
+    }
+
+    /// The reference's own cases (`selftest/test_bank_reconciliation.py`'s `StatementArithmetic`
+    /// at reference `da9e2d3d`), as amounts there: each check alone marks the statement, within Re 1.
+    #[test]
+    fn a_statement_that_does_not_add_up_explains_nothing_unmatched() {
+        let two = || {
+            vec![
+                voucher("v1", "20250605", -1_000),
+                voucher("v2", "20250620", -1_000),
+            ]
+        };
+        // A dropped row: the sum and the last row are off, and v2 is not called timing.
+        let r = run_june(
+            two(),
+            vec![row_bal(0, "20250605", -1_000, Some(4_000), "NEFT payment")],
+            5_000,
+            3_000,
+        );
+        assert_eq!(figure(&r, "statement_arithmetic_diff_paise"), Some(1_000));
+        assert_eq!(figure(&r, "statement_last_row_tie_diff_paise"), Some(1_000));
+        assert_eq!(figure(&r, "statement_first_row_tie_diff_paise"), Some(0));
+        assert_eq!(reasons(&r, "books", REASON_NOT_COMPUTED), ["v2"]);
+        assert!(reasons(&r, "books", REASON_CHEQUE_NOT_PRESENTED).is_empty());
+        let f = finding(&r, "statement_does_not_add_up").expect("the finding");
+        assert_eq!(f.confidence, Confidence::NeedsDocument);
+        let cited: Vec<(&str, &str)> = f
+            .evidence
+            .iter()
+            .map(|e| (e.kind.as_str(), e.id.as_str()))
+            .collect();
+        assert_eq!(cited, [("voucher", "v2")]);
+        // The same statement adding up keeps its timing reason.
+        let r = run_june(
+            two(),
+            vec![row_bal(0, "20250605", -1_000, Some(4_000), "NEFT payment")],
+            5_000,
+            4_000,
+        );
+        assert_eq!(reasons(&r, "books", REASON_CHEQUE_NOT_PRESENTED), ["v2"]);
+        assert!(finding(&r, "statement_does_not_add_up").is_none());
+        // Re 1 is within the tolerance and one paisa more is not.
+        for (closing, adds_up) in [(4_100, true), (4_101, false), (3_900, true), (3_899, false)] {
+            let r = run_june(
+                two(),
+                vec![row_bal(0, "20250605", -1_000, None, "NEFT payment")],
+                5_000,
+                closing,
+            );
+            assert_eq!(
+                finding(&r, "statement_does_not_add_up").is_none(),
+                adds_up,
+                "{closing}"
+            );
+        }
+
+        // Each check alone: with the sum tying, a middle row with no balance hides the chain.
+        let one = || vec![voucher("v1", "20250605", -1_500)];
+        let names = [
+            "statement_arithmetic_diff_paise",
+            "statement_first_row_tie_diff_paise",
+            "statement_last_row_tie_diff_paise",
+            "statement_balance_chain_break_count",
+        ];
+        for (balances, off) in [
+            ([Some(9_000), None, Some(3_500)], names[1]),
+            ([Some(4_000), None, Some(9_999)], names[2]),
+            ([Some(4_000), Some(3_000), Some(3_500)], names[3]),
+        ] {
+            let rows = [1_000, 300, 200]
+                .into_iter()
+                .zip(balances)
+                .enumerate()
+                .map(|(i, (debit, b))| {
+                    row_bal(
+                        i as i64,
+                        &format!("2025060{}", 5 + i),
+                        -debit,
+                        b,
+                        "NEFT payment",
+                    )
+                })
+                .collect();
+            let r = run_june(one(), rows, 5_000, 3_500);
+            let nonzero: Vec<&str> = names
+                .into_iter()
+                .filter(|n| figure(&r, n).is_some_and(|v| v != 0))
+                .collect();
+            assert_eq!(nonzero, [off]);
+            assert!(finding(&r, "statement_does_not_add_up").is_some(), "{off}");
+        }
+        // A row step exactly Re 1 off is not a break; one paisa more is.
+        for (balance, breaks) in [(3_600, 0), (3_601, 1)] {
+            let rows = vec![
+                row_bal(0, "20250605", -1_000, Some(4_000), "NEFT payment"),
+                row_bal(1, "20250606", -500, Some(balance), "NEFT payment"),
+            ];
+            let r = run_june(one(), rows, 5_000, balance);
+            assert_eq!(
+                figure(&r, "statement_balance_chain_break_count"),
+                Some(breaks)
+            );
+        }
+        // With no balance on any row, no end tie is reported and the chain counts nothing.
+        let r = run_june(
+            one(),
+            vec![row_bal(0, "20250605", -1_500, None, "x")],
+            5_000,
+            3_000,
+        );
+        assert_eq!(figure(&r, "statement_first_row_tie_diff_paise"), None);
+        assert_eq!(figure(&r, "statement_last_row_tie_diff_paise"), None);
+        assert_eq!(figure(&r, "statement_balance_chain_break_count"), Some(0));
+        assert_eq!(figure(&r, "statement_net_movement_paise"), Some(-1_500));
+
+        // A repeated charge row is not an unbooked charge, and a repeated payment not "not found";
+        // only the row it repeats is matched, and the finding cites the other.
+        let r = run_june(
+            vec![voucher("c1", "20250630", -590)],
+            vec![
+                row_bal(0, "20250630", -590, Some(9_410), "SMS CHARGES QTR"),
+                row_bal(1, "20250630", -590, Some(9_410), "SMS CHARGES QTR"),
+            ],
+            10_000,
+            9_410,
+        );
+        assert_eq!(figure(&r, "statement_balance_chain_break_count"), Some(1));
+        assert!(reasons(&r, "statement", REASON_BANK_ONLY_CHARGE).is_empty());
+        assert!(reasons(&r, "statement", REASON_NOT_FOUND).is_empty());
+        assert_eq!(
+            reasons(&r, "statement", REASON_NOT_COMPUTED),
+            ["SMS CHARGES QTR"]
+        );
+        let f = finding(&r, "statement_does_not_add_up").unwrap();
+        let cited: Vec<&str> = f.evidence.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(cited, ["bank:unit#1"]);
+        assert!(finding(&r, "not_found").is_none());
+
+        // No part-settlement is searched, either way.
+        let r = run_june(
+            vec![voucher("v1", "20250610", -30_000)],
+            vec![
+                row_bal(0, "20250609", -10_000, Some(90_000), "NEFT A"),
+                row_bal(1, "20250611", -20_000, Some(70_000), "NEFT B"),
+            ],
+            100_000,
+            40_000,
+        );
+        assert_eq!(reasons(&r, "books", REASON_NOT_COMPUTED), ["v1"]);
+        assert!(reasons(&r, "books", REASON_SPLIT_SETTLEMENT).is_empty());
+        assert!(finding(&r, "split_settlement").is_none());
+        let r = run_june(
+            vec![
+                voucher("v1", "20250609", -10_000),
+                voucher("v2", "20250611", -20_000),
+            ],
+            vec![row_bal(0, "20250610", -30_000, Some(70_000), "NEFT")],
+            100_000,
+            60_000,
+        );
+        assert!(reasons(&r, "statement", REASON_SPLIT_SETTLEMENT).is_empty());
+        assert_eq!(reasons(&r, "statement", REASON_NOT_COMPUTED), ["NEFT"]);
+    }
+
+    #[test]
+    fn a_refused_statement_is_not_reconciled_and_says_why_once() {
+        let rules = Rules::vendored().unwrap();
+        let r = refused(&rules, "declares no opening balance").unwrap();
+        let ids: Vec<&str> = r.figures.iter().map(|f| f.id.as_str()).collect();
+        assert_eq!(ids, [format!("{TEST_ID}.statement_refused_reason")]);
+        assert_eq!(
+            r.figures[0].value,
+            Value::Text("declares no opening balance".to_string())
+        );
+        assert_eq!(r.findings.len(), 1);
+        let f = &r.findings[0];
+        assert_eq!(f.id, format!("{TEST_ID}/statement_refused"));
+        assert_eq!(
+            (f.confidence, f.ask_client.len()),
+            (Confidence::NeedsDocument, 1)
+        );
+        assert_eq!(f.facts, [("reason".to_string(), ids[0].to_string())]);
+        assert!(check_invariants(&[], &r).unwrap().is_empty());
     }
 
     #[test]

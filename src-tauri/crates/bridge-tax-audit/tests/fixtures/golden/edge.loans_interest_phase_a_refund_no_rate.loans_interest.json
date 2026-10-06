@@ -94,8 +94,8 @@
       "id": "loans_interest.clause31_not_computed_row_count",
       "value": 1,
       "unit": "count",
-      "definition_sha256_16": "205bd6d2d7ead77a",
-      "definition_text": "Taken/repaid entries listed as not computed -- because the two walks of the principal balance disagree on their reportability, or because a voucher listed as both crediting and debiting their loan comes on or before their date and their own amount is less than the limit: in no reportable total and not in the flag count.",
+      "definition_sha256_16": "91f4c28a48e8d293",
+      "definition_text": "Taken/repaid entries listed as not computed -- because the two walks of the principal balance disagree on their reportability, or a loan taken may be reportable if earlier repayments paid interest first (bridge#802), or because a voucher listed as both crediting and debiting their loan comes on or before their date and their own amount is less than the limit: in no reportable total and not in the flag count.",
       "evidence": []
     },
     {
@@ -422,8 +422,8 @@
       "id": "loans_interest.s269ss_269t_possible_not_computed_count",
       "value": 2,
       "unit": "count",
-      "definition_sha256_16": "60374b1ff54d4000",
-      "definition_text": "Entries and vouchers whose s.269SS/269T flag is not computed and may apply: rows the two walks of the balance disagree on, which the second would flag; entries in cash, journal or other mode dated on or after a voucher listed as both crediting and debiting their loan; and such vouchers whose other lines include a ledger that is not a bank account. Listed as questions or noted on the row, never in the flag count.",
+      "definition_sha256_16": "24ccc6f18401a5bf",
+      "definition_text": "Entries and vouchers whose s.269SS/269T flag is not computed and may apply: rows the two walks of the balance disagree on, which the second would flag; loans taken that may cross the limit if earlier repayments paid interest first (bridge#802); entries in cash, journal or other mode dated on or after a voucher listed as both crediting and debiting their loan; and such vouchers whose other lines include a ledger that is not a bank account. Listed as questions or noted on the row, never in the flag count.",
       "evidence": []
     },
     {

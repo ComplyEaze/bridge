@@ -665,6 +665,10 @@
       "reason": "The check of Tally's Cash Flow net total against the cash and bank ledgers of the trial balance, and which groups it counts as money; a defect passes a cash movement that does not tie or counts a ledger Tally does not."
     },
     {
+      "path": "src-tauri/src/reports/cash_flow_tests.rs",
+      "reason": "Tests pinning the Cash Flow check: the tie measured on live captures, a one-paisa difference, the groups counted as money and the Bank OD refusal; a weakened test lets a cash movement that does not tie ship unseen."
+    },
+    {
       "path": "src-tauri/src/reports/mod.rs"
     },
     {

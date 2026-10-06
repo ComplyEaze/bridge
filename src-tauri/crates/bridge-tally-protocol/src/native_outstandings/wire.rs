@@ -566,34 +566,6 @@ pub fn parse_native_ledger_snapshot_for_company(
         .collect()
 }
 
-/// A ledger's `ISBILLWISEON`, read without its balances.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NativeLedgerBillWiseFlag {
-    pub name: String,
-    pub parent: Option<String>,
-    pub bill_wise_on: bool,
-}
-
-/// Each ledger's bill-wise flag from a snapshot Tally's collection-level compute
-/// proves came from the selected company. It never parses a balance, so a book
-/// whose closing balance is a currency composite, which
-/// [`parse_native_ledger_snapshot_for_company`] refuses whole, still answers.
-pub fn parse_native_ledger_bill_wise_flags_for_company(
-    xml: &str,
-    expected_company_guid: &str,
-) -> Result<Vec<NativeLedgerBillWiseFlag>, NativeOutstandingsError> {
-    let rows = parse_native_ledger_snapshot_rows(xml)?;
-    require_snapshot_company(&rows, expected_company_guid)?;
-    Ok(rows
-        .into_iter()
-        .map(|row| NativeLedgerBillWiseFlag {
-            name: row.name,
-            parent: row.parent,
-            bill_wise_on: row.bill_wise_on,
-        })
-        .collect())
-}
-
 /// Every row's collection-level company GUID matches the selected company, and
 /// there is at least one row.
 fn require_snapshot_company(

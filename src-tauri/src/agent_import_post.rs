@@ -366,6 +366,7 @@ impl Server {
                     .iter()
                     .filter(|(name, guid)| {
                         catalogue
+                            .catalog()
                             .bind_selected([name.clone()])
                             .ok()
                             .and_then(|now| {
@@ -782,19 +783,31 @@ impl Server {
             {
                 return Err("import_masters_changed".to_string().into());
             }
+            // A ledger switched to bill-wise since the build would take an entry
+            // On Account unseen: only the ledgers the person approved may be
+            // bill-wise now (design E of #1234, closing the window between the
+            // build's check and the post).
+            if !super::bill_wise::flags_still_as_approved(
+                &catalogue_identities,
+                &super::bill_wise::named_ledgers(&payload),
+                line.on_account_approved.as_deref().unwrap_or_default(),
+            ) {
+                return Err("import_bill_wise_changed".to_string().into());
+            }
             // A ledger that now folds equal to another live ledger could be
             // taken for it by Tally's import lookup (bridge#626). Refused as the
             // build refuses it, including for a batch built before the twin
             // appeared or before the build checked for one.
             if !folded_twins(
                 &requested_ledger_names(&payload),
-                catalogue_identities.parents(),
+                catalogue_identities.catalog().parents(),
             )
             .is_empty()
             {
                 return Err("ledger_has_folded_twin".to_string().into());
             }
             let ledger_binding = catalogue_identities
+                .catalog()
                 .bind_selected(requested_ledger_names(&payload))
                 .map_err(|_| "import_masters_changed".to_string())?;
             // The same ledgers must still carry the GUIDs the build bound them
@@ -817,7 +830,8 @@ impl Server {
                 let (groups, evidence) =
                     self.read_group_collection(&identity, &company.name).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence);
-                let observed = ObservedMasters::new(catalogue_identities.parents(), groups);
+                let observed =
+                    ObservedMasters::new(catalogue_identities.catalog().parents(), groups);
                 if cash_bank_refusals(&payload, &observed, RECHECK_REFUSAL_BUDGET).is_refused() {
                     return Err("import_bank_classification_changed".to_string().into());
                 }
@@ -1153,6 +1167,13 @@ impl Server {
                     )
                 }) {
                     super::bill_wise::BILL_WISE_NOT_RECORDED
+                } else if error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                        Some(ApprovedImportAdmissionError::BillWiseChanged)
+                    )
+                }) {
+                    "import_bill_wise_changed"
                 } else if error.chain().any(|cause| {
                     matches!(
                         cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -1915,14 +1936,16 @@ fn recheck_import_admission(
         "import_preexisting_identity" => ApprovedImportAdmissionError::PreexistingIdentity.into(),
         _ => anyhow::Error::msg(code),
     })?;
-    if !ledger_binding
-        .matches(catalogue, company_name, company_guid)
-        .map_err(ApprovedImportAdmissionError::CatalogueUnreadable)?
-    {
+    let catalogue = crate::tally::standard_ledger_catalog::parse_import_ledger_catalog_response(
+        catalogue,
+        company_name,
+        company_guid,
+    )
+    .map_err(ApprovedImportAdmissionError::CatalogueUnreadable)?;
+    if !ledger_binding.matches_catalog(catalogue.catalog()) {
         return Err(ApprovedImportAdmissionError::LedgerIdentityChanged.into());
     }
-    let parents = parse_standard_ledger_catalog_response(catalogue, company_name, company_guid)
-        .map_err(ApprovedImportAdmissionError::CatalogueUnreadable)?;
+    let parents = catalogue.catalog();
     // Nor can the binding see a ledger added since approval that folds equal to
     // a named one, which Tally's import lookup could take for it (bridge#626).
     let named = line
@@ -1935,6 +1958,17 @@ fn recheck_import_admission(
         .collect::<Vec<_>>();
     if !folded_twins(&named, parents.parents()).is_empty() {
         return Err(ApprovedImportAdmissionError::LedgerFoldedTwin.into());
+    }
+    // A ledger switched to bill-wise since the build would take an entry On
+    // Account unseen: only the ledgers the person approved may be bill-wise
+    // now. The same catalogue read carries the flags (design E of #1234).
+    let approved = line.on_account_approved.as_deref().unwrap_or_default();
+    if !super::bill_wise::flags_still_as_approved(
+        &catalogue,
+        &named.iter().map(String::as_str).collect(),
+        approved,
+    ) {
+        return Err(ApprovedImportAdmissionError::BillWiseChanged.into());
     }
     // The binding above compares each ledger's name and GUID, not its parent,
     // so it cannot see a ledger or a group re-parented since approval. A bank

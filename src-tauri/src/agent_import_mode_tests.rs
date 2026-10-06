@@ -96,11 +96,8 @@ async fn import_build_requires_an_observed_mode_bracket_and_retains_probe_eviden
         let plans = if admitted {
             [
                 import_profile_probe(fault),
-                import_cycle_plans()[..10].to_vec(),
-                bill_wise_flag_plans(&[]),
-                import_cycle_plans()[10..16].to_vec(),
-                import_cycle_plans()[4..10].to_vec(),
-                bill_wise_flag_plans(&[]),
+                import_family_cycle_plans()[..16].to_vec(),
+                import_family_cycle_plans()[4..10].to_vec(),
                 build_preflight_plans(),
                 import_profile_probe(fault),
             ]
@@ -142,8 +139,8 @@ async fn import_build_requires_an_observed_mode_bracket_and_retains_probe_eviden
                 result.payload["result"]["verification_preflight"],
                 json!({
                     "state":"current_window_readable", "from":"20260901", "to":"20260902",
-                    "source_rows":0, "paired_source_bytes":responses[37].len() * 2,
-                    "response_sha256":sha256_hex(&responses[37])
+                    "source_rows":0, "paired_source_bytes":responses[25].len() * 2,
+                    "response_sha256":sha256_hex(&responses[25])
                 })
             );
             let batch = result.payload["result"]["batch_id"].as_str().unwrap();
@@ -177,15 +174,15 @@ async fn import_build_requires_an_observed_mode_bracket_and_retains_probe_eviden
         let mut response_hash = join(&response(0), &response(1));
         let mut bytes = responses[0].len() + responses[1].len();
         if admitted {
-            assert_eq!(observed.len(), 44);
-            for i in [2, 7, 13, 19, 25, 31, 37] {
+            assert_eq!(observed.len(), 32);
+            for i in [2, 7, 13, 19, 25] {
                 request_hash = join(&request_hash, &request(i));
                 response_hash = join(&response_hash, &response(i));
                 bytes += 2 * responses[i].len();
             }
-            request_hash = join(&request_hash, &join(&request(42), &request(43)));
-            response_hash = join(&response_hash, &join(&response(42), &response(43)));
-            bytes += responses[42].len() + responses[43].len();
+            request_hash = join(&request_hash, &join(&request(30), &request(31)));
+            response_hash = join(&response_hash, &join(&response(30), &response(31)));
+            bytes += responses[30].len() + responses[31].len();
         } else {
             assert_eq!(observed.len(), 2);
         }
@@ -261,9 +258,9 @@ async fn education_build_refuses_an_unsupported_voucher_date_before_any_catalogu
 #[tokio::test]
 async fn import_build_rechecks_captured_catalogue_before_persistence() {
     for fault in ["none", "rename", "identity", "parent", "delete"] {
-        let mut plans = qualified_import_cycle_plans()[..44].to_vec();
+        let mut plans = qualified_import_cycle_plans()[..32].to_vec();
         if fault != "none" {
-            for index in [25, 27] {
+            for index in [19, 21] {
                 let xml = plans[index].fixture.body().into_owned();
                 let changed = match fault {
                     "rename" => xml.replace("Bridge Nested Debtor WR4", "Renamed Debtor"),
@@ -285,7 +282,7 @@ async fn import_build_rechecks_captured_catalogue_before_persistence() {
                 assert_ne!(changed, xml);
                 plans[index].fixture = Fixture::SyntheticXml(changed);
             }
-            plans.truncate(30);
+            plans.truncate(24);
         }
         let responses = plans
             .iter()
@@ -319,7 +316,7 @@ async fn import_build_rechecks_captured_catalogue_before_persistence() {
             *error.evidence.unwrap()
         };
         let observed = simulator.finish().unwrap();
-        assert_eq!(observed.len(), if fault == "none" { 44 } else { 30 });
+        assert_eq!(observed.len(), if fault == "none" { 32 } else { 24 });
         let join = |a: &str, b: &str| sha256_hex(format!("{a}:{b}").as_bytes());
         let mut request = join(
             &observed[0].request_body_sha256,
@@ -327,33 +324,31 @@ async fn import_build_rechecks_captured_catalogue_before_persistence() {
         );
         let mut response = join(&sha256_hex(&responses[0]), &sha256_hex(&responses[1]));
         let mut bytes = responses[0].len() + responses[1].len();
-        for i in [2, 7, 13, 19, 25] {
+        for i in [2, 7, 13, 19] {
             request = join(&request, &observed[i].request_body_sha256);
             response = join(&response, &sha256_hex(&responses[i]));
             bytes += 2 * responses[i].len();
         }
         assert_eq!(
             observed[7].request_body_sha256,
-            observed[25].request_body_sha256
+            observed[19].request_body_sha256
         );
         if fault == "none" {
-            for i in [31, 37] {
-                request = join(&request, &observed[i].request_body_sha256);
-                response = join(&response, &sha256_hex(&responses[i]));
-                bytes += responses[i].len() * 2;
-            }
+            request = join(&request, &observed[25].request_body_sha256);
+            response = join(&response, &sha256_hex(&responses[25]));
+            bytes += responses[25].len() * 2;
             request = join(
                 &request,
                 &join(
-                    &observed[42].request_body_sha256,
-                    &observed[43].request_body_sha256,
+                    &observed[30].request_body_sha256,
+                    &observed[31].request_body_sha256,
                 ),
             );
             response = join(
                 &response,
-                &join(&sha256_hex(&responses[42]), &sha256_hex(&responses[43])),
+                &join(&sha256_hex(&responses[30]), &sha256_hex(&responses[31])),
             );
-            bytes += responses[42].len() + responses[43].len();
+            bytes += responses[30].len() + responses[31].len();
         }
         assert_eq!(evidence.request_sha256, request);
         assert_eq!(evidence.response_sha256, response);

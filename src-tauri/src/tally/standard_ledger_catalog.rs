@@ -6,9 +6,10 @@
 use sha2::{Digest, Sha256};
 
 use bridge_tally_protocol::{
+    parse_standard_ledger_catalog_v2_with_identities,
     parse_standard_ledger_catalog_with_identities,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
-    StandardLedgerCatalog, StandardLedgerCatalogError,
+    StandardLedgerCatalog, StandardLedgerCatalogError, StandardLedgerCatalogV2,
 };
 use bridge_tally_transport::TallyTransportError;
 
@@ -88,6 +89,14 @@ pub(crate) fn render_standard_ledger_catalog_request(company_name: &str) -> anyh
     Ok(ReadOnlyProfile::StandardLedgerCatalogV1 { company: &company }.render())
 }
 
+/// The import family's ledger catalogue request: V1's rows, each with the
+/// ledger's `ISBILLWISEON` (design E of #1234). Only the import family sends
+/// it; every other read keeps V1.
+pub(crate) fn render_import_ledger_catalog_request(company_name: &str) -> anyhow::Result<String> {
+    let company = ValidatedCompanyName::new(company_name.to_owned())?;
+    Ok(ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render())
+}
+
 pub(crate) fn admit_standard_ledger_catalog_request(
     request_xml: String,
 ) -> Result<AgentReadRequest, super::agent_read_request::AgentReadRequestError> {
@@ -104,6 +113,32 @@ pub(crate) fn parse_standard_ledger_catalog_response(
         expected_company_name,
         expected_company_guid,
     )
+}
+
+/// The V2 answer to [`render_import_ledger_catalog_request`]. A body without
+/// the flag on every row is refused, never read as "not bill-wise".
+pub(crate) fn parse_import_ledger_catalog_response(
+    response_xml: &str,
+    expected_company_name: &str,
+    expected_company_guid: &str,
+) -> Result<StandardLedgerCatalogV2, StandardLedgerCatalogError> {
+    parse_standard_ledger_catalog_v2_with_identities(
+        response_xml,
+        expected_company_name,
+        expected_company_guid,
+    )
+}
+
+/// The V1 view of a V2 answer, for tests that bind or classify against the
+/// names, GUIDs and parents of a captured import-family catalogue.
+#[cfg(test)]
+pub(crate) fn parse_import_catalog_as_v1(
+    response_xml: &str,
+    expected_company_name: &str,
+    expected_company_guid: &str,
+) -> Result<StandardLedgerCatalog, StandardLedgerCatalogError> {
+    parse_import_ledger_catalog_response(response_xml, expected_company_name, expected_company_guid)
+        .map(|catalogue| catalogue.catalog().clone())
 }
 
 pub(crate) async fn read_standard_ledger_catalog(

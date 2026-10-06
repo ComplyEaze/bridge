@@ -1908,61 +1908,69 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
             .exists());
         // 50 before the pre-flight volume bound, plus the six legs of the one
         // high-water read verify_import now makes (protocol reference §11c).
-        assert_eq!(simulator.finish().expect("requests").len(), 68);
+        assert_eq!(simulator.finish().expect("requests").len(), 56);
     }
 }
 
-/// One paired bill-wise flag read, shaped exactly like the catalogue read
-/// beside it: company, flags, status, flags, status, company.
+/// A V2 catalogue answer with every ledger's flag set here: the names in
+/// `bill_wise` Yes, every other No.
 ///
-/// A REGRESSION DOUBLE, not evidence (AGENTS.md P1): its ledger names and
-/// parents are the live catalogue capture's, and the flag column is set here
-/// (`bill_wise` names the ledgers marked Yes, every other No). It exercises
-/// the build's wiring only. What Tally answers to the build's flag request is
-/// pinned separately, on captures of a live Tally, by the `live_` tests in
-/// `agent_import_bill_wise_tests.rs` and `tests/bill_wise_flags_live.rs`; this
-/// book (nine ledgers) was not part of that capture.
-fn bill_wise_flag_plans(bill_wise: &[&str]) -> Vec<ScenarioPlan> {
+/// A REGRESSION DOUBLE over a live capture (AGENTS.md P1): only the flag column
+/// is rewritten; names, GUIDs, parents and layout are the capture's. It
+/// exercises the build's and the post's own rules. What Tally answers to the
+/// V2 request is pinned on the captures themselves
+/// (`agent_import_bill_wise_tests.rs`, `tests/standard_ledger_catalogue_rows.rs`).
+pub(super) fn with_bill_wise_flags(catalogue: &str, bill_wise: &[&str]) -> String {
+    const OPEN: &str = "<LEDGER NAME=\"";
+    const FLAG: &str = "<ISBILLWISEON TYPE=\"Logical\">";
+    let mut out = String::with_capacity(catalogue.len());
+    let mut rest = catalogue;
+    while let Some(start) = rest.find(OPEN) {
+        let after = &rest[start + OPEN.len()..];
+        let name = &after[..after.find('"').expect("a ledger name closes")];
+        let name = name
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#13;", "\r")
+            .replace("&#10;", "\n");
+        let row_end = after.find("</LEDGER>").expect("a ledger closes");
+        let flag_at = after[..row_end]
+            .find(FLAG)
+            .expect("a V2 row carries its flag")
+            + FLAG.len();
+        let flag_end = flag_at + after[flag_at..].find('<').expect("the flag closes");
+        out.push_str(&rest[..start + OPEN.len() + flag_at]);
+        out.push_str(if bill_wise.contains(&name.as_str()) {
+            "Yes"
+        } else {
+            "No"
+        });
+        out.push_str(&after[flag_end..row_end]);
+        rest = &after[row_end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The import cycle with its two ledger catalogue answers (offsets 5 and 7) the
+/// V2 answer the import family reads (design E of #1234): the same book, each
+/// ledger's `ISBILLWISEON` in the row, none of them bill-wise. Every other
+/// reader of the cycle keeps the V1 answers.
+fn import_family_cycle_plans() -> Vec<ScenarioPlan> {
     let bytes = include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     );
     let words = bytes
         .chunks_exact(2)
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
         .collect::<Vec<_>>();
-    let catalogue = String::from_utf16(&words).expect("captured native catalogue");
-    let mut rows = String::new();
-    let mut rest = catalogue.as_str();
-    while let Some(start) = rest.find("<LEDGER NAME=\"") {
-        let after = &rest[start + "<LEDGER NAME=\"".len()..];
-        let name_end = after.find('"').expect("a ledger name closes");
-        let raw_name = &after[..name_end];
-        let body_end = after.find("</LEDGER>").expect("a ledger closes");
-        let body = &after[..body_end];
-        let parent_start = body.find("<PARENT").expect("a ledger has a parent");
-        let parent_text_start =
-            body[parent_start..].find('>').expect("parent opens") + parent_start + 1;
-        let parent_end = body[parent_text_start..]
-            .find("</PARENT>")
-            .expect("parent closes")
-            + parent_text_start;
-        let raw_parent = &body[parent_text_start..parent_end];
-        let flag = if bill_wise.contains(&raw_name.replace("&amp;", "&").as_str()) {
-            "Yes"
-        } else {
-            "No"
-        };
-        rows.push_str(&format!(
-            "<LEDGER NAME=\"{raw_name}\"><BRIDGECOMPANYGUID>{CAPTURED_GUID}</BRIDGECOMPANYGUID><PARENT>{raw_parent}</PARENT><CLOSINGBALANCE>0</CLOSINGBALANCE><OPENINGBALANCE>0</OPENINGBALANCE><ISBILLWISEON>{flag}</ISBILLWISEON></LEDGER>"
-        ));
-        rest = &after[body_end + "</LEDGER>".len()..];
-    }
-    let snapshot = format!(
-        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>{rows}</COLLECTION></DATA></BODY></ENVELOPE>"
+    let catalogue = with_bill_wise_flags(
+        &String::from_utf16(&words).expect("captured native V2 catalogue"),
+        &[],
     );
-    let mut plans = import_cycle_plans()[4..10].to_vec();
-    for index in [1, 3] {
-        plans[index].fixture = Fixture::SyntheticXml(snapshot.clone());
+    let mut plans = import_cycle_plans();
+    for index in [5, 7] {
+        plans[index].fixture = Fixture::SyntheticXml(catalogue.clone());
     }
     plans
 }
@@ -2603,7 +2611,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
         (true, 1, true, false),
         (false, 1, false, false),
     ] {
-        let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()[..44].to_vec())
+        let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()[..32].to_vec())
             .expect("captured build plan");
         let directory = tempfile::tempdir().unwrap();
         let server = Server::new(crate::agent::Settings {
@@ -2692,7 +2700,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
                 .any(|warning| warning.contains("measured on licensed TallyPrime 7.1 Gold only")),
             "release-evidence warning leaked into a Journal-only batch: {warnings:?}"
         );
-        assert_eq!(simulator.finish().unwrap().len(), 44);
+        assert_eq!(simulator.finish().unwrap().len(), 32);
     }
 }
 
@@ -2720,7 +2728,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
         ),
     ];
     for (batch_post_enabled, voucher_count, edit, refusal) in cases {
-        let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()[..44].to_vec())
+        let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()[..32].to_vec())
             .expect("captured build plan");
         let directory = tempfile::tempdir().unwrap();
         let server = Server::new(crate::agent::Settings {
@@ -2789,7 +2797,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
                 response.value
             );
         }
-        assert_eq!(simulator.finish().unwrap().len(), 44);
+        assert_eq!(simulator.finish().unwrap().len(), 32);
     }
 }
 
@@ -2868,34 +2876,15 @@ mod bank_tests;
 #[path = "agent_import_bill_wise_build_tests.rs"]
 mod bill_wise_build_tests;
 
-/// The 44 requests of one Journal build, in the build's order: the opening
-/// mode probe, identity and catalogue (`cycle[..10]`), the first bill-wise flag
-/// read, the mark (`cycle[10..16]`), the catalogue again, the second flag
-/// read, the pre-flight window, and the closing probe.
-fn journal_build_plans(
-    first_flags: Vec<ScenarioPlan>,
-    second_flags: Vec<ScenarioPlan>,
-) -> Vec<ScenarioPlan> {
-    let cycle = import_cycle_plans();
+fn qualified_import_cycle_plans() -> Vec<ScenarioPlan> {
+    let cycle = import_family_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
     [
         probe.clone(),
-        cycle[..10].to_vec(),
-        first_flags,
-        cycle[10..16].to_vec(),
+        cycle[..16].to_vec(),
         cycle[4..10].to_vec(),
-        second_flags,
         build_preflight_plans(),
-        probe,
-    ]
-    .concat()
-}
-
-fn qualified_import_cycle_plans() -> Vec<ScenarioPlan> {
-    let cycle = import_cycle_plans();
-    let probe = mode_tests::licensed_import_probe();
-    [
-        journal_build_plans(bill_wise_flag_plans(&[]), bill_wise_flag_plans(&[])),
+        probe.clone(),
         probe,
         cycle[16..].to_vec(),
     ]
@@ -3412,7 +3401,7 @@ async fn verify_saved_batch_after_dispatch(
     // Six more than before the pre-flight bound: verify_import's high-water read.
     assert_eq!(
         simulator.finish().expect("captured plan requests").len(),
-        68
+        56
     );
     let markdown = fs::read_to_string(
         server
@@ -3515,7 +3504,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
     // Six more than before the pre-flight bound: verify_import's high-water read.
     assert_eq!(
         simulator.finish().expect("captured plan requests").len(),
-        68
+        56
     );
 }
 
@@ -3550,14 +3539,14 @@ fn master_match_byte_cap_retains_narrow_fold_candidate() {
 /// large and read again as its two days, then replayed day by day.
 fn verify_split_after_refusal_plans() -> Vec<ScenarioPlan> {
     let cycle = qualified_import_cycle_plans();
-    // Legs 0..56 build the batch and open verify_import through its marks.
-    let (company, status, premark) = (cycle[56].clone(), cycle[58].clone(), cycle[51].clone());
-    let readback = cycle[57].fixture.body().into_owned();
+    // Legs 0..44 build the batch and open verify_import through its marks.
+    let (company, status, premark) = (cycle[44].clone(), cycle[46].clone(), cycle[39].clone());
+    let readback = cycle[45].fixture.body().into_owned();
     let first = readback.find("<VOUCHER ").unwrap();
     let second = readback.rfind("<VOUCHER ").unwrap();
     let end = readback.rfind("</COLLECTION>").unwrap();
     let day = |voucher: &str| {
-        let mut plan = cycle[57].clone();
+        let mut plan = cycle[45].clone();
         plan.fixture = Fixture::SyntheticXml(format!(
             "{}{voucher}{}",
             &readback[..first],
@@ -3576,11 +3565,11 @@ fn verify_split_after_refusal_plans() -> Vec<ScenarioPlan> {
             company.clone(),
         ]
     };
-    let mut plans = cycle[..56].to_vec();
+    let mut plans = cycle[..44].to_vec();
     // The whole window, refused as over the transport cap.
     plans.push(company.clone());
     plans.push(
-        cycle[57]
+        cycle[45]
             .clone()
             .with_framing(ResponseFraming::DeclaredContentLength {
                 bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
@@ -3638,7 +3627,7 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
                 2
             );
         }
-        assert_eq!(simulator.finish().expect("requests").len(), 94);
+        assert_eq!(simulator.finish().expect("requests").len(), 82);
     }
 }
 

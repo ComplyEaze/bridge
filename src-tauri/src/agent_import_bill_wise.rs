@@ -18,28 +18,11 @@ use super::{
     VoucherType,
 };
 use bridge_tally_core::ExactDecimal;
-use bridge_tally_protocol::native_outstandings::{
-    NativeLedgerBillWiseFlag, NativeLedgerSnapshotPeriod,
-};
-use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
-use bridge_tally_protocol::parent_partition::{
-    ParentName, ParentObservation, ParentPart, ParentPartition, ParentPartitionError,
-    PartitionLimits,
-};
+use bridge_tally_protocol::{BillWiseFlag, StandardLedgerCatalogV2};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-
-/// Most parent parts one bill-wise check may read: Bridge's own bound, and NOT
-/// a justified one. A build reads the flags twice (before the approval verdict
-/// and again after the catalogue and group repeats), a part is at most 16 MB
-/// (4,266 ledgers at the 3,750 bytes a ledger is estimated at), and a 22 MB
-/// ledger read of a large book took 7 to 11 s once: at that rate four parts,
-/// twice, is about 80 s, past the 45 s one call may take (`CALL_CEILING`). The
-/// time of this read on a large book was not measured, and the filtered
-/// snapshot has been read live only on small books. See the pull request.
-pub(super) const MAX_BILL_WISE_PARTS: usize = 4;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The build argument carrying one approval per party.
 pub(super) const APPROVALS_KEY: &str = "on_account_approvals";
@@ -48,214 +31,93 @@ pub(super) const APPROVALS_KEY: &str = "on_account_approvals";
 /// wherever it would be posted.
 pub(super) const BILL_WISE_NOT_RECORDED: &str = "import_batch_predates_bill_wise_record";
 
-/// Why the flags of the named ledgers were not established. Every variant is
-/// carries no data: it names no ledger, parent or company.
+/// Why the flags of the named ledgers were not in hand, or no longer hold. Every
+/// variant carries no data: it names no ledger, parent or company.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum BillWiseError {
-    /// The company's `books_from` is absent, so no period can be asked for.
-    BooksFromAbsent,
-    /// `books_from` is not a date the read's period admits (an Education
-    /// licence reads only on the 1st, 2nd or 31st).
-    PeriodUnsupported,
-    /// A named ledger is not in the catalogue.
+    /// A named ledger is not in the catalogue the flags came from.
     LedgerNotInCatalogue,
-    /// A named ledger's parent cannot be named in a filter, and the book is
-    /// too large to read whole.
-    ParentNotNameable,
-    /// One parent holds more ledgers than a part may.
-    ParentOverBudget,
-    /// The parents need more parts than the limit allows.
-    TooManyParts,
-    /// The catalogue's rows cannot be planned into parts, for the reason the
-    /// protocol names.
-    Unplannable(&'static str),
-    /// A response answered a different number of ledgers than the catalogue
-    /// holds for what was asked.
-    RowCountDiffers,
-    /// A named ledger is in none of the rows.
-    LedgerAbsent,
-    /// Two rows carry one ledger name.
-    LedgerRepeated,
 }
 
 impl BillWiseError {
-    /// `bill_wise_read_too_large` when a smaller ask could be made;
-    /// `bill_wise_not_established` otherwise.
     pub(super) fn reason(self) -> &'static str {
-        match self {
-            Self::ParentOverBudget | Self::TooManyParts => "bill_wise_read_too_large",
-            _ => "bill_wise_not_established",
-        }
+        "bill_wise_not_established"
     }
 
-    /// One sentence a person can be told, for each cause.
+    /// One sentence a person can be told.
     pub(super) fn plain(self) -> &'static str {
         match self {
-            Self::BooksFromAbsent => "Tally did not give this company's books-from date, so the check could not be asked for.",
-            Self::PeriodUnsupported => "This company's books-from date could not be used to ask for the check: it is not a valid date, or this licence does not let ComplyEaze Bridge read on it (Tally Education reads only on the 1st, 2nd or 31st of a month).",
             Self::LedgerNotInCatalogue => "A ledger in this batch is not in the company's ledger list, so it cannot be checked.",
-            Self::ParentNotNameable => "A ledger in this batch sits under a group whose name ComplyEaze Bridge cannot use to read a large book part by part.",
-            Self::ParentOverBudget => "A group holding one of these ledgers has more ledgers than one read can check, and this version cannot split it.",
-            Self::TooManyParts => "The ledgers in this batch sit under more groups than this version will read in one build.",
-            Self::Unplannable(_) => "The company's ledger list could not be divided safely to read it part by part.",
-            Self::RowCountDiffers => "Tally returned a different number of ledgers than its ledger list holds, so the answer could not be trusted. A ledger may have been added or removed during the build.",
-            Self::LedgerAbsent => "Tally's answer did not include a ledger this batch names under the same spelling. This can happen for a ledger whose name ends in a line break, which this version cannot check yet.",
-            Self::LedgerRepeated => "Tally's answer listed one ledger name twice, so its answer could not be trusted.",
         }
     }
 
     pub(super) fn cause(self) -> &'static str {
         match self {
-            Self::BooksFromAbsent => "books_from_absent",
-            Self::PeriodUnsupported => "period_unsupported",
             Self::LedgerNotInCatalogue => "ledger_not_in_catalogue",
-            Self::ParentNotNameable => "parent_not_nameable",
-            Self::ParentOverBudget => "parent_over_budget",
-            Self::TooManyParts => "too_many_parts",
-            Self::Unplannable(code) => code,
-            Self::RowCountDiffers => "row_count_differs",
-            Self::LedgerAbsent => "ledger_absent",
-            Self::LedgerRepeated => "ledger_repeated",
         }
     }
 }
 
-/// The period the flag read asks for: one day, the company's `books_from`.
-/// The flag does not depend on the period; the smallest body is the cheapest
-/// read. [verified live 6 Oct 2026 on one synthetic book of 17 ledgers: the
-/// one-day answer has the same ledgers, parents and flags as the wide window
-/// (lab record); the `live_` tests pin the one-day request and its answer]
-pub(super) fn bill_wise_period(
-    books_from: Option<&str>,
-    profile: DateBoundaryProfile,
-) -> Result<NativeLedgerSnapshotPeriod, BillWiseError> {
-    let books_from = books_from.ok_or(BillWiseError::BooksFromAbsent)?;
-    let date = bridge_tally_core::TallyDate::parse(books_from.replace('-', ""))
-        .map_err(|_| BillWiseError::PeriodUnsupported)?;
-    NativeLedgerSnapshotPeriod::new(profile, date.clone(), date)
-        .map_err(|_| BillWiseError::PeriodUnsupported)
-}
-
-/// What to read: the whole snapshot when the catalogue fits one part, else the
-/// parts holding the named ledgers' parents. Never a complement part: its
-/// formula bound is not verified.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum BillWiseReadPlan {
-    Whole { catalogue_rows: usize },
-    Parts(Vec<ParentPart>),
-}
-
-/// The read plan for `named`. `rows` is the catalogue's `identified_parents()`,
-/// `limits` the build's `parent_partition_limits()`.
-pub(super) fn plan_reads<'a>(
-    rows: impl IntoIterator<Item = (&'a str, &'a str, ParentObservation<'a>)>,
-    limits: PartitionLimits,
-    named: &BTreeSet<&str>,
-) -> Result<BillWiseReadPlan, BillWiseError> {
-    let rows = rows.into_iter().collect::<Vec<_>>();
-    let parent_of = rows
-        .iter()
-        .map(|(name, _, parent)| (*name, *parent))
-        .collect::<HashMap<_, _>>();
-    // Absence from the catalogue is refused whichever way the book is read,
-    // so a whole read never hides a ledger the catalogue lacks.
-    if named.iter().any(|name| !parent_of.contains_key(name)) {
-        return Err(BillWiseError::LedgerNotInCatalogue);
-    }
-    if u64::try_from(rows.len()).is_ok_and(|count| count <= limits.max_ledgers_per_part) {
-        return Ok(BillWiseReadPlan::Whole {
-            catalogue_rows: rows.len(),
-        });
-    }
-    let mut parents = BTreeSet::new();
-    for name in named {
-        match parent_of[name] {
-            ParentObservation::Named(text) if ParentName::parse(text).is_ok() => {
-                parents.insert(text);
-            }
-            _ => return Err(BillWiseError::ParentNotNameable),
-        }
-    }
-    // Every ledger under each such parent, so each part's row count is exact.
-    let under_parents = rows.iter().copied().filter(
-        |(_, _, parent)| matches!(parent, ParentObservation::Named(text) if parents.contains(text)),
-    );
-    let partition = ParentPartition::plan(under_parents, limits).map_err(|error| match error {
-        ParentPartitionError::ParentOverBudget { .. } => BillWiseError::ParentOverBudget,
-        ParentPartitionError::TooManyParts { .. } => BillWiseError::TooManyParts,
-        other => BillWiseError::Unplannable(other.safe_code()),
-    })?;
-    if partition.parts().len() > MAX_BILL_WISE_PARTS {
-        return Err(BillWiseError::TooManyParts);
-    }
-    Ok(BillWiseReadPlan::Parts(partition.parts().to_vec()))
-}
-
-/// What one response was asked for.
-pub(super) enum BillWiseScope<'a> {
-    Whole { catalogue_rows: usize },
-    Part(&'a ParentPart),
-}
-
-/// One snapshot response's rows, and what was asked for.
-pub(super) struct BillWiseRead<'a> {
-    pub(super) scope: BillWiseScope<'a>,
-    pub(super) rows: &'a [NativeLedgerBillWiseFlag],
-}
-
-/// Each observed ledger's `ISBILLWISEON`, by exact name.
+/// Each named ledger's `ISBILLWISEON`, by exact name, as the ledger catalogue
+/// read said it (design E of #1234: the flag rides the catalogue the build
+/// already reads). A V2 catalogue holds a typed flag for every ledger, so a
+/// ledger never lacks one here; a name that was not asked for is treated as
+/// bill-wise, the refusing direction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ObservedBillWise {
-    flags: BTreeMap<String, bool>,
+    flags: BTreeMap<String, BillWiseFlag>,
 }
 
 impl ObservedBillWise {
-    /// Refuses when a response's row count differs from the catalogue's, when
-    /// a name repeats across the rows, or when a requested ledger is in none.
-    pub(super) fn new<'a>(
+    /// Refuses when a requested ledger is not in the catalogue.
+    pub(super) fn from_catalogue<'a>(
+        catalogue: &StandardLedgerCatalogV2,
         requested: impl IntoIterator<Item = &'a str>,
-        reads: &[BillWiseRead<'_>],
     ) -> Result<Self, BillWiseError> {
-        let mut flags = BTreeMap::new();
-        for read in reads {
-            let count_ok = match &read.scope {
-                BillWiseScope::Whole { catalogue_rows } => read.rows.len() == *catalogue_rows,
-                BillWiseScope::Part(part) => part.check_row_count(read.rows.len()).is_ok(),
-            };
-            if !count_ok {
-                return Err(BillWiseError::RowCountDiffers);
-            }
-            for row in read.rows {
-                if flags.insert(row.name.clone(), row.bill_wise_on).is_some() {
-                    return Err(BillWiseError::LedgerRepeated);
-                }
-            }
-        }
-        if requested.into_iter().any(|name| !flags.contains_key(name)) {
-            return Err(BillWiseError::LedgerAbsent);
+        let requested = requested.into_iter().collect::<BTreeSet<_>>();
+        let flags = catalogue
+            .bill_wise_flags()
+            .filter(|(name, _, _)| requested.contains(name))
+            .map(|(name, _, flag)| (name.to_string(), flag))
+            .collect::<BTreeMap<_, _>>();
+        if requested.iter().any(|name| !flags.contains_key(*name)) {
+            return Err(BillWiseError::LedgerNotInCatalogue);
         }
         Ok(Self { flags })
     }
 
-    /// The flags of the named ledgers alone, for comparing two observations:
-    /// a ledger the batch does not name changing between two reads does not
-    /// matter to it.
-    pub(super) fn flags_of<'a>(
-        &self,
-        named: &BTreeSet<&'a str>,
-    ) -> BTreeMap<&'a str, Option<bool>> {
-        named
-            .iter()
-            .map(|name| (*name, self.flags.get(*name).copied()))
-            .collect()
-    }
-
-    /// A name that was never observed counts as bill-wise: `new` refuses a
-    /// requested ledger that is absent, so this only answers for a name the
-    /// caller did not request, and refusing is the safe error.
+    /// A name that was never observed counts as bill-wise: `from_catalogue`
+    /// refuses a requested ledger that is absent, so this only answers for a
+    /// name the caller did not request, and refusing is the safe error.
     fn is_bill_wise(&self, ledger: &str) -> bool {
-        self.flags.get(ledger).copied().unwrap_or(true)
+        !matches!(self.flags.get(ledger), Some(BillWiseFlag::Off))
     }
+}
+
+/// Whether every ledger the batch names still reads as it did when the person
+/// was asked: a named ledger with no approval was not bill-wise at the build, so
+/// it must not be bill-wise now, or an entry on it would land On Account unseen.
+/// An approved ledger that is no longer bill-wise needs no approval and passes.
+/// A named ledger the catalogue no longer holds fails.
+pub(super) fn flags_still_as_approved(
+    catalogue: &StandardLedgerCatalogV2,
+    named: &BTreeSet<&str>,
+    approved: &[OnAccountApproved],
+) -> bool {
+    let approved = approved
+        .iter()
+        .map(|item| item.ledger.as_str())
+        .collect::<BTreeSet<_>>();
+    let now = catalogue
+        .bill_wise_flags()
+        .filter(|(name, _, _)| named.contains(name))
+        .map(|(name, _, flag)| (name, flag))
+        .collect::<BTreeMap<_, _>>();
+    named.iter().all(|name| match now.get(name) {
+        Some(BillWiseFlag::Off) => true,
+        Some(BillWiseFlag::On) => approved.contains(name),
+        None => false,
+    })
 }
 
 /// Every ledger name the payload's entries carry.

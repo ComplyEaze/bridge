@@ -1253,7 +1253,7 @@ fn high_water_read() -> AgentReadRequest {
 }
 
 fn cash_binding() -> bridge_tally_protocol::StandardLedgerCatalogBinding {
-    bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue(),
         "WR2 Unicode Lab",
         GUID,
@@ -1304,7 +1304,7 @@ async fn granted(
 }
 
 fn binding_of(line: &ImportLedgerLine, preview: &str) -> ApprovalBinding {
-    let binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue(),
         "WR2 Unicode Lab",
         GUID,

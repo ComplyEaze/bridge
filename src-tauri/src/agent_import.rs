@@ -1,13 +1,14 @@
 use super::{
     arg_usize, combine_evidence, company_currency_read, company_high_water_read, company_json,
-    ledger_bill_wise_read, ledger_bill_wise_whole_read, native_group_snapshot_read,
-    normalized_date, optional_string, parse_company_high_water, party_name, required_string,
-    sha256_hex, sha256_json, standard_ledger_catalog_read, Evidence, Server, ToolFailure,
-    ToolOutcome, VOUCHER_CHECKPOINT_NOT_OBSERVED,
+    import_ledger_catalogue_read, native_group_snapshot_read, normalized_date, optional_string,
+    parse_company_high_water, party_name, required_string, sha256_hex, sha256_json,
+    standard_ledger_catalog_read, Evidence, Server, ToolFailure, ToolOutcome,
+    VOUCHER_CHECKPOINT_NOT_OBSERVED,
 };
 use crate::tally::agent_read_request::AgentReadRequest;
 use crate::tally::standard_ledger_catalog::{
-    admit_standard_ledger_catalog_request, parse_standard_ledger_catalog_response,
+    admit_standard_ledger_catalog_request, parse_import_ledger_catalog_response,
+    parse_standard_ledger_catalog_response,
 };
 use bridge_tally_core::master_binding::{
     self, twin_fold_keys, BindingBasis, BindingStatus, Candidates, EntityBinding, MasterCatalog,
@@ -627,7 +628,7 @@ impl Server {
                     evidence.clone(),
                 ))
             })?;
-        annotate_folded_twins(&mut report, &names, ledger_masters.parents());
+        annotate_folded_twins(&mut report, &names, ledger_masters.catalog().parents());
         let hash = sha256_json(&catalogue);
         Ok(ToolOutcome {
             payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"masters": report, "catalogue_evidence_sha256": hash}}),
@@ -731,7 +732,7 @@ impl Server {
             accumulated = combine_evidence(accumulated.clone(), catalogue_evidence.clone());
             let requested_names = requested_ledger_names(&payload);
             let mut report = masters_for_payload(&payload, &catalogue)?;
-            annotate_folded_twins(&mut report, &requested_names, ledger_masters.parents());
+            annotate_folded_twins(&mut report, &requested_names, ledger_masters.catalog().parents());
             if report.iter().any(|value| value["match_state"] != "exact") {
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
@@ -744,7 +745,7 @@ impl Server {
                     truncated: false,
                 });
             }
-            let twins = folded_twins(&requested_names, ledger_masters.parents());
+            let twins = folded_twins(&requested_names, ledger_masters.catalog().parents());
             if !twins.is_empty() {
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
@@ -765,6 +766,7 @@ impl Server {
             // Bind each named ledger to the GUID this read observed (#239): a
             // post refuses a ledger renamed and replaced under its name since.
             let build_binding = ledger_masters
+                .catalog()
                 .bind_selected(requested_ledger_names(&payload))
                 .map_err(|_| "import_masters_changed".to_string())?
                 .pairs()
@@ -783,7 +785,7 @@ impl Server {
             if renders_bank_shape(&payload.vouchers) || !resolved.cash_ledgers.is_empty() {
                 let (groups, evidence) = self.read_group_collection(&identity, &company.name).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence.clone());
-                let observed = ObservedMasters::new(ledger_masters.parents(), groups);
+                let observed = ObservedMasters::new(ledger_masters.catalog().parents(), groups);
                 let refusals =
                     cash_bank_refusals(&payload, &observed, self.settings.max_bytes);
                 if refusals.is_refused() {
@@ -823,7 +825,7 @@ impl Server {
                 }
                 if let Some(ledgers) = &resolved.statement_ledgers {
                     let findings = statement_ledger_findings(ledgers, &observed, |name| {
-                        ledger_masters.parents().any(|(known, _)| known == name)
+                        ledger_masters.catalog().parents().any(|(known, _)| known == name)
                     });
                     if findings.bank_in_cash_in_hand {
                         let row = refused_ledger_row(
@@ -886,13 +888,16 @@ impl Server {
                     });
                 }
             }
-            // Which of the named ledgers keep bills in Tally. Read after the
+            // Which of the named ledgers keep bills in Tally, as the catalogue
+            // read above said it (design E of #1234: the flag rides the
+            // catalogue the build already reads, so no further request is made
+            // and the catalogue repeat below holds the flags to the same
+            // byte-for-byte stability as the names). Entries on such a ledger
+            // with no bill allocation land On Account (#1234). Judged after the
             // already-posted check, so nobody is asked to approve a batch that
             // is refused for that reason, and before the mark, so a refusal
-            // here costs no further read. A later check (the catalogue or
-            // group repeat, the second flag read, an amendment's comparison)
-            // can still refuse a batch whose approval was asked. Entries on
-            // such a ledger with no bill allocation land On Account (#1234).
+            // here costs no further read. A later check can still refuse a
+            // batch whose approval was asked.
             let digest_company = import_company_tuple(&company)?;
             let digest_endpoint = super::canonical_loopback_origin(&self.settings.endpoint)
                 .map_err(|_| "host_setting_invalid".to_string())?;
@@ -902,32 +907,22 @@ impl Server {
                 amends_batch_id: payload.amends_batch_id.as_deref(),
                 batch_content: bill_wise::batch_content_digest(&payload.vouchers),
             };
-            let first_flags = match self
-                .read_bill_wise_flags(
-                    &identity,
-                    &company.name,
-                    company.books_from.as_deref(),
-                    boundary_profile_for(&opening_profile),
-                    &ledger_masters,
-                    &payload,
-                )
-                .await
-            {
-                Ok(observation) => observation,
-                Err(BillWiseReadFailure::Refused(error, evidence)) => {
+            let observed_flags = match bill_wise::ObservedBillWise::from_catalogue(
+                &ledger_masters,
+                bill_wise::named_ledgers(&payload),
+            ) {
+                Ok(observed) => observed,
+                Err(error) => {
                     return Ok(bill_wise_not_established(
                         &company,
                         &payload.company_guid,
                         error,
-                        evidence,
                         accumulated.clone(),
                     ));
                 }
-                Err(BillWiseReadFailure::Failed(failure)) => return Err(*failure),
             };
-            accumulated = combine_evidence(accumulated.clone(), first_flags.evidence.clone());
             let parties =
-                bill_wise::bill_wise_parties(&payload.vouchers, &first_flags.observed);
+                bill_wise::bill_wise_parties(&payload.vouchers, &observed_flags);
             let verdict = bill_wise::judge_approvals(&approvals, &parties, &bill_wise_context)
                 .map_err(approval_invalid)?;
             if !verdict.unapproved.is_empty() {
@@ -941,7 +936,7 @@ impl Server {
                         "refused_parties":refused,
                         "refused_party_count":verdict.unapproved.len(),
                         "refused_parties_omitted":omitted,
-                        "bill_wise_response_sha256":first_flags.response_sha256s,
+                        "bill_wise_response_sha256":[catalogue_evidence.response_sha256.clone()],
                         "next_step":BILL_WISE_UNAPPROVED_NEXT_STEP
                     }}),
                     evidence: accumulated.clone(),
@@ -952,8 +947,9 @@ impl Server {
             let on_account_approved = verdict.approved;
             let (mark, mark_evidence) = self.pre_import_mark(&company, &identity).await?;
             accumulated = combine_evidence(accumulated.clone(), mark_evidence.clone());
-            let (_, repeated_catalogue_evidence) =
-                self.read_ledger_catalogue(&identity, &company.name).await?;
+            let (_, _, _, repeated_catalogue_evidence) = self
+                .read_import_ledger_catalogue(&identity, &company.name)
+                .await?;
             accumulated = combine_evidence(accumulated.clone(), repeated_catalogue_evidence.clone());
             // Compare the complete captured catalogue, including identities and parents.
             // This proves stability across these observations, not an atomic snapshot.
@@ -971,37 +967,10 @@ impl Server {
                     return Err("import_groups_changed".to_string().into());
                 }
             }
-            // The flags are held to the same stability as the catalogue and the
-            // groups: a ledger switched to or from bill-wise between the two
-            // reads is refused rather than approved on one observation.
-            let second_flags = match self
-                .read_bill_wise_flags(
-                    &identity,
-                    &company.name,
-                    company.books_from.as_deref(),
-                    boundary_profile_for(&opening_profile),
-                    &ledger_masters,
-                    &payload,
-                )
-                .await
-            {
-                Ok(observation) => observation,
-                Err(BillWiseReadFailure::Refused(error, evidence)) => {
-                    return Ok(bill_wise_not_established(
-                        &company,
-                        &payload.company_guid,
-                        error,
-                        evidence,
-                        accumulated.clone(),
-                    ));
-                }
-                Err(BillWiseReadFailure::Failed(failure)) => return Err(*failure),
-            };
-            accumulated = combine_evidence(accumulated.clone(), second_flags.evidence.clone());
-            let named = bill_wise::named_ledgers(&payload);
-            if first_flags.observed.flags_of(&named) != second_flags.observed.flags_of(&named) {
-                return Err("import_bill_wise_changed".to_string().into());
-            }
+            // The flags came in the catalogue rows, so the byte comparison above
+            // already holds them to the stability it holds the names to: a
+            // ledger switched to or from bill-wise between the two reads is
+            // `import_catalogue_changed`.
             let (date_from, date_to) = match &lineage {
                 // The window must hold each voucher where it is now as well as
                 // where the amendment moves it, or both checks miss it.
@@ -1208,14 +1177,10 @@ impl Server {
                     "verification_preflight": verification_preflight,
                     "identity_scheme": line.identity_scheme,
                     // The bill-wise ledgers a person approved, each with the
-                    // digest the approval was tied to, and the flag reads'
-                    // responses (#1234).
+                    // digest the approval was tied to, and the catalogue
+                    // response the flags came from (#1234).
                     "on_account_approved": line.on_account_approved,
-                    "bill_wise_response_sha256": first_flags
-                        .response_sha256s
-                        .iter()
-                        .chain(&second_flags.response_sha256s)
-                        .collect::<Vec<_>>(),
+                    "bill_wise_response_sha256": [catalogue_evidence.response_sha256.clone()],
                     // The fifth element of §9.13's identity tuple. It is
                     // recorded on the batch and compared on dispatch, but a
                     // hand import never reaches that check — so the operator
@@ -1706,135 +1671,55 @@ impl Server {
         Ok(())
     }
 
+    /// The V1 ledger catalogue, for every read outside the import family
+    /// (presence, vouchers, the bill trail).
     pub(super) async fn read_ledger_catalogue(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
     ) -> Result<(Vec<String>, Evidence), ToolFailure> {
-        let (names, _, _, evidence) = self
-            .read_import_ledger_catalogue(identity, company_name)
-            .await?;
-        Ok((names, evidence))
+        let read = standard_ledger_catalog_read(company_name)
+            .map_err(|_| "company_name_invalid".to_string())?;
+        admit_standard_ledger_catalog_request(read.as_str().to_string())
+            .map_err(|_| "ledger_export_invalid".to_string())?;
+        let (xml, evidence) = self.post_read(identity, read).await?;
+        let catalogue =
+            parse_standard_ledger_catalog_response(&xml, company_name, identity.company_guid())
+                .map_err(|error| catalogue_failure(error, &evidence))?;
+        Ok((catalogue.names().map(str::to_string).collect(), evidence))
     }
 
-    async fn read_import_ledger_catalogue(
+    /// The import family's ledger catalogue: V1's rows, each with its
+    /// `ISBILLWISEON` (design E of #1234), so one read answers both which
+    /// ledgers exist and which keep bills. Used by the build, `validate_masters`,
+    /// the post and the queue's re-read.
+    pub(super) async fn read_import_ledger_catalogue(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
     ) -> Result<
         (
             Vec<String>,
-            bridge_tally_protocol::StandardLedgerCatalog,
+            bridge_tally_protocol::StandardLedgerCatalogV2,
             AgentReadRequest,
             Evidence,
         ),
         ToolFailure,
     > {
-        let read = standard_ledger_catalog_read(company_name)
+        let read = import_ledger_catalogue_read(company_name)
             .map_err(|_| "company_name_invalid".to_string())?;
         let request = admit_standard_ledger_catalog_request(read.as_str().to_string())
             .map_err(|_| "ledger_export_invalid".to_string())?;
         let (xml, evidence) = self.post_read(identity, read).await?;
         let catalogue =
-            parse_standard_ledger_catalog_response(&xml, company_name, identity.company_guid())
-                .map_err(|error| {
-                    // `code` keeps naming what failed; the cause says why, which
-                    // every catalogue refusal used to leave out (bridge#634).
-                    let mut failure = ToolFailure::from("ledger_export_invalid".to_string())
-                        .with_prior_evidence(evidence.clone());
-                    failure.cause = Some(error.safe_code());
-                    failure
-                })?;
+            parse_import_ledger_catalog_response(&xml, company_name, identity.company_guid())
+                .map_err(|error| catalogue_failure(error, &evidence))?;
         Ok((
-            catalogue.names().map(str::to_string).collect(),
+            catalogue.catalog().names().map(str::to_string).collect(),
             catalogue,
             request,
             evidence,
         ))
-    }
-
-    /// Each ledger the payload names, with its `ISBILLWISEON`, from the
-    /// outstandings snapshot: one unfiltered read when the catalogue fits one
-    /// part, else the parts holding the named ledgers' parents (#1234). The
-    /// response is parsed for the flag alone, so a book whose balances the
-    /// full snapshot parse refuses still answers.
-    async fn read_bill_wise_flags(
-        &self,
-        identity: &super::VerifiedCompanyIdentity,
-        company_name: &str,
-        books_from: Option<&str>,
-        boundary: DateBoundaryProfile,
-        catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
-        payload: &ImportPayload,
-    ) -> Result<BillWiseObservation, BillWiseReadFailure> {
-        use bridge_tally_protocol::native_outstandings::parse_native_ledger_bill_wise_flags_for_company;
-        let refused = |error| BillWiseReadFailure::Refused(error, None);
-        let named = bill_wise::named_ledgers(payload);
-        let period = bill_wise::bill_wise_period(books_from, boundary).map_err(refused)?;
-        let plan = bill_wise::plan_reads(
-            catalogue.identified_parents(),
-            crate::tally::connection::parent_partition_limits(),
-            &named,
-        )
-        .map_err(refused)?;
-        let requests = match &plan {
-            bill_wise::BillWiseReadPlan::Whole { .. } => {
-                vec![ledger_bill_wise_whole_read(company_name, &period)]
-            }
-            bill_wise::BillWiseReadPlan::Parts(parts) => parts
-                .iter()
-                .map(|part| ledger_bill_wise_read(company_name, &period, part))
-                .collect(),
-        };
-        let mut evidence: Option<Evidence> = None;
-        let mut response_sha256s = Vec::with_capacity(requests.len());
-        let mut responses = Vec::with_capacity(requests.len());
-        for request in requests {
-            let (xml, read_evidence) = self
-                .post_read(identity, request)
-                .await
-                .map_err(|failure| BillWiseReadFailure::Failed(Box::new(failure)))?;
-            response_sha256s.push(read_evidence.response_sha256.clone());
-            evidence = Some(match evidence {
-                Some(so_far) => combine_evidence(so_far, read_evidence.clone()),
-                None => read_evidence.clone(),
-            });
-            let rows =
-                parse_native_ledger_bill_wise_flags_for_company(&xml, identity.company_guid())
-                    .map_err(|error| {
-                        let mut failure = ToolFailure::from("bill_wise_export_invalid".to_string())
-                            .with_prior_evidence(read_evidence.clone());
-                        failure.cause = crate::tally::approved_import::group_snapshot_cause(&error);
-                        BillWiseReadFailure::Failed(Box::new(failure))
-                    })?;
-            responses.push(rows);
-        }
-        let reads = match &plan {
-            bill_wise::BillWiseReadPlan::Whole { catalogue_rows } => responses
-                .iter()
-                .map(|rows| bill_wise::BillWiseRead {
-                    scope: bill_wise::BillWiseScope::Whole {
-                        catalogue_rows: *catalogue_rows,
-                    },
-                    rows,
-                })
-                .collect::<Vec<_>>(),
-            bill_wise::BillWiseReadPlan::Parts(parts) => parts
-                .iter()
-                .zip(&responses)
-                .map(|(part, rows)| bill_wise::BillWiseRead {
-                    scope: bill_wise::BillWiseScope::Part(part),
-                    rows,
-                })
-                .collect::<Vec<_>>(),
-        };
-        let observed = bill_wise::ObservedBillWise::new(named.iter().copied(), &reads)
-            .map_err(|error| BillWiseReadFailure::Refused(error, evidence.clone()))?;
-        Ok(BillWiseObservation {
-            observed,
-            response_sha256s,
-            evidence: evidence.unwrap_or_else(|| local_evidence("bill_wise_flags_not_read")),
-        })
     }
 
     /// The company's group tree, read only when a payload needs one leg
@@ -2488,18 +2373,16 @@ fn nonempty_company_field(value: &str) -> Result<String, String> {
         .ok_or_else(|| "company_identity_incomplete".to_string())
 }
 
-/// What a bill-wise flag read established, and what it cost.
-struct BillWiseObservation {
-    observed: bill_wise::ObservedBillWise,
-    response_sha256s: Vec<String>,
-    evidence: Evidence,
-}
-
-/// Why the flags are not in hand: refused with a typed cause (the reads that
-/// did happen are kept as evidence), or a read that failed outright.
-enum BillWiseReadFailure {
-    Refused(bill_wise::BillWiseError, Option<Evidence>),
-    Failed(Box<ToolFailure>),
+/// A catalogue answer that cannot be used: `code` keeps naming what failed; the
+/// cause says why, which every catalogue refusal used to leave out (bridge#634).
+fn catalogue_failure(
+    error: bridge_tally_protocol::StandardLedgerCatalogError,
+    evidence: &Evidence,
+) -> ToolFailure {
+    let mut failure = ToolFailure::from("ledger_export_invalid".to_string())
+        .with_prior_evidence(evidence.clone());
+    failure.cause = Some(error.safe_code());
+    failure
 }
 
 fn approval_invalid(error: bill_wise::ApprovalError) -> ToolFailure {
@@ -2512,13 +2395,8 @@ fn bill_wise_not_established(
     company: &bridge_tally_protocol::TallyCompany,
     company_guid: &str,
     error: bill_wise::BillWiseError,
-    read_evidence: Option<Evidence>,
-    accumulated: Evidence,
+    evidence: Evidence,
 ) -> ToolOutcome {
-    let evidence = match read_evidence {
-        Some(read) => combine_evidence(accumulated, read),
-        None => accumulated,
-    };
     ToolOutcome {
         payload: json!({"company": company_json(company, std::slice::from_ref(company)), "result": {
             "state":"refused", "reason":error.reason(), "cause":error.cause(),
@@ -2531,13 +2409,13 @@ fn bill_wise_not_established(
     }
 }
 
-const BILL_WISE_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written. ComplyEaze Bridge could not establish which of the ledgers in this batch keep bills in Tally, so it cannot tell whether an entry would land On Account. Tell the person what message says, in your own words, and that nothing was posted. Build again once it is resolved: a ledger added or removed during the build clears by building again. Do not drop a ledger from the batch to get past this. For too_many_parts, building fewer vouchers at a time (so the batch names ledgers under fewer groups) can help; for parent_over_budget it cannot, and this version has no way through for that ledger.";
+const BILL_WISE_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written. ComplyEaze Bridge could not establish which of the ledgers in this batch keep bills in Tally, so it cannot tell whether an entry would land On Account. Tell the person what message says, in your own words, and that nothing was posted. Build again once it is resolved. Do not drop a ledger from the batch to get past this.";
 
 const BILL_WISE_UNAPPROVED_NEXT_STEP: &str = "No file was written. Each party listed is a ledger that keeps bills in Tally. An entry on it with no bill allocation lands On Account, and the person must then match it to a bill in Tally by hand. Show the person each party with its row_count, its debit_total and credit_total, and the rows listed, and say how many more rows there are (rows_omitted, refused_parties_omitted); raise BRIDGE_AGENT_MAX_BYTES to list them all. Ask whether each party's entries may be posted On Account, one party per question. Only for the parties the person says yes to, build again with on_account_approvals: a list of {ledger, party_digest}, the digest copied from this answer. The digest ties the approval to this exact batch, this company and this endpoint, and changing any row changes every party's digest, so the person is asked again. It does not prove that a person said yes, and a hand import of the file is not checked at all: never approve on the person's behalf. The native approval dialog does not yet show these entries. If this batch amends an earlier one, importing it also replaces any bill allocations the person made in Tally.";
 
-const BILL_WISE_NONE_NOTE: &str = "Checked: none of the ledgers this batch names is a bill-wise ledger, as read from Tally during this build. A ledger switched to bill-wise after the build is not caught by ComplyEaze Bridge before posting in this version; its entries would land On Account.";
+const BILL_WISE_NONE_NOTE: &str = "Checked: none of the ledgers this batch names is a bill-wise ledger, as read from Tally in the ledger list during this build. ComplyEaze Bridge reads the ledger list again before posting and refuses the post (import_bill_wise_changed) if a named ledger has become bill-wise since. A hand import of the file is not checked at all.";
 
-const BILL_WISE_APPROVED_NOTE: &str = "Entries on the bill-wise ledgers listed in on_account_approved carry no bill allocation, so each amount lands On Account and must be matched to bills in Tally afterwards. Each has an approval digest that matches this batch; ComplyEaze Bridge cannot tell whether a person said yes, and the native approval dialog does not yet list these entries. A ledger switched to bill-wise after the build is not caught before posting in this version.";
+const BILL_WISE_APPROVED_NOTE: &str = "Entries on the bill-wise ledgers listed in on_account_approved carry no bill allocation, so each amount lands On Account and must be matched to bills in Tally afterwards. Each has an approval digest that matches this batch; ComplyEaze Bridge cannot tell whether a person said yes, and the native approval dialog does not yet list these entries. Any other ledger this batch names that has become bill-wise by the time of posting is refused (import_bill_wise_changed).";
 
 /// Why `post_import` would refuse a saved batch, for the build's warning. The
 /// code is the one `post_import` returns; the text only explains it. A code

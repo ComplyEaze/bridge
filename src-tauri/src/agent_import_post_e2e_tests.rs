@@ -30,9 +30,12 @@ fn companies() -> String {
 }
 
 fn catalogue() -> String {
-    captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
-    ))
+    crate::agent::agent_import::tests::with_bill_wise_flags(
+        &captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+        )),
+        &[],
+    )
 }
 
 /// The captured Currency masters of a book with exactly one (`I₹`).
@@ -258,7 +261,7 @@ fn bind_to_captured_catalogue(line: &mut ImportLedgerLine) {
         vouchers: line.vouchers.clone(),
         amends_batch_id: None,
     };
-    let binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue(),
         "WR2 Unicode Lab",
         GUID,
@@ -2838,6 +2841,44 @@ async fn a_new_ledger_under_an_approved_name_during_approval_is_refused_by_ident
     assert_eq!(observed.len(), expected, "{response}");
 }
 
+/// #1234 (design E): the queue re-reads the catalogue after approval, inside
+/// its identity brackets, and its rows carry the flag. A ledger switched to
+/// bill-wise while the approval waits, with no approval recorded for it, is
+/// refused before the intent and the POST under its own code.
+#[tokio::test]
+async fn a_named_ledger_switched_to_bill_wise_during_approval_is_refused_in_the_queue() {
+    let switched =
+        crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue(), &["WR2 Sales"]);
+    let mut plans = before_approval();
+    let mut after = after_approval(xml(created_one()));
+    // The queue's catalogue: its first report and its replay.
+    let catalogue_at = probe().len() + 2;
+    after[catalogue_at + 1] = xml(switched.clone());
+    after[catalogue_at + 3] = xml(switched);
+    // The recheck runs once every queue read is in; only the POST is never sent.
+    after.pop();
+    let expected = plans.len() + after.len();
+    plans.extend(after);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_bill_wise_changed",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert_eq!(observed.len(), expected, "{response}");
+}
+
 /// bridge#634, #641: the queue's catalogue re-read at post time holds a
 /// repeated ledger. The admission recheck refuses before the intent and the
 /// POST under its own code, not the catch-all that says the outcome is
@@ -3134,6 +3175,62 @@ async fn a_ledger_replaced_under_its_name_since_the_build_is_refused_before_appr
         );
         assert_eq!(observed, expected, "{result}");
         assert!(!intent);
+    }
+}
+
+/// #1234 (design E): the post's own catalogue read, made before approval,
+/// carries each ledger's flag. A saved batch whose named ledger reads
+/// bill-wise now, with no approval recorded for it, is refused before any
+/// approval is asked and before a dispatch intent, on both surfaces.
+#[tokio::test]
+async fn a_named_ledger_that_became_bill_wise_since_the_build_is_refused_before_approval() {
+    for desktop in [false, true] {
+        let mut plans = before_approval();
+        for plan in &mut plans {
+            let body = plan.fixture.body().into_owned();
+            if body.contains("<LEDGER NAME=\"") && body.contains("<ISBILLWISEON") {
+                plan.fixture = Fixture::SyntheticXml(
+                    crate::agent::agent_import::tests::with_bill_wise_flags(&body, &["WR2 Sales"]),
+                );
+            }
+        }
+        // The Currency read and mode probe after the catalogue are never sent.
+        plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+        let expected = plans.len();
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (line, args) = saved_batch(&server);
+        let scripted = ScriptedApproval::approving();
+        let result = if desktop {
+            let outcome = SCRIPTED_APPROVAL
+                .scope(
+                    scripted.clone(),
+                    server.post_import_checked(&args, Some(&line.sha256), PostScope::JournalOnly),
+                )
+                .await
+                .expect("a refusal is reported as the post's outcome");
+            super::super::desktop_journal::DesktopJournalOperation::from_outcome(outcome).result
+                ["result"]
+                .clone()
+        } else {
+            SCRIPTED_APPROVAL
+                .scope(scripted.clone(), server.call_tool("post_import", args))
+                .await["structuredContent"]["result"]
+                .clone()
+        };
+        let observed = sent(simulator).len();
+        let intent = String::from_utf8(journal(directory.path()))
+            .unwrap()
+            .contains("\"dispatch_intent\"");
+        assert_eq!(
+            result["error"]["code"], "import_bill_wise_changed",
+            "{result}"
+        );
+        assert_eq!(result["attempt_recorded"], json!(false), "{result}");
+        assert_eq!(observed, expected, "{result}");
+        assert!(!intent);
+        assert!(scripted.previews().is_empty(), "approval must not be asked");
     }
 }
 

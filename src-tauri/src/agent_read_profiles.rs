@@ -330,6 +330,13 @@ pub(super) fn standard_ledger_catalog_read(company: &str) -> anyhow::Result<Read
         .map(ReadRequest)
 }
 
+/// The import family's ledger catalogue: V1's request with each ledger's
+/// bill-wise flag in the same row (design E of #1234).
+pub(super) fn import_ledger_catalogue_read(company: &str) -> anyhow::Result<ReadRequest> {
+    crate::tally::standard_ledger_catalog::render_import_ledger_catalog_request(company)
+        .map(ReadRequest)
+}
+
 pub(super) fn native_group_snapshot_read(company: &str) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(company),
@@ -342,34 +349,6 @@ pub(super) fn native_group_snapshot_read(company: &str) -> ReadRequest {
 pub(super) fn company_currency_read(company: &str) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_company_currency_request(company),
-    )
-}
-
-/// The ledger snapshot restricted to one parent part: the request the
-/// outstandings paths send, verbatim, read here only for each ledger's
-/// `ISBILLWISEON`.
-pub(super) fn ledger_bill_wise_read(
-    company: &str,
-    period: &bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriod,
-    part: &bridge_tally_protocol::parent_partition::ParentPart,
-) -> ReadRequest {
-    ReadRequest(
-        bridge_tally_protocol::native_outstandings::render_native_ledger_snapshot_request_for_parents(
-            company, period, part,
-        ),
-    )
-}
-
-/// The same snapshot, unfiltered: the whole book's ledgers in one request, for a
-/// book whose catalogue fits one part.
-pub(super) fn ledger_bill_wise_whole_read(
-    company: &str,
-    period: &bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriod,
-) -> ReadRequest {
-    ReadRequest(
-        bridge_tally_protocol::native_outstandings::render_native_ledger_snapshot_request(
-            company, period,
-        ),
     )
 }
 

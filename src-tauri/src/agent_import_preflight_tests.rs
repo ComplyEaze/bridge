@@ -35,10 +35,10 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
                 voucher.date = "2026-08-01".into();
             }
         }
-        let mut plans = qualified_import_cycle_plans()[..42].to_vec();
+        let mut plans = qualified_import_cycle_plans()[..30].to_vec();
         if fault == "http" {
-            plans[37].http_status = 503;
-            plans.truncate(38);
+            plans[25].http_status = 503;
+            plans.truncate(26);
         } else {
             // Refusal-only scalar fault injection into an otherwise unchanged capture.
             let body = if fault == "invalid_amount" {
@@ -64,7 +64,7 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
             } else {
                 source.clone()
             };
-            for index in [37, 39] {
+            for index in [25, 27] {
                 plans[index].fixture = Fixture::SyntheticXml(body.clone());
             }
         }
@@ -109,7 +109,7 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
             "{fault}"
         );
         let observed = simulator.finish().unwrap();
-        assert_eq!(observed.len(), if fault == "http" { 38 } else { 42 });
+        assert_eq!(observed.len(), if fault == "http" { 26 } else { 30 });
         let join = |a: &str, b: &str| sha256_hex(format!("{a}:{b}").as_bytes());
         let mut request = join(
             &observed[0].request_body_sha256,
@@ -117,11 +117,9 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
         );
         let mut response = join(&sha256_hex(&responses[0]), &sha256_hex(&responses[1]));
         let mut bytes = responses[0].len() + responses[1].len();
-        // identity, catalogue, flag read, mark, catalogue, flag read, then the
-        // pre-flight read (which an "http" fault cuts off).
-        for index in [2, 7, 13, 19, 25, 31]
+        for index in [2, 7, 13, 19]
             .into_iter()
-            .chain((fault != "http").then_some(37))
+            .chain((fault != "http").then_some(25))
         {
             request = join(&request, &observed[index].request_body_sha256);
             response = join(&response, &sha256_hex(&responses[index]));

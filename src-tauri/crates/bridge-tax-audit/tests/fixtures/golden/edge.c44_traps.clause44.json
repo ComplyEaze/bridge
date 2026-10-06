@@ -134,7 +134,7 @@
     },
     {
       "id": "clause44.no_supplier_party_ledger_is_itself_a_pl_ledger_paise",
-      "value": 102995,
+      "value": 44009,
       "unit": "paise",
       "definition_sha256_16": "ed8e485fbd541e4f",
       "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'party_ledger_is_itself_a_pl_ledger'.",
@@ -209,7 +209,7 @@
     },
     {
       "id": "clause44.registered_other_than_composition_paise",
-      "value": 196412,
+      "value": 198654,
       "unit": "paise",
       "definition_sha256_16": "39a002038f56f019",
       "definition_text": "Sum of expenditure, category 'registered_other_than_composition'.",
@@ -217,7 +217,7 @@
     },
     {
       "id": "clause44.total_expenditure_paise",
-      "value": 421601,
+      "value": 431361,
       "unit": "paise",
       "definition_sha256_16": "073b6e286df50c91",
       "definition_text": "Sum of every bucket and no-supplier/judgement-reason figure above (books-POPULATION only); tied in check_invariants (CL44-1), TOGETHER WITH population_excluded_expense_paise below, to the financial_statements test's own TB-based expenditure definition (purchases + direct_expenses + indirect_expenses), independent of this walk.",
@@ -244,7 +244,7 @@
     },
     {
       "id": "clause44.unregistered_paise",
-      "value": 122194,
+      "value": 188698,
       "unit": "paise",
       "definition_sha256_16": "594f33d4e0f14407",
       "definition_text": "Sum of expenditure, category 'unregistered'.",
@@ -411,12 +411,12 @@
     {
       "invariant": "POP-1",
       "subject": "Unmastered Expense",
-      "detail": "vouchers 54771 vs TB movement 0 paise"
+      "detail": "vouchers 27421 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-3",
       "subject": "closing_paise",
-      "detail": "TB closing_paise sums to -54771 paise"
+      "detail": "TB closing_paise sums to -27421 paise"
     },
     {
       "invariant": "POP-5",

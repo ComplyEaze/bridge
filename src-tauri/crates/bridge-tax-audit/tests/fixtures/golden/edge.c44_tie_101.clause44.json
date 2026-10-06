@@ -22,7 +22,7 @@
     },
     {
       "id": "clause44.exempt_or_non_gst_supply_paise",
-      "value": 163737,
+      "value": 126274,
       "unit": "paise",
       "definition_sha256_16": "c09808b2acff12ca",
       "definition_text": "Sum of expenditure, category 'exempt_or_non_gst_supply'.",
@@ -206,7 +206,7 @@
     },
     {
       "id": "clause44.total_expenditure_paise",
-      "value": 163737,
+      "value": 126274,
       "unit": "paise",
       "definition_sha256_16": "073b6e286df50c91",
       "definition_text": "Sum of every bucket and no-supplier/judgement-reason figure above (books-POPULATION only); tied in check_invariants (CL44-1), TOGETHER WITH population_excluded_expense_paise below, to the financial_statements test's own TB-based expenditure definition (purchases + direct_expenses + indirect_expenses), independent of this walk.",
@@ -374,7 +374,7 @@
     {
       "invariant": "POP-1",
       "subject": "Office Expenses",
-      "detail": "vouchers 163737 vs TB movement 163838 paise"
+      "detail": "vouchers 126274 vs TB movement 126375 paise"
     }
   ],
   "result_invariants_evaluated": [
@@ -390,7 +390,7 @@
     {
       "invariant": "clause44.check_invariants",
       "subject": "clause44",
-      "detail": "CL44-1: total_expenditure_paise (163737p) + population_excluded_expense_paise (0p) = 163737p does not tie the financial_statements expenditure definition (purchases + direct_expenses + indirect_expenses = 163838p) within 100p; unexplained difference -101p"
+      "detail": "CL44-1: total_expenditure_paise (126274p) + population_excluded_expense_paise (0p) = 126274p does not tie the financial_statements expenditure definition (purchases + direct_expenses + indirect_expenses = 126375p) within 100p; unexplained difference -101p"
     }
   ]
 }

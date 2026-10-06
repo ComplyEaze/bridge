@@ -1,5 +1,5 @@
 {
- "comment": "clause44: the Trial Balance's Office Expenses closing is 101 paise more than the walk, past the tolerance: CL44-1 fires (a negative unexplained difference). Capital takes the other side so the TB still sums to zero. GSTINs invented (fourteenth character Y).",
+ "comment": "clause44: the Trial Balance's Office Expenses closing is exactly Re 1 more than the walk, inside the tolerance: no violation (a negative difference at the boundary). Capital takes the other side so the TB still sums to zero. GSTINs invented (fourteenth character Y).",
  "groups": {
   "Capital Account": null,
   "Current Assets": null,
@@ -27,7 +27,7 @@
    "chain": [
     "Capital Account"
    ],
-   "guid": "edge-c44_tie_101-000"
+   "guid": "edge-c44_tie_minus_100-000"
   },
   {
    "name": "Bank A",
@@ -35,7 +35,7 @@
     "Bank Accounts",
     "Current Assets"
    ],
-   "guid": "edge-c44_tie_101-001"
+   "guid": "edge-c44_tie_minus_100-001"
   },
   {
    "name": "Cash",
@@ -43,7 +43,7 @@
     "Cash-in-Hand",
     "Current Assets"
    ],
-   "guid": "edge-c44_tie_101-002"
+   "guid": "edge-c44_tie_minus_100-002"
   },
   {
    "name": "Input CGST",
@@ -51,7 +51,7 @@
     "Duties & Taxes",
     "Current Liabilities"
    ],
-   "guid": "edge-c44_tie_101-003"
+   "guid": "edge-c44_tie_minus_100-003"
   },
   {
    "name": "Input SGST",
@@ -59,21 +59,21 @@
     "Duties & Taxes",
     "Current Liabilities"
    ],
-   "guid": "edge-c44_tie_101-004"
+   "guid": "edge-c44_tie_minus_100-004"
   },
   {
    "name": "Sales",
    "chain": [
     "Sales Accounts"
    ],
-   "guid": "edge-c44_tie_101-005"
+   "guid": "edge-c44_tie_minus_100-005"
   },
   {
    "name": "Office Expenses",
    "chain": [
     "Indirect Expenses"
    ],
-   "guid": "edge-c44_tie_101-006"
+   "guid": "edge-c44_tie_minus_100-006"
   },
   {
    "name": "Alpha Traders",
@@ -81,7 +81,7 @@
     "Sundry Creditors",
     "Current Liabilities"
    ],
-   "guid": "edge-c44_tie_101-007",
+   "guid": "edge-c44_tie_minus_100-007",
    "gstin": "27ALPHA1111A1Y1"
   }
  ],
@@ -90,15 +90,15 @@
    "ledger": "Capital",
    "opening": 0,
    "debit": 0,
-   "credit": 101,
-   "closing": -101
+   "credit": 100,
+   "closing": -100
   },
   {
    "ledger": "Bank A",
    "opening": 0,
-   "debit": 597995,
+   "debit": 556355,
    "credit": 0,
-   "closing": 597995
+   "closing": 556355
   },
   {
    "ledger": "Cash",
@@ -125,22 +125,22 @@
    "ledger": "Sales",
    "opening": 0,
    "debit": 0,
-   "credit": 597995,
-   "closing": -597995
+   "credit": 556355,
+   "closing": -556355
   },
   {
    "ledger": "Office Expenses",
    "opening": 0,
-   "debit": 126375,
+   "debit": 154829,
    "credit": 0,
-   "closing": 126375
+   "closing": 154829
   },
   {
    "ledger": "Alpha Traders",
    "opening": 0,
    "debit": 0,
-   "credit": 126274,
-   "closing": -126274
+   "credit": 154729,
+   "closing": -154729
   }
  ],
  "vouchers": [
@@ -152,11 +152,11 @@
    "lines": [
     [
      "Office Expenses",
-     126274
+     154729
     ],
     [
      "Alpha Traders",
-     -126274
+     -154729
     ]
    ],
    "number": "P-1"
@@ -169,11 +169,11 @@
    "lines": [
     [
      "Bank A",
-     597995
+     556355
     ],
     [
      "Sales",
-     -597995
+     -556355
     ]
    ],
    "number": "BR-1"

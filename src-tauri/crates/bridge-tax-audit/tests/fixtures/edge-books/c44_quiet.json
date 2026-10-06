@@ -89,9 +89,9 @@
   {
    "ledger": "Bank A",
    "opening": 0,
-   "debit": 194627,
+   "debit": 108801,
    "credit": 0,
-   "closing": 194627
+   "closing": 108801
   },
   {
    "ledger": "Cash",
@@ -118,15 +118,15 @@
    "ledger": "Sales",
    "opening": 0,
    "debit": 0,
-   "credit": 172398,
-   "closing": -172398
+   "credit": 113901,
+   "closing": -113901
   },
   {
    "ledger": "Debtor One",
    "opening": 0,
-   "debit": 0,
-   "credit": 22229,
-   "closing": -22229
+   "debit": 5100,
+   "credit": 0,
+   "closing": 5100
   }
  ],
  "vouchers": [
@@ -138,11 +138,11 @@
    "lines": [
     [
      "Debtor One",
-     172398
+     113901
     ],
     [
      "Sales",
-     -172398
+     -113901
     ]
    ],
    "number": "S-1"
@@ -155,11 +155,11 @@
    "lines": [
     [
      "Bank A",
-     194627
+     108801
     ],
     [
      "Debtor One",
-     -194627
+     -108801
     ]
    ],
    "number": "BR-1"

@@ -9930,10 +9930,10 @@
  {
   "id": "CL44-37",
   "by": "author",
-  "what": "clause44: CL44-2 lets two unclassified lines pass",
+  "what": "clause44: CL44-2 lets one unclassified line pass",
   "file": "src/clause44.rs",
   "from": "    if let Some(n) = unclassified.filter(|n| *n != 0) {",
-  "to": "    if let Some(n) = unclassified.filter(|n| *n > 2) {"
+  "to": "    if let Some(n) = unclassified.filter(|n| *n > 1) {"
  },
  {
   "id": "CL44-38",
@@ -10038,5 +10038,21 @@
   "file": "src/clause44.rs",
   "from": "    a.checked_add(b).ok_or_else(|| support::overflow(TEST_ID))",
   "to": "    Ok(a.wrapping_add(b))"
+ },
+ {
+  "id": "CL44-51",
+  "by": "author",
+  "what": "clause44: a depreciation line counts as a real line beside round-off",
+  "file": "src/clause44.rs",
+  "from": "                && !inputs.dep_expense_ledgers.contains(&l.ledger)\n                && !inputs.no_supplier_expense_ledgers.contains(&l.ledger)\n                && !inputs.round_off_ledgers",
+  "to": "                && !inputs.no_supplier_expense_ledgers.contains(&l.ledger)\n                && !inputs.round_off_ledgers"
+ },
+ {
+  "id": "CL44-52",
+  "by": "author",
+  "what": "clause44: a judgement item does not count as a real line beside round-off",
+  "file": "src/clause44.rs",
+  "from": "                && !inputs.round_off_ledgers.contains(&l.ledger)\n        });",
+  "to": "                && !inputs.round_off_ledgers.contains(&l.ledger)\n                && !inputs\n                    .money_category_by_ledger\n                    .get(&l.ledger)\n                    .is_some_and(|c| c.is_judgement())\n        });"
  }
 ]

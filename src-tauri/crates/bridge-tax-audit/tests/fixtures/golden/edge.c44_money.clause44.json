@@ -32,7 +32,7 @@
     },
     {
       "id": "clause44.exempt_or_non_gst_supply_paise",
-      "value": 547186,
+      "value": 474525,
       "unit": "paise",
       "definition_sha256_16": "c09808b2acff12ca",
       "definition_text": "Sum of expenditure, category 'exempt_or_non_gst_supply'.",
@@ -64,7 +64,7 @@
     },
     {
       "id": "clause44.interest_individual_no_gstin_lines_paise",
-      "value": 333395,
+      "value": 287093,
       "unit": "paise",
       "definition_sha256_16": "262c2716ef997fc5",
       "definition_text": "Sum of the lines above; already included in total_expenditure_paise via its own bucket, not a separate addition.",
@@ -91,7 +91,7 @@
     },
     {
       "id": "clause44.money_category_forced_lines_paise",
-      "value": 301674,
+      "value": 285927,
       "unit": "paise",
       "definition_sha256_16": "816493fcd894ece8",
       "definition_text": "Sum of the lines above; already included in total_expenditure_paise via its own forced bucket, not a separate addition.",
@@ -118,7 +118,7 @@
     },
     {
       "id": "clause44.no_supplier_depreciation_or_provision_expense_ledger_paise",
-      "value": 141033,
+      "value": 109912,
       "unit": "paise",
       "definition_sha256_16": "5060ba117720673f",
       "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'depreciation_or_provision_expense_ledger'.",
@@ -126,7 +126,7 @@
     },
     {
       "id": "clause44.no_supplier_judgement_required_money_item_count",
-      "value": 2,
+      "value": 3,
       "unit": "count",
       "definition_sha256_16": "c877c27a7c2d3a0f",
       "definition_text": "Expense lines outside the four GST-registration columns, reason 'judgement_required_money_item'.",
@@ -140,12 +140,17 @@
           "kind": "voucher",
           "id": "m07",
           "label": "Payment BP-3 on 2025-07-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "m14",
+          "label": "Payment BP-7 on 2025-09-30"
         }
       ]
     },
     {
       "id": "clause44.no_supplier_judgement_required_money_item_paise",
-      "value": 341747,
+      "value": 427879,
       "unit": "paise",
       "definition_sha256_16": "e126c86f9bc6fe50",
       "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'judgement_required_money_item'.",
@@ -167,7 +172,7 @@
     },
     {
       "id": "clause44.no_supplier_no_party_ledger_on_voucher_paise",
-      "value": 65789,
+      "value": 50139,
       "unit": "paise",
       "definition_sha256_16": "9f86a20a0460f84c",
       "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'no_party_ledger_on_voucher'.",
@@ -189,7 +194,7 @@
     },
     {
       "id": "clause44.no_supplier_non_supply_expense_paise",
-      "value": 67221,
+      "value": 69697,
       "unit": "paise",
       "definition_sha256_16": "3123c969094dd783",
       "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'non_supply_expense'.",
@@ -275,7 +280,7 @@
     },
     {
       "id": "clause44.registered_other_than_composition_paise",
-      "value": 20490,
+      "value": 21345,
       "unit": "paise",
       "definition_sha256_16": "39a002038f56f019",
       "definition_text": "Sum of expenditure, category 'registered_other_than_composition'.",
@@ -283,7 +288,7 @@
     },
     {
       "id": "clause44.total_expenditure_paise",
-      "value": 1335870,
+      "value": 1355853,
       "unit": "paise",
       "definition_sha256_16": "073b6e286df50c91",
       "definition_text": "Sum of every bucket and no-supplier/judgement-reason figure above (books-POPULATION only); tied in check_invariants (CL44-1), TOGETHER WITH population_excluded_expense_paise below, to the financial_statements test's own TB-based expenditure definition (purchases + direct_expenses + indirect_expenses), independent of this walk.",
@@ -291,7 +296,7 @@
     },
     {
       "id": "clause44.unregistered_count",
-      "value": 2,
+      "value": 3,
       "unit": "count",
       "definition_sha256_16": "70e8c2734ce8f94c",
       "definition_text": "Expense lines classified 'unregistered'.",
@@ -305,12 +310,17 @@
           "kind": "voucher",
           "id": "m08",
           "label": "Payment BP-4 on 2025-08-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "m14",
+          "label": "Payment BP-7 on 2025-09-30"
         }
       ]
     },
     {
       "id": "clause44.unregistered_paise",
-      "value": 152404,
+      "value": 202356,
       "unit": "paise",
       "definition_sha256_16": "594f33d4e0f14407",
       "definition_text": "Sum of expenditure, category 'unregistered'.",
@@ -478,6 +488,11 @@
           "kind": "voucher",
           "id": "m13",
           "label": "Journal J-6 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "m14",
+          "label": "Payment BP-7 on 2025-09-30"
         }
       ],
       "title_sha256_16": "6ca5bdb4e1a6a5cb",
@@ -568,6 +583,11 @@
           "kind": "voucher",
           "id": "m07",
           "label": "Payment BP-3 on 2025-07-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "m14",
+          "label": "Payment BP-7 on 2025-09-30"
         }
       ],
       "title_sha256_16": "d8eb32864e2aa5aa",

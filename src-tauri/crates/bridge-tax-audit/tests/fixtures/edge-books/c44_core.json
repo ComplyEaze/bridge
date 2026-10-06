@@ -1,5 +1,5 @@
 {
- "comment": "clause44: the four columns and the closed reasons. A supplier's GSTIN from its ledger, and from the voucher's own PARTYGSTIN (padded and lower case, which the reference strips and upper-cases) on a cash purchase and on a purchase from a ledger with none; composition from the client's map (padded, mixed case, a no-break space; 'Regular' is not composition; a composition ledger with no GSTIN stays unregistered); a voucher with input tax is 'other than composition', one without (or with a nil tax line) is 'exempt or non-GST'; a debit note's credit lines reduce the column; a nil expense line is no line; round-off rides with a voucher's real line and, alone or beside only salary, has no supplier; salary (configured as no supplier), depreciation, a journal with no party and one whose party is an income ledger; a party named on no ledger master; and a round-off line beside a real line on a journal with no party, which rides into the GSTIN rule and reads 'unregistered' while its sibling is 'no party'. Every GSTIN is invented (fourteenth character Y).",
+ "comment": "clause44: the four columns and the closed reasons. A supplier's GSTIN from its ledger, and from the voucher's own PARTYGSTIN (padded and lower case, which the reference strips and upper-cases) on a cash purchase and on a purchase from a ledger with none; composition from the client's map (padded, mixed case, a no-break space; 'Regular' is not composition; a composition ledger with no GSTIN stays unregistered); a voucher with input tax is 'other than composition', one without (or with a nil tax line) is 'exempt or non-GST'; a debit note's credit lines reduce the column; a nil expense line is no line; round-off rides with a voucher's real line and, alone or beside only salary, has no supplier; salary (configured as no supplier), depreciation, a journal with no party and one whose party is an income ledger; a party named on no ledger master; and a round-off line beside a real line on a journal with no party, which rides into the GSTIN rule and reads 'unregistered' while its sibling is 'no party'; round-off beside only a depreciation line (no supplier); round-off beside a real line on a voucher whose party is an income ledger (it rides into the GSTIN rule while its sibling is 'party is a P&L ledger'); and a PARTYGSTIN of 'URP', which the reference reads as a GSTIN like any non-blank text. Every GSTIN is invented (fourteenth character Y).",
  "groups": {
   "Capital Account": null,
   "Current Assets": null,
@@ -258,9 +258,9 @@
   {
    "ledger": "Office Expenses",
    "opening": 0,
-   "debit": 221730,
+   "debit": 386191,
    "credit": 0,
-   "closing": 221730
+   "closing": 386191
   },
   {
    "ledger": "Staff Salary",
@@ -272,30 +272,30 @@
   {
    "ledger": "Depreciation",
    "opening": 0,
-   "debit": 187316,
+   "debit": 248500,
    "credit": 0,
-   "closing": 187316
+   "closing": 248500
   },
   {
    "ledger": "Round Off",
    "opening": 0,
-   "debit": 280679,
+   "debit": 340764,
    "credit": 0,
-   "closing": 280679
+   "closing": 340764
   },
   {
    "ledger": "Scrap Sales",
    "opening": 0,
    "debit": 0,
-   "credit": 43542,
-   "closing": -43542
+   "credit": 153602,
+   "closing": -153602
   },
   {
    "ledger": "Furniture",
    "opening": 0,
    "debit": 0,
-   "credit": 187316,
-   "closing": -187316
+   "credit": 267814,
+   "closing": -267814
   },
   {
    "ledger": "Outstanding Expenses",
@@ -343,8 +343,8 @@
    "ledger": "Gamma Works",
    "opening": 0,
    "debit": 0,
-   "credit": 233723,
-   "closing": -233723
+   "credit": 328895,
+   "closing": -328895
   },
   {
    "ledger": "Delta Mart",
@@ -760,6 +760,66 @@
     ]
    ],
    "number": "J-5"
+  },
+  {
+   "guid": "c21",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Depreciation",
+     61184
+    ],
+    [
+     "Round Off",
+     19314
+    ],
+    [
+     "Furniture",
+     -80498
+    ]
+   ],
+   "number": "J-6"
+  },
+  {
+   "guid": "c22",
+   "date": "2025-06-06",
+   "base_type": "Journal",
+   "party": "Scrap Sales",
+   "lines": [
+    [
+     "Office Expenses",
+     69289
+    ],
+    [
+     "Round Off",
+     40771
+    ],
+    [
+     "Scrap Sales",
+     -110060
+    ]
+   ],
+   "number": "J-7"
+  },
+  {
+   "guid": "c23",
+   "date": "2025-08-04",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Office Expenses",
+     95172
+    ],
+    [
+     "Gamma Works",
+     -95172
+    ]
+   ],
+   "number": "P-11",
+   "party_gstin": "URP"
   }
  ],
  "clause44": {

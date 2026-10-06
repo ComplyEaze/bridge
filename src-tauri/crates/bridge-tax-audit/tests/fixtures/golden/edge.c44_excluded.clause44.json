@@ -22,7 +22,7 @@
     },
     {
       "id": "clause44.exempt_or_non_gst_supply_paise",
-      "value": 105722,
+      "value": 194442,
       "unit": "paise",
       "definition_sha256_16": "c09808b2acff12ca",
       "definition_text": "Sum of expenditure, category 'exempt_or_non_gst_supply'.",
@@ -177,7 +177,7 @@
     },
     {
       "id": "clause44.population_excluded_expense_paise",
-      "value": 239724,
+      "value": 297689,
       "unit": "paise",
       "definition_sha256_16": "6dbce00c1853eabb",
       "definition_text": "Sum of expenditure-group lines on post-dated, population-excluded vouchers.",
@@ -217,7 +217,7 @@
     },
     {
       "id": "clause44.total_expenditure_paise",
-      "value": 105722,
+      "value": 194442,
       "unit": "paise",
       "definition_sha256_16": "073b6e286df50c91",
       "definition_text": "Sum of every bucket and no-supplier/judgement-reason figure above (books-POPULATION only); tied in check_invariants (CL44-1), TOGETHER WITH population_excluded_expense_paise below, to the financial_statements test's own TB-based expenditure definition (purchases + direct_expenses + indirect_expenses), independent of this walk.",
@@ -380,22 +380,22 @@
     {
       "invariant": "POP-1",
       "subject": "Alpha Traders",
-      "detail": "vouchers -105722 vs TB movement -279461 paise"
+      "detail": "vouchers -194442 vs TB movement -345211 paise"
     },
     {
       "invariant": "POP-1",
       "subject": "Bank A",
-      "detail": "vouchers 594442 vs TB movement 528457 paise"
+      "detail": "vouchers 547401 vs TB movement 400481 paise"
     },
     {
       "invariant": "POP-1",
       "subject": "Hardware Purchases",
-      "detail": "vouchers 105722 vs TB movement 212419 paise"
+      "detail": "vouchers 194442 vs TB movement 305228 paise"
     },
     {
       "invariant": "POP-1",
       "subject": "Office Expenses",
-      "detail": "vouchers 0 vs TB movement 133027 paise"
+      "detail": "vouchers 0 vs TB movement 186903 paise"
     }
   ],
   "result_invariants_evaluated": [

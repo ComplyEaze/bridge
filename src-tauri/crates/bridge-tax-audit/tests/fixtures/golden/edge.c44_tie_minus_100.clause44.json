@@ -22,7 +22,7 @@
     },
     {
       "id": "clause44.exempt_or_non_gst_supply_paise",
-      "value": 120959,
+      "value": 154729,
       "unit": "paise",
       "definition_sha256_16": "c09808b2acff12ca",
       "definition_text": "Sum of expenditure, category 'exempt_or_non_gst_supply'.",
@@ -206,7 +206,7 @@
     },
     {
       "id": "clause44.total_expenditure_paise",
-      "value": 120959,
+      "value": 154729,
       "unit": "paise",
       "definition_sha256_16": "073b6e286df50c91",
       "definition_text": "Sum of every bucket and no-supplier/judgement-reason figure above (books-POPULATION only); tied in check_invariants (CL44-1), TOGETHER WITH population_excluded_expense_paise below, to the financial_statements test's own TB-based expenditure definition (purchases + direct_expenses + indirect_expenses), independent of this walk.",

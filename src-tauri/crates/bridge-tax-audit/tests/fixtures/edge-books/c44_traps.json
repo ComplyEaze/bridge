@@ -105,9 +105,9 @@
   {
    "ledger": "Bank A",
    "opening": 0,
-   "debit": 555819,
+   "debit": 546515,
    "credit": 0,
-   "closing": 555819
+   "closing": 546515
   },
   {
    "ledger": "Cash",
@@ -119,44 +119,44 @@
   {
    "ledger": "Input CGST",
    "opening": 0,
-   "debit": 109156,
+   "debit": 83377,
    "credit": 0,
-   "closing": 109156
+   "closing": 83377
   },
   {
    "ledger": "Input SGST",
    "opening": 0,
-   "debit": 52633,
+   "debit": 81291,
    "credit": 0,
-   "closing": 52633
+   "closing": 81291
   },
   {
    "ledger": "Sales",
    "opening": 0,
    "debit": 0,
-   "credit": 713585,
-   "closing": -713585
+   "credit": 617945,
+   "closing": -617945
   },
   {
    "ledger": "Office Expenses",
    "opening": 0,
-   "debit": 421601,
+   "debit": 431361,
    "credit": 0,
-   "closing": 421601
+   "closing": 431361
   },
   {
    "ledger": "Alpha Traders",
    "opening": 0,
    "debit": 0,
-   "credit": 377607,
-   "closing": -377607
+   "credit": 427393,
+   "closing": -427393
   },
   {
    "ledger": "Gamma Works",
    "opening": 0,
    "debit": 0,
-   "credit": 102788,
-   "closing": -102788
+   "credit": 124627,
+   "closing": -124627
   }
  ],
  "vouchers": [
@@ -168,11 +168,11 @@
    "lines": [
     [
      "Office Expenses",
-     19406
+     64071
     ],
     [
      "Alpha Traders",
-     -19406
+     -64071
     ]
    ],
    "number": "P-1",
@@ -186,19 +186,19 @@
    "lines": [
     [
      "Office Expenses",
-     101683
+     86462
     ],
     [
      "Input CGST",
-     49201
+     57619
     ],
     [
      "Input SGST",
-     22759
+     74198
     ],
     [
      "Alpha Traders",
-     -173643
+     -218279
     ]
    ],
    "number": "P-2"
@@ -211,11 +211,11 @@
    "lines": [
     [
      "Office Expenses",
-     102788
+     124627
     ],
     [
      "Gamma Works",
-     -102788
+     -124627
     ]
    ],
    "number": "P-3"
@@ -228,19 +228,19 @@
    "lines": [
     [
      "Office Expenses",
-     94729
+     112192
     ],
     [
      "Input CGST",
-     59955
+     25758
     ],
     [
      "Input SGST",
-     29874
+     7093
     ],
     [
      "Alpha Traders",
-     -184558
+     -145043
     ]
    ],
    "number": "P-4"
@@ -253,15 +253,15 @@
    "lines": [
     [
      "Office Expenses",
-     102995
+     44009
     ],
     [
      "Unmastered Expense",
-     54771
+     27421
     ],
     [
      "Sales",
-     -157766
+     -71430
     ]
    ],
    "number": "J-1"
@@ -274,11 +274,11 @@
    "lines": [
     [
      "Office Expenses",
-     72462
+     56409
     ],
     [
      "Gamma Works",
-     -72462
+     -56409
     ]
    ],
    "number": "P-5",
@@ -292,11 +292,11 @@
    "lines": [
     [
      "Bank A",
-     555819
+     546515
     ],
     [
      "Sales",
-     -555819
+     -546515
     ]
    ],
    "number": "BR-1"

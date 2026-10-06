@@ -103,9 +103,9 @@
   {
    "ledger": "Bank A",
    "opening": 0,
-   "debit": 528457,
+   "debit": 400481,
    "credit": 0,
-   "closing": 528457
+   "closing": 400481
   },
   {
    "ledger": "Cash",
@@ -132,29 +132,29 @@
    "ledger": "Sales",
    "opening": 0,
    "debit": 0,
-   "credit": 594442,
-   "closing": -594442
+   "credit": 547401,
+   "closing": -547401
   },
   {
    "ledger": "Hardware Purchases",
    "opening": 0,
-   "debit": 212419,
+   "debit": 305228,
    "credit": 0,
-   "closing": 212419
+   "closing": 305228
   },
   {
    "ledger": "Office Expenses",
    "opening": 0,
-   "debit": 133027,
+   "debit": 186903,
    "credit": 0,
-   "closing": 133027
+   "closing": 186903
   },
   {
    "ledger": "Alpha Traders",
    "opening": 0,
    "debit": 0,
-   "credit": 279461,
-   "closing": -279461
+   "credit": 345211,
+   "closing": -345211
   }
  ],
  "vouchers": [
@@ -166,11 +166,11 @@
    "lines": [
     [
      "Hardware Purchases",
-     105722
+     194442
     ],
     [
      "Alpha Traders",
-     -105722
+     -194442
     ]
    ],
    "number": "P-1"
@@ -183,11 +183,11 @@
    "lines": [
     [
      "Hardware Purchases",
-     106697
+     110786
     ],
     [
      "Office Expenses",
-     67042
+     39983
     ],
     [
      "Office Expenses",
@@ -195,7 +195,7 @@
     ],
     [
      "Alpha Traders",
-     -173739
+     -150769
     ]
    ],
    "number": "P-2",
@@ -209,11 +209,11 @@
    "lines": [
     [
      "Office Expenses",
-     5870
+     64737
     ],
     [
      "Bank A",
-     -5870
+     -64737
     ]
    ],
    "number": "J-1",
@@ -227,11 +227,11 @@
    "lines": [
     [
      "Hardware Purchases",
-     24845
+     103952
     ],
     [
      "Alpha Traders",
-     -24845
+     -103952
     ]
    ],
    "number": "P-3",
@@ -245,11 +245,11 @@
    "lines": [
     [
      "Hardware Purchases",
-     90197
+     17183
     ],
     [
      "Alpha Traders",
-     -90197
+     -17183
     ]
    ],
    "number": "P-4",
@@ -263,11 +263,11 @@
    "lines": [
     [
      "Office Expenses",
-     60115
+     82183
     ],
     [
      "Bank A",
-     -60115
+     -82183
     ]
    ],
    "number": "J-2",
@@ -281,11 +281,11 @@
    "lines": [
     [
      "Bank A",
-     594442
+     547401
     ],
     [
      "Sales",
-     -594442
+     -547401
     ]
    ],
    "number": "BR-1"

@@ -96,9 +96,9 @@
   {
    "ledger": "Bank A",
    "opening": 0,
-   "debit": 537983,
+   "debit": 572788,
    "credit": 0,
-   "closing": 537983
+   "closing": 572788
   },
   {
    "ledger": "Cash",
@@ -125,22 +125,22 @@
    "ledger": "Sales",
    "opening": 0,
    "debit": 0,
-   "credit": 537983,
-   "closing": -537983
+   "credit": 572788,
+   "closing": -572788
   },
   {
    "ledger": "Office Expenses",
    "opening": 0,
-   "debit": 170686,
+   "debit": 120859,
    "credit": 0,
-   "closing": 170686
+   "closing": 120859
   },
   {
    "ledger": "Alpha Traders",
    "opening": 0,
    "debit": 0,
-   "credit": 170786,
-   "closing": -170786
+   "credit": 120959,
+   "closing": -120959
   }
  ],
  "vouchers": [
@@ -152,11 +152,11 @@
    "lines": [
     [
      "Office Expenses",
-     170786
+     120959
     ],
     [
      "Alpha Traders",
-     -170786
+     -120959
     ]
    ],
    "number": "P-1"
@@ -169,11 +169,11 @@
    "lines": [
     [
      "Bank A",
-     537983
+     572788
     ],
     [
      "Sales",
-     -537983
+     -572788
     ]
    ],
    "number": "BR-1"

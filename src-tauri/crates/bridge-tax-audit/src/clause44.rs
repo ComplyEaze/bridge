@@ -9,8 +9,10 @@
 //! its walk, ported here, takes every nonzero line, so a credit on an expense ledger reduces its
 //! column.
 //!
-//! The supplier's GSTIN is the voucher's own `PARTYGSTIN` first, then its party ledger's GSTIN in
-//! force at the period end. Composition status and the money categories are client
+//! The supplier's GSTIN is the voucher's own `PARTYGSTIN` first, then its party ledger's GSTIN (the
+//! master's flat `PARTYGSTIN`, else its registration in force on the period's last day). Any text
+//! that is not blank counts as a GSTIN, as in the reference, so "URP" or "NA" reads as registered.
+//! Composition status and the money categories are client
 //! configuration, never read from a ledger name. Two categories settle the column by statute
 //! (interest to a bank or NBFC, bank charges); the rest leave the ordinary rule in place or put
 //! the line outside the four columns for the CA.
@@ -1005,10 +1007,10 @@ direct_expenses + indirect_expenses = 100000p) within 100p; unexplained differen
     fn cl44_2_fires_on_any_unclassified_line() {
         let b = book();
         let mut r = result(&b);
-        set(&mut r, "no_supplier_unclassified_count", 2);
+        set(&mut r, "no_supplier_unclassified_count", 1);
         assert_eq!(
             check_invariants(&b, &r).unwrap(),
-            vec!["CL44-2: 2 expense line(s) have no classification reason".to_string()]
+            vec!["CL44-2: 1 expense line(s) have no classification reason".to_string()]
         );
     }
 

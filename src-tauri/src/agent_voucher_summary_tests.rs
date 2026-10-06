@@ -1196,7 +1196,7 @@ fn a_ledger_whose_chain_cannot_be_walked_refuses_the_whole_group_summary_with_th
         let err = summarise(&rows, &live_request(group, build(&touched)))
             .err()
             .expect("refused");
-        assert_eq!(err, "summary_group_unresolved:no_parent", "{group:?}");
+        assert_eq!(err, "summary_group_unresolved:no_parent:Cash", "{group:?}");
     }
     // A ledger the window never touches may have a gap: nothing is placed under it.
     let untouched = catalogue_parents("Drawings");
@@ -1215,7 +1215,10 @@ fn a_ledger_whose_chain_cannot_be_walked_refuses_the_whole_group_summary_with_th
     )
     .err()
     .expect("refused");
-    assert_eq!(err, "summary_group_unresolved:ledger_not_in_catalogue");
+    assert_eq!(
+        err,
+        "summary_group_unresolved:ledger_not_in_catalogue:Not In The Catalogue"
+    );
     // And a request that asks for a group grouping with no placements at all cannot summarise.
     let none = SummaryRequest {
         group: SummaryGroup::Group,

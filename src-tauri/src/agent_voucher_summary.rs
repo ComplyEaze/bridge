@@ -155,8 +155,11 @@ fn placement_of<'a>(request: &'a SummaryRequest, ledger: &str) -> Result<&'a Pla
         .as_ref()
         .ok_or_else(|| "summary_group_unresolved:no_placements".to_string())?;
     match placements.get(ledger) {
-        None => Err("summary_group_unresolved:ledger_not_in_catalogue".to_string()),
-        Some(Err(gap)) => Err(format!("summary_group_unresolved:{gap}")),
+        // The ledger's name travels after the gap code (a ledger name may hold a colon, a gap code never does).
+        None => Err(format!(
+            "summary_group_unresolved:ledger_not_in_catalogue:{ledger}"
+        )),
+        Some(Err(gap)) => Err(format!("summary_group_unresolved:{gap}:{ledger}")),
         Some(Ok(placement)) => Ok(placement),
     }
 }
@@ -183,13 +186,20 @@ fn group_meta(group: SummaryGroup, placement: &Placement) -> GroupMeta {
         ..
     } = placement.primary();
     let mut fields = serde_json::Map::new();
+    // What a figure covers is said in every row, not only in the basis: a `group` bucket and a
+    // `subtree_totals` row of the same group have different figures.
     if group == SummaryGroup::PrimaryGroup {
+        fields.insert("covers".to_string(), json!("every ledger under the group"));
         fields.insert("reserved_name".to_string(), json!(reserved_name));
         return GroupMeta {
             label: name,
             fields,
         };
     }
+    fields.insert(
+        "covers".to_string(),
+        json!("only the ledgers directly under the group, not its sub-groups"),
+    );
     fields.insert(
         "reserved_name".to_string(),
         json!(placement.group_reserved_name()),
@@ -533,7 +543,8 @@ fn subtree_totals_shown(
         .map(|(_, _, name, subtree)| {
             let net = add_decimal(&subtree.debit, &subtree.credit)?;
             Ok(json!({
-                "group": name, "reserved_name": subtree.reserved_name, "depth": subtree.depth,
+                "group": name, "covers": "the group and everything under it, sub-groups included",
+                "reserved_name": subtree.reserved_name, "depth": subtree.depth,
                 "vouchers": subtree.vouchers, "debit": subtree.debit, "credit": subtree.credit, "net": net,
             }))
         })

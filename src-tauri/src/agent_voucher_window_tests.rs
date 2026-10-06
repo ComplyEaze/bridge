@@ -5792,7 +5792,19 @@ fn wr2_group_snapshot() -> String {
 /// The scripted sequence of one first-page group summary: the identity, the masters, the counted window,
 /// the masters again.
 fn group_summary_plans(before: (String, String), after: (String, String)) -> Vec<ScenarioPlan> {
+    group_plans_sized_by(counted_marks(), before, after)
+}
+
+/// The plans of a group summary whose sizing read (the company's marks, read before the ledger list)
+/// is `sizing`.
+fn group_plans_sized_by(
+    sizing: ScenarioPlan,
+    before: (String, String),
+    after: (String, String),
+) -> Vec<ScenarioPlan> {
     let mut plans = identity_plans();
+    // The group modes size the ledger list first, from the company's marks.
+    plans.extend(paired(&sizing));
     plans.extend(paired(&xml_plan(before.0)));
     plans.extend(paired(&xml_plan(before.1)));
     plans.extend(paired(&counted_marks()));
@@ -5997,10 +6009,11 @@ async fn a_held_group_summary_does_not_serve_a_page_of_another_grouping() {
 
 #[tokio::test]
 async fn a_group_summary_with_a_ledger_counts_every_entry_of_that_ledgers_vouchers() {
-    // `ledger` first resolves the name against the catalogue, so the catalogue is read for it as well:
-    // the resolve read, the two reads of the masters around the window, and the corroboration read.
+    // `ledger` resolves its name against the ledger list the placements are built from, so the list is
+    // read once before the window and once after it, as without `ledger`: the sizing marks, the list, the
+    // groups, the window's marks and parts, then the list and the groups again.
     let mut plans = identity_plans();
-    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(paired(&counted_marks()));
     plans.extend(paired(&xml_plan(ledger_catalogue())));
     plans.extend(paired(&xml_plan(wr2_group_snapshot())));
     plans.extend(paired(&counted_marks()));
@@ -6008,7 +6021,6 @@ async fn a_group_summary_with_a_ledger_counts_every_entry_of_that_ledgers_vouche
     plans.extend(paired(&xml_plan(three_vouchers())));
     plans.extend(paired(&xml_plan(ledger_catalogue())));
     plans.extend(paired(&xml_plan(wr2_group_snapshot())));
-    plans.extend(paired(&xml_plan(ledger_catalogue())));
     let total = plans.len();
     let one = OneServer::spawn(plans);
     let response = one
@@ -6044,6 +6056,7 @@ async fn a_group_summary_refuses_a_catalogue_that_names_a_ledger_twice_at_the_ca
         &catalogue[end..]
     );
     let mut plans = identity_plans();
+    plans.extend(paired(&counted_marks()));
     plans.extend(paired(&xml_plan(twice)));
     plans.extend(paired(&xml_plan(wr2_group_snapshot())));
     let one = OneServer::spawn(plans);
@@ -6055,6 +6068,161 @@ async fn a_group_summary_refuses_a_catalogue_that_names_a_ledger_twice_at_the_ca
         refusal["cause"], "ledger_catalogue_duplicate_identity",
         "{refusal}"
     );
+}
+
+/// A catalogue in which `ledger` has no parent group (its `PARENT` is empty).
+fn catalogue_without_parent_of(ledger: &str) -> String {
+    let catalogue = ledger_catalogue();
+    let start = catalogue
+        .find(&format!("<LEDGER NAME=\"{ledger}\""))
+        .expect("the ledger is in the catalogue");
+    let open = catalogue[start..]
+        .find("<PARENT TYPE=\"String\">")
+        .expect("it has a parent")
+        + start;
+    let close = catalogue[open..].find("</PARENT>").unwrap() + open + "</PARENT>".len();
+    format!(
+        "{}<PARENT TYPE=\"String\"></PARENT>{}",
+        &catalogue[..open],
+        &catalogue[close..]
+    )
+}
+
+#[tokio::test]
+async fn a_group_summary_names_the_ledger_it_could_not_place_and_masks_it_under_mask_parties() {
+    let ledger = "Café Naïve Traders";
+    let broken = catalogue_without_parent_of(ledger);
+    let plans = || {
+        group_summary_plans(
+            (broken.clone(), wr2_group_snapshot()),
+            (broken.clone(), wr2_group_snapshot()),
+        )
+    };
+    let plain = OneServer::spawn(plans())
+        .call(json!({"summarise_by": "group"}))
+        .await;
+    let refusal = refusal_of(&plain);
+    assert_eq!(refusal["code"], "summary_group_unresolved", "{refusal}");
+    assert_eq!(refusal["cause"], "no_parent", "{refusal}");
+    assert_eq!(refusal["ledger"], ledger, "{refusal}");
+    let masked = OneServer::spawn_with(plans(), Redaction::MaskParties)
+        .call(json!({"summarise_by": "primary_group"}))
+        .await;
+    let refusal = refusal_of(&masked);
+    assert_eq!(refusal["code"], "summary_group_unresolved", "{refusal}");
+    assert!(
+        !masked.to_string().contains("Naïve"),
+        "the unplaced ledger is named under mask_parties: {masked}"
+    );
+    assert!(refusal["ledger"].is_string(), "{refusal}");
+}
+
+#[tokio::test]
+async fn a_ledger_the_vouchers_name_and_the_list_lacks_is_refused_by_name_with_its_cause() {
+    // The ledger list of the second read omits nothing, the vouchers name a ledger the list has under
+    // another spelling: renamed in both reads of the list, so it is not drift.
+    let renamed = ledger_catalogue().replacen(
+        "<LEDGER NAME=\"WR2 Sales\"",
+        "<LEDGER NAME=\"WR2 Sales Renamed\"",
+        1,
+    );
+    assert_ne!(renamed, ledger_catalogue());
+    let one = OneServer::spawn(group_summary_plans(
+        (renamed.clone(), wr2_group_snapshot()),
+        (renamed, wr2_group_snapshot()),
+    ));
+    let response = one.call(json!({"summarise_by": "group"})).await;
+    let refusal = refusal_of(&response);
+    assert_eq!(refusal["code"], "summary_group_unresolved", "{refusal}");
+    assert_eq!(refusal["cause"], "ledger_not_in_catalogue", "{refusal}");
+    assert_eq!(refusal["ledger"], "WR2 Sales", "{refusal}");
+}
+
+#[tokio::test]
+async fn the_group_modes_size_the_ledger_list_first_from_the_masters_mark() {
+    let limit = super::vouchers::GROUP_LEDGER_LIST_MARK_LIMIT;
+    // One over the limit: refused after the identity and the marks reads, with no ledger list request.
+    let mut plans = identity_plans();
+    plans.extend(paired(&marks_plan(counted_marks_vouchers(), limit + 1)));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let response = one.call(json!({"summarise_by": "group"})).await;
+    let refusal = refusal_of(&response);
+    assert_eq!(refusal["code"], "summary_group_book_too_large", "{refusal}");
+    assert_eq!(refusal["size"]["master_alter_id"], limit + 1, "{refusal}");
+    assert_eq!(refusal["size"]["limit_master_alter_id"], limit, "{refusal}");
+    assert_eq!(one.requests(), total);
+    // At the limit: read.
+    for grouping in ["group", "primary_group"] {
+        let one = OneServer::spawn(group_plans_sized_by(
+            marks_plan(counted_marks_vouchers(), limit),
+            masters(),
+            masters(),
+        ));
+        let response = one.call(json!({"summarise_by": grouping})).await;
+        assert_eq!(response["isError"], false, "{grouping}: {response}");
+    }
+}
+
+#[tokio::test]
+async fn a_group_summary_masks_every_ledger_name_and_no_group_name_under_mask_parties() {
+    let plain = OneServer::spawn(group_summary_plans(masters(), masters()))
+        .call(json!({"summarise_by": "group"}))
+        .await;
+    let masked = OneServer::spawn_with(
+        group_summary_plans(masters(), masters()),
+        Redaction::MaskParties,
+    )
+    .call(json!({"summarise_by": "group"}))
+    .await;
+    let members = |response: &Value| -> Vec<String> {
+        buckets_of(response)
+            .iter()
+            .flat_map(|bucket| bucket["members"].as_array().unwrap().clone())
+            .map(|member| member["ledger"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let (real, shown) = (members(&plain), members(&masked));
+    assert!(!real.is_empty());
+    assert_eq!(real.len(), shown.len());
+    let text = masked.to_string();
+    for (real, shown) in real.iter().zip(&shown) {
+        assert_ne!(real, shown, "a member ledger was not masked");
+        assert!(
+            !text.contains(real.as_str()),
+            "{real} appears in a masked response"
+        );
+    }
+    // Group names are the book's configuration labels and stay as they are, in both modes.
+    let groups = |response: &Value| -> Vec<Value> {
+        buckets_of(response)
+            .iter()
+            .map(|b| b["group"].clone())
+            .collect()
+    };
+    assert_eq!(groups(&plain), groups(&masked));
+}
+
+#[tokio::test]
+async fn a_later_page_of_a_primary_group_summary_is_served_from_the_held_window() {
+    let mut plans = group_summary_plans(masters(), masters());
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one
+        .call(json!({"summarise_by": "primary_group", "limit": 1}))
+        .await;
+    assert_eq!(buckets_of(&first).len(), 1);
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(json!({"summarise_by": "primary_group", "limit": 1, "offset": 1, "snapshot_id": id}))
+        .await;
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    assert_ne!(
+        buckets_of(&second)[0]["group"],
+        buckets_of(&first)[0]["group"]
+    );
+    assert_eq!(one.requests(), total);
 }
 
 #[tokio::test]
@@ -6070,6 +6238,11 @@ async fn only_a_group_summary_carries_subtree_totals() {
         "{totals:?}"
     );
     assert_eq!(result["subtree_totals_complete"], true);
+    // A bucket and a subtree row of the same group say, each in its own row, what their figure covers.
+    let buckets = buckets_of(&response);
+    let bucket_covers = buckets[0]["covers"].as_str().expect("a bucket says what it covers");
+    let subtree_covers = totals[0]["covers"].as_str().expect("a subtree row says what it covers");
+    assert_ne!(bucket_covers, subtree_covers);
     let one = OneServer::spawn(group_summary_plans(masters(), masters()));
     let response = one.call(json!({"summarise_by": "primary_group"})).await;
     assert!(response["structuredContent"]["result"]

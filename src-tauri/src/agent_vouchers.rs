@@ -250,17 +250,35 @@ pub(super) fn page_items(
 /// are the same as `ledger_movement`'s; the voucher types are not told apart.
 const SUMMARY_BASIS: &str = "every voucher the window, selectors and search selected that is not cancelled, optional or without accounting entries, as ledger_movement counts (a narrowed window is not a ledger's whole movement); post-dated vouchers are summed too: post_dated_included counts those Tally flagged Yes and post_dated_flag_absent those with no flag at all (Tally asserts the flag on every voucher the current read asks for, so that is expected to be 0; only when it is not is a zero in the first no proof that none are post-dated); a voucher type that does not post (a memorandum, a reversing journal, a sales or purchase order, a delivery or receipt note), if the book uses it and Tally exports it with ledger entries, is not told apart and is summed (none of the vouchers in the one window this was checked on were of those types; the book's voucher-type masters were not read)";
 
+/// The largest master-alteration mark a group summary reads the ledger list at: the mark is an upper bound on
+/// ledgers (every other master raises it), a ledger row of the standard list is about 1,400 bytes (the
+/// estimate the compliance ledger read uses), and one response must stay under 16 MiB, half the transport cap.
+const GROUP_LEDGER_LIST_BYTES_PER_LEDGER: u64 = 1_400;
+const GROUP_LEDGER_LIST_LIMIT_BYTES: u64 = 16 * 1024 * 1024;
+pub(super) const GROUP_LEDGER_LIST_MARK_LIMIT: u64 =
+    GROUP_LEDGER_LIST_LIMIT_BYTES / GROUP_LEDGER_LIST_BYTES_PER_LEDGER;
+
 /// What a `group` or `primary_group` summary adds to its basis (#1230): where the groups come from and
 /// what a bucket is.
-pub(super) const GROUP_BASIS: &str = "groups are the book's masters read now (each ledger's group chain was the same when read before the window and again after it), not the grouping in force on each voucher's date; a `group` bucket holds only the ledgers directly under that group, as the ledger master shows it, so a predefined group whose ledgers sit in sub-groups has no bucket or a small one: its whole figure, descendants included, is in `subtree_totals` (a `group` summary only), which overlap and do not add up to `totals`; a `primary_group` bucket holds every ledger under the group directly under the reserved root, keyed by its reserved name (a group the book's user made there by its name); a ledger directly under the root has a bucket of its own named Primary; `members` lists the ledgers in a bucket, largest movement first and at most 10, with `members_total` exact; a ledger whose group chain cannot be walked, or that the ledger list does not hold, refuses the summary (`summary_group_unresolved`)";
+pub(super) const GROUP_BASIS: &str = "groups are the book's masters read now (each ledger's group chain was the same when read before the window and again after it), not the grouping in force on each voucher's date; a `group` bucket holds only the ledgers directly under that group, as the ledger master shows it (its `covers` says so; so does a `subtree_totals` row's, for the group and everything under it), so a predefined group whose ledgers sit in sub-groups has no bucket or a small one: its whole figure, descendants included, is in `subtree_totals` (a `group` summary only), which overlap and do not add up to `totals`; a `primary_group` bucket holds every ledger under the group directly under the reserved root, keyed by its reserved name (a group the book's user made there by its name); a ledger directly under the root has a bucket of its own named Primary; `members` lists the ledgers in a bucket, largest movement first and at most 10, with `members_total` exact; a ledger whose group chain cannot be walked, or that the ledger list does not hold, refuses the summary (`summary_group_unresolved`)";
 
 /// A refused summary as a failure: a ledger whose group chain could not be walked names the gap as
 /// the cause, so the answer says what to look at in the book's groups.
 fn summary_failure(code: String) -> ToolFailure {
     match code.strip_prefix("summary_group_unresolved:") {
-        Some(gap) => {
+        Some(rest) => {
+            let (gap, ledger) = match rest.split_once(':') {
+                Some((gap, ledger)) => (gap, Some(ledger)),
+                None => (rest, None),
+            };
             let mut failure = ToolFailure::from("summary_group_unresolved".to_string());
             failure.cause = Some(voucher_groups::static_gap_code(gap));
+            if let Some(ledger) = ledger {
+                failure
+                    .read_detail
+                    .get_or_insert_with(Box::default)
+                    .unplaced_ledger = Some(ledger.to_string());
+            }
             failure
         }
         None => ToolFailure::from(code),
@@ -526,9 +544,38 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             }
             server.drop_voucher_page(key)?;
         }
+        let wants_placements = summary_group.is_some_and(SummaryGroup::needs_placements);
+        if wants_placements {
+            // Sized first, as the compliance ledger read is (#637): the ledger list is a whole-book
+            // read, and a response past the transport cap is cut off mid-read.
+            let (marks, marks_evidence) = server
+                .read_company_marks_once(&identity, &company.name)
+                .await?;
+            accumulate_evidence(&mut accumulated, marks_evidence);
+            if marks.masters > GROUP_LEDGER_LIST_MARK_LIMIT {
+                let mut failure = ToolFailure::from("summary_group_book_too_large".to_string());
+                failure.read_size = Some(Box::new(ReadSize {
+                    master_alter_id: marks.masters,
+                    estimated_bytes: marks.masters.saturating_mul(GROUP_LEDGER_LIST_BYTES_PER_LEDGER),
+                    limit_bytes: GROUP_LEDGER_LIST_LIMIT_BYTES,
+                    limit_master_alter_id: GROUP_LEDGER_LIST_MARK_LIMIT,
+                }));
+                return Err(failure);
+            }
+        }
+        // With `ledger` and a group grouping the one ledger list read serves both: the names the
+        // ledger is resolved against and the parents the placements are built from.
+        let mut parents_before = None;
         let selected_catalogue = if let Some(requested) = requested_ledger {
-            let (ledgers, catalogue_evidence) =
-                server.read_ledger_catalogue(&identity, &company.name).await?;
+            let (ledgers, catalogue_evidence) = if wants_placements {
+                let (parents, evidence) =
+                    server.read_ledger_parents(&identity, &company.name).await?;
+                let names = parents.iter().map(|(name, _)| name.clone()).collect();
+                parents_before = Some(parents);
+                (names, evidence)
+            } else {
+                server.read_ledger_catalogue(&identity, &company.name).await?
+            };
             accumulate_evidence(&mut accumulated, catalogue_evidence);
             let resolved = resolve_ledger_or_refuse(
                 ledgers.iter().map(String::as_str),
@@ -542,8 +589,17 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         // #1230: a group summary needs each ledger's place in the group tree. It is read before the
         // window and again after it, and the two must be equal (below), so a ledger moved or a group
         // renamed while the window was read refuses instead of being summed under a stale chain.
-        let placements_before = if summary_group.is_some_and(SummaryGroup::needs_placements) {
-            Some(server.read_group_placements(&identity, &company.name, &mut accumulated).await?)
+        let placements_before = if wants_placements {
+            Some(
+                server
+                    .read_group_placements(
+                        &identity,
+                        &company.name,
+                        &mut accumulated,
+                        parents_before.take(),
+                    )
+                    .await?,
+            )
         } else {
             None
         };
@@ -595,7 +651,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let placements = match placements_before {
             Some(first) => {
                 let second = server
-                    .read_group_placements(&identity, &company.name, &mut accumulated)
+                    .read_group_placements(&identity, &company.name, &mut accumulated, None)
                     .await?;
                 if !first.same_ledgers(&second) {
                     return Err("ledger_snapshot_drifted".to_string().into());
@@ -612,14 +668,25 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let mut ledger_match = None;
         let mut selected_ledger = None;
         if let Some((ledger, catalogue)) = selected_catalogue {
-            let (corroboration, catalogue_evidence) =
-                server.read_ledger_catalogue(&identity, &company.name).await?;
-            accumulate_evidence(&mut accumulated, catalogue_evidence);
+            // A group grouping read the ledger list again after the window already, and refused if its
+            // ledgers differed from the first read's (`same_ledgers` above): that read is this one.
+            let corroboration = if placements.is_some() {
+                None
+            } else {
+                let (names, catalogue_evidence) =
+                    server.read_ledger_catalogue(&identity, &company.name).await?;
+                accumulate_evidence(&mut accumulated, catalogue_evidence);
+                Some(names)
+            };
             let initial = catalogue.iter().map(String::as_str).collect::<BTreeSet<_>>();
-            let repeated = corroboration.iter().map(String::as_str).collect::<BTreeSet<_>>();
+            let repeated = corroboration
+                .as_ref()
+                .map(|names| names.iter().map(String::as_str).collect::<BTreeSet<_>>());
             if initial.len() != catalogue.len()
-                || repeated.len() != corroboration.len()
-                || initial != repeated
+                || corroboration
+                    .as_ref()
+                    .zip(repeated.as_ref())
+                    .is_some_and(|(names, set)| set.len() != names.len() || *set != initial)
                 || rows.iter().flat_map(|row| row["amounts"].as_array().into_iter().flatten())
                     .any(|entry| !initial.contains(entry["ledger"].as_str().unwrap_or_default()))
             {
@@ -904,9 +971,18 @@ impl Server {
         identity: &VerifiedCompanyIdentity,
         company: &str,
         accumulated: &mut Option<Evidence>,
+        parents_read: Option<Vec<(String, Option<String>)>>,
     ) -> Result<Placements, ToolFailure> {
-        let (parents, catalogue_evidence) = self.read_ledger_parents(identity, company).await?;
-        accumulate_evidence(accumulated, catalogue_evidence);
+        // A ledger list the caller already read (and accumulated the evidence of) is not read again.
+        let parents = match parents_read {
+            Some(parents) => parents,
+            None => {
+                let (parents, catalogue_evidence) =
+                    self.read_ledger_parents(identity, company).await?;
+                accumulate_evidence(accumulated, catalogue_evidence);
+                parents
+            }
+        };
         let (groups, group_evidence) = self.read_group_collection(identity, company).await?;
         accumulate_evidence(accumulated, group_evidence);
         Ok(Placements::build(

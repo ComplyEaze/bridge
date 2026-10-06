@@ -1118,7 +1118,9 @@ each other.
     group total. The whole figure of a group, descendants included, is in **`subtree_totals`**: each
     group on any bucket's chain with its `depth` (1 for a group under the root), `vouchers`,
     `debit`, `credit` and `net` over everything under it, largest movement first, at most 60, with
-    `subtree_totals_total` exact and `subtree_totals_complete`. They overlap (a ledger counts under
+    `subtree_totals_total` exact and `subtree_totals_complete`. Each row says what it `covers`: a
+    `subtree_totals` row covers the group and everything under it, a `group` bucket only the
+    ledgers directly under it, so a row is never added to a bucket of the same group. They overlap (a ledger counts under
     every group above it), so they do not add up to `totals`. Every page carries them. When
     `subtree_totals_complete` is false the groups past the 60th are not in the answer: the groups
     directly under the root are all in `primary_group`, and any other group's figure is the sum of
@@ -1148,13 +1150,21 @@ each other.
     `group_name_repeated`, `reserved_name_missing`, `cycle`, `exhausted`, `top_group_not_under_root`
     (the top group of the chain has no parent, or none that is the root) or `ledger_not_in_catalogue`
     (`no_parent` also covers a group name Tally returned that cannot be carried, one with control
-    characters or over 1,024 bytes): a group total that is short of an entry it could not place is the
+    characters or over 1,024 bytes); `ledger` names the ledger that could not be placed (masked
+    when parties are masked) and the group is not named: a group total that is short of an entry it could not place is the
     misleading answer, so there is no "unplaced" bucket. A ledger no voucher of the window touches
     does not matter. A voucher withheld for a foreign-currency amount is still in no bucket (the
     result is `partial`, as for every summary).
-  - Cost, by construction and not measured: the ledger list in 4 requests and the group list in 4
-    more (two paired reads each), and 8 and 4 when `ledger` is also given, on top of the window
-    read; a large book's ledger list is large, and a real book's group buckets may need several
+  - Cost, by construction and not measured: 30 requests on top of the window read, with or without
+    `ledger` (its name is resolved against the same ledger list). A paired, identity-bracketed read
+    is 6 requests; a group summary makes five: the company's marks first, to size the ledger list,
+    then the ledger list and the group list before the window and again after it. A book whose
+    master-alteration mark is above 11,983 is refused before the ledger list is read
+    (`summary_group_book_too_large`, with `size`): the mark is an upper bound on ledgers (every
+    other master raises it), a ledger row of the standard list is about 1,400 bytes, and one
+    response must stay under 16 MiB. A smaller book may be refused; use the ledger, month or
+    voucher_type summaries and `ledger_masters` for each ledger's group. A book of thousands of
+    ledgers has not been measured; a large book's ledger list is large, and a real book's group buckets may need several
     pages (use `offset`). For ledger totals over a month or more on a large book, `trial_balance` is
     the cheaper read.
   - A later page comes from the held window with the placements it was read with, so it reads no

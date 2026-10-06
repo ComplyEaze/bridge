@@ -37,6 +37,7 @@ pub mod canonical;
 pub mod cash_44ab;
 pub mod cash_book_integrity;
 pub mod cash_payments_40a3;
+pub mod clause21a_candidates;
 pub mod compare;
 pub mod counter_cheques_40a3;
 pub mod creditor_ageing_43bh;
@@ -181,6 +182,10 @@ pub struct Engagement {
     /// `related_parties_cl23`-only: `[related_parties]`, bound by [`Engagement::bind`]; empty
     /// before binding. See [`RelatedPartiesConfig`].
     pub related_parties: RelatedPartiesConfig,
+    /// `clause21a_candidates`-only: the optional `[clause21a]` table as written, `None` when absent.
+    /// Typed when that test runs ([`clause21a_candidates::extra_terms`]), so a malformed one fails
+    /// that test alone.
+    pub clause21a: Option<toml::Value>,
     /// `creditor_ageing_43bh`-only: the optional `[creditor_ageing_43bh]` table. Filled by
     /// [`Engagement::bind`]; see [`CreditorAgeingConfig`] for what is typed when.
     pub creditor_ageing: CreditorAgeingConfig,
@@ -971,6 +976,7 @@ not YYYY-MM-DD"
             loans: LoansConfig::default(),
             partners: PartnersConfig::default(),
             related_parties: RelatedPartiesConfig::default(),
+            clause21a: cfg.get("clause21a").cloned(),
             creditor_ageing: CreditorAgeingConfig::default(),
             statutory_dues: StatutoryDuesConfig::default(),
             base_dir: base_dir.map_or_else(PathBuf::new, Path::to_path_buf),
@@ -1566,6 +1572,21 @@ pub fn books_examined_on(
     documents_read: &BTreeSet<books_examined::DocumentRead>,
 ) -> Result<serde_json::Value> {
     let result = books_examined::run(book, rules, documents_read)?;
+    canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `clause21a_candidates` on a book and return its canonical parity dump: the client's
+/// `[clause21a].extra_terms` and the bound `[partners]` interest and remuneration ledgers, as the
+/// reference's pack passes them. The reference module has no `check_invariants`.
+pub fn clause21a_candidates_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let extra_terms = clause21a_candidates::extra_terms(engagement.clause21a.as_ref())?;
+    let (bound, _report) = engagement.bind(book)?;
+    let partner_ledgers = clause21a_candidates::partner_ledgers(&bound.partners)?;
+    let result = clause21a_candidates::run(book, rules, &extra_terms, &partner_ledgers)?;
     canonical::canonical_test_result(book, &result, None)
 }
 

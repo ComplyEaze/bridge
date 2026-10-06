@@ -321,7 +321,7 @@ group in tag order. Clause lists keep their authored order (parity spec section 
 - **A table value of the wrong shape** (a person value that is not an object, a nature value that is
   not a list: a non-empty string would count as a non-empty list here).
 - **Rules with no `[entity]` table at all.** For a non-empty table the reference looks the rate up
-  once, after the two refusals above and before it reads any person's natures, so such rules fail on
+  once, after the tag-collision and non-text refusals and before it reads any person's natures, so such rules fail on
   every such run, whatever the amounts; an empty table returns `applicable` `no` without looking
   anything up. The rate is looked up again for each person and nature with a nonzero amount, and by
   SPD-1. The crate's `Rules::s40b_interest_rate_bp` refuses on any call, so a port must make that

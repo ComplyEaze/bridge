@@ -222,11 +222,10 @@ Both kinds carry:
   newlines and other whitespace becomes one space), in single quotes, not lower-cased and with no
   escaping (`'Working Partner'`, `'Partner in the firm'`, `'partner'` in `sp_labels`, where the raw
   texts carry tabs, newlines, no-break and ideographic spaces and the control characters U+001F and
-  U+001C). A relationship of only whitespace reads `''` (measured on the reference's own rendering function; no golden has one), and a quote
-  inside the text is not escaped. The split is
-  Python's `str.split()`, so the whitespace set is the one of section 3.3, **including U+001C to U+001F**: a join over
-  Rust's `split_whitespace()` differs on those four characters, so build the split from the same
-  set as the strip.
+  U+001C). The split is Python's `str.split()`, so the whitespace set is the one of section 3.3,
+  **including U+001C to U+001F**: a join over Rust's `split_whitespace()` differs on those four
+  characters. The crate's `support::py_split` splits on Python's whitespace set; build the join from
+  it, not from `split_whitespace()`.
 - Every text then goes through the dump's NFC normalisation before it is written and hashed (parity
   spec section 4), so the Kelvin sign in a relationship appears as a plain `K` in `limits_text`
   (`sp_labels`).
@@ -248,8 +247,9 @@ violation. Each violation is `{"invariant": "specified_persons_40a2b.check_invar
 
 The conditions are tried in this order and the first that holds gives the message; each message names
 what was emitted. `<key>`, `<nature>` and `<relationship>` are Python `repr()` renderings (quoted; the
-relationship raw, not the whitespace-joined form of section 3.4), `<governed id>` and `<comparable id>`
-are the two finding ids for the pair:
+`repr()` of the unmodified relationship text, not the whitespace-joined form of section 3.4; the
+crate's `support::py_repr_str` renders it), `<governed id>` and `<comparable id>` are the two finding
+ids for the pair:
 
 a. both ids present:
    `SPD-1: <key> nature <nature> has BOTH <governed id> and <comparable id> -- exactly one must be emitted`
@@ -306,22 +306,26 @@ group in tag order. Clause lists keep their authored order (parity spec section 
 - **A related-party result that lacks a figure the table implies.** The reference stops with an
   error (measured by calling the test with an empty related-party result: it raises rather than
   returning a result). The reference's pack cannot reach this, because both tests get the same
-  table, and the edge harness cannot either. A port should refuse with a typed error; ask for its
-  exact form before choosing one.
-- **Two person keys with the same tag.** The reference refuses the table before any figure, with a
-  typed error that names the tag and every key sharing it, sorted (measured with the invented keys
-  `Person PXD` and `Person ACOW`, which share tag `773442d1`); neither test runs. No golden is
-  possible. The exact refusal form is the port's own.
-- **A relationship that is not text.** The reference refuses it before any figure, in both this test
-  and the related-party test, with a typed error that names the person key (a person whose
-  `relationship` key is absent has the text `""`, not a refusal). No golden is possible (the run stops
-  before any dump); the exact refusal form is the port's own.
+  table, and the edge harness cannot either. A port should refuse with a typed error; the exact form
+  is the port's own.
+- **Two person keys with the same tag.** For a non-empty table the reference refuses it, in both
+  tests, with a typed error that names the tag and every key sharing it, sorted (measured with the
+  invented keys `Person PXD` and `Person ACOW`, which share tag `773442d1`). The test returns no
+  result and no golden is possible. The exact refusal form is the port's own.
+- **A relationship that is not text.** For a non-empty table the reference refuses it, in both this
+  test and the related-party test, with a typed error that names the person key (a person whose
+  `relationship` key is absent has the text `""`, not a refusal). The keys are checked in sorted
+  order, each for text before the tags are compared, so a table with both a non-text relationship
+  and a tag collision gets the non-text refusal. No golden is possible; the exact refusal form is
+  the port's own. (An empty table is not refused: both tests return `applicable` `no` first.)
 - **A table value of the wrong shape** (a person value that is not an object, a nature value that is
   not a list: a non-empty string would count as a non-empty list here).
-- **Rules with no `[entity]` table at all.** The reference looks the rate up once, before it reads any
-  person, so such rules fail on every run of this test, whatever the amounts (SPD-1 looks it up
-  again). The crate's `Rules::s40b_interest_rate_bp` refuses on any call, so a port that looks the
-  rate up once, first, matches.
+- **Rules with no `[entity]` table at all.** For a non-empty table the reference looks the rate up
+  once, after the two refusals above and before it reads any person's natures, so such rules fail on
+  every such run, whatever the amounts; an empty table returns `applicable` `no` without looking
+  anything up. The rate is looked up again for each person and nature with a nonzero amount, and by
+  SPD-1. The crate's `Rules::s40b_interest_rate_bp` refuses on any call, so a port must make that
+  call only where the reference does.
 - Any SPD-1 message (section 4).
 
 ## 9. The books

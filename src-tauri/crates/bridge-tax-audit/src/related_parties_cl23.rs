@@ -674,4 +674,36 @@ gives closing payable 4000000p for the same ledger set",
             ]
         );
     }
+
+    /// SUM-1's movement is checked arithmetic: a closing and opening whose difference leaves i64
+    /// refuse as every other money sum here does, instead of wrapping or panicking.
+    #[test]
+    fn sum_1_refuses_a_movement_that_overflows() {
+        let mut book = Book::default();
+        book.tb.insert(
+            "Rent".into(),
+            crate::book::TbRow {
+                opening_paise: -1,
+                debit_paise: 0,
+                credit_paise: 0,
+                closing_paise: i64::MAX,
+            },
+        );
+        let rules = Rules::vendored().unwrap();
+        let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
+        let rent = vec![EvidenceRef::new("ledger", "Rent")];
+        r.fig(
+            "amount_rent_aaaaaaaa",
+            Value::Int(5),
+            Unit::Paise,
+            "d",
+            rent,
+        )
+        .unwrap();
+        let err = check_invariants(&book, &r).unwrap_err();
+        assert!(
+            matches!(&err, AuditError::Config(m) if m == "related_parties_cl23: a total overflowed i64 paise"),
+            "{err}"
+        );
+    }
 }

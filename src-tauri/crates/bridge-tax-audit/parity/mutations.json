@@ -9678,5 +9678,13 @@
   "file": "src/related_parties_cl23.rs",
   "from": "        format!(\"{TEST_ID}: related_parties.{key:?}.{field} is present but is not {expected}\"),",
   "to": "        format!(\"{TEST_ID}: related_parties.{field} is present but is not {expected}\"),"
+ },
+ {
+  "id": "RP-26",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1's movement subtracts unchecked",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            let movement = tb_sum(&names, |row| row.closing_paise)?\n                .checked_sub(tb_sum(&names, |row| row.opening_paise)?)\n                .ok_or_else(overflow)?;",
+  "to": "            let movement = tb_sum(&names, |row| row.closing_paise - row.opening_paise)?;"
  }
 ]

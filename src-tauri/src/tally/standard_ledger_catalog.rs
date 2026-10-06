@@ -1,4 +1,6 @@
-//! Shared StandardLedgerCatalogV1 profile contract and guarded desktop read.
+//! Shared StandardLedgerCatalogV1 profile contract and guarded desktop read, and
+//! the V2 read (the same request plus each ledger's bill-wise flag) the import
+//! family sends.
 //!
 //! The returned catalog retains ledger GUIDs only in memory. Callers may expose
 //! names, but must never serialize the catalog or a binding directly.
@@ -90,7 +92,7 @@ pub(crate) fn render_standard_ledger_catalog_request(company_name: &str) -> anyh
 }
 
 /// The import family's ledger catalogue request: V1's rows, each with the
-/// ledger's `ISBILLWISEON` (design E of #1234). Only the import family sends
+/// ledger's `ISBILLWISEON` (#1234). Only the import family sends
 /// it; every other read keeps V1.
 pub(crate) fn render_import_ledger_catalog_request(company_name: &str) -> anyhow::Result<String> {
     let company = ValidatedCompanyName::new(company_name.to_owned())?;

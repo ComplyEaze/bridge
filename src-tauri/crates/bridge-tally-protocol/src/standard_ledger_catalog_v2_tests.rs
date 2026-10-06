@@ -213,9 +213,8 @@ fn the_flag_element_belongs_to_v2_alone() {
 }
 
 /// The flag codes are new strings: the older outstandings parser already emits
-/// `ledger_bill_wise_flag_missing` and `_invalid` for its own read, which stays
-/// in the import path until V2 replaces it, so a failure log must say which read
-/// refused.
+/// `ledger_bill_wise_flag_missing` and `_invalid` for its own read, so a failure
+/// log must say which read refused.
 #[test]
 fn the_flag_codes_are_not_the_outstandings_parsers_codes() {
     let codes = [

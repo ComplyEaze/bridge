@@ -1,5 +1,5 @@
 //! #1234 slice 1 through `build_import_xml`: the bill-wise flag a build reads from
-//! the ledger catalogue (design E), the per-party refusal and approval, and what
+//! the ledger catalogue (V2 catalogue), the per-party refusal and approval, and what
 //! a build records.
 //!
 //! The scripted catalogue answers are regression doubles (`flagged`): their

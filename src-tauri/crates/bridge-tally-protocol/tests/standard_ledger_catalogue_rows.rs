@@ -107,7 +107,7 @@ fn the_same_capture_is_refused_for_a_different_expected_company_name() {
     assert_eq!(error, StandardLedgerCatalogError::CompanyIdentityMismatch);
 }
 
-// ---- The V2 catalogue on captures of a live Tally (design E of #1234) ------------------------------------------
+// ---- The V2 catalogue on captures of a live Tally (#1234) ------------------------------------------
 //
 // Three synthetic books answered Bridge's own `StandardLedgerCatalogV2` request on 6 Oct 2026: V1's rows, each with
 // the ledger's `ISBILLWISEON`. Each provenance file records the request that was sent and the response's hash.
@@ -237,7 +237,7 @@ fn each_v2_capture_is_the_answer_to_the_request_the_profile_renders() {
 }
 
 /// A ledger whose name ends in a carriage return and line feed (the case the
-/// snapshot read slice 1 first chose could not read) comes back in the V2
+/// separate outstandings snapshot could not read) comes back in the V2
 /// catalogue as an escaped attribute, with a flag like any other.
 #[test]
 fn ledger_names_ending_in_crlf_carry_a_flag_in_the_v2_catalogue() {

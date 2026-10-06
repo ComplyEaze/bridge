@@ -783,17 +783,6 @@ impl Server {
             {
                 return Err("import_masters_changed".to_string().into());
             }
-            // A ledger switched to bill-wise since the build would take an entry
-            // On Account unseen: only the ledgers the person approved may be
-            // bill-wise now (design E of #1234, closing the window between the
-            // build's check and the post).
-            if !super::bill_wise::flags_still_as_approved(
-                &catalogue_identities,
-                &super::bill_wise::named_ledgers(&payload),
-                line.on_account_approved.as_deref().unwrap_or_default(),
-            ) {
-                return Err("import_bill_wise_changed".to_string().into());
-            }
             // A ledger that now folds equal to another live ledger could be
             // taken for it by Tally's import lookup (bridge#626). Refused as the
             // build refuses it, including for a batch built before the twin
@@ -821,6 +810,17 @@ impl Server {
                     ToolFailure::from(refusal.code().to_string())
                 },
             )?;
+            // A ledger switched to bill-wise since the build would take an entry
+            // On Account unseen: only the ledgers the person approved may be
+            // bill-wise now. Judged after the identity binding, so a ledger
+            // replaced under its old name is reported as that, not as a flag.
+            if !super::bill_wise::flags_still_as_approved(
+                &catalogue_identities,
+                &super::bill_wise::named_ledgers(&payload),
+                line.on_account_approved.as_deref().unwrap_or_default(),
+            ) {
+                return Err("import_bill_wise_changed".to_string().into());
+            }
             // A Payment, Receipt or Contra is only the right type while every
             // leg classifies as its build found it. The build's own check is
             // stale by now, so classify again before approval from this
@@ -1961,7 +1961,7 @@ fn recheck_import_admission(
     }
     // A ledger switched to bill-wise since the build would take an entry On
     // Account unseen: only the ledgers the person approved may be bill-wise
-    // now. The same catalogue read carries the flags (design E of #1234).
+    // now. The same catalogue read carries the flags (#1234).
     let approved = line.on_account_approved.as_deref().unwrap_or_default();
     if !super::bill_wise::flags_still_as_approved(
         &catalogue,
@@ -2166,6 +2166,16 @@ fn explain_unbound_batch(payload: &mut Value) {
              bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally \
              whether its file was already imported by hand, since posting the rebuilt batch would import it a second time. \
              Then build the batch again and post the new batch."
+        );
+    }
+    if payload["result"]["error"]["code"] == json!("import_bill_wise_changed")
+        && payload["result"]["attempt_recorded"] == json!(false)
+    {
+        payload["result"]["error"]["message"] = json!(
+            "A ledger in this batch now keeps bills in Tally, and the person did not approve \
+             entries on it going On Account. Nothing was posted. Build the batch again: the \
+             new build lists the ledger, and the person is asked whether its entries may post \
+             On Account."
         );
     }
     if payload["result"]["error"]["code"] == json!("import_batch_predates_ledger_binding")

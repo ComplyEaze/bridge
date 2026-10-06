@@ -1953,7 +1953,7 @@ pub(super) fn with_bill_wise_flags(catalogue: &str, bill_wise: &[&str]) -> Strin
 }
 
 /// The import cycle with its two ledger catalogue answers (offsets 5 and 7) the
-/// V2 answer the import family reads (design E of #1234): the same book, each
+/// V2 answer the import family reads (#1234): the same book, each
 /// ledger's `ISBILLWISEON` in the row, none of them bill-wise. Every other
 /// reader of the cycle keeps the V1 answers.
 fn import_family_cycle_plans() -> Vec<ScenarioPlan> {

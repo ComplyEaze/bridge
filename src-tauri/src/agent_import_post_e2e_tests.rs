@@ -2841,7 +2841,7 @@ async fn a_new_ledger_under_an_approved_name_during_approval_is_refused_by_ident
     assert_eq!(observed.len(), expected, "{response}");
 }
 
-/// #1234 (design E): the queue re-reads the catalogue after approval, inside
+/// #1234: the queue re-reads the catalogue after approval, inside
 /// its identity brackets, and its rows carry the flag. A ledger switched to
 /// bill-wise while the approval waits, with no approval recorded for it, is
 /// refused before the intent and the POST under its own code.
@@ -2877,6 +2877,54 @@ async fn a_named_ledger_switched_to_bill_wise_during_approval_is_refused_in_the_
     );
     assert_eq!(result["attempt_recorded"], json!(false), "{response}");
     assert_eq!(observed.len(), expected, "{response}");
+}
+
+/// #1234: the approval the build recorded is what lets a bill-wise ledger
+/// through. The same ledger, bill-wise at the post and again in the queue, is
+/// posted when the saved batch records its approval, and the POST is the
+/// request the intent recorded; with no approval recorded it is the refusal
+/// above. A post that read the approved list as empty would fail here.
+#[tokio::test]
+async fn a_ledger_that_is_bill_wise_and_was_approved_at_the_build_still_posts() {
+    let bill_wise =
+        crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue(), &["WR2 Sales"]);
+    let mut plans = before_approval();
+    for plan in &mut plans {
+        let body = plan.fixture.body().into_owned();
+        if body.contains("<LEDGER NAME=\"") && body.contains("<ISBILLWISEON") {
+            plan.fixture = Fixture::SyntheticXml(
+                crate::agent::agent_import::tests::with_bill_wise_flags(&body, &["WR2 Sales"]),
+            );
+        }
+    }
+    let mut after = after_approval(xml(created_one()));
+    let catalogue_at = probe().len() + 2;
+    after[catalogue_at + 1] = xml(bill_wise.clone());
+    after[catalogue_at + 3] = xml(bill_wise);
+    let post_at = plans.len() + after.len() - 1;
+    plans.extend(after);
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (mut line, args) = saved_batch(&server);
+    line.on_account_approved = Some(vec![super::super::bill_wise::OnAccountApproved {
+        ledger: "WR2 Sales".into(),
+        party_digest: "0".repeat(64),
+    }]);
+    server.append_import_ledger(&line).unwrap();
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), post_at + 1, "{response}");
+    let intent = dispatch_intent(directory.path());
+    assert_eq!(
+        observed[post_at].request_body_sha256,
+        intent["native_request_sha256"].as_str().unwrap()
+    );
 }
 
 /// bridge#634, #641: the queue's catalogue re-read at post time holds a
@@ -3178,7 +3226,53 @@ async fn a_ledger_replaced_under_its_name_since_the_build_is_refused_before_appr
     }
 }
 
-/// #1234 (design E): the post's own catalogue read, made before approval,
+/// #1234: when a ledger was replaced under its old name AND a named ledger is
+/// bill-wise now, the post reports the replacement (which names the ledger and
+/// says to confirm the intended one), not the flag, so a rebuild is not
+/// advised before the person knows the name now means another ledger.
+#[tokio::test]
+async fn a_replaced_ledger_is_reported_before_a_flag_that_changed() {
+    let mut plans = before_approval();
+    for plan in &mut plans {
+        let body = plan.fixture.body().into_owned();
+        if body.contains("<LEDGER NAME=\"") && body.contains("<ISBILLWISEON") {
+            plan.fixture = Fixture::SyntheticXml(
+                crate::agent::agent_import::tests::with_bill_wise_flags(&body, &["WR2 Sales"]),
+            );
+        }
+    }
+    plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (mut line, args) = saved_batch(&server);
+    line.ledger_identities = Some(vec![
+        BoundLedger {
+            name: "Cash".into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000ff".into(),
+        },
+        BoundLedger {
+            name: "WR2 Sales".into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d0".into(),
+        },
+    ]);
+    server.append_import_ledger(&line).unwrap();
+    let result = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await["structuredContent"]["result"]
+        .clone();
+    assert_eq!(
+        result["error"]["code"], "import_masters_changed_since_build",
+        "{result}"
+    );
+    assert_eq!(sent(simulator).len(), expected, "{result}");
+}
+
+/// #1234: the post's own catalogue read, made before approval,
 /// carries each ledger's flag. A saved batch whose named ledger reads
 /// bill-wise now, with no approval recorded for it, is refused before any
 /// approval is asked and before a dispatch intent, on both surfaces.
@@ -3228,6 +3322,10 @@ async fn a_named_ledger_that_became_bill_wise_since_the_build_is_refused_before_
             "{result}"
         );
         assert_eq!(result["attempt_recorded"], json!(false), "{result}");
+        assert!(result["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("Build the batch again"));
         assert_eq!(observed, expected, "{result}");
         assert!(!intent);
         assert!(scripted.previews().is_empty(), "approval must not be asked");

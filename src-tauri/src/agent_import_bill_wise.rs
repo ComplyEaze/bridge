@@ -31,35 +31,8 @@ pub(super) const APPROVALS_KEY: &str = "on_account_approvals";
 /// wherever it would be posted.
 pub(super) const BILL_WISE_NOT_RECORDED: &str = "import_batch_predates_bill_wise_record";
 
-/// Why the flags of the named ledgers were not in hand, or no longer hold. Every
-/// variant carries no data: it names no ledger, parent or company.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum BillWiseError {
-    /// A named ledger is not in the catalogue the flags came from.
-    LedgerNotInCatalogue,
-}
-
-impl BillWiseError {
-    pub(super) fn reason(self) -> &'static str {
-        "bill_wise_not_established"
-    }
-
-    /// One sentence a person can be told.
-    pub(super) fn plain(self) -> &'static str {
-        match self {
-            Self::LedgerNotInCatalogue => "A ledger in this batch is not in the company's ledger list, so it cannot be checked.",
-        }
-    }
-
-    pub(super) fn cause(self) -> &'static str {
-        match self {
-            Self::LedgerNotInCatalogue => "ledger_not_in_catalogue",
-        }
-    }
-}
-
 /// Each named ledger's `ISBILLWISEON`, by exact name, as the ledger catalogue
-/// read said it (design E of #1234: the flag rides the catalogue the build
+/// read said it (#1234: the flag rides the catalogue the build
 /// already reads). A V2 catalogue holds a typed flag for every ledger, so a
 /// ledger never lacks one here; a name that was not asked for is treated as
 /// bill-wise, the refusing direction.
@@ -69,26 +42,24 @@ pub(super) struct ObservedBillWise {
 }
 
 impl ObservedBillWise {
-    /// Refuses when a requested ledger is not in the catalogue.
+    /// Only the requested ledgers are kept. The build has already refused a
+    /// name the catalogue does not hold exactly (`masters_for_payload`), and a
+    /// name missing here would count as bill-wise anyway, the refusing direction.
     pub(super) fn from_catalogue<'a>(
         catalogue: &StandardLedgerCatalogV2,
         requested: impl IntoIterator<Item = &'a str>,
-    ) -> Result<Self, BillWiseError> {
+    ) -> Self {
         let requested = requested.into_iter().collect::<BTreeSet<_>>();
         let flags = catalogue
             .bill_wise_flags()
             .filter(|(name, _, _)| requested.contains(name))
             .map(|(name, _, flag)| (name.to_string(), flag))
             .collect::<BTreeMap<_, _>>();
-        if requested.iter().any(|name| !flags.contains_key(*name)) {
-            return Err(BillWiseError::LedgerNotInCatalogue);
-        }
-        Ok(Self { flags })
+        Self { flags }
     }
 
-    /// A name that was never observed counts as bill-wise: `from_catalogue`
-    /// refuses a requested ledger that is absent, so this only answers for a
-    /// name the caller did not request, and refusing is the safe error.
+    /// A name that was never observed counts as bill-wise, so refusing is the
+    /// safe error for a name the caller did not request or the catalogue lacks.
     fn is_bill_wise(&self, ledger: &str) -> bool {
         !matches!(self.flags.get(ledger), Some(BillWiseFlag::Off))
     }

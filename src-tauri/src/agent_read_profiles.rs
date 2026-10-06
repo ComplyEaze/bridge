@@ -331,7 +331,7 @@ pub(super) fn standard_ledger_catalog_read(company: &str) -> anyhow::Result<Read
 }
 
 /// The import family's ledger catalogue: V1's request with each ledger's
-/// bill-wise flag in the same row (design E of #1234).
+/// bill-wise flag in the same row (#1234).
 pub(super) fn import_ledger_catalogue_read(company: &str) -> anyhow::Result<ReadRequest> {
     crate::tally::standard_ledger_catalog::render_import_ledger_catalog_request(company)
         .map(ReadRequest)

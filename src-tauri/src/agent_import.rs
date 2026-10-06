@@ -777,9 +777,8 @@ impl Server {
                 .collect::<Vec<_>>();
             // Only a payload carrying a cash/bank voucher reads the group
             // collection. Every payload, a Journal-only one included, reads
-            // each named ledger's bill-wise flag (#1234), so a Journal build
-            // no longer keeps the request sequence its qualification was
-            // measured on.
+            // each named ledger's bill-wise flag (#1234), from the ledger list
+            // it already reads, so no request is added.
             let mut group_evidence = None;
             let mut statement_warnings: Vec<Value> = Vec::new();
             if renders_bank_shape(&payload.vouchers) || !resolved.cash_ledgers.is_empty() {
@@ -889,7 +888,7 @@ impl Server {
                 }
             }
             // Which of the named ledgers keep bills in Tally, as the catalogue
-            // read above said it (design E of #1234: the flag rides the
+            // read above said it (#1234: the flag rides the
             // catalogue the build already reads, so no further request is made
             // and the catalogue repeat below holds the flags to the same
             // byte-for-byte stability as the names). Entries on such a ledger
@@ -907,20 +906,10 @@ impl Server {
                 amends_batch_id: payload.amends_batch_id.as_deref(),
                 batch_content: bill_wise::batch_content_digest(&payload.vouchers),
             };
-            let observed_flags = match bill_wise::ObservedBillWise::from_catalogue(
+            let observed_flags = bill_wise::ObservedBillWise::from_catalogue(
                 &ledger_masters,
                 bill_wise::named_ledgers(&payload),
-            ) {
-                Ok(observed) => observed,
-                Err(error) => {
-                    return Ok(bill_wise_not_established(
-                        &company,
-                        &payload.company_guid,
-                        error,
-                        accumulated.clone(),
-                    ));
-                }
-            };
+            );
             let parties =
                 bill_wise::bill_wise_parties(&payload.vouchers, &observed_flags);
             let verdict = bill_wise::judge_approvals(&approvals, &parties, &bill_wise_context)
@@ -1690,7 +1679,7 @@ impl Server {
     }
 
     /// The import family's ledger catalogue: V1's rows, each with its
-    /// `ISBILLWISEON` (design E of #1234), so one read answers both which
+    /// `ISBILLWISEON` (#1234), so one read answers both which
     /// ledgers exist and which keep bills. Used by the build, `validate_masters`,
     /// the post and the queue's re-read.
     pub(super) async fn read_import_ledger_catalogue(
@@ -2391,29 +2380,9 @@ fn approval_invalid(error: bill_wise::ApprovalError) -> ToolFailure {
     failure
 }
 
-fn bill_wise_not_established(
-    company: &bridge_tally_protocol::TallyCompany,
-    company_guid: &str,
-    error: bill_wise::BillWiseError,
-    evidence: Evidence,
-) -> ToolOutcome {
-    ToolOutcome {
-        payload: json!({"company": company_json(company, std::slice::from_ref(company)), "result": {
-            "state":"refused", "reason":error.reason(), "cause":error.cause(),
-            "message":error.plain(),
-            "next_step":BILL_WISE_NOT_ESTABLISHED_NEXT_STEP
-        }}),
-        evidence,
-        company_guid: Some(company_guid.to_string()),
-        truncated: false,
-    }
-}
-
-const BILL_WISE_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written. ComplyEaze Bridge could not establish which of the ledgers in this batch keep bills in Tally, so it cannot tell whether an entry would land On Account. Tell the person what message says, in your own words, and that nothing was posted. Build again once it is resolved. Do not drop a ledger from the batch to get past this.";
-
 const BILL_WISE_UNAPPROVED_NEXT_STEP: &str = "No file was written. Each party listed is a ledger that keeps bills in Tally. An entry on it with no bill allocation lands On Account, and the person must then match it to a bill in Tally by hand. Show the person each party with its row_count, its debit_total and credit_total, and the rows listed, and say how many more rows there are (rows_omitted, refused_parties_omitted); raise BRIDGE_AGENT_MAX_BYTES to list them all. Ask whether each party's entries may be posted On Account, one party per question. Only for the parties the person says yes to, build again with on_account_approvals: a list of {ledger, party_digest}, the digest copied from this answer. The digest ties the approval to this exact batch, this company and this endpoint, and changing any row changes every party's digest, so the person is asked again. It does not prove that a person said yes, and a hand import of the file is not checked at all: never approve on the person's behalf. The native approval dialog does not yet show these entries. If this batch amends an earlier one, importing it also replaces any bill allocations the person made in Tally.";
 
-const BILL_WISE_NONE_NOTE: &str = "Checked: none of the ledgers this batch names is a bill-wise ledger, as read from Tally in the ledger list during this build. ComplyEaze Bridge reads the ledger list again before posting and refuses the post (import_bill_wise_changed) if a named ledger has become bill-wise since. A hand import of the file is not checked at all.";
+const BILL_WISE_NONE_NOTE: &str = "Checked: none of the ledgers this batch names is a bill-wise ledger, as read from Tally in the ledger list during this build. ComplyEaze Bridge reads the ledger list again before posting and refuses the post (import_bill_wise_changed) if a named ledger has become bill-wise since. This reads each ledger's own bill-wise setting; whether a company-wide setting still allocates bills is not read. A hand import of the file is not checked at all.";
 
 const BILL_WISE_APPROVED_NOTE: &str = "Entries on the bill-wise ledgers listed in on_account_approved carry no bill allocation, so each amount lands On Account and must be matched to bills in Tally afterwards. Each has an approval digest that matches this batch; ComplyEaze Bridge cannot tell whether a person said yes, and the native approval dialog does not yet list these entries. Any other ledger this batch names that has become bill-wise by the time of posting is refused (import_bill_wise_changed).";
 

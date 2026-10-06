@@ -61,7 +61,7 @@ fn catalogue_v2(all: &[&str], bill_wise: &[&str]) -> StandardLedgerCatalogV2 {
 
 /// The names `bill_wise` marks Yes, every other name in `all` marked No.
 fn observed(all: &[&str], bill_wise: &[&str]) -> ObservedBillWise {
-    ObservedBillWise::from_catalogue(&catalogue_v2(all, bill_wise), all.iter().copied()).unwrap()
+    ObservedBillWise::from_catalogue(&catalogue_v2(all, bill_wise), all.iter().copied())
 }
 
 fn row(txn: &str, voucher_type: VoucherType, entries: &[(EntrySide, &str)]) -> PartyRow {
@@ -300,9 +300,8 @@ fn no_party_is_returned_when_no_ledger_is_bill_wise() {
 
 #[test]
 fn a_ledger_the_observation_does_not_hold_counts_as_bill_wise() {
-    // `ObservedBillWise::new` refuses a requested ledger that is absent, so
-    // only a name nobody requested reaches this answer, and refusing is the
-    // safe error.
+    // A name nobody requested, or that the catalogue lacks, is not in the
+    // observation, and refusing is the safe error.
     let payload = payload(vec![voucher(
         "txn-1",
         VoucherType::Journal,
@@ -344,18 +343,17 @@ fn the_named_ledgers_are_every_entrys_ledger_once() {
 }
 
 #[test]
-fn a_requested_ledger_the_catalogue_lacks_fails_closed() {
+fn a_requested_ledger_the_catalogue_lacks_counts_as_bill_wise() {
     let catalogue = catalogue_v2(&["Party A"], &[]);
-    assert_eq!(
-        ObservedBillWise::from_catalogue(&catalogue, ["Party A", "Party B"]),
-        Err(BillWiseError::LedgerNotInCatalogue)
-    );
+    let observed = ObservedBillWise::from_catalogue(&catalogue, ["Party A", "Party B"]);
+    assert!(!observed.is_bill_wise("Party A"));
+    assert!(observed.is_bill_wise("Party B"));
 }
 
 #[test]
 fn only_the_requested_ledgers_are_kept_and_the_rest_count_as_bill_wise() {
     let catalogue = catalogue_v2(&["Party A", "Party B", "Bank"], &["Party B"]);
-    let observed = ObservedBillWise::from_catalogue(&catalogue, ["Party A", "Bank"]).unwrap();
+    let observed = ObservedBillWise::from_catalogue(&catalogue, ["Party A", "Bank"]);
     assert_eq!(observed.flags.len(), 2);
     assert!(!observed.is_bill_wise("Party A") && !observed.is_bill_wise("Bank"));
     // Party B was not requested: it was not read into the observation, so it is
@@ -897,22 +895,6 @@ fn a_total_that_cannot_be_added_is_absent_rather_than_guessed() {
     assert_eq!(credit.as_deref(), Some("0"));
 }
 
-#[test]
-fn the_refusal_has_a_plain_sentence_that_names_no_code() {
-    let sentence = BillWiseError::LedgerNotInCatalogue.plain();
-    assert!(sentence.ends_with('.') && sentence.len() > 40, "{sentence}");
-    // A person is told this sentence, so no snake_case code is in it.
-    assert!(!sentence.contains('_'), "{sentence}");
-    assert_eq!(
-        BillWiseError::LedgerNotInCatalogue.cause(),
-        "ledger_not_in_catalogue"
-    );
-    assert_eq!(
-        BillWiseError::LedgerNotInCatalogue.reason(),
-        "bill_wise_not_established"
-    );
-}
-
 // ---- On a capture of a live Tally ---------------------------------------------------------------------------
 //
 // The answer below was read by Bridge's own V2 catalogue request (the profile this module reads through) from the
@@ -1021,8 +1003,7 @@ fn live_a_batch_naming_a_bill_wise_and_a_plain_ledger_has_one_party() {
             entry(LIVE_BANK, EntrySide::Cr, "10.00"),
         ],
     )]);
-    let observed =
-        ObservedBillWise::from_catalogue(&live_catalogue(), named_ledgers(&payload)).unwrap();
+    let observed = ObservedBillWise::from_catalogue(&live_catalogue(), named_ledgers(&payload));
     let parties = bill_wise_parties(&payload.vouchers, &observed);
     assert_eq!(parties.len(), 1);
     assert_eq!(parties[0].ledger, LIVE_PARTY);

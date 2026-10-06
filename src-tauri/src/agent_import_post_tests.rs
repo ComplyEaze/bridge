@@ -1441,7 +1441,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     ));
 }
 
-/// #1234 (design E): the catalogue the queue re-reads after approval carries
+/// #1234: the catalogue the queue re-reads after approval carries
 /// each ledger's flag, so a named ledger switched to bill-wise since the build,
 /// with no approval for it, is refused before the post; an approved one passes
 /// whether it stays bill-wise or is switched off.

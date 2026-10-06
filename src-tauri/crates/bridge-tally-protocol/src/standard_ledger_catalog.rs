@@ -258,8 +258,8 @@ pub enum BillWiseFlag {
 
 impl BillWiseFlag {
     fn parse(text: &str) -> Result<Self, StandardLedgerCatalogError> {
-        // Exactly the two spellings observed live (the outstandings snapshot);
-        // any other is refused until a capture shows Tally uses it (P1).
+        // After the reader's trimming, exactly the two spellings observed live
+        // (§12a.15); any other is refused until a capture shows Tally uses it (P1).
         if text == "Yes" {
             Ok(Self::On)
         } else if text == "No" {

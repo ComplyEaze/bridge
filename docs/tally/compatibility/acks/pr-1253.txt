@@ -1,6 +1,6 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
 src-tauri/crates/bridge-tally-protocol/src/lib.rs
-src-tauri/crates/bridge-tally-protocol/src/native_outstandings/mod.rs
-src-tauri/crates/bridge-tally-protocol/src/native_outstandings/wire.rs
 src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs
 src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
 src-tauri/src/agent_catalog.rs

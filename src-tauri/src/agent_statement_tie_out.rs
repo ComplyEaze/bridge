@@ -186,7 +186,9 @@ struct StatementFile {
     /// What this file's vouchers add to the bank ledger.
     proposals_net: BankSide,
     /// Rows of the statement with no voucher in the file: a cash line not yet
-    /// answered, or a row skipped because another account's Contra carries it.
+    /// answered, a row skipped because another account's Contra carries it, or
+    /// any disposition this check does not know (a row is counted as carried
+    /// only when the file says it is a voucher).
     rows_without_voucher: usize,
 }
 
@@ -206,12 +208,7 @@ impl StatementFile {
             .as_array()
             .ok_or_else(invalid)?
             .iter()
-            .filter(|record| {
-                matches!(
-                    record["disposition"].as_str(),
-                    Some("needs_answer" | "skipped")
-                )
-            })
+            .filter(|record| record["disposition"].get("voucher").is_none())
             .count();
         Ok(Self {
             opening: BankSide::from_printed(text(&document["controls"]["opening_balance"])?)?,
@@ -306,7 +303,9 @@ impl LedgerRead {
 
 /// The catalogue dates a tie-out reads: the first row's date, the day after
 /// the last (the book's position at the end of the last day), and the first
-/// again to catch a change made during the read.
+/// again. The third read catches a change dated before the first date made
+/// between the first and the third read; a voucher dated inside the window and
+/// posted in between moves only the end figure, and is not caught.
 fn read_dates(first: Date, last: Date) -> Result<[TallyDate; 3], String> {
     let tally = |date: Date| {
         TallyDate::parse(date.iso().replace('-', "")).map_err(|_| "invalid_date".to_string())
@@ -375,7 +374,7 @@ fn gaps(
 const SIGN_SENTENCE: &str = "A positive amount means the book shows more money in the bank than the statement does; a negative amount, less.";
 const POSSIBLE_CAUSES: &str = "Uncleared cheques and deposits in transit explain differences like these. So can a missing entry, a repeated entry or the wrong bank ledger. This check cannot tell them apart. To see which vouchers are involved, read the bank ledger's vouchers for these dates.";
 const SCOPE: &str =
-    "This checks the bank ledger only. A wrong party or expense ledger is not caught here.";
+    "This checks the bank ledger only, and takes the ledger named in the file to be a bank account: a ledger of another kind opens at zero for the period, so its gaps would mean nothing. A wrong party or expense ledger is not caught here.";
 
 /// The fixed reading text. The headline comes first; it names every figure
 /// that is not established, then every gap that is not zero, and prescribes
@@ -401,12 +400,14 @@ fn reading(stage: Stage, window: Option<(Date, Date)>, gaps: &Gaps) -> Value {
         .filter(|(_, figure)| figure.reason().is_some())
         .collect::<Vec<_>>();
     if let Some(reason) = missing.first().and_then(|(_, figure)| figure.reason()) {
-        // All three, or the closing gap and the change, by construction.
         let names = missing.iter().map(|(label, _)| *label).collect::<Vec<_>>();
-        let (last, rest) = names.split_last().expect("one at least");
+        let listed = match names.split_last() {
+            Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
+            Some((only, _)) => (*only).to_string(),
+            None => String::new(),
+        };
         parts.push(format!(
-            "{} and {last} not established ({})",
-            rest.join(", "),
+            "{listed} not established ({})",
             reason.explanation()
         ));
     }
@@ -505,11 +506,9 @@ impl Server {
                             .as_deref()
                             .ok_or_else(|| "company_identity_incomplete".to_string())?,
                     )?;
-                    let gaps = if ensure_movement_window_within_books(
-                        &first.iso().replace('-', ""),
-                        &books_from,
-                    )
-                    .is_err()
+                    let first_day = normalized_date(&first.iso())?;
+                    let gaps = if ensure_movement_window_within_books(&first_day, &books_from)
+                        .is_err()
                     {
                         all_not_established(NotEstablished::WindowPrecedesBooksFrom)
                     } else {

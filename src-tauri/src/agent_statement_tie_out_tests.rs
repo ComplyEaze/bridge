@@ -229,6 +229,30 @@ fn rows_without_a_voucher_are_the_open_cash_lines_and_the_skipped_rows() {
 }
 
 #[test]
+fn a_row_counts_as_carried_only_when_the_file_says_it_is_a_voucher() {
+    use bridge_bank_statement::proposals::{Disposition, VoucherType};
+    // the records as the parse writes them: the serialiser's own spelling
+    let mut written = document(vec![]);
+    written["records"] = json!([
+        {"disposition": Disposition::NeedsAnswer},
+        {"disposition": Disposition::Skipped},
+        {"disposition": Disposition::Voucher(VoucherType::Contra)},
+        {"disposition": Disposition::Voucher(VoucherType::Payment)},
+        {"disposition": Disposition::Voucher(VoucherType::Receipt)},
+    ]);
+    assert_eq!(
+        StatementFile::read(&written).unwrap().rows_without_voucher,
+        2
+    );
+    // a disposition this check has never heard of is not a voucher either
+    written["records"] = json!([{"disposition": "held_for_review"}, {"disposition": null}]);
+    assert_eq!(
+        StatementFile::read(&written).unwrap().rows_without_voucher,
+        2
+    );
+}
+
+#[test]
 fn only_an_exact_bank_ledger_name_counts() {
     let vouchers = vec![voucher(&[
         ("synthetic bank ledger", "300.00", "Dr"),
@@ -495,7 +519,7 @@ fn a_ledger_named_twice_in_one_catalogue_is_refused() {
 
 const CAUSES: &str = "Uncleared cheques and deposits in transit explain differences like these. So can a missing entry, a repeated entry or the wrong bank ledger. This check cannot tell them apart. To see which vouchers are involved, read the bank ledger's vouchers for these dates.";
 const SCOPE: &str =
-    "This checks the bank ledger only. A wrong party or expense ledger is not caught here.";
+    "This checks the bank ledger only, and takes the ledger named in the file to be a bank account: a ledger of another kind opens at zero for the period, so its gaps would mean nothing. A wrong party or expense ledger is not caught here.";
 
 fn window() -> Option<(Date, Date)> {
     Some((date(2026, 8, 1), date(2026, 8, 7)))
@@ -556,6 +580,26 @@ fn the_headline_leaves_out_a_figure_that_is_zero_and_says_so_when_all_are() {
     // Nothing differs, so the causes are not offered; the scope always is.
     assert!(text.get("possible_causes").is_none(), "{text}");
     assert_eq!(text["scope"], SCOPE);
+}
+
+#[test]
+fn the_headline_lists_one_missing_figure_without_an_and() {
+    let one_missing = Gaps {
+        opening: Figure::Gap(
+            BankSide::canonical(ExactDecimal::parse("0.00".to_string()).unwrap()).unwrap(),
+        ),
+        closing: Figure::NotEstablished(NotEstablished::BankLedgerNotInBook),
+        change: Figure::Gap(
+            BankSide::canonical(ExactDecimal::parse("0.00".to_string()).unwrap()).unwrap(),
+        ),
+    };
+    let text = reading(Stage::AfterPost, window(), &one_missing);
+    let headline = text["headline"].as_str().unwrap();
+    assert!(
+        headline.contains(": closing gap not established ("),
+        "{headline}"
+    );
+    assert!(!headline.contains(" and closing gap"), "{headline}");
 }
 
 #[test]

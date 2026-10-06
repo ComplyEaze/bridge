@@ -1380,7 +1380,9 @@ deadlocks.
   company it was parsed for; pass the company the statement belongs to.
 - **Three reads of the ledger list**, none of vouchers: the position at the first
   row's date, at the day after the last row's date, and at the first date again.
-  A change between the first and third read is `book_changed_during_read`.
+  A change dated before the statement, made between the first and third read, is
+  `book_changed_during_read`; a voucher dated inside the statement and posted
+  during the read moves only the end figure and is not caught.
 - **Three figures**, all in the statement's sign (book less statement: positive
   means the book shows more money in the bank), with the two dates:
   `opening_gap`, `closing_gap` (`before_build` adds what the file's vouchers put

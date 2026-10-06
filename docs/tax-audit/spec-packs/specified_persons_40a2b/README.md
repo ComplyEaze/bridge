@@ -130,8 +130,9 @@ crate's `support::hash8`; `sp_keys`). `<nature>` is a vocabulary name.
 ### 3.1 The gate and the only figure
 
 The test has exactly one figure, `specified_persons_40a2b.applicable`: `"yes"` when the table has at
-least one person key, whatever the values hold (`sp_empty`: one key whose value is an empty object
-makes it `"yes"`, with no finding), and `"no"` for an absent or empty table (`sp_none`). Unit
+least one person key, whatever else the values hold (`sp_empty`: one key whose value is an empty
+object makes it `"yes"`, with no finding), unless the table is refused first (two keys with one tag,
+or a relationship that is not text: section 8), and `"no"` for an absent or empty table (`sp_none`). Unit
 `text`, no evidence; its definition is a fixed sentence (`definition_text` in any golden). The gate
 reads the table, not the related-party test's own gate; the two agree because both read the same
 table.

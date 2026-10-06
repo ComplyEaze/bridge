@@ -18,6 +18,7 @@ fn voucher(txn: &str, voucher_type: VoucherType, entries: Vec<ImportEntry>) -> I
         narration: None,
         reference: None,
         voucher_number: None,
+        invoice: None,
         entries,
     }
 }

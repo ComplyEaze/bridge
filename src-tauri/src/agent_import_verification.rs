@@ -149,7 +149,7 @@ pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFinge
         normalized_date(&voucher.date)
             .ok()
             .map(|date| date.as_str().to_string()),
-        Some(voucher.voucher_type.as_str().to_string()),
+        Some(voucher.filed_type_name().to_string()),
         expected_entry_fingerprint(voucher),
     )
 }
@@ -643,6 +643,72 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
     }
 }
 
+/// What a person does about an invoice that is in the book and did not read
+/// back as built.
+pub(super) const INVOICE_DIVERGENT_NEXT_STEP: &str = "This invoice is in Tally, but it is not confirmed as built. `diffs` says why: a GST field, the reference, the entries (`legs`) or the bill allocation differs; or the invoice was not read back, because the read failed, the company is now over the size limit for that read, or this version does not read invoices of this type back; or another voucher of its type carries the same number; or the voucher found under that number is not the one this post created (`guid`, `alter_id`). Open the invoice in Tally and check it against the source document before relying on it. Do not post it again.";
+
+/// An invoice the standard readback matched, whose own fields did not read back
+/// as built (party, GST header, reference, allocation, or the voucher could not
+/// be read), is divergent: "posted_verified" means every field was checked.
+pub(super) fn mark_invoice_readback(
+    result: &mut Value,
+    bridge_txn_id: &str,
+    differences: &[String],
+) {
+    if differences.is_empty() {
+        return;
+    }
+    let mut moved = 0_u64;
+    if let Some(vouchers) = result["vouchers"].as_array_mut() {
+        for voucher in vouchers {
+            if voucher["bridge_txn_id"] == bridge_txn_id && voucher["status"] == "posted_verified" {
+                voucher["status"] = json!("posted_divergent");
+                voucher["diffs"] = json!([{ "invoice_fields": differences }]);
+                voucher["next_step"] = json!(INVOICE_DIVERGENT_NEXT_STEP);
+                moved += 1;
+            }
+        }
+    }
+    let counts = &mut result["counts"];
+    counts["posted_verified"] = json!(counts["posted_verified"]
+        .as_u64()
+        .unwrap_or(0)
+        .saturating_sub(moved));
+    counts["posted_divergent"] = json!(counts["posted_divergent"].as_u64().unwrap_or(0) + moved);
+}
+
+/// The invoice of a batch whose own read-back is due: the one the standard
+/// readback matched, with its matched row. An invoice of a type this build
+/// does not qualify (a line another build saved) is never read back by a
+/// request that is not qualified either: it is marked not confirmed here
+/// (`invoice_type_unqualified`) and nothing is due.
+pub(super) fn invoice_readback_due<'a>(
+    result: &mut Value,
+    vouchers: &'a [ImportVoucher],
+    qualified: &[super::VoucherType],
+) -> Option<(&'a ImportVoucher, Value)> {
+    let voucher = vouchers
+        .iter()
+        .find(|voucher| voucher.voucher_type.is_invoice())?;
+    let matched = result["vouchers"]
+        .as_array()?
+        .iter()
+        .find(|row| {
+            row["bridge_txn_id"] == voucher.bridge_txn_id.as_str()
+                && row["status"] == "posted_verified"
+        })
+        .cloned()?;
+    if !qualified.contains(&voucher.voucher_type) {
+        mark_invoice_readback(
+            result,
+            &voucher.bridge_txn_id,
+            &["invoice_type_unqualified".to_string()],
+        );
+        return None;
+    }
+    Some((voucher, matched))
+}
+
 fn mark_not_found_as(result: &mut Value, status: &str) {
     let mut moved = 0_u64;
     if let Some(vouchers) = result["vouchers"].as_array_mut() {
@@ -892,7 +958,7 @@ pub(super) fn voucher_diffs(
     {
         diffs.push(json!("effective_date"));
     }
-    if actual.voucher_type.as_deref() != Some(expected.voucher_type.as_str()) {
+    if actual.voucher_type.as_deref() != Some(expected.filed_type_name()) {
         diffs.push(json!("voucher_type"));
     }
     if expected.voucher_number.is_some()

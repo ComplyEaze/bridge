@@ -18,6 +18,7 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
         narration: None,
         reference: None,
         voucher_number: None,
+        invoice: None,
         entries: template
             .entries
             .iter()

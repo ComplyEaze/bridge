@@ -3442,3 +3442,180 @@ fn a_text_refusal_says_to_build_again_only_when_no_attempt_was_recorded() {
         )
     );
 }
+
+/// An invoice to a bill-wise customer is written with a New Ref, so the queue's
+/// bill-wise recheck must not ask for an On Account approval of the customer,
+/// must still refuse every other leg that has become bill-wise, and must refuse
+/// when the customer itself is no longer bill-wise (Tally would drop the New Ref
+/// silently). Without the exemption every invoice to a bill-wise customer was
+/// refused in the queue, after the approval was spent.
+#[test]
+fn the_queued_bill_wise_recheck_exempts_an_invoices_new_ref_party_and_nobody_else() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    ));
+    let raw_catalogue = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    ));
+    let single_currency = captured_currencies(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-00000000-0000-4000-8000-0000000000a1",
+        "identity_scheme":"batch_v1", "company_guid":company_guid,
+        "txn_ids":["INV_1"],
+        "date_from":"20260907", "date_to":"20260907", "sha256":"0000000000000000000000000000000000000000000000000000000000000000",
+        "built_at":"2026-10-06T10:00:00.000Z", "status":"built", "cash_in_hand_ledgers":[], "on_account_approved":[],
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+        "vouchers":[{"bridge_txn_id":"INV_1","date":"20260907","voucher_type":"Sales",
+            "narration":null, "reference":null, "voucher_number":"278",
+            "invoice":{"voucher_type_name":"Sales","place_of_supply":"Rajasthan","observed":{
+                "voucher_type_guid":"g-type","party_gstin":null,"party_state":"Rajasthan",
+                "party_registration_type":"Unregistered/Consumer","party_bill_wise":true,"company_state":"Rajasthan"}},
+            "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"1120.00","side":"Dr"},
+                {"ledger":"Cash","amount":"1120.00","side":"Cr"}]}]
+    }))
+    .unwrap();
+    let recheck = |bill_wise: &[&str], line: &ImportLedgerLine| {
+        let catalogue =
+            crate::agent::agent_import::tests::with_bill_wise_flags(&raw_catalogue, bill_wise);
+        let binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+            &catalogue,
+            "WR2 Unicode Lab",
+            company_guid,
+        )
+        .unwrap()
+        .bind_selected(requested_ledger_names(&ImportPayload {
+            company_guid: company_guid.into(),
+            vouchers: line.vouchers.clone(),
+            amends_batch_id: None,
+        }))
+        .unwrap();
+        recheck_import_admission(
+            line,
+            company_guid,
+            "WR2 Unicode Lab",
+            &captured,
+            &captured,
+            &catalogue,
+            None,
+            &single_currency,
+            &binding,
+        )
+    };
+    let changed = |result: anyhow::Result<()>| {
+        matches!(
+            result
+                .unwrap_err()
+                .downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BillWiseChanged)
+        )
+    };
+    // The customer is bill-wise, as built: admitted with no On Account approval.
+    recheck(&["Bridge Nested Debtor WR4"], &line)
+        .expect("a New Ref party needs no On Account approval");
+    // The customer is no longer bill-wise: the New Ref would be dropped unseen.
+    assert!(changed(recheck(&[], &line)));
+    // Another leg has become bill-wise: still judged, still refused.
+    assert!(changed(recheck(
+        &["Bridge Nested Debtor WR4", "Cash"],
+        &line
+    )));
+    // An ordinary Journal to a bill-wise ledger is refused as before: no exemption.
+    let mut journal = line.clone();
+    journal.vouchers[0].voucher_type = VoucherType::Journal;
+    journal.vouchers[0].invoice = None;
+    journal.vouchers[0].voucher_number = None;
+    assert!(changed(recheck(&["Bridge Nested Debtor WR4"], &journal)));
+}
+
+fn invoice_batch(entries: serde_json::Value) -> (ImportLedgerLine, TallyEndpointConfig) {
+    let (mut line, endpoint) = batch();
+    line.vouchers = serde_json::from_value(json!([{
+        "bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Sales",
+        "narration":"Synthetic test only","reference":null,"voucher_number":"278",
+        "invoice":{"voucher_type_name":"Sales Acc","place_of_supply":"Rajasthan","round_off_ledger":"Round Off",
+            "observed":{"voucher_type_guid":"g-type","party_gstin":null,"party_state":"Rajasthan",
+                "party_registration_type":"Unregistered/Consumer","party_bill_wise":true,"company_state":"Rajasthan"}},
+        "entries":entries
+    }]))
+    .unwrap();
+    line.sha256 = sha256_hex(
+        render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id).as_bytes(),
+    );
+    (line, endpoint)
+}
+
+/// The approval a person gives to a GST invoice shows what they are agreeing to,
+/// inside the dialog's caps, with a round off (the most legs an invoice has),
+/// and a saved invoice is not posted while Sales is not a qualified type.
+#[test]
+fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualified() {
+    let (line, endpoint) = invoice_batch(json!([
+        {"ledger":"Customer A","amount":"11200.40","side":"Dr"},
+        {"ledger":"Sales","amount":"10000.00","side":"Cr"},
+        {"ledger":"Output CGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Output SGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Round Off","amount":"0.40","side":"Cr"}
+    ]));
+    let preview = review_preview_for(&line, &endpoint, PostScope::Vouchers)
+        .expect("a five-leg invoice fits the dialog");
+    for needed in [
+        "Create ONE Sales invoice",
+        "Voucher type: \"Sales Acc\"",
+        "Number and reference: \"278\"",
+        "Customer: \"Customer A\"",
+        "Unregistered, no GSTIN  Place of supply: Rajasthan",
+        "Bill allocation: New Ref \"278\"",
+        "Dr 11200.40  \"Customer A\"",
+        "Cr 0.40  \"Round Off\"",
+    ] {
+        assert!(
+            preview.contains(needed),
+            "the dialog lacks {needed:?}:\n{preview}"
+        );
+    }
+    assert!(
+        preview.lines().count() <= 24 && preview.lines().all(|l| l.chars().count() <= 100),
+        "{preview}"
+    );
+    // Not postable, however the batch came to be saved, until Sales is qualified.
+    assert_eq!(
+        admit_saved_voucher(&line, &endpoint, PostScope::Vouchers, 1).unwrap_err(),
+        "import_voucher_type_unqualified"
+    );
+    // A registered customer that is not bill-wise says so, and a long customer name still fits.
+    let (mut other, endpoint) = invoice_batch(json!([
+        {"ledger":"A very long customer ledger name that goes on and on, Private Limited, Unit 2","amount":"11200.00","side":"Dr"},
+        {"ledger":"Sales","amount":"10000.00","side":"Cr"},
+        {"ledger":"Output CGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Output SGST","amount":"600.00","side":"Cr"}
+    ]));
+    if let Some(detail) = other.vouchers[0].invoice.as_mut() {
+        detail.round_off_ledger = None;
+        if let Some(seen) = detail.observed.as_mut() {
+            seen.party_gstin = Some("08ZZZZZ0000Z1ZQ".into());
+            seen.party_registration_type = "Regular".into();
+            seen.party_bill_wise = false;
+        }
+    }
+    let preview = review_preview_for(&other, &endpoint, PostScope::Vouchers).unwrap();
+    assert!(
+        preview.contains("Regular, GSTIN ") && preview.contains("none (customer not bill-wise)"),
+        "{preview}"
+    );
+    assert!(
+        preview.lines().all(|l| l.chars().count() <= 100),
+        "{preview}"
+    );
+}

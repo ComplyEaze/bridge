@@ -2827,8 +2827,15 @@ fn refusal_reason_states_the_current_voucher_limit() {
     let too_large = native_post_refusal_reason("import_post_batch_too_large", 50);
     assert!(too_large.contains("(50)"), "{too_large}");
     // An unlisted code keeps its own name in the warning and a neutral reason.
-    let (warnings, _) =
-        build_import_guidance(true, Some("import_something_new"), 1, false, false, false);
+    let (warnings, _) = build_import_guidance(
+        true,
+        Some("import_something_new"),
+        1,
+        false,
+        false,
+        false,
+        false,
+    );
     assert!(warnings[0]
         .as_str()
         .unwrap()

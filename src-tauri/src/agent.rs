@@ -1248,6 +1248,67 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              (those three may share a batch). Split the vouchers into one batch of each kind \
              and build them separately; nothing was written or sent.",
         ),
+        // A Sales invoice's number is the document number GSTR-1 reports, and
+        // rule 46(b) of the CGST Rules fixes what it may be. Neither text says
+        // what was or was not written: the first code is also a build refusal,
+        // the second also a refusal of a post whose number came into use.
+        "invoice_number_invalid" => Some(
+            "An invoice number must follow GST rule 46(b): at most 16 characters, made only of \
+             letters, digits, the hyphen (-) and the slash (/), and unique in the financial \
+             year. This number is longer than that or has a space or another character the rule \
+             does not allow, so ComplyEaze Bridge refuses it. Do not shorten or change the \
+             number yourself: tell the user the rule and ask which invoice number to use.",
+        ),
+        "invoice_number_already_used" => Some(
+            "GST rule 46(b) needs an invoice number to be unique in the financial year (1 April \
+             to 31 March), and the read of that year's Sales vouchers found this number already \
+             in use, so ComplyEaze Bridge refuses it. Do not pick another number yourself: tell \
+             the user the number is in use and ask which invoice number to use.",
+        ),
+        // The qualified list (`LIVE_QUALIFIED_VOUCHER_TYPES`) is what
+        // `voucher_schema` offers. The text names no type, so it stays true as
+        // the list grows.
+        "import_voucher_type_unqualified" => Some(
+            "ComplyEaze Bridge builds and posts only the voucher types voucher_schema lists. \
+             This voucher's type is not one of them, so it was refused: a build stops before \
+             anything is read from Tally and writes no file, and a saved batch of that type \
+             is not posted. Tell the user this voucher has to be entered in Tally itself. Do \
+             not rebuild it as a Journal: a GST invoice entered as a Journal is not filed as \
+             an invoice.",
+        ),
+        "import_invoice_masters_changed" => Some(
+            "Since this invoice was built, what Tally says about it has changed: the \
+             customer's GSTIN, state, registration type or bill-wise setting, the voucher \
+             type, or the company's state. Nothing was posted. Build the invoice again, so it \
+             is checked against the book as it is now, and show the user the new approval \
+             text.",
+        ),
+        "invoice_party_registration_type_not_reported" => Some(
+            "Tally's ledger for this customer does not say what kind of GST registration it \
+             holds on the invoice date (it may carry a GSTIN with no dated registration \
+             details), so it is read neither as a Regular customer nor as an unregistered one. \
+             Ask the user to check the customer's GST registration details in Tally: the \
+             registration type, the GSTIN and the date they apply from. Then build again.",
+        ),
+        "invoice_party_registration_not_in_force" => Some(
+            "This customer's GST registration details in Tally apply from a date after the \
+             invoice date, so nothing says what the customer was on that day, and it is not \
+             read as unregistered. Ask the user to check the invoice date and the date the \
+             customer's GST registration applies from in Tally. Then build again.",
+        ),
+        "invoice_book_too_large" | "invoice_book_too_many_vouchers" => Some(
+            "ComplyEaze Bridge builds an invoice only on a company within its size limits: a \
+             voucher mark of 25,000 or less, and a master mark of 5,000 or less or else 2,000 \
+             ledgers or fewer. `detail` gives the count that is over. Building again gives the \
+             same refusal while the company is that size. Tell the user this invoice has to be \
+             entered in Tally itself.",
+        ),
+        "invoice_book_size_unknown" | "invoice_book_size_unreadable" => Some(
+            "Tally did not report the company's size (its voucher mark, its master mark or its \
+             ledger count), so ComplyEaze Bridge could not tell whether the company is within \
+             the limits for an invoice, and nothing was written. Build once more; if the \
+             refusal repeats, tell the user this invoice has to be entered in Tally itself.",
+        ),
         // A date argument a caller can correct. `TallyDate` admits years 0001
         // to 9999, and the edge codes come from widening an empty window past
         // either end of that (#1268).

@@ -2465,6 +2465,14 @@ pub(super) fn admit_saved_voucher_integrity(
     }) {
         return Err("import_invoice_not_observed".into());
     }
+    // The duplicate-number read finds nothing on a Tally that never matches its
+    // formula as readily as on a clean book: until it has been shown to find a
+    // known invoice, an invoice is built and shown but not posted.
+    if !super::invoice::INVOICE_NUMBER_FILTER_MEASURED
+        && line.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice())
+    {
+        return Err("import_invoice_number_check_unmeasured".into());
+    }
     totals(&line.vouchers)?;
     let xml = render_import_xml(&company.name, &line.vouchers, line.identity_batch_id());
     if sha256_hex(xml.as_bytes()) != line.sha256 {
@@ -2691,7 +2699,7 @@ fn invoice_review_preview(
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}  Number: {}  Books from: {}\nTally: {origin}\nVoucher type: {}  Date: {}  Number and reference: {}\nCustomer: {}  {registration}\nPlace of supply: {} (the company's state)  Bill allocation: {allocation}\nNarration: {}\n\n{}\n\nTotal debit: {debit}  Total credit: {credit}\nChecked in Tally: Sundry Debtors customer, Sales Accounts ledger, CGST and state tax by head.\nBatch: {}\n\nLedgers checked by identity against the build; narration sent as prepared.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}  Number: {}  Books from: {}\nTally: {origin}\nVoucher type: {}  Date: {}  Number and reference: {}\nCustomer: {}\n{registration}  Place of supply: {}\nBill allocation: {allocation}\nNarration: {}\n\n{}\n\nTotal debit: {debit}  Total credit: {credit}\nChecked in Tally: Sundry Debtors customer, Sales Accounts ledger, CGST and state tax by head.\nBatch: {}\n\nLedgers checked by identity against the build; narration sent as prepared.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         quoted(&company.name), company.guid, company.company_number, company.books_from,
         quoted(&detail.voucher_type_name), voucher.date, quoted(number),
         quoted(party), observed.company_state,

@@ -307,15 +307,14 @@ pub(super) fn guid_literal_safe(guid: &str) -> bool {
         && guid.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
 }
 
-/// Whether any Sales voucher, of whatever Sales-class type, already carries
-/// this number in the financial year: GST requires an invoice number to be
-/// unique within the year across every series, and a book can hold several
-/// Sales types. The class is `$$IsSales:$VoucherTypeName`, measured as a
-/// per-row compute for the vouchers read (bridge#625). SVFROMDATE and SVTODATE
-/// do not limit which vouchers a collection returns (IMPLEMENTATION_GUIDE), so
-/// the window is also a `$Date` formula on literal dates. NOT YET MEASURED as a
-/// filter: the rehearsal must run it against a known existing invoice and see
-/// one row before a zero is believed.
+/// The vouchers of the financial year that carry this number, whatever their
+/// type, each with the measured per-row class compute (`$$IsSales` of the row's
+/// voucher type, bridge#625). GST requires an invoice number to be unique within
+/// the year across every series, and a book can hold several Sales types, so the
+/// class is decided here, client-side, from that compute. Only measured
+/// primitives reach Tally: a date formula on literal dates (SVFROMDATE and
+/// SVTODATE do not limit a collection), a voucher-number equality (the form the
+/// hand-keyed invoice read used) and the class compute.
 pub(in crate::agent) fn render_invoice_number_request(
     company: &str,
     number: &str,
@@ -327,9 +326,28 @@ pub(in crate::agent) fn render_invoice_number_request(
         return None;
     }
     Some(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $$IsSales:$VoucherTypeName</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED</FETCH><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED</FETCH><COMPUTE>{SALES_CLASS_TAG}:$$IsSales:$VoucherTypeName</COMPUTE><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
     ))
+}
+
+/// The element the Sales class compute answers in (the name the voucher reads
+/// already use).
+const SALES_CLASS_TAG: &str = "BRIDGEVCHISSALES";
+
+/// How many of the returned vouchers are Sales-class. A row whose class
+/// element is missing or is neither Yes nor No is an error: an unknown function
+/// omits its element, so a gap is never a No.
+pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
+    let mut sales = 0;
+    for row in rows(xml, "VOUCHER")? {
+        match row.one(SALES_CLASS_TAG)? {
+            Some("Yes") => sales += 1,
+            Some("No") => {}
+            _ => return Err("invoice_number_class_unread"),
+        }
+    }
+    Ok(sales)
 }
 
 /// What a posted invoice reads back as: the voucher-level fields and every
@@ -420,7 +438,8 @@ pub(super) fn parse_invoice_readback(xml: &str) -> Result<Option<ReadInvoice>, &
     Ok(Some(ReadInvoice { fields, legs }))
 }
 
-/// The number of vouchers the duplicate-number read returned.
+/// The number of vouchers an answer holds (the status check included).
+#[cfg(test)]
 pub(super) fn count_vouchers(xml: &str) -> Result<usize, &'static str> {
     Ok(rows(xml, "VOUCHER")?.len())
 }

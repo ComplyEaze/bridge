@@ -252,6 +252,19 @@ fn paise(amount: &str) -> Option<i128> {
 /// large book's gateway. A client sample book on the lab sits at 1,604.
 const INVOICE_MAX_MASTER_MARK: u64 = 5_000;
 
+/// What a book above that mark may hold, by the company's own ledger count,
+/// and still be built on: the whole compliance listing is a few kilobytes a
+/// ledger, so this keeps one read of it to a few megabytes. The listing's own
+/// size gate stays in front of it; a follow-up scopes the read to the named
+/// ledgers' parent groups so large books can be admitted.
+const INVOICE_MAX_LEDGERS: u64 = 2_000;
+
+/// Whether the duplicate-number read has been shown, on a lab book, to find a
+/// known existing invoice. Until it has, a zero is not believed: the build says
+/// so and a post is refused (`import_invoice_number_check_unmeasured`). Set to
+/// true in the change that adds that capture to section 9.16.
+pub(super) const INVOICE_NUMBER_FILTER_MEASURED: bool = false;
+
 /// The GST slab rates an invoice's tax may be, in percent.
 const SLAB_RATES: &[i128] = &[5, 12, 18, 28, 40];
 
@@ -884,13 +897,34 @@ impl super::super::Server {
             .pre_import_mark(company, identity)
             .await
             .map_err(InvoiceAdmission::Failed)?;
+        let mut size_evidence = mark_evidence;
         match mark.master_value {
             Some(value) if value <= INVOICE_MAX_MASTER_MARK => {}
+            // The mark counts every master alteration, so a long-lived or
+            // stock-heavy book is over it whatever its ledger count: the
+            // company's own count of its ledgers can admit such a book.
             Some(value) => {
-                return Err(refused("invoice_book_too_large", format!("master mark {value}")));
+                let (xml, read) = self
+                    .post_read(identity, super::super::invoice_ledger_count_read(&company.name))
+                    .await?;
+                size_evidence = super::super::combine_evidence(size_evidence, read);
+                let count = bridge_tally_protocol::outstandings_shared::parse_company_ledger_count(
+                    &xml,
+                    &company.name,
+                    identity.company_guid(),
+                )
+                .map_err(|_| failed("invoice_book_size_unreadable"))?;
+                match count.map(|count| count.get()) {
+                    Some(ledgers) if ledgers <= INVOICE_MAX_LEDGERS => {}
+                    Some(ledgers) => {
+                        return Err(refused("invoice_book_too_large", format!("{ledgers} ledgers")));
+                    }
+                    None => return Err(refused("invoice_book_too_large", format!("master mark {value}"))),
+                }
             }
             None => return Err(refused("invoice_book_size_unknown", "")),
         }
+        let mark_evidence = size_evidence;
 
         // 1. The compliance listing.
         let today = bridge_tally_core::TallyDate::parse(super::super::tally_host_today())
@@ -982,7 +1016,7 @@ impl super::super::Server {
         .ok_or_else(|| refused("invoice_number_invalid", &number))?;
         let (xml, read) = self.post_read(identity, request).await?;
         evidence = super::super::combine_evidence(evidence, read);
-        if wire::count_vouchers(&xml).map_err(failed)? != 0 {
+        if wire::count_sales_vouchers(&xml).map_err(failed)? != 0 {
             return Err(refused("invoice_number_already_used", &number));
         }
 

@@ -3540,3 +3540,72 @@ fn the_queued_bill_wise_recheck_exempts_an_invoices_new_ref_party_and_nobody_els
     journal.vouchers[0].voucher_number = None;
     assert!(changed(recheck(&["Bridge Nested Debtor WR4"], &journal)));
 }
+
+fn invoice_batch(entries: serde_json::Value) -> (ImportLedgerLine, TallyEndpointConfig) {
+    let (mut line, endpoint) = batch();
+    line.vouchers = serde_json::from_value(json!([{
+        "bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Sales",
+        "narration":"Synthetic test only","reference":null,"voucher_number":"278",
+        "invoice":{"voucher_type_name":"Sales Acc","place_of_supply":"Rajasthan","round_off_ledger":"Round Off",
+            "observed":{"voucher_type_guid":"g-type","party_gstin":null,"party_state":"Rajasthan",
+                "party_registration_type":"Unregistered/Consumer","party_bill_wise":true,"company_state":"Rajasthan"}},
+        "entries":entries
+    }]))
+    .unwrap();
+    line.sha256 = sha256_hex(
+        render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id).as_bytes(),
+    );
+    (line, endpoint)
+}
+
+/// The approval a person gives to a GST invoice shows what they are agreeing to,
+/// inside the dialog's caps, with a round off (the most legs an invoice has),
+/// and an invoice is not posted while its duplicate-number check is unmeasured.
+#[test]
+fn an_invoice_shows_what_a_gst_document_needs_and_waits_for_its_number_check() {
+    let (line, endpoint) = invoice_batch(json!([
+        {"ledger":"Customer A","amount":"11200.40","side":"Dr"},
+        {"ledger":"Sales","amount":"10000.00","side":"Cr"},
+        {"ledger":"Output CGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Output SGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Round Off","amount":"0.40","side":"Cr"}
+    ]));
+    let preview = review_preview_for(&line, &endpoint, PostScope::Vouchers)
+        .expect("a five-leg invoice fits the dialog");
+    for needed in [
+        "Create ONE Sales invoice",
+        "Voucher type: \"Sales Acc\"",
+        "Number and reference: \"278\"",
+        "Customer: \"Customer A\"",
+        "Unregistered, no GSTIN  Place of supply: Rajasthan",
+        "Bill allocation: New Ref \"278\"",
+        "Dr 11200.40  \"Customer A\"",
+        "Cr 0.40  \"Round Off\"",
+    ] {
+        assert!(preview.contains(needed), "the dialog lacks {needed:?}:\n{preview}");
+    }
+    assert!(preview.lines().count() <= 24 && preview.lines().all(|l| l.chars().count() <= 100), "{preview}");
+    // Not postable until the number check has been measured.
+    assert_eq!(
+        admit_saved_voucher(&line, &endpoint, PostScope::Vouchers, 1).unwrap_err(),
+        "import_invoice_number_check_unmeasured"
+    );
+    // A registered customer that is not bill-wise says so, and a long customer name still fits.
+    let (mut other, endpoint) = invoice_batch(json!([
+        {"ledger":"A very long customer ledger name that goes on and on, Private Limited, Unit 2","amount":"11200.00","side":"Dr"},
+        {"ledger":"Sales","amount":"10000.00","side":"Cr"},
+        {"ledger":"Output CGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Output SGST","amount":"600.00","side":"Cr"}
+    ]));
+    if let Some(detail) = other.vouchers[0].invoice.as_mut() {
+        detail.round_off_ledger = None;
+        if let Some(seen) = detail.observed.as_mut() {
+            seen.party_gstin = Some(concat!("08ABCDE", "1234F1Z0").into());
+            seen.party_registration_type = "Regular".into();
+            seen.party_bill_wise = false;
+        }
+    }
+    let preview = review_preview_for(&other, &endpoint, PostScope::Vouchers).unwrap();
+    assert!(preview.contains("Regular, GSTIN ") && preview.contains("none (customer not bill-wise)"), "{preview}");
+    assert!(preview.lines().all(|l| l.chars().count() <= 100), "{preview}");
+}

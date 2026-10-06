@@ -102,12 +102,13 @@ fn an_answer_that_is_not_tallys_success_is_never_read_as_no_rows() {
 }
 
 #[test]
-fn the_number_read_is_class_wide_dated_and_carries_only_closed_alphabet_literals() {
+fn the_number_read_uses_measured_primitives_and_decides_the_class_client_side() {
     let request = render_invoice_number_request("Co", "INV/26-27/0042", ("20250401", "20260331")).unwrap();
-    assert!(request.contains("$VoucherNumber = \"INV/26-27/0042\" AND $$IsSales:$VoucherTypeName"));
+    assert!(request.contains("$VoucherNumber = \"INV/26-27/0042\"</SYSTEM>"), "the number is the only literal beside the dates");
     // SVFROMDATE and SVTODATE do not limit a collection: the window is a formula too.
     assert!(request.contains("$Date &gt;= $$Date:\"20250401\" AND $Date &lt;= $$Date:\"20260331\""));
-    assert!(request.contains("<SVFROMDATE TYPE=\"Date\">20250401</SVFROMDATE><SVTODATE TYPE=\"Date\">20260331</SVTODATE>"));
+    assert!(request.contains("<COMPUTE>BRIDGEVCHISSALES:$$IsSales:$VoucherTypeName</COMPUTE>"));
+    assert!(!request.contains("AND $$IsSales"), "the class is a compute, not an unmeasured filter");
     assert!(request.contains("<TYPE>Voucher</TYPE>") && !request.contains("IMPORTDATA"));
     // GST rule 46(b): 16 characters, letters, digits, hyphen, slash.
     for bad_number in ["A\"B", "A\\B", "", " A", "A B", "A_B", "A.B", "A$B", "x OR y; \"", "\u{e9}", "12345678901234567"] {
@@ -115,6 +116,25 @@ fn the_number_read_is_class_wide_dated_and_carries_only_closed_alphabet_literals
     }
     assert!(render_invoice_number_request("Co", "1234567890123456", ("20250401", "20260331")).is_some());
     assert!(render_invoice_number_request("Co", "1", ("2025-04-01", "20260331")).is_none());
+}
+
+#[test]
+fn only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate() {
+    let wrap = |rows: &str| format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>");
+    let row = |class: &str| format!("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER><BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>");
+    assert_eq!(count_sales_vouchers(&wrap("")), Ok(0));
+    assert_eq!(count_sales_vouchers(&wrap(&row("Yes"))), Ok(1));
+    // The same number under a Purchase-class type is not an invoice number clash.
+    assert_eq!(count_sales_vouchers(&wrap(&row("No"))), Ok(0));
+    assert_eq!(count_sales_vouchers(&wrap(&(row("Yes") + &row("Yes") + &row("No")))), Ok(2));
+    // A row whose class did not come back is an error, never a No.
+    assert_eq!(count_sales_vouchers(&wrap("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER></VOUCHER>")), Err("invoice_number_class_unread"));
+    assert_eq!(count_sales_vouchers(&wrap(&row("Maybe"))), Err("invoice_number_class_unread"));
+    // And an answer that is not Tally's success is never "no rows".
+    assert_eq!(
+        count_sales_vouchers("<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><DATA><COLLECTION></COLLECTION></DATA></ENVELOPE>"),
+        Err("invoice_read_status_not_success")
+    );
 }
 
 #[test]

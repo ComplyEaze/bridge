@@ -23,8 +23,14 @@
 //!   a non-embedded base-14 font and takes its ascent from that face, where
 //!   poppler uses the standard AFM metrics. A shift that is uniform within a
 //!   font changes neither line grouping nor anchors; a line mixing two
-//!   non-embedded fonts could group differently from `pdftotext`, which the
-//!   balance replay would then have to catch. Embedded fonts were not measured.
+//!   non-embedded fonts could group differently from `pdftotext`. What would
+//!   catch that depends on what the difference reaches: the balance replay and
+//!   the control totals prove amounts, the date parse proves the date column,
+//!   and nothing proves narration text. A difference that moves words into a
+//!   narration (the statement-period line did, #1310) changes the row's
+//!   transaction identity and can change its party, and no amount check sees it.
+//!   A grouping difference is therefore caught only when it reaches a date or an
+//!   amount. Embedded fonts were not measured.
 //!
 //! Coordinates are converted to the top-left page space of `pdftotext`,
 //! relative to the crop box (or the media box when a page has no crop box).

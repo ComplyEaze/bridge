@@ -183,3 +183,22 @@ test("a file named like a test but reached by an ordinary mod is still scanned",
   });
   assert.deepEqual(actual, [planted("src-tauri/src/looks_like_tests.rs")]);
 });
+
+test("a file production also declares is scanned, and what it declares, whatever test code declares it", async () => {
+  const actual = await scanTree({
+    "src-tauri/src/lib.rs": `#[cfg(test)]
+#[path = "shared.rs"]
+mod shared_for_tests;
+#[path = "shared.rs"]
+mod shared;
+#[cfg(test)]
+#[path = "test_only.rs"]
+mod test_only;
+`,
+    "src-tauri/src/shared.rs": `${HAZARD}mod inner;\n`,
+    "src-tauri/src/shared/inner.rs": HAZARD,
+    "src-tauri/src/test_only.rs": HAZARD,
+  });
+  // The shared file and what it declares are scanned; a file only test code reaches is not.
+  assert.deepEqual(actual, [planted("src-tauri/src/shared.rs"), planted("src-tauri/src/shared/inner.rs")]);
+});

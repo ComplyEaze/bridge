@@ -997,5 +997,17 @@ mark was not measured.
   describes `DupCombine` as combining opening balances);
 - any import option other than `IMPORTDUPS`, and any formula name the reference does not document.
 
+### 9.4h A ledger's own name can differ in case or symbols from its row's `NAME` attribute
+
+**Measured on captured `List of Ledgers` collections, 4,017 distinct ledger GUIDs in 13 books (kept outside the repository, counted separately and not re-derived here); one row is committed.** **Confidence: PARTIAL.**
+
+A ledger row names its ledger twice: in the row's `NAME` attribute, and as the first `NAME` under `LANGUAGENAME.LIST/NAME.LIST` (its own name; any later `NAME` is an alias). The voucher rows' `LEDGERNAME` has so far carried the attribute spelling (measured on one book only).
+
+- **26** of the 4,017 GUIDs ever had an attribute that differed from their own name, in 4 of the 13 books. Every such pair shares the same letters and digits and differs in case or symbols. The committed capture `native-shape-lab-ledger-catalogue.utf16le.xml` holds one: attribute `ROUND OFF`, own name `Round Off`.
+- For 21 GUIDs the attribute changed between captures (the `ALTERID` advanced) while the own name stayed the same. The own name never varied for a GUID.
+- ComplyEaze Bridge reads the own name (`standard_ledger_catalog.rs`), takes either spelling as an exact request for that one ledger in `vouchers` and the `outstandings` party detail (a spelling that is two ledgers' is `ledger_ambiguous`, and so is a case-and-spaces match over either spelling of two ledgers), and shows the own name. The voucher filter still compares the spelling the voucher rows carry.
+
+**Not measured:** that the first `LANGUAGENAME.LIST` is the primary language when a master has several; what the outstandings (bills) reports carry for such a ledger; which spelling a voucher row carries for such a ledger on a book other than the one it was read on; whether Tally accepts the attribute spelling in an import when it differs from the own name (imports are unchanged); whether an alias can equal another ledger's own name.
+
 
 #

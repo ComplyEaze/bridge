@@ -521,6 +521,37 @@ async fn a_party_named_in_another_case_is_answered_under_the_catalogues_name() {
     assert_eq!(detail["state"], "tied", "{detail}");
 }
 
+/// #1085: a party typed as the ledger's own (stored) name, which differs from the
+/// spelling its vouchers carry, is reached, and the trail is still built from the
+/// spelling the vouchers carry. The answer names the stored name and says how the
+/// vouchers spell it. The catalogue here is hand-edited from a capture, so this
+/// shows the wiring; what Tally's bills report carries for such a ledger is not
+/// measured. Mutant killed: using the shown name as the party.
+#[tokio::test]
+async fn a_party_typed_as_its_stored_name_is_answered_from_the_spelling_its_vouchers_carry() {
+    let mut call = Call::new(DetailKind::Unadjusted);
+    call.party = "Cafe Traders";
+    call.unallocated = vec![residual("102.02")];
+    let mut plans = detail_plans(captured_window());
+    for plan in &mut plans {
+        let body = plan.fixture.body().replace(
+            "<NAME>Café Naïve Traders</NAME>",
+            "<NAME>Cafe Traders</NAME>",
+        );
+        plan.fixture = Fixture::SyntheticXml(body);
+    }
+    let (result, _) = run(plans, call).await;
+    let (detail, _) = result.unwrap();
+    assert_eq!(detail["party"], PARTY, "{detail}");
+    assert_eq!(detail["ledger_match"]["matched"], "exact", "{detail}");
+    assert_eq!(detail["ledger_match"]["ledger"], "Cafe Traders", "{detail}");
+    assert_eq!(
+        detail["ledger_match"]["ledger_row_spelling"], PARTY,
+        "{detail}"
+    );
+    assert_eq!(detail["state"], "tied", "{detail}");
+}
+
 /// The case of an accented letter is not folded (#1076 decision A, reference
 /// 9.4f): `CAFÉ` asks the user rather than reading `Café`.
 #[tokio::test]

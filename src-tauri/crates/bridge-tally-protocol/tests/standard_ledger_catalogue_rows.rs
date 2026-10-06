@@ -107,6 +107,148 @@ fn the_same_capture_is_refused_for_a_different_expected_company_name() {
     assert_eq!(error, StandardLedgerCatalogError::CompanyIdentityMismatch);
 }
 
+/// A live capture of a licensed Silver 7.1 company (`BRIDGE SHAPE LAB`), 43
+/// ledgers, taken before #1085. One row's `NAME` attribute is `ROUND OFF` and
+/// its stored name `Round Off`.
+const SHAPE_LAB_COMPANY_NAME: &str = "BRIDGE SHAPE LAB";
+const SHAPE_LAB_COMPANY_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+const SHAPE_LAB_LEDGER_CATALOGUE: &[u8] =
+    include_bytes!("fixtures/agent/native-shape-lab-ledger-catalogue.utf16le.xml");
+
+fn decoded_shape_lab_catalogue() -> String {
+    decode_tally_xml_response_bytes_limited(
+        SHAPE_LAB_LEDGER_CATALOGUE,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        SHAPE_LAB_LEDGER_CATALOGUE.len(),
+    )
+    .expect("captured BOM-less UTF-16LE response decodes")
+    .text
+}
+
+/// The `(row spelling, stored name)` pairs the catalogue holds for `xml`.
+fn shape_lab_spellings(xml: &str) -> Vec<(String, Option<String>)> {
+    parse_standard_ledger_catalog_with_identities(
+        xml,
+        SHAPE_LAB_COMPANY_NAME,
+        SHAPE_LAB_COMPANY_GUID,
+    )
+    .expect("the shape lab capture parses")
+    .spellings()
+    .map(|(row, stored)| (row.to_string(), stored.map(str::to_string)))
+    .collect()
+}
+
+/// A ledger whose name arrives in the row's attribute and in its own list
+/// under two spellings carries both; every other ledger of the capture, whose
+/// two spellings are one (several hold escaped markup and line breaks), carries
+/// its row spelling alone.
+#[test]
+fn a_ledger_whose_stored_name_differs_carries_both_spellings() {
+    let spellings = shape_lab_spellings(&decoded_shape_lab_catalogue());
+    assert_eq!(spellings.len(), 43);
+    let differing = spellings
+        .iter()
+        .filter(|(_, stored)| stored.is_some())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        differing,
+        [&("ROUND OFF".to_string(), Some("Round Off".to_string()))]
+    );
+}
+
+/// Edits of the captured `ROUND OFF` row, to its list only. The capture holds
+/// one name there; these are the shapes the parser must still decide.
+fn shape_lab_with_round_off_list(list: &str) -> String {
+    let xml = decoded_shape_lab_catalogue();
+    let start = xml.find("<LEDGER NAME=\"ROUND OFF\"").unwrap();
+    let from = start + xml[start..].find("<LANGUAGENAME.LIST>").unwrap();
+    let to = start + xml[start..].find("</LEDGER>").unwrap();
+    format!("{}{list}{}", &xml[..from], &xml[to..])
+}
+
+fn round_off_stored(list: &str) -> Option<String> {
+    shape_lab_spellings(&shape_lab_with_round_off_list(list))
+        .into_iter()
+        .find(|(row, _)| row == "ROUND OFF")
+        .expect("the row is still there")
+        .1
+}
+
+const ROUND_OFF_LIST_HEAD: &str = "<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\">";
+const ROUND_OFF_LIST_TAIL: &str = "</NAME.LIST><LANGUAGEID>0</LANGUAGEID></LANGUAGENAME.LIST>";
+
+/// Only the first name is the ledger's own; the others are aliases and never
+/// identity, whatever they say.
+#[test]
+fn a_later_name_in_the_list_is_an_alias_and_never_the_stored_name() {
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>Round Off</NAME><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_stored(&list).as_deref(), Some("Round Off"));
+}
+
+/// An empty or unusable first name leaves the ledger on its row spelling:
+/// the alias after it is not promoted, and the read is not refused.
+#[test]
+fn an_unusable_first_name_leaves_the_row_spelling_and_does_not_promote_an_alias() {
+    let blank =
+        format!("{ROUND_OFF_LIST_HEAD}<NAME>   </NAME><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}");
+    assert_eq!(round_off_stored(&blank), None);
+    let bidi = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>Round\u{202e}Off</NAME><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_stored(&bidi), None);
+}
+
+/// A row with no list is known by its row spelling, and a second list adds
+/// nothing: only the first can name the ledger.
+#[test]
+fn a_row_without_a_list_has_no_stored_name_and_a_second_list_names_nothing() {
+    assert_eq!(round_off_stored(""), None);
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>   </NAME>{ROUND_OFF_LIST_TAIL}\
+         {ROUND_OFF_LIST_HEAD}<NAME>Second List</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_stored(&list), None);
+}
+
+/// A name outside `NAME.LIST` is not the ledger's own.
+#[test]
+fn a_name_outside_the_name_list_is_not_the_stored_name() {
+    let list =
+        "<LANGUAGENAME.LIST><NAME>Round Off</NAME><LANGUAGEID>0</LANGUAGEID></LANGUAGENAME.LIST>";
+    assert_eq!(round_off_stored(list), None);
+}
+
+/// A first name Tally wrote with an entity this parser cannot decode is unusable,
+/// not fatal: the catalogue still parses (the skip it replaced never decoded the
+/// list), the ledger keeps its row spelling, and the alias after it is not promoted.
+#[test]
+fn an_undecodable_first_name_leaves_the_row_spelling_and_fails_no_read() {
+    let list = format!(
+        "{ROUND_OFF_LIST_HEAD}<NAME>A &bogus; B</NAME><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}"
+    );
+    assert_eq!(round_off_stored(&list), None);
+}
+
+/// A self-closing first name is still the first name: the alias after it is not
+/// promoted to the ledger's own name.
+#[test]
+fn a_self_closing_first_name_does_not_let_an_alias_in() {
+    let list = format!("{ROUND_OFF_LIST_HEAD}<NAME/><NAME>Rounding</NAME>{ROUND_OFF_LIST_TAIL}");
+    assert_eq!(round_off_stored(&list), None);
+}
+
+/// Only a `NAME` of a `NAME.LIST` is a name: one nested in another child of the
+/// list is not the ledger's own.
+#[test]
+fn a_name_nested_in_another_child_of_the_list_is_not_the_stored_name() {
+    let list =
+        "<LANGUAGENAME.LIST><LANGUAGEID><NAME>Round Off</NAME></LANGUAGEID></LANGUAGENAME.LIST>";
+    assert_eq!(round_off_stored(list), None);
+}
+
 // ---- The V2 catalogue on captures of a live Tally (#1234) ------------------------------------------
 //
 // Four synthetic books answered Bridge's own `StandardLedgerCatalogV2` request on 6 Oct 2026: V1's rows, each with

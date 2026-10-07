@@ -54,6 +54,14 @@ These changes are in source and not yet in a published build.
 
 **Safer or fixed**
 
+- `vouchers` can keep only the vouchers of a ledger whose narration ends in a suspense
+  tag ComplyEaze Bridge writes (`suspense_tagged: true` with `ledger`, #810 slice 2):
+  "purpose not confirmed" for a cash line answered "don't know", or "UNIDENTIFIED -
+  reallocate from" the ledger for a party no mapping names; each item says which in
+  `matched.suspense_tag`. It reads the tag from the narration, so a voucher whose
+  narration was edited after the tag is not listed and the same text typed by hand
+  matches: read the ledger without the filter too. Not measured: a tagged narration
+  read back from a real Tally.
 - `purchase_register` and `sales_register` now take their `state` from the rule
   `vouchers` uses. A non-empty window is `complete` only when every voucher read
   was checked against a separate count of the window. Before, the registers called

@@ -5213,6 +5213,11 @@ fn a_held_window_answers_one_question_only() {
         searched(json!({"amount": "5"})),
         searched(json!({"amount": "5.00"}))
     );
+    // A suspense-tag search is its own question beside the same other criteria (#810).
+    assert_ne!(
+        searched(json!({"suspense_tagged": true, "ledger": "WR2 Sales", "amount": "5"})),
+        searched(json!({"ledger": "WR2 Sales", "amount": "5"}))
+    );
     // A summary is its own question, and each grouping a different one.
     assert_ne!(base(), base().with_summary(Some(SummaryGroup::Month)));
     assert_ne!(
@@ -5917,4 +5922,88 @@ async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_rem
         vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
     assert_eq!(whole.items.len(), 4);
     assert!(!whole.truncated);
+}
+
+// -- #810 slice 2: the suspense tag, through the tool. The window is the captured three vouchers
+// (each touches "WR2 Sales"), with two narrations replaced in the captured text to carry a tag.
+
+/// The plans of a first page read with the `ledger` selector, over this window.
+fn suspense_plans(window: String) -> Vec<ScenarioPlan> {
+    let mut plans = identity_plans();
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(paired(&counted_marks()));
+    plans.extend(paired(&xml_plan(window.clone())));
+    plans.extend(paired(&xml_plan(window)));
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans
+}
+
+fn tagged_window() -> String {
+    let xml = three_vouchers();
+    let purpose = "WR2-N3-DEV-01A01A2F | Bridge: purpose not confirmed; reclassify";
+    let unidentified = "WR2-N3-NFC-01A01A2F | UNIDENTIFIED - reallocate from WR2 Sales \
+                        [BRIDGE:547cb4ad-9457-8ee7-a1b2-0123456789ab]";
+    assert_eq!(xml.matches("WR2-N3-DEV-01A01A2F").count(), 1);
+    assert_eq!(xml.matches("WR2-N3-NFC-01A01A2F").count(), 1);
+    xml.replace("WR2-N3-DEV-01A01A2F", purpose)
+        .replace("WR2-N3-NFC-01A01A2F", unidentified)
+}
+
+#[tokio::test]
+async fn a_suspense_tag_search_lists_the_tagged_vouchers_of_the_ledger_with_their_kind() {
+    let plans = suspense_plans(tagged_window());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let response = one
+        .call(json!({"ledger": "WR2 Sales", "suspense_tagged": true}))
+        .await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["total"], 2, "{result}");
+    let kinds = result["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| {
+            (
+                item["voucher_number"].as_str().unwrap().to_string(),
+                item["matched"]["suspense_tag"]
+                    .as_str()
+                    .unwrap()
+                    .to_string(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        kinds,
+        [
+            ("1".to_string(), "purpose_not_confirmed".to_string()),
+            ("2".to_string(), "unidentified".to_string())
+        ]
+    );
+    // The search is client-side over the one counted read: nothing more was sent.
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_suspense_tag_search_over_untagged_narrations_is_a_checked_zero() {
+    let one = OneServer::spawn(suspense_plans(three_vouchers()));
+    let response = one
+        .call(json!({"ledger": "WR2 Sales", "suspense_tagged": true}))
+        .await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["total"], 0, "{result}");
+    assert_eq!(result["items"], json!([]));
+}
+
+#[tokio::test]
+async fn a_suspense_tag_search_without_the_ledger_is_refused_before_the_window_is_read() {
+    let one = OneServer::spawn(identity_plans());
+    let response = one.call(json!({"suspense_tagged": true})).await;
+    assert_eq!(
+        refusal_of(&response)["code"],
+        "search_suspense_tagged_needs_ledger"
+    );
+    assert_eq!(one.requests(), 4);
 }

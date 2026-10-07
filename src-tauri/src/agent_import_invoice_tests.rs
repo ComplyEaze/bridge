@@ -394,11 +394,10 @@ fn observed() -> InvoiceObserved {
     }
 }
 
-/// The bytes the renderer writes, pinned. NOT a shape Tally has accepted as a
-/// whole: the hand-imported Sales invoices Tally took carried the invoice view
-/// and the legs (party first, credit legs after) without this GST header, and
-/// the header is the one an accepted Purchase shape carried (section 9.16).
-/// The rehearsal's capture replaces this claim with an observed one.
+/// The bytes the renderer writes, pinned. The rehearsal of 7 Oct 2026 posted
+/// two invoices the renderer wrote in this shape and Tally took both (section
+/// 9.16). Their import files are not committed, so the bytes pinned here are
+/// the renderer's own, with invented names.
 #[test]
 fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
     let mut v = voucher();
@@ -848,9 +847,10 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
 /// HAND-AUTHORED, not a capture. The layout (tags, order, an empty allocation
 /// container on every leg, TYPE attributes, leading spaces in numbers) follows
 /// a hand-keyed invoice read back on the lab; the party GSTIN and the New Ref
-/// allocation were on no invoice read there and are assumed. It checks the
-/// comparison against a layout this module's renderer did not produce, and is
-/// replaced by the rehearsal's capture. Names and numbers are synthetic.
+/// allocation were on no invoice read when it was written, and were assumed. It checks the
+/// comparison against a layout this module's renderer did not produce. The
+/// rehearsal's captured read-backs are compared in the test after it. Names
+/// and numbers are synthetic.
 #[test]
 fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
     let xml = format!(
@@ -879,6 +879,149 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
     // A stray allocation name on a leg that should carry none shows too.
     let stray = xml.replace("<LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST>", "<LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST><NAME TYPE=\"String\">X</NAME></BILLALLOCATIONS.LIST>");
     assert_eq!(differences(&v, &stray), vec!["bill_allocation"]);
+}
+
+/// One of the Sales rehearsal's captured read-backs (the `sales-rehearsal`
+/// set; its PROVENANCE table is beside the fixtures), decoded and compared
+/// with `expected` as a post compares them. In the registered customer's two
+/// read-backs the GSTIN is a substituted token (that table says so), so its
+/// comparison there shows the element is read, not what Tally stored.
+fn rehearsal_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> Vec<String> {
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    match wire::parse_invoice_readback(&xml).unwrap() {
+        wire::Readback::One(read) => invoice_readback_differences(expected, &read, date),
+        other => panic!("one voucher expected, got {other:?}"),
+    }
+}
+
+/// An invoice of the rehearsal, written here from its build plan and from what
+/// the build recorded as observed: the keyed `Sales Manual` type, the lab
+/// company's customers and ledgers. The narration is left out; the comparison
+/// does not read it.
+fn rehearsal_invoice(
+    (number, date): (&str, &str),
+    party: &str,
+    registered_bill_wise: bool,
+    credits: &[(&str, &str)],
+    total: &str,
+) -> ImportVoucher {
+    let round_off = credits
+        .iter()
+        .find(|(ledger, _)| *ledger == "Round Off")
+        .map(|(ledger, _)| ledger.to_string());
+    let mut entries = vec![entry(party, total, EntrySide::Dr)];
+    entries.extend(
+        credits
+            .iter()
+            .map(|(ledger, amount)| entry(ledger, amount, EntrySide::Cr)),
+    );
+    ImportVoucher {
+        bridge_txn_id: "rehearsal".to_string(),
+        date: date.to_string(),
+        voucher_type: VoucherType::Sales,
+        narration: None,
+        reference: None,
+        voucher_number: Some(number.to_string()),
+        invoice: Some(InvoiceDetail {
+            voucher_type_name: "Sales Manual".to_string(),
+            place_of_supply: RAJ.to_string(),
+            round_off_ledger: round_off,
+            observed: Some(InvoiceObserved {
+                voucher_type_guid: "ae1490be-52c5-4544-9ffc-4b7da85f9797-00000106".to_string(),
+                party_gstin: registered_bill_wise.then(|| GSTIN_RJ.to_string()),
+                party_state: RAJ.to_string(),
+                party_registration_type: if registered_bill_wise {
+                    "Regular"
+                } else {
+                    "Unregistered/Consumer"
+                }
+                .to_string(),
+                party_bill_wise: registered_bill_wise,
+                company_state: RAJ.to_string(),
+            }),
+        }),
+        entries,
+    }
+}
+
+/// The two invoices the rehearsal posted (7 Oct 2026, the synthetic lab
+/// company), each written from its build plan, against Tally's answer to the
+/// read-back request sent raw after the post (not the binary's own read of
+/// it): no difference. The invoice keyed by hand to the registered customer
+/// differs from what a build would write only by the reference, which a keyed
+/// invoice of that book does not carry.
+#[test]
+fn the_rehearsals_posted_invoices_read_back_as_planned_on_the_captured_answers() {
+    let registered = rehearsal_invoice(
+        ("TG/25-26/002", "2026-03-11"),
+        "TG Buyer Regular RJ",
+        true,
+        &[
+            ("Sales - Goods", "1234.50"),
+            ("Output CGST", "111.11"),
+            ("Output SGST", "111.11"),
+            ("Round Off", "0.28"),
+        ],
+        "1457.00",
+    );
+    assert_eq!(
+        rehearsal_differences(
+            &registered,
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-registered.utf16le.xml"),
+            "20260311",
+        ),
+        Vec::<String>::new()
+    );
+    let ten_thousand_at_18_percent: &[(&str, &str)] = &[
+        ("Sales - Goods", "10000.00"),
+        ("Output CGST", "900.00"),
+        ("Output SGST", "900.00"),
+    ];
+    let unregistered = rehearsal_invoice(
+        ("TG/25-26/003", "2026-03-11"),
+        "TG Buyer Unregistered RJ",
+        false,
+        ten_thousand_at_18_percent,
+        "11800.00",
+    );
+    assert_eq!(
+        rehearsal_differences(
+            &unregistered,
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-unregistered.utf16le.xml"),
+            "20260311",
+        ),
+        Vec::<String>::new()
+    );
+    // Each read-back is that invoice's own: the other one's differs.
+    assert_ne!(
+        rehearsal_differences(
+            &unregistered,
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-registered.utf16le.xml"),
+            "20260311",
+        ),
+        Vec::<String>::new()
+    );
+    let keyed = rehearsal_invoice(
+        ("TG/25-26/001", "2026-03-10"),
+        "TG Buyer Regular RJ",
+        true,
+        ten_thousand_at_18_percent,
+        "11800.00",
+    );
+    assert_eq!(
+        rehearsal_differences(
+            &keyed,
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-keyed-registered.utf16le.xml"),
+            "20260310",
+        ),
+        vec!["REFERENCE", "REFERENCEDATE"]
+    );
 }
 
 #[test]

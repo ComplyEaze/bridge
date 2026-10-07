@@ -321,8 +321,10 @@ pub(super) fn resolve_voucher_type(
         return Err("invoice_voucher_type_guid_unusable");
     }
     // The series-level method decides what an import's supplied number does,
-    // not the top-level field (measured: the lab's "Sales" reads Automatic
-    // (Manual Override) on top and Manual in its series).
+    // not the top-level field (measured, §9.16: one book's predefined Sales
+    // type reads Automatic (Manual Override) on top and Manual in its series;
+    // the type keyed for the rehearsal reads None on top and Manual in its
+    // series).
     match target.series.as_slice() {
         [(_, method)] if method == "Manual" => {}
         [] => return Err("invoice_voucher_type_series_missing"),
@@ -391,8 +393,8 @@ pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
 /// ledger entry with its bill allocations. The fetch is the entry wildcard the
 /// agent's voucher reads use (it returns the legs of an invoice-view voucher
 /// as ALLLEDGERENTRIES.LIST, measured on a committed Sales capture) plus the GST
-/// header fields. NOT YET MEASURED together on a Bridge-posted invoice: the
-/// rehearsal must show every field below comes back.
+/// header fields. Measured together on the two invoices the rehearsal posted
+/// (7 Oct 2026, §9.16): every field below came back.
 pub(in crate::agent) fn render_invoice_readback_request(
     company: &str,
     type_guid: &str,

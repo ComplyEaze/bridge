@@ -269,8 +269,9 @@ fn journal_renderer_preserves_create_remote_identity_with_optional_number() {
     }
 }
 
-/// Sales is declared and not qualified: no invoice built here has been posted
-/// and read back (section 9.16). The one list refuses it on every surface: the
+/// Sales is declared and not qualified: one rehearsal posted two invoices built
+/// here and read them back, and what it left owed comes first (section 9.16).
+/// The one list refuses it on every surface: the
 /// build before its first request and with nothing written, the schema, and
 /// (in the post tests) a saved batch at post.
 #[tokio::test]

@@ -4,14 +4,19 @@ These seven files are answers Tally gave on 2026-10-07 during one rehearsal of t
 invoice core on the disposable BRIDGE GST RECON LAB book (TallyPrime 7.1 Silver, licensed mode).
 Each request was sent by itself, straight to the gateway, by a small export script that refuses
 anything but an Export request and saves the decoded answer; the two posts between them were made
-by `bridge_mcp` built from this pull request's head with Sales added to the qualified list (a local
-build, never pushed). Each file is the answer's body as Tally sent it, but for one substitution named under the table (UTF-16LE without a
+by `bridge_mcp` built from this pull request's commit `5905768c5` with one line added, Sales in
+the qualified list (a local build, never pushed). Each file is the answer's body as Tally sent it, but for one substitution named under the table (UTF-16LE without a
 BOM): the saved text was encoded again and its SHA-256 compared with the one the script printed for
-the bytes on the wire, for two of the day's answers (both equal); for these seven the byte counts
-equal the counts the script reported. Nothing was trimmed: each answer names this one company only.
+the bytes on the wire, for two of the day's answers (both equal; which two was not recorded); for these seven the byte counts
+equal the counts the script reported, and the decoded text of each equals the text the script saved,
+but for the substituted token in two of them. Nothing was trimmed: each answer is of this one company only.
 
-The data is synthetic: the book, the customers `TG Buyer Regular RJ` and `TG Buyer Unregistered RJ`,
-their invented GSTIN and the invoices were made for this rehearsal. One book, one release, one day:
+The data is synthetic. The book is the disposable lab company other fixture sets here were captured
+from, so the answers also carry its earlier synthetic vouchers and types; the customers
+`TG Buyer Regular RJ` and `TG Buyer Unregistered RJ`, their invented GSTIN, the type `Sales Manual`
+and the invoices numbered `TG/25-26/...` were made for this rehearsal. Besides the two raw U+0005
+characters named in the table, the answers carry Tally's numeric references to control characters
+(`&#4;`), as received. One book, one release, one day:
 the files back the parsers and the order of the invoice's reads on answers Tally really gave, not
 any claim about another release, licence tier or book.
 

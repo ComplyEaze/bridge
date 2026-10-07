@@ -298,7 +298,9 @@ fn the_company_state_is_taken_from_the_row_with_the_verified_guid() {
 }
 
 /// One of the rehearsal's captured answers (see the PROVENANCE table beside
-/// the fixtures): Tally's own bytes, decoded.
+/// the fixtures): Tally's own bytes, decoded. In the two read-backs of the
+/// registered customer's invoices one token, the customer's GSTIN, is a
+/// substitute named in that table.
 macro_rules! rehearsal {
     ($name:literal) => {
         String::from_utf16(

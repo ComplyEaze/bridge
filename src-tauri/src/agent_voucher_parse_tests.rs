@@ -1164,6 +1164,67 @@ fn captured_utf16le(bytes: &[u8]) -> String {
     .unwrap()
 }
 
+/// `reference_date` (#1257), checked on derived shapes: the captured three-voucher fixture was taken before
+/// the request named REFERENCEDATE, so these injected elements are not evidence of what Tally returns under
+/// this request. They pin the parse of two derived shapes (a populated `YYYYMMDD` element, and an empty one,
+/// as private books returned them to a request that named every method) and the refusal of a value that is
+/// not a date.
+#[test]
+fn reference_date_is_optional_a_date_when_present_and_refused_otherwise() {
+    let captured = captured_native_vouchers();
+    for rows in [
+        parse_agent_rows(&captured, CAPTURED_VOUCHER_COMPANY_GUID).unwrap(),
+        parse_agent_changed_rows(&captured, CAPTURED_VOUCHER_COMPANY_GUID).unwrap(),
+    ] {
+        assert!(
+            rows.iter().all(|row| row.get("reference_date").is_none()),
+            "reference_date must not be invented when Tally did not report it"
+        );
+    }
+    // Populated on voucher 1 only, with and without the `TYPE="Date"` attribute.
+    for element in [
+        "<REFERENCEDATE>20260415</REFERENCEDATE>",
+        "<REFERENCEDATE TYPE=\"Date\">20260415</REFERENCEDATE>",
+    ] {
+        let populated = with_injected_voucher_element(element);
+        let rows = parse_agent_rows(&populated, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+        assert_eq!(rows[0]["reference_date"], "20260415", "{element}");
+        assert!(rows[1].get("reference_date").is_none(), "{element}");
+        assert!(rows[2].get("reference_date").is_none(), "{element}");
+    }
+    // An empty element, closed or self-closing, is not observed, exactly like an absent one.
+    for element in [
+        "<REFERENCEDATE TYPE=\"Date\"></REFERENCEDATE>",
+        "<REFERENCEDATE/>",
+    ] {
+        let empty = with_injected_voucher_element(element);
+        let rows = parse_agent_rows(&empty, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+        assert!(rows[0].get("reference_date").is_none(), "{element}");
+    }
+    // A padded value is read as the date it holds, and returned trimmed.
+    let padded = with_injected_voucher_element("<REFERENCEDATE>  20260415 </REFERENCEDATE>");
+    let rows = parse_agent_rows(&padded, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    assert_eq!(rows[0]["reference_date"], "20260415");
+    // A value that is not a date refuses the read rather than passing as unobserved.
+    for bad in ["15-Apr-2026", "20261340", "20260230", "2026"] {
+        let malformed =
+            with_injected_voucher_element(&format!("<REFERENCEDATE>{bad}</REFERENCEDATE>"));
+        assert_eq!(
+            parse_agent_rows(&malformed, CAPTURED_VOUCHER_COMPANY_GUID),
+            Err("voucher_reference_date_invalid".to_string()),
+            "{bad}"
+        );
+    }
+    // A repeated element is the scalar rule's refusal, as for every other scalar.
+    let twice = with_injected_voucher_element(
+        "<REFERENCEDATE>20260415</REFERENCEDATE><REFERENCEDATE>20260416</REFERENCEDATE>",
+    );
+    assert_eq!(
+        parse_agent_rows(&twice, CAPTURED_VOUCHER_COMPANY_GUID),
+        Err("agent_read_protocol_invalid".to_string())
+    );
+}
+
 /// `TALLY_PROTOCOL_REFERENCE.md` §1.1(d): the agent parsers read `&#4;` as
 /// the marker the protocol crate's native parsers produce, not as U+0004.
 const MARKED_ROOT: &str = "\u{fffd}#4; Primary";

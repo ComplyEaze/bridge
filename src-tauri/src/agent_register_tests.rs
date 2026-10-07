@@ -125,6 +125,23 @@ fn an_intra_state_purchase_carries_tax_per_entry_on_recognised_heads() {
         .is_empty());
 }
 
+/// `reference_date` (#1257) is copied to the register row only where the voucher row carries it. The rows
+/// are the captured ones with the key injected on one voucher: derived, as the parser's own test says.
+#[test]
+fn a_register_row_carries_a_reference_date_only_where_the_voucher_has_one() {
+    let mut rows = captured_rows();
+    let at = rows
+        .iter()
+        .position(|row| row["date"] == "20250905")
+        .expect("the inter-state purchase is in the captured rows");
+    rows[at]["reference_date"] = json!("20250902");
+    let page = classify_register(&captured_index(), &rows).unwrap();
+    assert_eq!(row_on(&page.rows, "20250905")["reference_date"], "20250902");
+    assert!(row_on(&page.rows, "20250903")
+        .get("reference_date")
+        .is_none());
+}
+
 #[test]
 fn an_inter_state_purchase_carries_its_reference_and_one_igst_entry() {
     let page = classify_register(&captured_index(), &captured_rows()).unwrap();

@@ -635,6 +635,23 @@ fn parse_voucher_rows(
                         {
                             parsed["reference"] = json!(reference);
                         }
+                        // REFERENCEDATE (#1257) is the date of the supplier's invoice a voucher's
+                        // REFERENCE names. Like EFFECTIVEDATE above, an empty or absent element is
+                        // not observed and the key is omitted, never invented as ""; a present value
+                        // must be a date, as DATE must, or the read is refused. The shapes handled
+                        // here (a populated `YYYYMMDD` element, an empty one) are DERIVED from what
+                        // private books returned to a request that named every method; no capture
+                        // under this request records them yet, and the request here does not name
+                        // the field until one does.
+                        if let Some(reference_date) = row
+                            .get("REFERENCEDATE")
+                            .map(|value| value.trim())
+                            .filter(|value| !value.is_empty())
+                        {
+                            bridge_tally_core::TallyDate::parse(reference_date.to_string())
+                                .map_err(|_| "voucher_reference_date_invalid".to_string())?;
+                            parsed["reference_date"] = json!(reference_date);
+                        }
                         // ISINVOICE follows ISPOSTDATED's optional-boolean idiom exactly:
                         // absent or empty is "Tally did not say" and the key is omitted,
                         // never invented as false; a present value must be Yes/No. §8.2c's

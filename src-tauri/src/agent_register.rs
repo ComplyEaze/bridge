@@ -445,6 +445,7 @@ pub(super) fn classify_register(
             "party",
             "party_gstin",
             "reference",
+            "reference_date",
             "is_invoice",
             "cancelled",
             "optional",

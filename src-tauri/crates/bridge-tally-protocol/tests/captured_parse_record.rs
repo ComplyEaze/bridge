@@ -246,6 +246,8 @@ fn cash_flow(text: &str, from: &str, to: &str) -> String {
 
 const FOREX_GUID: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
 const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+/// The parity lab book's company GUID, as scrubbed in its captures (`native_masters_tests.rs`).
+const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
 const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const AARAV_NAME: &str = "Aarav Trading Company Demo";
@@ -2154,6 +2156,37 @@ const ROWS: &[Row] = &[
         source: Source::Synthetic,
         parser: "parse_ledgers",
         parse: |_, text| untyped(parse_ledgers(text)),
+    },
+    // src/native_masters_tests.rs: cost centres and cost categories (#1398).
+    Row {
+        fixture: "tests/fixtures/masters_cost_centres_shape_lab_flag_no_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(CostCentres, SHAPE LAB)",
+        parse: |_, text| masters(NativeMasterKind::CostCentres, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_cost_categories_shape_lab_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(CostCategories, SHAPE LAB)",
+        parse: |_, text| masters(NativeMasterKind::CostCategories, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_cost_centres_corpus_forex_empty_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(CostCentres, FOREX)",
+        parse: |_, text| masters(NativeMasterKind::CostCentres, text, FOREX_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_cost_centres_parity_flag_yes_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(CostCentres, PARITY LAB)",
+        parse: |_, text| masters(NativeMasterKind::CostCentres, text, PARITY_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_cost_categories_parity_flag_yes_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(CostCategories, PARITY LAB)",
+        parse: |_, text| masters(NativeMasterKind::CostCategories, text, PARITY_GUID),
     },
 ];
 

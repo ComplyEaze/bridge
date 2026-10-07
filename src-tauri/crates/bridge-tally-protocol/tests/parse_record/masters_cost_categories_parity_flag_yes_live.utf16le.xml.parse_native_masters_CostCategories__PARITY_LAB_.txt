@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/masters_cost_categories_parity_flag_yes_live.utf16le.xml
+# parser: parse_native_masters(CostCategories, PARITY LAB)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Primary Cost Category",
+            guid: "7c0de000-0000-4000-8000-0000000000a1-00000062",
+            master_id: 98,
+            alter_id: 99,
+            parent: None,
+            detail: CostCategory {
+                allocates_revenue: true,
+                allocates_non_revenue: true,
+                affects_stock: false,
+            },
+        },
+    ],
+})

@@ -12,7 +12,7 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-## [0.5.0] - 2026-10-07
+## [0.5.0] - 2026-10-08
 
 ### In plain words: ComplyEaze Bridge 0.5.0, since 0.4.2 (3 Oct 2026)
 
@@ -353,9 +353,10 @@ counter Tally keeps that moves when vouchers or ledgers change.
   a party-scoped request is not built (#945, #1356). The slice L captures of
   #1257 (a duty-head change or delete moving the master change counter; an item
   purchase on the class-entry shape) have not been run.
-- Cost centres, whether the company has cost centres or GST switched on, and
-  bank-reconciliation fields are not read (`trial_balance` and `cash_flow` do
-  return the company's currency, and `stock_summary` the inventory settings) **[#1231: rewrite when the slice's merge is known]**.
+- Whether a company has cost centres or GST switched on, how a voucher is
+  allocated to a cost centre, and bank-reconciliation fields are not read
+  (`trial_balance` and `cash_flow` do return the company's currency, and
+  `stock_summary` the inventory settings) (#1231).
   Tally's Funds Flow, Ratio Analysis, Negative Stock and Negative Ledgers
   reports are not read (#1358).
 - GST Sales and Purchase posting are not in this build (#628).

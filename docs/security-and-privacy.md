@@ -2,11 +2,12 @@
 
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source that
-becomes release 0.5.0, read at commit `eb6983ffe` (no 0.5.0 tag exists yet), except the cost centre
-and cost category lists of the masters read, which were added after that commit
-and are read at the head of the pull request that adds them (#1398), in sections
-1 and 2 only. It was written from a reading of the source code of release 0.4.0 (tag
-`mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
+becomes release 0.5.0, read at commit `eb6983ffe` (no 0.5.0 tag exists yet). Two
+changes were added after that commit, and the page describes each as read in the
+pull request that adds it: the cost centre and cost category lists of the
+masters read, in sections 1 and 2 (#1398), and the note on how long a
+`ledger_movement` read took, in section 2 (#1366). It was written from a reading
+of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again,
 and neither were the sentences in the other sections that describe 0.4.0 or
@@ -69,7 +70,7 @@ until you accept the new version (section 4). A server started by hand with
   and bank movement, totals by ledger, month, voucher type or group, a voucher's reference
   date, the bill-wise ledgers waiting for your On Account approval with their
   row dates and amounts, and counts and seconds describing how long a voucher
-  read took (no book data), to Claude Desktop.
+  read or a `ledger_movement` read took (no book data), to Claude Desktop.
   Claude Desktop is the host, and it sends tool results to the AI provider you
   use as part of the conversation; that is the host's behaviour, which this
   repository cannot show. ComplyEaze Bridge can shorten party and ledger names
@@ -134,8 +135,8 @@ until you accept the new version (section 4). A server started by hand with
       and row count, and a 64-character fingerprint (a short code made from that
       ledger's rows, the batch and the company). The approved-party list in the
       build result is shortened the same way.
-    - The note on how long a voucher read took holds counts and seconds, and no
-      book data. Cash Flow, like the trial balance and the two statements, also
+    - The note on how long a voucher read or a `ledger_movement` read took holds
+      counts and seconds, and no book data. Cash Flow, like the trial balance and the two statements, also
       sends a short summary in words naming the company and the period; the
       trial balance's also counts its rows.
   - Either setting also leaves out the text of an error Tally returned for a

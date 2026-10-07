@@ -40,6 +40,24 @@ The synthetic golden is the same test on the crate's synthetic engagement, throu
 Running every book a second time reproduced every golden byte for byte. The goldens are regenerated
 only by the reference's maintainers.
 
+## The Unicode probes
+
+`unicode-probes.json` is not a Tally read and comes from no spec pack. It holds Python 3.13's own
+answers (Unicode 15.1) for the text reader in `src/knock_off_candidates.rs`: the general category on
+both sides of every range of the generated `src/unicode_tables.rs`, the code points Python 3.13 does
+not know but the crate's `unicode-normalization` decomposes or gives a combining class, and, for
+sequences of a base letter, marks and such a code point (with the zero-width joiner, non-joiner and
+soft hyphen between marks), Python's NFD, its case-fold after the cut, and the tokens of the
+generator's model of the pack's README section 3.3. That model is not the reference's code; the
+pack's goldens tie it to the reference. It is written, together with `src/unicode_tables.rs`, by
+`parity/unicode_tables.py`, which refuses to write unless Python and the crate's library agree on
+the combining class and the canonical decomposition of every code point assigned at Unicode 15.1:
+
+    cargo run --locked --release -p bridge-tax-audit --example unicode_tables_dump > /tmp/nfd.tsv
+    uv run -q --python 3.13 python parity/unicode_tables.py /tmp/nfd.tsv
+
+It is ASCII, with every code point stored as an integer.
+
 ## Bytes
 
 | File | Bytes | SHA-256 | Path |
@@ -71,3 +89,4 @@ only by the reference's maintainers.
 | `edge.ko_shared.knock_off_candidates.json` | 6,922 | `6668237665bf24a8df569706d51ceab7fdd7bb8f0279beb1960852bcbbcbcd41` | `golden/edge.ko_shared.knock_off_candidates.json` |
 | `edge.ko_transfer.knock_off_candidates.json` | 7,331 | `28f12db8f7cdd5527ad9b7bc53aed8a455bbe7eb80f84691fd225fb1bf9cd2ec` | `golden/edge.ko_transfer.knock_off_candidates.json` |
 | `synthetic.knock_off_candidates.json` | 4,117 | `bab0b914b24aea4014b2aa125f95ad2ce7d975eb6c2b15887bb344eb19051276` | `golden/synthetic.knock_off_candidates.json` |
+| `unicode-probes.json` | 79,925 | `24d0ad19ffa2dafa71b2252adbc190fc59d98903268c74eee8f2903450b5ffde` | `unicode-probes.json` |

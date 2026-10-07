@@ -1114,9 +1114,23 @@ judged as a whole page. When the block is left out the window says so
 window carries the window timings and no `read_cost`, and a page read afresh is read
 now. The desktop screen's voucher list shares the read and receives the
 block too. `outstandings`, which also reports window timings, keeps its shape; the
-other tools that read a window (`ledger_movement`, `verify_import`,
-`voucher_presence`) do not report it yet; and a `vouchers` refusal raised after the
-whole read carries no window.
+other tools that read a window (`verify_import`, `voucher_presence`) do not report it
+yet; `ledger_movement` does (below); and a `vouchers` refusal raised after the whole
+read carries no window.
+
+`ledger_movement` reads its voucher window twice, a planned read and a replay of the
+same parts that proves nothing moved, so its `result` carries the block (`read_cost`
+or `read_cost_left_out`, beside `ledgers`) when the two reads together were slow
+enough, with `window_reads: 2` and the same rules: the vouchers are the window's,
+counted once; `observed_seconds` add both reads; `floor_seconds` is each read's own
+gaps between consecutive census reads (the replay sends none, so it is the planned
+read's); the 240 s verdict is of the two voucher reads together, so a window whose planned
+read fitted can read `window_too_long` once the replay is added. The figures cover
+the two voucher reads alone: not the two ledger catalogue reads, the company check,
+or the wider read an empty window gets in each of the two reads (each pays its own
+census when the book is large; the verdict is then `not_established`). A
+`ledger_movement` refusal states no block yet. The result of a quick call is
+unchanged.
 
 ### Search and summaries in `vouchers` (#1230)
 

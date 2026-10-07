@@ -449,3 +449,163 @@ fn a_refusal_at_a_small_cap_keeps_its_code_and_drops_the_block() {
         "{error}"
     );
 }
+
+// -- a call that reads its window twice (`ledger_movement`, #1239) ----------------------------------
+
+/// The replay of the largest book's day: the same part again, no census, one more
+/// marks read (synthetic times).
+fn its_replay() -> WindowReadTimings {
+    timings(1_000, (0, 0), vec![part(760, 21_000)])
+}
+
+fn replayed_block(first: &WindowReadTimings, second: &WindowReadTimings) -> Value {
+    read_cost_of_replayed(first, second, Ended::Read).expect("a block")
+}
+
+/// The vouchers are the window's, counted once; the times of both reads add; the
+/// census floor is the first read's gaps, and the block says it covers two reads.
+#[test]
+fn two_reads_of_a_window_count_its_vouchers_once_and_add_their_times() {
+    let cost = replayed_block(&largest_book_day(), &its_replay());
+    assert_eq!(cost["window_reads"], 2, "{cost}");
+    assert_eq!(cost["vouchers_read"], 760, "{cost}");
+    assert_eq!(cost["census_reads"], 120, "{cost}");
+    assert_eq!(
+        cost["observed_seconds"],
+        json!({"marks": 4, "census": 145, "parts": 42, "total": 191}),
+        "{cost}"
+    );
+    assert_eq!(cost["floor_seconds"], 59, "{cost}");
+    let say = cost["say"].as_str().unwrap();
+    assert!(say.contains("reads the window twice"), "{say}");
+    assert!(
+        say.starts_with("The two window reads took 191 seconds for 760 vouchers."),
+        "{say}"
+    );
+}
+
+/// The verdict is the call's: a first read that fitted alone does not fit once the
+/// replay's time is added.
+#[test]
+fn a_replay_can_take_a_call_past_the_host_limit_its_first_read_was_inside() {
+    let first = largest_book_day();
+    assert_eq!(block(&first)["host_240"]["state"], "window_fits");
+    let slow_replay = timings(1_000, (0, 0), vec![part(760, 90_000)]);
+    let cost = replayed_block(&first, &slow_replay);
+    assert_eq!(
+        cost["host_240"],
+        json!({"state": "window_too_long"}),
+        "{cost}"
+    );
+}
+
+/// A pair of quick reads says nothing, as one quick read does, and a one-read block
+/// keeps its shape (no `window_reads`).
+#[test]
+fn a_quick_pair_says_nothing_and_a_single_read_has_no_window_reads_field() {
+    let small = timings(1_000, (4, 5_200), vec![part(82, 1_540)]);
+    let replay = timings(1_000, (0, 0), vec![part(82, 1_540)]);
+    assert_eq!(read_cost_of_replayed(&small, &replay, Ended::Read), None);
+    assert!(block(&largest_book_day()).get("window_reads").is_none());
+}
+
+/// A pair that stopped states the floor and no verdict, like a single read.
+#[test]
+fn a_pair_that_stopped_names_no_verdict() {
+    let cost =
+        read_cost_of_replayed(&largest_book_day(), &its_replay(), Ended::Stopped).expect("a block");
+    assert_eq!(cost["ended"], "stopped", "{cost}");
+    assert_eq!(
+        cost["host_240"],
+        json!({"state": "not_established"}),
+        "{cost}"
+    );
+}
+
+/// The block is placed in the result beside the ledgers, and left out, saying so,
+/// when the response cannot carry it.
+#[test]
+fn the_pair_block_is_placed_or_marked_left_out_by_the_response_budget() {
+    let mut roomy = json!({});
+    add_read_cost_of_replayed(
+        &mut roomy,
+        1_000,
+        (&largest_book_day(), &its_replay()),
+        Ended::Read,
+        1_000_000,
+    );
+    assert!(roomy.get("read_cost").is_some(), "{roomy}");
+    let mut tight = json!({});
+    add_read_cost_of_replayed(
+        &mut tight,
+        1_000,
+        (&largest_book_day(), &its_replay()),
+        Ended::Read,
+        1_000,
+    );
+    assert_eq!(tight, json!({"read_cost_left_out": "response_budget"}));
+}
+
+/// Each read's own census gaps add: a second read that did send census reads (the
+/// replay sends none today) adds its gaps to the floor, and never a gap between the
+/// two reads, which is not between two census reads.
+#[test]
+fn the_floor_of_two_reads_adds_each_reads_own_census_gaps() {
+    let second = timings(1_000, (5, 2_000), vec![part(760, 21_000)]);
+    let cost = replayed_block(&largest_book_day(), &second);
+    // 119 gaps in the first read and 4 in the second, 0.5 s each: 61.5 s, rounded down.
+    assert_eq!(cost["floor_seconds"], 61, "{cost}");
+    assert_eq!(cost["census_reads"], 125, "{cost}");
+}
+
+/// A window with no voucher is read once more in each of the two reads, and the
+/// sentence says each of them, not one.
+#[test]
+fn an_empty_window_read_twice_says_each_read_pays_its_wider_read() {
+    let empty = timings(1_000, (1, 5_000), vec![]);
+    let replay = timings(1_000, (0, 0), vec![]);
+    let cost = read_cost_of_replayed(&empty, &replay, Ended::Read)
+        .or_else(|| {
+            let slow = timings(1_000, (16, 5_000), vec![]);
+            read_cost_of_replayed(&slow, &replay, Ended::Read)
+        })
+        .expect("a block");
+    assert_eq!(
+        cost["host_240"],
+        json!({"state": "not_established"}),
+        "{cost}"
+    );
+    let say = cost["say"].as_str().unwrap();
+    assert!(say.contains("once more by each of the two reads"), "{say}");
+    // One read says it once, in its own words.
+    let single = read_cost(&timings(1_000, (16, 5_000), vec![]), Ended::Read).expect("a block");
+    let single_say = single["say"].as_str().unwrap();
+    assert!(
+        single_say.contains("also read once more, a day wider"),
+        "{single_say}"
+    );
+}
+
+/// The floor sentence of a pair says the census was across the two reads, not "this
+/// book's" (a replay that sent census reads of its own would otherwise be hidden
+/// in a figure that reads as the book's alone); a single read keeps its words.
+#[test]
+fn the_floor_sentence_of_a_pair_says_the_census_was_across_the_two_reads() {
+    let second = timings(1_000, (5, 2_000), vec![part(760, 21_000)]);
+    let pair = replayed_block(&largest_book_day(), &second);
+    let say = pair["say"].as_str().unwrap();
+    assert!(
+        say.contains("Across the two reads the census took 125 reads"),
+        "{say}"
+    );
+    assert!(!say.contains("This book's census took"), "{say}");
+    assert_eq!(pair["window_reads"], 2, "{pair}");
+    let single = block(&largest_book_day())["say"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        single.contains("This book's census took 120 reads"),
+        "{single}"
+    );
+}

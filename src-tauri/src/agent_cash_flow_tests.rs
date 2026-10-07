@@ -142,6 +142,15 @@ async fn call_observed(
     from: &str,
     to: &str,
 ) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, usize) {
+    call_observed_under(plans, from, to, Redaction::None).await
+}
+
+async fn call_observed_under(
+    plans: Vec<ScenarioPlan>,
+    from: &str,
+    to: &str,
+    redaction: Redaction,
+) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, usize) {
     let expected = plans.len();
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -153,7 +162,7 @@ async fn call_observed(
         data_dir: directory.path().into(),
         max_rows: 500,
         max_bytes: 200_000,
-        redaction: Redaction::None,
+        redaction,
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
@@ -554,5 +563,187 @@ async fn a_window_that_is_not_whole_months_is_refused_before_any_cash_flow_reque
         assert_eq!(error["code"], code, "{from}..{to}: {response}");
         // Nothing past the date boundary was sent.
         assert_eq!(sent, total, "{from}..{to}");
+    }
+}
+
+// ---- redaction: what `mask_parties` and `drop_narration` change in a Cash Flow answer ----
+
+/// Every string value in a JSON document, keys left out.
+fn string_values(value: &Value, into: &mut Vec<String>) {
+    match value {
+        Value::String(text) => into.push(text.clone()),
+        Value::Array(items) => items.iter().for_each(|item| string_values(item, into)),
+        Value::Object(map) => map.values().for_each(|item| string_values(item, into)),
+        _ => {}
+    }
+}
+
+/// The response with the read time and the duration, which differ between any two calls, removed.
+fn without_the_clock(response: &Value) -> Value {
+    fn strip(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                map.remove("read_at");
+                map.remove("duration_ms");
+                map.values_mut().for_each(strip);
+            }
+            Value::Array(items) => items.iter_mut().for_each(strip),
+            // The response carries the same answer again as text in `content`: compare it parsed.
+            Value::String(text) if text.starts_with('{') => {
+                if let Ok(mut parsed) = serde_json::from_str::<Value>(text) {
+                    strip(&mut parsed);
+                    *value = parsed;
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut copy = response.clone();
+    strip(&mut copy);
+    copy
+}
+
+/// The paths at which two JSON documents differ, for a failure message that can be read.
+fn differing_paths(left: &Value, right: &Value, at: &str, into: &mut Vec<String>) {
+    match (left, right) {
+        (Value::Object(a), Value::Object(b)) => {
+            for key in a
+                .keys()
+                .chain(b.keys())
+                .collect::<std::collections::BTreeSet<_>>()
+            {
+                match (a.get(key), b.get(key)) {
+                    (Some(x), Some(y)) => differing_paths(x, y, &format!("{at}/{key}"), into),
+                    _ => into.push(format!("{at}/{key} (present on one side only)")),
+                }
+            }
+        }
+        (Value::Array(a), Value::Array(b)) if a.len() == b.len() => {
+            for (index, (x, y)) in a.iter().zip(b).enumerate() {
+                differing_paths(x, y, &format!("{at}[{index}]"), into);
+            }
+        }
+        _ if left == right => {}
+        _ => into.push(format!("{at}: {left} != {right}")),
+    }
+}
+
+/// The ledger names of the captured trial balance every scripted call here reads.
+fn fixture_ledger_names() -> Vec<String> {
+    let report = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
+    );
+    let mut names = Vec::new();
+    let mut rest = report;
+    while let Some(at) = rest.find("<LEDGER NAME=\"") {
+        rest = &rest[at + "<LEDGER NAME=\"".len()..];
+        let end = rest.find('"').unwrap();
+        if end > 0 {
+            names.push(rest[..end].replace("&amp;", "&"));
+        }
+    }
+    names
+}
+
+#[tokio::test]
+async fn the_four_outcomes_of_a_cash_flow_read_the_same_under_every_redaction_and_name_no_ledger() {
+    // The Cash Flow answer holds month names, amounts and the company name, and no ledger or party
+    // name on any outcome, so a redaction setting has nothing to change in it. Each of the four
+    // outcomes is scripted twice per setting from the same captured reads; the answers must be
+    // equal apart from the read time, and no ledger name of the captured trial balance may appear
+    // anywhere in them.
+    let names = fixture_ledger_names();
+    assert!(names.len() >= 4, "{names:?}");
+    assert!(
+        names.contains(&"Ageing Customer A".to_string()),
+        "{names:?}"
+    );
+    type Scripted = fn() -> Vec<ScenarioPlan>;
+    // Each outcome is pinned by its state and its reason, so a mis-scripted one fails here.
+    let outcomes: [(&str, Scripted, &str, Option<&str>); 4] = [
+        ("tied", || plans("-4950.00"), "observed", None),
+        (
+            "differs",
+            || plans("-4949.00"),
+            "not_established",
+            Some("cash_flow_differs_from_trial_balance"),
+        ),
+        (
+            "money group unmeasured",
+            || plans_with("-4950.00", cash_under("Bank OD A/c")),
+            "not_established",
+            Some("cash_flow_money_group_unmeasured"),
+        ),
+        (
+            "nothing to compare",
+            || plans_with("", cash_under("Sundry Debtors")),
+            "not_established",
+            Some("cash_flow_nothing_to_compare"),
+        ),
+    ];
+    for (label, scripted, state, reason) in outcomes {
+        let (plain, _, _) =
+            call_observed_under(scripted(), "2026-04-01", "2026-06-30", Redaction::None).await;
+        assert_eq!(result(&plain)["state"], state, "{label}");
+        match reason {
+            Some(code) => assert_eq!(result(&plain)["reason"], code, "{label}"),
+            None => assert!(result(&plain).get("reason").is_none(), "{label}"),
+        }
+        // The text copy of the answer is there and is the same answer, so comparing it is not vacuous.
+        let text = plain["content"][0]["text"].as_str().expect("a text copy");
+        let parsed: Value = serde_json::from_str(text).expect("the text copy is JSON");
+        assert_eq!(
+            parsed["result"]["state"],
+            plain["structuredContent"]["result"]["state"]
+        );
+        for redaction in [Redaction::MaskParties, Redaction::DropNarration] {
+            let (other, _, _) =
+                call_observed_under(scripted(), "2026-04-01", "2026-06-30", redaction).await;
+            // The clock is removed before comparing, so check first that both sides carry it.
+            for side in [&plain, &other] {
+                assert!(
+                    side["structuredContent"]["evidence"]["read_at"].is_string(),
+                    "{label}"
+                );
+                assert!(
+                    side["structuredContent"]["evidence"]["duration_ms"].is_number(),
+                    "{label}"
+                );
+            }
+            let mut paths = Vec::new();
+            differing_paths(
+                &without_the_clock(&plain),
+                &without_the_clock(&other),
+                "",
+                &mut paths,
+            );
+            assert!(
+                paths.is_empty(),
+                "{label}: the answer changed under a redaction setting at {paths:?}"
+            );
+        }
+        let mut strings = Vec::new();
+        string_values(&plain, &mut strings);
+        for name in &names {
+            assert!(
+                !strings.iter().any(|text| text == name),
+                "{label}: the ledger name {name:?} is in the answer"
+            );
+        }
+        // A longer name must not appear inside any text either. A short one such as "Cash" is a
+        // common word of the lead ("Cash Flow"), so it is searched in its quoted forms.
+        let everything = plain.to_string();
+        for name in names.iter().filter(|name| name.len() > 5) {
+            assert!(!everything.contains(name.as_str()), "{label}: {name:?}");
+        }
+        for name in names.iter().filter(|name| name.len() <= 5) {
+            for quoted in [
+                format!("\\\"{name}\\\""),
+                format!("\u{201c}{name}\u{201d}"),
+                format!("'{name}'"),
+            ] {
+                assert!(!everything.contains(&quoted), "{label}: {quoted}");
+            }
+        }
     }
 }

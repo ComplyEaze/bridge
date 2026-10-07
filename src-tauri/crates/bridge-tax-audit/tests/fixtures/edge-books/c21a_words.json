@@ -1,0 +1,578 @@
+{
+ "comment": "clause21a_candidates with a word for every item of the keyword table, in the ledger name, the narration or the party field; P&L ledgers under Purchase Accounts, Direct Expenses, Indirect Expenses and a group under it; a line matching two items; credits beside on two items; two debits of one amount on one item and one voucher with two lines on the same item; a voucher with no number; amounts with paise and in lakhs; and words that sit inside a longer word, at its start or end, or after a digit, which do not match.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Admin Expenses": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_words-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_words-001"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c21a_words-002"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-c21a_words-003"
+  },
+  {
+   "name": "Freight Inward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-c21a_words-004"
+  },
+  {
+   "name": "General Expenses",
+   "chain": [
+    "Admin Expenses",
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_words-005"
+  },
+  {
+   "name": "Penalty and Fines",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_words-006"
+  },
+  {
+   "name": "Interest on TDS",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_words-007"
+  },
+  {
+   "name": "Advertisement",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_words-008"
+  },
+  {
+   "name": "Legal Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_words-009"
+  },
+  {
+   "name": "Packing Charges",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-c21a_words-010"
+  },
+  {
+   "name": "Publicity",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_words-011"
+  },
+  {
+   "name": "Vendor A",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c21a_words-012"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 150000,
+   "credit": 17840050,
+   "closing": -17690050
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 13130700,
+   "credit": 0,
+   "closing": 13130700
+  },
+  {
+   "ledger": "Freight Inward",
+   "opening": 0,
+   "debit": 70000,
+   "credit": 0,
+   "closing": 70000
+  },
+  {
+   "ledger": "General Expenses",
+   "opening": 0,
+   "debit": 7820050,
+   "credit": 0,
+   "closing": 7820050
+  },
+  {
+   "ledger": "Penalty and Fines",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 50000,
+   "closing": 250000
+  },
+  {
+   "ledger": "Interest on TDS",
+   "opening": 0,
+   "debit": 120000,
+   "credit": 0,
+   "closing": 120000
+  },
+  {
+   "ledger": "Advertisement",
+   "opening": 0,
+   "debit": 2700000,
+   "credit": 100000,
+   "closing": 2600000
+  },
+  {
+   "ledger": "Legal Charges",
+   "opening": 0,
+   "debit": 6000000,
+   "credit": 0,
+   "closing": 6000000
+  },
+  {
+   "ledger": "Packing Charges",
+   "opening": 0,
+   "debit": 110000,
+   "credit": 0,
+   "closing": 110000
+  },
+  {
+   "ledger": "Publicity",
+   "opening": 0,
+   "debit": 90000,
+   "credit": 0,
+   "closing": 90000
+  },
+  {
+   "ledger": "Vendor A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 12500700,
+   "closing": -12500700
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "edge-c21a_words-v01",
+   "date": "2025-06-01",
+   "base_type": "Purchase",
+   "narration": "Purchase of laptop for the office",
+   "lines": [
+    [
+     "Purchases",
+     12500700
+    ],
+    [
+     "Vendor A",
+     -12500700
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v02",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "School fees",
+   "lines": [
+    [
+     "General Expenses",
+     4500050
+    ],
+    [
+     "Bank",
+     -4500050
+    ]
+   ],
+   "number": ""
+  },
+  {
+   "guid": "edge-c21a_words-v03",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Advertisement in a souvenir",
+   "lines": [
+    [
+     "Advertisement",
+     2000000
+    ],
+    [
+     "Bank",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v04",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Annual membership",
+   "lines": [
+    [
+     "General Expenses",
+     1500000
+    ],
+    [
+     "Bank",
+     -1500000
+    ]
+   ],
+   "party": "City Club"
+  },
+  {
+   "guid": "edge-c21a_words-v05",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Banquet hall",
+   "lines": [
+    [
+     "General Expenses",
+     800000
+    ],
+    [
+     "Bank",
+     -800000
+    ]
+   ],
+   "party": "Hill Gymkhana"
+  },
+  {
+   "guid": "edge-c21a_words-v06",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "GST late fee and penalty",
+   "lines": [
+    [
+     "Penalty and Fines",
+     300000
+    ],
+    [
+     "Bank",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v07",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Quarter 2",
+   "lines": [
+    [
+     "Interest on TDS",
+     120000
+    ],
+    [
+     "Bank",
+     -120000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v08",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Compounding fee for a filing default",
+   "lines": [
+    [
+     "Legal Charges",
+     5000000
+    ],
+    [
+     "Bank",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v09",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Sponsorship of a conference",
+   "lines": [
+    [
+     "Advertisement",
+     700000
+    ],
+    [
+     "Bank",
+     -700000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v10",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "SEBI settlement order",
+   "lines": [
+    [
+     "Legal Charges",
+     1000000
+    ],
+    [
+     "Bank",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v11",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "narration": "Souvenir refund",
+   "lines": [
+    [
+     "Bank",
+     100000
+    ],
+    [
+     "Advertisement",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v12",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "narration": "Penalty reversed",
+   "lines": [
+    [
+     "Bank",
+     50000
+    ],
+    [
+     "Penalty and Fines",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v13",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Packing material",
+   "lines": [
+    [
+     "Packing Charges",
+     60000
+    ],
+    [
+     "Bank",
+     -60000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v14",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Accessories",
+   "lines": [
+    [
+     "Packing Charges",
+     50000
+    ],
+    [
+     "Bank",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v15",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Public notice",
+   "lines": [
+    [
+     "Publicity",
+     90000
+    ],
+    [
+     "Bank",
+     -90000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v16",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Ref 1234e",
+   "lines": [
+    [
+     "Freight Inward",
+     40000
+    ],
+    [
+     "Bank",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v17",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Fee u/s 234E",
+   "lines": [
+    [
+     "General Expenses",
+     20000
+    ],
+    [
+     "Bank",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v18",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Spares",
+   "lines": [
+    [
+     "Purchases",
+     600000
+    ],
+    [
+     "Bank",
+     -600000
+    ]
+   ],
+   "party": "AC Traders"
+  },
+  {
+   "guid": "edge-c21a_words-v19",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Tuition",
+   "lines": [
+    [
+     "General Expenses",
+     500000
+    ],
+    [
+     "Bank",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v20",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Household",
+   "lines": [
+    [
+     "General Expenses",
+     500000
+    ],
+    [
+     "Bank",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v21",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Machine and machinery parts",
+   "lines": [
+    [
+     "Freight Inward",
+     30000
+    ],
+    [
+     "Purchases",
+     30000
+    ],
+    [
+     "Bank",
+     -60000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_words-v22",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Penalty",
+   "lines": [
+    [
+     "Penalty and Fines",
+     70000
+    ],
+    [
+     "Bank",
+     -70000
+    ]
+   ],
+   "status": "cancelled"
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank"
+ ],
+ "tests": [
+  "clause21a_candidates"
+ ]
+}

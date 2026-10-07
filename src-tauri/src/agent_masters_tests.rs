@@ -47,6 +47,12 @@ fn capture(kind: &str) -> String {
         "stock_groups" => include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml"
         ),
+        "cost_centres" => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_cost_centres_shape_lab_flag_no_live.utf16le.xml"
+        ),
+        "cost_categories" => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_cost_categories_shape_lab_live.utf16le.xml"
+        ),
         _ => panic!("no capture for {kind}"),
     };
     decode(bytes)
@@ -270,6 +276,8 @@ fn the_tool_definition_admits_only_the_five_kinds_and_states_the_size_limits() {
             "godowns",
             "units",
             "stock_groups",
+            "cost_centres",
+            "cost_categories",
             "groups"
         ])
     );
@@ -282,6 +290,8 @@ fn the_tool_definition_admits_only_the_five_kinds_and_states_the_size_limits() {
         NativeMasterKind::Godowns,
         NativeMasterKind::Units,
         NativeMasterKind::StockGroups,
+        NativeMasterKind::CostCentres,
+        NativeMasterKind::CostCategories,
     ] {
         let mark = MASTERS_RESPONSE_BUDGET_BYTES / masters_worst_row_bytes(kind);
         let written = format!("{},{:03}", mark / 1000, mark % 1000);
@@ -507,6 +517,47 @@ async fn stock_groups_read_end_to_end_with_their_parent() {
     assert_eq!(packaging["parent"], "\u{fffd}#4; Primary");
     assert_eq!(packaging["alter_id"], 264);
     assert!(packaging.get("active").is_none());
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn cost_centres_read_end_to_end_with_their_category_although_the_setting_is_off() {
+    let one = OneServer::spawn(first_page_plans(capture("cost_centres"), 14));
+    let response = one.call(args("cost_centres", 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["kind"], "cost_centres");
+    assert_eq!(page["total"], 2);
+    let rows = page["masters"].as_array().unwrap();
+    let assembly = rows.iter().find(|row| row["name"] == "Assembly").unwrap();
+    assert_eq!(assembly["category"], "Business Line");
+    assert_eq!(assembly["parent"], "\u{fffd}#4; Primary");
+    assert!(page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line
+            .as_str()
+            .unwrap()
+            .contains("whether or not the company's Cost Centres setting is on")));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn cost_categories_read_end_to_end_with_their_allocation_flags() {
+    let one = OneServer::spawn(first_page_plans(capture("cost_categories"), 14));
+    let response = one.call(args("cost_categories", 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["kind"], "cost_categories");
+    assert_eq!(page["total"], 2);
+    let rows = page["masters"].as_array().unwrap();
+    let line = rows
+        .iter()
+        .find(|row| row["name"] == "Business Line")
+        .unwrap();
+    assert_eq!(line["allocates_revenue"], true);
+    assert_eq!(line["allocates_non_revenue"], false);
+    assert_eq!(line["affects_stock"], false);
+    assert_eq!(line["parent"], Value::Null);
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 

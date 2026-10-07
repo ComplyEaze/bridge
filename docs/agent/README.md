@@ -332,11 +332,22 @@ reads. Use `ledger_movement` with narrow dates when voucher detail is needed.
 ### Masters
 
 Use `masters` with `company_guid` and one `kind`: `voucher_types`, `godowns`,
-`units`, `stock_groups` or `groups`. It lists a company's masters of that
+`units`, `stock_groups`, `cost_centres`, `cost_categories` or `groups`. It lists a company's masters of that
 kind, for example a voucher type's numbering method (`automatic`, `manual` or
 `default`, as Tally reports it) and its `active` and `optional` flags. Each row
 carries `name`, `guid`, `master_id`, `alter_id` and `parent`; units add
-`decimal_places` and `simple`. A `groups` row carries `name`,
+`decimal_places` and `simple`; cost centres add `category` (null when none) and
+cost categories `allocates_revenue`, `allocates_non_revenue` and `affects_stock`.
+Cost centres and categories are returned whether or not the company's Cost
+Centres setting is on: a book whose setting read No still returned its two
+centres and two categories (one synthetic book), so a No setting is not "no
+centres", and an empty cost-centre list (one synthetic book with none defined
+answered one) does not say whether the feature is off or none is defined; this
+call does not return the setting. An empty cost-category list is refused
+(`masters_cost_categories_empty`): the predefined Primary Cost Category always
+exists. Under `mask_parties` the names, parents and categories of cost centres
+and categories are masked, as godown and stock-group names are. How a voucher
+was allocated to a centre is in the `vouchers` read, not here. A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
 parent that is Tally's reserved root keeps its marker form, as in
 `trial_balance`. Alias names are not returned.
@@ -349,15 +360,16 @@ its read in memory and a later page continues from it while the extent is
 unchanged (`snapshot`, `snapshot_id`, `listing_snapshot_changed`), as
 `trial_balance` does.
 
-Godowns, units and stock groups are read whole only when the master-alteration
+Godowns, units, stock groups, cost centres and cost categories are read whole only when the master-alteration
 mark (`ALTMSTID`) times an assumed worst-case row for that kind fits 16 MB. The
 mark counts the masters of every kind, so a book with few of this kind can be
-refused. That admits a mark of at most 1,152 for godowns, 1,168 for units and
-1,160 for stock groups; a larger book is refused before any collection request
+refused. That admits a mark of at most 1,152 for godowns, 1,168 for units,
+1,160 for stock groups, 1,037 for cost centres and 1,264 for cost categories; a larger book is refused before any collection request
 as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
 `limit_bytes`, and `limit_master_alter_id`, the largest mark this kind would be
 read at). Retrying refuses again. Both stock-heavy client books measured, with
-marks of about 100,000 and 300,000, refuse these three kinds; how common such
+marks of about 100,000 and 300,000, refuse godowns, units and stock groups (cost
+centres and categories were not tried on them); how common such
 marks are across live books is unmeasured (protocol reference §12a.12). `voucher_types` and `groups` have no size check
 before the read: voucher types keep the policy of Bridge's other voucher-type
 read, and groups that of the group read `profit_and_loss` and `balance_sheet`

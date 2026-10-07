@@ -88,9 +88,9 @@ impl Server {
             "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only",
             "One kind per call; no counts or hints; a master's aliases are not returned",
             if marks_party_text(kind) {
-                "Under mask_parties, godown and stock-group names and parents are masked, because a job-work godown or a supplier-named stock group can carry a party's name; Tally's reserved root as a parent is left as it is"
+                "Under mask_parties, godown, stock-group, cost-centre and cost-category names, parents and categories are masked, because a job-work godown, a supplier-named stock group or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is left as it is"
             } else {
-                "Voucher-type, unit and account-group names are not masked by mask_parties: they are configuration labels, not counterparties (godown and stock-group names are masked)"
+                "Voucher-type, unit and account-group names are not masked by mask_parties: they are configuration labels, not counterparties (godown, stock-group, cost-centre and cost-category names are masked)"
             },
         ];
         match kind {
@@ -101,6 +101,14 @@ impl Server {
                 "The completeness of this list is unverified: absence from it is not evidence that a voucher type is absent from the book",
                 "Voucher types are read whole with no size check before the read; rows, AlterIDs and response size are checked after it",
             ]),
+            MastersKind::Native(NativeMasterKind::CostCentres | NativeMasterKind::CostCategories) => {
+                limitations.extend([
+                    "Cost centres and categories are returned whether or not the company's Cost Centres setting is on: a book with the setting off was read with its two centres (one synthetic book); this call does not return the setting",
+                    "An empty list of cost centres does not say whether the feature is off or no centre is defined; one book with none defined answered an empty list",
+                    "How a voucher was allocated to a centre is in the `vouchers` read, not here",
+                    "Measured on two synthetic books on one release; a larger book is refused when its master mark is too large for the response budget",
+                ]);
+            }
             MastersKind::Groups => limitations.push(
                 "Groups are read whole from the group snapshot, with no size check before the read",
             ),
@@ -135,7 +143,12 @@ impl Server {
 const fn marks_party_text(kind: MastersKind) -> bool {
     matches!(
         kind,
-        MastersKind::Native(NativeMasterKind::Godowns | NativeMasterKind::StockGroups)
+        MastersKind::Native(
+            NativeMasterKind::Godowns
+                | NativeMasterKind::StockGroups
+                | NativeMasterKind::CostCentres
+                | NativeMasterKind::CostCategories
+        )
     )
 }
 
@@ -182,6 +195,21 @@ fn native_row(row: &NativeMasterRow, mark_party_text: bool) -> Value {
         } => {
             json["decimal_places"] = json!(decimal_places);
             json["simple"] = json!(simple);
+        }
+        NativeMasterDetail::CostCentre { category } => {
+            json["category"] = json!(category);
+            if mark_party_text && category.is_some() {
+                mark_party_field(&mut json, "category");
+            }
+        }
+        NativeMasterDetail::CostCategory {
+            allocates_revenue,
+            allocates_non_revenue,
+            affects_stock,
+        } => {
+            json["allocates_revenue"] = json!(allocates_revenue);
+            json["allocates_non_revenue"] = json!(allocates_non_revenue);
+            json["affects_stock"] = json!(affects_stock);
         }
     }
     json

@@ -396,6 +396,9 @@ base revision.
 <a id="12a15-the-ledger-catalogue-can-carry-each-ledgers-isbillwiseon"></a>
 
 [12a.15 The ledger catalogue can carry each ledger's `ISBILLWISEON`](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a15-the-ledger-catalogue-can-carry-each-ledgers-isbillwiseon)
+<a id="12a17-cost-centres-and-categories-are-returned-and-an-allocation-is-stored-when-the-companys-setting-reads-no"></a>
+
+[12a.17 Cost centres and categories are returned, and an allocation is stored, when the company's setting reads No](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a17-cost-centres-and-categories-are-returned-and-an-allocation-is-stored-when-the-companys-setting-reads-no)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

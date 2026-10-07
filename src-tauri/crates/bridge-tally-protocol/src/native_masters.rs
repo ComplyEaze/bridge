@@ -1,5 +1,5 @@
-//! Native `masters` collections: voucher types, godowns, units and stock
-//! groups, each read as one Collection with the company GUID computed onto
+//! Native `masters` collections: voucher types, godowns, units, stock
+//! groups, cost centres and cost categories, each read as one Collection with the company GUID computed onto
 //! every row.
 //!
 //! Evidence: one synthetic book on one licensed `TallyPrime` 7.1
@@ -49,14 +49,18 @@ pub enum NativeMasterKind {
     Godowns,
     Units,
     StockGroups,
+    CostCentres,
+    CostCategories,
 }
 
 impl NativeMasterKind {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 6] = [
         Self::VoucherTypes,
         Self::Godowns,
         Self::Units,
         Self::StockGroups,
+        Self::CostCentres,
+        Self::CostCategories,
     ];
 
     /// The element Tally names each row of this kind by.
@@ -66,6 +70,8 @@ impl NativeMasterKind {
             Self::Godowns => b"GODOWN",
             Self::Units => b"UNIT",
             Self::StockGroups => b"STOCKGROUP",
+            Self::CostCentres => b"COSTCENTRE",
+            Self::CostCategories => b"COSTCATEGORY",
         }
     }
 
@@ -101,6 +107,18 @@ impl NativeMasterKind {
                 "StockGroup",
                 "NAME, PARENT, GUID, MASTERID, ALTERID",
             ),
+            Self::CostCentres => (
+                "Bridge Master Cost Centres",
+                "No",
+                "CostCentre",
+                "NAME, PARENT, CATEGORY, GUID, MASTERID, ALTERID",
+            ),
+            Self::CostCategories => (
+                "Bridge Master Cost Categories",
+                "No",
+                "CostCategory",
+                "NAME, GUID, MASTERID, ALTERID, ALLOCATEREVENUE, ALLOCATENONREVENUE, AFFECTSSTOCK",
+            ),
         }
     }
 
@@ -117,6 +135,8 @@ impl NativeMasterKind {
             Self::Godowns => 800,
             Self::Units => 700,
             Self::StockGroups => 750,
+            Self::CostCentres => 800,
+            Self::CostCategories => 950,
         }
     }
 
@@ -130,6 +150,8 @@ impl NativeMasterKind {
         match self {
             Self::VoucherTypes => 5,
             Self::Godowns | Self::Units | Self::StockGroups => 4,
+            Self::CostCentres => 5,
+            Self::CostCategories => 3,
         }
     }
 }
@@ -190,6 +212,16 @@ pub enum NativeMasterDetail {
         decimal_places: u8,
         simple: bool,
     },
+    /// The category a cost centre belongs to, as the text Tally sent; absent or
+    /// blank is `None`.
+    CostCentre {
+        category: Option<String>,
+    },
+    CostCategory {
+        allocates_revenue: bool,
+        allocates_non_revenue: bool,
+        affects_stock: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -230,6 +262,9 @@ pub enum NativeMastersError {
     /// A present, empty `COLLECTION` for voucher types. Every company has
     /// predefined voucher types, so none is no answer, not a zero-row one.
     VoucherTypesEmpty,
+    /// A present, empty `COLLECTION` for cost categories. Every company has the
+    /// predefined Primary Cost Category, so none is no answer, not a zero-row one.
+    CostCategoriesEmpty,
 }
 
 impl NativeMastersError {
@@ -251,12 +286,16 @@ impl NativeMastersError {
                 "is_optional" => "masters_row_field_invalid:is_optional",
                 "decimal_places" => "masters_row_field_invalid:decimal_places",
                 "is_simple_unit" => "masters_row_field_invalid:is_simple_unit",
+                "allocate_revenue" => "masters_row_field_invalid:allocate_revenue",
+                "allocate_non_revenue" => "masters_row_field_invalid:allocate_non_revenue",
+                "affects_stock" => "masters_row_field_invalid:affects_stock",
                 _ => "masters_row_field_invalid",
             },
             Self::DuplicateGuid => "masters_row_duplicate_guid",
             Self::DuplicateName => "masters_row_duplicate_name",
             Self::RowExceedsBound => "masters_row_exceeds_bound",
             Self::VoucherTypesEmpty => "masters_voucher_types_empty",
+            Self::CostCategoriesEmpty => "masters_cost_categories_empty",
         }
     }
 }
@@ -276,7 +315,7 @@ impl std::error::Error for NativeMastersError {}
 /// The scalar children a row's fields are read from, by upper-case name. One
 /// occurrence each; a repeat refuses. `ORIGINALNAME`, `ALIAS` and `NAME` are
 /// read only to check them against the name bound.
-const ROW_FIELDS: [&str; 13] = [
+const ROW_FIELDS: [&str; 17] = [
     "GUID",
     "PARENT",
     "BRIDGECOMPANYGUID",
@@ -290,6 +329,10 @@ const ROW_FIELDS: [&str; 13] = [
     "ISSIMPLEUNIT",
     "ALIAS",
     "NAME",
+    "CATEGORY",
+    "ALLOCATEREVENUE",
+    "ALLOCATENONREVENUE",
+    "AFFECTSSTOCK",
 ];
 
 /// Parses one masters collection of `kind`, bound to `company_guid`.
@@ -418,6 +461,11 @@ pub fn parse_native_masters(
         1 if rows.is_empty() && kind == NativeMasterKind::VoucherTypes => {
             Err(NativeMastersError::VoucherTypesEmpty)
         }
+        // The predefined Primary Cost Category always exists; cost centres may be none
+        // (a zero-row answer was captured live on a book with none defined).
+        1 if rows.is_empty() && kind == NativeMasterKind::CostCategories => {
+            Err(NativeMastersError::CostCategoriesEmpty)
+        }
         1 => Ok(NativeMasters { rows }),
         _ => Err(NativeMastersError::Malformed("masters_collection_repeated")),
     }
@@ -509,7 +557,7 @@ fn parse_row(
     if row_chars > masters_worst_row_bytes(kind) / 2 {
         return Err(NativeMastersError::RowExceedsBound);
     }
-    for field in ["PARENT", "ALIAS", "NAME", "ORIGINALNAME"] {
+    for field in ["PARENT", "ALIAS", "NAME", "ORIGINALNAME", "CATEGORY"] {
         if let Some(text) = fields.get(field) {
             within_name_bound(text)?;
         }
@@ -528,7 +576,7 @@ fn parse_row(
     let master_id = parsed(&mut fields, "MASTERID", "master_id")?;
     let alter_id = parsed(&mut fields, "ALTERID", "alter_id")?;
     let parent = match kind {
-        NativeMasterKind::Units => None,
+        NativeMasterKind::Units | NativeMasterKind::CostCategories => None,
         _ => fields
             .remove("PARENT")
             .filter(|parent| !parent.trim().is_empty()),
@@ -549,6 +597,21 @@ fn parse_row(
                 .ok_or(NativeMastersError::RowFieldInvalid("is_simple_unit"))?,
         },
         NativeMasterKind::Godowns | NativeMasterKind::StockGroups => NativeMasterDetail::Plain,
+        NativeMasterKind::CostCentres => NativeMasterDetail::CostCentre {
+            category: fields
+                .remove("CATEGORY")
+                .map(|text| text.trim().to_string())
+                .filter(|text| !text.is_empty()),
+        },
+        NativeMasterKind::CostCategories => NativeMasterDetail::CostCategory {
+            allocates_revenue: required_yes_no(&mut fields, "ALLOCATEREVENUE", "allocate_revenue")?,
+            allocates_non_revenue: required_yes_no(
+                &mut fields,
+                "ALLOCATENONREVENUE",
+                "allocate_non_revenue",
+            )?,
+            affects_stock: required_yes_no(&mut fields, "AFFECTSSTOCK", "affects_stock")?,
+        },
     };
     Ok(NativeMasterRow {
         name,
@@ -724,6 +787,15 @@ fn optional_yes_no(
         Some("No") => Ok(Some(false)),
         Some(_) => Err(NativeMastersError::RowFieldInvalid(label)),
     }
+}
+
+/// A `Yes` or `No` field that must be present: an absent one is not a `No`.
+fn required_yes_no(
+    fields: &mut HashMap<&'static str, String>,
+    key: &'static str,
+    label: &'static str,
+) -> Result<bool, NativeMastersError> {
+    optional_yes_no(fields, key, label)?.ok_or(NativeMastersError::RowFieldInvalid(label))
 }
 
 fn numbering_method(text: &str) -> Result<NativeNumberingMethod, NativeMastersError> {

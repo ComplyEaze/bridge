@@ -1503,6 +1503,16 @@ Bridge's own profile code and sent over the gateway by a reads-only sitting. Wha
 Not shown: a book above a few thousand ledgers (size and time), or a ledger whose flag reads `No` yet holds bills
 (company-wide bill-wise settings, §12a.5).
 
+### 12a.17 Cost centres and categories are returned, and an allocation is stored, when the company's setting reads No
+
+**PARTIAL: VERIFIED 2026-10-07, licensed TallyPrime 7.1 Silver** (`education_mode=false`), attended, one request at a time. Two synthetic books (`BRIDGE SHAPE LAB`, `BRIDGE CORPUS FOREX`), one run each; the owner read the Cost Centres setting on screen (F11): No on both. Nothing here is evidence about a client book. Fixtures: the `masters_cost_*` files and `MASTERS_CAPTURE_PROVENANCE.md`.
+
+- **The setting is not "no centres".** The Company collection (a `$GUID` filter) answered `ISCOSTCENTRESON` No, equal to the screen, on both books. `CostCentre` on `BRIDGE SHAPE LAB` still returned two centres (`Assembly`, `Trading`; `PARENT` the reserved root, `CATEGORY` `Business Line`, `GUID`, `MASTERID`, `ALTERID`, and the computed `BRIDGECOMPANYGUID`) and `CostCategory` two categories (`Business Line`: `ALLOCATEREVENUE` Yes, `ALLOCATENONREVENUE` No, `AFFECTSSTOCK` No; `Primary Cost Category`: Yes, Yes, No). `BRIDGE CORPUS FOREX`, with none defined, answered `STATUS` 1 and one present, empty `COLLECTION`. So a No setting plus an empty list does not say whether the feature is off or no centre is defined, and a No setting alone must not refuse a cost-centre read.
+- **An imported allocation is stored although the setting is No.** The one-day `vouchers` read of the Journal `SHAPELAB-C9-costcentre` (2025-06-05, written by an import) returned, under its `ALLLEDGERENTRIES.LIST`, `CATEGORYALLOCATIONS.LIST` with `CATEGORY` `Business Line`, `ISDEEMEDPOSITIVE` Yes and two `COSTCENTREALLOCATIONS.LIST` (`NAME` `Trading`, `AMOUNT` -600.00; `NAME` `Assembly`, `AMOUNT` -400.00; empty `ACTUALQTY` and `BILLEDQTY`; `PAYHEADSORTORDER` and `EMPLOYEESORTORDER` 0), adding up to the -1000.00 party leg. How a screen-keyed allocation looks was not captured.
+- **The Company collection answers the F11 flags** `ISACCOUNTINGON, ISINVENTORYON, ISINTEGRATED, ISBILLWISEON, ISALLBILLWISEON, ISCOSTCENTRESON, ISBATCHWISEON, ISPAYROLLON, ISTDSON, ISJOBCOSTINGON, ISTCSON, ISGSTON, ISGSTCLASSIFON, ISEDITLOGON, ISCOSTTRACKINGON, ISISOCURRENCYAPPLICABLE, ISTRACKVOUCHERSON` with `CompanyNumber`, `ALTVCHID`, `ALTMSTID`, `LASTVOUCHERDATE` and `CURRENCYNAME` written as the symbol. Only `ISCOSTCENTRESON` was compared with a screen. `ISISOCURRENCYAPPLICABLE` read No on both books although `BRIDGE SHAPE LAB` has currency masters: it is not the multi-currency signal.
+- **Bank allocations stayed empty:** every `BANKALLOCATIONS.LIST` container of the books read (2 on `BRIDGE AMEND LAB`, 94 on `BRIDGE SHAPE LAB` in a June window) was empty, so a reconciled entry's wire form is still unseen.
+- **Not measured:** a book whose setting reads Yes, a screen-keyed allocation, a reconciled bank entry, a larger book, any release other than this one.
+
 ## 13. Open questions
 
 | Question | Why it matters |

@@ -3316,8 +3316,8 @@
   "by": "author (Lane E2)",
   "what": "LOAN-1 leaves out the TDS deducted on the loan",
   "file": "src/loans_interest.rs",
-  "from": "        let expected_movement = -taken_total + repaid_total - interest + tds_on_loan;",
-  "to": "        let expected_movement = -taken_total + repaid_total - interest;"
+  "from": "        let expected_movement =\n            -taken_total + repaid_total - interest + tds_on_loan - tds_in_principal;",
+  "to": "        let expected_movement =\n            -taken_total + repaid_total - interest - tds_in_principal;"
  },
  {
   "id": "LR-30",

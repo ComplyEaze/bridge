@@ -18,6 +18,19 @@ These changes are in source and not yet in a published build.
 
 **New**
 
+- `vouchers` and the `outstandings` party detail now reach a ledger by either
+  spelling of its name when Tally's own name for it differs in case or symbols from the
+  spelling its vouchers carry (26 of 4,017 ledgers in a separate census of 13 books,
+  not reproducible from this repository), and `ledger_match` shows Tally's own name,
+  with `ledger_row_spelling` when the vouchers spell it differently. A spelling
+  that is two ledgers' is refused as `ledger_ambiguous`. The voucher filter and the
+  trail still use the spelling the vouchers carry; `ledger_movement` and imports are
+  unchanged. Not measured: that Tally accepts the voucher-row spelling when it
+  differs from the ledger's own name, what a voucher row carries for such a ledger
+  on a book other than the one measured, and what the outstandings report that the
+  trail reads carries for it, so a party detail that finds no bill or no unallocated
+  row for such a ledger says `report_spelling: not_established`; that the first name
+  list is the primary language (#1085).
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
   `amount`), and can add a window up by ledger, month or voucher type
@@ -81,6 +94,19 @@ These changes are in source and not yet in a published build.
   approval is the assistant's word, not proof that a person said yes, and a hand
   import of the file is not checked. Not measured: a large book, and the bills
   of a ledger whose flag reads No (#1234).
+- Versions 0.3.0 to 0.4.2 refuse to post a batch this version builds. They do
+  not read the cash-in-hand and bill-wise records a saved batch now carries,
+  so after a rollback they could have posted it with neither check; the batch's
+  ledger binding is now saved under a name they do not read, and they refuse a
+  batch with no binding before any approval window or request to Tally
+  (`import_batch_predates_ledger_binding`, nothing posted). Their message for
+  that refusal says "Build the batch again"; for a batch this version built,
+  reinstall this version (or a newer one) and post the batch from it instead,
+  because a batch built again on an older version has neither check. A batch an
+  earlier version saved is read as before. Which versions can read the import
+  history is unchanged: from the first post attempted with 0.4.2 or later,
+  only 0.4.2 and later read it. 0.2.0 and earlier have no such refusal: do not
+  run them over a data folder this version has built in (#1234).
 - The posting setting is shorter and names its four known limits in plainer
   words, and Terms of Use section 9.2 (version 2026-10.1, effective 7 October
   2026) now lists the same limits and more: a company or ledger renamed or opened
@@ -97,6 +123,22 @@ These changes are in source and not yet in a published build.
   found and counted as before and none is chosen for you; when more than 25 are
   found, the ones left off the list are the ledgers holding only some of the
   words before those holding all of them (#1076).
+- Five lists of a batch's ledgers in refusals now come in the batch's own
+  order, not in name order. `masters` of `masters_not_exact`, `ledger_twins`
+  and `ledgers_changed` list a ledger where the batch first names it;
+  `refused_ledgers` of `cash_bank_ledger_not_established` lists a ledger where
+  one of its entries is first refused, and `refused_ledgers` of the cash-answer
+  refusals (in `build_import_xml` and `post_import`) where an answer first
+  names it. The order is the same whether or not party names are masked. The
+  same ledgers are found and refused as before.
+  Where a list is cut (`ledgers_changed` names eight; a small response cap
+  leaves rows of `refused_ledgers` out), which ledgers are named, and how many
+  `refused_ledgers_omitted` counts, can differ from before. The ledgers a
+  `post_import` or `verify_import` answer names in `masters_after_post.ledgers`
+  come in the same order, where the batch first names each, in the answer and
+  in the proof saved from it (the desktop screen names the first eight of
+  them); the recorded verdict, and the review dialog that reads it, keep the
+  order they were recorded in. Other lists are unchanged (#1234).
 
 ## [0.4.2] - 2026-10-03
 

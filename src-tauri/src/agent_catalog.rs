@@ -461,7 +461,7 @@ fn parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
         ("outstandings", "ageing_basis") => "Which date each open bill is aged from: due_date (the default) or bill_date. A bill whose date is after as_of has no age yet.",
         ("outstandings", "detail") => "Optional, with party: bill_trail (each bill's allocations) or unadjusted (the party's on-account, advance and pending note allocations). It reads the company's vouchers; the description gives its cost and limits.",
         ("outstandings", "direction") => "receivable, payable or both (the default). Direction follows the sign of each bill's balance, not the type of party.",
-        ("outstandings", "party") => "Optional, for detail: a party ledger's name, spelled as in the book or differing only in ASCII case and spaces.",
+        ("outstandings", "party") => "Optional, for detail: a party ledger's name, spelled as in the book or differing only in ASCII case and spaces. A ledger whose own name differs in case or symbols from the spelling its vouchers carry is reached by either; `ledger_match` shows its own name and, when different, `ledger_row_spelling`, the spelling its vouchers carry. The bills are matched on the voucher spelling; what Tally's outstandings reports call such a ledger is not measured, so a detail that finds no bill for a party that has some is not proof it has none.",
         ("outstandings", "reference") => "Optional, with detail=bill_trail: one bill reference as open_bills lists it; the read then starts at the earliest date the reports list for that bill.",
         ("outstandings", "top") => "How many parties to rank by gross exposure (default 25). It ranks parties only; page the bills with offset and limit.",
         ("parse_bank_statement", "bank_ledger") => "The Tally ledger of this bank account, spelled as in the book; check it with validate_masters.",
@@ -484,7 +484,7 @@ fn parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
         ("vouchers", "narration_contains") => "Optional: only vouchers whose narration contains this phrase (at least 3 characters), ignoring letter case, accent composition and runs of spaces. Refused where narrations are withheld from the assistant.",
         ("vouchers", "amount") => "Optional: an unsigned decimal such as 1180.50; only vouchers with a ledger entry of exactly this amount (debit or credit). Each item says which entries matched.",
         ("vouchers", "summarise_by") => "Optional: ledger, month or voucher_type. The result then holds buckets of debit, credit and voucher counts instead of the vouchers, over the same window, selectors and search; offset and limit page the buckets.",
-        ("vouchers", "ledger") => "Optional: only vouchers with an entry on this ledger, spelled as in the book or differing only in ASCII case and spaces.",
+        ("vouchers", "ledger") => "Optional: only vouchers with an entry on this ledger, spelled as in the book or differing only in ASCII case and spaces. A ledger whose own name differs in case or symbols from the spelling its vouchers carry is reached by either; `ledger_match` shows its own name and, when different, `ledger_row_spelling`, the spelling its vouchers carry.",
         ("vouchers", "voucher_class") => "Optional, at most one of voucher_class, voucher_type_guid and voucher_type: a reserved class, matched however the book has renamed its types, child types included.",
         ("vouchers", "voucher_type") => "Optional, at most one of the three: one voucher type's display name, matched ignoring ASCII case. A name that could mean more than one class or type is refused (voucher_type_ambiguous).",
         ("vouchers", "voucher_type_guid") => "Optional, at most one of the three: exactly one voucher type, by its GUID. Another company's GUID is refused (voucher_type_guid_foreign).",
@@ -568,7 +568,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     ),
                     "egress_log" => (
                         concat!(
-                            "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider; redaction can only mask party names or drop narration. Never tell the user that no data has left their computer. ",
+                            "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider; redaction can only shorten party and ledger names and bank account numbers or drop narrations, and does not hide amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or references; under mask_parties a name written inside a narration or reference stays as it is. Never tell the user that no data has left their computer. ",
                             "Shows the receipts ComplyEaze Bridge keeps of its own tool calls, read from its local log file on this computer: tool, time, company, counts and fingerprints, no figures or book content (bounded to the most recent receipts). ",
                             "It does not show what the AI provider received. ",
                             "Use it when the user asks what ComplyEaze Bridge has done, or to show a reviewer which calls ran, on which company and when. ",
@@ -614,7 +614,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     ),
                     "read_evidence" => (
                         concat!(
-                            "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider; redaction can only mask party names or drop narration. Never tell the user that no data has left their computer. ",
+                            "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider; redaction can only shorten party and ledger names and bank account numbers or drop narrations, and does not hide amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or references; under mask_parties a name written inside a narration or reference stays as it is. Never tell the user that no data has left their computer. ",
                             "Shows ComplyEaze Bridge's own recent reads since it started, kept in memory on this computer: request and response fingerprints, byte counts and state, no figures or book content (bounded: the newest `limit` records). ",
                             "It does not show what the AI provider received. ",
                             "Use it to check which reads ComplyEaze Bridge made since it started, with their fingerprints and byte counts. ",

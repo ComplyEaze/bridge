@@ -44,9 +44,13 @@ creation with `agent_data_dir_encoding_invalid`; no lossy path alias is used.
 Before requesting financial data through an MCP client, the client may send the selected
 Tally result to its AI provider, including company
 identity, party or open-bill details, and amounts. An unset
-`BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` masks party names
-(in `stock_summary` it also masks stock item names and stock-group parents; GUIDs
-and Tally's reserved root stay plain) and `drop_narration` drops narration. Neither setting removes amounts. Set the
+`BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
+names and bank account numbers to their first two and last two characters (a name of
+four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
+and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
+drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
+GSTIN, IFSC, MSME or Udyam registration numbers or contact details, and the bank statement tool's `account_last4` (the last
+four digits of the statement's account number) is sent under every setting. Set the
 environment variable before launch when that better fits the workflow.
 
 On Unix, new data directories use mode `0700`; an existing data directory
@@ -199,8 +203,8 @@ answer was larger than the response limit (#1033); a count that is equal, lower 
 or sizes anything, and the
 result of a counted read says which it was in `ledger_count_cross_check.status` (`matched`,
 `company_count_lower` or `unavailable`, the last meaning the check did not run). Equality was measured
-on three books only (one synthetic with its answer captured in the tree, two real books read by
-another lane and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
+on three books only (one synthetic with its answer captured in the tree, two real books read separately
+and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
 against the rows the read returns, not by this check. A mark
 above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
 `size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the
@@ -647,7 +651,16 @@ after it, before any voucher is read.
 A ledger name given to `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
 resolves only when it is spelled exactly as a ledger in the book, or when exactly one ledger differs
 from it only in ASCII case and ASCII spaces and no other ledger differs from that one only in case or
-whitespace (#1076; the case of a letter outside A-Z is not folded, reference §9.4f). Otherwise it
+whitespace (#1076; the case of a letter outside A-Z is not folded, reference §9.4f). A ledger's own name
+(the first name in its `LANGUAGENAME.LIST`) can differ in case or symbols from the spelling its vouchers carry (26 of 4,017
+ledgers in a separate census of 13 books, not reproducible from this repository); for `vouchers` and the
+`outstandings` party detail either spelling is exact, a spelling that is two ledgers' is `ledger_ambiguous`,
+and `ledger_match` shows the ledger's own name (with `ledger_row_spelling` when its vouchers spell it
+differently), while the voucher filter and the trail still use the spelling the vouchers carry (#1085). What
+the outstandings report carries for such a ledger is not measured, so a party detail that finds no bill or
+no unallocated row for a ledger with two spellings carries `report_spelling: not_established`: it may mean
+the report names the ledger differently. `ledger_movement` takes its names from
+another report and is unchanged. Otherwise it
 refuses as `ledger_not_found`, or as `ledger_ambiguous` when several ledgers differ from it only in case
 or whitespace (such as a twin with a trailing line break, §9.4e). Every answer for a named ledger carries `ledger_match`:
 the ledger read, `matched` (`exact` or `case_or_spacing`) and `similar_ledgers` (at most 25, with `similar_ledgers_total`; both left out under `mask_parties`), the other ledgers that
@@ -1730,14 +1743,25 @@ Existing batch files and proofs keep their formats; new journal fields are
 optional on read, and no database migration or background queue is introduced.
 Disabling the switch and restarting the connector removes posting from tool
 availability without deleting reconciliation evidence.
-**Keep this connector version for recovery.** The journal reader refuses any
-record carrying a field it does not know. So after a native post, an older
-connector refuses the whole journal, including reconciliation of batches it
+**Keep this connector version for recovery.** The journal reader refuses a
+dispatch or status record, or a voucher, carrying a field it does not know; a
+saved batch's own record can carry fields an older connector does not read. So
+after a native post attempted with 0.4.2 or later, a connector older than 0.4.2
+refuses the whole journal, including reconciliation of batches it
 wrote itself. Since bridge#579, each native dispatch intent records the
-REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post made
-with this version, the dispatch intent also records the pre-POST voucher mark and
-the journal a binding record, which an older connector refuses: do not downgrade
-after posting with it. A downgrade before that first post is harmless.
+REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post attempted
+with 0.4.2 or later, the dispatch intent also records the pre-POST voucher mark and
+the journal a binding record, which a connector older than 0.4.2 refuses: do not
+downgrade after posting with it. A downgrade before that first post leaves the
+journal readable, and versions 0.3.0 to 0.4.2 then refuse to post a batch this
+version built (`import_batch_predates_ledger_binding`, nothing posted): they
+cannot make the cash-in-hand and bill-wise checks it was built with. Their
+message for that refusal says "Build the batch again"; it was written for
+batches older than they are, and for a batch this version built it is the wrong
+step. Reinstall this version (or a newer one) and post the batch from it. What
+an older version builds and posts itself, the same batch built again included,
+has neither check. 0.2.0 and earlier have no such refusal: do not run them over a
+data folder this version has built in.
 
 This is a bounded first posting slice, not blanket host/licence qualification.
 A ledger mapper is unnecessary for exact existing names: `validate_masters`
@@ -2282,8 +2306,9 @@ supplier bill, a 20,000 customer advance and a 10,000 credit note to a customer,
 `payable` reads 80,000 and only 50,000 of it is owed to a supplier. The direction
 of an `unallocated` amount is the sign of the party's net unallocated balance, so
 an on-account receipt and an on-account payment on one party net into one figure.
-Separating advances, credit and debit notes and on-account amounts by their
-voucher's bill type is tracked in #945.
+For one party, `detail: unadjusted` separates advances, pending credit and debit notes and
+on-account amounts by their voucher's bill type (below). The book-wide `open_bills.kind` and
+`unallocated` figures do not; what is still to be measured is in #1356, the follow-up to #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted

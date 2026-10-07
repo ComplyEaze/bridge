@@ -367,7 +367,7 @@ reads the empty vector as "nothing exists" is wrong in two cases out of three.
 
 This is stated here, in the producer's contract, rather than left to each
 consumer to rediscover, because **it has already been got wrong twice by
-different lanes**: the preparation screen rendered "0 possible ledgers are
+different consumers**: the preparation screen rendered "0 possible ledgers are
 listed first" over a family of 120, and the voucher-presence contract had to
 add a paired test to stop its own rule collapsing into "no candidates means
 unknown" — a reading that is right for the truncated case and wrong for

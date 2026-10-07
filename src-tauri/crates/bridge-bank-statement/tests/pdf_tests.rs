@@ -355,3 +355,37 @@ fn malformed_input_is_refused_not_parsed() {
         "pdf_engine_unavailable",
     );
 }
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn a_pdf_with_no_text_with_figures_is_refused_under_its_own_name() {
+    for name in [
+        // one image per page
+        "scan-image-only.pdf",
+        // every character drawn as a path
+        "print-to-pdf-vector-glyphs.pdf",
+        // an image under a scanner app's stamp, which has words and no digit
+        "scan-with-visible-stamp.pdf",
+    ] {
+        refuses(
+            extract_pages(pdfium(), &pdf(name), "synthetic-user-4321"),
+            "no_readable_text",
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn a_logo_and_a_watermark_do_not_change_the_words_that_are_read() {
+    let words =
+        |pages: &[Page]| -> Vec<String> { pages[0].iter().map(|word| word.text.clone()).collect() };
+    let with_images = extract_pages(
+        pdfium(),
+        &pdf("hdfc-logo-and-watermark.pdf"),
+        "synthetic-user-4321",
+    )
+    .unwrap();
+    let plain = extract_pages(pdfium(), &pdf("hdfc-synthetic.pdf"), "synthetic-user-4321").unwrap();
+    assert_eq!(with_images.len(), 1);
+    assert_eq!(words(&with_images), words(&plain));
+}

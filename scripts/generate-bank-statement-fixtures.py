@@ -484,7 +484,7 @@ FIXTURES = {
 
 
 def main(argv):
-    if len(argv) not in (2, 3) or (len(argv) == 3 and argv[2] != "--check"):
+    if len(argv) not in (2, 3) or argv[1].startswith("-") or (len(argv) == 3 and argv[2] != "--check"):
         raise SystemExit(__doc__)
     directory = pathlib.Path(argv[1])
     check = len(argv) == 3

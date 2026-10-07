@@ -37,6 +37,14 @@ fn response(kind: NativeMasterKind) -> String {
         NativeMasterKind::StockGroups => {
             &include_bytes!("../tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml")[..]
         }
+        // Captured 7 Oct 2026 on a book whose Cost Centres flag reads No and that holds two centres.
+        NativeMasterKind::CostCentres => &include_bytes!(
+            "../tests/fixtures/masters_cost_centres_shape_lab_flag_no_live.utf16le.xml"
+        )[..],
+        NativeMasterKind::CostCategories => {
+            &include_bytes!("../tests/fixtures/masters_cost_categories_shape_lab_live.utf16le.xml")
+                [..]
+        }
     })
 }
 
@@ -54,6 +62,12 @@ fn request_fixture(kind: NativeMasterKind) -> String {
         NativeMasterKind::StockGroups => {
             &include_bytes!("../tests/fixtures/masters_stock_groups_request.utf16le.xml")[..]
         }
+        NativeMasterKind::CostCentres => {
+            &include_bytes!("../tests/fixtures/masters_cost_centres_request.utf16le.xml")[..]
+        }
+        NativeMasterKind::CostCategories => {
+            &include_bytes!("../tests/fixtures/masters_cost_categories_request.utf16le.xml")[..]
+        }
     })
 }
 
@@ -70,7 +84,11 @@ fn reads_lab_response(kind: NativeMasterKind) -> String {
         NativeMasterKind::Godowns => {
             &include_bytes!("../tests/fixtures/masters_godowns_reads_lab_live.utf16le.xml")[..]
         }
-        NativeMasterKind::VoucherTypes => panic!("no READS LAB voucher types capture"),
+        NativeMasterKind::VoucherTypes
+        | NativeMasterKind::CostCentres
+        | NativeMasterKind::CostCategories => {
+            panic!("no READS LAB capture of this kind")
+        }
     })
 }
 
@@ -81,6 +99,7 @@ fn captured_rows(kind: NativeMasterKind) -> usize {
         NativeMasterKind::Godowns => 2,
         NativeMasterKind::Units => 4,
         NativeMasterKind::StockGroups => 3,
+        NativeMasterKind::CostCentres | NativeMasterKind::CostCategories => 2,
     }
 }
 
@@ -1014,7 +1033,8 @@ fn only_xml_whitespace_may_sit_between_elements() {
 }
 
 /// Every company has predefined voucher types, so a present, empty voucher-type
-/// collection is refused; the other kinds may answer with none.
+/// collection is refused; the other kinds may answer with none (an empty cost-category
+/// collection is refused by `an_empty_cost_category_answer_is_refused_because_the_primary_category_always_exists`).
 #[test]
 fn a_voucher_type_collection_with_no_rows_is_refused_and_the_other_kinds_may_be_empty() {
     let kind = NativeMasterKind::VoucherTypes;
@@ -1385,16 +1405,381 @@ fn every_fixture_row_fits_the_worst_row_bytes_of_its_kind() {
 #[test]
 fn the_worst_row_bytes_follow_the_documented_arithmetic() {
     // 2 * (fixed + 6 * 128 * (slots + 4)), worked by hand: fixed 1,200, 800,
-    // 700, 750 and slots 5, 4, 4, 4.
+    // 700, 750, 800, 950 and slots 5, 4, 4, 4, 5, 3.
     for (kind, bytes) in [
         (NativeMasterKind::VoucherTypes, 16_224),
         (NativeMasterKind::Godowns, 13_888),
         (NativeMasterKind::Units, 13_688),
         (NativeMasterKind::StockGroups, 13_788),
+        (NativeMasterKind::CostCentres, 15_424),
+        (NativeMasterKind::CostCategories, 12_652),
     ] {
         assert_eq!(masters_worst_row_bytes(kind), bytes, "{kind:?}");
     }
     assert_eq!(MASTERS_ASSUMED_NAME_CHARS, 128);
     assert_eq!(MASTERS_ASSUMED_ALIASES, 4);
     assert_eq!(MASTERS_RESPONSE_BUDGET_BYTES, 16_000_000);
+}
+
+// ---- cost centres and cost categories (captured 7 Oct 2026, flag No, rows present) ----
+
+/// `BRIDGE CORPUS FOREX`, a book with no cost centre defined.
+const FOREX_COMPANY: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+
+fn forex_cost_centres() -> String {
+    utf16le(
+        &include_bytes!(
+            "../tests/fixtures/masters_cost_centres_corpus_forex_empty_live.utf16le.xml"
+        )[..],
+    )
+}
+
+#[test]
+fn the_cost_centre_capture_reads_both_centres_with_their_category_and_root_parent() {
+    let rows = parse(
+        NativeMasterKind::CostCentres,
+        &response(NativeMasterKind::CostCentres),
+    )
+    .unwrap()
+    .rows;
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].name, "Assembly");
+    assert_eq!(rows[0].guid, format!("{COMPANY}-00000109"));
+    assert_eq!((rows[0].master_id, rows[0].alter_id), (265, 267));
+    assert_eq!(
+        rows[0].detail,
+        NativeMasterDetail::CostCentre {
+            category: "Business Line".to_string()
+        }
+    );
+    assert!(is_tally_reserved_root(rows[0].parent.as_deref().unwrap()));
+    assert_eq!(rows[1].name, "Trading");
+    assert_eq!((rows[1].master_id, rows[1].alter_id), (217, 218));
+}
+
+#[test]
+fn a_cost_centre_without_a_category_or_with_a_blank_one_is_refused_not_read_as_none() {
+    // Every captured centre carried a category (the default one where none was chosen), so a
+    // missing or blank one is an answer that was not read, not a centre with no category.
+    for replacement in ["", "<CATEGORY TYPE=\"String\">  </CATEGORY>"] {
+        let changed = edited(
+            NativeMasterKind::CostCentres,
+            "<CATEGORY TYPE=\"String\">Business Line</CATEGORY>",
+            replacement,
+        );
+        assert_eq!(
+            parse(NativeMasterKind::CostCentres, &changed),
+            Err(NativeMastersError::RowFieldInvalid("category")),
+            "{replacement:?}"
+        );
+    }
+    assert_eq!(
+        NativeMastersError::RowFieldInvalid("category").code(),
+        "masters_row_field_invalid:category"
+    );
+}
+
+#[test]
+fn the_two_cost_collections_must_name_their_own_type_so_an_unresolved_one_is_not_read_as_empty() {
+    // The `MSTDEPTYPE` of every captured answer (32 for centres, 16 for categories), the zero-row
+    // answer included. A collection that does not carry its own is refused, whether it holds rows
+    // or none: an empty answer that was not resolved to the type asked for says nothing.
+    let type_error = Err(NativeMastersError::Malformed(
+        "masters_collection_type_unexpected",
+    ));
+    for (kind, own, other) in [
+        (NativeMasterKind::CostCentres, "32", "16"),
+        (NativeMasterKind::CostCategories, "16", "32"),
+    ] {
+        let text = response(kind);
+        let own_attribute = format!("MSTDEPTYPE=\"{own}\"");
+        assert!(text.contains(&own_attribute), "{kind:?}");
+        let wrong = text.replace(&own_attribute, &format!("MSTDEPTYPE=\"{other}\""));
+        let absent = text.replace(&own_attribute, "");
+        assert_eq!(parse(kind, &wrong), type_error.clone(), "{kind:?} wrong");
+        assert_eq!(parse(kind, &absent), type_error.clone(), "{kind:?} absent");
+        // The right type parses, and it is the capture itself.
+        assert!(parse(kind, &text).is_ok(), "{kind:?}");
+    }
+    // The captured zero-row cost-centre answer carries its type and is a valid answer; the same
+    // answer without it is refused, and so is a self-closed collection that names none.
+    assert!(forex_cost_centres().contains("MSTDEPTYPE=\"32\""));
+    let no_type = forex_cost_centres().replace("MSTDEPTYPE=\"32\"", "");
+    assert_eq!(
+        parse_native_masters(NativeMasterKind::CostCentres, &no_type, FOREX_COMPANY),
+        type_error
+    );
+    let text = response(NativeMasterKind::CostCategories);
+    let (start, _, end) = collection_span(&text);
+    let self_closed = format!("{}<COLLECTION/>{}", &text[..start], &text[end..]);
+    assert_eq!(
+        parse(NativeMasterKind::CostCategories, &self_closed),
+        type_error
+    );
+    // A self-closed collection that does name its type is an empty answer, classified like the
+    // open-and-close form: refused for categories, a zero-row answer for centres.
+    let typed = format!(
+        "{}<COLLECTION MSTDEPTYPE=\"16\"/>{}",
+        &text[..start],
+        &text[end..]
+    );
+    assert_eq!(
+        parse(NativeMasterKind::CostCategories, &typed),
+        Err(NativeMastersError::CostCategoriesEmpty)
+    );
+    let text = response(NativeMasterKind::CostCentres);
+    let (start, _, end) = collection_span(&text);
+    let typed = format!(
+        "{}<COLLECTION MSTDEPTYPE=\"32\"/>{}",
+        &text[..start],
+        &text[end..]
+    );
+    assert!(parse(NativeMasterKind::CostCentres, &typed)
+        .unwrap()
+        .rows
+        .is_empty());
+}
+
+#[test]
+fn the_cost_category_capture_reads_the_three_allocation_flags() {
+    let rows = parse(
+        NativeMasterKind::CostCategories,
+        &response(NativeMasterKind::CostCategories),
+    )
+    .unwrap()
+    .rows;
+    assert_eq!(rows.len(), 2);
+    let find = |name: &str| rows.iter().find(|row| row.name == name).unwrap();
+    assert_eq!(
+        find("Business Line").detail,
+        NativeMasterDetail::CostCategory {
+            allocates_revenue: true,
+            allocates_non_revenue: false,
+            affects_stock: false
+        }
+    );
+    assert_eq!(
+        find("Primary Cost Category").detail,
+        NativeMasterDetail::CostCategory {
+            allocates_revenue: true,
+            allocates_non_revenue: true,
+            affects_stock: false
+        }
+    );
+    // A category has no parent.
+    assert_eq!(find("Business Line").parent, None);
+}
+
+#[test]
+fn a_book_with_no_cost_centre_answers_an_empty_collection_that_is_a_zero_row_answer() {
+    // No row is read here, so no company binding is exercised: only that a typed, empty answer
+    // is a zero-row answer.
+    let rows = parse_native_masters(
+        NativeMasterKind::CostCentres,
+        &forex_cost_centres(),
+        FOREX_COMPANY,
+    )
+    .unwrap()
+    .rows;
+    assert!(rows.is_empty());
+}
+
+#[test]
+fn an_empty_cost_category_answer_is_refused_because_the_primary_category_always_exists() {
+    let (start, open_end, end) = collection_span(&response(NativeMasterKind::CostCategories));
+    let text = response(NativeMasterKind::CostCategories);
+    let empty = format!(
+        "{}{}",
+        &text[..open_end],
+        &text[end - "</COLLECTION>".len()..]
+    );
+    assert!(empty.len() < text.len() && start < open_end);
+    assert_eq!(
+        parse(NativeMasterKind::CostCategories, &empty),
+        Err(NativeMastersError::CostCategoriesEmpty)
+    );
+    assert_eq!(
+        NativeMastersError::CostCategoriesEmpty.code(),
+        "masters_cost_categories_empty"
+    );
+}
+
+#[test]
+fn a_cost_category_row_that_carries_a_parent_has_none() {
+    // A category has no parent: a PARENT element on the wire is not read as one.
+    let text = response(NativeMasterKind::CostCategories);
+    let tag = "<COSTCATEGORY NAME=\"Business Line\"";
+    let at = text.find(tag).unwrap();
+    let open_end = at + text[at..].find('>').unwrap() + 1;
+    let changed = format!(
+        "{}<PARENT TYPE=\"String\">Business Line</PARENT>{}",
+        &text[..open_end],
+        &text[open_end..]
+    );
+    assert_ne!(changed, text);
+    let rows = parse(NativeMasterKind::CostCategories, &changed)
+        .unwrap()
+        .rows;
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().all(|row| row.parent.is_none()), "{rows:?}");
+}
+
+#[test]
+fn an_absent_or_unreadable_allocation_flag_is_refused_not_read_as_no() {
+    for (field, label, code) in [
+        (
+            "ALLOCATEREVENUE",
+            "allocate_revenue",
+            "masters_row_field_invalid:allocate_revenue",
+        ),
+        (
+            "ALLOCATENONREVENUE",
+            "allocate_non_revenue",
+            "masters_row_field_invalid:allocate_non_revenue",
+        ),
+        (
+            "AFFECTSSTOCK",
+            "affects_stock",
+            "masters_row_field_invalid:affects_stock",
+        ),
+    ] {
+        let tag = format!("<{field} TYPE=\"Logical\">No</{field}>");
+        let tag_yes = format!("<{field} TYPE=\"Logical\">Yes</{field}>");
+        let from = if response(NativeMasterKind::CostCategories).contains(&tag) {
+            tag.clone()
+        } else {
+            tag_yes
+        };
+        let absent = edited(NativeMasterKind::CostCategories, &from, "");
+        assert_eq!(
+            parse(NativeMasterKind::CostCategories, &absent),
+            Err(NativeMastersError::RowFieldInvalid(label)),
+            "{field} absent"
+        );
+        let odd = edited(
+            NativeMasterKind::CostCategories,
+            &from,
+            &format!("<{field} TYPE=\"Logical\">Maybe</{field}>"),
+        );
+        let error = parse(NativeMasterKind::CostCategories, &odd).unwrap_err();
+        assert_eq!(error, NativeMastersError::RowFieldInvalid(label));
+        assert_eq!(error.code(), code);
+    }
+}
+
+#[test]
+fn a_cost_centre_row_from_another_company_and_a_repeated_category_are_refused() {
+    assert_eq!(
+        parse_native_masters(
+            NativeMasterKind::CostCentres,
+            &response(NativeMasterKind::CostCentres),
+            FOREIGN_COMPANY
+        ),
+        Err(NativeMastersError::RowGuidForeign)
+    );
+    let repeated = edited(
+        NativeMasterKind::CostCentres,
+        "<CATEGORY TYPE=\"String\">Business Line</CATEGORY>",
+        "<CATEGORY TYPE=\"String\">Business Line</CATEGORY><CATEGORY TYPE=\"String\">X</CATEGORY>",
+    );
+    assert_eq!(
+        parse(NativeMasterKind::CostCentres, &repeated),
+        Err(NativeMastersError::Malformed("masters_row_field_repeated"))
+    );
+}
+
+#[test]
+fn a_cost_centre_category_over_the_name_bound_is_refused() {
+    let long = "x".repeat(MASTERS_ASSUMED_NAME_CHARS + 1);
+    let edited = edited(
+        NativeMasterKind::CostCentres,
+        "<CATEGORY TYPE=\"String\">Business Line</CATEGORY>",
+        &format!("<CATEGORY TYPE=\"String\">{long}</CATEGORY>"),
+    );
+    assert_eq!(
+        parse(NativeMasterKind::CostCentres, &edited),
+        Err(NativeMastersError::RowExceedsBound)
+    );
+}
+
+// ---- the same collections on a book whose Cost Centres setting reads Yes (captured 7 Oct 2026 in a separate sitting, scrubbed) ----
+
+/// The parity book's synthetic company GUID, as scrubbed in the fixtures.
+const PARITY_COMPANY: &str = "7c0de000-0000-4000-8000-0000000000a1";
+
+fn parity(bytes: &[u8]) -> String {
+    utf16le(bytes)
+}
+
+#[test]
+fn a_book_with_the_setting_at_yes_reads_its_three_centres_one_under_another() {
+    let rows = parse_native_masters(
+        NativeMasterKind::CostCentres,
+        &parity(
+            &include_bytes!(
+                "../tests/fixtures/masters_cost_centres_parity_flag_yes_live.utf16le.xml"
+            )[..],
+        ),
+        PARITY_COMPANY,
+    )
+    .unwrap()
+    .rows;
+    assert_eq!(
+        rows.iter().map(|row| row.name.as_str()).collect::<Vec<_>>(),
+        ["Parity CC A", "Parity CC A1", "Parity CC B"]
+    );
+    // The two top-level centres carry the reserved root marker; the child names its parent centre.
+    assert!(is_tally_reserved_root(rows[0].parent.as_deref().unwrap()));
+    assert_eq!(rows[1].parent.as_deref(), Some("Parity CC A"));
+    assert!(!is_tally_reserved_root(rows[1].parent.as_deref().unwrap()));
+    assert!(is_tally_reserved_root(rows[2].parent.as_deref().unwrap()));
+    // The default category is a category like any other: kept, not dropped.
+    for row in &rows {
+        assert_eq!(
+            row.detail,
+            NativeMasterDetail::CostCentre {
+                category: "Primary Cost Category".to_string()
+            }
+        );
+    }
+    assert_eq!((rows[0].master_id, rows[0].alter_id), (206, 211));
+    assert_eq!((rows[1].master_id, rows[1].alter_id), (208, 213));
+}
+
+#[test]
+fn the_parity_book_cost_category_is_the_predefined_one_with_its_flags() {
+    let rows = parse_native_masters(
+        NativeMasterKind::CostCategories,
+        &parity(
+            &include_bytes!(
+                "../tests/fixtures/masters_cost_categories_parity_flag_yes_live.utf16le.xml"
+            )[..],
+        ),
+        PARITY_COMPANY,
+    )
+    .unwrap()
+    .rows;
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].name, "Primary Cost Category");
+    assert_eq!(rows[0].parent, None);
+    assert_eq!(
+        rows[0].detail,
+        NativeMasterDetail::CostCategory {
+            allocates_revenue: true,
+            allocates_non_revenue: true,
+            affects_stock: false,
+        }
+    );
+}
+
+#[test]
+fn the_flag_yes_cost_centre_answer_is_company_bound() {
+    let centres = parity(
+        &include_bytes!("../tests/fixtures/masters_cost_centres_parity_flag_yes_live.utf16le.xml")
+            [..],
+    );
+    assert_eq!(
+        parse_native_masters(NativeMasterKind::CostCentres, &centres, COMPANY),
+        Err(NativeMastersError::RowGuidForeign)
+    );
 }

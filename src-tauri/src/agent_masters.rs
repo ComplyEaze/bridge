@@ -88,9 +88,9 @@ impl Server {
             "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only",
             "One kind per call; no counts or hints; a master's aliases are not returned",
             if marks_party_text(kind) {
-                "Under mask_parties, godown and stock-group names and parents are masked, because a job-work godown or a supplier-named stock group can carry a party's name; Tally's reserved root as a parent is left as it is"
+                "Under mask_parties, godown, stock-group, cost-centre and cost-category names, parents and categories are masked, because a job-work godown, a supplier-named stock group or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is left as it is"
             } else {
-                "Voucher-type, unit and account-group names are not masked by mask_parties: they are configuration labels, not counterparties (godown and stock-group names are masked)"
+                "Voucher-type, unit and account-group names are not masked by mask_parties: they are configuration labels, not counterparties (godown, stock-group, cost-centre and cost-category names are masked)"
             },
         ];
         match kind {
@@ -101,6 +101,15 @@ impl Server {
                 "The completeness of this list is unverified: absence from it is not evidence that a voucher type is absent from the book",
                 "Voucher types are read whole with no size check before the read; rows, AlterIDs and response size are checked after it",
             ]),
+            MastersKind::Native(NativeMasterKind::CostCentres | NativeMasterKind::CostCategories) => {
+                limitations.extend([
+                    "Cost centres and categories are returned whether or not the company's Cost Centres setting is on: a book with the setting off was read with its two centres and two categories and a book with it on with its three centres, one under another, and its one category (two synthetic books, the same shape); this call does not return the setting",
+                    "An empty list of cost centres does not say whether the feature is off or no centre is defined; one book with none defined answered an empty list",
+                    "An empty list of cost categories is refused, on the expectation that the predefined Primary Cost Category always exists: it was present in the two books whose categories were captured (one with the setting at No, one at Yes), and the categories of a book with none defined were not captured",
+                    "ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool reads those allocations yet, so their absence from any other tool's answer says nothing",
+                    "Measured on three synthetic books for cost centres and two for cost categories (the first two on one release; the third was captured in a separate sitting, and that sitting's own status read recorded TallyPrime 7.1, licence Silver, Education mode off; the status answer is not committed); centres nested more than one level deep, a centre with an alias beyond its own name and a larger book are not measured, and a larger book is refused when its master mark is too large for the response budget",
+                ]);
+            }
             MastersKind::Groups => limitations.push(
                 "Groups are read whole from the group snapshot, with no size check before the read",
             ),
@@ -135,7 +144,12 @@ impl Server {
 const fn marks_party_text(kind: MastersKind) -> bool {
     matches!(
         kind,
-        MastersKind::Native(NativeMasterKind::Godowns | NativeMasterKind::StockGroups)
+        MastersKind::Native(
+            NativeMasterKind::Godowns
+                | NativeMasterKind::StockGroups
+                | NativeMasterKind::CostCentres
+                | NativeMasterKind::CostCategories
+        )
     )
 }
 
@@ -151,10 +165,11 @@ fn native_row(row: &NativeMasterRow, mark_party_text: bool) -> Value {
     });
     if mark_party_text {
         mark_party_field(&mut json, "name");
-        if !row
+        // A null parent keeps its key: only a text parent that is not the reserved root is user text.
+        if row
             .parent
             .as_deref()
-            .is_some_and(bridge_tally_protocol::is_tally_reserved_root)
+            .is_some_and(|parent| !bridge_tally_protocol::is_tally_reserved_root(parent))
         {
             mark_party_field(&mut json, "parent");
         }
@@ -182,6 +197,21 @@ fn native_row(row: &NativeMasterRow, mark_party_text: bool) -> Value {
         } => {
             json["decimal_places"] = json!(decimal_places);
             json["simple"] = json!(simple);
+        }
+        NativeMasterDetail::CostCentre { category } => {
+            json["category"] = json!(category);
+            if mark_party_text {
+                mark_party_field(&mut json, "category");
+            }
+        }
+        NativeMasterDetail::CostCategory {
+            allocates_revenue,
+            allocates_non_revenue,
+            affects_stock,
+        } => {
+            json["allocates_revenue"] = json!(allocates_revenue);
+            json["allocates_non_revenue"] = json!(allocates_non_revenue);
+            json["affects_stock"] = json!(affects_stock);
         }
     }
     json

@@ -2,8 +2,10 @@
 
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source that
-becomes release 0.5.0, read at commit `eb6983ffe` (no 0.5.0 tag exists yet). It
-was written from a reading of the source code of release 0.4.0 (tag
+becomes release 0.5.0, read at commit `eb6983ffe` (no 0.5.0 tag exists yet), except the cost centre
+and cost category lists of the masters read, which were added after that commit
+and are read at the head of the pull request that adds them (#1398), in sections
+1 and 2 only. It was written from a reading of the source code of release 0.4.0 (tag
 `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again,
@@ -20,7 +22,7 @@ To report a vulnerability, see [SECURITY.md](../SECURITY.md).
 
 It reads from the TallyPrime running on your own computer, over Tally's own
 local gateway: the loaded companies, ledger masters, other masters as lists
-(voucher types, godowns, units, stock groups, ledger groups), the trial balance,
+(voucher types, godowns, units, stock groups, cost centres, cost categories, ledger groups), the trial balance,
 Profit and Loss and Balance Sheet, vouchers in a date window, outstanding
 receivables and payables with ageing, ledger movement, a purchase register of
 the tax the books record, and closing stock values per item. It also reads
@@ -84,7 +86,8 @@ until you accept the new version (section 4). A server started by hand with
     listed under a group total, the ledger named when a group total cannot be
     given, the list of bill-wise ledgers waiting for approval, the suspense ledger
     named in a build warning and the ledger in a refused cash-or-bank row), stock
-    item names and their parents, godown and stock-group names and their parents,
+    item names and their parents, godown, stock-group, cost-centre and cost-category
+    names and their parents, the category a cost centre belongs to,
     and three fields of a ledger's details: the name on the PAN, the bank account
     holder's name and the bank details. A name of four characters or fewer is
     replaced by “…”. The spelling a ledger's vouchers carry, which is returned
@@ -117,6 +120,14 @@ until you accept the new version (section 4). A server started by hand with
       a group total cannot be given, are shortened under `mask_parties`.
     - A voucher's reference date (the `reference_date` field) is a date, the
       same under every setting.
+    - The cost centre and cost category lists (two new kinds of the masters
+      read) send each one's name, its parent (a cost centre's parent is another
+      cost centre or the top level), its category for a cost centre, three
+      yes-or-no allocation flags for a cost category, and the Tally identifier
+      and alteration number of each. Names, parents and categories are
+      shortened under `mask_parties`; the flags are not names. In the answers
+      captured they carry no amounts and no narrations. How a voucher was
+      allocated to a cost centre is not read.
     - The list of bill-wise ledgers waiting for your approval sends each
       ledger's name (shortened under `mask_parties`), the date, voucher type,
       side and amount of each of its rows with its transaction label, its totals

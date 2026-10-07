@@ -9572,8 +9572,8 @@
   "by": "author",
   "what": "related_parties_cl23: XCL-1 fires at the tolerance",
   "file": "src/related_parties_cl23.rs",
-  "from": "        if gap > TOLERANCE_PAISE {",
-  "to": "        if gap >= TOLERANCE_PAISE {"
+  "from": "        if gap > TOLERANCE_PAISE {\n            out.push(format!(\n                \"XCL-1: {} = {paid}p",
+  "to": "        if gap >= TOLERANCE_PAISE {\n            out.push(format!(\n                \"XCL-1: {} = {paid}p"
  },
  {
   "id": "RP-13",
@@ -9660,8 +9660,8 @@
   "by": "author",
   "what": "related_parties_cl23: XCL-1 never compares a published opening or closing payable",
   "file": "src/related_parties_cl23.rs",
-  "from": "                if published != recomputed {",
-  "to": "                if published != recomputed && false {"
+  "from": "                if gap > TOLERANCE_PAISE {\n                    out.push(format!(\n                        \"XCL-1: {id} = {published}p",
+  "to": "                if gap > TOLERANCE_PAISE && false {\n                    out.push(format!(\n                        \"XCL-1: {id} = {published}p"
  },
  {
   "id": "RP-24",

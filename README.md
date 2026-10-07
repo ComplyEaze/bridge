@@ -75,7 +75,7 @@ with no figures, to a log on this computer.
 | `verify_import` | Reads back a batch you imported by hand in TallyPrime | Proof files and status records on this computer |
 | `voucher_presence` | Which proposed vouchers are already in the book | Nothing |
 | `voucher_schema` | The voucher-file format, without asking TallyPrime | Nothing |
-| `vouchers` | The vouchers in a period, optionally searched by voucher number, reference, narration or amount, or summarised by ledger, month or voucher type (search and summaries checked once on a synthetic book of 67 vouchers, not on a large book) | Nothing |
+| `vouchers` | The vouchers in a period. Search by voucher number, reference, narration or amount, and summaries by ledger, month or voucher type, are in the next build and not in 0.4.2 (checked once on a synthetic book of 67 vouchers, not on a large book) | Nothing |
 
 With posting turned on in the extension, two more appear: `post_import` posts one saved voucher after you approve it in a
 ComplyEaze Bridge window, and `acknowledge_post_review` asks you, in its own window, to record that you reviewed a posted voucher
@@ -88,13 +88,18 @@ whose ledger now points to a different master.
   tell whether that local port is forwarded to another machine; do not forward
   one across the internet. The Tally connection sends nothing to a ComplyEaze
   server.
-- **Your AI provider sees what the assistant reads**, just as it sees the
-  rest of the conversation: company names, party names, amounts and party
-  GSTINs, and, when it asks for them, details such as PAN and bank account
-  numbers. You can
-  mask party names or drop narration. Neither setting hides amounts, company
-  names, or PAN and GSTIN numbers. See
-  *Before you use it with client data* below.
+- **Your AI provider sees what the assistant reads**, just as it sees the rest of
+  the conversation, including company, party and ledger names, amounts, dates,
+  narrations, references, GSTINs and, when it reads ledger details, PAN, bank
+  account numbers, IFSC, MSME or Udyam registration numbers, email, phone and
+  address, and, when it builds a voucher file, that file's local path (which can
+  include your computer user name). The setting takes one value, not both:
+  shorten party and ledger names and bank account numbers to their first two and
+  last two characters (four or fewer become “…”), or drop narrations. Neither
+  hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration
+  numbers, contact details or references, and a shortened name can still be
+  identified, not least from the GSTIN or PAN sent beside it. See *Before you
+  use it with client data* below.
 - **Posting is off by default in the extension.** If you installed an
   earlier version, check the setting: an earlier default may still be saved as
   on. When you turn posting on, each voucher waits for your approval in a
@@ -311,13 +316,19 @@ See [Security and privacy](./docs/security-and-privacy.md).
 ## Before you use it with client data
 
 **One thing to understand before you use it.** When you ask an AI assistant for
-financial data through Bridge, the assistant's provider sees what it reads —
-company names, party names, amounts and party GSTINs, and, when it asks for
-them, details such as PAN and bank account numbers. That is a property of using a
-hosted assistant, not of Bridge. Bridge can mask party names or drop narration first
-(`BRIDGE_AGENT_REDACTION`), but **neither setting removes amounts, company
-names, or PAN and GSTIN numbers** — figures always go with the answer. Decide this
-deliberately for client data.
+financial data through Bridge, the assistant's provider sees what it reads,
+including company, party and ledger names, amounts, dates, narrations,
+references, GSTINs and, when it reads ledger details, PAN, bank account numbers,
+IFSC, MSME or Udyam registration numbers, email, phone and address, and, when it
+builds a voucher file, that file's local path (which can include your computer
+user name). That is a property of using a hosted assistant, not of Bridge.
+ComplyEaze Bridge can, before sending, shorten party and ledger names and bank
+account numbers to their first two and last two characters (four or fewer become
+“…”), or drop narrations (`BRIDGE_AGENT_REDACTION` takes one value, not both).
+**Neither hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam
+registration numbers, contact details or references, and a shortened name can
+still be identified, not least from the GSTIN or PAN sent beside it** — figures
+always go with the answer. Decide this deliberately for client data.
 
 ## What it costs
 
@@ -407,15 +418,18 @@ of the Claude Desktop extension with the [installation guide](./docs/agent/INSTA
 use, the contributor quick start below builds the desktop app; to run the MCP
 server from source, follow the [source MCP setup](./docs/agent/README.md).
 
-Before requesting financial data through an MCP client, the client may send the selected
-Tally result to its AI provider, including company
-identity, party or open-bill details, amounts and party GSTINs, and, when asked
-for, details such as PAN and bank account numbers. Source installations default
-to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties` or `drop_narration`
-before launch when that better fits the workflow. These settings mask party
-names or drop narration; they do not remove amounts, company names, or PAN and
-GSTIN numbers. The package installation
-settings expose the same choices.
+Before requesting financial data through an MCP client, the client may send the
+selected Tally result to its AI provider, including company identity, party or
+open-bill details, amounts, dates, narrations, references, GSTINs and, when it
+reads ledger details, PAN, bank account numbers, IFSC, MSME or Udyam
+registration numbers, email, phone and address, and, when it builds a voucher
+file, that file's local path (which can include your computer user name). Source
+installations default to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties`
+or `drop_narration` (one value, not both) before launch when that better fits
+the workflow. These settings shorten party and ledger names and bank account
+numbers or drop narrations; they do not hide amounts, company names, PAN, GSTIN,
+IFSC, MSME or Udyam registration numbers, contact details or references. The
+package installation settings expose the same choices.
 
 For a first result, run `tally_status` to check that TallyPrime and its Licensed
 or Education mode are observed, then list the loaded companies. Select a

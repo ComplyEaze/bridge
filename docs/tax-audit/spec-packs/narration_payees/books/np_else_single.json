@@ -1,0 +1,193 @@
+{
+ "comment": "The single-sum limit on a debit to another ledger; every payment from Bank A. Each payee has 500000 paise of Wages and one payment booked to Driver Advances: ALPHA TRADERS (k01, k02) 3000000, exactly the limit: not listed. BETA STORES (k11, k12) 3000001: listed. GAMMA MILLS (k21, k22) 2999999: not listed. elsewhere_over_total is 3000001.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_else_single-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_else_single-001"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_else_single-002"
+  },
+  {
+   "name": "Driver Advances",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-np_else_single-003"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10500000,
+   "closing": -10500000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 1500000,
+   "credit": 0,
+   "closing": 1500000
+  },
+  {
+   "ledger": "Driver Advances",
+   "opening": 0,
+   "debit": 9000000,
+   "credit": 0,
+   "closing": 9000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "k01",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "k02",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "k11",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-WAGES",
+   "lines": [
+    [
+     "Wages",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "k12",
+   "date": "2025-06-03",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     3000001
+    ],
+    [
+     "Bank A",
+     -3000001
+    ]
+   ]
+  },
+  {
+   "guid": "k21",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "k22",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     2999999
+    ],
+    [
+     "Bank A",
+     -2999999
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

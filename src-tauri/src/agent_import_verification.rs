@@ -38,6 +38,7 @@ pub(super) fn parse_import_voucher_rows(
                 | "change_row_core_field_invalid"
                 | "voucher_date_invalid"
                 | "voucher_effective_date_invalid"
+                | "voucher_reference_date_invalid"
                 | "voucher_accounting_state_not_observed" => "import_verification_export_invalid",
                 "change_row_identity_invalid"
                 | "voucher_source_identity_invalid"

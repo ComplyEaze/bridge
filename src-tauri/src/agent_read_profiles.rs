@@ -38,9 +38,14 @@ use bridge_tally_core::TallyDate;
 /// matches on tag name only), and `PARTYGSTIN` was structurally present but
 /// empty on every voucher in that capture — its population is unverified,
 /// not its presence.
+///
+/// `REFERENCEDATE` (#1257) is requested for the same reason, added last. A live read of the
+/// synthetic book `BRIDGE SHAPE LAB` with this word added returned the element on every voucher
+/// (`TYPE="Date"`, empty on 66 of 67 and `YYYYMMDD` on one), and the answers were byte-equal to the
+/// same reads without it apart from the elements (protocol reference §8.2f).
 const AGENT_VOUCHER_FETCH: &str = "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
 GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
-REFERENCE,ISINVOICE,PARTYGSTIN";
+REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE";
 
 /// The FETCH list for `ledger_movement`, which DISCARDS bill allocations.
 ///

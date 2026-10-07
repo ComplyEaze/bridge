@@ -20,9 +20,11 @@
 //
 // Only uncompressed executables prove anything. A .dmg, .msi, .zip, .mcpb or
 // installer compresses its contents, so a clean scan of one would pass
-// whatever it holds; those are refused rather than scanned.
+// whatever it holds; those are refused rather than scanned. A file is refused by
+// its name, and also by its first bytes (a gzip, zip, zstd, xz, bzip2 or 7z
+// signature) wherever it sits, whatever it is called (#839).
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,6 +32,16 @@ export const SEAM_MARKER = "bridge-test-approval-seam-5f1c9e7a";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const COMPRESSED = /\.(dmg|msi|zip|mcpb|gz|tgz|xz|bz2|7z|pkg|appimage|deb|rpm)$|-setup\.exe$/i;
+// What a compressed file starts with, whatever it is called. The list is not exhaustive: the exact executables a bundle
+// is built from are scanned separately (ci.yml, the bundle smoke step), which does not depend on this list.
+const CONTAINER_SIGNATURES = [
+  ["gzip", [0x1f, 0x8b]],
+  ["zip", [0x50, 0x4b, 0x03, 0x04]],
+  ["zstd", [0x28, 0xb5, 0x2f, 0xfd]],
+  ["xz", [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00]],
+  ["bzip2", [0x42, 0x5a, 0x68]],
+  ["7z", [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]],
+];
 const SHIPPED_BINARIES = ["bridge", "bridge_mcp"];
 
 export function holdsMarker(path) {
@@ -54,6 +66,33 @@ function refuseCompressed(path) {
   }
 }
 
+/** The family of container `path` starts with, or undefined: read from the first bytes, never from the name. */
+function containerSignature(path) {
+  const head = Buffer.alloc(6);
+  const descriptor = openSync(path, "r");
+  let length;
+  try {
+    length = readSync(descriptor, head, 0, head.length, 0);
+  } finally {
+    closeSync(descriptor);
+  }
+  return CONTAINER_SIGNATURES.find(
+    ([, signature]) => length >= signature.length && signature.every((byte, index) => head[index] === byte),
+  )?.[0];
+}
+
+/** Throws, with code `compressed_artefact`, if `path` names a compressed archive or starts like one. */
+function refuseCompressedFile(path) {
+  refuseCompressed(path);
+  const family = containerSignature(path);
+  if (family) {
+    throw Object.assign(
+      new Error(`${path} is compressed (it starts like a ${family} file): scan the executables it was built from instead`),
+      { code: "compressed_artefact" },
+    );
+  }
+}
+
 /**
  * The files among `paths` that hold the marker. Refuses compressed archives, both
  * as arguments and wherever a walked directory holds one: an archive's bytes are
@@ -69,7 +108,7 @@ export function markedFiles(paths) {
     files.push(...filesUnder(path));
   }
   if (files.length === 0) throw new Error(`no regular files under ${paths.join(", ")}`);
-  files.forEach(refuseCompressed);
+  files.forEach(refuseCompressedFile);
   return files.filter(holdsMarker);
 }
 

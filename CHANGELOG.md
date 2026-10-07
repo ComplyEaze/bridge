@@ -18,6 +18,11 @@ These changes are in source and not yet in a published build.
 
 **New**
 
+- `vouchers`, `changes` and the sales and purchase registers now return `reference_date`, a voucher's
+  `REFERENCEDATE` (`YYYYMMDD`), where the voucher has one (#1257). Checked once against a
+  live TallyPrime 7.1 on one synthetic book: the element came back on every voucher, empty on all but one
+  and filled on that one (a Purchase) and on a voucher keyed for the check; it was not checked on a sale or on
+  another voucher type, and a value that is not a date refuses the read.
 - `vouchers` and the `outstandings` party detail now reach a ledger by either
   spelling of its name when Tally's own name for it differs in case or symbols from the
   spelling its vouchers carry (26 of 4,017 ledgers in a separate census of 13 books,
@@ -51,14 +56,34 @@ These changes are in source and not yet in a published build.
 
 - `purchase_register` and `sales_register` now take their `state` from the rule
   `vouchers` uses. A non-empty window is `complete` only when every voucher read
-  was checked against a separate count of the window; a window nothing counted,
-  which only a book small enough to need no census gets (a few dozen vouchers), is
-  `partial` with `reason` `nonempty_window_unqualified`, and its rows are still
-  returned. Before, the registers called such a window `complete` on the
-  company marks and the ledger masters alone, so the same window had two answers.
-  A row's `status` is unchanged. Not measured live: a window admitted against a
-  census through the registers on a large book; the change sends no new request,
-  it uses the census the read already makes (#1031).
+  was checked against a separate count of the window. Before, the registers called
+  such a window `complete` on the company marks and the ledger masters alone, so
+  the same window had two answers. A row's `status` is unchanged. Not measured live:
+  a window admitted against a census through the registers on a large book (#1031).
+- `vouchers`, `voucher_presence`, `purchase_register` and `sales_register` now
+  count a small book's window too (a company with a few dozen vouchers or fewer),
+  where they used to read it without a count. A nonempty window of such a book can
+  now be `complete`, and `voucher_presence` can say `absent` for it, which it
+  could not before. The cost is one more read of the book's vouchers: six more
+  requests to Tally on every call that counts (a `vouchers` call on a small book
+  goes from 16 to 22 requests, `voucher_presence` from 28 to 34); the added time
+  was measured on windows of one voucher, on debug builds, at 0.5 to 2 seconds a
+  call (one run of the day and week calls, three of the presence call), and not
+  on a larger book. `absent` still needs a window proven complete, nothing
+  resembling the proposal, the voucher number of a `manual` type, and a party that was
+  supplied and compared completely: a proposal with no party (a Journal), no manual
+  number, or a party whose comparison was cut short reads `possibly_present` with its
+  reason, however complete the window. A voucher created, altered or deleted between the
+  count and the read now refuses a small book as `voucher_window_part_not_admitted`
+  (cause `part_census_mismatch`), as a large one always did. The Ledger Entries
+  screen reads through `vouchers`' window read, so it counts too and meets the
+  same refusal. An empty window of a small book is answered as before, by the
+  check of an empty window: the count adds its requests there and changes
+  nothing else. `ledger_movement`, `verify_import`, `outstandings` and that check
+  are unchanged. Not measured against a live book: what Tally does when it cannot serve the
+  count, which refuses the call as `volume_unestimated` where the small book used
+  to answer `partial` (it served the count every time in the run above), and a
+  larger book (#1029).
 - `profit_and_loss` now compares Tally's `Cost of Sales :` heading with the
   derived cost of sales (Purchase Accounts plus Direct Expenses) even when the
   heading reads zero or empty. Over a non-zero cost of sales such a heading
@@ -115,6 +140,22 @@ These changes are in source and not yet in a published build.
   found and counted as before and none is chosen for you; when more than 25 are
   found, the ones left off the list are the ledgers holding only some of the
   words before those holding all of them (#1076).
+- Five lists of a batch's ledgers in refusals now come in the batch's own
+  order, not in name order. `masters` of `masters_not_exact`, `ledger_twins`
+  and `ledgers_changed` list a ledger where the batch first names it;
+  `refused_ledgers` of `cash_bank_ledger_not_established` lists a ledger where
+  one of its entries is first refused, and `refused_ledgers` of the cash-answer
+  refusals (in `build_import_xml` and `post_import`) where an answer first
+  names it. The order is the same whether or not party names are masked. The
+  same ledgers are found and refused as before.
+  Where a list is cut (`ledgers_changed` names eight; a small response cap
+  leaves rows of `refused_ledgers` out), which ledgers are named, and how many
+  `refused_ledgers_omitted` counts, can differ from before. The ledgers a
+  `post_import` or `verify_import` answer names in `masters_after_post.ledgers`
+  come in the same order, where the batch first names each, in the answer and
+  in the proof saved from it (the desktop screen names the first eight of
+  them); the recorded verdict, and the review dialog that reads it, keep the
+  order they were recorded in. Other lists are unchanged (#1234).
 
 ## [0.4.2] - 2026-10-03
 
@@ -399,7 +440,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   run showed (such as cess), an invoice of another shape than the one run (for
   example several goods lines), a sale typed on Tally's screen,
   accounting-invoice mode, a post-dated sale, a `REFERENCE` or a filled
-  `PARTYGSTIN` on a sale, a `REFERENCEDATE` (it is not returned), or a currency
+  `PARTYGSTIN` on a sale, a `REFERENCEDATE` on a sale, or a currency
   other than the book's base. The invoice it was replayed on was imported by
   this project. Its `complete` state rests on the company marks and the ledger
   masters reading the same before and after, not on a separate voucher count

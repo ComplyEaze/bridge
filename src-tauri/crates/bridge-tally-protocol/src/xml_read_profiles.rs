@@ -883,7 +883,7 @@ pub const AUDIT_COMPANY_FETCH: [&str; 4] = ["GUID", "NAME", "BOOKSFROM", "ISINTE
 
 /// FETCH of the tally-read v1 `ledgers` part (`AuditLedgersV1`).
 ///
-/// The fields the audit consumers were recorded reading (Lane B's recorded
+/// The fields the audit consumers were recorded reading (the recorded
 /// Python reads and the crate's traced reads of the same parts, 2026-09-21).
 /// It is deliberately narrower
 /// than the party-master workbook's list: no bank details, IFSC, e-mail,

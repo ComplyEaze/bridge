@@ -878,7 +878,14 @@ impl Server {
         // be, and this read uses the entry wildcard: it is bounded like any
         // other windowed read rather than trusted to be small.
         let wider = self
-            .read_entry_wildcard_window(identity, company, &wider_from, &wider_to, known_marks)
+            .read_entry_wildcard_window(
+                identity,
+                company,
+                &wider_from,
+                &wider_to,
+                known_marks,
+                SmallBooks::Skip,
+            )
             .await?;
         let mut evidence = wider.all_evidence();
         let wider_rows = wider.rows;
@@ -916,9 +923,10 @@ impl Server {
 
 impl Server {
     /// A bounded read of the entry-wildcard voucher window (`render_agent_vouchers`)
-    /// shared by `vouchers`, `voucher_presence` and the empty-window
-    /// corroboration. Rows are parsed per part and returned in date order;
-    /// validating them is the caller's job, over the union.
+    /// shared by `voucher_presence` and the empty-window corroboration. Rows
+    /// are parsed per part and returned in date order; validating them is the
+    /// caller's job, over the union. `small_books` is whether a book that fits
+    /// one request is counted first (#1029).
     pub(super) async fn read_entry_wildcard_window(
         &self,
         identity: &VerifiedCompanyIdentity,
@@ -926,6 +934,7 @@ impl Server {
         from: &TallyDate,
         to: &TallyDate,
         known_marks: Option<CompanyMarks>,
+        small_books: SmallBooks,
     ) -> Result<WindowReadOutcome<Value>, ToolFailure> {
         self.read_entry_window_shaped(
             identity,
@@ -934,6 +943,7 @@ impl Server {
             to,
             known_marks,
             VoucherReadShape::EntryWildcard,
+            small_books,
         )
         .await
     }
@@ -956,7 +966,7 @@ impl Server {
             to,
             shape,
             WindowPlanSource::Estimate { known_marks: None },
-            WindowReadLimits::for_shape(shape),
+            WindowReadLimits::for_shape(shape).counting_small_books(),
             |xml| match composites {
                 VoucherComposites::Withhold => {
                     parse_agent_rows_withholding(xml, identity.company_guid())
@@ -970,6 +980,7 @@ impl Server {
 
     /// [`Self::read_entry_wildcard_window`] in either entry-wildcard shape:
     /// plain, or with each row's voucher type resolved (bridge#625).
+    #[allow(clippy::too_many_arguments)]
     pub(super) async fn read_entry_window_shaped(
         &self,
         identity: &VerifiedCompanyIdentity,
@@ -978,7 +989,13 @@ impl Server {
         to: &TallyDate,
         known_marks: Option<CompanyMarks>,
         shape: VoucherReadShape,
+        small_books: SmallBooks,
     ) -> Result<WindowReadOutcome<Value>, ToolFailure> {
+        let limits = WindowReadLimits::for_shape(shape);
+        let limits = match small_books {
+            SmallBooks::Skip => limits,
+            SmallBooks::Count => limits.counting_small_books(),
+        };
         self.read_voucher_window(
             identity,
             company,
@@ -986,7 +1003,7 @@ impl Server {
             to,
             shape,
             WindowPlanSource::Estimate { known_marks },
-            WindowReadLimits::for_shape(shape),
+            limits,
             |xml| parse_agent_rows(xml, identity.company_guid()),
         )
         .await

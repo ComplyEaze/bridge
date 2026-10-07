@@ -793,6 +793,14 @@ impl Server {
             let mut report = masters_for_payload(&payload, &catalogue)?;
             annotate_folded_twins(&mut report, &requested_names, ledger_masters.catalog().parents());
             if report.iter().any(|value| value["match_state"] != "exact") {
+                let report = in_batch_order(
+                    requested_names.iter().zip(report).collect(),
+                    &payload.vouchers,
+                    |(name, _)| name.as_str(),
+                )
+                .into_iter()
+                .map(|(_, master)| master)
+                .collect::<Vec<_>>();
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                         "state":"refused", "reason":"masters_not_exact", "masters":report,
@@ -804,7 +812,11 @@ impl Server {
                     truncated: false,
                 });
             }
-            let twins = folded_twins(&requested_names, ledger_masters.catalog().parents());
+            let twins = in_batch_order(
+                folded_twins(&requested_names, ledger_masters.catalog().parents()),
+                &payload.vouchers,
+                |twins| twins.requested.as_str(),
+            );
             if !twins.is_empty() {
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
@@ -1689,7 +1701,8 @@ impl Server {
             };
             let mut proof = proof;
             if let Some(masters) = &masters_after_post {
-                proof["masters_after_post"] = masters.clone();
+                proof["masters_after_post"] =
+                    served_masters_verdict(masters.clone(), &line.vouchers);
             }
             // Whether a person's recorded review still covers this doubt and
             // this voucher (#239). Beside the verdict, never instead of it.
@@ -3116,7 +3129,10 @@ fn cash_bank_refusals(
     max_bytes: usize,
 ) -> CashBankRefusals {
     let mut classified = BTreeMap::<&str, CashBankState>::new();
-    let mut refused = BTreeMap::<(&str, &'static str), Value>::new();
+    // One row per ledger and requirement, in the order the batch's legs are
+    // first refused, never by name, with or without masking. The order also
+    // decides which rows the budget below keeps.
+    let mut refused = Vec::<((&str, &'static str), Value)>::new();
     let mut legs = 0_usize;
     for (voucher, side, ledger, requirement) in constrained_legs(payload) {
         let state = classified
@@ -3132,7 +3148,11 @@ fn cash_bank_refusals(
             LegRequirement::Money => "cash_bank",
             LegRequirement::Counterparty => "not_cash_bank",
         };
-        refused.entry((ledger, requires)).or_insert_with(|| {
+        if refused.iter().any(|(row, _)| *row == (ledger, requires)) {
+            continue;
+        }
+        refused.push((
+            (ledger, requires),
             json!({
                 "ledger": party_name(ledger),
                 "requires": requires,
@@ -3142,13 +3162,14 @@ fn cash_bank_refusals(
                 // One voucher a caller can open to see the problem, rather
                 // than every voucher that repeats it.
                 "first_bridge_txn_id": voucher.bridge_txn_id,
-            })
-        });
+            }),
+        ));
     }
     let mut budget = refusal_diagnostic_budget(max_bytes);
     let distinct = refused.len();
     let ledgers = refused
-        .into_values()
+        .into_iter()
+        .map(|(_, row)| row)
         // Filter rather than stop at the first row that will not fit: an
         // oversized row is one long ledger name, not a reason to discard every
         // shorter refusal behind it. Budget is only spent on rows that are
@@ -3473,14 +3494,15 @@ fn requested_master_report(
 /// cash-in-hand answer's ledger outside Cash-in-Hand
 /// (`cash_ledger_not_cash_in_hand`), else another answer's ledger under
 /// Suspense A/c (`cash_answer_ledger_in_suspense`). One row per ledger with the
-/// reserved group it reaches, bounded like the cash/bank refusal.
+/// reserved group it reaches, in the order the answers first name them and
+/// never by name, bounded like the cash/bank refusal.
 fn answered_ledger_refusals(
     required: &[super::bank_statement::AnsweredCashLedger],
     observed: &ObservedMasters,
     max_bytes: usize,
 ) -> Option<(&'static str, Vec<Value>, usize)> {
-    let mut not_cash = BTreeMap::<&str, Value>::new();
-    let mut in_suspense = BTreeMap::<&str, Value>::new();
+    let mut not_cash = Vec::<(&str, Value)>::new();
+    let mut in_suspense = Vec::<(&str, Value)>::new();
     for need in required {
         let state = observed.classify(&need.ledger);
         let (refused, requires) = if need.cash_in_hand && !state.is_cash_in_hand() {
@@ -3490,9 +3512,12 @@ fn answered_ledger_refusals(
         } else {
             continue;
         };
-        refused.entry(need.ledger.as_str()).or_insert_with(|| {
-            refused_ledger_row(&need.ledger, requires, &state, Some(&need.bridge_txn_id))
-        });
+        if !refused.iter().any(|(ledger, _)| *ledger == need.ledger) {
+            refused.push((
+                need.ledger.as_str(),
+                refused_ledger_row(&need.ledger, requires, &state, Some(&need.bridge_txn_id)),
+            ));
+        }
     }
     let (reason, refused) = if !not_cash.is_empty() {
         ("cash_ledger_not_cash_in_hand", not_cash)
@@ -3502,8 +3527,10 @@ fn answered_ledger_refusals(
         return None;
     };
     let mut budget = refusal_diagnostic_budget(max_bytes);
-    let (rows, omitted) =
-        super::bank_statement::bounded(refused.into_values().collect(), &mut budget);
+    let (rows, omitted) = super::bank_statement::bounded(
+        refused.into_iter().map(|(_, row)| row).collect(),
+        &mut budget,
+    );
     Some((reason, rows, omitted))
 }
 
@@ -3555,6 +3582,41 @@ fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
     })
 }
 
+/// `rows` in the order the batch first names each row's ledger. A list of the
+/// batch's ledgers goes out in this order and never by name, with or without
+/// masking. A ledger the batch does not name goes last, in its incoming order:
+/// the lists built from the batch hold none, and a recorded verdict names the
+/// ledgers the batch was bound to.
+fn in_batch_order<T>(
+    mut rows: Vec<T>,
+    vouchers: &[ImportVoucher],
+    ledger: impl for<'a> Fn(&'a T) -> &'a str,
+) -> Vec<T> {
+    rows.sort_by_cached_key(|row| {
+        vouchers
+            .iter()
+            .flat_map(|voucher| &voucher.entries)
+            .position(|entry| entry.ledger == ledger(row))
+            .unwrap_or(usize::MAX)
+    });
+    rows
+}
+
+/// A masters verdict as an answer carries it: the ledgers it names in the order
+/// the batch names them (`in_batch_order`), not the order they were recorded
+/// in. The recorded verdict is left as it was saved: a recorded review is bound
+/// to its bytes.
+fn served_masters_verdict(mut verdict: Value, vouchers: &[ImportVoucher]) -> Value {
+    if let Some(ledgers) = verdict.get_mut("ledgers").and_then(Value::as_array_mut) {
+        *ledgers = in_batch_order(std::mem::take(ledgers), vouchers, |ledger| {
+            ledger.as_str().unwrap_or_default()
+        });
+    }
+    verdict
+}
+
+/// The ledgers a batch names, each once, in name order. A list of them sent to
+/// the caller is put `in_batch_order` first.
 fn requested_ledger_names(payload: &ImportPayload) -> Vec<String> {
     payload
         .vouchers

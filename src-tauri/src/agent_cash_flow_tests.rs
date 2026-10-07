@@ -658,7 +658,8 @@ async fn the_four_outcomes_of_a_cash_flow_read_the_same_under_every_redaction_an
         names.contains(&"Ageing Customer A".to_string()),
         "{names:?}"
     );
-    let outcomes: [(&str, fn() -> Vec<ScenarioPlan>, &str); 4] = [
+    type Scripted = fn() -> Vec<ScenarioPlan>;
+    let outcomes: [(&str, Scripted, &str); 4] = [
         ("tied", || plans("-4950.00"), "observed"),
         ("differs", || plans("-4949.00"), "not_established"),
         (

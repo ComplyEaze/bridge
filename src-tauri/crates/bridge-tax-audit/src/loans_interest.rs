@@ -3526,7 +3526,9 @@ narrated with ACH, NACH, ECS or EMI (each has a notice)."
 /// balanced voucher on the loan alone. The tie adds the TDS deducted on the loan, less what the
 /// taken and repaid totals already hold of it (`tds_in_principal_<tag>`, published only where
 /// there is some): a repayment booked net of TDS carries its deduction in its loan line
-/// (bridge#1259 item 2).
+/// (bridge#1259 item 2). Its re-derivation reads vouchers by GUID, as the reference does: on a GUID
+/// a voucher outside the taken and repaid rows shares, it reads that voucher too and the line can
+/// fire while the tie holds. Refs go in (id, label) order; the reference's, per id, is not fixed.
 pub fn check_invariants(book: &Book, result: &TestResult) -> Result<Vec<String>> {
     check_invariants_with(book, result, NET_REVERSALS)
 }

@@ -1723,11 +1723,40 @@ impl Server {
         company_name: &str,
     ) -> Result<(Vec<super::ledger_candidates::CatalogueLedger>, Evidence), ToolFailure> {
         let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
-        let ledgers = catalogue
-            .spellings()
-            .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
-            .collect();
-        Ok((ledgers, evidence))
+        Ok((resolvable_ledgers(&catalogue), evidence))
+    }
+
+    /// The same catalogue read, with each ledger's immediate parent group as Tally returned it
+    /// (`None` when it returned none), for the group summaries of `vouchers` (#1230).
+    pub(super) async fn read_ledger_parents(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(Vec<(String, Option<String>)>, Evidence), ToolFailure> {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        Ok((owned_parents(&catalogue), evidence))
+    }
+
+    /// One catalogue read that serves both a typed ledger name (the spellings it resolves against) and
+    /// the group placements (each ledger's parent), so a group summary with `ledger` reads the list once.
+    pub(super) async fn read_resolvable_ledgers_with_parents(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<
+        (
+            Vec<super::ledger_candidates::CatalogueLedger>,
+            Vec<(String, Option<String>)>,
+            Evidence,
+        ),
+        ToolFailure,
+    > {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        Ok((
+            resolvable_ledgers(&catalogue),
+            owned_parents(&catalogue),
+            evidence,
+        ))
     }
 
     async fn read_v1_catalogue(
@@ -1779,10 +1808,11 @@ impl Server {
         ))
     }
 
-    /// The company's group tree, read only when a payload needs one leg
-    /// classified as cash or bank. A ledger row carries a single `PARENT` hop
-    /// and no `PARENTSTRUCTURE`, so the group identities live here.
-    async fn read_group_collection(
+    /// The company's group tree, read when a payload needs one leg
+    /// classified as cash or bank and for the group summaries of `vouchers`. A
+    /// ledger row carries a single `PARENT` hop and no `PARENTSTRUCTURE`, so the
+    /// group identities live here.
+    pub(super) async fn read_group_collection(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
@@ -4164,3 +4194,23 @@ fn served_verification_page(persisted: &[u8], offset: usize) -> Result<(Value, V
 #[cfg(test)]
 #[path = "agent_import_file_tests.rs"]
 mod file_tests;
+
+/// The catalogue's ledgers as a request can reach them: each row spelling with its stored name (#1085).
+fn resolvable_ledgers(
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) -> Vec<super::ledger_candidates::CatalogueLedger> {
+    catalogue
+        .spellings()
+        .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
+        .collect()
+}
+
+/// Each ledger of a catalogue with its immediate parent group as Tally returned it (#1230).
+fn owned_parents(
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) -> Vec<(String, Option<String>)> {
+    catalogue
+        .parents()
+        .map(|(ledger, parent)| (ledger.to_string(), parent.map(str::to_string)))
+        .collect()
+}

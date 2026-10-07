@@ -68,10 +68,13 @@ mod voucher_search;
 #[path = "agent_vouchers.rs"]
 mod vouchers;
 use voucher_search::VoucherSearch;
+#[path = "agent_voucher_groups.rs"]
+mod voucher_groups;
 #[path = "agent_voucher_summary.rs"]
 mod voucher_summary;
 #[cfg(test)]
 use outstandings::*;
+use voucher_groups::Placements;
 use voucher_summary::{SummaryGroup, SummaryRequest};
 #[path = "agent_movement.rs"]
 mod movement;
@@ -495,6 +498,9 @@ struct ReadDetail {
     /// The report kind and 1-based row of a Bills report whose row could not be
     /// read (bridge#1091). A word and a number: never the bill's party or reference.
     bill_row: Option<BillRowRef>,
+    /// The ledger a group summary could not place (#1230). Shown as a party name, so `mask_parties`
+    /// masks it; a group is never named (its name is in the book's groups, and only the ledger is known).
+    unplaced_ledger: Option<String>,
 }
 
 /// See [`ReadDetail::bill_row`].
@@ -975,6 +981,39 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              and no request was sent. Ask for a 31 March `as_of`; retrying the same date \
              refuses again. Only the period ending 31 March 2026 has been measured for \
              stock: another year's 31 March is read, but its figures are unmeasured.",
+        ),
+        "summary_group_unresolved" => Some(
+            "A ledger in this window could not be placed under a group, so no group total was \
+             given: a total that is short of an entry it could not place would mislead. `ledger` \
+             names the ledger and `cause` says why: `no_parent` (the book gives it no parent \
+             group, or one ComplyEaze Bridge will not carry: a name with a control character or \
+             over 1,024 bytes), `group_absent` (its parent group is not in the group list), \
+             `group_name_repeated`, `cycle`, `exhausted` (its chain is longer than the walk allows), \
+             `reserved_name_missing`, `top_group_not_under_root` (the top group of its chain has \
+             no parent, or none that is the root) or `ledger_not_in_catalogue` (the ledger list \
+             does not hold it). Only the first such ledger is named: correct it and call again. Show the person the \
+             ledger and the cause. Call ledger_masters for that ledger's `parent` and masters with \
+             kind groups for the groups, and ask them to correct it in Tally; or summarise by \
+             ledger, month or voucher_type instead. Retrying this call refuses again until the \
+             book is corrected.",
+        ),
+        "summary_group_book_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) is above the limit a \
+             group summary reads the ledger list at (`size.limit_master_alter_id`), so no request \
+             for the ledgers was sent. The limit is provisional and computed, not measured on this \
+             list: 16 MiB, a size chosen here and not verified, over an estimate of 1,400 bytes a \
+             ledger. A response past the transport's response cap is cut off mid-read, which can \
+             leave Tally's gateway unable to answer (#637); this limit is about half of that cap. \
+             The mark is an UPPER BOUND on ledgers, since every other master raises it too, so a \
+             company with fewer ledgers may be refused. Tell the person the limit is provisional. \
+             Summarise by ledger, month or voucher_type instead, and read ledger_masters for each \
+             ledger's group. Retrying this call refuses again.",
+        ),
+        "group_snapshot_drifted" => Some(
+            "A ledger's group, or a group's place in the tree, changed in Tally while this call \
+             was being read, so the groups read before the window and after it differ and no \
+             group total was given. Nothing is wrong with the book: ask the person whether \
+             anyone is editing it, then call this again once they have stopped.",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(
@@ -1841,15 +1880,21 @@ impl Server {
                 }
                 // The partial read's own reason, under the same budget rule:
                 // a few codes, kept beside the refusal's code.
-                let (incomplete_read, planned_reads, bill_row) = read_detail
+                let (incomplete_read, planned_reads, bill_row, unplaced_ledger) = read_detail
                     .map(|detail| {
                         (
                             detail.incomplete_read,
                             detail.planned_reads,
                             detail.bill_row,
+                            detail.unplaced_ledger,
                         )
                     })
                     .unwrap_or_default();
+                if let Some(ledger) = unplaced_ledger {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["ledger"] = party_name_value(ledger);
+                    }
+                }
                 if let Some(bill_row) = bill_row {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["bill_row"] = json!({"report": bill_row.report, "row": bill_row.row});

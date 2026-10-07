@@ -38,11 +38,19 @@ These changes are in source and not yet in a published build.
   list is the primary language (#1085).
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
-  `amount`), and can add a window up by ledger, month or voucher type
-  (`summarise_by`), with debit, credit and voucher counts per bucket and the
-  cancelled, optional and entry-less vouchers counted apart. Both run on the
-  rows the window read already holds, so they send no new request to Tally; a
-  zero from a counted window is a checked zero. A narration phrase is refused
+  `amount`), and can add a window up by ledger, month, voucher type, group or
+  primary group (`summarise_by`), with debit, credit and voucher counts per bucket and the
+  cancelled, optional and entry-less vouchers counted apart. Search and the
+  ledger, month and voucher-type summaries run on the rows the window read already
+  holds and send no new request to Tally; the group and primary-group summaries
+  also read the ledger list and the group list, before and after the window. They
+  refuse when any ledger's group chain, or the set of ledgers, changed meanwhile, and
+  when a ledger the window touches cannot be placed, so no entry is left out of a
+  group total, naming the ledger it could not place. A book whose master-alteration
+  mark is above 11,983 (a provisional limit, computed and not measured, about half of what the transport admits for the same list) is refused before the
+  ledger list is read. A `group` summary also
+  gives each group's whole figure, descendants included, as `subtree_totals`, and every
+  row says what it `covers`. A zero from a counted window is a checked zero. A narration phrase is refused
   where narrations are withheld from the assistant. A summary sums post-dated
   vouchers (counted, with the vouchers Tally sent no flag for counted apart) and any
   non-posting voucher type a book uses, and says so in the result. Checked once
@@ -50,7 +58,15 @@ These changes are in source and not yet in a published build.
   equalled the sums over the listed vouchers, the ledger buckets equalled
   `trial_balance` for the same year, and each search returned what the same
   criterion selects from the listing; it did not cover a large book, a memorandum,
-  a reversing journal or a voucher withheld for a foreign-currency amount (#1230).
+  a reversing journal or a voucher withheld for a foreign-currency amount. That check
+  covered search and the ledger, month and voucher-type summaries. A second check on
+  7 October 2026 on the same book read the whole year once as `group` and once as
+  `primary_group`: 12 and 8 buckets over the 64 vouchers that count (a cancelled, an optional and
+  an entry-less voucher left out); every group bucket equalled the ledger buckets added up by the
+  trial balance's own parent column, the 18 `subtree_totals` equalled the trial balance rolled up
+  the group tree, and each call took 64 requests (the window's 34 and the group modes' 30, as counted from the code) and
+  about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
+  read, or a held later page (#1230).
 
 **Safer or fixed**
 

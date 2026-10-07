@@ -2221,6 +2221,14 @@ async fn voucher_read_evidence_uses_utf16_transport_bytes() {
         status_plan(),
         high_water_plan(),
         status_plan(),
+        // The census of the window (#1029), then the window, both of the
+        // captured vouchers.
+        company_plan(),
+        company_plan(),
+        voucher_plan(),
+        status_plan(),
+        voucher_plan(),
+        status_plan(),
         company_plan(),
         company_plan(),
         voucher_plan(),
@@ -2257,16 +2265,18 @@ async fn voucher_read_evidence_uses_utf16_transport_bytes() {
     let expected_bytes = bridge_tally_protocol::encode_tally_xml_request_utf16le(&company_xml)
         .len()
         + bridge_tally_protocol::encode_tally_xml_request_utf16le(high_water_xml).len()
-        + bridge_tally_protocol::encode_tally_xml_request_utf16le(captured_vouchers).len();
+        // The census and the window both serve the captured vouchers.
+        + 2 * bridge_tally_protocol::encode_tally_xml_request_utf16le(captured_vouchers).len();
     assert_eq!(
         response["structuredContent"]["evidence"]["bytes"],
         expected_bytes * 2
     );
     assert_ne!(
         response["structuredContent"]["evidence"]["bytes"],
-        company_xml.len() + high_water_xml.len() + captured_vouchers.len()
+        company_xml.len() + high_water_xml.len() + 2 * captured_vouchers.len()
     );
-    assert_eq!(simulator.finish().expect("simulator result").len(), 16);
+    // 16 before the census (#1029) and its six legs.
+    assert_eq!(simulator.finish().expect("simulator result").len(), 22);
 }
 
 /// `vouchers` over an empty window on a company whose high-water row carries

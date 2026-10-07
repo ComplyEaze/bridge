@@ -44,9 +44,13 @@ creation with `agent_data_dir_encoding_invalid`; no lossy path alias is used.
 Before requesting financial data through an MCP client, the client may send the selected
 Tally result to its AI provider, including company
 identity, party or open-bill details, and amounts. An unset
-`BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` masks party names
-(in `stock_summary` it also masks stock item names and stock-group parents; GUIDs
-and Tally's reserved root stay plain) and `drop_narration` drops narration. Neither setting removes amounts. Set the
+`BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
+names and bank account numbers to their first two and last two characters (a name of
+four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
+and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
+drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
+GSTIN, IFSC, MSME or Udyam registration numbers or contact details, and the bank statement tool's `account_last4` (the last
+four digits of the statement's account number) is sent under every setting. Set the
 environment variable before launch when that better fits the workflow.
 
 On Unix, new data directories use mode `0700`; an existing data directory
@@ -199,8 +203,8 @@ answer was larger than the response limit (#1033); a count that is equal, lower 
 or sizes anything, and the
 result of a counted read says which it was in `ledger_count_cross_check.status` (`matched`,
 `company_count_lower` or `unavailable`, the last meaning the check did not run). Equality was measured
-on three books only (one synthetic with its answer captured in the tree, two real books read by
-another lane and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
+on three books only (one synthetic with its answer captured in the tree, two real books read separately
+and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
 against the rows the read returns, not by this check. A mark
 above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
 `size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the
@@ -857,8 +861,8 @@ or vouchers.
 - **What `state` means.** The response `state` follows the rule `vouchers` and
   `voucher_presence` use (#985, #1031): a non-empty window is `complete` only when
   every voucher read was checked against a separate count of the window (a census,
-  which ComplyEaze Bridge sends unless the book's voucher high-water mark alone
-  proves it small, a few dozen vouchers), and an empty window when its
+  which ComplyEaze Bridge sends for every book that has held a voucher, however
+  few), and an empty window when its
   corroboration read confirmed it. Otherwise it is `partial` with `reason`
   `nonempty_window_unqualified` (or the corroboration's own reason for an empty
   window), and the rows are still returned. Before #1031 the registers called a
@@ -934,10 +938,10 @@ rate or return section, and matches nothing against any portal.
   1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry
   `-1000.00`, each tax entry `-90.00` and the party entry `1180.00`, where a Sales
   row has the sales and tax entries positive and the party entry negative.
-- **The cost varies by book.** The same call sent 96 requests on a book with 8
-  ledgers and one currency and 118 on one with 44 ledgers and two currencies (a
-  voucher census and base-currency reads are added). The result does not report
-  the cost.
+- **The cost varies by book.** A call sends 102 requests on a book with 8
+  ledgers and one currency (96 were recorded before a small book was counted, plus
+  the six the count adds; not measured since) and 118 on one with 44 ledgers and two
+  currencies (base-currency reads are added). The result does not report the cost.
 - **There are two recognised state-side heads.** One is `state_tax` (raw `State Tax`)
   on one measured book and the other `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
   recognised heads for the same side of the tax, so a caller must not look for
@@ -1009,8 +1013,8 @@ covers only the identity and marks reads it sent.
   `earlier_snapshot` (`id`, `cause` `book_changed_since_first_page`,
   `offsets_do_not_continue` true): the page is a correct read of the book as it
   is, but its offsets do not continue the earlier pages; start again from offset 0.
-- **What is held.** Only a `complete` window; a `partial` one (an uncounted
-  small book, a withheld foreign-currency voucher) is read again by each page.
+- **What is held.** Only a `complete` window; a `partial` one (a withheld
+  foreign-currency voucher) is read again by each page.
   One window per company and question (dates, ledger, voucher-type selector,
   search, and listing or summary by grouping),
   for ten minutes after the read finished, within 64 MiB of its own, counted as
@@ -1067,8 +1071,8 @@ no estimate for a larger or a smaller window.
   fit; no number is given: the census follows the book's mark, not the window, so a
   shorter window saves only the time of its vouchers and how short is enough is not
   established), or `not_established` (no voucher was read, whatever the time: such a window is read
-  twice, the second read wider and with its own census, which these figures do not
-  include; or the read stopped). A call past 240 s on Claude Desktop is cancelled and
+  twice, the second read wider (with its own census on a large book; a small book's
+  wider read sends none), which these figures do not include; or the read stopped). A call past 240 s on Claude Desktop is cancelled and
   its result never arrives, so `window_too_long` is seen on another host.
 - A read that **stopped** (a refusal) states the floor and no verdict: a request
   that failed or hung is not what a window costs.
@@ -1927,7 +1931,7 @@ one request. The building blocks:
 - **Window read.** A bounded voucher window (`read_voucher_window_timed` in
   `src-tauri/src/agent_voucher_window.rs`): the company's voucher marks (when
   not already known), the census spans (when the marks alone do not bound the
-  window), the data parts, then closing marks (only when the window was
+  window, or the tool counts a small book too), the data parts, then closing marks (only when the window was
   divided). Each is folded with the tool-level combination.
 - **Extent check.** On a later page of a listing, the two book-extent requests
   that decide whether the held read can be reused, folded with the runtime
@@ -2311,8 +2315,9 @@ supplier bill, a 20,000 customer advance and a 10,000 credit note to a customer,
 `payable` reads 80,000 and only 50,000 of it is owed to a supplier. The direction
 of an `unallocated` amount is the sign of the party's net unallocated balance, so
 an on-account receipt and an on-account payment on one party net into one figure.
-Separating advances, credit and debit notes and on-account amounts by their
-voucher's bill type is tracked in #945.
+For one party, `detail: unadjusted` separates advances, pending credit and debit notes and
+on-account amounts by their voucher's bill type (below). The book-wide `open_bills.kind` and
+`unallocated` figures do not; what is still to be measured is in #1356, the follow-up to #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted
@@ -2375,9 +2380,9 @@ byte cap retain partial source commitments in the in-process evidence store.
 window by one rule (#985, #1031): `complete`
 only when its rows were admitted voucher for voucher against the census that
 sized the read (protocol reference §11c.3), or it was empty and corroborated;
-otherwise `partial` with reason `nonempty_window_unqualified`. A book whose
-voucher high-water mark alone proves it small (a few dozen vouchers) sends no
-census, so its nonempty windows are `partial`. Voucher selectors are applied
+otherwise `partial` with reason `nonempty_window_unqualified`. A book that has
+held a voucher is counted however small, so a few vouchers can be `complete` (#1029);
+only a book that has never held one sends no census (Tally omits its mark), and a nonempty window read without one is `partial`. Voucher selectors are applied
 after the window is labelled, so a nonempty counted source with no matching
 ledger returns a complete empty selection, and an uncounted one a partial one. Amounts
 must parse as exact decimals, polarity flags must be `Yes` or `No`, and dates

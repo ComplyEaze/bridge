@@ -750,7 +750,7 @@ fn a_captured_credit_only_month_keeps_its_debit_empty_and_a_mixed_month_keeps_bo
     assert_eq!(amend.rows[0].debit, NativeStatementAmount::Empty);
     assert_eq!(amend.rows[0].credit, present("21371.00"));
     assert_eq!(amend.rows[0].closing, present("21371.00"));
-    // July 2026: both, and the closing is the smaller net figure.
+    // July 2026: both, and the closing is their net.
     assert_eq!(amend.rows[3].month, month(2026, 7));
     assert_eq!(amend.rows[3].debit, present("-33501.00"));
     assert_eq!(amend.rows[3].credit, present("15810.00"));

@@ -7,11 +7,12 @@
 //! check is on the **net**, and only the net: the sum of the months' closing
 //! amounts must equal the sum of `debit + credit` over every ledger whose
 //! predefined group is Cash-in-Hand or Bank Accounts (a debit negative, a
-//! credit positive: the trial balance's convention, protocol reference §5.6; the
-//! sign and meaning of the Cash Flow's own credit column are not measured, and
-//! its closing figure was measured only where the credit column was empty). On
+//! credit positive: the trial balance's convention, protocol reference §5.6; on
+//! every captured month with an amount Tally's closing was the debit plus the
+//! credit, but the Cash Flow's own debit and credit columns each differed from
+//! the ledgers' totals while the net tied). On
 //! the trial balance side a contra between two such ledgers moves both and nets
-//! to nothing; how Tally's own Cash Flow prints a contra is not measured. Both
+//! to nothing; how Tally's own Cash Flow prints a contra is not established. Both
 //! sides must carry an amount: an empty amount is not a zero, and a side with
 //! none is not compared (`Differs` or `NothingToCompare`).
 //!
@@ -76,7 +77,8 @@ pub(crate) enum CashFlowCheck {
         unclassified_with_movement: usize,
     },
     /// A ledger under Bank OD A/c or Bank OCC A/c has movement in the window,
-    /// and whether Tally's Cash Flow counts it is not measured.
+    /// and Tally's Cash Flow was seen counting one such ledger, which this check
+    /// does not count.
     MoneyGroupUnmeasured { ledgers: usize },
     /// Nothing to tie: neither side carries an amount (no cash or bank ledger
     /// with an amount, and every month of Tally's Cash Flow empty; an empty

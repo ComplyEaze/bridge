@@ -526,13 +526,16 @@ fn a_bank_od_ledger_with_movement_is_refused_by_the_check_and_is_what_the_differ
             assert_eq!(money_ledgers, 3);
             assert!(tally_net.numeric_eq(&decimal("5735.50")));
             assert!(ledger_net.numeric_eq(&decimal("8335.50")));
+            // The gap is exactly the Bank OD ledger's net.
+            let with_bank_od = ledger_net.checked_add(&decimal("-2600.00")).unwrap();
+            assert!(with_bank_od.numeric_eq(&tally_net));
         }
         other => panic!("expected a difference, got {other:?}"),
     }
 }
 
 #[test]
-fn a_whole_year_of_empty_months_has_nothing_to_compare_whatever_the_money_rows_hold_empty() {
+fn a_whole_year_of_empty_months_over_money_rows_with_no_amount_has_nothing_to_compare() {
     // BRIDGE CORPUS DENSE (about 30,000 vouchers): twelve month rows, every amount empty. The lab's
     // earlier reading of that book is that it has no cash or bank activity; this answer alone cannot
     // tell that from a report that did not compute, so the check reports no comparison, never a tie.

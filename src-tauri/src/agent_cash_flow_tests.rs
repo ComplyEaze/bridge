@@ -199,7 +199,7 @@ async fn a_net_that_ties_returns_the_months_and_says_what_was_checked() {
     assert_eq!(months[1]["closing"], json!({"state": "empty"}));
     assert_eq!(result["net_total"]["state"], "checked");
     assert_eq!(result["net_total"]["value"], "-4950.00");
-    // Debit-only months in one year: the measured shape, so nothing is flagged.
+    // Debit-only months in one year: the shape every window of the first captures had, so nothing is flagged.
     assert_eq!(result["unmeasured_in_this_answer"], json!([]));
     assert_eq!(
         result["basis"],
@@ -227,7 +227,7 @@ async fn a_net_that_ties_returns_the_months_and_says_what_was_checked() {
         "{lead}"
     );
     assert!(
-        lead.contains("No month with an outflow has been measured"),
+        lead.contains("No month's figure has been checked against"),
         "{lead}"
     );
     assert!(
@@ -498,7 +498,7 @@ async fn a_tie_that_holds_a_credit_amount_is_observed_but_flagged_and_its_lead_s
         "{lead}"
     );
     assert!(
-        !lead.contains("No month with an outflow has been measured"),
+        !lead.contains("No month's figure has been checked against"),
         "{lead}"
     );
 }

@@ -436,21 +436,22 @@ The top-level `state` is `observed` when the months are returned and
   `cash_flow_differs_from_trial_balance`, not a tie.
 
 `unmeasured_in_this_answer` lists, in the result itself, what this answer holds that
-has never been measured against Tally: `credit_amount_present` (a non-zero credit
-column), `positive_closing` (a closing on the credit side, an outflow) and
+was never compared with Tally's own Cash Flow screen: `credit_amount_present` (a non-zero
+credit column), `positive_closing` (a closing on the credit side) and
 `window_runs_from_march_into_april` (a window across a financial year of the usual
-April-to-March kind). It is empty only for the measured shape (debit-only months in
-one year), and when it is not empty the lead says to treat each month's figure as
-unverified and compare it with Tally's own Cash Flow. A bank ledger placed under
+April-to-March kind). The first two were seen tied to the trial balance in live runs on one
+synthetic book (two windows) and are still named; the third was never run. The list is empty only for
+debit-only months in one year, and when it is not empty the lead says to treat each month's
+figure as unverified and compare it with Tally's own Cash Flow. A bank ledger placed under
 another group, a liability one for example, is not counted as cash or bank: if Tally
 counts it the net total differs and the result is `not_established`.
 
 `checks` says per field what was `checked`, `differs` (compared, and the figures
 disagree), `not_checked` or `withheld`: the net total is checked; the split into months is Tally's own and is not checked (a total
 can tie while one month is wrong); Tally's debit and credit columns are read but
-not returned: on the two books with credits each column differed from the ledgers'
-debit and credit totals in the trial balance by the same amount while the net tied,
-and what that amount is has not been established. A month
+not returned: on the two books with credits each column differed from the debit and credit
+totals of the ledgers Tally counts as cash and bank (on one of them including a Bank OD A/c
+ledger) by one common amount while the net tied, and what that amount is has not been established. A month
 Tally printed with no amounts is returned with an empty `closing`, which is not zero and does not
 say the month had no entries (whether entries that cancel print an empty closing is not measured).
 A negative amount is a debit: cash and bank grew.
@@ -477,7 +478,7 @@ every captured month with an amount the closing is the debit plus the credit, an
 months on a large book was answered at once. Not measured: a ledger under Bank OD A/c or Bank OCC
 A/c in the tool's own run (Tally was seen counting a Bank OD ledger, so the refusal above stands in
 place of a difference; it is covered by tests only), what Tally's debit and credit columns each
-include (each differed from the ledgers' totals by the same amount while the net tied), a window
+include (each differed from the totals of the ledgers Tally counts as cash and bank by one common amount while the net tied; on one book that set includes a Bank OD A/c ledger), a window
 crossing a financial year, optional or post-dated vouchers, a book with several currencies, and a
 large book with cash activity.
 

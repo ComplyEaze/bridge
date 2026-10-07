@@ -24,9 +24,9 @@ fn checks(check: &CashFlowCheck) -> Value {
     })
 }
 
-/// What this Cash Flow answer holds that has not been measured against Tally. The
-/// measured shape is debit-only months, a negative closing and a window inside one
-/// March-to-March year; anything else is named here, so the result says so itself
+/// What this Cash Flow answer holds that was never compared with Tally's own Cash
+/// Flow screen. The shape of the first captures is debit-only months, a negative
+/// closing and a window inside one March-to-March year; anything else is named here, so the result says so itself
 /// and not only the fixed `limitations`.
 fn unmeasured_shape(
     cash_flow: &bridge_tally_protocol::native_cash_flow::NativeCashFlow,
@@ -159,8 +159,8 @@ impl Server {
             "currency": trial_balance.currency, "read_at": trial_balance.read_at,
             "months": months,
             "net_total": net_total,
-            // What this answer holds that was never measured against Tally: empty when it
-            // has only the measured shape (debit-only months inside one March-to-March year).
+            // What this answer holds that was never compared with Tally's own screen: empty when it
+            // has only the first captures' shape (debit-only months inside one March-to-March year).
             "unmeasured_in_this_answer": unmeasured,
             "checks": checks(&read.check),
             "verification": VERIFICATION,
@@ -171,10 +171,10 @@ impl Server {
                 "Only the net total of the whole period is compared with the trial balance, over the ledgers this check counts as cash and bank: those under Cash-in-Hand and Bank Accounts, a group inside them included (a ledger under a group a user made inside one was not measured). The split into months is Tally's and is not checked, and a total can tie while one month is wrong",
                 "The comparison does not show that Tally honoured the year of the dates for each month: a wrong-year answer is caught only if its net total differs",
                 "A month Tally printed with empty amounts is returned as a month with an empty closing, which is not zero and does not say the month had no entries: whether a month with entries that cancel prints an empty closing has not been measured",
-                "Tally's debit and credit columns are not returned: on the two books with credits, each column differed from the debit and credit totals of the cash and bank ledgers in the trial balance by the same amount while the net total tied, so only the net is compared and what the difference is has not been established",
+                "Tally's debit and credit columns are not returned: on the two books with credits, each column differed from the debit and credit totals of the ledgers Tally counts as cash and bank (on one of them including a Bank OD A/c ledger) by one common amount while the net total tied, so only the net is compared and what the difference is has not been established",
                 "A ledger under Bank OD A/c or Bank OCC A/c with movement in the period refuses the result: Tally's Cash Flow was seen counting one such ledger (debit only, one book), which this check does not yet count, so without the refusal the figures would differ by its net; the refusal was tested in code and has not been seen against Tally, and a Bank OD credit or a Bank OCC ledger was not measured. A ledger whose group could not be resolved is left out of the comparison and counted if the figures differ",
                 "The period must be whole months, at most twelve, so that each row can be placed in its year, and must not start before the book does: a book that begins mid-month cannot have its first month read",
-                "Measured on three synthetic books (Tally's answers) and two (this tool run against Tally: the net total tied on five windows, with a credit present and with a positive closing, and a quiet window was answered as nothing to compare); a month with entries that cancel, optional or post-dated vouchers, a window crossing a financial year, a later financial year, a several-currency book and a large book with cash activity are not measured. The report has no size check, and its cost on a large book is not known (one year of empty months on a large book answered at once): ask for one month first, and if a call times out do not repeat it",
+                "Tally's answers were measured on four synthetic books, and this tool was run against Tally on two of them: the net total tied on five windows, with a credit present and with a positive closing, and a quiet window was answered as nothing to compare; a month with entries that cancel, optional or post-dated vouchers, a window crossing a financial year, a later financial year, a several-currency book and a large book with cash activity are not measured. The report has no size check, and its cost on a large book is not known (one year of empty months on a large book answered at once): ask for one month first, and if a call times out do not repeat it",
                 "Tally's own report carries no company identity; it is bound only by the company, mode and book-extent checks around the read",
                 "Not voucher-level reconciliation or an atomic snapshot",
             ],

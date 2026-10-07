@@ -1509,9 +1509,10 @@ statutory dues classified as TDS payable, on every voucher that posts to the loa
         // A voucher counted in taken or repaid already holds its TDS in its loan line (Loan Dr
         // 10,000 / TDS Cr 1,000 / Bank Cr 9,000 is a repayment of 10,000): LOAN-1 adds
         // tds_on_loan for the deductions outside those totals, so it is told what to leave out.
-        // Published where a taken or repaid voucher carries TDS lines (bridge#1259 item 2). A voucher listed
-        // as both crediting and debiting the loan is not read this way: LOAN-1 firing on one
-        // carrying TDS stays.
+        // Published where a taken or repaid voucher carries TDS lines that net to an amount on
+        // that voucher, at 0 when those vouchers' TDS offsets across them (bridge#1259 item 2). A
+        // voucher listed as both crediting and debiting the loan is not read this way: LOAN-1
+        // firing on one carrying TDS stays.
         let in_principal: BTreeSet<usize> = rows
             .taken
             .iter()
@@ -3525,8 +3526,9 @@ narrated with ACH, NACH, ECS or EMI (each has a notice)."
 /// every such voucher is listed with its own two sides, or is an interest or TDS entry, or a
 /// balanced voucher on the loan alone. The tie adds the TDS deducted on the loan, less what the
 /// taken and repaid totals already hold of it (`tds_in_principal_<tag>`, published where a taken
-/// or repaid voucher carries TDS lines): a repayment booked net of TDS carries its deduction in its loan line
-/// (bridge#1259 item 2). Its re-derivation reads vouchers by GUID, as the reference does: on a GUID
+/// or repaid voucher carries TDS lines that net to an amount on that voucher, at 0 when those
+/// vouchers' TDS offsets across them): a repayment booked net of TDS carries its deduction in its
+/// loan line (bridge#1259 item 2). Its re-derivation reads vouchers by GUID, as the reference does: on a GUID
 /// a voucher outside the taken and repaid rows shares, it reads that voucher too and the line can
 /// fire while the tie holds. It reads the published TDS ledger names as the figure holds them (an
 /// empty name among others too; an empty figure as none), where LOAN-4 leaves the empty name out.

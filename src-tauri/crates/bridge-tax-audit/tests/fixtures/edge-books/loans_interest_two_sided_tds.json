@@ -1,5 +1,5 @@
 {
- "comment": "loans_interest, bridge#1259 item 2, a firm: a voucher that both credits and debits the loan and carries TDS is listed, not counted in taken or repaid, so no tds_in_principal is published for it and LOAN-1 still fires on it.",
+ "comment": "loans_interest, bridge#1259 item 2, a firm: a voucher that both credits and debits the loan and carries TDS is listed, not in the taken or repaid rows, so no tds_in_principal is published for it and LOAN-1 still fires on it.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",

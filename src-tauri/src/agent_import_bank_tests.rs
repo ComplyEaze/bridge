@@ -2614,7 +2614,7 @@ fn a_ledger_the_batch_does_not_name_is_listed_after_those_it_names() {
     // The batch names Bridge Nested Debtor WR4, Cash and WR2 Sales, in that order.
     let listed = in_batch_order(
         vec!["Not Named B", "WR2 Sales", "Not Named A", "Cash"],
-        &captured_bank_payload(),
+        &captured_bank_payload().vouchers,
         |ledger| *ledger,
     );
     assert_eq!(listed, ["Cash", "WR2 Sales", "Not Named B", "Not Named A"]);

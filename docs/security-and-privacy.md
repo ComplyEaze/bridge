@@ -64,7 +64,7 @@ until you accept the new version (section 4). A server started by hand with
   details, PAN, bank account numbers, IFSC, MSME or Udyam registration numbers,
   email, phone and address, and, when it builds a voucher file, that file's
   local path (which can include your computer user name), month-by-month cash
-  and bank movement, totals by ledger, month or group, a voucher's reference
+  and bank movement, totals by ledger, month, voucher type or group, a voucher's reference
   date, the bill-wise ledgers waiting for your On Account approval with their
   row dates and amounts, and counts and seconds describing how long a voucher
   read took (no book data), to Claude Desktop.
@@ -82,7 +82,9 @@ until you accept the new version (section 4). A server started by hand with
     ledger lists, the trial balance and statements, outstandings, the purchase
     register, bank-statement proposals, voucher totals by ledger, the ledgers
     listed under a group total, the ledger named when a group total cannot be
-    given, and the list of bill-wise ledgers waiting for approval), stock item
+    given, the list of bill-wise ledgers waiting for approval, the suspense ledger
+    named in a build warning, the ledger in a refused cash-or-bank row, and a
+    ledger's own spelling beside the spelling its vouchers carry), stock item
     names and their parents, godown and stock-group names and their parents, and
     three fields of a ledger's details: the name on the PAN, the bank account
     holder's name and the bank details. A name of four characters or fewer is

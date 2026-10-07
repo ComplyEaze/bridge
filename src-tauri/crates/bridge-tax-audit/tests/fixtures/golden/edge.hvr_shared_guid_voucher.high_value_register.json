@@ -88,7 +88,7 @@
     },
     {
       "id": "high_value_register.bank_receipt_day_any_amount_count",
-      "value": 0,
+      "value": 1,
       "unit": "count",
       "definition_sha256_16": "c6ef473ff6e6db45",
       "definition_text": "Distinct (party, day) pairs with a bank receipt on a population, non-Contra voucher.",
@@ -96,15 +96,26 @@
     },
     {
       "id": "high_value_register.bank_receipt_day_any_amount_total",
-      "value": 0,
+      "value": 25000000,
       "unit": "paise",
       "definition_sha256_16": "5041c6598b07b72b",
       "definition_text": "Sum of bank receipts across all (party, day) pairs above, any amount.",
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt B1 on 2025-06-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt B2 on 2025-06-11"
+        }
+      ]
     },
     {
       "id": "high_value_register.bank_receipt_day_at_or_over_threshold_count",
-      "value": 0,
+      "value": 1,
       "unit": "count",
       "definition_sha256_16": "87a06b9760e08d0d",
       "definition_text": "(party, day) pairs at or over the CA-set vouching threshold (20000000 paise), counting a pair only when its vouchers' own bank debited is at or over it too.",
@@ -119,8 +130,35 @@
       "evidence": []
     },
     {
+      "id": "high_value_register.bank_receipt_day_row_amount_bank_receipt_day_2025-06-11_dee715b8",
+      "value": 25000000,
+      "unit": "paise",
+      "definition_sha256_16": "bff50adbe36a6275",
+      "definition_text": "Bank receipt from/to one party ledger (tag dee715b8) on 2025-06-11, summed across every population voucher that day.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt B1 on 2025-06-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt B2 on 2025-06-11"
+        }
+      ]
+    },
+    {
+      "id": "high_value_register.bank_receipt_day_row_date_bank_receipt_day_2025-06-11_dee715b8",
+      "value": "2025-06-11",
+      "unit": "text",
+      "definition_sha256_16": "439573d82e4abeff",
+      "definition_text": "Date of the party-day total above.",
+      "evidence": []
+    },
+    {
       "id": "high_value_register.bank_receipt_voucher_any_amount_count",
-      "value": 0,
+      "value": 2,
       "unit": "count",
       "definition_sha256_16": "f3633e23f5e147ba",
       "definition_text": "Distinct (party, voucher) pairs with a bank receipt on a population, non-Contra voucher.",
@@ -128,11 +166,22 @@
     },
     {
       "id": "high_value_register.bank_receipt_voucher_any_amount_total",
-      "value": 0,
+      "value": 25000000,
       "unit": "paise",
       "definition_sha256_16": "fba729aa467e3a87",
       "definition_text": "Sum of bank receipts across all (party, voucher) pairs above, any amount.",
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt B1 on 2025-06-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt B2 on 2025-06-11"
+        }
+      ]
     },
     {
       "id": "high_value_register.bank_receipt_voucher_at_or_over_threshold_count",
@@ -175,13 +224,13 @@
       "evidence": [
         {
           "kind": "voucher",
-          "id": "",
-          "label": "Payment B1 on 2025-06-07"
+          "id": "dup-p",
+          "label": "Payment P1 on 2025-06-10"
         },
         {
           "kind": "voucher",
-          "id": "",
-          "label": "Payment B2 on 2025-06-07"
+          "id": "dup-p",
+          "label": "Payment P2 on 2025-06-10"
         }
       ]
     },
@@ -202,27 +251,27 @@
       "evidence": []
     },
     {
-      "id": "high_value_register.cash_payment_day_row_amount_cash_payment_day_2025-06-07_0e76c1f2",
+      "id": "high_value_register.cash_payment_day_row_amount_cash_payment_day_2025-06-10_90cfd29c",
       "value": 25000000,
       "unit": "paise",
-      "definition_sha256_16": "47ee8665d9e833c6",
-      "definition_text": "Cash payments on 2025-06-07 on vouchers with no party ledger (tag 0e76c1f2), whatever name they print, summed: the payees' side of each voucher.",
+      "definition_sha256_16": "acde9fbe04cd8525",
+      "definition_text": "Cash payment from/to one party ledger (tag 90cfd29c) on 2025-06-10, summed across every population voucher that day.",
       "evidence": [
         {
           "kind": "voucher",
-          "id": "",
-          "label": "Payment B1 on 2025-06-07"
+          "id": "dup-p",
+          "label": "Payment P1 on 2025-06-10"
         },
         {
           "kind": "voucher",
-          "id": "",
-          "label": "Payment B2 on 2025-06-07"
+          "id": "dup-p",
+          "label": "Payment P2 on 2025-06-10"
         }
       ]
     },
     {
-      "id": "high_value_register.cash_payment_day_row_date_cash_payment_day_2025-06-07_0e76c1f2",
-      "value": "2025-06-07",
+      "id": "high_value_register.cash_payment_day_row_date_cash_payment_day_2025-06-10_90cfd29c",
+      "value": "2025-06-10",
       "unit": "text",
       "definition_sha256_16": "439573d82e4abeff",
       "definition_text": "Date of the party-day total above.",
@@ -261,13 +310,13 @@
       "evidence": [
         {
           "kind": "voucher",
-          "id": "",
-          "label": "Payment B1 on 2025-06-07"
+          "id": "dup-p",
+          "label": "Payment P1 on 2025-06-10"
         },
         {
           "kind": "voucher",
-          "id": "",
-          "label": "Payment B2 on 2025-06-07"
+          "id": "dup-p",
+          "label": "Payment P2 on 2025-06-10"
         }
       ]
     },
@@ -289,7 +338,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_day_any_amount_count",
-      "value": 5,
+      "value": 10,
       "unit": "count",
       "definition_sha256_16": "a5aeb9acf745e529",
       "definition_text": "Distinct (party, day) pairs with a cash receipt on a population, non-Contra voucher.",
@@ -297,7 +346,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_day_any_amount_total",
-      "value": 50020000,
+      "value": 98000000,
       "unit": "paise",
       "definition_sha256_16": "ae1efbc4328f136a",
       "definition_text": "Sum of cash receipts across all (party, day) pairs above, any amount.",
@@ -305,38 +354,88 @@
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt N1 on 2025-07-03"
+          "label": "Receipt E1 on 2025-06-12"
         },
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt R1 on 2025-06-05"
+          "label": "Receipt E2 on 2025-06-12"
         },
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt R2 on 2025-06-05"
+          "label": "Receipt E3 on 2025-06-12"
         },
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt T1 on 2025-07-01"
+          "label": "Receipt E4 on 2025-06-12"
         },
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt T2 on 2025-07-02"
+          "label": "Receipt E5 on 2025-06-12"
         },
         {
           "kind": "voucher",
-          "id": "n02",
-          "label": "Receipt N2 on 2025-07-04"
+          "id": "",
+          "label": "Receipt S1 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S2 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt T1 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt T2 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-r",
+          "label": "Receipt Q1 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-r",
+          "label": "Receipt Q2 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-vw",
+          "label": "Receipt V1 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-vw",
+          "label": "Receipt W1 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-y",
+          "label": "Receipt Y1 on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-y",
+          "label": "Receipt Y2 on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "two-party",
+          "label": "Receipt VW2 on 2025-06-06"
         }
       ]
     },
     {
       "id": "high_value_register.cash_receipt_day_at_or_over_threshold_count",
-      "value": 1,
+      "value": 4,
       "unit": "count",
       "definition_sha256_16": "f97b28142fa5b340",
       "definition_text": "(party, day) pairs at or over the s.269ST(a) limit (20000000 paise), counting a pair only when its vouchers' own cash debited is at or over it too.",
@@ -351,50 +450,165 @@
       "evidence": []
     },
     {
-      "id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-06-05_378acb7b",
+      "id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-06-02_23a90f9c",
       "value": 25000000,
       "unit": "paise",
-      "definition_sha256_16": "90100e05c790e048",
-      "definition_text": "Cash receipt from/to one party ledger (tag 378acb7b) on 2025-06-05, summed across every population voucher that day.",
+      "definition_sha256_16": "cd8df98eda36d726",
+      "definition_text": "Cash receipt from/to one party ledger (tag 23a90f9c) on 2025-06-02, summed across every population voucher that day.",
       "evidence": [
         {
           "kind": "voucher",
-          "id": "",
-          "label": "Receipt R1 on 2025-06-05"
+          "id": "dup-r",
+          "label": "Receipt Q1 on 2025-06-02"
         },
         {
           "kind": "voucher",
-          "id": "",
-          "label": "Receipt R2 on 2025-06-05"
+          "id": "dup-r",
+          "label": "Receipt Q2 on 2025-06-02"
         }
       ]
     },
     {
-      "id": "high_value_register.cash_receipt_day_row_date_cash_receipt_day_2025-06-05_378acb7b",
-      "value": "2025-06-05",
+      "id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-06-03_b274cb37",
+      "value": 20000000,
+      "unit": "paise",
+      "definition_sha256_16": "e75688a90343ed27",
+      "definition_text": "Cash receipt from/to one party ledger (tag b274cb37) on 2025-06-03, summed across every population voucher that day. This is the party's side of each voucher; on one or more of the row's vouchers it differs from the cash line, which is shown with it.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt T1 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt T2 on 2025-06-03"
+        }
+      ]
+    },
+    {
+      "id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-06-04_0e76c1f2",
+      "value": 20000000,
+      "unit": "paise",
+      "definition_sha256_16": "80ad1dc356621170",
+      "definition_text": "Cash receipts on 2025-06-04 on vouchers with no party ledger (tag 0e76c1f2), whatever name they print, summed: the payers' side of each voucher. On one or more of the row's vouchers it differs from the cash line, which is shown with it.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S1 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S2 on 2025-06-04"
+        }
+      ]
+    },
+    {
+      "id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-06-12_23a90f9c",
+      "value": 25000000,
+      "unit": "paise",
+      "definition_sha256_16": "7b88213c1bba81f8",
+      "definition_text": "Cash receipt from/to one party ledger (tag 23a90f9c) on 2025-06-12, summed across every population voucher that day.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt E1 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt E2 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt E3 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt E4 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt E5 on 2025-06-12"
+        }
+      ]
+    },
+    {
+      "id": "high_value_register.cash_receipt_day_row_cash_line_cash_receipt_day_2025-06-03_b274cb37",
+      "value": 20000000,
+      "unit": "paise",
+      "definition_sha256_16": "8016f5c534175fd3",
+      "definition_text": "The cash debited on the vouchers in this row, summed, whichever parties it was for.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt T1 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt T2 on 2025-06-03"
+        }
+      ]
+    },
+    {
+      "id": "high_value_register.cash_receipt_day_row_cash_line_cash_receipt_day_2025-06-04_0e76c1f2",
+      "value": 20000000,
+      "unit": "paise",
+      "definition_sha256_16": "8016f5c534175fd3",
+      "definition_text": "The cash debited on the vouchers in this row, summed, whichever parties it was for.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S1 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S2 on 2025-06-04"
+        }
+      ]
+    },
+    {
+      "id": "high_value_register.cash_receipt_day_row_date_cash_receipt_day_2025-06-02_23a90f9c",
+      "value": "2025-06-02",
       "unit": "text",
       "definition_sha256_16": "439573d82e4abeff",
       "definition_text": "Date of the party-day total above.",
       "evidence": []
     },
     {
-      "id": "high_value_register.cash_receipt_single_transaction_amount_receipt_0fbbc532_24c82656",
-      "value": 25000000,
-      "unit": "paise",
-      "definition_sha256_16": "44dcf87a11237c78",
-      "definition_text": "Cash receipts from/to one party ledger (tag 24c82656) sharing voucher reference (tag 0fbbc532), summed across every date.",
-      "evidence": [
-        {
-          "kind": "voucher",
-          "id": "",
-          "label": "Receipt T1 on 2025-07-01"
-        },
-        {
-          "kind": "voucher",
-          "id": "",
-          "label": "Receipt T2 on 2025-07-02"
-        }
-      ]
+      "id": "high_value_register.cash_receipt_day_row_date_cash_receipt_day_2025-06-03_b274cb37",
+      "value": "2025-06-03",
+      "unit": "text",
+      "definition_sha256_16": "439573d82e4abeff",
+      "definition_text": "Date of the party-day total above.",
+      "evidence": []
+    },
+    {
+      "id": "high_value_register.cash_receipt_day_row_date_cash_receipt_day_2025-06-04_0e76c1f2",
+      "value": "2025-06-04",
+      "unit": "text",
+      "definition_sha256_16": "439573d82e4abeff",
+      "definition_text": "Date of the party-day total above.",
+      "evidence": []
+    },
+    {
+      "id": "high_value_register.cash_receipt_day_row_date_cash_receipt_day_2025-06-12_23a90f9c",
+      "value": "2025-06-12",
+      "unit": "text",
+      "definition_sha256_16": "439573d82e4abeff",
+      "definition_text": "Date of the party-day total above.",
+      "evidence": []
     },
     {
       "id": "high_value_register.cash_receipt_single_transaction_groups_count",
@@ -406,7 +620,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_single_transaction_no_reference_vouchers_count",
-      "value": 4,
+      "value": 15,
       "unit": "count",
       "definition_sha256_16": "01416de5dc863104",
       "definition_text": "Cash receipt vouchers with a qualifying money leg whose own REFERENCE field is blank -- not linkable to any other voucher by this books-only signal; limb (b) coverage is partial, stated as this count, never silently assumed complete.",
@@ -414,7 +628,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_voucher_any_amount_count",
-      "value": 6,
+      "value": 18,
       "unit": "count",
       "definition_sha256_16": "bc440322d15f3f1f",
       "definition_text": "Distinct (party, voucher) pairs with a cash receipt on a population, non-Contra voucher.",
@@ -422,7 +636,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_voucher_any_amount_total",
-      "value": 50020000,
+      "value": 98000000,
       "unit": "paise",
       "definition_sha256_16": "e003e0ff061903a6",
       "definition_text": "Sum of cash receipts across all (party, voucher) pairs above, any amount.",
@@ -430,32 +644,82 @@
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt N1 on 2025-07-03"
+          "label": "Receipt E1 on 2025-06-12"
         },
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt R1 on 2025-06-05"
+          "label": "Receipt E2 on 2025-06-12"
         },
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt R2 on 2025-06-05"
+          "label": "Receipt E3 on 2025-06-12"
         },
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt T1 on 2025-07-01"
+          "label": "Receipt E4 on 2025-06-12"
         },
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt T2 on 2025-07-02"
+          "label": "Receipt E5 on 2025-06-12"
         },
         {
           "kind": "voucher",
-          "id": "n02",
-          "label": "Receipt N2 on 2025-07-04"
+          "id": "",
+          "label": "Receipt S1 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt S2 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt T1 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt T2 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-r",
+          "label": "Receipt Q1 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-r",
+          "label": "Receipt Q2 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-vw",
+          "label": "Receipt V1 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-vw",
+          "label": "Receipt W1 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-y",
+          "label": "Receipt Y1 on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-y",
+          "label": "Receipt Y2 on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "two-party",
+          "label": "Receipt VW2 on 2025-06-06"
         }
       ]
     },
@@ -559,7 +823,50 @@
       ]
     },
     {
-      "id": "high_value_register/cash_payment_day_2025-06-07_0e76c1f2",
+      "id": "high_value_register/bank_receipt_day_2025-06-11_dee715b8",
+      "clauses": [],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "high_value_register.bank_receipt_day_row_amount_bank_receipt_day_2025-06-11_dee715b8"
+        },
+        {
+          "name": "date",
+          "figure_id": "high_value_register.bank_receipt_day_row_date_bank_receipt_day_2025-06-11_dee715b8"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Party R",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt B1 on 2025-06-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt B2 on 2025-06-11"
+        }
+      ],
+      "title_sha256_16": "738a2315bf2ad1dd",
+      "title_text": "Bank receipt at or over the CA-set vouching threshold on 2025-06-11",
+      "limits_sha256_16": "6796c9644e50c60e",
+      "limits_text": [
+        "Bank mode is not a s.269ST test (that section is cash-only); this row is the CA-set vouching-list threshold only, not a statutory limb.",
+        "Account-payee status of the instrument behind this bank movement is not visible in Tally."
+      ],
+      "ask_client_sha256_16": "fb4f30813b1a1d24",
+      "ask_client_text": [
+        "Vouch this entry to the bank statement and the underlying document."
+      ]
+    },
+    {
+      "id": "high_value_register/cash_payment_day_2025-06-10_90cfd29c",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(bc)"
@@ -568,11 +875,159 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "high_value_register.cash_payment_day_row_amount_cash_payment_day_2025-06-07_0e76c1f2"
+          "figure_id": "high_value_register.cash_payment_day_row_amount_cash_payment_day_2025-06-10_90cfd29c"
         },
         {
           "name": "date",
-          "figure_id": "high_value_register.cash_payment_day_row_date_cash_payment_day_2025-06-07_0e76c1f2"
+          "figure_id": "high_value_register.cash_payment_day_row_date_cash_payment_day_2025-06-10_90cfd29c"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Party X",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-p",
+          "label": "Payment P1 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-p",
+          "label": "Payment P2 on 2025-06-10"
+        }
+      ],
+      "title_sha256_16": "5734ad14e1b67ce3",
+      "title_text": "Cash paid to one party at or over the s.269ST(a) limb (a) person-per-day threshold on 2025-06-10 -- reportable in clause 31(bc)",
+      "limits_sha256_16": "9336a42770423aae",
+      "limits_text": [
+        "s.269ST(a) is a duty on the receiver of the cash, not the payer ('No person shall receive...'); a payment by the assessee is not a books-testable exposure for the assessee under s.269ST -- it is a Form 3CD clause 31(bc) reporting item only (limb (a): aggregate per person per day).",
+        "Books test covers limb (a) only. Limbs (b)/(c) need bill-wise/event linkage the books do not carry."
+      ],
+      "ask_client_sha256_16": "25218c6eb5a06205",
+      "ask_client_text": [
+        "Confirm whether this payment is genuinely to one party.",
+        "Confirm whether limbs (b)/(c) apply (documents needed)."
+      ]
+    },
+    {
+      "id": "high_value_register/cash_receipt_day_2025-06-02_23a90f9c",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-06-02_23a90f9c"
+        },
+        {
+          "name": "date",
+          "figure_id": "high_value_register.cash_receipt_day_row_date_cash_receipt_day_2025-06-02_23a90f9c"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Party Q",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-r",
+          "label": "Receipt Q1 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-r",
+          "label": "Receipt Q2 on 2025-06-02"
+        }
+      ],
+      "title_sha256_16": "770860a850ed88de",
+      "title_text": "Cash received from one party at or over the s.269ST(a) limb (a) person-per-day threshold on 2025-06-02",
+      "limits_sha256_16": "0d2843ac7ecdd07a",
+      "limits_text": [
+        "Books test covers limb (a) (aggregate per person per day) only. Limbs (b) (a single transaction) and (c) (receipts relating to one event or occasion) need bill-wise/event linkage the books do not carry (see the single-transaction and event views below)."
+      ],
+      "ask_client_sha256_16": "37ae58ad791a29f7",
+      "ask_client_text": [
+        "Confirm whether this receipt is genuinely from one party.",
+        "Confirm whether limbs (b)/(c) apply (documents needed)."
+      ]
+    },
+    {
+      "id": "high_value_register/cash_receipt_day_2025-06-03_b274cb37",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-06-03_b274cb37"
+        },
+        {
+          "name": "cash_line",
+          "figure_id": "high_value_register.cash_receipt_day_row_cash_line_cash_receipt_day_2025-06-03_b274cb37"
+        },
+        {
+          "name": "date",
+          "figure_id": "high_value_register.cash_receipt_day_row_date_cash_receipt_day_2025-06-03_b274cb37"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Party T",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt T1 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt T2 on 2025-06-03"
+        }
+      ],
+      "title_sha256_16": "f9f9e7ae5bc07f9f",
+      "title_text": "Cash received from one party at or over the s.269ST(a) limb (a) person-per-day threshold on 2025-06-03",
+      "limits_sha256_16": "3e4077450b99fa3f",
+      "limits_text": [
+        "Books test covers limb (a) (aggregate per person per day) only. Limbs (b) (a single transaction) and (c) (receipts relating to one event or occasion) need bill-wise/event linkage the books do not carry (see the single-transaction and event views below).",
+        "The amount is this party's own side of each voucher, not the voucher's own cash line. On one or more of the row's vouchers the two differ, so such a voucher carries other lines as well (such as money moving by bank, a discount or deduction, a round-off, a loan, a counterparty this register leaves out, several parties sharing the line, or money moving the other way). The cash debited on these vouchers is shown with this row."
+      ],
+      "ask_client_sha256_16": "37ae58ad791a29f7",
+      "ask_client_text": [
+        "Confirm whether this receipt is genuinely from one party.",
+        "Confirm whether limbs (b)/(c) apply (documents needed)."
+      ]
+    },
+    {
+      "id": "high_value_register/cash_receipt_day_2025-06-04_0e76c1f2",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-06-04_0e76c1f2"
+        },
+        {
+          "name": "cash_line",
+          "figure_id": "high_value_register.cash_receipt_day_row_cash_line_cash_receipt_day_2025-06-04_0e76c1f2"
+        },
+        {
+          "name": "date",
+          "figure_id": "high_value_register.cash_receipt_day_row_date_cash_receipt_day_2025-06-04_0e76c1f2"
         }
       ],
       "evidence": [
@@ -584,30 +1039,30 @@
         {
           "kind": "voucher",
           "id": "",
-          "label": "Payment B1 on 2025-06-07"
+          "label": "Receipt S1 on 2025-06-04"
         },
         {
           "kind": "voucher",
           "id": "",
-          "label": "Payment B2 on 2025-06-07"
+          "label": "Receipt S2 on 2025-06-04"
         }
       ],
-      "title_sha256_16": "edaae59efbd36473",
-      "title_text": "Cash paid on 2025-06-07 on vouchers that do not name the payee: the total is at or over the s.269ST(a) limit; whether any one person was paid that much is not known",
-      "limits_sha256_16": "57b2e370493d45df",
+      "title_sha256_16": "298132ee208cfda8",
+      "title_text": "Cash received on 2025-06-04 on vouchers that do not name the payer: the total is at or over the s.269ST(a) limit; whether any one person paid that much is not known",
+      "limits_sha256_16": "018a15a16e6a17cb",
       "limits_text": [
-        "s.269ST(a) is a duty on the receiver of the cash, not the payer ('No person shall receive...'); a payment by the assessee is not a books-testable exposure for the assessee under s.269ST -- it is a Form 3CD clause 31(bc) reporting item only (limb (a): aggregate per person per day).",
-        "Books test covers limb (a) only. Limbs (b)/(c) need bill-wise/event linkage the books do not carry.",
+        "Books test covers limb (a) (aggregate per person per day) only. Limbs (b) (a single transaction) and (c) (receipts relating to one event or occasion) need bill-wise/event linkage the books do not carry (see the single-transaction and event views below).",
+        "The amount is the payers' side of each voucher, not the voucher's own cash line. On one or more of the row's vouchers the two differ, so such a voucher carries other lines as well (such as money moving by bank, a discount or deduction, a round-off, a loan, a counterparty this register leaves out, several parties sharing the line, or money moving the other way). The cash debited on these vouchers is shown with this row.",
         "No party ledger is on these vouchers -- the books cannot name the counterparty. The row holds every voucher of the day with no party ledger, whatever name it prints (each usable printed name is shown with the row), so it may be one person's money or several people's; none is dropped or scattered across its tax/round-off lines."
       ],
-      "ask_client_sha256_16": "a656eb7015e098a1",
+      "ask_client_sha256_16": "be2294a46a8bfb61",
       "ask_client_text": [
         "Confirm whether limbs (b)/(c) apply (documents needed).",
-        "Who was paid on each of these vouchers, and did any one person reach the s.269ST(a) limit this day? Supply each counterparty's name and PAN."
+        "Who paid on each of these vouchers, and did any one person reach the s.269ST(a) limit this day? Supply each counterparty's name and PAN."
       ]
     },
     {
-      "id": "high_value_register/cash_receipt_day_2025-06-05_378acb7b",
+      "id": "high_value_register/cash_receipt_day_2025-06-12_23a90f9c",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -616,11 +1071,11 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-06-05_378acb7b"
+          "figure_id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-06-12_23a90f9c"
         },
         {
           "name": "date",
-          "figure_id": "high_value_register.cash_receipt_day_row_date_cash_receipt_day_2025-06-05_378acb7b"
+          "figure_id": "high_value_register.cash_receipt_day_row_date_cash_receipt_day_2025-06-12_23a90f9c"
         }
       ],
       "evidence": [
@@ -632,16 +1087,31 @@
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt R1 on 2025-06-05"
+          "label": "Receipt E1 on 2025-06-12"
         },
         {
           "kind": "voucher",
           "id": "",
-          "label": "Receipt R2 on 2025-06-05"
+          "label": "Receipt E2 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt E3 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt E4 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt E5 on 2025-06-12"
         }
       ],
-      "title_sha256_16": "77a1ef55d3f591be",
-      "title_text": "Cash received from one party at or over the s.269ST(a) limb (a) person-per-day threshold on 2025-06-05",
+      "title_sha256_16": "fde7ca1ffac0f1d4",
+      "title_text": "Cash received from one party at or over the s.269ST(a) limb (a) person-per-day threshold on 2025-06-12",
       "limits_sha256_16": "0d2843ac7ecdd07a",
       "limits_text": [
         "Books test covers limb (a) (aggregate per person per day) only. Limbs (b) (a single transaction) and (c) (receipts relating to one event or occasion) need bill-wise/event linkage the books do not carry (see the single-transaction and event views below)."
@@ -693,48 +1163,6 @@
       "ask_client_text": [
         "Confirm return-filing status for the three assessment years immediately preceding this one."
       ]
-    },
-    {
-      "id": "high_value_register/single_transaction/receipt_0fbbc532_24c82656",
-      "clauses": [
-        "3CD-31(ba)"
-      ],
-      "confidence": "judgement_required",
-      "facts": [
-        {
-          "name": "amount",
-          "figure_id": "high_value_register.cash_receipt_single_transaction_amount_receipt_0fbbc532_24c82656"
-        }
-      ],
-      "evidence": [
-        {
-          "kind": "ledger",
-          "id": "Party S",
-          "label": ""
-        },
-        {
-          "kind": "voucher",
-          "id": "",
-          "label": "Receipt T1 on 2025-07-01"
-        },
-        {
-          "kind": "voucher",
-          "id": "",
-          "label": "Receipt T2 on 2025-07-02"
-        }
-      ],
-      "title_sha256_16": "2c30ddc1264bf45f",
-      "title_text": "Candidate: cash receipts sharing one bill/voucher reference may be a single s.269ST(b) transaction across dates -- CA determination needed",
-      "limits_sha256_16": "5e5667d1e0c25104",
-      "limits_text": [
-        "'Single transaction' has no statutory or notified definition beyond the GN's own illustrative examples (GN 56.10: 'will depend on facts'); a shared voucher reference is evidence FOR, not proof of, one transaction -- this is a candidate for the CA to decide, never a computed breach or reportable fact.",
-        "Grouped by the voucher's own REFERENCE field only, not full bill-wise allocation detail -- a reference reused for an unrelated bill, or a genuine single bill recorded across differently-worded references, would both be missed by this signal.",
-        "s.269ST limb (b) (one transaction) can span cash AND other modes together in law; this view is cash-only (the books-testable limb for the receiver/payer distinction)."
-      ],
-      "ask_client_sha256_16": "b876ba96f799f454",
-      "ask_client_text": [
-        "Confirm whether this reference genuinely identifies one bill/transaction, and whether limb (b) applies."
-      ]
     }
   ],
   "book_invariants_evaluated": [
@@ -751,27 +1179,87 @@
     {
       "invariant": "POP-1",
       "subject": "Cash",
-      "detail": "vouchers 25020000 vs TB movement 0 paise"
+      "detail": "vouchers 71000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Discount Allowed",
+      "detail": "vouchers 4000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Edge Bank",
+      "detail": "vouchers 23000000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",
       "subject": "Party Q",
+      "detail": "vouchers -50000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Party R",
       "detail": "vouchers -25000000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",
-      "subject": "Party S",
-      "detail": "vouchers -25020000 vs TB movement 0 paise"
+      "subject": "Party T",
+      "detail": "vouchers -20000000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",
-      "subject": "Purchases",
+      "subject": "Party U",
+      "detail": "vouchers -2000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Party V",
+      "detail": "vouchers -2000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Party W",
+      "detail": "vouchers -2000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Party X",
       "detail": "vouchers 25000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Party Y",
+      "detail": "vouchers -2000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Sales",
+      "detail": "vouchers -20000000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-5",
       "subject": "(blank)",
-      "detail": "7 in-books voucher(s) have no GUID"
+      "detail": "11 in-books voucher(s) have no GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "dup-p",
+      "detail": "2 in-books vouchers share this GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "dup-r",
+      "detail": "2 in-books vouchers share this GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "dup-vw",
+      "detail": "2 in-books vouchers share this GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "dup-y",
+      "detail": "2 in-books vouchers share this GUID"
     }
   ],
   "result_invariants_evaluated": [

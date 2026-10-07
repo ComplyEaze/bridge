@@ -7,45 +7,69 @@
   "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). One entry = one voucher's net Dr+/Cr- line-sum on a person's nature ledger set.",
   "figures": [
     {
-      "id": "related_parties_cl23.amount_rent_4bf6c4e4",
-      "value": 1400000,
+      "id": "related_parties_cl23.amount_rent_d7d6f631",
+      "value": 1000000,
       "unit": "paise",
-      "definition_sha256_16": "c0d8fa2648a32fec",
-      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 4bf6c4e4)'s 'rent' ledger(s), confirmed by the client.",
+      "definition_sha256_16": "4260e1ab136d06e5",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag d7d6f631)'s 'rent' ledger(s), confirmed by the client.",
       "evidence": [
         {
           "kind": "ledger",
-          "id": "Gamma Rent",
+          "id": "Delta Rent",
           "label": ""
         },
         {
           "kind": "voucher",
-          "id": "g01",
-          "label": "Payment 1 on 2025-05-01"
+          "id": "",
+          "label": "Payment  on 2025-09-10"
         },
         {
           "kind": "voucher",
-          "id": "g01",
-          "label": "Payment 2 on 2025-06-01"
+          "id": "k01",
+          "label": "Payment 10 on 2025-06-10"
         },
         {
           "kind": "voucher",
-          "id": "g02",
-          "label": "Payment 4 on 2025-08-01"
+          "id": "k01",
+          "label": "Payment 2 on 2025-05-10"
         },
         {
           "kind": "voucher",
-          "id": "h01",
-          "label": "Payment 3 on 2025-07-01"
+          "id": "k01",
+          "label": "Payment 3 on 2025-07-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "m01",
+          "label": "Payment 7 on 2025-10-10"
         }
       ]
     },
     {
-      "id": "related_parties_cl23.amount_total_4bf6c4e4",
-      "value": 1400000,
+      "id": "related_parties_cl23.amount_salary_d7d6f631",
+      "value": 500000,
       "unit": "paise",
-      "definition_sha256_16": "645f13e5478a9711",
-      "definition_text": "Sum of amount_<nature>_4bf6c4e4 across every nature configured for person (tag 4bf6c4e4).",
+      "definition_sha256_16": "ba2a54c1bd0e254a",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag d7d6f631)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Delta Salary",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k01",
+          "label": "Journal 4 on 2025-08-10"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_total_d7d6f631",
+      "value": 1500000,
+      "unit": "paise",
+      "definition_sha256_16": "51e39c3130cea663",
+      "definition_text": "Sum of amount_<nature>_d7d6f631 across every nature configured for person (tag d7d6f631).",
       "evidence": []
     },
     {
@@ -65,17 +89,17 @@
       "evidence": []
     },
     {
-      "id": "related_parties_cl23.relationship_4bf6c4e4",
-      "value": "mother of a partner",
+      "id": "related_parties_cl23.relationship_d7d6f631",
+      "value": "brother of the proprietor",
       "unit": "text",
-      "definition_sha256_16": "f9a5d56963ef928f",
-      "definition_text": "Relationship confirmed by the client for related person (tag 4bf6c4e4) -- client confirmation only, never inferred from a ledger or party name.",
+      "definition_sha256_16": "2aa3f570d595640a",
+      "definition_text": "Relationship confirmed by the client for related person (tag d7d6f631) -- client confirmation only, never inferred from a ledger or party name.",
       "evidence": []
     }
   ],
   "findings": [
     {
-      "id": "related_parties_cl23/40a2b_reasonableness/4bf6c4e4",
+      "id": "related_parties_cl23/40a2b_reasonableness/d7d6f631",
       "clauses": [
         "s.40A(2)(b)"
       ],
@@ -83,16 +107,20 @@
       "facts": [
         {
           "name": "rent",
-          "figure_id": "related_parties_cl23.amount_rent_4bf6c4e4"
+          "figure_id": "related_parties_cl23.amount_rent_d7d6f631"
+        },
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_d7d6f631"
         },
         {
           "name": "total",
-          "figure_id": "related_parties_cl23.amount_total_4bf6c4e4"
+          "figure_id": "related_parties_cl23.amount_total_d7d6f631"
         }
       ],
       "evidence": [],
-      "title_sha256_16": "baf1120444a81775",
-      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 4bf6c4e4) is not assessed here",
+      "title_sha256_16": "1e9cb05383ca45f5",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag d7d6f631) is not assessed here",
       "limits_sha256_16": "769547273746b56a",
       "limits_text": [
         "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
@@ -103,7 +131,7 @@
       ]
     },
     {
-      "id": "related_parties_cl23/clause23/4bf6c4e4",
+      "id": "related_parties_cl23/clause23/d7d6f631",
       "clauses": [
         "3CD-23",
         "s.40A(2)(b)"
@@ -112,16 +140,20 @@
       "facts": [
         {
           "name": "rent",
-          "figure_id": "related_parties_cl23.amount_rent_4bf6c4e4"
+          "figure_id": "related_parties_cl23.amount_rent_d7d6f631"
+        },
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_d7d6f631"
         },
         {
           "name": "total",
-          "figure_id": "related_parties_cl23.amount_total_4bf6c4e4"
+          "figure_id": "related_parties_cl23.amount_total_d7d6f631"
         }
       ],
       "evidence": [],
-      "title_sha256_16": "296ab44d0ed272bb",
-      "title_text": "Transactions with a related person (tag 4bf6c4e4) confirmed by the client, reportable under Clause 23",
+      "title_sha256_16": "9f9488896aa5f46c",
+      "title_text": "Transactions with a related person (tag d7d6f631) confirmed by the client, reportable under Clause 23",
       "limits_sha256_16": "d0910a1413d4a72f",
       "limits_text": [
         "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
@@ -143,13 +175,13 @@
   "book_invariant_violations": [
     {
       "invariant": "POP-5",
-      "subject": "g01",
-      "detail": "2 in-books vouchers share this GUID"
+      "subject": "(blank)",
+      "detail": "2 in-books voucher(s) have no GUID"
     },
     {
       "invariant": "POP-5",
-      "subject": "g02",
-      "detail": "2 in-books vouchers share this GUID"
+      "subject": "k01",
+      "detail": "4 in-books vouchers share this GUID"
     }
   ],
   "result_invariants_evaluated": [

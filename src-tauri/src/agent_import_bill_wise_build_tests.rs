@@ -160,12 +160,13 @@ async fn an_unapproved_bill_wise_party_refuses_the_build_and_lists_its_rows() {
         "never approve on the person's behalf",
         "one party per question",
         "hand import of the file is not checked at all",
-        "does not mark which entries land On Account",
+        "the native approval dialog marks each approved party On Account, from this build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines).",
+        "That dialog is one answer for the whole batch and asks nothing about any one party, so it does not replace these questions.",
         "importing it also replaces any bill allocations",
     ] {
         assert!(next_step.contains(phrase), "{phrase}");
     }
-    // It must not suggest a person's own dialog already covers these entries.
+    // The dialog marks the parties; it does not ask about each.
     assert!(!next_step.contains("shows the person its own dialog"));
 }
 
@@ -227,6 +228,10 @@ async fn an_approved_party_builds_and_the_record_carries_the_approval() {
         .find(|text| text.contains("on_account_approved"))
         .expect("the build says an entry lands On Account");
     assert!(note.contains("cannot tell whether a person said yes"));
+    assert!(
+        note.contains("If this batch is posted natively, the approval dialog marks each of these ledgers On Account, from this build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines); a hand import of the file shows no dialog."),
+        "{note}"
+    );
     assert!(!note.contains("approved in chat"));
     let saved = server.import_ledger().unwrap().pop().unwrap();
     assert_eq!(
@@ -724,7 +729,7 @@ fn the_tool_text_says_what_the_digest_does_not_prove_and_where_the_gate_is() {
     for phrase in [
         "it does NOT prove that a person said yes",
         "never approve on the person's behalf",
-        "does not mark which entries land On Account",
+        "The native approval dialog marks each approved party On Account, from the build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines);",
         "a hand import of the file is not checked at all",
         "is refused at post as import_bill_wise_changed",
         "bill_wise_party_unapproved",

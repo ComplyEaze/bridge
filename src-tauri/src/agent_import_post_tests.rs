@@ -2083,6 +2083,21 @@ fn a_bank_preview_is_refused_at_each_cap_rather_than_truncated() {
     );
 }
 
+/// An assistant's post adds the line that says when the post happens, so its
+/// text holds one entry fewer: six entries of a bank voucher fit 24 lines and
+/// seven do not.
+#[test]
+fn an_assistants_bank_preview_fits_one_entry_fewer() {
+    let (_, endpoint) = batch();
+    let six = agent_review_preview(&payment_with(5, |i| format!("Party {i}")), &endpoint)
+        .expect("six entries fit");
+    assert_eq!(six.lines().count(), 24, "{six}");
+    assert_eq!(
+        agent_review_preview(&payment_with(6, |i| format!("Party {i}")), &endpoint).unwrap_err(),
+        "import_review_too_large"
+    );
+}
+
 /// Grow a preview one character at a time with `build(pad)`: it fits up to some
 /// size and is refused beyond it, never the other way round. The largest preview
 /// that fit, and the refusal that followed it (`None` if none did by `max_pad`).
@@ -3823,10 +3838,10 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
     for needed in [
         "Create ONE Sales invoice",
         "Voucher type: \"Sales Acc\"",
-        "Number and reference: \"278\"",
+        "Number: \"278\"",
         "Customer: \"Customer A\"",
         "Unregistered, no GSTIN  Place of supply: Rajasthan",
-        "Bill allocation: New Ref \"278\"",
+        "Bill allocation: New Ref \"278\"\n",
         "Dr 11200.40  \"Customer A\"",
         "Cr 0.40  \"Round Off\"",
     ] {
@@ -3838,6 +3853,114 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
     assert!(
         preview.lines().count() <= 24 && preview.lines().all(|l| l.chars().count() <= 100),
         "{preview}"
+    );
+    // The whole text, line by line: the voucher's own text is last, under its
+    // heading and after the agent's timing line; the cue stands once, above the
+    // entries, on a line of the dialog's own that carries none of the voucher's
+    // text; no ledger is recorded as approved On Account, so no line is marked
+    // and the line under the entries is blank.
+    let text = |entries: [&str; 5], under_the_entries: &str| {
+        [
+            "Create ONE Sales invoice in \"Synthetic Accounts\"",
+            "Company GUID: 00000000-0000-4000-8000-000000000002",
+            "Company number: 100001  Books from: 20260401",
+            "Tally: http://127.0.0.1:9001  (the voucher's own text: last two lines)",
+            "Voucher type: \"Sales Acc\"  Date: 20260901  Number: \"278\"",
+            "Customer: \"Customer A\"",
+            "Unregistered, no GSTIN  Place of supply: Rajasthan",
+            "Bill allocation: New Ref \"278\"",
+        ]
+        .into_iter()
+        .chain(entries)
+        .chain([
+            under_the_entries,
+            // Totals are printed as the other dialogs print them, without
+            // trailing zeros.
+            "Total debit: 11200.4  Total credit: 11200.4",
+            "Checked in Tally: Sundry Debtors customer, Sales Accounts ledger, CGST and state tax by head.",
+            "Batch: bridge-00000000-0000-4000-8000-000000000001",
+            "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
+            "Do not post a file already imported manually. Pause other edits/imports in this company.",
+            "After a timeout, reconcile this batch; do not rebuild or resend it.",
+        ])
+        .map(str::to_string)
+        .chain(agent_post_timing_lines())
+        .chain([
+            VOUCHER_TEXT_HEADING.to_string(),
+            "Reference: \"278\"".to_string(),
+            "Narration: \"Synthetic test only\"".to_string(),
+        ])
+        .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        preview.lines().collect::<Vec<_>>(),
+        text(
+            [
+                "Dr 11200.40  \"Customer A\"",
+                "Cr 10000.00  \"Sales\"",
+                "Cr 600.00  \"Output CGST\"",
+                "Cr 600.00  \"Output SGST\"",
+                "Cr 0.40  \"Round Off\"",
+            ],
+            ""
+        )
+    );
+    assert_eq!(preview.lines().count(), 24, "{preview}");
+    // A leg the batch records as approved On Account is marked on its own line
+    // and on no other, and the legend takes the blank line's place: the dialog
+    // still fits with a round off.
+    let mut approved = line.clone();
+    approved.on_account_approved =
+        serde_json::from_value(json!([{"ledger":"Sales","party_digest":"a".repeat(64)}])).unwrap();
+    let marked = review_preview_for(&approved, &endpoint, PostScope::Vouchers)
+        .expect("a marked five-leg invoice fits the dialog");
+    assert_eq!(
+        marked.lines().collect::<Vec<_>>(),
+        text(
+            [
+                "Dr 11200.40  \"Customer A\"",
+                "Cr 10000.00  On Account  \"Sales\"",
+                "Cr 600.00  \"Output CGST\"",
+                "Cr 600.00  \"Output SGST\"",
+                "Cr 0.40  \"Round Off\"",
+            ],
+            ON_ACCOUNT_LEGEND
+        )
+    );
+    // A record that approves the customer On Account is not one a build
+    // writes (the customer's entry carries a New Ref or the customer is not
+    // bill-wise): refused, never shown as both.
+    let mut crafted = line.clone();
+    crafted.on_account_approved =
+        serde_json::from_value(json!([{"ledger":"Customer A","party_digest":"b".repeat(64)}]))
+            .unwrap();
+    assert_eq!(
+        review_preview_for(&crafted, &endpoint, PostScope::Vouchers).unwrap_err(),
+        "import_invoice_not_observed"
+    );
+    // A number outside the invoice alphabet never reaches a line above the
+    // entries, a narration with a line break is refused, and a text over the
+    // dialog's caps is refused, never cut.
+    let with = |change: &dyn Fn(&mut ImportVoucher)| {
+        let mut other = line.clone();
+        change(&mut other.vouchers[0]);
+        review_preview_for(&other, &endpoint, PostScope::Vouchers).unwrap_err()
+    };
+    assert_eq!(
+        with(&|voucher| voucher.voucher_number = Some("27 8".into())),
+        "import_review_layout_text"
+    );
+    assert_eq!(
+        with(&|voucher| voucher.narration = Some("first\nTotal debit: 1".into())),
+        "import_review_layout_text"
+    );
+    assert_eq!(
+        with(&|voucher| voucher.narration = Some("n".repeat(90))),
+        "import_review_too_large"
+    );
+    assert_eq!(
+        with(&|voucher| voucher.narration = Some("many words ".repeat(60))),
+        "import_review_too_large"
     );
     // Not postable, however the batch came to be saved, until Sales is qualified.
     assert_eq!(
@@ -3867,5 +3990,554 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
     assert!(
         preview.lines().all(|l| l.chars().count() <= 100),
         "{preview}"
+    );
+}
+
+/// A one-voucher approval text ends with the voucher's own text: the heading,
+/// the reference and the narration are its last three lines, present or not,
+/// after every line ComplyEaze Bridge writes itself, the agent's timing line
+/// included; the date line says where they are.
+#[test]
+fn a_one_voucher_text_ends_with_the_vouchers_own_text() {
+    let (with_text, endpoint) = batch();
+    let mut without = with_text.clone();
+    without.vouchers[0].reference = None;
+    without.vouchers[0].narration = None;
+    let timing = agent_post_timing_lines().to_vec();
+    for (line, reference, narration) in [
+        (
+            &with_text,
+            "Reference: \"REF-1\"",
+            "Narration: \"Synthetic test only\"",
+        ),
+        (&without, "Reference: (none)", "Narration: (none)"),
+    ] {
+        for footer in [Vec::new(), timing.clone()] {
+            let text = review_preview_with(line, &endpoint, &footer).unwrap();
+            let lines: Vec<&str> = text.lines().collect();
+            let (own, voucher_text) = lines.split_at(lines.len() - 3);
+            assert_eq!(
+                voucher_text,
+                [VOUCHER_TEXT_HEADING, reference, narration],
+                "{text}"
+            );
+            assert_eq!(
+                own[4],
+                format!("Date: 20260901  Voucher number: Tally assigns it  {VOUCHER_TEXT_CUE}"),
+                "{text}"
+            );
+            // Every line the dialog writes itself is above the heading, and
+            // the voucher's text is nowhere among them.
+            for start in [
+                "Create ONE ",
+                "Dr ",
+                "Cr ",
+                "Total debit: ",
+                "Batch: ",
+                "After a timeout, ",
+            ] {
+                assert_eq!(
+                    own.iter().filter(|shown| shown.starts_with(start)).count(),
+                    1,
+                    "{start:?} in {text}"
+                );
+            }
+            assert!(!own.iter().any(|shown| {
+                shown.starts_with("Reference: ") || shown.starts_with("Narration: ")
+            }));
+            assert_eq!(
+                own.last().copied(),
+                Some(footer.last().map_or(
+                    "After a timeout, reconcile this batch; do not rebuild or resend it.",
+                    String::as_str
+                )),
+                "{text}"
+            );
+            // Five header lines, a blank, two entries, the line under them,
+            // the totals, the batch, four standing sentences, then the footer.
+            assert_eq!(own.len(), 15 + footer.len(), "{text}");
+        }
+    }
+    assert!(VOUCHER_TEXT_HEADING.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS);
+}
+
+/// Records `ledgers` on `line` as approved to take entries On Account, the
+/// way the build does once the caller's approvals matched (#1234).
+fn approve_on_account(line: &mut ImportLedgerLine, ledgers: &[&str]) {
+    line.on_account_approved = Some(
+        serde_json::from_value(json!(ledgers
+            .iter()
+            .map(|ledger| json!({"ledger":ledger,"party_digest":"a".repeat(64)}))
+            .collect::<Vec<_>>()))
+        .unwrap(),
+    );
+}
+
+/// The lines of `preview` from its first `Dr`/`Cr` line to its `Total debit`
+/// line: the entries of one voucher or a batch's per-ledger totals, and the
+/// line under them.
+fn ledger_block(preview: &str) -> Vec<&str> {
+    preview
+        .lines()
+        .skip_while(|line| !line.starts_with("Dr ") && !line.starts_with("Cr "))
+        .take_while(|line| !line.starts_with("Total debit: "))
+        .collect()
+}
+
+/// One voucher's approval marks every entry on a ledger the batch records as
+/// approved to take entries On Account, before the quoted name and on both
+/// sides, and says once what the mark means, in place of the blank line under
+/// the entries: the marked text has the line count of the unmarked one. The
+/// desktop's Journal post shows the same text. A record of other ledgers, or
+/// of a name that differs by a character or by case, marks nothing and leaves
+/// the text as it was.
+#[test]
+fn one_voucher_marks_each_entry_on_a_ledger_approved_on_account() {
+    let (mut line, endpoint) = batch();
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Party A","amount":"10.00","side":"Dr"},
+        {"ledger":"Party A","amount":"4.00","side":"Cr"},
+        {"ledger":"Cash","amount":"6.00","side":"Cr"}]))
+    .unwrap();
+    refresh_batch_sha256(&mut line);
+    let plain = admit_fresh_saved_voucher(&line, &endpoint).unwrap();
+    assert_eq!(
+        ledger_block(&plain),
+        [
+            "Dr 10.00  \"Party A\"",
+            "Cr 4.00  \"Party A\"",
+            "Cr 6.00  \"Cash\"",
+            ""
+        ],
+        "{plain}"
+    );
+    for other in [&["Party A2"][..], &["party a"], &["Party"], &["Rent"]] {
+        approve_on_account(&mut line, other);
+        assert_eq!(
+            admit_fresh_saved_voucher(&line, &endpoint).unwrap(),
+            plain,
+            "{other:?}"
+        );
+    }
+    approve_on_account(&mut line, &["Party A"]);
+    let marked = admit_fresh_saved_voucher(&line, &endpoint).unwrap();
+    assert_eq!(
+        ledger_block(&marked),
+        [
+            "Dr 10.00  On Account  \"Party A\"",
+            "Cr 4.00  On Account  \"Party A\"",
+            "Cr 6.00  \"Cash\"",
+            "On Account: a bill-wise ledger when this batch was built. Its entries carry no bill allocation.",
+        ],
+        "{marked}"
+    );
+    assert_eq!(marked.lines().count(), plain.lines().count(), "{marked}");
+    // Nothing else moves: the reference and the narration are shown as they
+    // are, marked or not, as the last two lines.
+    let changed: Vec<(&str, &str)> = plain
+        .lines()
+        .zip(marked.lines())
+        .filter(|(before, after)| before != after)
+        .collect();
+    assert_eq!(
+        changed,
+        [
+            ("Dr 10.00  \"Party A\"", "Dr 10.00  On Account  \"Party A\""),
+            ("Cr 4.00  \"Party A\"", "Cr 4.00  On Account  \"Party A\""),
+            ("", ON_ACCOUNT_LEGEND),
+        ],
+        "{marked}"
+    );
+    assert!(marked.ends_with(&format!(
+        "\n{VOUCHER_TEXT_HEADING}\nReference: \"REF-1\"\nNarration: \"Synthetic test only\""
+    )));
+    assert_eq!(
+        marked
+            .lines()
+            .filter(|line| *line == ON_ACCOUNT_LEGEND)
+            .count(),
+        1
+    );
+    assert!(ON_ACCOUNT_LEGEND.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS);
+    assert_eq!(admit_saved_journal(&line, &endpoint).unwrap().1, marked);
+    // The agent's text is the same, with its timing line above the heading.
+    assert_eq!(
+        agent_review_preview(&line, &endpoint).unwrap(),
+        marked.replacen(
+            &format!("\n{VOUCHER_TEXT_HEADING}"),
+            &format!("\n{}\n{VOUCHER_TEXT_HEADING}", agent_post_timing_lines()[0]),
+            1
+        )
+    );
+    // A batch saved before the record existed has nothing to mark; it is
+    // refused for posting where the record is asked for.
+    line.on_account_approved = None;
+    assert_eq!(admit_fresh_saved_voucher(&line, &endpoint).unwrap(), plain);
+}
+
+/// A batch marks the per-ledger totals line of each recorded ledger and puts
+/// the legend in place of the blank line under the totals, so no line is
+/// added; the per-voucher lines carry no mark. The marks stay whichever way
+/// the voucher lines fall back: over ten vouchers, an unsafe narration, or
+/// lines that do not fit.
+#[test]
+fn a_batch_marks_the_totals_line_of_a_ledger_approved_on_account() {
+    let (mut line, endpoint) = batch_of_every_type();
+    let plain = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        ledger_block(&plain),
+        [
+            "Dr 5  Cr 15  2 entries  \"Bank\"",
+            "Dr 40  Cr 17.5  3 entries  \"Cash\"",
+            "Dr 12.5  Cr 0  1 entry  \"Expense\"",
+            "Dr 0  Cr 40  1 entry  \"Party A\"",
+            "Dr 15  Cr 0  1 entry  \"Party B\"",
+            ""
+        ],
+        "{plain}"
+    );
+    approve_on_account(&mut line, &["Party A", "Party B"]);
+    let marked_block = [
+        "Dr 5  Cr 15  2 entries  \"Bank\"",
+        "Dr 40  Cr 17.5  3 entries  \"Cash\"",
+        "Dr 12.5  Cr 0  1 entry  \"Expense\"",
+        "Dr 0  Cr 40  1 entry  On Account  \"Party A\"",
+        "Dr 15  Cr 0  1 entry  On Account  \"Party B\"",
+        ON_ACCOUNT_LEGEND,
+    ];
+    let marked = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(ledger_block(&marked), marked_block, "{marked}");
+    assert_eq!(marked.lines().count(), plain.lines().count(), "{marked}");
+    // The voucher lines carry no mark, and their heading then says where it is.
+    assert_eq!(voucher_block(&plain)[0], VOUCHER_LINES_HEADING);
+    assert_eq!(
+        voucher_block(&marked)[0],
+        "Each voucher: type, date, amount, ledger, narration (no references; On Account is marked below):"
+    );
+    assert_eq!(
+        voucher_block(&marked)[1..],
+        voucher_block(&plain)[1..],
+        "{marked}"
+    );
+    assert!(VOUCHER_LINES_HEADING_MARKED.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS);
+    assert!(
+        voucher_block(&marked)
+            .contains(&"Receipt 20260902  40  \"Party A\"  \"Synthetic test only\""),
+        "{marked}"
+    );
+
+    let mut unsafe_text = line.clone();
+    unsafe_text.vouchers[1].narration = Some("line\nbreak".into());
+    let mut too_wide = line.clone();
+    too_wide.vouchers[3].narration = Some("N".repeat(60));
+    too_wide.vouchers[3].entries[0].ledger = "B".repeat(40);
+    too_wide.vouchers[2].entries[1].ledger = "B".repeat(40);
+    let mut over_ten = line.clone();
+    for index in 0..7 {
+        let mut extra = over_ten.vouchers[0].clone();
+        extra.bridge_txn_id = format!("journal-more-{index}");
+        over_ten.vouchers.push(extra);
+    }
+    for (batch, reason) in [
+        (&unsafe_text, VOUCHER_LINES_UNSAFE),
+        (&too_wide, VOUCHER_LINES_DO_NOT_FIT),
+        (&over_ten, VOUCHER_LINES_OVER_LIMIT),
+    ] {
+        let preview = review_preview_with(batch, &endpoint, &[]).unwrap();
+        assert_eq!(voucher_block(&preview), [reason], "{preview}");
+        let block = ledger_block(&preview);
+        assert_eq!(block.last(), Some(&ON_ACCOUNT_LEGEND), "{preview}");
+        for party in ["On Account  \"Party A\"", "On Account  \"Party B\""] {
+            assert_eq!(
+                block.iter().filter(|line| line.ends_with(party)).count(),
+                1,
+                "{party} under {reason}: {preview}"
+            );
+        }
+    }
+}
+
+/// The record alone moves the text a person approves, and so the approval's
+/// binding: the batch file's own hash does not include it.
+#[test]
+fn the_approval_binding_covers_the_on_account_record() {
+    let (mut line, endpoint) = batch();
+    let ledgers = captured_binding(&["Cash"]);
+    let plain = agent_review_preview(&line, &endpoint).unwrap();
+    let before = ApprovalBinding::new(&line, &plain, &ledgers);
+    approve_on_account(&mut line, &["Expense"]);
+    let marked = agent_review_preview(&line, &endpoint).unwrap();
+    assert_ne!(ApprovalBinding::new(&line, &marked, &ledgers), before);
+    assert_eq!(ApprovalBinding::new(&line, &plain, &ledgers), before);
+
+    let (mut batch_line, endpoint) = batch_of_every_type();
+    let plain = agent_review_preview(&batch_line, &endpoint).unwrap();
+    let before = ApprovalBinding::new(&batch_line, &plain, &ledgers);
+    approve_on_account(&mut batch_line, &["Party A"]);
+    let marked = agent_review_preview(&batch_line, &endpoint).unwrap();
+    assert_ne!(ApprovalBinding::new(&batch_line, &marked, &ledgers), before);
+}
+
+/// The mark is part of the line the caps measure: a marked entry line of 100
+/// characters fits and one of 101 is refused, never shown without its mark,
+/// and the build's own check of the route (`admit_saved_voucher`) says so.
+#[test]
+fn a_marked_line_is_held_to_the_line_cap_with_its_mark() {
+    let (_, endpoint) = batch();
+    // One entry line is `Dr 1.00  On Account  "<name>"`: 23 characters around the name.
+    let marked = |length: usize| {
+        let mut line = payment_with(1, |_| "N".repeat(length));
+        let name = line.vouchers[0].entries[0].ledger.clone();
+        approve_on_account(&mut line, &[&name]);
+        refresh_batch_sha256(&mut line);
+        line
+    };
+    let fits = admit_fresh_saved_voucher(&marked(77), &endpoint).expect("a 100-character line");
+    assert!(
+        fits.lines()
+            .any(|line| line.chars().count() == 100 && line.contains(ON_ACCOUNT_MARK)),
+        "{fits}"
+    );
+    assert_eq!(
+        admit_fresh_saved_voucher(&marked(78), &endpoint).unwrap_err(),
+        "import_review_too_large"
+    );
+    assert_eq!(
+        admit_saved_voucher(&marked(78), &endpoint, PostScope::Vouchers, 1).unwrap_err(),
+        "import_review_too_large"
+    );
+    // Unmarked, the same name fits: the mark is what the cap refused.
+    assert!(admit_fresh_saved_voucher(&payment_with(1, |_| "N".repeat(78)), &endpoint).is_ok());
+}
+
+/// The batch of `the_batch_post_preview_at_full_width_against_its_caps` with
+/// every party marked. Unmarked, that batch at full width is under the
+/// character cap; marked, each name gives up twelve characters of its line to
+/// the mark and the legend takes a line the blank had, so the 3,200-character
+/// cap binds: the batch is refused there, never cut and never unmarked.
+#[test]
+fn a_fully_marked_batch_at_full_width_is_refused_at_the_character_cap() {
+    let (_, endpoint) = batch();
+    let fits = |lengths: &[usize]| {
+        let names: Vec<String> = (0..22)
+            .map(|party| name_of(party, lengths[1 + party], "N"))
+            .collect();
+        let mut line = payment_batch_with(&names, &name_of(24, lengths[0], "N"));
+        for voucher in &mut line.vouchers {
+            voucher.entries.last_mut().unwrap().ledger = name_of(23, lengths[23], "N");
+        }
+        approve_on_account(
+            &mut line,
+            &names.iter().map(String::as_str).collect::<Vec<_>>(),
+        );
+        refresh_batch_sha256(&mut line);
+        review_preview_with(&line, &endpoint, &[])
+    };
+    let caps: Vec<usize> = (0..24)
+        .map(|field| {
+            widest(|length| {
+                let mut lengths = vec![1; 24];
+                lengths[field] = length;
+                fits(&lengths).is_ok()
+            })
+        })
+        .collect();
+    let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 24 * 100);
+    assert_eq!(refusal.as_deref(), Some("import_review_too_large"));
+    assert_eq!(fit.chars().count(), BATCH_REVIEW_MAX_CHARS, "{fit}");
+    assert_eq!(fit.lines().count(), BATCH_REVIEW_MAX_LINES, "{fit}");
+    assert_eq!(
+        fit.lines()
+            .filter(|line| line.contains(ON_ACCOUNT_MARK))
+            .count(),
+        22,
+        "{fit}"
+    );
+    assert!(fit.lines().any(|line| line == ON_ACCOUNT_LEGEND), "{fit}");
+}
+
+/// When a batch names recorded ledgers, `seal` passes its dialog text only if
+/// each of them has a line ending in its marked name and the legend is there:
+/// at least one marked line for each such ledger, and the sentence. Any other
+/// text of such a batch is refused, whatever shape produced it.
+#[test]
+fn a_dialog_text_without_a_recorded_ledgers_mark_is_refused() {
+    let (mut line, endpoint) = batch();
+    let plain = admit_fresh_saved_voucher(&line, &endpoint).unwrap();
+    approve_on_account(&mut line, &["Expense", "Cash", "Rent"]);
+    let marked = admit_fresh_saved_voucher(&line, &endpoint).unwrap();
+    let marks = OnAccountMarks::of(&line);
+    assert_eq!(
+        marks.seal(&line, marked.clone()).unwrap().into_string(),
+        marked
+    );
+    let seal = |text: String| marks.seal(&line, text).map(ReviewText::into_string);
+    // One of two recorded ledgers unmarked is refused, whichever it is.
+    for ledger in ["Expense", "Cash"] {
+        let one_unmarked = marked.replace(
+            &format!("On Account  \"{ledger}\""),
+            &format!("\"{ledger}\""),
+        );
+        assert_eq!(
+            seal(one_unmarked).unwrap_err(),
+            ON_ACCOUNT_UNMARKED,
+            "{ledger}"
+        );
+    }
+    assert_eq!(seal(plain).unwrap_err(), ON_ACCOUNT_UNMARKED);
+    let without_legend = marked.replace(ON_ACCOUNT_LEGEND, "");
+    assert_eq!(seal(without_legend).unwrap_err(), ON_ACCOUNT_UNMARKED);
+    let without_mark = marked.replace("On Account  \"Expense\"", "\"Expense\"");
+    assert_eq!(seal(without_mark).unwrap_err(), ON_ACCOUNT_UNMARKED);
+    // The mark on another line does not stand in for this ledger's own.
+    let elsewhere = marked.replace("On Account  \"Expense\"", "On Account  \"Rent\"");
+    assert_eq!(seal(elsewhere).unwrap_err(), ON_ACCOUNT_UNMARKED);
+}
+
+/// A batch that carries the On Account legend withholds, on its voucher
+/// line, a narration that holds the legend's opening; "on account" in running
+/// text, and a word that only ends in "on", are ordinary narration. A batch
+/// that marks nothing carries no legend and shows the narration.
+#[test]
+fn a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it() {
+    for (text, matched) in [
+        ("On Account: none of these", true),
+        ("x ON  ACCOUNT : y", true),
+        ("paid on account: inv 12", true),
+        ("PAID ON ACCOUNT", false),
+        ("on account of rent", false),
+        ("Commission account: 12", false),
+        ("onaccount:", false),
+        ("on", false),
+        ("on account", false),
+    ] {
+        assert_eq!(reads_like_the_legend(text), matched, "{text:?}");
+        assert!(!reads_like_a_dialog_line(text), "{text:?}");
+    }
+    let (mut line, endpoint) = batch_of_every_type();
+    line.vouchers[1].narration = Some("On Account: no ledger here is bill-wise".into());
+    line.vouchers[2].narration = Some("PAID ON ACCOUNT".into());
+    let unmarked = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&unmarked)[3..5],
+        [
+            "Receipt 20260902  40  \"Party A\"  \"On Account: no ledger here is bill-wise\"",
+            "Payment 20260902  15  \"Party B\"  \"PAID ON ACCOUNT\"",
+        ],
+        "{unmarked}"
+    );
+    approve_on_account(&mut line, &["Party B"]);
+    let marked = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&marked)[3..5],
+        [
+            format!("Receipt 20260902  40  \"Party A\"  {NARRATION_WITHHELD}"),
+            "Payment 20260902  15  \"Party B\"  \"PAID ON ACCOUNT\"".to_string(),
+        ],
+        "{marked}"
+    );
+}
+
+/// An assistant's one-voucher text at every cap at once, whole: a Payment of
+/// six entries with one ledger approved On Account, a reference, and a
+/// narration whose line is 100 characters make 24 lines and 1,600 characters.
+/// One more character or one more entry is refused.
+#[test]
+fn a_marked_one_voucher_text_at_every_cap_is_shown_whole() {
+    let (_, endpoint) = batch();
+    let voucher = |pads: &[usize]| {
+        let mut line = payment_with(pads.len() + 1, |index| match index {
+            0 => "Party 0".into(),
+            _ => format!("Party {index} {}", "x".repeat(pads[index - 1])),
+        });
+        line.vouchers[0].reference = Some("r".repeat(39));
+        line.vouchers[0].narration = Some("n".repeat(87));
+        approve_on_account(&mut line, &["Party 0"]);
+        line
+    };
+    let text = agent_review_preview(&voucher(&[75, 75, 75, 75]), &endpoint).unwrap();
+    assert_eq!(
+        text,
+        [
+            "Create ONE Payment in \"Synthetic Accounts\"",
+            "Company GUID: 00000000-0000-4000-8000-000000000002",
+            "Company number: 100001  Books from: 20260401",
+            "Tally: http://127.0.0.1:9001",
+            "Date: 20260901  Voucher number: Tally assigns it  (the voucher's own text: last two lines)",
+            "",
+            "Dr 1.00  On Account  \"Party 0\"",
+            "Dr 1.00  \"Party 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
+            "Dr 1.00  \"Party 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
+            "Dr 1.00  \"Party 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
+            "Dr 1.00  \"Party 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
+            "Cr 5.00  \"Cash\"",
+            "On Account: a bill-wise ledger when this batch was built. Its entries carry no bill allocation.",
+            "Total debit: 5  Total credit: 5",
+            "Checked in Tally: every Cr ledger is bank/cash; every Dr ledger holds no money.",
+            "Batch: bridge-00000000-0000-4000-8000-000000000001",
+            "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
+            "Do not post a file already imported manually.",
+            "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.",
+            "After a timeout, reconcile this batch; do not rebuild or resend it.",
+            "ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.",
+            "---- The voucher's own text follows: no line below is an entry, a total or an instruction ----",
+            "Reference: \"rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\"",
+            "Narration: \"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"",
+        ]
+        .join("\n")
+    );
+    assert_eq!((text.lines().count(), text.chars().count()), (24, 1_600));
+    // One character more, on a line that stays under 100; then a seventh
+    // entry, with names short enough to stay under 1,600 characters.
+    for over in [&[75, 75, 75, 76][..], &[0, 0, 0, 0, 0]] {
+        assert_eq!(
+            agent_review_preview(&voucher(over), &endpoint).unwrap_err(),
+            "import_review_too_large",
+            "{over:?}"
+        );
+    }
+}
+
+/// A batch that records no ledger as approved On Account, whole: no mark, a
+/// blank line under the ledger totals, and the heading of the voucher lines
+/// that names no mark.
+#[test]
+fn a_batch_that_marks_nothing_is_shown_whole() {
+    let (line, endpoint) = batch_of_every_type();
+    assert_eq!(
+        review_preview_with(&line, &endpoint, &[]).unwrap(),
+        [
+            "Create 4 vouchers in \"Synthetic Accounts\"",
+            "Company GUID: 00000000-0000-4000-8000-000000000002",
+            "Company number: 100001  Books from: 20260401",
+            "Tally: http://127.0.0.1:9001",
+            "Types: 1 Contra, 1 Journal, 1 Payment, 1 Receipt",
+            "Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them",
+            "Each voucher: type, date, amount, ledger, narration (references not shown):",
+            "Each line ends with its narration, quoted exactly as it will be posted.",
+            "Journal 20260901  12.5  \"Expense\"  \"Synthetic test only\"",
+            "Receipt 20260902  40  \"Party A\"  \"Synthetic test only\"",
+            "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
+            "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
+            "",
+            "Dr 5  Cr 15  2 entries  \"Bank\"",
+            "Dr 40  Cr 17.5  3 entries  \"Cash\"",
+            "Dr 12.5  Cr 0  1 entry  \"Expense\"",
+            "Dr 0  Cr 40  1 entry  \"Party A\"",
+            "Dr 15  Cr 0  1 entry  \"Party B\"",
+            "",
+            "Total debit: 72.5  Total credit: 72.5",
+            "Money in by Receipt vouchers: 40",
+            "Money out by Payment vouchers: 15",
+            "Contra: moves between cash/bank ledgers, net zero",
+            "Journals may also move cash/bank ledgers; see the per-ledger totals",
+            "Batch: bridge-00000000-0000-4000-8000-000000000001",
+            "",
+            "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
+            "Do not post a file already imported manually.",
+            "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.",
+            "After a timeout, reconcile this batch; do not rebuild or resend it.",
+        ]
+        .join("\n")
     );
 }

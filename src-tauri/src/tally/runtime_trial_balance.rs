@@ -1,5 +1,9 @@
 //! One native report operation shared by desktop and MCP callers.
 use super::*;
+use bridge_tally_protocol::native_cash_flow::{
+    parse_native_cash_flow, render_native_cash_flow_request, NativeCashFlow, WholeMonthWindow,
+    WholeMonthWindowError,
+};
 use bridge_tally_protocol::native_statement_reports::{
     parse_native_statement, render_native_statement_request, NativeStatement, NativeStatementKind,
 };
@@ -172,6 +176,40 @@ struct StatementSources {
     profit_and_loss: Option<NativeStatement>,
 }
 
+/// What a Cash Flow read adds to a Trial Balance read: the group tree that
+/// classifies its ledgers and Tally's own Cash Flow for the same window.
+struct CashFlowSources {
+    trial_balance: SingleCurrencyTrialBalance,
+    groups: Vec<TallyNamedMaster>,
+    cash_flow: NativeCashFlow,
+}
+
+enum ExtraSources {
+    Statement(StatementSources),
+    CashFlow(CashFlowSources),
+}
+
+/// What a Trial Balance read is asked to read inside its bracket besides the
+/// Trial Balance itself.
+#[derive(Clone, Copy)]
+enum TrialBalanceExtras {
+    Nothing,
+    Statement(NativeStatementKind),
+    /// Tally's Cash Flow over whole months. The window is built inside the
+    /// bracket, once the mode's date boundary profile is known.
+    CashFlow,
+}
+
+/// A Cash Flow read: the Trial Balance it is checked against, Tally's own
+/// Cash Flow, the window it covers, and the check of the one against the other,
+/// all read inside one identity and book-extent bracket (#1232).
+#[derive(Debug, Clone)]
+pub(crate) struct CashFlowRead {
+    pub(crate) trial_balance: TrialBalanceRead,
+    pub(crate) cash_flow: NativeCashFlow,
+    pub(crate) check: crate::reports::cash_flow::CashFlowCheck,
+}
+
 /// An ordered caller-selected range. Profile-specific boundary admission stays
 /// inside the identity-bracketed runtime read.
 #[derive(Debug, Clone)]
@@ -199,6 +237,9 @@ pub(crate) enum TrialBalanceReadError {
     BeforeBooks,
     #[error("trial_balance_period_not_honoured")]
     Period(bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriodError),
+    /// The Cash Flow's window is not whole months inside the limit (#1232).
+    #[error("cash_flow_window_refused")]
+    CashFlowWindow(WholeMonthWindowError),
     #[error("{0}")]
     Currency(&'static str),
 }
@@ -209,6 +250,7 @@ impl TrialBalanceReadError {
             Self::EducationUnqualified => "trial_balance_education_unqualified",
             Self::BeforeBooks => "trial_balance_before_books",
             Self::Period(_) => "trial_balance_period_not_honoured",
+            Self::CashFlowWindow(error) => error.code(),
             Self::Currency(code) => code,
         }
     }
@@ -245,9 +287,15 @@ impl TallyRuntime {
         period: TrialBalancePeriod,
         scope: TrialBalanceCurrencyScope,
     ) -> anyhow::Result<(TrialBalanceRead, CompanyBookExtent)> {
-        self.fetch_trial_balance_sources(config, identity, period, scope, None)
-            .await
-            .map(|(read, _, extent)| (read, extent))
+        self.fetch_trial_balance_sources(
+            config,
+            identity,
+            period,
+            scope,
+            TrialBalanceExtras::Nothing,
+        )
+        .await
+        .map(|(read, _, extent)| (read, extent))
     }
 
     /// Tally's `kind` statement derived from the Trial Balance and group tree.
@@ -266,10 +314,12 @@ impl TallyRuntime {
                 identity,
                 period,
                 TrialBalanceCurrencyScope::SingleCurrency,
-                Some(kind),
+                TrialBalanceExtras::Statement(kind),
             )
             .await?;
-        let sources = sources.ok_or_else(|| anyhow::anyhow!("statement_sources_not_read"))?;
+        let Some(ExtraSources::Statement(sources)) = sources else {
+            return Err(anyhow::anyhow!("statement_sources_not_read"));
+        };
         let derived = crate::reports::statements::derive_statements(
             &sources.trial_balance,
             &sources.groups,
@@ -282,18 +332,49 @@ impl TallyRuntime {
         })
     }
 
+    /// Tally's own Cash Flow for whole months, with the Trial Balance of the
+    /// same window and the book's group tree read beside it, and the check of
+    /// the Cash Flow's net total against the cash and bank ledgers' movement.
+    /// All inside one identity and book-extent bracket; a several-currency book
+    /// is refused as for every statement.
+    pub(crate) async fn fetch_cash_flow(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        period: TrialBalancePeriod,
+    ) -> anyhow::Result<CashFlowRead> {
+        let (trial_balance, sources, _) = self
+            .fetch_trial_balance_sources(
+                config,
+                identity,
+                period,
+                TrialBalanceCurrencyScope::SingleCurrency,
+                TrialBalanceExtras::CashFlow,
+            )
+            .await?;
+        let Some(ExtraSources::CashFlow(sources)) = sources else {
+            return Err(anyhow::anyhow!("cash_flow_sources_not_read"));
+        };
+        let check = crate::reports::cash_flow::check_cash_flow(
+            &sources.trial_balance,
+            &sources.groups,
+            &sources.cash_flow,
+        )?;
+        Ok(CashFlowRead {
+            trial_balance,
+            cash_flow: sources.cash_flow,
+            check,
+        })
+    }
+
     async fn fetch_trial_balance_sources(
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         period: TrialBalancePeriod,
         scope: TrialBalanceCurrencyScope,
-        statement: Option<NativeStatementKind>,
-    ) -> anyhow::Result<(
-        TrialBalanceRead,
-        Option<StatementSources>,
-        CompanyBookExtent,
-    )> {
+        extras: TrialBalanceExtras,
+    ) -> anyhow::Result<(TrialBalanceRead, Option<ExtraSources>, CompanyBookExtent)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
         self.execute(
@@ -315,6 +396,15 @@ impl TallyRuntime {
                         let period =
                             NativeLedgerSnapshotPeriod::new(profile, from.clone(), to.clone())
                                 .map_err(TrialBalanceReadError::Period)?;
+                        // Before anything is sent for the report: a window that
+                        // is not whole months costs no request.
+                        let cash_flow_window = match extras {
+                            TrialBalanceExtras::CashFlow => Some(
+                                WholeMonthWindow::new(profile, from.clone(), to.clone())
+                                    .map_err(TrialBalanceReadError::CashFlowWindow)?,
+                            ),
+                            _ => None,
+                        };
                         bracket_verified_company_identity(&client, &identity).await?;
                         let extent = client.fetch_company_book_extent(&identity).await?;
                         if from < *extent.books_from() {
@@ -417,9 +507,54 @@ impl TallyRuntime {
                             ),
                         };
                         let totals = crate::reports::trial_balance::observed_totals(&report)?;
-                        let sources = match statement {
-                            None => None,
-                            Some(kind) => {
+                        let sources = match extras {
+                            TrialBalanceExtras::Nothing => None,
+                            TrialBalanceExtras::CashFlow => {
+                                let Some(window) = &cash_flow_window else {
+                                    return Err(anyhow::anyhow!("cash_flow_window_not_built"));
+                                };
+                                let request =
+                                    render_native_group_snapshot_request(identity.display_name());
+                                let (xml, bytes, hash) = client
+                                    .fetch_native_report_paired(request.clone())
+                                    .await?
+                                    .require_stable(PairedReadValidationError::NativeLedgerGroup)?;
+                                evidence = evidence
+                                    .clone()
+                                    .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                                let groups =
+                                    parse_native_group_snapshot(&xml, identity.company_guid())?;
+                                let request = render_native_cash_flow_request(
+                                    identity.display_name(),
+                                    window,
+                                );
+                                let (xml, bytes, hash) = client
+                                    .fetch_native_report_paired(request.clone())
+                                    .await?
+                                    .require_stable(PairedReadValidationError::NativeCashFlow)?;
+                                evidence = evidence
+                                    .clone()
+                                    .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                                let cash_flow = parse_native_cash_flow(&xml, window)?;
+                                // A several-currency book was refused above
+                                // (`fetch_cash_flow` asks for the single-currency
+                                // scope); a partial read never reaches a check.
+                                let TrialBalanceAdmission::SingleInr(admission) = &admitted else {
+                                    return Err(TrialBalanceReadError::Currency(
+                                        "company_base_currency_undetermined",
+                                    )
+                                    .into());
+                                };
+                                Some(ExtraSources::CashFlow(CashFlowSources {
+                                    trial_balance: SingleCurrencyTrialBalance::admitted(
+                                        report.clone(),
+                                        admission,
+                                    ),
+                                    groups,
+                                    cash_flow,
+                                }))
+                            }
+                            TrialBalanceExtras::Statement(kind) => {
                                 let request =
                                     render_native_group_snapshot_request(identity.display_name());
                                 let (xml, bytes, hash) = client
@@ -478,7 +613,7 @@ impl TallyRuntime {
                                     )
                                     .into());
                                 };
-                                Some(StatementSources {
+                                Some(ExtraSources::Statement(StatementSources {
                                     trial_balance: SingleCurrencyTrialBalance::admitted(
                                         report.clone(),
                                         admission,
@@ -486,7 +621,7 @@ impl TallyRuntime {
                                     groups,
                                     balance_sheet,
                                     profit_and_loss,
-                                })
+                                }))
                             }
                         };
                         let closing_extent = client.fetch_company_book_extent(&identity).await?;

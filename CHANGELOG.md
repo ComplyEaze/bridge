@@ -36,13 +36,37 @@ These changes are in source and not yet in a published build.
   trail reads carries for it, so a party detail that finds no bill or no unallocated
   row for such a ledger says `report_spelling: not_established`; that the first name
   list is the primary language (#1085).
+- `cash_flow` reads Tally's own Cash Flow for whole months (the month-wise
+  movement of the cash and bank ledgers, not a cash flow statement under AS 3). The
+  months are returned only after their net total has been compared with the
+  trial balance's cash and bank ledgers and found equal; the split into months is
+  Tally's own and is not checked, and Tally's debit and credit columns are not
+  returned. A ledger under Bank OD A/c or Bank OCC A/c with movement refuses the
+  result: Tally was seen counting one such ledger, which the check does not yet
+  count, and the refusal is covered by tests and has not been seen against Tally.
+  The tool was run against Tally on two synthetic books: the net total tied on
+  five windows (three with only debits, two with a credit amount, one of them
+  with a positive closing as well) and a quiet window was answered as nothing to
+  compare. Tally's own answers were captured on four synthetic books in all, one
+  of them a year of empty months on a large book. A Bank OD credit or a Bank OCC ledger, a contra, a month with entries that
+  cancel, a window ending in February, a window crossing a financial year,
+  optional or post-dated vouchers, a several-currency book and a large book with
+  cash activity are not measured.
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
-  `amount`), and can add a window up by ledger, month or voucher type
-  (`summarise_by`), with debit, credit and voucher counts per bucket and the
-  cancelled, optional and entry-less vouchers counted apart. Both run on the
-  rows the window read already holds, so they send no new request to Tally; a
-  zero from a counted window is a checked zero. A narration phrase is refused
+  `amount`), and can add a window up by ledger, month, voucher type, group or
+  primary group (`summarise_by`), with debit, credit and voucher counts per bucket and the
+  cancelled, optional and entry-less vouchers counted apart. Search and the
+  ledger, month and voucher-type summaries run on the rows the window read already
+  holds and send no new request to Tally; the group and primary-group summaries
+  also read the ledger list and the group list, before and after the window. They
+  refuse when any ledger's group chain, or the set of ledgers, changed meanwhile, and
+  when a ledger the window touches cannot be placed, so no entry is left out of a
+  group total, naming the ledger it could not place. A book whose master-alteration
+  mark is above 11,983 (a provisional limit, computed and not measured, about half of what the transport admits for the same list) is refused before the
+  ledger list is read. A `group` summary also
+  gives each group's whole figure, descendants included, as `subtree_totals`, and every
+  row says what it `covers`. A zero from a counted window is a checked zero. A narration phrase is refused
   where narrations are withheld from the assistant. A summary sums post-dated
   vouchers (counted, with the vouchers Tally sent no flag for counted apart) and any
   non-posting voucher type a book uses, and says so in the result. Checked once
@@ -50,7 +74,15 @@ These changes are in source and not yet in a published build.
   equalled the sums over the listed vouchers, the ledger buckets equalled
   `trial_balance` for the same year, and each search returned what the same
   criterion selects from the listing; it did not cover a large book, a memorandum,
-  a reversing journal or a voucher withheld for a foreign-currency amount (#1230).
+  a reversing journal or a voucher withheld for a foreign-currency amount. That check
+  covered search and the ledger, month and voucher-type summaries. A second check on
+  7 October 2026 on the same book read the whole year once as `group` and once as
+  `primary_group`: 12 and 8 buckets over the 64 vouchers that count (a cancelled, an optional and
+  an entry-less voucher left out); every group bucket equalled the ledger buckets added up by the
+  trial balance's own parent column, the 18 `subtree_totals` equalled the trial balance rolled up
+  the group tree, and each call took 64 requests (the window's 34 and the group modes' 30, as counted from the code) and
+  about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
+  read, or a held later page (#1230).
 
 **Safer or fixed**
 
@@ -82,8 +114,9 @@ These changes are in source and not yet in a published build.
   nothing else. `ledger_movement`, `verify_import`, `outstandings` and that check
   are unchanged. Not measured against a live book: what Tally does when it cannot serve the
   count, which refuses the call as `volume_unestimated` where the small book used
-  to answer `partial` (it served the count every time in the run above), and a
-  larger book (#1029).
+  to answer `partial` (it served the count every time in the run above), a
+  larger book, and the registers and the Ledger Entries screen, which use the same
+  count but were not called live (#1029).
 - `profit_and_loss` now compares Tally's `Cost of Sales :` heading with the
   derived cost of sales (Purchase Accounts plus Direct Expenses) even when the
   heading reads zero or empty. Over a non-zero cost of sales such a heading
@@ -109,8 +142,30 @@ These changes are in source and not yet in a published build.
   is refused for posting as `import_batch_predates_bill_wise_record` and is
   rebuilt (check first whether its file was already imported by hand). The
   approval is the assistant's word, not proof that a person said yes, and a hand
-  import of the file is not checked. Not measured: a large book, and the bills
-  of a ledger whose flag reads No (#1234).
+  import of the file is not checked. The approval dialog of a native post
+  shows the person which ledgers these are: "On Account" stands before the name
+  of each approved ledger, on each of its entries for one voucher and on its
+  totals line for a batch, with one sentence saying the ledger was bill-wise
+  when the batch was built and its entries carry no bill allocation; the
+  desktop Journal review shows the mark and the sentence too. A batch's
+  per-voucher lines carry no mark, and their heading then says it is marked
+  below; in such a batch a narration that holds the sentence's opening is
+  withheld on its per-voucher line. A dialog that
+  cannot show the mark refuses. The mark adds no line, only characters, so a
+  batch already at the dialog's 100-character line limit or its character
+  limit can now be refused as too large (`import_review_too_large`). The
+  dialog for one voucher ends with the voucher's own text: its reference and
+  narration are the last two lines, quoted as they will be posted, under a
+  line saying that no line below it is an entry, a total or an instruction;
+  every line the dialog writes itself stands above that line, and the date
+  line says where the two are. That line and the note on the date line count
+  toward the dialog's 100-character line limit and its 1,600-character limit.
+  Looked at once on each system, with a one-voucher text at all three limits
+  (24 lines, 1,600 characters, a 100-character narration line): on one Mac
+  and on one Windows PC the whole text, its last two lines included, and the
+  buttons were visible without scrolling. Not measured: a smaller screen or a
+  larger display scaling, a batch dialog on either system, a large book, and
+  the bills of a ledger whose flag reads No (#1234).
 - Versions 0.3.0 to 0.4.2 refuse to post a batch this version builds. They do
   not read the cash-in-hand and bill-wise records a saved batch now carries,
   so after a rollback they could have posted it with neither check; the batch's

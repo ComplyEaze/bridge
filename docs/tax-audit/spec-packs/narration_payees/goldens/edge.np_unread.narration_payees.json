@@ -1,0 +1,784 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "narration_payees",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "491f22a8d7ad83c5",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded): debits to the ledgers the client lists, and any 194C-mapped ledger whose payees the TDS payee test could not name, when that test's finding lists them; bank payments read for the printed payee.",
+  "figures": [
+    {
+      "id": "narration_payees.added_ledgers_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "67832d0c861c0d90",
+      "definition_text": "194C-mapped ledgers read besides those the client lists, because the TDS payee test could not name the payee of their payments (its finding lists them; on a book whose vouchers share a blank or repeated identifier, a ledger debited on another voucher with the same identifier too). With no ledger listed or added, nothing was read.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.configured_ledgers_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "db736a29e0c67c2e",
+      "definition_text": "Ledgers the client lists as paid to payees named only in the bank narration.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.cut_handle_unjoined_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "572435bbb39da9af",
+      "definition_text": "Bank payments whose UPI address one bank printed cut short and no single full address among the bank payments completes under an agreeing name (none, several, or one printed under another name): joined to no other payee by it.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.elsewhere_over_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "1b9226a248db354e",
+      "definition_text": "Payees under both s.194C limits on the ledgers read, whose total with their debits to other ledgers exceeds the aggregate limit, or one of whose payments debits other ledgers by more than the single-sum limit.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.elsewhere_over_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "bef05cdfc659c919",
+      "definition_text": "The debits to other ledgers of every such payee, added together.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.not_through_bank_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "62b8d7662ebec896",
+      "definition_text": "Debits on the ledgers read with no bank leg (cash or journal): no payee is read from a bank narration for them.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "b6f907568524af65",
+      "definition_text": "Distinct payees printed by the bank: payments sharing a printed name or a whole UPI handle are one payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_over_194c_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "2400a2096d06bfa0",
+      "definition_text": "Of those, payees over a s.194C threshold.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_over_194c_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "121fee500217c9d5",
+      "definition_text": "Total paid to the payees over a threshold.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.placeholder_payee_total",
+      "value": 3134,
+      "unit": "paise",
+      "definition_sha256_16": "78e46136ab75d08c",
+      "definition_text": "Bank payments on the ledgers read where the bank printed a placeholder (such as \"Bank Acc\" or \"PhonePe\") in place of the payee: not read as any payee.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "u40",
+          "label": "Payment u40 on 2025-05-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "u41",
+          "label": "Payment u41 on 2025-05-02"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.possible_same_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "4f94c204008d6113",
+      "definition_text": "Groups of payees that a shortened UPI address might join, listed apart and never joined.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.resolved_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "0a0479b3fe570ca0",
+      "definition_text": "Total bank payments with a printed payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.same_day_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f0d6e165f7e7002d",
+      "definition_text": "Payees paid two or more times on one day, the day's total over the s.194C single-sum limit, counted once per payee and day.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.same_day_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8bc394ef74148d1d",
+      "definition_text": "The day totals of every payee paid more than once on one day, over the s.194C single-sum limit, added together.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.unresolved_bank_total",
+      "value": 97105,
+      "unit": "paise",
+      "definition_sha256_16": "bb150e6493cc3554",
+      "definition_text": "Bank payments on the ledgers read whose narration names no payee that can be read (a placeholder in place of the payee included).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "u01",
+          "label": "Payment u01 on 2025-04-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "u02",
+          "label": "Payment u02 on 2025-04-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "u03",
+          "label": "Payment u03 on 2025-04-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "u04",
+          "label": "Payment u04 on 2025-04-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "u05",
+          "label": "Payment u05 on 2025-04-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "u06",
+          "label": "Payment u06 on 2025-04-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "u07",
+          "label": "Payment u07 on 2025-04-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "u08",
+          "label": "Payment u08 on 2025-04-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "u09",
+          "label": "Payment u09 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "u10",
+          "label": "Payment u10 on 2025-04-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "u11",
+          "label": "Payment u11 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "u12",
+          "label": "Payment u12 on 2025-04-13"
+        },
+        {
+          "kind": "voucher",
+          "id": "u20",
+          "label": "Payment u20 on 2025-04-14"
+        },
+        {
+          "kind": "voucher",
+          "id": "u21",
+          "label": "Payment u21 on 2025-04-15"
+        },
+        {
+          "kind": "voucher",
+          "id": "u22",
+          "label": "Payment u22 on 2025-04-16"
+        },
+        {
+          "kind": "voucher",
+          "id": "u23",
+          "label": "Payment u23 on 2025-04-17"
+        },
+        {
+          "kind": "voucher",
+          "id": "u24",
+          "label": "Payment u24 on 2025-04-18"
+        },
+        {
+          "kind": "voucher",
+          "id": "u25",
+          "label": "Payment u25 on 2025-04-19"
+        },
+        {
+          "kind": "voucher",
+          "id": "u30",
+          "label": "Payment u30 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "u31",
+          "label": "Payment u31 on 2025-04-21"
+        },
+        {
+          "kind": "voucher",
+          "id": "u32",
+          "label": "Payment u32 on 2025-04-22"
+        },
+        {
+          "kind": "voucher",
+          "id": "u33",
+          "label": "Payment u33 on 2025-04-23"
+        },
+        {
+          "kind": "voucher",
+          "id": "u34",
+          "label": "Payment u34 on 2025-04-24"
+        },
+        {
+          "kind": "voucher",
+          "id": "u35",
+          "label": "Payment u35 on 2025-04-25"
+        },
+        {
+          "kind": "voucher",
+          "id": "u36",
+          "label": "Payment u36 on 2025-04-26"
+        },
+        {
+          "kind": "voucher",
+          "id": "u37",
+          "label": "Payment u37 on 2025-04-27"
+        },
+        {
+          "kind": "voucher",
+          "id": "u38",
+          "label": "Payment u38 on 2025-04-28"
+        },
+        {
+          "kind": "voucher",
+          "id": "u40",
+          "label": "Payment u40 on 2025-05-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "u41",
+          "label": "Payment u41 on 2025-05-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "u42",
+          "label": "Payment u42 on 2025-05-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "u43",
+          "label": "Payment u43 on 2025-05-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "u44",
+          "label": "Payment u44 on 2025-05-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "u45",
+          "label": "Payment u45 on 2025-05-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "u46",
+          "label": "Payment u46 on 2025-05-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "u47",
+          "label": "Payment u47 on 2025-05-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "u48",
+          "label": "Payment u48 on 2025-05-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "u49",
+          "label": "Payment u49 on 2025-05-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "u50",
+          "label": "Payment u50 on 2025-05-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "u51",
+          "label": "Payment u51 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "u52",
+          "label": "Payment u52 on 2025-05-13"
+        },
+        {
+          "kind": "voucher",
+          "id": "u60",
+          "label": "Payment u60 on 2025-05-14"
+        },
+        {
+          "kind": "voucher",
+          "id": "u61",
+          "label": "Payment u61 on 2025-05-15"
+        },
+        {
+          "kind": "voucher",
+          "id": "u62",
+          "label": "Payment u62 on 2025-05-16"
+        },
+        {
+          "kind": "voucher",
+          "id": "u63",
+          "label": "Payment u63 on 2025-05-17"
+        },
+        {
+          "kind": "voucher",
+          "id": "u64",
+          "label": "Payment u64 on 2025-05-18"
+        },
+        {
+          "kind": "voucher",
+          "id": "u65",
+          "label": "Payment u65 on 2025-05-19"
+        },
+        {
+          "kind": "voucher",
+          "id": "u66",
+          "label": "Payment u66 on 2025-05-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "u67",
+          "label": "Payment u67 on 2025-05-21"
+        },
+        {
+          "kind": "voucher",
+          "id": "u68",
+          "label": "Payment u68 on 2025-05-22"
+        },
+        {
+          "kind": "voucher",
+          "id": "u69",
+          "label": "Payment u69 on 2025-05-23"
+        },
+        {
+          "kind": "voucher",
+          "id": "u70",
+          "label": "Payment u70 on 2025-05-24"
+        },
+        {
+          "kind": "voucher",
+          "id": "u71",
+          "label": "Payment u71 on 2025-05-25"
+        },
+        {
+          "kind": "voucher",
+          "id": "u72",
+          "label": "Payment u72 on 2025-05-26"
+        },
+        {
+          "kind": "voucher",
+          "id": "u73",
+          "label": "Payment u73 on 2025-05-27"
+        },
+        {
+          "kind": "voucher",
+          "id": "u74",
+          "label": "Payment u74 on 2025-05-28"
+        },
+        {
+          "kind": "voucher",
+          "id": "u80",
+          "label": "Payment u80 on 2025-06-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "u81",
+          "label": "Payment u81 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "u82",
+          "label": "Payment u82 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "u83",
+          "label": "Payment u83 on 2025-06-04"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "narration_payees/recipient_not_read",
+      "clauses": [
+        "s.194C"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "narration_payees.unresolved_bank_total"
+        },
+        {
+          "name": "placeholders",
+          "figure_id": "narration_payees.placeholder_payee_total"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "u01",
+          "label": "Payment u01 on 2025-04-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "u02",
+          "label": "Payment u02 on 2025-04-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "u03",
+          "label": "Payment u03 on 2025-04-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "u04",
+          "label": "Payment u04 on 2025-04-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "u05",
+          "label": "Payment u05 on 2025-04-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "u06",
+          "label": "Payment u06 on 2025-04-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "u07",
+          "label": "Payment u07 on 2025-04-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "u08",
+          "label": "Payment u08 on 2025-04-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "u09",
+          "label": "Payment u09 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "u10",
+          "label": "Payment u10 on 2025-04-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "u11",
+          "label": "Payment u11 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "u12",
+          "label": "Payment u12 on 2025-04-13"
+        },
+        {
+          "kind": "voucher",
+          "id": "u20",
+          "label": "Payment u20 on 2025-04-14"
+        },
+        {
+          "kind": "voucher",
+          "id": "u21",
+          "label": "Payment u21 on 2025-04-15"
+        },
+        {
+          "kind": "voucher",
+          "id": "u22",
+          "label": "Payment u22 on 2025-04-16"
+        },
+        {
+          "kind": "voucher",
+          "id": "u23",
+          "label": "Payment u23 on 2025-04-17"
+        },
+        {
+          "kind": "voucher",
+          "id": "u24",
+          "label": "Payment u24 on 2025-04-18"
+        },
+        {
+          "kind": "voucher",
+          "id": "u25",
+          "label": "Payment u25 on 2025-04-19"
+        },
+        {
+          "kind": "voucher",
+          "id": "u30",
+          "label": "Payment u30 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "u31",
+          "label": "Payment u31 on 2025-04-21"
+        },
+        {
+          "kind": "voucher",
+          "id": "u32",
+          "label": "Payment u32 on 2025-04-22"
+        },
+        {
+          "kind": "voucher",
+          "id": "u33",
+          "label": "Payment u33 on 2025-04-23"
+        },
+        {
+          "kind": "voucher",
+          "id": "u34",
+          "label": "Payment u34 on 2025-04-24"
+        },
+        {
+          "kind": "voucher",
+          "id": "u35",
+          "label": "Payment u35 on 2025-04-25"
+        },
+        {
+          "kind": "voucher",
+          "id": "u36",
+          "label": "Payment u36 on 2025-04-26"
+        },
+        {
+          "kind": "voucher",
+          "id": "u37",
+          "label": "Payment u37 on 2025-04-27"
+        },
+        {
+          "kind": "voucher",
+          "id": "u38",
+          "label": "Payment u38 on 2025-04-28"
+        },
+        {
+          "kind": "voucher",
+          "id": "u40",
+          "label": "Payment u40 on 2025-05-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "u41",
+          "label": "Payment u41 on 2025-05-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "u42",
+          "label": "Payment u42 on 2025-05-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "u43",
+          "label": "Payment u43 on 2025-05-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "u44",
+          "label": "Payment u44 on 2025-05-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "u45",
+          "label": "Payment u45 on 2025-05-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "u46",
+          "label": "Payment u46 on 2025-05-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "u47",
+          "label": "Payment u47 on 2025-05-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "u48",
+          "label": "Payment u48 on 2025-05-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "u49",
+          "label": "Payment u49 on 2025-05-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "u50",
+          "label": "Payment u50 on 2025-05-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "u51",
+          "label": "Payment u51 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "u52",
+          "label": "Payment u52 on 2025-05-13"
+        },
+        {
+          "kind": "voucher",
+          "id": "u60",
+          "label": "Payment u60 on 2025-05-14"
+        },
+        {
+          "kind": "voucher",
+          "id": "u61",
+          "label": "Payment u61 on 2025-05-15"
+        },
+        {
+          "kind": "voucher",
+          "id": "u62",
+          "label": "Payment u62 on 2025-05-16"
+        },
+        {
+          "kind": "voucher",
+          "id": "u63",
+          "label": "Payment u63 on 2025-05-17"
+        },
+        {
+          "kind": "voucher",
+          "id": "u64",
+          "label": "Payment u64 on 2025-05-18"
+        },
+        {
+          "kind": "voucher",
+          "id": "u65",
+          "label": "Payment u65 on 2025-05-19"
+        },
+        {
+          "kind": "voucher",
+          "id": "u66",
+          "label": "Payment u66 on 2025-05-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "u67",
+          "label": "Payment u67 on 2025-05-21"
+        },
+        {
+          "kind": "voucher",
+          "id": "u68",
+          "label": "Payment u68 on 2025-05-22"
+        },
+        {
+          "kind": "voucher",
+          "id": "u69",
+          "label": "Payment u69 on 2025-05-23"
+        },
+        {
+          "kind": "voucher",
+          "id": "u70",
+          "label": "Payment u70 on 2025-05-24"
+        },
+        {
+          "kind": "voucher",
+          "id": "u71",
+          "label": "Payment u71 on 2025-05-25"
+        },
+        {
+          "kind": "voucher",
+          "id": "u72",
+          "label": "Payment u72 on 2025-05-26"
+        },
+        {
+          "kind": "voucher",
+          "id": "u73",
+          "label": "Payment u73 on 2025-05-27"
+        },
+        {
+          "kind": "voucher",
+          "id": "u74",
+          "label": "Payment u74 on 2025-05-28"
+        },
+        {
+          "kind": "voucher",
+          "id": "u80",
+          "label": "Payment u80 on 2025-06-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "u81",
+          "label": "Payment u81 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "u82",
+          "label": "Payment u82 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "u83",
+          "label": "Payment u83 on 2025-06-04"
+        }
+      ],
+      "title_sha256_16": "470a0a725268fb8c",
+      "title_text": "Bank payments whose recipient the bank narration does not give: the recipient of each is not known",
+      "limits_sha256_16": "c1f0b20d2bedd375",
+      "limits_text": [
+        "The narration of each payment listed names no one, carries a placeholder in place of the payee (such as \"Bank Acc\" for a transfer to an account, or \"PhonePe\" for a bill paid through it), or prints the payee in a form not read here. So these payments are counted under no payee and no s.194C limit is tested on them; one recipient may have been paid several of them."
+      ],
+      "ask_client_sha256_16": "7fcbc1b345c6703b",
+      "ask_client_text": [
+        "The recipient of each payment listed, and what it was for."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "narration_payees.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

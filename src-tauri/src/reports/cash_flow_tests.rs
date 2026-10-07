@@ -253,8 +253,8 @@ fn an_inflow_and_an_outflow_in_one_ledger_net_in_the_tie() {
 }
 
 #[test]
-fn a_bank_od_ledger_with_movement_is_refused_until_it_has_been_measured() {
-    // synthetic: Tally's cash flow may or may not count a Bank OD A/c ledger; unmeasured.
+fn a_bank_od_ledger_with_movement_is_refused_because_the_check_does_not_count_it() {
+    // synthetic: Tally was seen counting a Bank OD A/c ledger (one book); the check does not, so it refuses.
     let rows = vec![
         row("W1 Bank", "Bank Accounts", "-100.00", ""),
         row("HDFC CC", "Bank OD A/c", "-250.00", ""),
@@ -510,7 +510,7 @@ fn a_bank_od_ledger_with_movement_is_refused_by_the_check_and_is_what_the_differ
     };
     let mut with_bank_od = money();
     with_bank_od.push(row("HDFC CC", "Bank OD A/c", "-2600.00", ""));
-    // The check does not guess: a Bank OD ledger with movement is not measured, so it is refused.
+    // The check does not count a Bank OD ledger that Tally counts, so it refuses instead of tying.
     assert_eq!(
         check(with_bank_od, &cash_flow),
         CashFlowCheck::MoneyGroupUnmeasured { ledgers: 1 }

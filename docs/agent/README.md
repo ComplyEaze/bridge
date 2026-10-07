@@ -440,7 +440,7 @@ was never compared with Tally's own Cash Flow screen: `credit_amount_present` (a
 credit column), `positive_closing` (a closing on the credit side) and
 `window_runs_from_march_into_april` (a window across a financial year of the usual
 April-to-March kind). The first two were seen tied to the trial balance in live runs on one
-synthetic book (two windows) and are still named; the third was never run. The list is empty only for
+synthetic book (a credit in two windows, a positive closing in one of them) and are still named; the third was never run. The list is empty only for
 debit-only months in one year, and when it is not empty the lead says to treat each month's
 figure as unverified and compare it with Tally's own Cash Flow. A bank ledger placed under
 another group, a liability one for example, is not counted as cash or bank: if Tally
@@ -473,14 +473,14 @@ one call at a time through a recording relay): on five windows the net total tie
 balance and the months were returned (three windows with debits only; two with a credit amount,
 one of them with a positive closing as well), and a quiet window with no cash or bank amount was
 answered as `cash_flow_nothing_to_compare`. An independent recomputation from the raw bytes
-agreed with the tool on all six. Tally's own answers were also captured on three more books: on
+agreed with the tool on all six. Tally's own answers were captured on four synthetic books in all: on
 every captured month with an amount the closing is the debit plus the credit, and a year of empty
 months on a large book was answered at once. Not measured: a ledger under Bank OD A/c or Bank OCC
 A/c in the tool's own run (Tally was seen counting a Bank OD ledger, so the refusal above stands in
 place of a difference; it is covered by tests only), what Tally's debit and credit columns each
-include (each differed from the totals of the ledgers Tally counts as cash and bank by one common amount in size (the ledgers' columns larger in both) while the net tied; on one book that set includes a Bank OD A/c ledger), a window
-crossing a financial year, optional or post-dated vouchers, a book with several currencies, and a
-large book with cash activity.
+include (each differed from the totals of the ledgers Tally counts as cash and bank by one common amount in size (the ledgers' columns larger in both) while the net tied; on one book that set includes a Bank OD A/c ledger), a contra, a window
+ending in February, a window crossing a financial year, optional or post-dated vouchers, a book with
+several currencies, and a large book with cash activity.
 
 ### Stock Summary
 

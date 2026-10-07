@@ -241,7 +241,7 @@ until you accept the new version (section 4). A server started by hand with
   Cash-in-Hand for a bank cash answer (with the voucher label), and the
   bill-wise ledgers you approved to receive entries On Account (with the
   64-character fingerprint your approval matched when the batch was built, a
-  short code made from that party's rows and the batch; it is kept as a record
+  short code made from that party's rows, the batch and the company; it is kept as a record
   and is not checked again when the batch is posted). These records hold ledger
   names and fingerprints, and no new amounts, PAN, bank account numbers or
   contact details. It also holds the proof-of-post files that hold what Tally

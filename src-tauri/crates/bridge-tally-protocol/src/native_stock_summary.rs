@@ -684,7 +684,9 @@ fn position(
 /// refuses. The row reader turns that refusal into an unread quantity
 /// ([`position`]); a quantity must pass this grammar before one is ever
 /// returned.
-fn quantity(text: Option<String>) -> Result<Option<NativeStockQuantity>, NativeStockError> {
+pub(crate) fn quantity(
+    text: Option<String>,
+) -> Result<Option<NativeStockQuantity>, NativeStockError> {
     let Some(text) = text else {
         return Ok(None);
     };

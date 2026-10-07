@@ -375,3 +375,25 @@ test("does not admit Journal actions before native lifecycle protection is ready
   expect(mocks.invoke).not.toHaveBeenCalled();
   root.unmount();
 });
+
+test("marks an entry sent as On Account and shows its note only when sent (#1234)", async () => {
+  const note = "On Account: a bill-wise ledger when this batch was built. Its entries carry no bill allocation.";
+  const cells = async (details: typeof review.details & { onAccountNote?: string }) => {
+    mocks.invoke.mockResolvedValueOnce({ ...review, details });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => { root.render(<JournalPostingScreen config={config} />); });
+    await act(async () => { button(host, "Choose Journal file").click(); });
+    const shown = {
+      marks: [...host.querySelectorAll("tbody td:first-child")].map((cell) => cell.querySelector("strong")?.textContent ?? null),
+      note: host.textContent?.includes(note) ?? false,
+    };
+    root.unmount();
+    return shown;
+  };
+  expect(await cells(review.details)).toEqual({ marks: [null, null], note: false });
+  const [expense, cash] = review.details.entries;
+  expect(await cells({ ...review.details, entries: [{ ...expense, onAccount: true }, { ...cash, onAccount: false }], onAccountNote: note }))
+    .toEqual({ marks: ["On Account", null], note: true });
+});

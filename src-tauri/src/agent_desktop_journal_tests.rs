@@ -487,6 +487,54 @@ fn review_refuses_selected_xml_from_a_superseded_full_record() {
     assert_eq!(review.details.narration.as_deref(), Some("Updated Journal"));
 }
 
+/// The review screen marks each entry on a ledger the batch records as
+/// approved to take entries On Account, and carries the native dialog's own
+/// sentence for the mark, as that dialog does next (#1234); a batch that
+/// records none carries neither.
+#[test]
+fn review_marks_each_entry_on_a_ledger_approved_on_account() {
+    for (approved, flags, note) in [
+        (json!([]), [false, false], None),
+        (
+            json!([{"ledger":"Expense","party_digest":"a".repeat(64)}]),
+            [true, false],
+            Some(super::post::ON_ACCOUNT_LEGEND),
+        ),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let (service, line) = service_recording(
+            directory.path().join("agent"),
+            None,
+            TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: 9001,
+            },
+            approved,
+        );
+        let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+        std::fs::write(
+            service
+                .server
+                .imports_dir()
+                .unwrap()
+                .join(format!("{}.xml", line.batch_id)),
+            &xml,
+        )
+        .unwrap();
+        let review = service.review_selected_xml(xml.as_bytes()).unwrap();
+        assert_eq!(
+            review
+                .details
+                .entries
+                .iter()
+                .map(|entry| entry.on_account)
+                .collect::<Vec<_>>(),
+            flags
+        );
+        assert_eq!(review.details.on_account_note.as_deref(), note);
+    }
+}
+
 /// The desktop Journal review screen shows the narration the post sends
 /// (#1055, after #1223): without outer whitespace, including spaces HTML would
 /// keep such as U+00A0, and one of only spaces reads as absent, since both

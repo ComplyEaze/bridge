@@ -1680,7 +1680,7 @@ fn a_cost_centre_category_over_the_name_bound_is_refused() {
     );
 }
 
-// ---- the same collections on a book whose Cost Centres setting reads Yes (captured 7 Oct 2026 by another lane, scrubbed) ----
+// ---- the same collections on a book whose Cost Centres setting reads Yes (captured 7 Oct 2026 in a separate sitting, scrubbed) ----
 
 /// The parity book's synthetic company GUID, as scrubbed in the fixtures.
 const PARITY_COMPANY: &str = "7c0de000-0000-4000-8000-0000000000a1";

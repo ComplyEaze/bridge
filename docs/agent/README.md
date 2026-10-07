@@ -343,7 +343,7 @@ Cost centres and categories are returned whether or not the company's Cost
 Centres setting is on: a book whose setting read No still returned its two
 centres and two categories (one synthetic book), and a book whose setting read Yes
 returned its three centres, one under another, with the same shape (a third synthetic
-book, captured by another lane), so a No setting is not "no centres", and an empty cost-centre list (one synthetic book with none defined
+book, captured in a separate sitting), so a No setting is not "no centres", and an empty cost-centre list (one synthetic book with none defined
 answered one) does not say whether the feature is off or none is defined; this
 call does not return the setting. An empty cost-category list is refused
 (`masters_cost_categories_empty`) on the expectation that the predefined Primary Cost

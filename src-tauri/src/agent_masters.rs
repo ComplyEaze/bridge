@@ -107,7 +107,7 @@ impl Server {
                     "An empty list of cost centres does not say whether the feature is off or no centre is defined; one book with none defined answered an empty list",
                     "An empty list of cost categories is refused, on the expectation that the predefined Primary Cost Category always exists: it was present in the two books whose categories were captured (one with the setting at No, one at Yes), and the categories of a book with none defined were not captured",
                     "ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool reads those allocations yet, so their absence from any other tool's answer says nothing",
-                    "Measured on three synthetic books for cost centres and two for cost categories (the first two on one release; the third was captured by another lane and its release was not recorded here); centres nested more than one level deep, a centre with an alias beyond its own name and a larger book are not measured, and a larger book is refused when its master mark is too large for the response budget",
+                    "Measured on three synthetic books for cost centres and two for cost categories (the first two on one release; the third was captured in a separate sitting and its release was not recorded here); centres nested more than one level deep, a centre with an alias beyond its own name and a larger book are not measured, and a larger book is refused when its master mark is too large for the response budget",
                 ]);
             }
             MastersKind::Groups => limitations.push(

@@ -51,9 +51,9 @@ Voucher types, godowns, units, stock groups, cost centres and cost categories, e
 | `masters_cost_categories_shape_lab_live.utf16le.xml` | 5782 | `e61714960d2c365c93805366c2021703eb885891be684b8c879d1721056c9b7b` | cost categories | 2 |
 | `masters_cost_centres_corpus_forex_empty_live.utf16le.xml` | 2996 | `9ec9b8fbbfc810101a9cfe8a4a8b1a82df383be0c678400cf3e5ab82d954909a` | cost centres | 0 |
 
-### Cost centres and categories on a book with the setting at Yes (captured 2026-10-07 by another lane)
+### Cost centres and categories on a book with the setting at Yes (captured 2026-10-07 in a separate sitting)
 
-A third synthetic book, the parity lab, whose Cost Centres setting read Yes (the Company flag `ISCOSTCENTRESON`, equal to the owner's screen), captured through the same collection requests as the files above (that capture records no release or licence; the capturing lane reported licensed TallyPrime 7.1 Silver). The fixtures are **scrubbed copies**: the company GUID prefix is replaced with a synthetic one and the three lab centre names with `Parity CC A`, `Parity CC A1` and `Parity CC B`; the structure and every other byte of the answers are as received (BOM-less UTF-16LE, `&#4;` kept in `PARENT`). The originals are 6,806 and 4,458 bytes.
+A third synthetic book, the parity lab, whose Cost Centres setting read Yes (the Company flag `ISCOSTCENTRESON`, equal to the owner's screen), captured through the same collection requests as the files above (that capture records no release or licence; reported at capture as licensed TallyPrime 7.1 Silver). The fixtures are **scrubbed copies**: the company GUID prefix is replaced with a synthetic one and the three lab centre names with `Parity CC A`, `Parity CC A1` and `Parity CC B`; the structure and every other byte of the answers are as received (BOM-less UTF-16LE, `&#4;` kept in `PARENT`). The originals are 6,806 and 4,458 bytes.
 
 | file | bytes | sha256 | content |
 | --- | --- | --- | --- |

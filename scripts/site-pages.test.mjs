@@ -54,7 +54,8 @@ const outsideLinks = /^https:\/\/github\.com\/ComplyEaze\/bridge(?:[/#?]|$)/;
 
 test("every reference on a page is a file the site ships or the deploy writes, or a link to this project on GitHub", () => {
   for (const name of pages) {
-    const html = read(name).replace(/<!--[\s\S]*?-->/g, " ");
+    // the legal template holds a marker where the renderer writes the page's own address (render-legal.test.mjs checks that)
+    const html = read(name).replace("<!-- legal-canonical -->", siteOrigin + name).replace(/<!--[\s\S]*?-->/g, " ");
     for (const [tag, attribute, , ref] of html.matchAll(/<[a-z][^>]*?\b(href|src)=(["'])(.*?)\2/g)) {
       if (ref.startsWith("#")) continue;
       // a page may name its own address as its canonical one, and no other address on this site's origin

@@ -2877,7 +2877,7 @@ fn test_duplicates(observed: &[ReadVoucher]) -> Result<Vec<Value>, String> {
         .collect::<Result<Vec<_>, _>>()?;
     let fingerprints = observed
         .iter()
-        .map(|voucher| sha256_json(&observed_fingerprint(voucher)))
+        .map(|voucher| sha256_json(&observed_fingerprint(voucher, None)))
         .collect::<Vec<_>>();
     Ok(duplicates(observed, &identities, &fingerprints))
 }

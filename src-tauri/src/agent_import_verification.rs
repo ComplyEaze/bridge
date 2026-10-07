@@ -119,7 +119,84 @@ pub(super) fn canonical_verification_amount(value: &str) -> Result<String, Strin
         .map_err(|_| "import_verification_amount_invalid".to_string())
 }
 
-type VerificationFingerprint = (Option<String>, Option<String>, Vec<String>);
+/// What a batch voucher and a book row are matched by. Every voucher but a
+/// numbered invoice is matched by its content (date, type, entries) and
+/// serialises as that triple always has, so the duplicate report's hash of
+/// such a row does not change. An invoice is matched by its date, type and
+/// number (owner decision of 7 Oct 2026, ADR 0004): two invoices that differ
+/// only by number are two documents.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum VerificationFingerprint {
+    Content(Option<String>, Option<String>, Vec<String>),
+    Numbered(Option<String>, Option<String>, String),
+}
+
+impl Serialize for VerificationFingerprint {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Content(date, voucher_type, entries) => {
+                (date, voucher_type, entries).serialize(serializer)
+            }
+            Self::Numbered(date, voucher_type, number) => {
+                json!({"numbered": [date, voucher_type, number]}).serialize(serializer)
+            }
+        }
+    }
+}
+
+/// How a batch's invoice is recognised among the rows of its voucher type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum InvoiceIdentity {
+    /// By its number: a row with another number is another document, even
+    /// with the same figures.
+    ByNumber,
+    /// By its number, and by its figures whatever the number. Used while this
+    /// machine's journal holds another batch with the same figures that was
+    /// sent and has not been read back as posted: a post whose answer was lost
+    /// may be this invoice under the number it was first given.
+    ByNumberOrFigures,
+}
+
+impl InvoiceIdentity {
+    /// The identity to use beside `unsettled_twin`, the batch of this machine
+    /// with the invoice's figures that was sent and not found posted.
+    pub(super) fn beside(unsettled_twin: Option<&str>) -> Self {
+        match unsettled_twin {
+            Some(_) => Self::ByNumberOrFigures,
+            None => Self::ByNumber,
+        }
+    }
+}
+
+/// The batch's one invoice, as the rows of its type are compared with it.
+pub(super) struct InvoiceKey<'a> {
+    voucher_type: &'a str,
+    key: VerificationFingerprint,
+    content: VerificationFingerprint,
+    identity: InvoiceIdentity,
+}
+
+/// A voucher number as two numbers are compared for absence: trimmed, ASCII
+/// case ignored. `None` for a number that is absent, empty or blank. Looser
+/// than the comparison after a post (`voucher_diffs`), so it refuses more.
+fn folded_number(number: &str) -> Option<String> {
+    let number = number.trim();
+    (!number.is_empty()).then(|| number.to_ascii_uppercase())
+}
+
+/// The number an invoice is matched by; `None` for every other voucher and for
+/// an invoice that carries none, which is then matched by content like them.
+fn invoice_number(voucher: &ImportVoucher) -> Option<String> {
+    voucher
+        .voucher_type
+        .is_invoice()
+        .then(|| voucher.voucher_number.as_deref().and_then(folded_number))
+        .flatten()
+}
+
+fn entries_match(expected: &ImportVoucher, matched: &ReadVoucher) -> bool {
+    expected_entry_fingerprint(expected) == actual_entry_fingerprint(matched)
+}
 
 #[derive(Default)]
 struct VerificationCandidates {
@@ -141,12 +218,10 @@ impl VerificationCandidates {
     }
 }
 
-/// The fingerprint a batch voucher is matched by: its date, type and entries.
-/// `voucher` must carry canonical amounts, as `verify_batch`'s comparison copy
-/// does. One function, so the copy search for a cancelled voucher (#806) and
-/// the matching use the same key.
-pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFingerprint {
-    (
+/// A batch voucher's date, type and entries. `voucher` must carry canonical
+/// amounts, as `verify_batch_as`'s comparison copy does.
+fn expected_content(voucher: &ImportVoucher) -> VerificationFingerprint {
+    VerificationFingerprint::Content(
         normalized_date(&voucher.date)
             .ok()
             .map(|date| date.as_str().to_string()),
@@ -155,16 +230,65 @@ pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFinge
     )
 }
 
+/// The fingerprint a batch voucher is matched by: an invoice's date, type and
+/// number, every other voucher's date, type and entries. One function, so the
+/// copy search for a cancelled voucher (#806) and the matching use the same
+/// key.
+pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFingerprint {
+    match invoice_number(voucher) {
+        Some(number) => VerificationFingerprint::Numbered(
+            normalized_date(&voucher.date)
+                .ok()
+                .map(|date| date.as_str().to_string()),
+            Some(voucher.filed_type_name().to_string()),
+            number,
+        ),
+        None => expected_content(voucher),
+    }
+}
+
 /// At most this many effective copies of one cancelled voucher are listed;
 /// the count is exact (#806).
 const MAX_EFFECTIVE_COPIES_LISTED: usize = 5;
 
-pub(super) fn observed_fingerprint(voucher: &ReadVoucher) -> VerificationFingerprint {
-    (
+fn observed_content(voucher: &ReadVoucher) -> VerificationFingerprint {
+    VerificationFingerprint::Content(
         voucher.date.clone(),
         voucher.voucher_type.clone(),
         actual_entry_fingerprint(voucher),
     )
+}
+
+/// The fingerprint a book row is matched by. A row of the batch invoice's
+/// voucher type takes the invoice's own key when it is the same document: it
+/// carries no number and has the invoice's figures (so a read that dropped the
+/// number never makes an invoice look absent), or, under
+/// `InvoiceIdentity::ByNumberOrFigures`, it has the invoice's figures whatever
+/// its number. Otherwise such a row is keyed by its own number. Every other
+/// row, and every row when the batch holds no invoice, is keyed by content.
+pub(super) fn observed_fingerprint(
+    voucher: &ReadVoucher,
+    invoice: Option<&InvoiceKey<'_>>,
+) -> VerificationFingerprint {
+    let content = observed_content(voucher);
+    let Some(invoice) =
+        invoice.filter(|invoice| voucher.voucher_type.as_deref() == Some(invoice.voucher_type))
+    else {
+        return content;
+    };
+    let same_figures = content == invoice.content;
+    match voucher.voucher_number.as_deref().and_then(folded_number) {
+        None if same_figures => invoice.key.clone(),
+        None => content,
+        Some(_) if same_figures && invoice.identity == InvoiceIdentity::ByNumberOrFigures => {
+            invoice.key.clone()
+        }
+        Some(number) => VerificationFingerprint::Numbered(
+            voucher.date.clone(),
+            voucher.voucher_type.clone(),
+            number,
+        ),
+    }
 }
 
 /// How a batch's vouchers can be attributed to rows of the book.
@@ -187,10 +311,23 @@ pub(super) enum Attribution<'a> {
 /// A bound voucher the window does not hold is `bound_not_in_window`, never
 /// `not_found`: it was posted, so its absence here is not evidence that it is
 /// absent.
+#[cfg(test)]
 pub(super) fn verify_batch(
     line: &ImportLedgerLine,
     observed: &ImportReadSource,
     attribution: Attribution<'_>,
+) -> Result<Value, String> {
+    verify_batch_as(line, observed, attribution, InvoiceIdentity::ByNumber)
+}
+
+/// [`verify_batch`], with how the batch's invoice is recognised. Production
+/// callers choose it from the journal (`unsettled_invoice_twin`); a batch
+/// with no invoice reads the same either way.
+pub(super) fn verify_batch_as(
+    line: &ImportLedgerLine,
+    observed: &ImportReadSource,
+    attribution: Attribution<'_>,
+    invoice_identity: InvoiceIdentity,
 ) -> Result<Value, String> {
     let (bindings, tags_attribute) = match attribution {
         Attribution::Tag => (None, true),
@@ -218,14 +355,34 @@ pub(super) fn verify_batch(
         .collect::<Result<Vec<_>, _>>()?;
     let mut fully_verified_identities = BTreeSet::new();
     let mut rows = Vec::new();
+    // An invoice is built alone, so a batch holds at most one. A batch that
+    // held more than one numbered invoice is matched as every other voucher
+    // is, by content: the stricter rule.
+    let numbered = line
+        .vouchers
+        .iter()
+        .filter(|voucher| invoice_number(voucher).is_some())
+        .collect::<Vec<_>>();
+    let invoice = match numbered.as_slice() {
+        [voucher] => Some(InvoiceKey {
+            voucher_type: voucher.filed_type_name(),
+            key: expected_fingerprint(voucher),
+            content: expected_content(voucher),
+            identity: invoice_identity,
+        }),
+        _ => None,
+    };
     let expected_fingerprints = line
         .vouchers
         .iter()
-        .map(expected_fingerprint)
+        .map(|voucher| match invoice {
+            Some(_) => expected_fingerprint(voucher),
+            None => expected_content(voucher),
+        })
         .collect::<Vec<VerificationFingerprint>>();
     let observed_fingerprints = observed
         .iter()
-        .map(observed_fingerprint)
+        .map(|row| observed_fingerprint(row, invoice.as_ref()))
         .collect::<Vec<_>>();
     let mut expected_fingerprint_counts = BTreeMap::new();
     for fingerprint in &expected_fingerprints {
@@ -336,7 +493,7 @@ pub(super) fn verify_batch(
                             expected,
                             matched,
                             "post_span_binding",
-                            expected_key.2 == observed_fingerprints[*index].2,
+                            entries_match(expected, matched),
                             &mut counts,
                         )?;
                         if value["status"] == "posted_verified" {
@@ -398,17 +555,13 @@ pub(super) fn verify_batch(
             }
             let matched = &observed[matched_index];
             let effective_date_unobserved = effective_date_not_observed(expected, matched);
-            let diffs = voucher_diffs(
-                expected,
-                matched,
-                expected_key.2 == observed_fingerprints[matched_index].2,
-            );
+            let diffs = voucher_diffs(expected, matched, entries_match(expected, matched));
             let mut matched_value = if !fingerprint_fallback {
                 let value = attributed_status(
                     expected,
                     matched,
                     marker,
-                    expected_key.2 == observed_fingerprints[matched_index].2,
+                    entries_match(expected, matched),
                     &mut counts,
                 )?;
                 if value["status"] == "posted_verified" {
@@ -482,6 +635,43 @@ pub(super) fn verify_batch(
             observed_copies["ambiguous_within_batch"] = Value::Bool(true);
         }
         row["effective_copies_observed"] = observed_copies;
+    }
+    // An invoice that its number does not find, or that reads cancelled: the
+    // effective rows of its type with its figures and another number, as #806
+    // lists a cancelled voucher's copies. Report-only: equal figures under
+    // another number are another invoice unless a person says otherwise, so
+    // nothing is attributed through them and no verdict changes.
+    if let Some(invoice) = &invoice {
+        for (row, expected) in rows.iter_mut().zip(&line.vouchers) {
+            let cancelled =
+                row["status"] == "posted_not_effective" && row["reason"] == "voucher_cancelled";
+            if invoice_number(expected).is_none() || !(row["status"] == "not_found" || cancelled) {
+                continue;
+            }
+            let mut others = (0..observed.len())
+                .filter(|&index| {
+                    !bound_indexes.contains(&index)
+                        && observed_fingerprints[index] != invoice.key
+                        && observed_content(&observed[index]) == invoice.content
+                        && observed[index].cancelled != Some(true)
+                        && observed[index].optional != Some(true)
+                })
+                .collect::<Vec<_>>();
+            if others.is_empty() {
+                continue;
+            }
+            others.sort_by_key(|&index| observed[index].alter_id);
+            let entries = others
+                .iter()
+                .take(MAX_EFFECTIVE_COPIES_LISTED)
+                .map(|&index| {
+                    let other = &observed[index];
+                    json!({"guid":other.guid,"master_id":other.master_id,"alter_id":other.alter_id,"voucher_number":other.voucher_number})
+                })
+                .collect::<Vec<_>>();
+            row["same_figures_other_number"] =
+                json!({"count":others.len(),"entries":entries,"attribution":"not_established"});
+        }
     }
     let (batch_duplicates, unrelated_duplicates_in_window) = batch_duplicate_sets(
         observed,

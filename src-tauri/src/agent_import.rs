@@ -74,13 +74,13 @@ use verification::{
     company_high_water_mark, corroborate_verification_window, expected_entry_fingerprint,
     final_verification_status, mark_verification_names, parse_import_voucher_rows,
     parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
-    verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
-    Attribution, DeltaBasis, VerificationStatus,
+    verification_window_identities, verify_batch_as, voucher_diffs,
+    voucher_is_accounting_effective, Attribution, DeltaBasis, InvoiceIdentity, VerificationStatus,
 };
 #[cfg(test)]
 use verification::{
     batch_duplicate_sets, duplicates, expected_fingerprint, observed_fingerprint,
-    observed_voucher_identity, VERIFICATION_NAME_FIELDS,
+    observed_voucher_identity, verify_batch, VERIFICATION_NAME_FIELDS,
 };
 
 struct ImportProfileObservation {
@@ -269,8 +269,9 @@ impl VoucherType {
 // duplicate-number read finding a known invoice, Tally taking two of the
 // element sets, every read-back field coming back, and the company's
 // STATENAME equal to the GST registration state of a keyed invoice. It joins
-// this list when what that rehearsal left owed is done (ADR 0004): the
-// invoice's number in the pre-post identity check first.
+// this list when what that rehearsal left owed is done (ADR 0004). The check
+// before a post now recognises an invoice by its number; that has not run
+// against Tally.
 const LIVE_QUALIFIED_VOUCHER_TYPES: &[VoucherType] = &[
     VoucherType::Journal,
     VoucherType::Payment,
@@ -1557,7 +1558,16 @@ impl Server {
             } else {
                 Attribution::Tag
             };
-            let mut result = verify_batch(&line, &observed, attribution)?;
+            // An invoice is recognised by its number, and by its figures as
+            // well while this machine holds an unsettled batch with them.
+            let invoice_identity = {
+                let _lock = self.lock_import_admission_shared()?;
+                InvoiceIdentity::beside(
+                    self.import_unsettled_invoice_twin_while_admitted(&line)?
+                        .as_deref(),
+                )
+            };
+            let mut result = verify_batch_as(&line, &observed, attribution, invoice_identity)?;
             // The standard readback sees a voucher's date, type, number, entries
             // and narration. An invoice's party, GST header, reference and bill
             // allocation are read back separately; "posted_verified" is kept
@@ -2357,6 +2367,18 @@ impl Server {
     ) -> Result<Option<String>, String> {
         match self.import_journal_while_admitted()? {
             Some(reader) => ledger::rows_already_posted(reader, line),
+            None => Ok(None),
+        }
+    }
+
+    /// The batch, sent and not found posted, that holds an invoice with the
+    /// figures of `line`'s invoice (`ledger::unsettled_invoice_twin`).
+    pub(super) fn import_unsettled_invoice_twin_while_admitted(
+        &self,
+        line: &ImportLedgerLine,
+    ) -> Result<Option<String>, String> {
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::unsettled_invoice_twin(reader, line),
             None => Ok(None),
         }
     }

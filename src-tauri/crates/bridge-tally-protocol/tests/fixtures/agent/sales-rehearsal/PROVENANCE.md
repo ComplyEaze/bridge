@@ -39,3 +39,8 @@ customer's invented GSTIN had the shape of one that could be issued, so it is re
 of the two files, by a token of the same length that cannot be issued (`08ZZZZZ0000Z1ZQ`). Those two
 files differ from Tally's bytes by that token only, and their SHA-256 in the table is of the committed
 file. The other five are as received.
+
+Two notes for a reader checking the table. The voucher-types request was written the day before the
+others, with that day's request files, and its hash is of that file. In that answer the keyed type's
+`LASTNUMBER` reads `TG/25-26/013`: three invoices were keyed by hand in the type before the rehearsal,
+numbered 001, 011 and 013, and the rehearsal then posted 002 and 003.

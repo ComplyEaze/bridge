@@ -131,9 +131,15 @@ fn delimiter_bearing_ledger_names_do_not_create_accounting_duplicates() {
         is_deemed_positive: "No".into(),
     }];
     let rows = vec![first, second];
-    let fingerprints = rows.iter().map(observed_fingerprint).collect::<Vec<_>>();
+    let fingerprints = rows
+        .iter()
+        .map(|row| observed_fingerprint(row, None))
+        .collect::<Vec<_>>();
     assert_ne!(fingerprints[0], fingerprints[1]);
-    assert_eq!(fingerprints[0].2.join(","), fingerprints[1].2.join(","));
+    assert_eq!(
+        actual_entry_fingerprint(&rows[0]).join(","),
+        actual_entry_fingerprint(&rows[1]).join(",")
+    );
     let identities = rows
         .iter()
         .map(observed_voucher_identity)
@@ -286,9 +292,12 @@ fn cancelled_vouchers_pair_neither_in_the_batch_nor_in_the_window() {
         .map(observed_voucher_identity)
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
-    let fingerprints = pair.iter().map(observed_fingerprint).collect::<Vec<_>>();
+    let fingerprints = pair
+        .iter()
+        .map(|row| observed_fingerprint(row, None))
+        .collect::<Vec<_>>();
     assert_eq!(fingerprints[0], fingerprints[1]);
-    let batch_fingerprint = observed_fingerprint(&effective);
+    let batch_fingerprint = observed_fingerprint(&effective, None);
     let expected = BTreeMap::from([(&batch_fingerprint, 1)]);
     for (tags, expected_tags) in [
         (
@@ -360,6 +369,6 @@ fn the_hand_re_entry_carries_the_cancelled_vouchers_fingerprint() {
         entry.amount = canonical_verification_amount(&entry.amount).unwrap();
     }
     let expected = expected_fingerprint(&built);
-    assert_eq!(observed_fingerprint(&row_at(1790)), expected);
-    assert_ne!(observed_fingerprint(&row_at(1789)), expected);
+    assert_eq!(observed_fingerprint(&row_at(1790), None), expected);
+    assert_ne!(observed_fingerprint(&row_at(1789), None), expected);
 }

@@ -530,6 +530,80 @@ pub(super) fn rows_already_posted(
     )
 }
 
+/// An invoice's date, filed type and entries, as two saved invoices are
+/// compared; `None` for every other voucher.
+fn invoice_figures(voucher: &ImportVoucher) -> Option<(String, String, Vec<String>)> {
+    if !voucher.voucher_type.is_invoice() {
+        return None;
+    }
+    let mut canonical = voucher.clone();
+    for entry in &mut canonical.entries {
+        entry.amount = super::verification::canonical_verification_amount(&entry.amount).ok()?;
+    }
+    Some((
+        normalized_date(&voucher.date).ok()?.as_str().to_string(),
+        voucher.filed_type_name().to_string(),
+        super::verification::expected_entry_fingerprint(&canonical),
+    ))
+}
+
+/// The id of another batch of the same company that Bridge sent to Tally (a
+/// dispatch intent), that no readback has found posted, and that holds an
+/// invoice with the date, filed type and entries of `batch`'s invoice; the
+/// first in id order. A post whose answer was lost never binds, and such a
+/// batch may be this invoice under the number it was first given, so while it
+/// stands the invoice is matched by its figures as well as its number
+/// (`InvoiceIdentity::ByNumberOrFigures`). A batch that was only built, or one
+/// a readback found posted, does not count: two invoices with the same figures
+/// are otherwise two documents. A batch with no invoice reads nothing here.
+pub(super) fn unsettled_invoice_twin(
+    reader: impl BufRead,
+    batch: &ImportLedgerLine,
+) -> Result<Option<String>, String> {
+    let wanted = batch
+        .vouchers
+        .iter()
+        .filter_map(invoice_figures)
+        .collect::<Vec<_>>();
+    if wanted.is_empty() {
+        return Ok(None);
+    }
+    let mut holds_a_twin = BTreeSet::new();
+    let mut sent = BTreeSet::new();
+    let mut found_posted = BTreeSet::new();
+    scan_records(reader, |record, _| match record {
+        Record::Batch(other) if other.batch_id != batch.batch_id => {
+            let twin = other.company_guid.eq_ignore_ascii_case(&batch.company_guid)
+                && other
+                    .vouchers
+                    .iter()
+                    .filter_map(invoice_figures)
+                    .any(|figures| wanted.contains(&figures));
+            if twin {
+                holds_a_twin.insert(other.batch_id.clone());
+            } else {
+                holds_a_twin.remove(&other.batch_id);
+            }
+            if other.status == "posted_verified" {
+                found_posted.insert(other.batch_id.clone());
+            }
+        }
+        Record::Status(update) => {
+            if matches!(update.record_type, StatusKind::DispatchIntent) {
+                sent.insert(update.batch_id.clone());
+            }
+            if update.status == "posted_verified" {
+                found_posted.insert(update.batch_id.clone());
+            }
+        }
+        Record::Batch(_) => {}
+    })?;
+    Ok(holds_a_twin
+        .intersection(&sent)
+        .find(|id| !found_posted.contains(*id))
+        .cloned())
+}
+
 /// The same check for vouchers not yet in a batch (a build), where no batch id
 /// of their own exists to skip.
 pub(super) fn vouchers_already_posted(

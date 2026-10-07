@@ -4,6 +4,7 @@ docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md
 src-tauri/src/agent.rs
 src-tauri/src/agent_import.rs
 src-tauri/src/agent_import_bill_wise.rs
+src-tauri/src/agent_import_ledger.rs
 src-tauri/src/agent_import_post.rs
 src-tauri/src/agent_import_span_identity.rs
 src-tauri/src/agent_import_verification.rs

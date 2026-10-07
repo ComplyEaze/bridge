@@ -1313,8 +1313,11 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "invoice_number_already_used" => Some(
             "GST rule 46(b) needs an invoice number to be unique in the financial year (1 April \
              to 31 March), and the read of that year's Sales vouchers found this number already \
-             in use, so ComplyEaze Bridge refuses it. Do not pick another number yourself: tell \
-             the user the number is in use and ask which invoice number to use.",
+             in use, so ComplyEaze Bridge refuses it. The voucher that has the number may be this \
+             same invoice, already in the book: open it in Tally first, and if an earlier \
+             batch for this invoice was sent, run verify_import on it. Only if it is another \
+             invoice, tell the user the number is in use and ask which invoice number to \
+             use. Do not pick another number yourself.",
         ),
         // The qualified list (`LIVE_QUALIFIED_VOUCHER_TYPES`) is what
         // `voucher_schema` offers. The text names no type, so it stays true as

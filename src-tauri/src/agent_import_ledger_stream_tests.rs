@@ -778,3 +778,81 @@ fn an_unreadable_candidate_amount_fails_closed() {
     );
     assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
 }
+
+/// One Sales invoice dated 1 Sep 2026 under `number`, over `entries`.
+fn invoice_batch(
+    id: &str,
+    sha: char,
+    (number, filed): (&str, &str),
+    entries: &[(&str, &str, &str)],
+) -> ImportLedgerLine {
+    let mut line = row_batch(id, "synthetic-guid", id, sha, entries);
+    line.vouchers[0] = serde_json::from_value(json!({
+        "bridge_txn_id":id, "date":"20260901", "voucher_type":"Sales", "voucher_number":number,
+        "invoice":{"voucher_type_name":filed, "place_of_supply":"Rajasthan"},
+        "entries":entries.iter().map(|(ledger, amount, side)|
+            json!({"ledger":ledger,"amount":amount,"side":side})).collect::<Vec<_>>()
+    }))
+    .unwrap();
+    line
+}
+
+const SALE: &[(&str, &str, &str)] = &[("Customer", "118", "Dr"), ("Sales", "118.00", "Cr")];
+
+/// An invoice has an unsettled twin while another batch of the company holds an
+/// invoice with its date, filed type and entries (whatever its number), was
+/// sent, and no readback found it posted. A twin only built, one found posted,
+/// other figures, another filed type, another company, a Journal with the same
+/// entries and the batch itself are not; and a batch with no invoice asks
+/// nothing of the journal.
+#[test]
+fn an_invoice_sent_and_not_found_posted_is_the_unsettled_twin_of_its_figures() {
+    let twin = |journal: Vec<Vec<u8>>, candidate: &ImportLedgerLine| {
+        unsettled_invoice_twin(Cursor::new(journal.concat()), candidate).unwrap()
+    };
+    let first = invoice_batch("first", 'a', ("INV/1", "Sales Manual"), SALE);
+    let second = invoice_batch(
+        "second",
+        'b',
+        ("INV/2", "Sales Manual"),
+        &[("Customer", "118.00", "Dr"), ("Sales", "118", "Cr")],
+    );
+    assert_eq!(
+        twin(vec![record(&first), sent(&first), record(&second)], &second),
+        Some("first".to_string())
+    );
+    // Only built; found posted; the batch itself.
+    assert_eq!(twin(vec![record(&first), record(&second)], &second), None);
+    assert_eq!(
+        twin(
+            vec![record(&first), sent(&first), found(&first), record(&second)],
+            &second
+        ),
+        None
+    );
+    assert_eq!(twin(vec![record(&second), sent(&second)], &second), None);
+    // Other figures, another filed type, another company, a Journal.
+    let dearer = invoice_batch(
+        "dearer",
+        'c',
+        ("INV/1", "Sales Manual"),
+        &[("Customer", "119", "Dr"), ("Sales", "119", "Cr")],
+    );
+    let other_type = invoice_batch("other-type", 'd', ("INV/1", "Sales Export"), SALE);
+    let mut elsewhere = invoice_batch("elsewhere", 'e', ("INV/1", "Sales Manual"), SALE);
+    elsewhere.company_guid = "another-guid".into();
+    let journal = row_batch("journal", "synthetic-guid", "journal", 'f', SALE);
+    for other in [&dearer, &other_type, &elsewhere, &journal] {
+        assert_eq!(
+            twin(vec![record(other), sent(other), record(&second)], &second),
+            None,
+            "{}",
+            other.batch_id
+        );
+    }
+    // A batch with no invoice reads nothing: a journal that is not one is not met.
+    assert_eq!(
+        unsettled_invoice_twin(Cursor::new(b"not json\n".to_vec()), &journal),
+        Ok(None)
+    );
+}

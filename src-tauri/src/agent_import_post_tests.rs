@@ -1373,6 +1373,7 @@ fn a_journal_recording_a_cash_in_hand_ledger_is_refused_by_the_queue() {
             None,
             &single_currency,
             &ledger_binding,
+            InvoiceIdentity::ByNumber,
         )
     };
     let error = recheck(&catalogue).expect_err("a recorded cash ledger without a bank voucher");
@@ -1453,6 +1454,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
             None,
             &single_currency,
             &ledger_binding,
+            InvoiceIdentity::ByNumber,
         )
     };
     // Control: the captured catalogue holds no twin of any named ledger.
@@ -1551,6 +1553,7 @@ fn a_named_ledger_switched_to_bill_wise_since_the_build_is_refused_by_the_queue(
             None,
             &single_currency,
             &ledger_binding,
+            InvoiceIdentity::ByNumber,
         )
     };
     // Control: nothing bill-wise at the build and nothing now.
@@ -1638,6 +1641,7 @@ fn a_record_without_cash_in_hand_ledgers_is_refused_by_the_queue() {
         None,
         "",
         &ledger_binding,
+        InvoiceIdentity::ByNumber,
     )
     .expect_err("a record without the field must be refused");
     assert_eq!(
@@ -1695,6 +1699,7 @@ fn a_record_without_bill_wise_approvals_is_refused_by_the_queue() {
         None,
         "",
         &ledger_binding,
+        InvoiceIdentity::ByNumber,
     )
     .expect_err("a record without the field must be refused");
     assert_eq!(
@@ -1782,6 +1787,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         None,
         &single_currency,
         &ledger_binding,
+        InvoiceIdentity::ByNumber,
     )
     .expect_err("captured attributed Journal must block the queued native attempt");
     assert!(matches!(
@@ -1806,6 +1812,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         None,
         &single_currency,
         &ledger_binding,
+        InvoiceIdentity::ByNumber,
     )
     .expect("paired captured source establishes absence of the new candidate");
 
@@ -1830,6 +1837,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         None,
         &single_currency,
         &ledger_binding,
+        InvoiceIdentity::ByNumber,
     )
     .expect_err("a folded twin added since approval must refuse the queued post");
     assert!(matches!(
@@ -1864,6 +1872,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
             groups,
             &single_currency,
             &ledger_binding,
+            InvoiceIdentity::ByNumber,
         )
     };
     recheck(&payment, Some(&groups)).expect("the captured masters classify this Payment");
@@ -3662,12 +3671,12 @@ fn only_present_rows_are_named_and_a_clean_result_names_none() {
     assert!(present_txn_ids(&json!({})).is_empty());
 
     let mut payload = json!({"result":{"error":{"code":"import_preexisting_identity"}}});
-    name_preexisting_rows(&mut payload, &[]);
+    name_preexisting_rows(&mut payload, &[], None);
     assert!(payload["result"]["error"].get("next_step").is_none());
     // An unobserved attempt's generic message would say never to rebuild it.
     payload["result"]["error"]["message"] =
         json!("The saved batch requires reconciliation. never rebuild it to retry.");
-    name_preexisting_rows(&mut payload, &["t2".into(), "t3".into()]);
+    name_preexisting_rows(&mut payload, &["t2".into(), "t3".into()], None);
     assert!(payload["result"]["error"]["message"]
         .as_str()
         .unwrap()
@@ -3776,6 +3785,7 @@ fn the_queued_bill_wise_recheck_exempts_an_invoices_new_ref_party_and_nobody_els
             None,
             &single_currency,
             &binding,
+            InvoiceIdentity::ByNumber,
         )
     };
     let changed = |result: anyhow::Result<()>| {
@@ -4540,4 +4550,126 @@ fn a_batch_that_marks_nothing_is_shown_whole() {
         ]
         .join("\n")
     );
+}
+
+/// The invoice's own next step where a bank batch gets the statement one, and
+/// the unsettled batch named when there is one.
+#[test]
+fn an_invoice_met_in_the_book_gets_its_own_next_step_and_names_the_unsettled_batch() {
+    let refused = || json!({"result":{"error":{"code":"import_preexisting_identity"}}});
+    let mut bank = refused();
+    name_preexisting_rows(&mut bank, &["t1".into()], None);
+    assert_eq!(
+        bank["result"]["error"]["next_step"],
+        PREEXISTING_ROWS_NEXT_STEP
+    );
+    assert!(bank["result"]["error"].get("unsettled_batch_id").is_none());
+    let mut invoice = refused();
+    name_preexisting_rows(&mut invoice, &["t1".into()], Some(&None));
+    assert_eq!(
+        invoice["result"]["error"]["next_step"],
+        PREEXISTING_INVOICE_NEXT_STEP
+    );
+    assert!(invoice["result"]["error"]
+        .get("unsettled_batch_id")
+        .is_none());
+    let mut beside_a_twin = refused();
+    name_preexisting_rows(
+        &mut beside_a_twin,
+        &["t1".into()],
+        Some(&Some("bridge-earlier".to_string())),
+    );
+    assert_eq!(
+        beside_a_twin["result"]["error"]["unsettled_batch_id"],
+        "bridge-earlier"
+    );
+    assert_eq!(
+        beside_a_twin["result"]["error"]["next_step"],
+        PREEXISTING_INVOICE_NEXT_STEP
+    );
+    // The invoice text speaks of a number and never of a statement row.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("this invoice's number"));
+    assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("statement"));
+}
+
+/// The queue's own check recognises an invoice as the check before the dialog
+/// does: a voucher with its figures and another number passes, the same number
+/// is refused, and beside an unsettled batch of this machine the figures are
+/// enough to refuse. Wiring only: the captured Journal's type is named as the
+/// invoice's filed type so that one captured row can stand for a voucher of
+/// that type; no evidence of what Tally stores for an invoice.
+#[test]
+fn the_queue_recognises_an_invoice_by_its_number_and_by_its_figures_beside_an_unsettled_batch() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    // One Journal, number 2: 12.61 from the debtor to Cash, 7 Sep 2026.
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    ));
+    let catalogue = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    ));
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
+    let single_currency = captured_currencies(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(vec![
+        "Bridge Nested Debtor WR4".to_string(),
+        "Cash".to_string(),
+    ])
+    .unwrap();
+    let refused_as_in_the_book = |number: &str, identity: InvoiceIdentity| {
+        let line: ImportLedgerLine = serde_json::from_value(json!({
+            "batch_id":"bridge-00000000-0000-4000-8000-000000000691",
+            "identity_scheme":"batch_v1", "company_guid":company_guid,
+            "txn_ids":["inv-1"],
+            "date_from":"20260907", "date_to":"20260907", "sha256":"",
+            "built_at":"2026-10-07T00:00:00Z", "status":"built",
+            "cash_in_hand_ledgers":[], "on_account_approved":[],
+            "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+            "vouchers":[{"bridge_txn_id":"inv-1","date":"20260907","voucher_type":"Sales",
+                "narration":null,"reference":null,"voucher_number":number,
+                "invoice":{"voucher_type_name":"Journal","place_of_supply":"Rajasthan"},
+                "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"12.61","side":"Dr"},
+                    {"ledger":"Cash","amount":"12.61","side":"Cr"}]}]
+        }))
+        .unwrap();
+        recheck_import_admission(
+            &line,
+            company_guid,
+            "WR2 Unicode Lab",
+            &captured,
+            &captured,
+            &catalogue,
+            None,
+            &single_currency,
+            &ledger_binding,
+            identity,
+        )
+        .err()
+        .is_some_and(|error| {
+            error.downcast_ref::<ApprovedImportAdmissionError>()
+                == Some(&ApprovedImportAdmissionError::PreexistingIdentity)
+        })
+    };
+    assert!(!refused_as_in_the_book("INV/9", InvoiceIdentity::ByNumber));
+    assert!(refused_as_in_the_book("2", InvoiceIdentity::ByNumber));
+    assert!(refused_as_in_the_book(
+        "INV/9",
+        InvoiceIdentity::ByNumberOrFigures
+    ));
 }

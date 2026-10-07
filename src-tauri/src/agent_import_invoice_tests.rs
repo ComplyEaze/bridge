@@ -573,6 +573,36 @@ fn what_the_renderer_writes_reads_back_clean() {
     assert_eq!(differences(&u, &readback_xml(&u)), Vec::<String>::new());
 }
 
+/// The fields the standard readback also sees are compared here as well: a
+/// read-back whose number, date or optional flag differs names that field.
+#[test]
+fn the_number_the_date_and_the_optional_flag_are_compared_by_name() {
+    let v = observed_voucher();
+    let good = readback_xml(&v);
+    let altered = |from: &str, to: &str| {
+        assert!(good.contains(from), "fixture lacks {from}");
+        differences(&v, &good.replace(from, to))
+    };
+    assert_eq!(
+        altered(
+            "<VOUCHERNUMBER>278</VOUCHERNUMBER>",
+            "<VOUCHERNUMBER>279</VOUCHERNUMBER>"
+        ),
+        vec!["VOUCHERNUMBER"]
+    );
+    assert_eq!(
+        altered("<DATE>20260310</DATE>", "<DATE>20260311</DATE>"),
+        vec!["DATE"]
+    );
+    assert_eq!(
+        altered(
+            "<ISOPTIONAL>No</ISOPTIONAL>",
+            "<ISOPTIONAL>Yes</ISOPTIONAL>"
+        ),
+        vec!["ISOPTIONAL"]
+    );
+}
+
 #[test]
 fn each_field_the_standard_readback_never_sees_is_compared_by_name() {
     let v = observed_voucher();
@@ -954,8 +984,8 @@ fn rehearsal_invoice(
 /// company), each written from its build plan, against Tally's answer to the
 /// read-back request sent raw after the post (not the binary's own read of
 /// it): no difference. The invoice keyed by hand to the registered customer
-/// differs from what a build would write only by the reference, which a keyed
-/// invoice of that book does not carry.
+/// differs from what a build would write only by the reference and its date,
+/// which a keyed invoice of that book does not carry.
 #[test]
 fn the_rehearsals_posted_invoices_read_back_as_planned_on_the_captured_answers() {
     let registered = rehearsal_invoice(
@@ -998,14 +1028,23 @@ fn the_rehearsals_posted_invoices_read_back_as_planned_on_the_captured_answers()
         ),
         Vec::<String>::new()
     );
-    // Each read-back is that invoice's own: the other one's differs.
-    assert_ne!(
+    // Each read-back is that invoice's own: against the other invoice it
+    // differs in every field the two do not share.
+    assert_eq!(
         rehearsal_differences(
             &unregistered,
             include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-registered.utf16le.xml"),
             "20260311",
         ),
-        Vec::<String>::new()
+        vec![
+            "VOUCHERNUMBER",
+            "REFERENCE",
+            "PARTYLEDGERNAME",
+            "PARTYGSTIN",
+            "GSTREGISTRATIONTYPE",
+            "legs",
+            "bill_allocation"
+        ]
     );
     let keyed = rehearsal_invoice(
         ("TG/25-26/001", "2026-03-10"),
@@ -1068,8 +1107,11 @@ fn an_invoice_number_refusal_names_rule_46b_and_what_it_allows() {
         used["remediation"],
         "GST rule 46(b) needs an invoice number to be unique in the financial year (1 April to \
          31 March), and the read of that year's Sales vouchers found this number already in use, \
-         so ComplyEaze Bridge refuses it. Do not pick another number yourself: tell the user the \
-         number is in use and ask which invoice number to use."
+         so ComplyEaze Bridge refuses it. The voucher that has the number may be this same invoice, \
+         already in the book: open it in Tally first, and if an earlier batch for this invoice \
+         was sent, run verify_import on it. Only if it is another invoice, tell the user the \
+         number is in use and ask which invoice number to use. Do not pick another number \
+         yourself."
     );
     // The structural refusal reaches the caller as a failure code, which takes
     // the same text.

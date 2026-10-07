@@ -6447,10 +6447,61 @@ async fn a_group_summary_of_a_window_with_a_withheld_voucher_is_partial_and_says
     // The composite voucher is in no bucket: two of the three vouchers are summarised, and the
     // result says the totals are short by the withheld one.
     assert_eq!(result["vouchers_summarised"], 2, "{result}");
+    assert!(result["coverage"].is_string(), "{result}");
     assert!(
-        result["coverage"].is_string() || result["withheld_vouchers"].is_array(),
+        result["withheld_vouchers"]
+            .as_array()
+            .is_some_and(|w| w.len() == 1),
         "{result}"
     );
+}
+
+#[tokio::test]
+async fn a_group_summary_with_a_ledger_masks_the_ledger_and_every_member_under_mask_parties() {
+    let mut plans = identity_plans();
+    plans.extend(paired(&counted_marks()));
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(paired(&xml_plan(wr2_group_snapshot())));
+    plans.extend(paired(&counted_marks()));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(paired(&xml_plan(wr2_group_snapshot())));
+    let one = OneServer::spawn_with(plans, Redaction::MaskParties);
+    let response = one
+        .call(json!({"summarise_by": "group", "ledger": "Café Naïve Traders"}))
+        .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let text = response.to_string();
+    for real in ["Café Naïve Traders", "WR2 Sales"] {
+        assert!(
+            !text.contains(real),
+            "{real} appears under mask_parties: {text}"
+        );
+    }
+    let buckets = buckets_of(&response);
+    assert_eq!(buckets.len(), 2, "{response}");
+    assert!(buckets
+        .iter()
+        .all(|bucket| bucket["members"].as_array().unwrap().len() == 1));
+}
+
+#[tokio::test]
+async fn a_moved_ledger_is_refused_with_the_group_drift_advice() {
+    let moved = ledger_catalogue().replacen(
+        "<PARENT TYPE=\"String\">Cash-in-Hand</PARENT>",
+        "<PARENT TYPE=\"String\">Sundry Debtors</PARENT>",
+        1,
+    );
+    assert_ne!(moved, ledger_catalogue());
+    let one = OneServer::spawn(group_summary_plans(
+        (ledger_catalogue(), wr2_group_snapshot()),
+        (moved, wr2_group_snapshot()),
+    ));
+    let response = one.call(json!({"summarise_by": "group"})).await;
+    let refusal = refusal_of(&response);
+    assert_eq!(refusal["code"], "group_snapshot_drifted", "{refusal}");
+    assert!(refusal["remediation"].is_string(), "{refusal}");
 }
 
 #[tokio::test]

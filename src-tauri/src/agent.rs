@@ -998,13 +998,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              book is corrected.",
         ),
         "summary_group_book_too_large" => Some(
-            "The company's master-alteration mark (`size.master_alter_id`) is above what a group \
-             summary can read the ledger list for (`size.limit_master_alter_id`), so no request \
-             for the ledgers was sent: a response past the transport's response cap is cut off \
-             mid-read, which can leave Tally's gateway unable to answer (#637). The mark is an \
-             UPPER BOUND on ledgers, since every other master raises it too, so a company with \
-             fewer ledgers may be refused. Summarise by ledger, month or voucher_type instead, \
-             and read ledger_masters for each ledger's group. Retrying this call refuses again.",
+            "The company's master-alteration mark (`size.master_alter_id`) is above the limit a \
+             group summary reads the ledger list at (`size.limit_master_alter_id`), so no request \
+             for the ledgers was sent. The limit is provisional and computed, not measured on this \
+             list: 16 MiB, a size chosen here and not verified, over an estimate of 1,400 bytes a \
+             ledger. A response past the transport's response cap is cut off mid-read, which can \
+             leave Tally's gateway unable to answer (#637); this limit is about half of that cap. \
+             The mark is an UPPER BOUND on ledgers, since every other master raises it too, so a \
+             company with fewer ledgers may be refused. Tell the person the limit is provisional. \
+             Summarise by ledger, month or voucher_type instead, and read ledger_masters for each \
+             ledger's group. Retrying this call refuses again.",
         ),
         "group_snapshot_drifted" => Some(
             "A ledger's group, or a group's place in the tree, changed in Tally while this call \

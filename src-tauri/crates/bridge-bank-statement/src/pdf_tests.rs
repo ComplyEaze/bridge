@@ -28,3 +28,28 @@ fn words_break_at_space_gap_and_baseline_but_not_between_adjacent_glyphs() {
     assert!((words[0].x1 - 18.4).abs() < 1e-9);
     assert!((words[0].y0 - 14.5).abs() < 1e-9);
 }
+
+fn word(text: &str) -> Word {
+    Word::new(10.0, 10.0, 30.0, 19.0, text)
+}
+
+#[test]
+fn a_document_with_no_figures_in_its_words_has_no_readable_text() {
+    for pages in [
+        vec![],
+        vec![Page::new(), Page::new()],
+        vec![vec![word("SCANNED"), word("WITH"), word("APP")]],
+    ] {
+        let refusal = require_readable_text(&pages).unwrap_err();
+        assert_eq!(refusal.category, "no_readable_text");
+    }
+}
+
+#[test]
+fn one_figure_on_any_page_is_readable_text() {
+    // a blank first page does not decide it, and a Unicode digit or fraction counts
+    for figure in ["4321", "AB1", "\u{0967}", "\u{00bd}"] {
+        let pages = vec![Page::new(), vec![word("TERMS"), word(figure)]];
+        assert!(require_readable_text(&pages).is_ok(), "{figure}");
+    }
+}

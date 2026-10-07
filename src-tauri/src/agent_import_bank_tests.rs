@@ -2608,6 +2608,19 @@ fn sent_in_order(list: &Value, key: &str) -> Vec<String> {
         .collect()
 }
 
+/// No list holds a ledger its batch does not name, so no tool call reaches
+/// this: such a ledger goes after the named ones and never ahead of them.
+#[test]
+fn a_ledger_the_batch_does_not_name_is_listed_after_those_it_names() {
+    // The batch names Bridge Nested Debtor WR4, Cash and WR2 Sales, in that order.
+    let listed = in_batch_order(
+        vec!["Not Named B", "WR2 Sales", "Not Named A", "Cash"],
+        &captured_bank_payload(),
+        |ledger| *ledger,
+    );
+    assert_eq!(listed, ["Cash", "WR2 Sales", "Not Named B", "Not Named A"]);
+}
+
 /// A build refused on the shape lab's catalogue read, as the assistant
 /// receives it.
 async fn shape_lab_refusal(

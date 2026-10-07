@@ -8,6 +8,11 @@ use tally_protocol_simulator::{
 };
 use tokio::io::AsyncReadExt;
 
+/// A date as `normalized_date` returns it.
+fn day(text: &str) -> bridge_tally_core::TallyDate {
+    bridge_tally_core::TallyDate::parse(text).unwrap()
+}
+
 pub(super) fn company_collection_xml() -> String {
     "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME=\"BRIDGE SYNTHETIC BOOK\"><GUID>00000000-0000-4000-8000-000000000001</GUID><COMPANYNUMBER>1</COMPANYNUMBER><BOOKSFROM>20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>".to_string()
 }
@@ -103,6 +108,8 @@ fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
             "REFERENCE",
             "ISINVOICE",
             "PARTYGSTIN",
+            // Same inertness trap: `reference_date` is parsed only if the request names it (#1257).
+            "REFERENCEDATE",
         ] {
             assert!(fields.iter().any(|value| value == field), "missing {field}");
         }
@@ -743,9 +750,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // name, so a new tool must either be given a sample or be listed here
     // deliberately. `acknowledge_post_review` writes one local record and its
     // module marks no party name; `local_data_report` returns only static
-    // strings, counts, sizes and whole days.
+    // strings, counts, sizes and whole days; `cash_flow` returns only months,
+    // amounts and counts of ledgers, and no ledger name.
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
-    let mut without_a_sample = vec!["acknowledge_post_review", "local_data_report"];
+    let mut without_a_sample = vec!["acknowledge_post_review", "cash_flow", "local_data_report"];
     // The lab-only tools, compiled in with the `lab-writes` feature, are not
     // sampled yet: `lab_read_inventory` returns party-bearing fields and the two
     // import tools were not examined (#999).
@@ -1451,11 +1459,11 @@ fn ledger_masters_evidence_changes_when_a_ledger_response_changes() {
 #[test]
 fn ledger_movement_rejects_a_window_before_the_observed_books_from() {
     assert_eq!(
-        ensure_movement_window_within_books("20260331", "20260401"),
+        ensure_movement_window_within_books(&day("20260331"), &day("20260401")),
         Err("window_precedes_books_from".to_string())
     );
     assert_eq!(
-        ensure_movement_window_within_books("20260401", "20260401"),
+        ensure_movement_window_within_books(&day("20260401"), &day("20260401")),
         Ok(())
     );
 }
@@ -2037,8 +2045,8 @@ fn voucher_window_rejects_out_of_range_rows_and_requires_a_wider_empty_check() {
     ));
     assert!(window_honoured(&[], "20260901", "20260902"));
     assert_eq!(
-        widened_window("20260901", "20260902"),
-        Ok(("20260831".to_string(), "20260903".to_string()))
+        widened_window(&day("20260901"), &day("20260902")),
+        Ok((day("20260831"), day("20260903")))
     );
 }
 
@@ -2048,21 +2056,41 @@ fn voucher_window_rejects_out_of_range_rows_and_requires_a_wider_empty_check() {
 #[test]
 fn widening_a_window_at_the_calendar_edge_is_refused_by_its_typed_code() {
     assert_eq!(
-        widened_window("20260901", "99991231"),
+        widened_window(&day("20260901"), &day("99991231")),
         Err("tally_date_overflow".to_string())
     );
     assert_eq!(
-        widened_window("00010101", "20260902"),
+        widened_window(&day("00010101"), &day("20260902")),
         Err("tally_date_underflow".to_string())
     );
     assert_eq!(
-        widened_window("2026-09-01", "20260902"),
-        Err("invalid_date".to_string())
+        widened_window(&day("99991230"), &day("99991230")),
+        Ok((day("99991229"), day("99991231")))
     );
-    assert_eq!(
-        widened_window("99991230", "99991230"),
-        Ok(("99991229".to_string(), "99991231".to_string()))
-    );
+}
+
+/// A tool's date is parsed once, at the boundary, by `normalized_date`: a date
+/// no `YYYYMMDD` can name is refused there by its typed code, so no window
+/// below it can hold one (#1245; formerly asserted where the window was read).
+#[test]
+fn a_tool_date_that_is_not_a_tally_date_is_refused_at_the_boundary() {
+    for text in [
+        "20261301",
+        "20260229",
+        "2026-13-01",
+        "2026090",
+        "",
+        "2026-09-0x",
+    ] {
+        assert_eq!(
+            normalized_date(text),
+            Err("invalid_date".to_string()),
+            "{text:?}"
+        );
+    }
+    // Every `-` is dropped before parsing, as before #1245.
+    assert_eq!(normalized_date("2026-09-01"), Ok(day("20260901")));
+    assert_eq!(normalized_date("20240229"), Ok(day("20240229")));
 }
 
 #[test]
@@ -2195,6 +2223,14 @@ async fn voucher_read_evidence_uses_utf16_transport_bytes() {
         status_plan(),
         high_water_plan(),
         status_plan(),
+        // The census of the window (#1029), then the window, both of the
+        // captured vouchers.
+        company_plan(),
+        company_plan(),
+        voucher_plan(),
+        status_plan(),
+        voucher_plan(),
+        status_plan(),
         company_plan(),
         company_plan(),
         voucher_plan(),
@@ -2231,16 +2267,18 @@ async fn voucher_read_evidence_uses_utf16_transport_bytes() {
     let expected_bytes = bridge_tally_protocol::encode_tally_xml_request_utf16le(&company_xml)
         .len()
         + bridge_tally_protocol::encode_tally_xml_request_utf16le(high_water_xml).len()
-        + bridge_tally_protocol::encode_tally_xml_request_utf16le(captured_vouchers).len();
+        // The census and the window both serve the captured vouchers.
+        + 2 * bridge_tally_protocol::encode_tally_xml_request_utf16le(captured_vouchers).len();
     assert_eq!(
         response["structuredContent"]["evidence"]["bytes"],
         expected_bytes * 2
     );
     assert_ne!(
         response["structuredContent"]["evidence"]["bytes"],
-        company_xml.len() + high_water_xml.len() + captured_vouchers.len()
+        company_xml.len() + high_water_xml.len() + 2 * captured_vouchers.len()
     );
-    assert_eq!(simulator.finish().expect("simulator result").len(), 16);
+    // 16 before the census (#1029) and its six legs.
+    assert_eq!(simulator.finish().expect("simulator result").len(), 22);
 }
 
 /// `vouchers` over an empty window on a company whose high-water row carries

@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE OUTSTANDINGS LAB through the raw serial sender of a lab sitting that made reads only: no import and no write",
+  "observed_date": "2026-10-06",
+  "source_response_bytes": 24220,
+  "source_response_sha256": "b7be4e74259d80f4eff0b1d8fba85e9a359f12800b58beb75b1288a0991474d2",
+  "source_request_bytes": 2120,
+  "source_request_sha256": "cc0bff50a77c39f4a50c1a98589cf24792ed80bb2d212682f63c5db2c3d7f58a",
+  "request_rendered_by": "ReadOnlyProfile::StandardLedgerCatalogV2 { company }.render() (V1's request plus the one NativeMethod line IsBillWiseOn)",
+  "fixture_bytes": 24220,
+  "fixture_sha256": "b7be4e74259d80f4eff0b1d8fba85e9a359f12800b58beb75b1288a0991474d2",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "The import family's ledger catalogue (design E of #1234): 17 ledgers with name, GUID, parent, the company GUID and name computes, and ISBILLWISEON on every row (10 Yes, 7 No; the six ledgers under cash, bank, income, purchase, sales and the root all answer No).",
+  "provenance_limit": "One synthetic book on one build. It shows how Tally answers this request for these shapes; it is not evidence about a client's book, about a large book, or about a ledger whose name ends in a line break (this book holds none). The request was sent twice in the sitting and both answers were byte-identical; the first of the two is the fixture. The flags equal, by name, the same book's 1 Oct outstandings snapshot.",
+  "sensitivity_review": "Synthetic BRIDGE company, synthetic ledger names and GUIDs; no client, GSTIN, address or credential.",
+  "observed_at_utc": "2026-10-06T06:07Z"
+}

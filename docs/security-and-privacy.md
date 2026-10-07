@@ -52,22 +52,29 @@ settings (section 4).
 - **A Windows network path, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The
   bank statement tool could be given a path that names another computer, and
   Windows then connects to that computer by itself. Section 3 describes it.
-- **To your AI provider: yes, whatever the assistant reads.** ComplyEaze
-  Bridge hands each tool result, including company names, party names and
-  amounts, to Claude Desktop. Claude Desktop is the host, and it sends tool
-  results to the AI provider you use as part of the conversation; that is the
-  host's behaviour, which this repository cannot show. ComplyEaze Bridge can
-  mask party names or drop narration
-  (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting), but neither
-  removes amounts. The default is `none`: nothing is masked unless you choose it.
+- **To your AI provider: yes, whatever the assistant reads.** ComplyEaze Bridge
+  hands each tool result, including company, party and ledger names, amounts,
+  dates, narrations, references and GSTINs and, when the assistant reads ledger
+  details, PAN, bank account numbers, IFSC, MSME or Udyam registration numbers,
+  email, phone and address, and, when it builds a voucher file, that file's
+  local path (which can include your computer user name), to Claude Desktop.
+  Claude Desktop is the host, and it sends tool results to the AI provider you
+  use as part of the conversation; that is the host's behaviour, which this
+  repository cannot show. ComplyEaze Bridge can shorten party and ledger names
+  and bank account numbers to their first two and last two characters, or drop
+  narrations (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting; one
+  value, not both), but neither hides amounts, company names, PAN, GSTIN, IFSC,
+  MSME or Udyam registration numbers, contact details or references, and a
+  shortened name can still be identified, not least from the GSTIN or PAN sent
+  beside it. The default is `none`: nothing is masked unless you choose it.
   - `mask_parties` shortens, to their first two and last two characters, the
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase
     register and bank-statement proposals), stock item names and their
     parents, godown and stock-group names and their parents, and three fields
     of a ledger's details: the name on the PAN, the bank account holder's name
-    and the bank details. A name of four characters or fewer is removed
-    entirely. It does not mask amounts, company names, a ledger's parent
+    and the bank details. A name of four characters or fewer is replaced
+    by “…”. It does not mask amounts, company names, a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
     addresses or IFSCs, and a name written inside a narration or reference
@@ -172,7 +179,7 @@ settings (section 4).
   count of the rest. The second records that the response was written out. It
   holds no row values.
 - **A terms record** (`terms-acceptance.jsonl`): the extension asks you to
-  accept the ComplyEaze Bridge Terms of Use (version 2026-10) in its settings,
+  accept the ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings,
   and every tool refuses with `terms_not_accepted` until you do. When the
   server starts with the setting on, it appends a line with the terms version,
   the time, and that the acceptance came through the setting (once per

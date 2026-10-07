@@ -12,7 +12,7 @@
 //! path exists anywhere in this file.
 //!
 //! No signed compatibility evidence exists for any inventory field read here
-//! on any Tally release/mode (the plan-research note's §4.2/§4.5 findings):
+//! on any Tally release/mode:
 //! every value this tool returns is exploratory, not a qualified claim.
 
 use super::*;
@@ -792,8 +792,7 @@ pub(super) async fn lab_read_inventory(
 ) -> Result<ToolOutcome, ToolFailure> {
     let guid = required_string(args, "company_guid")?;
     let date = |key| -> Result<bridge_tally_core::TallyDate, ToolFailure> {
-        bridge_tally_core::TallyDate::parse(normalized_date(required_string(args, key)?)?)
-            .map_err(|_| "invalid_date".to_string().into())
+        Ok(normalized_date(required_string(args, key)?)?)
     };
     let (from, to) = (date("from")?, date("to")?);
     if from > to {

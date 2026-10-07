@@ -87,6 +87,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     // published.
     const READ_TOOLS: &[&str] = &[
         "balance_sheet",
+        "cash_flow",
         "changed_since",
         "egress_log",
         "ledger_masters",
@@ -851,6 +852,28 @@ fn the_vouchers_description_names_the_bill_date_and_credit_period_of_an_allocati
     );
 }
 
+/// The `vouchers` description states the master-mark limit of the group summaries as the code has it, and
+/// calls it provisional: the number in the text is the constant's, written with its thousands separator.
+#[test]
+fn the_vouchers_description_states_the_group_ledger_list_limit_the_code_enforces() {
+    let tools = registered_tool_definitions(true, true);
+    let description = tools
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|tool| tool["name"] == "vouchers")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("vouchers is in the catalogue");
+    let limit = super::super::vouchers::GROUP_LEDGER_LIST_MARK_LIMIT.to_string();
+    let (head, tail) = limit.split_at(limit.len() - 3);
+    let written = format!("{head},{tail}");
+    assert!(
+        description.contains(&format!("mark is above {written} is refused first")),
+        "the description does not carry the limit {written}"
+    );
+    assert!(description.contains("provisional and computed, not measured"));
+}
+
 /// The `vouchers` description states the order of summary buckets, including the rule for a tie
 /// in movement (#1230): first counted in the window, never by name, which under `mask_parties`
 /// would show the alphabetical order of the real names.
@@ -866,7 +889,7 @@ fn the_vouchers_description_states_the_tie_rule_of_summary_buckets() {
         .expect("vouchers is in the catalogue");
     assert!(
         description.contains(
-            "Buckets are ordered by the larger movement first (ledger, type), ties in movement keeping the order in which the bucket was first counted in the window, or by month."
+            "Buckets are ordered by the larger movement first (ledger, type, group, primary_group), ties in movement keeping the order in which the bucket was first counted in the window, or by month."
         ),
         "the vouchers description lacks the bucket order and its tie rule"
     );
@@ -898,10 +921,11 @@ fn the_vouchers_description_does_not_say_a_capture_showed_post_dated_omitted() {
     );
 }
 
-/// The extension's "Allow voucher posting" setting is the risk disclosure the Terms (9.2) point to:
-/// "you accept the known limits described in the extension settings", so each limit, the approval
-/// gate and the sentence that ties the setting to the Terms are pinned by a short phrase on its
-/// own (#1010), never the whole text. The setting can be shortened as long as every phrase stays
+/// The extension's "Allow voucher posting" setting is a risk disclosure the Terms (9.2) point to:
+/// "you accept the known limits below, and any further known limits described in the extension
+/// settings", and the setting points back to 9.2. So each limit, the approval gate and the two
+/// sentences that tie the setting to the Terms are pinned by a short phrase on its own (#1010),
+/// never the whole text. The setting can be shortened as long as every phrase stays
 /// or its pin changes in the same commit, where a reviewer sees it. A phrase that only means
 /// something with its neighbour ("it", "such change") is pinned together with that neighbour. A
 /// renamed key panics rather than passing silently.
@@ -919,7 +943,11 @@ fn the_posting_setting_keeps_each_known_limit() {
             "the sentence that ties the setting to the Terms: the person accepts the limits by turning it on",
         ),
         (
-            "each only after you approve it in a native dialog",
+            "Terms of Use section 9.2",
+            "the sentence that names the Terms section holding the full list of known limits",
+        ),
+        (
+            "each only after you approve it in a separate window",
             "every post waits for the person's approval",
         ),
         (
@@ -1264,7 +1292,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         .expect("extension description");
     for phrase in [
         "goes to your AI provider",
-        "can only mask party names or drop narration",
+        "can only shorten party and ledger names and bank account numbers or drop narrations",
     ] {
         assert!(
             extension.contains(phrase),

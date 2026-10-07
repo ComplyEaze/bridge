@@ -1047,8 +1047,8 @@ the same asymmetry as the `$$` crash (§I1) and the current-period edit block (�
 Each wrong guess costs a hung gateway and an operator interruption. Object and report names
 must come from documentation or from Tally's own UI, never from experimentation.
 
-**This rule was violated during the investigation** — six unknown types were sent in a loop
-after the first had already hung for 300 s, taking the instance down. That is exactly the
+**This rule has been broken before** — several unknown types were sent in a loop after the
+first had already hung the gateway, taking the instance down. That is exactly the
 "never auto-retry a request that caused a hang" rule in §5.4. Recorded because the failure was
 procedural, not technical.
 

@@ -3,11 +3,13 @@
 [![ComplyEaze Bridge MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/ComplyEaze/bridge/badges/score.svg)](https://glama.ai/mcp/servers/ComplyEaze/bridge)
 
 <!-- llms:begin -->
-ComplyEaze Bridge is a TallyPrime MCP server for Claude Desktop. It connects
-Claude Desktop to the TallyPrime running on your own computer, and it is built
-for chartered accountants, CA firms and accountants. You can ask about the
-trial balance, outstanding receivables and payables with ageing, ledger
-movement and vouchers, the purchase and sales registers, the stock summary,
+ComplyEaze Bridge is an open-source (Apache-2.0) TallyPrime (also written Tally
+Prime) MCP server for Claude Desktop. It connects Claude Desktop to the
+TallyPrime running on your own computer, and it is built for chartered
+accountants, CA firms and accountants. What Claude reads from your books goes to
+your AI provider as part of the chat. You can ask about the trial balance,
+outstanding receivables and payables with ageing, ledger movement and vouchers,
+the purchase and sales registers, the stock summary,
 and the Profit and Loss and Balance Sheet (a book with stock items is expected
 to be refused for these two). It checks ledger names before you post. For bank
 statement to TallyPrime vouchers, it proposes Payment, Receipt and Contra
@@ -25,10 +27,10 @@ Bridge is not made by, or affiliated with, Tally Solutions, and we have not run
 the two side by side. TallyPrime also has its own Bank Statement import, which
 takes statement files in the formats Tally lists for each bank.
 
-**Current release:**
-<!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,
-for Windows x64 and Apple Silicon Macs. We check each release before we
-publish it: the release check confirms that each package launches, lists its
+**Current release:** <!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,
+for Windows x64 and Apple Silicon Macs, as a Claude Desktop extension (an .mcpb
+file); it has not been run in other MCP clients. We check each release before
+we publish it: the release check confirms that each package launches, lists its
 tools and parses a synthetic encrypted bank statement. It does not run against
 TallyPrime, and nothing we can run covers every
 Tally edition, set of books or setting. What has been run against a real
@@ -73,7 +75,7 @@ with no figures, to a log on this computer.
 | `verify_import` | Reads back a batch you imported by hand in TallyPrime | Proof files and status records on this computer |
 | `voucher_presence` | Which proposed vouchers are already in the book | Nothing |
 | `voucher_schema` | The voucher-file format, without asking TallyPrime | Nothing |
-| `vouchers` | The vouchers in a period, optionally searched by voucher number, reference, narration or amount, or summarised by ledger, month or voucher type (search and summaries not yet measured against a live book) | Nothing |
+| `vouchers` | The vouchers in a period. Search by voucher number, reference, narration or amount, and summaries by ledger, month, voucher type, group or primary group, are in the next build and not in 0.4.2 (search and the first three summaries checked once, and the group and primary-group summaries in a second run, on a synthetic book of 67 vouchers; not checked on a large book) | Nothing |
 
 With posting turned on in the extension, two more appear: `post_import` posts one saved voucher after you approve it in a
 ComplyEaze Bridge window, and `acknowledge_post_review` asks you, in its own window, to record that you reviewed a posted voucher
@@ -86,10 +88,18 @@ whose ledger now points to a different master.
   tell whether that local port is forwarded to another machine; do not forward
   one across the internet. The Tally connection sends nothing to a ComplyEaze
   server.
-- **Your AI provider sees what the assistant reads**, just as it sees the
-  rest of the conversation: company names, party names and amounts. You can
-  mask party names or drop narration. Amounts are always sent. See
-  *Before you use it with client data* below.
+- **Your AI provider sees what the assistant reads**, just as it sees the rest of
+  the conversation, including company, party and ledger names, amounts, dates,
+  narrations, references, GSTINs and, when it reads ledger details, PAN, bank
+  account numbers, IFSC, MSME or Udyam registration numbers, email, phone and
+  address, and, when it builds a voucher file, that file's local path (which can
+  include your computer user name). The setting takes one value, not both:
+  shorten party and ledger names and bank account numbers to their first two and
+  last two characters (four or fewer become “…”), or drop narrations. Neither
+  hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration
+  numbers, contact details or references, and a shortened name can still be
+  identified, not least from the GSTIN or PAN sent beside it. See *Before you
+  use it with client data* below.
 - **Posting is off by default in the extension.** If you installed an
   earlier version, check the setting: an earlier default may still be saved as
   on. When you turn posting on, each voucher waits for your approval in a
@@ -110,7 +120,7 @@ whose ledger now points to a different master.
   identifier, and a fingerprint of what was asked and of what came back,
   written whether the call succeeds or is refused.
 - **You accept the Terms of Use first.** The extension asks you to accept the
-  ComplyEaze Bridge Terms of Use (version 2026-10) in its settings, and every
+  ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings, and every
   tool refuses with `terms_not_accepted` until you do.
 - **Open source** under Apache-2.0.
 
@@ -207,13 +217,21 @@ hosted CI runners for Windows x64 and Apple Silicon Mac.
 
 - Stock quantities, and stock reads on books with many masters of any kind; sales,
   purchase or tax posting; creating masters; bill-wise allocation
+- TallyPrime Education mode: the trial balance, Profit and Loss, Balance Sheet,
+  the stock summary and the `masters` read are refused; so is a read of vouchers,
+  ledger movement, either register or another date-window read whose window starts
+  or ends on a day other than the 1st, 2nd or 31st; so is an import file or a post
+  with a voucher dated on any other day (posting on Education has not been run)
+- The stock summary on a book with inventory turned off, or on a company split by
+  year when a sibling year's company is loaded at the same time
 - Deleting or undoing a posted voucher (correct it in Tally)
 - Reads on very large books can fail or take longer than the assistant waits
   (#485, #703)
 - A base currency other than INR. On a book with several currencies: the
   foreign-currency ledgers and vouchers themselves (they are set aside or
   withheld, and named), ledger movement, Profit and Loss and Balance Sheet,
-  the purchase register, and posting
+  the purchase and sales registers (each refuses the whole read, with no rows, if
+  one voucher in it names a set-aside ledger), and posting
 - Tally Cloud Access or any remote Tally host
 - Intel Macs, and a code-signed installer
 <!-- llms:end -->
@@ -298,10 +316,18 @@ See [Security and privacy](./docs/security-and-privacy.md).
 ## Before you use it with client data
 
 **One thing to understand before you use it.** When you ask an AI assistant for
-financial data through Bridge, the assistant's provider sees what it reads —
-company names, party names and amounts. That is a property of using a hosted
-assistant, not of Bridge. Bridge can mask party names or drop narration first
-(`BRIDGE_AGENT_REDACTION`), but **neither setting removes amounts** — figures
+financial data through Bridge, the assistant's provider sees what it reads,
+including company, party and ledger names, amounts, dates, narrations,
+references, GSTINs and, when it reads ledger details, PAN, bank account numbers,
+IFSC, MSME or Udyam registration numbers, email, phone and address, and, when it
+builds a voucher file, that file's local path (which can include your computer
+user name). That is a property of using a hosted assistant, not of Bridge.
+ComplyEaze Bridge can, before sending, shorten party and ledger names and bank
+account numbers to their first two and last two characters (four or fewer become
+“…”), or drop narrations (`BRIDGE_AGENT_REDACTION` takes one value, not both).
+**Neither hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam
+registration numbers, contact details or references, and a shortened name can
+still be identified, not least from the GSTIN or PAN sent beside it** — figures
 always go with the answer. Decide this deliberately for client data.
 
 ## What it costs
@@ -392,13 +418,18 @@ of the Claude Desktop extension with the [installation guide](./docs/agent/INSTA
 use, the contributor quick start below builds the desktop app; to run the MCP
 server from source, follow the [source MCP setup](./docs/agent/README.md).
 
-Before requesting financial data through an MCP client, the client may send the selected
-Tally result to its AI provider, including company
-identity, party or open-bill details, and amounts. Source installations default
-to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties` or `drop_narration`
-before launch when that better fits the workflow. These settings mask party
-names or drop narration; they do not remove amounts. The package installation
-settings expose the same choices.
+Before requesting financial data through an MCP client, the client may send the
+selected Tally result to its AI provider, including company identity, party or
+open-bill details, amounts, dates, narrations, references, GSTINs and, when it
+reads ledger details, PAN, bank account numbers, IFSC, MSME or Udyam
+registration numbers, email, phone and address, and, when it builds a voucher
+file, that file's local path (which can include your computer user name). Source
+installations default to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties`
+or `drop_narration` (one value, not both) before launch when that better fits
+the workflow. These settings shorten party and ledger names and bank account
+numbers or drop narrations; they do not hide amounts, company names, PAN, GSTIN,
+IFSC, MSME or Udyam registration numbers, contact details or references. The
+package installation settings expose the same choices.
 
 For a first result, run `tally_status` to check that TallyPrime and its Licensed
 or Education mode are observed, then list the loaded companies. Select a

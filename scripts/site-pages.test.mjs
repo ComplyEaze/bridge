@@ -6,7 +6,7 @@ const site = new URL("../site/", import.meta.url);
 const read = (name) => readFileSync(new URL(name, site), "utf8");
 // The deploy writes these from the tracked templates; a template is the page this test reads.
 const siteOrigin = "https://bridge.complyeaze.com/";
-const generated = new Set(["changelog.html", "privacy.html", "releases.json", "terms.html"]);
+const generated = new Set(["changelog.html", "privacy.html", "releases.json", "terms.html", "terms-2026-10.html"]);
 const pages = readdirSync(site).filter((name) => name.endsWith(".html") && !generated.has(name)).sort();
 
 function region(html, open, close) {
@@ -54,12 +54,14 @@ const outsideLinks = /^https:\/\/github\.com\/ComplyEaze\/bridge(?:[/#?]|$)/;
 
 test("every reference on a page is a file the site ships or the deploy writes, or a link to this project on GitHub", () => {
   for (const name of pages) {
-    const html = read(name).replace(/<!--[\s\S]*?-->/g, " ");
+    // the legal template holds a marker where the renderer writes the page's own address (render-legal.test.mjs checks that)
+    const html = read(name).replace("<!-- legal-canonical -->", siteOrigin + name).replace(/<!--[\s\S]*?-->/g, " ");
     for (const [tag, attribute, , ref] of html.matchAll(/<[a-z][^>]*?\b(href|src)=(["'])(.*?)\2/g)) {
       if (ref.startsWith("#")) continue;
       // a page may name its own address as its canonical one, and no other address on this site's origin
       if (tag.startsWith('<link rel="canonical"')) {
-        assert.equal(ref, siteOrigin + (name === "index.html" ? "" : name), `${name}: its canonical address is not its own`);
+        // a template is read in place of the page the deploy writes from it (changelog.template.html -> changelog.html)
+        assert.equal(ref, siteOrigin + (name === "index.html" ? "" : name.replace("changelog.template.html", "changelog.html")), `${name}: its canonical address is not its own`);
         continue;
       }
       if (/^[a-z][a-z0-9+.-]*:/i.test(ref) || ref.startsWith("//")) {
@@ -500,4 +502,10 @@ test("the Atom feed is complete, and has one entry for each blog post, pointing 
   // the feed carries words too, so it keeps to the same wording rules as a page
   for (const banned of [/\bfree\b/i, /\boffline\b/i, /nothing leaves/i, /\bpreviews?\b/i, /[™®]|&trade;|&reg;/]) assert.doesNotMatch(feed, banned, `feed.xml says ${banned}`);
   assert.doesNotMatch(feed, /(?<!ComplyEaze )\bBridge\b/, "feed.xml names the product as a bare Bridge");
+});
+
+test("the changelog template names the address the deploy writes it to as its canonical one", () => {
+  const html = read("changelog.template.html");
+  assert.equal(html.match(/<link rel="canonical" href="([^"]*)" \/>/g)?.length, 1, "changelog.template.html: exactly one canonical link");
+  assert.match(html, /<link rel="canonical" href="https:\/\/bridge\.complyeaze\.com\/changelog\.html" \/>/, "changelog.template.html: its canonical address is not changelog.html");
 });

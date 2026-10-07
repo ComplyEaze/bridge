@@ -38,6 +38,7 @@ pub(super) fn parse_import_voucher_rows(
                 | "change_row_core_field_invalid"
                 | "voucher_date_invalid"
                 | "voucher_effective_date_invalid"
+                | "voucher_reference_date_invalid"
                 | "voucher_accounting_state_not_observed" => "import_verification_export_invalid",
                 "change_row_identity_invalid"
                 | "voucher_source_identity_invalid"
@@ -146,7 +147,9 @@ impl VerificationCandidates {
 /// the matching use the same key.
 pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFingerprint {
     (
-        normalized_date(&voucher.date).ok(),
+        normalized_date(&voucher.date)
+            .ok()
+            .map(|date| date.as_str().to_string()),
         Some(voucher.voucher_type.as_str().to_string()),
         expected_entry_fingerprint(voucher),
     )
@@ -872,7 +875,10 @@ pub(super) fn voucher_diffs(
 ) -> Vec<Value> {
     let mut diffs = Vec::new();
     let expected_date = normalized_date(&expected.date).ok();
-    if actual.date.as_deref() != expected_date.as_deref() {
+    let expected_date = expected_date
+        .as_ref()
+        .map(bridge_tally_core::TallyDate::as_str);
+    if actual.date.as_deref() != expected_date {
         diffs.push(json!("date"));
     }
     // A bank voucher is written with EFFECTIVEDATE equal to DATE (§9.13), and
@@ -883,7 +889,7 @@ pub(super) fn voucher_diffs(
         && actual
             .effective_date
             .as_deref()
-            .is_some_and(|observed| Some(observed) != expected_date.as_deref())
+            .is_some_and(|observed| Some(observed) != expected_date)
     {
         diffs.push(json!("effective_date"));
     }

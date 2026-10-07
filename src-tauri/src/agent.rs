@@ -39,13 +39,18 @@ use agent_protocol::serve_stdio;
 #[path = "agent_company.rs"]
 mod company;
 use company::*;
+#[path = "agent_cash_flow.rs"]
+mod cash_flow;
 #[path = "agent_changes.rs"]
 mod changes;
 #[path = "agent_headline.rs"]
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
 mod ledger_candidates;
-use ledger_candidates::resolve_ledger_or_refuse;
+use ledger_candidates::{
+    ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
+    CatalogueLedger,
+};
 #[path = "agent_ledgers.rs"]
 mod ledgers;
 #[path = "agent_masters.rs"]
@@ -65,10 +70,13 @@ mod voucher_search;
 #[path = "agent_vouchers.rs"]
 mod vouchers;
 use voucher_search::VoucherSearch;
+#[path = "agent_voucher_groups.rs"]
+mod voucher_groups;
 #[path = "agent_voucher_summary.rs"]
 mod voucher_summary;
 #[cfg(test)]
 use outstandings::*;
+use voucher_groups::Placements;
 use voucher_summary::{SummaryGroup, SummaryRequest};
 #[path = "agent_movement.rs"]
 mod movement;
@@ -492,6 +500,9 @@ struct ReadDetail {
     /// The report kind and 1-based row of a Bills report whose row could not be
     /// read (bridge#1091). A word and a number: never the bill's party or reference.
     bill_row: Option<BillRowRef>,
+    /// The ledger a group summary could not place (#1230). Shown as a party name, so `mask_parties`
+    /// masks it; a group is never named (its name is in the book's groups, and only the ledger is known).
+    unplaced_ledger: Option<String>,
 }
 
 /// See [`ReadDetail::bill_row`].
@@ -774,6 +785,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(statement.code());
         }
+        if let Some(cash_flow) =
+            cause.downcast_ref::<bridge_tally_protocol::native_cash_flow::NativeCashFlowError>()
+        {
+            return Some(cash_flow.code());
+        }
+        if let Some(check) =
+            cause.downcast_ref::<crate::reports::cash_flow::CashFlowCheckError>()
+        {
+            return Some(check.code());
+        }
         if let Some(outstandings) =
             cause.downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
         {
@@ -972,6 +993,39 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              and no request was sent. Ask for a 31 March `as_of`; retrying the same date \
              refuses again. Only the period ending 31 March 2026 has been measured for \
              stock: another year's 31 March is read, but its figures are unmeasured.",
+        ),
+        "summary_group_unresolved" => Some(
+            "A ledger in this window could not be placed under a group, so no group total was \
+             given: a total that is short of an entry it could not place would mislead. `ledger` \
+             names the ledger and `cause` says why: `no_parent` (the book gives it no parent \
+             group, or one ComplyEaze Bridge will not carry: a name with a control character or \
+             over 1,024 bytes), `group_absent` (its parent group is not in the group list), \
+             `group_name_repeated`, `cycle`, `exhausted` (its chain is longer than the walk allows), \
+             `reserved_name_missing`, `top_group_not_under_root` (the top group of its chain has \
+             no parent, or none that is the root) or `ledger_not_in_catalogue` (the ledger list \
+             does not hold it). Only the first such ledger is named: correct it and call again. Show the person the \
+             ledger and the cause. Call ledger_masters for that ledger's `parent` and masters with \
+             kind groups for the groups, and ask them to correct it in Tally; or summarise by \
+             ledger, month or voucher_type instead. Retrying this call refuses again until the \
+             book is corrected.",
+        ),
+        "summary_group_book_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) is above the limit a \
+             group summary reads the ledger list at (`size.limit_master_alter_id`), so no request \
+             for the ledgers was sent. The limit is provisional and computed, not measured on this \
+             list: 16 MiB, a size chosen here and not verified, over an estimate of 1,400 bytes a \
+             ledger. A response past the transport's response cap is cut off mid-read, which can \
+             leave Tally's gateway unable to answer (#637); this limit is about half of that cap. \
+             The mark is an UPPER BOUND on ledgers, since every other master raises it too, so a \
+             company with fewer ledgers may be refused. Tell the person the limit is provisional. \
+             Summarise by ledger, month or voucher_type instead, and read ledger_masters for each \
+             ledger's group. Retrying this call refuses again.",
+        ),
+        "group_snapshot_drifted" => Some(
+            "A ledger's group, or a group's place in the tree, changed in Tally while this call \
+             was being read, so the groups read before the window and after it differ and no \
+             group total was given. Nothing is wrong with the book: ask the person whether \
+             anyone is editing it, then call this again once they have stopped.",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(
@@ -1838,15 +1892,21 @@ impl Server {
                 }
                 // The partial read's own reason, under the same budget rule:
                 // a few codes, kept beside the refusal's code.
-                let (incomplete_read, planned_reads, bill_row) = read_detail
+                let (incomplete_read, planned_reads, bill_row, unplaced_ledger) = read_detail
                     .map(|detail| {
                         (
                             detail.incomplete_read,
                             detail.planned_reads,
                             detail.bill_row,
+                            detail.unplaced_ledger,
                         )
                     })
                     .unwrap_or_default();
+                if let Some(ledger) = unplaced_ledger {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["ledger"] = party_name_value(ledger);
+                    }
+                }
                 if let Some(bill_row) = bill_row {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["bill_row"] = json!({"report": bill_row.report, "row": bill_row.row});
@@ -2037,6 +2097,7 @@ impl Server {
                 self.import_enabled()?;
                 self.build_import_xml(args).await
             }
+            "cash_flow" => self.cash_flow(args).await,
             "changed_since" => self.changed_since(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
             "ledger_masters" => self.ledger_masters(args).await,
@@ -2238,8 +2299,8 @@ pub(crate) async fn desktop_selected_vouchers(
         &server,
         &json!({
             "company_guid": company_guid,
-            "from": normalized_from,
-            "to": normalized_to,
+            "from": normalized_from.as_str(),
+            "to": normalized_to.as_str(),
             "ledger": ledger,
             "offset": offset,
             "limit": limit,
@@ -2296,7 +2357,10 @@ fn page_is_truncated(total: usize, offset: usize, page_len: usize) -> bool {
     offset.saturating_add(page_len) < total
 }
 
-fn ensure_movement_window_within_books(from: &str, books_from: &str) -> Result<(), String> {
+fn ensure_movement_window_within_books(
+    from: &bridge_tally_core::TallyDate,
+    books_from: &bridge_tally_core::TallyDate,
+) -> Result<(), String> {
     (from >= books_from)
         .then_some(())
         .ok_or_else(|| "window_precedes_books_from".to_string())
@@ -2399,13 +2463,16 @@ enum LedgerRefusal {
     NotFound,
     /// More than one ledger is that close, sorted: the set the user chooses from.
     Ambiguous(Vec<String>),
+    /// The exact spelling typed is the row spelling or the stored name of more
+    /// than one ledger, sorted (#1085).
+    SharedSpelling(Vec<String>),
 }
 
 impl LedgerRefusal {
     fn code(&self) -> &'static str {
         match self {
             Self::NotFound => "ledger_not_found",
-            Self::Ambiguous(_) => "ledger_ambiguous",
+            Self::Ambiguous(_) | Self::SharedSpelling(_) => "ledger_ambiguous",
         }
     }
 }
@@ -2530,25 +2597,22 @@ fn row_in_window(row: &Value, from: &str, to: &str) -> bool {
         .is_some_and(|date| date >= from && date <= to)
 }
 
-fn widened_window(from: &str, to: &str) -> Result<(String, String), String> {
-    let date = |value: &str| {
-        bridge_tally_core::TallyDate::parse(value).map_err(|_| "invalid_date".to_string())
-    };
+fn widened_window(
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
+) -> Result<(bridge_tally_core::TallyDate, bridge_tally_core::TallyDate), String> {
     // A window at either end of the calendar has no day beyond it to read. It
     // is refused by `TallyDate`'s own code (`tally_date_overflow`,
     // `tally_date_underflow`) rather than sent on as a date that is not eight
     // digits (#861).
     let step = |stepped: Result<bridge_tally_core::TallyDate, bridge_tally_core::TallyError>| {
         match stepped {
-            Ok(date) => Ok(date.as_str().to_string()),
+            Ok(date) => Ok(date),
             Err(bridge_tally_core::TallyError::InvalidData { code }) => Err(code),
             Err(_) => Err("invalid_date".to_string()),
         }
     };
-    Ok((
-        step(date(from)?.previous_day())?,
-        step(date(to)?.next_day())?,
-    ))
+    Ok((step(from.previous_day())?, step(to.next_day())?))
 }
 
 /// Tally is local to the Bridge host; accounting-day defaults therefore use
@@ -2645,10 +2709,11 @@ fn arg_positive_usize(args: &Value, key: &str, default: usize) -> Result<usize, 
         .then_some(value)
         .ok_or_else(|| "pagination_invalid".to_string())
 }
-fn normalized_date(value: &str) -> Result<String, String> {
-    let value = value.replace('-', "");
-    bridge_tally_core::TallyDate::parse(value.clone()).map_err(|_| "invalid_date".to_string())?;
-    Ok(value)
+/// A tool's date argument, parsed once at the boundary: every `-` is dropped, and
+/// the rest must be a valid `YYYYMMDD` date.
+fn normalized_date(value: &str) -> Result<bridge_tally_core::TallyDate, String> {
+    bridge_tally_core::TallyDate::parse(value.replace('-', ""))
+        .map_err(|_| "invalid_date".to_string())
 }
 
 fn add_decimal(left: &str, right: &str) -> Result<String, String> {

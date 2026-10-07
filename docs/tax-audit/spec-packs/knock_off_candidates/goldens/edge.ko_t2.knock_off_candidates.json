@@ -24,18 +24,18 @@
     },
     {
       "id": "knock_off_candidates.t2_candidate_total_paise",
-      "value": 2760000,
+      "value": 2880000,
       "unit": "paise",
-      "definition_sha256_16": "c81320270dcf7017",
-      "definition_text": "Bank and cash lines of the vouchers whose narration names a party ledger not on the voucher, summed -- a candidate total, not a reportable amount.",
+      "definition_sha256_16": "632d4e6d37fe2fa0",
+      "definition_text": "Bank and cash lines of the vouchers whose narration names a party ledger with no amount on the voucher, summed -- a candidate total, not a reportable amount. A Contra, or any voucher whose every line with an amount is on a bank or cash ledger, counts the larger side of its bank and cash lines once.",
       "evidence": []
     },
     {
       "id": "knock_off_candidates.t2_embedded_candidate_total_paise",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "2f59fc886c1b62be",
-      "definition_text": "Bank and cash lines of the vouchers whose narration holds a party's name only inside a longer name, summed -- a candidate total, not a reportable amount.",
+      "definition_sha256_16": "d05db920a7570d3e",
+      "definition_text": "Bank and cash lines of the vouchers whose narration holds a party's name only inside a longer name, summed -- a candidate total, not a reportable amount. A Contra, or any voucher whose every line with an amount is on a bank or cash ledger, counts the larger side of its bank and cash lines once.",
       "evidence": []
     },
     {
@@ -48,15 +48,20 @@
     },
     {
       "id": "knock_off_candidates.t2_named_count_03f5fa95",
-      "value": 1,
+      "value": 2,
       "unit": "count",
-      "definition_sha256_16": "f496462acf71465a",
-      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 03f5fa95) not on the voucher; a voucher naming two parties counts in both groups.",
+      "definition_sha256_16": "57e25b4f856d6be6",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 03f5fa95) with no amount on the voucher; a voucher naming two parties counts in both groups.",
       "evidence": [
         {
           "kind": "voucher",
           "id": "b09",
           "label": "Receipt b09 on 2025-08-05: narration: 'CAFÉ CORNER deposit'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b10",
+          "label": "Receipt b10 on 2025-08-06: narration: 'Cafe Corner deposit'"
         }
       ]
     },
@@ -64,8 +69,8 @@
       "id": "knock_off_candidates.t2_named_count_540eda69",
       "value": 2,
       "unit": "count",
-      "definition_sha256_16": "b8ba793cb4215c22",
-      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 540eda69) not on the voucher; a voucher naming two parties counts in both groups.",
+      "definition_sha256_16": "f3f9e24d6ac62786",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 540eda69) with no amount on the voucher; a voucher naming two parties counts in both groups.",
       "evidence": [
         {
           "kind": "voucher",
@@ -83,8 +88,8 @@
       "id": "knock_off_candidates.t2_named_count_8e58f74e",
       "value": 1,
       "unit": "count",
-      "definition_sha256_16": "f1788f56ede07128",
-      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 8e58f74e) not on the voucher; a voucher naming two parties counts in both groups.",
+      "definition_sha256_16": "31ca7095722336ad",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 8e58f74e) with no amount on the voucher; a voucher naming two parties counts in both groups.",
       "evidence": [
         {
           "kind": "voucher",
@@ -94,11 +99,25 @@
       ]
     },
     {
-      "id": "knock_off_candidates.t2_named_count_bea90e0a",
-      "value": 4,
+      "id": "knock_off_candidates.t2_named_count_9f9ff951",
+      "value": 1,
       "unit": "count",
-      "definition_sha256_16": "f6d11cafce267cc8",
-      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag bea90e0a) not on the voucher; a voucher naming two parties counts in both groups.",
+      "definition_sha256_16": "6ae159a7ddf8d641",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag 9f9ff951) with no amount on the voucher; a voucher naming two parties counts in both groups.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "b11",
+          "label": "Payment b11 on 2025-08-25: narration: 'देव ट्रेडर्स'"
+        }
+      ]
+    },
+    {
+      "id": "knock_off_candidates.t2_named_count_bea90e0a",
+      "value": 5,
+      "unit": "count",
+      "definition_sha256_16": "76445a01caa82b0a",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag bea90e0a) with no amount on the voucher; a voucher naming two parties counts in both groups.",
       "evidence": [
         {
           "kind": "voucher",
@@ -117,6 +136,11 @@
         },
         {
           "kind": "voucher",
+          "id": "b12",
+          "label": "Payment b12 on 2025-09-09: narration: 'for Gamma Supplies'"
+        },
+        {
+          "kind": "voucher",
           "id": "b13",
           "label": "Payment b13 on 2025-09-30: narration: 'Paid for Gamma Supplies'"
         }
@@ -126,8 +150,8 @@
       "id": "knock_off_candidates.t2_named_count_f5bc2c41",
       "value": 3,
       "unit": "count",
-      "definition_sha256_16": "eec0b56cb4d3b850",
-      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag f5bc2c41) not on the voucher; a voucher naming two parties counts in both groups.",
+      "definition_sha256_16": "d544c895479e21ec",
+      "definition_text": "Bank or cash vouchers whose narration names one party ledger (tag f5bc2c41) with no amount on the voucher; a voucher naming two parties counts in both groups.",
       "evidence": [
         {
           "kind": "voucher",
@@ -148,7 +172,7 @@
     },
     {
       "id": "knock_off_candidates.t2_named_pair_count",
-      "value": 11,
+      "value": 14,
       "unit": "count",
       "definition_sha256_16": "111e114ff2a3fa53",
       "definition_text": "Voucher and named-party pairs across the groups: equal to the voucher count unless a narration names more than one party.",
@@ -156,50 +180,58 @@
     },
     {
       "id": "knock_off_candidates.t2_named_total_paise_03f5fa95",
-      "value": 60000,
+      "value": 100000,
       "unit": "paise",
-      "definition_sha256_16": "25e03f1e18938bec",
-      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 03f5fa95), summed -- a candidate total, not a reportable amount.",
+      "definition_sha256_16": "ccdd2645430114c3",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 03f5fa95), summed -- a candidate total, not a reportable amount. A Contra, or any voucher whose every line with an amount is on a bank or cash ledger, counts the larger side of its bank and cash lines once.",
       "evidence": []
     },
     {
       "id": "knock_off_candidates.t2_named_total_paise_540eda69",
       "value": 300000,
       "unit": "paise",
-      "definition_sha256_16": "a502d6591bc097ab",
-      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 540eda69), summed -- a candidate total, not a reportable amount.",
+      "definition_sha256_16": "b5ea353ac226dc50",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 540eda69), summed -- a candidate total, not a reportable amount. A Contra, or any voucher whose every line with an amount is on a bank or cash ledger, counts the larger side of its bank and cash lines once.",
       "evidence": []
     },
     {
       "id": "knock_off_candidates.t2_named_total_paise_8e58f74e",
       "value": 100000,
       "unit": "paise",
-      "definition_sha256_16": "6c5ba14dc6fed9f7",
-      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 8e58f74e), summed -- a candidate total, not a reportable amount.",
+      "definition_sha256_16": "630d7e6ca4f3a298",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 8e58f74e), summed -- a candidate total, not a reportable amount. A Contra, or any voucher whose every line with an amount is on a bank or cash ledger, counts the larger side of its bank and cash lines once.",
+      "evidence": []
+    },
+    {
+      "id": "knock_off_candidates.t2_named_total_paise_9f9ff951",
+      "value": 30000,
+      "unit": "paise",
+      "definition_sha256_16": "6f1378fb340ffb69",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag 9f9ff951), summed -- a candidate total, not a reportable amount. A Contra, or any voucher whose every line with an amount is on a bank or cash ledger, counts the larger side of its bank and cash lines once.",
       "evidence": []
     },
     {
       "id": "knock_off_candidates.t2_named_total_paise_bea90e0a",
-      "value": 2000000,
+      "value": 2050000,
       "unit": "paise",
-      "definition_sha256_16": "2f66a9549e94defc",
-      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag bea90e0a), summed -- a candidate total, not a reportable amount.",
+      "definition_sha256_16": "983e2337400f2197",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag bea90e0a), summed -- a candidate total, not a reportable amount. A Contra, or any voucher whose every line with an amount is on a bank or cash ledger, counts the larger side of its bank and cash lines once.",
       "evidence": []
     },
     {
       "id": "knock_off_candidates.t2_named_total_paise_f5bc2c41",
       "value": 600000,
       "unit": "paise",
-      "definition_sha256_16": "4ec5e2c170147bd9",
-      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag f5bc2c41), summed -- a candidate total, not a reportable amount.",
+      "definition_sha256_16": "f22a1bad766af171",
+      "definition_text": "Bank and cash lines of the vouchers naming one party ledger (tag f5bc2c41), summed -- a candidate total, not a reportable amount. A Contra, or any voucher whose every line with an amount is on a bank or cash ledger, counts the larger side of its bank and cash lines once.",
       "evidence": []
     },
     {
       "id": "knock_off_candidates.t2_row_count",
-      "value": 10,
+      "value": 13,
       "unit": "count",
-      "definition_sha256_16": "a8baff95bb52e678",
-      "definition_text": "Bank or cash vouchers whose narration names, as whole words, a party ledger not on the voucher.",
+      "definition_sha256_16": "a97fd3650bae7d7b",
+      "definition_text": "Bank or cash vouchers whose narration names, as whole words, a party ledger with no amount on the voucher.",
       "evidence": [
         {
           "kind": "voucher",
@@ -235,6 +267,21 @@
           "kind": "voucher",
           "id": "b09",
           "label": "Receipt b09 on 2025-08-05: booked to Alpha Traders; narration names Café Corner; narration: 'CAFÉ CORNER deposit'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b10",
+          "label": "Receipt b10 on 2025-08-06: booked to Alpha Traders; narration names Café Corner; narration: 'Cafe Corner deposit'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b11",
+          "label": "Payment b11 on 2025-08-25: booked to Beta Stores; narration names देव ट्रेडर्स; narration: 'देव ट्रेडर्स'"
+        },
+        {
+          "kind": "voucher",
+          "id": "b12",
+          "label": "Payment b12 on 2025-09-09: booked to Beta Stores; narration names Gamma Supplies; narration: 'for Gamma Supplies'"
         },
         {
           "kind": "voucher",
@@ -287,26 +334,31 @@
         {
           "kind": "ledger",
           "id": "Café Corner",
-          "label": "named in 1 voucher(s), ₹600 (a candidate total, not a reportable amount)"
+          "label": "named in 2 voucher(s), ₹1,000 (a candidate total, not a reportable amount)"
         },
         {
           "kind": "ledger",
           "id": "Gamma Supplies",
-          "label": "named in 4 voucher(s), ₹20,000 (a candidate total, not a reportable amount)"
+          "label": "named in 5 voucher(s), ₹20,500 (a candidate total, not a reportable amount)"
         },
         {
           "kind": "ledger",
           "id": "Unit 7 Supplies",
           "label": "named in 1 voucher(s), ₹1,000 (a candidate total, not a reportable amount)"
+        },
+        {
+          "kind": "ledger",
+          "id": "देव ट्रेडर्स",
+          "label": "named in 1 voucher(s), ₹300 (a candidate total, not a reportable amount)"
         }
       ],
       "title_sha256_16": "d8b00d332e376b71",
       "title_text": "Bank or cash entries whose narration names a party other than the one booked: listed for the CA (may bear on clause 21(d) and s.68)",
-      "limits_sha256_16": "d17843ba3c36f4d6",
+      "limits_sha256_16": "a7162f3782ce58d5",
       "limits_text": [
-        "Listed, never judged: the candidate total is a candidate total, not a reportable amount, and nothing is left out for being small or looking harmless. Whether a row is a payment under s.40A(3), a Rule 6DD case, a loan or deposit, a trade set-off, or one person under two ledgers is the CA's to determine; no clause 31 or 21(d) row is written.",
+        "Listed, never judged: the candidate total is not a reportable amount, and nothing is left out for being small or looking harmless. Whether a row is a payment under s.40A(3), a Rule 6DD case, a loan or deposit, a trade set-off, or one person under two ledgers is the CA's to determine; no clause 31 or 21(d) row is written.",
         "Recall is not measured on real books.",
-        "A name is matched only whole and in full, and only when no other master shares it: a name cut short, broken up, abbreviated, or written in Hindi or Hinglish is missed, and a short or common name may be a coincidence (the proprietor, a family member, the operator)."
+        "A name is matched only whole and in full, and only when no other master shares it; an accent on an English letter is ignored, so two names differing only by one are shared and matched to neither. A name cut short, broken up, abbreviated, spelt differently, written in another alphabet than the ledger's (Devanagari for English letters, or the reverse), or garbled in conversion (a stray character joined to a word) is missed, and a short or common name may be a coincidence (the proprietor, a family member, the operator)."
       ],
       "ask_client_sha256_16": "f934f81c9581b01c",
       "ask_client_text": [

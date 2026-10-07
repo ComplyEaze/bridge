@@ -187,14 +187,31 @@ fn service_at_endpoint(
     voucher_number: Option<&str>,
     endpoint: TallyEndpointConfig,
 ) -> (DesktopJournalService, ImportLedgerLine) {
+    service_recording(root, voucher_number, endpoint, json!([]))
+}
+
+/// A saved Journal whose build recorded `on_account` as its bill-wise
+/// approvals (#1234); `null` for a record written before the field.
+fn service_recording(
+    root: PathBuf,
+    voucher_number: Option<&str>,
+    endpoint: TallyEndpointConfig,
+    on_account: Value,
+) -> (DesktopJournalService, ImportLedgerLine) {
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-00000000-0000-4000-8000-000000000001", "identity_scheme":"batch_v1", "company_guid":"00000000-0000-4000-8000-000000000002", "endpoint_origin":super::super::canonical_loopback_origin(&endpoint).unwrap(),
-        "company":{"name":"Synthetic Accounts","guid":"00000000-0000-4000-8000-000000000002","company_number":"100001","books_from":"20260401"}, "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901","sha256":"","built_at":"2026-09-07T00:00:00Z","status":"built","pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
+        "company":{"name":"Synthetic Accounts","guid":"00000000-0000-4000-8000-000000000002","company_number":"100001","books_from":"20260401"}, "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901","sha256":"","built_at":"2026-09-07T00:00:00Z","status":"built", "on_account_approved":on_account,"pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal","voucher_number":voucher_number,"entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Cash","amount":"12.50","side":"Cr"}]}]
     })).unwrap();
     line.sha256 = sha256_hex(
         render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id).as_bytes(),
     );
+    if line.on_account_approved.is_none() {
+        // A record from before the bill-wise field had the older fields: the
+        // post reaches its bill-wise check only past theirs.
+        line.ledger_identities = Some(Vec::new());
+        line.cash_in_hand_ledgers = Some(Vec::new());
+    }
     super::super::ensure_private_directory(&root).unwrap();
     let server = Server::new(super::super::Settings {
         endpoint,
@@ -210,6 +227,62 @@ fn service_at_endpoint(
     // setup lock that another parallel test's fork can transiently inherit.
     server.append_import_ledger_while_admitted(&line).unwrap();
     (DesktopJournalService { server }, line)
+}
+
+/// #1234: a Journal saved before the build recorded its bill-wise approvals is
+/// refused for review in plain words and at the post, and a dispatched one
+/// stays reviewable for reconciliation.
+#[tokio::test]
+async fn a_saved_journal_without_bill_wise_approvals_is_refused_in_plain_words() {
+    let directory = tempfile::tempdir().unwrap();
+    let (service, line) = service_recording(
+        directory.path().join("agent"),
+        None,
+        TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9001,
+        },
+        Value::Null,
+    );
+    assert_eq!(line.on_account_approved, None);
+    let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+    std::fs::write(
+        service
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        &xml,
+    )
+    .unwrap();
+    let code = service.review_selected_xml(xml.as_bytes()).unwrap_err();
+    assert_eq!(code, "import_batch_predates_bill_wise_record");
+
+    let operation = service
+        .post(&line.batch_id, &line.sha256, &line.company_guid)
+        .await;
+    let error = &operation.result["result"]["error"];
+    assert_eq!(error["code"], "import_batch_predates_bill_wise_record");
+    assert_eq!(
+        error["message"],
+        "This batch was built before ComplyEaze Bridge began checking ledgers that keep bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally whether its file was already imported by hand, since posting the rebuilt batch would import it a second time. Then build the batch again and post the new batch."
+    );
+    assert_eq!(operation.result["result"]["attempt_recorded"], false);
+
+    service
+        .server
+        .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_native(
+            &line,
+            "a".repeat(64),
+            uuid::Uuid::new_v4(),
+        ))
+        .unwrap();
+    assert!(
+        service
+            .review_selected_xml(xml.as_bytes())
+            .unwrap()
+            .dispatched
+    );
 }
 
 #[tokio::test]
@@ -412,6 +485,66 @@ fn review_refuses_selected_xml_from_a_superseded_full_record() {
     let review = service.review_selected_xml(latest_xml.as_bytes()).unwrap();
     assert_eq!(review.sha256, line.sha256);
     assert_eq!(review.details.narration.as_deref(), Some("Updated Journal"));
+}
+
+/// The details of a review with one entry marked On Account, as they are
+/// serialised for the screen. The screen's own test
+/// (`scripts/journal-posting-screen.test.tsx`) reads this text from this file
+/// and renders it.
+const MARKED_REVIEW_DETAILS_SENT: &str = r#"{"date":"20260901","reference":null,"narration":null,"entries":[{"ledger":"Expense","side":"Dr","amount":"12.50","onAccount":true},{"ledger":"Cash","side":"Cr","amount":"12.50","onAccount":false}],"onAccountNote":"On Account: a bill-wise ledger when this batch was built. Its entries carry no bill allocation.","totalDebit":"12.5","totalCredit":"12.5"}"#;
+
+/// The review screen marks each entry on a ledger the batch records as
+/// approved to take entries On Account, and carries the native dialog's own
+/// sentence for the mark, as that dialog does next (#1234); a batch that
+/// records none carries neither.
+#[test]
+fn review_marks_each_entry_on_a_ledger_approved_on_account() {
+    for (approved, flags, note) in [
+        (json!([]), [false, false], None),
+        (
+            json!([{"ledger":"Expense","party_digest":"a".repeat(64)}]),
+            [true, false],
+            Some(super::post::ON_ACCOUNT_LEGEND),
+        ),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let (service, line) = service_recording(
+            directory.path().join("agent"),
+            None,
+            TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: 9001,
+            },
+            approved,
+        );
+        let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+        std::fs::write(
+            service
+                .server
+                .imports_dir()
+                .unwrap()
+                .join(format!("{}.xml", line.batch_id)),
+            &xml,
+        )
+        .unwrap();
+        let review = service.review_selected_xml(xml.as_bytes()).unwrap();
+        assert_eq!(
+            review
+                .details
+                .entries
+                .iter()
+                .map(|entry| entry.on_account)
+                .collect::<Vec<_>>(),
+            flags
+        );
+        assert_eq!(review.details.on_account_note.as_deref(), note);
+        if note.is_some() {
+            assert_eq!(
+                serde_json::to_string(&review.details).unwrap(),
+                MARKED_REVIEW_DETAILS_SENT
+            );
+        }
+    }
 }
 
 /// The desktop Journal review screen shows the narration the post sends

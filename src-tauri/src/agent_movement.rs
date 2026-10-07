@@ -1,5 +1,6 @@
 //! Movement for the local MCP adapter.
 use super::*;
+use bridge_tally_core::TallyDate;
 
 impl Server {
     pub(super) async fn ledger_movement(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -18,8 +19,7 @@ impl Server {
                     .ok_or_else(|| "company_identity_incomplete".to_string())?,
             )?;
             ensure_movement_window_within_books(&from, &books_from)?;
-            let opening_date = bridge_tally_core::TallyDate::parse(from.clone())
-                .map_err(|_| "invalid_date".to_string())?;
+            let opening_date = from.clone();
             let (ledgers, ledger_evidence) = self
                 .read_movement_ledgers(&identity, opening_date.clone())
                 .await?;
@@ -225,21 +225,21 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
-        (from, to): (String, String),
+        (from, to): (TallyDate, TallyDate),
         source: WindowPlanSource,
         known_marks: Option<CompanyMarks>,
     ) -> Result<MovementWindowRead, ToolFailure> {
         let company = ValidatedCompanyName::new(company.to_string())
             .map_err(|_| "company_name_invalid".to_string())?;
-        let range =
-            ValidatedDateRange::new(from, to).map_err(|_| "invalid_date_range".to_string())?;
+        let range = ValidatedDateRange::new(from.as_str(), to.as_str())
+            .map_err(|_| "invalid_date_range".to_string())?;
         let shape = VoucherReadShape::Movement;
         let read = self
             .read_voucher_window(
                 identity,
                 company.as_str(),
-                range.from_yyyymmdd(),
-                range.to_yyyymmdd(),
+                &from,
+                &to,
                 shape,
                 source,
                 WindowReadLimits::for_shape(shape),
@@ -264,8 +264,8 @@ impl Server {
                     .corroborate_empty_voucher_read(
                         identity,
                         company.as_str(),
-                        range.from_yyyymmdd(),
-                        range.to_yyyymmdd(),
+                        &from,
+                        &to,
                         None,
                         marks,
                     )

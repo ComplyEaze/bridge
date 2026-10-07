@@ -152,7 +152,8 @@
       "path": "src-tauri/crates/bridge-bank-statement/src/cash.rs"
     },
     {
-      "path": "src-tauri/crates/bridge-bank-statement/src/csv_edge.rs"
+      "path": "src-tauri/crates/bridge-bank-statement/src/csv_edge.rs",
+      "reason": "decides what is read from a customer's CSV export and what is refused, before any amount reaches a proposal"
     },
     {
       "path": "src-tauri/crates/bridge-bank-statement/src/date.rs"

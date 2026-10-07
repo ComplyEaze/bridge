@@ -31,6 +31,7 @@ These changes are in source and not yet in a published build.
   trail reads carries for it, so a party detail that finds no bill or no unallocated
   row for such a ledger says `report_spelling: not_established`; that the first name
   list is the primary language (#1085).
+- `ledger_movement` now says what a slow read cost, as `vouchers` does: when its two reads of the voucher window together took 20 seconds or more, or the census was 16 reads or more, the result carries `read_cost` with both reads' observed seconds, a floor derived from the gaps between census reads (derived, not measured), and whether the call stayed inside the one measured host limit (#1239). It makes no estimate for another window, adds no request and refuses nothing. Not measured: a live `ledger_movement` against the figures (the floor against the observed seconds).
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
   `amount`), and can add a window up by ledger, month or voucher type

@@ -22,6 +22,9 @@ pub(crate) struct DesktopJournalEntry {
     pub(crate) ledger: String,
     pub(crate) side: String,
     pub(crate) amount: String,
+    /// The batch records this entry's ledger as approved to take entries On
+    /// Account; the native dialog of a post marks the same entries (#1234).
+    pub(crate) on_account: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -31,6 +34,9 @@ pub(crate) struct DesktopJournalDetails {
     pub(crate) reference: Option<String>,
     pub(crate) narration: Option<String>,
     pub(crate) entries: Vec<DesktopJournalEntry>,
+    /// What an entry's On Account mark means, when an entry carries one: the
+    /// native dialog's own sentence.
+    pub(crate) on_account_note: Option<String>,
     pub(crate) total_debit: String,
     pub(crate) total_credit: String,
 }

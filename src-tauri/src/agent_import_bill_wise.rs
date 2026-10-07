@@ -11,7 +11,8 @@
 //! company's whole identity tuple, the endpoint and ALL the party's rows (a
 //! refusal may list only some). It is a consistency binding, not proof that a
 //! person said yes: the assistant holds every input and can supply it without
-//! asking anyone. The human gate is the native dialog (slice 3).
+//! asking anyone. The human gate is the native dialog, which marks each
+//! recorded ledger On Account (slice 3).
 
 use super::{
     party_name, EntrySide, ImportCompanyTuple, ImportEntry, ImportPayload, ImportVoucher,

@@ -125,8 +125,30 @@ These changes are in source and not yet in a published build.
   is refused for posting as `import_batch_predates_bill_wise_record` and is
   rebuilt (check first whether its file was already imported by hand). The
   approval is the assistant's word, not proof that a person said yes, and a hand
-  import of the file is not checked. Not measured: a large book, and the bills
-  of a ledger whose flag reads No (#1234).
+  import of the file is not checked. The approval dialog of a native post
+  shows the person which ledgers these are: "On Account" stands before the name
+  of each approved ledger, on each of its entries for one voucher and on its
+  totals line for a batch, with one sentence saying the ledger was bill-wise
+  when the batch was built and its entries carry no bill allocation; the
+  desktop Journal review shows the mark and the sentence too. A batch's
+  per-voucher lines carry no mark, and their heading then says it is marked
+  below; in such a batch a narration that holds the sentence's opening is
+  withheld on its per-voucher line. A dialog that
+  cannot show the mark refuses. The mark adds no line, only characters, so a
+  batch already at the dialog's 100-character line limit or its character
+  limit can now be refused as too large (`import_review_too_large`). The
+  dialog for one voucher ends with the voucher's own text: its reference and
+  narration are the last two lines, quoted as they will be posted, under a
+  line saying that no line below it is an entry, a total or an instruction;
+  every line the dialog writes itself stands above that line, and the date
+  line says where the two are. That line and the note on the date line count
+  toward the dialog's 100-character line limit and its 1,600-character limit.
+  Looked at once on each system, with a one-voucher text at all three limits
+  (24 lines, 1,600 characters, a 100-character narration line): on one Mac
+  and on one Windows PC the whole text, its last two lines included, and the
+  buttons were visible without scrolling. Not measured: a smaller screen or a
+  larger display scaling, a batch dialog on either system, a large book, and
+  the bills of a ledger whose flag reads No (#1234).
 - Versions 0.3.0 to 0.4.2 refuse to post a batch this version builds. They do
   not read the cash-in-hand and bill-wise records a saved batch now carries,
   so after a rollback they could have posted it with neither check; the batch's

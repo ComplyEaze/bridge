@@ -1184,3 +1184,226 @@ fn a_masters_record_past_the_record_bound_is_unreadable() {
     std::fs::write(&path, padded(ledger::MAX_RECORD_BYTES + 1)).unwrap();
     assert_eq!(read_masters_record_raw(&path), Err(()));
 }
+
+/// bridge#626: a ledger name that ends in one CR LF is shown in the review
+/// of one voucher quoted, with the break written out and the mark before it,
+/// whether the doubt or an entry names it, and the note stands once above
+/// the batch line. The same break at the end of the narration, the company
+/// name or the voucher number is refused.
+#[test]
+fn a_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
+    let mut voucher = row_json(2, "Paid");
+    voucher["amounts"][0]["ledger"] = json!("Ledger 0\r\n");
+    let voucher: ReadVoucher = serde_json::from_value(voucher).unwrap();
+    let named = json!({"state":"posted_under_changed_masters","ledgers":["Cash\r\n"]});
+    let note_lines = |preview: &str| {
+        preview
+            .lines()
+            .filter(|shown| *shown == post::LINE_BREAK_NOTE)
+            .count()
+    };
+    let preview = review_preview(BATCH, MARKER, "Books", &named, &voucher).unwrap();
+    let lines: Vec<&str> = preview.lines().collect();
+    assert_eq!(
+        preview,
+        [
+            "Record that you reviewed ONE Journal in \"Books\"",
+            "ComplyEaze Bridge posted it, but these ledgers no longer resolve",
+            "to the master you approved:",
+            r#"  Line break  "Cash\r\n""#,
+            "",
+            "As it is in Tally now:",
+            "Date: \"20260907\"  Voucher number: \"2\"  ALTERID: 10",
+            "Narration:",
+            "  \"Paid\"",
+            r#"Dr 1.00  Line break  "Ledger 0\r\n""#,
+            "Dr 1.00  \"Ledger 1\"",
+            r"Line break: a name that ends in a line break in Tally (shown as \r\n). No other name here has one.",
+            &format!("Batch: {BATCH}"),
+            "",
+            &format!("Choosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally."),
+            "It is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,",
+            "and the batch still reads reconciliation_required.",
+        ]
+        .join("\n")
+    );
+    assert_eq!(note_lines(&preview), 1);
+    assert!(
+        !preview
+            .chars()
+            .any(|shown| shown.is_control() && shown != '\n'),
+        "{preview:?}"
+    );
+    // The note costs one line, and only a text that shows such a name has it.
+    let plain = review_preview(BATCH, MARKER, "Books", &doubt(), &row(2, "Paid")).unwrap();
+    assert_eq!(note_lines(&plain), 0);
+    assert_eq!(lines.len(), plain.lines().count() + 1);
+    // The doubt alone, an entry alone, and one name in both.
+    let both = json!({"state":"posted_under_changed_masters","ledgers":["Ledger 0\r\n"]});
+    for (doubt, voucher) in [
+        (&named, &row(2, "Paid")),
+        (&doubt(), &voucher),
+        (&both, &voucher),
+    ] {
+        let preview = review_preview(BATCH, MARKER, "Books", doubt, voucher).unwrap();
+        assert_eq!(note_lines(&preview), 1, "{preview}");
+    }
+    let both = review_preview(BATCH, MARKER, "Books", &both, &voucher).unwrap();
+    assert_eq!(both.matches(r#"Line break  "Ledger 0\r\n""#).count(), 2);
+    // The text passes the check every dialog text passes: a voucher type
+    // read back with the characters of a written-out break before a quote
+    // is not a marked name, and the text is refused.
+    let mut typed = row_json(2, "Paid");
+    typed["voucher_type"] = json!(r#"Journal\r\n""#);
+    let typed: ReadVoucher = serde_json::from_value(typed).unwrap();
+    assert_eq!(
+        review_preview(BATCH, MARKER, "Books", &doubt(), &typed),
+        Err("ack_review_layout_text".to_string())
+    );
+    let mut numbered = row_json(2, "Paid");
+    numbered["voucher_number"] = json!("2\r\n");
+    let numbered: ReadVoucher = serde_json::from_value(numbered).unwrap();
+    for (source, preview) in [
+        (
+            "narration",
+            review_preview(BATCH, MARKER, "Books", &doubt(), &row(2, "Paid\r\n")),
+        ),
+        (
+            "company",
+            review_preview(BATCH, MARKER, "Books\r\n", &doubt(), &row(2, "Paid")),
+        ),
+        (
+            "voucher number",
+            review_preview(BATCH, MARKER, "Books", &doubt(), &numbered),
+        ),
+    ] {
+        assert_eq!(
+            preview,
+            Err("ack_review_layout_text".to_string()),
+            "{source}"
+        );
+    }
+}
+
+/// The review of a batch shows such a name the same way, marked in the
+/// doubt's list and on its per-ledger totals line, with the note once above
+/// the batch line. A line break in any other value it shows is refused.
+#[test]
+fn a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
+    let line = posted_batch(3);
+    let plain_rows = batch_rows(&line);
+    let mut rows = plain_rows.clone();
+    for row in &mut rows {
+        row.entries[0].ledger = "Ledger 0\r\n".into();
+    }
+    let rows = rows.iter().collect::<Vec<_>>();
+    let masters = json!({"state":"posted_under_changed_masters","ledgers":["Cash\r\n"]});
+    let preview =
+        batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &rows).unwrap();
+    let lines: Vec<&str> = preview.lines().collect();
+    assert_eq!(
+        preview,
+        [
+            "Record that you reviewed 3 vouchers in \"Books\"",
+            "ComplyEaze Bridge posted them, but these ledgers no longer resolve",
+            "to the master you approved:",
+            r#"  Line break  "Cash\r\n""#,
+            "",
+            "As they are in Tally now:",
+            "Not shown here: narrations, voucher numbers and types.",
+            "Dates: 20260907 to 20260907  ALTERIDs: 10 to 12",
+            r#"Dr 3  Cr 0  3 entries  Line break  "Ledger 0\r\n""#,
+            "Dr 3  Cr 0  3 entries  \"Ledger 1\"",
+            r"Line break: a name that ends in a line break in Tally (shown as \r\n). No other name here has one.",
+            &format!("Batch: {BATCH}"),
+            "",
+            &format!("Choosing \"{REVIEW_BUTTON}\" records: \"I reviewed these 3 vouchers in Tally."),
+            "They are correct as they stand.\" ComplyEaze Bridge changes nothing in Tally,",
+            "and the batch still reads reconciliation_required.",
+        ]
+        .join("\n")
+    );
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|shown| **shown == post::LINE_BREAK_NOTE)
+            .count(),
+        1
+    );
+    assert!(
+        !preview
+            .chars()
+            .any(|shown| shown.is_control() && shown != '\n'),
+        "{preview:?}"
+    );
+    let plain_rows = plain_rows.iter().collect::<Vec<_>>();
+    let plain: Value = serde_json::from_slice(MASTERS_DOUBT).unwrap();
+    let plain =
+        batch_review_preview(&line, DoubtKind::Masters, "Books", &plain, &plain_rows).unwrap();
+    assert!(!plain.contains(post::LINE_BREAK_NOTE));
+    assert_eq!(lines.len(), plain.lines().count() + 1);
+    // A doubted ledger alone brings the mark and its line.
+    let doubted =
+        batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &plain_rows).unwrap();
+    let doubted: Vec<&str> = doubted.lines().collect();
+    assert!(doubted.contains(&r#"  Line break  "Cash\r\n""#));
+    assert!(doubted.contains(&post::LINE_BREAK_NOTE));
+    // A step doubt lists no doubted ledger, so a name only its record holds
+    // is not shown and brings no line about a mark; an entry's name does.
+    let mut step: Value = serde_json::from_slice(STEP_DOUBT).unwrap();
+    step["ledgers"] = json!(["Cash\r\n"]);
+    let stepped =
+        batch_review_preview(&line, DoubtKind::BatchStep, "Books", &step, &plain_rows).unwrap();
+    assert!(!stepped.contains("Line break"), "{stepped}");
+    let stepped = batch_review_preview(&line, DoubtKind::BatchStep, "Books", &step, &rows).unwrap();
+    let stepped: Vec<&str> = stepped.lines().collect();
+    assert!(stepped.contains(&r#"Dr 3  Cr 0  3 entries  Line break  "Ledger 0\r\n""#));
+    assert!(stepped.contains(&post::LINE_BREAK_NOTE));
+    assert!(!stepped.iter().any(|shown| shown.contains("Cash")));
+    // The text passes the check every dialog text passes: a date read back
+    // with the characters of a written-out break before a quote is not a
+    // marked name, and the text is refused.
+    let mut typed = batch_rows(&line);
+    typed[0].date = Some(r#"20260907\r\n""#.into());
+    let typed = typed.iter().collect::<Vec<_>>();
+    let plain_masters: Value = serde_json::from_slice(MASTERS_DOUBT).unwrap();
+    assert_eq!(
+        batch_review_preview(&line, DoubtKind::Masters, "Books", &plain_masters, &typed),
+        Err("ack_review_layout_text".to_string())
+    );
+    // Only a ledger name is taken so: the company name, an amount, a date
+    // or a voucher type with the same break is refused.
+    let masters = plain_masters;
+    assert_eq!(
+        batch_review_preview(
+            &line,
+            DoubtKind::Masters,
+            "Books\r\n",
+            &masters,
+            &plain_rows
+        ),
+        Err("ack_review_layout_text".to_string())
+    );
+    for (value, spoil) in [
+        (
+            "amount",
+            (|row: &mut ReadVoucher| row.entries[0].amount.push_str("\r\n"))
+                as fn(&mut ReadVoucher),
+        ),
+        ("date", |row: &mut ReadVoucher| {
+            row.date.as_mut().unwrap().push_str("\r\n")
+        }),
+        ("voucher type", |row: &mut ReadVoucher| {
+            row.voucher_type.as_mut().unwrap().push_str("\r\n")
+        }),
+    ] {
+        let mut rows = batch_rows(&line);
+        spoil(&mut rows[0]);
+        let rows = rows.iter().collect::<Vec<_>>();
+        assert_eq!(
+            batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &rows),
+            Err("ack_review_layout_text".to_string()),
+            "{value}"
+        );
+    }
+}

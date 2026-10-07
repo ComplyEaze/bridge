@@ -595,6 +595,13 @@ impl Server {
                 // posted, and must not keep other batches waiting (#725).
                 self.post_approvals
                     .revoke(batch_id, "batch_already_dispatched");
+                // The desktop does not go on to check a sent Journal that
+                // names a ledger whose name ends in a line break: that
+                // check's messages name ledgers as they are (bridge#626).
+                // One not yet sent is refused where its text is made.
+                if scope == PostScope::JournalOnly {
+                    refuse_a_line_break_name_on_the_desktop(&line)?;
+                }
                 return self
                     .verify_import(args)
                     .await
@@ -1540,6 +1547,8 @@ impl Server {
         // Retain batch and endpoint integrity without applying approval-only
         // display restrictions or constructing an approval request.
         let _ = admit_saved_journal_integrity(&snapshot.batch, &self.settings.endpoint)?;
+        // This entry is the desktop's alone, and so is this refusal.
+        refuse_a_line_break_name_on_the_desktop(&snapshot.batch)?;
         self.verify_import(args).await
     }
 
@@ -1662,6 +1671,9 @@ fn reconciliation_failure_payload(
     // have been sent is reconciled, never rebuilt.
     if code == "voucher_text_invalid" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
+    }
+    if code == DESKTOP_LEDGER_LINE_BREAK {
+        payload["result"]["error"]["message"] = json!(DESKTOP_LEDGER_LINE_BREAK_ACTION);
     }
     if code == "tally_endpoint_busy" {
         payload["result"]["error"]["retry_after_s"] =
@@ -2464,7 +2476,33 @@ fn admit_fresh_saved_voucher(
     line: &ImportLedgerLine,
     endpoint: &super::super::TallyEndpointConfig,
 ) -> Result<String, String> {
+    refuse_a_line_break_name_on_the_desktop(line)?;
     review_preview_with(line, endpoint, &[])
+}
+
+/// What the desktop answers for a saved Journal that names a ledger whose
+/// name ends in a line break.
+pub(super) const DESKTOP_LEDGER_LINE_BREAK: &str = "import_desktop_ledger_line_break";
+/// What the desktop's post and reconcile say with that code: the message
+/// and the remediation its review gives for the same Journal.
+pub(super) const DESKTOP_LEDGER_LINE_BREAK_ACTION: &str = "This saved Journal names a ledger whose name in Tally ends in a line break, and this screen cannot show such a name. Use the assistant for this Journal: its approval dialog shows such a name with the line break written out, and it can check a Journal that was already posted. If this one was already posted, do not post it again.";
+
+/// The desktop Journal screen shows a ledger's name as it is and has no way
+/// to show a line break at its end, so the desktop takes no saved Journal
+/// that names such a ledger: not to review or post, sent or not, and not
+/// to reconcile once it was sent (bridge#626).
+pub(super) fn refuse_a_line_break_name_on_the_desktop(
+    line: &ImportLedgerLine,
+) -> Result<(), String> {
+    if line
+        .vouchers
+        .iter()
+        .flat_map(|voucher| &voucher.entries)
+        .any(|entry| entry.ledger.ends_with("\r\n"))
+    {
+        return Err(DESKTOP_LEDGER_LINE_BREAK.into());
+    }
+    Ok(())
 }
 
 /// When the agent's post happens, stated in its dialog (#725): the post may
@@ -2534,17 +2572,14 @@ fn review_text(
         return batch_review_text(line, company, &origin, &debit, &credit, footer);
     }
     let voucher = &line.vouchers[0];
-    let mut review_text = std::iter::once(company.name.as_str())
-        .chain(voucher.voucher_number.iter().map(String::as_str))
-        .chain(voucher.reference.iter().map(String::as_str))
-        .chain(voucher.narration.iter().map(String::as_str))
-        .chain(voucher.entries.iter().map(|entry| entry.ledger.as_str()));
-    if review_text.clone().any(has_unsafe_review_layout_character) {
-        return Err("import_review_layout_text".into());
-    }
-    if review_text.any(has_unreviewable_format_character) {
-        return Err("import_review_format_text".into());
-    }
+    let ledgers = admit_review_text(
+        std::iter::once(company.name.as_str())
+            .chain(voucher.voucher_number.iter().map(String::as_str))
+            .chain(voucher.reference.iter().map(String::as_str))
+            .chain(voucher.narration.iter().map(String::as_str)),
+        voucher.entries.iter().map(|entry| entry.ledger.as_str()),
+    )
+    .map_err(ReviewTextRefusal::import_code)?;
     require_native_numbering(voucher)?;
     let marks = OnAccountMarks::of(line);
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
@@ -2557,7 +2592,8 @@ fn review_text(
     let entries = voucher
         .entries
         .iter()
-        .map(|entry| {
+        .zip(&ledgers)
+        .map(|(entry, ledger)| {
             format!(
                 "{} {}  {}",
                 if entry.side == EntrySide::Dr {
@@ -2566,19 +2602,20 @@ fn review_text(
                     "Cr"
                 },
                 entry.amount,
-                marks.named(&entry.ledger)
+                marks.named(*ledger)
             )
         })
         .collect::<Vec<_>>()
         .join("\n");
     let legend = marks.legend(voucher.entries.iter().map(|entry| entry.ledger.as_str()));
+    let under = lines_under_the_ledgers(legend, line_break_note(&ledgers));
     let classification = classification_review_line(&voucher.voucher_type)
         .map(|line| format!("\n{line}"))
         .unwrap_or_default();
     // The voucher's reference and narration come last, under their heading,
     // after every line ComplyEaze Bridge writes itself, the footer included.
     // The date line says where they are.
-    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}  {VOUCHER_TEXT_CUE}\n\n{}\n{legend}\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}  {VOUCHER_TEXT_CUE}\n\n{}\n{under}\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from,
         voucher.date, voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
         entries, debit.as_str(), credit.as_str(), line.batch_id);
@@ -2776,10 +2813,15 @@ fn voucher_review_lines(
             .filter(|entry| entry.side == side)
             .map(|entry| entry.ledger.as_str())
             .collect();
+        let shown = |name: &str| {
+            ReviewLedgerName::parse(name)
+                .map(ReviewLedgerName::shown)
+                .map_err(ReviewTextRefusal::import_code)
+        };
         let ledger = match named.as_slice() {
             [] => "(none)".to_string(),
-            [only] => quoted(only),
-            [first, rest @ ..] => format!("{} +{}", quoted(first), rest.len()),
+            [only] => shown(only)?,
+            [first, rest @ ..] => format!("{} +{}", shown(first)?, rest.len()),
         };
         let narration = match super::posted_narration(voucher) {
             None => "(none)".to_string(),
@@ -2828,17 +2870,14 @@ fn batch_review_text(
     credit: &ExactDecimal,
     footer: &[String],
 ) -> Result<ReviewText, String> {
-    let names = std::iter::once(company.name.as_str()).chain(
+    let names = admit_review_text(
+        [company.name.as_str()],
         line.vouchers
             .iter()
             .flat_map(|voucher| voucher.entries.iter().map(|entry| entry.ledger.as_str())),
-    );
-    if names.clone().any(has_unsafe_review_layout_character) {
-        return Err("import_review_layout_text".into());
-    }
-    if names.clone().any(has_unreviewable_format_character) {
-        return Err("import_review_format_text".into());
-    }
+    )
+    .map_err(ReviewTextRefusal::import_code)?;
+    let note = line_break_note(&names);
     for voucher in &line.vouchers {
         require_native_numbering(voucher)?;
     }
@@ -2851,13 +2890,16 @@ fn batch_review_text(
         Ok(())
     };
     let mut by_type = BTreeMap::<&str, usize>::new();
-    let mut ledgers = BTreeMap::<&str, (ExactDecimal, ExactDecimal, usize)>::new();
+    let mut ledgers = BTreeMap::<ReviewLedgerName, (ExactDecimal, ExactDecimal, usize)>::new();
     let (mut money_in, mut money_out) = (ExactDecimal::zero(), ExactDecimal::zero());
+    // `names` holds every entry's ledger, in this order.
+    let mut admitted = names.iter().copied();
     for voucher in &line.vouchers {
         *by_type.entry(voucher.voucher_type.as_str()).or_default() += 1;
         for entry in &voucher.entries {
+            let name = admitted.next().ok_or("import_review_layout_text")?;
             let totals = ledgers
-                .entry(entry.ledger.as_str())
+                .entry(name)
                 .or_insert_with(|| (ExactDecimal::zero(), ExactDecimal::zero(), 0));
             totals.2 += 1;
             match &entry.side {
@@ -2909,11 +2951,15 @@ fn batch_review_text(
             dr.as_str(),
             cr.as_str(),
             if *count == 1 { "entry" } else { "entries" },
-            marks.named(ledger)
+            marks.named(*ledger)
         ));
     }
-    let legend = marks.legend(ledgers.keys().copied());
-    text.push(legend.to_string());
+    let legend = marks.legend(ledgers.keys().map(|ledger| ledger.as_str()));
+    text.extend(
+        lines_under_the_ledgers(legend, note)
+            .split('\n')
+            .map(str::to_string),
+    );
     text.push(format!(
         "Total debit: {}  Total credit: {}",
         debit.as_str(),
@@ -2988,6 +3034,155 @@ fn batch_review_text(
         return Err("import_review_too_large".into());
     }
     marks.seal(line, summary.join("\n"))
+}
+
+/// Why a value cannot be shown in a native dialog. A layout character anywhere
+/// is reported before a format character anywhere.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum ReviewTextRefusal {
+    Layout,
+    Format,
+}
+
+impl ReviewTextRefusal {
+    fn of(value: &str) -> Option<Self> {
+        if has_unsafe_review_layout_character(value) {
+            Some(Self::Layout)
+        } else if has_unreviewable_format_character(value) {
+            Some(Self::Format)
+        } else {
+            None
+        }
+    }
+
+    /// The code an approval dialog refuses with.
+    fn import_code(self) -> String {
+        match self {
+            Self::Layout => "import_review_layout_text".into(),
+            Self::Format => "import_review_format_text".into(),
+        }
+    }
+}
+
+/// A ledger name as a dialog shows it (bridge#626): the only form a dialog
+/// line is written from. It is held to the rules for all dialog text, except
+/// that it may end in exactly one CR LF when the rest is a name the build
+/// admits, the one spelling with a line break that a build binds. It is shown
+/// JSON-quoted, so the break is written out and no control character reaches
+/// the dialog, with [`LINE_BREAK_MARK`] before the quote
+/// (`Line break  "Cash\r\n"`); a text that shows one carries
+/// [`LINE_BREAK_NOTE`] once.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct ReviewLedgerName<'a>(&'a str);
+
+/// What every line shows before the quoted name of a ledger whose name ends
+/// in a line break: on the name's own line and outside its quotes, where no
+/// name can write it.
+pub(super) const LINE_BREAK_MARK: &str = "Line break  ";
+/// What the mark says, once, on a line of its own under the lines that name
+/// ledgers.
+pub(super) const LINE_BREAK_NOTE: &str =
+    "Line break: a name that ends in a line break in Tally (shown as \\r\\n). No other name here has one.";
+
+impl<'a> ReviewLedgerName<'a> {
+    pub(super) fn parse(name: &'a str) -> Result<Self, ReviewTextRefusal> {
+        let checked = if super::live_spelling_importable(0, name) {
+            super::without_trailing_crlf(name)
+        } else {
+            name
+        };
+        ReviewTextRefusal::of(checked).map_or(Ok(Self(name)), Err)
+    }
+
+    pub(super) fn as_str(self) -> &'a str {
+        self.0
+    }
+
+    pub(super) fn ends_in_line_break(self) -> bool {
+        self.0.ends_with("\r\n")
+    }
+
+    /// The name as every dialog line shows it, and the only way one is
+    /// written: JSON-quoted, with [`LINE_BREAK_MARK`] before it when it ends
+    /// in a line break.
+    pub(super) fn shown(self) -> String {
+        let quoted = serde_json::to_string(self.0).expect("string serialization");
+        if self.ends_in_line_break() {
+            format!("{LINE_BREAK_MARK}{quoted}")
+        } else {
+            quoted
+        }
+    }
+}
+
+/// The check every dialog text passes for the names of `shown` that end in a
+/// line break. The text holds no carriage return. [`LINE_BREAK_NOTE`] is a
+/// line of it when there is such a name. For each such name a line ends in
+/// two spaces, the mark and the quoted name, which is the name's own line.
+/// And the characters `\r\n"`, a written-out break before a closing quote,
+/// stand in the text exactly as often as those marked names do, so none is
+/// shown without its mark. Every value a dialog quotes is refused for a
+/// control character unless it is such a name, a typed backslash is written
+/// doubled, and a quote inside a value has a backslash before it.
+pub(super) fn line_break_names_are_marked<'a>(
+    text: &str,
+    shown: impl IntoIterator<Item = ReviewLedgerName<'a>>,
+) -> bool {
+    let marked: BTreeSet<String> = shown
+        .into_iter()
+        .filter(|name| name.ends_in_line_break())
+        .map(ReviewLedgerName::shown)
+        .collect();
+    !text.contains('\r')
+        && (marked.is_empty() || text.lines().any(|line| line == LINE_BREAK_NOTE))
+        && marked.iter().all(|name| {
+            let own_line = format!("  {name}");
+            text.lines().any(|line| line.ends_with(&own_line))
+        })
+        && text.matches("\\r\\n\"").count()
+            == marked
+                .iter()
+                .map(|name| text.matches(name.as_str()).count())
+                .sum::<usize>()
+}
+
+/// The line or lines under a text's entry or per-ledger lines: the On Account
+/// sentence, the line-break note, both in that order, or one blank line.
+fn lines_under_the_ledgers(legend: &str, note: Option<&str>) -> String {
+    [legend, note.unwrap_or_default()]
+        .into_iter()
+        .filter(|shown| !shown.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// [`LINE_BREAK_NOTE`] when any of `names` ends in a line break.
+pub(super) fn line_break_note(names: &[ReviewLedgerName<'_>]) -> Option<&'static str> {
+    names
+        .iter()
+        .any(|name| name.ends_in_line_break())
+        .then_some(LINE_BREAK_NOTE)
+}
+
+/// Checks every value a dialog shows: `text` under the plain rules and
+/// `ledgers` as [`ReviewLedgerName`]s, returned in the order given.
+pub(super) fn admit_review_text<'a>(
+    text: impl IntoIterator<Item = &'a str>,
+    ledgers: impl IntoIterator<Item = &'a str>,
+) -> Result<Vec<ReviewLedgerName<'a>>, ReviewTextRefusal> {
+    let ledgers = ledgers
+        .into_iter()
+        .map(ReviewLedgerName::parse)
+        .collect::<Vec<_>>();
+    let refusal = text
+        .into_iter()
+        .filter_map(ReviewTextRefusal::of)
+        .chain(ledgers.iter().filter_map(|ledger| ledger.err()))
+        .min();
+    match refusal {
+        Some(refusal) => Err(refusal),
+        None => ledgers.into_iter().collect(),
+    }
 }
 
 pub(super) fn has_unsafe_review_layout_character(value: &str) -> bool {

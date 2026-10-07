@@ -84,6 +84,26 @@ These changes are in source and not yet in a published build.
   the group tree, and each call took 64 requests (the window's 34 and the group modes' 30, as counted from the code) and
   about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
   read, or a held later page (#1230).
+- The approval dialog of `post_import` now takes a voucher on a ledger whose
+  name in Tally ends in one line break; until now such a voucher could be
+  built and was refused for posting. The approval dialog, and the review
+  dialog if a doubt is recorded after the post, show such a name quoted
+  with the line break written out and the words "Line break" before the
+  quote, on every line that shows the name (`Line break  "Name\r\n"`), and
+  add one line saying what the mark means and that no other name in that
+  text has one. A line break anywhere else in a name is refused as before,
+  and no dialog shows a line break in any other value. The desktop Journal
+  screen takes no saved Journal that names such a ledger, to review or
+  post, or to reconcile once it was sent: it says so and says to use the
+  assistant for it. An approval text that carries both this line and the
+  On Account sentence holds one entry fewer. The mark takes 12 of a line's
+  100 characters and the written-out break 4: a text with a line over the
+  cap is refused, never cut, except that a batch's per-voucher lines give
+  way to a reason line.
+  Not measured: such a voucher posted through the dialog against a live
+  Tally, what Tally returns when it is read back (and so whether such a
+  post ends verified), and how macOS and Windows draw and wrap the mark and
+  the quoted name (#626).
 
 **Safer or fixed**
 

@@ -2512,7 +2512,7 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
             "a voucher carries its own number, and native posting lets Tally assign it".to_string()
         }
         "import_review_layout_text" | "import_review_format_text" => {
-            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully".to_string()
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name)".to_string()
         }
         "import_review_too_large" => {
             "the approval text does not fit in one native dialog".to_string()

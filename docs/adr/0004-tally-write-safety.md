@@ -397,7 +397,9 @@ the bank ledger back as the party on Payments and Receipts). A preview over the
 native dialog's caps (24 lines, 100 characters a line, 1,600 characters) is
 refused, never truncated; a bank voucher fits at most six entries (an
 assistant's post, the route a bank voucher takes, adds the line that says when
-the post happens; a text without that line fits seven). A
+the post happens; a text without that line fits seven). A preview that
+carries both the On Account sentence and the line about a ledger name ending
+in a line break holds one entry fewer (#626). A
 one-voucher preview ends with the voucher's own text: its reference and
 narration are the last two lines, quoted as they will be posted, under a line
 saying that no line below it is an entry, a total or an instruction, and the

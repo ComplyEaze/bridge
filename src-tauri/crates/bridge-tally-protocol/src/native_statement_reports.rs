@@ -380,7 +380,7 @@ fn amount_slot<'a>(
     Ok(slot)
 }
 
-fn amount(text: &str) -> Result<NativeStatementAmount, NativeStatementError> {
+pub(crate) fn amount(text: &str) -> Result<NativeStatementAmount, NativeStatementError> {
     if text.is_empty() {
         return Ok(NativeStatementAmount::Empty);
     }
@@ -392,7 +392,10 @@ fn amount(text: &str) -> Result<NativeStatementAmount, NativeStatementError> {
 }
 
 /// Text-only element content, with the five predefined entities decoded.
-fn read_text(reader: &mut Reader<&[u8]>, name: QName<'_>) -> Result<String, NativeStatementError> {
+pub(crate) fn read_text(
+    reader: &mut Reader<&[u8]>,
+    name: QName<'_>,
+) -> Result<String, NativeStatementError> {
     let end = name.as_ref().to_vec();
     let mut value = String::new();
     loop {

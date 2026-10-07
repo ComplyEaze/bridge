@@ -150,6 +150,9 @@ base revision.
 <a id="82e-a-voucher-types-class-comes-from-tallys-class-functions-not-its-display-name--verified-2026-09-24-tallyprime-71-one-synthetic-book"></a>
 
 [8.2e A voucher type's class comes from Tally's class functions, not its display name — **VERIFIED 2026-09-24; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82e-a-voucher-types-class-comes-from-tallys-class-functions-not-its-display-name--verified-2026-09-24-tallyprime-71-one-synthetic-book)
+<a id="82f-referencedate-on-the-voucher-fetch--verified-2026-10-07-tallyprime-71-one-synthetic-book"></a>
+
+[8.2f `REFERENCEDATE` on the voucher `FETCH` — **VERIFIED 2026-10-07; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82f-referencedate-on-the-voucher-fetch--verified-2026-10-07-tallyprime-71-one-synthetic-book)
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)
@@ -396,6 +399,9 @@ base revision.
 <a id="12a15-the-ledger-catalogue-can-carry-each-ledgers-isbillwiseon"></a>
 
 [12a.15 The ledger catalogue can carry each ledger's `ISBILLWISEON`](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a15-the-ledger-catalogue-can-carry-each-ledgers-isbillwiseon)
+<a id="12a16-cash-flow-and-its-sibling-built-in-reports-by-name-on-licensed-71"></a>
+
+[12a.16 Cash Flow and its sibling built-in reports by name on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a16-cash-flow-and-its-sibling-built-in-reports-by-name-on-licensed-71)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

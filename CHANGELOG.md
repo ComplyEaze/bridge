@@ -18,6 +18,11 @@ These changes are in source and not yet in a published build.
 
 **New**
 
+- `vouchers`, `changes` and the sales and purchase registers now return `reference_date`, a voucher's
+  `REFERENCEDATE` (`YYYYMMDD`), where the voucher has one (#1257). Checked once against a
+  live TallyPrime 7.1 on one synthetic book: the element came back on every voucher, empty on all but one
+  and filled on that one (a Purchase) and on a voucher keyed for the check; it was not checked on a sale or on
+  another voucher type, and a value that is not a date refuses the read.
 - `vouchers` and the `outstandings` party detail now reach a ledger by either
   spelling of its name when Tally's own name for it differs in case or symbols from the
   spelling its vouchers carry (26 of 4,017 ledgers in a separate census of 13 books,
@@ -31,13 +36,37 @@ These changes are in source and not yet in a published build.
   trail reads carries for it, so a party detail that finds no bill or no unallocated
   row for such a ledger says `report_spelling: not_established`; that the first name
   list is the primary language (#1085).
+- `cash_flow` reads Tally's own Cash Flow for whole months (the month-wise
+  movement of the cash and bank ledgers, not a cash flow statement under AS 3). The
+  months are returned only after their net total has been compared with the
+  trial balance's cash and bank ledgers and found equal; the split into months is
+  Tally's own and is not checked, and Tally's debit and credit columns are not
+  returned. A ledger under Bank OD A/c or Bank OCC A/c with movement refuses the
+  result: Tally was seen counting one such ledger, which the check does not yet
+  count, and the refusal is covered by tests and has not been seen against Tally.
+  The tool was run against Tally on two synthetic books: the net total tied on
+  five windows (three with only debits, two with a credit amount, one of them
+  with a positive closing as well) and a quiet window was answered as nothing to
+  compare. Tally's own answers were captured on four synthetic books in all, one
+  of them a year of empty months on a large book. A Bank OD credit or a Bank OCC ledger, a contra, a month with entries that
+  cancel, a window ending in February, a window crossing a financial year,
+  optional or post-dated vouchers, a several-currency book and a large book with
+  cash activity are not measured.
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
-  `amount`), and can add a window up by ledger, month or voucher type
-  (`summarise_by`), with debit, credit and voucher counts per bucket and the
-  cancelled, optional and entry-less vouchers counted apart. Both run on the
-  rows the window read already holds, so they send no new request to Tally; a
-  zero from a counted window is a checked zero. A narration phrase is refused
+  `amount`), and can add a window up by ledger, month, voucher type, group or
+  primary group (`summarise_by`), with debit, credit and voucher counts per bucket and the
+  cancelled, optional and entry-less vouchers counted apart. Search and the
+  ledger, month and voucher-type summaries run on the rows the window read already
+  holds and send no new request to Tally; the group and primary-group summaries
+  also read the ledger list and the group list, before and after the window. They
+  refuse when any ledger's group chain, or the set of ledgers, changed meanwhile, and
+  when a ledger the window touches cannot be placed, so no entry is left out of a
+  group total, naming the ledger it could not place. A book whose master-alteration
+  mark is above 11,983 (a provisional limit, computed and not measured, about half of what the transport admits for the same list) is refused before the
+  ledger list is read. A `group` summary also
+  gives each group's whole figure, descendants included, as `subtree_totals`, and every
+  row says what it `covers`. A zero from a counted window is a checked zero. A narration phrase is refused
   where narrations are withheld from the assistant. A summary sums post-dated
   vouchers (counted, with the vouchers Tally sent no flag for counted apart) and any
   non-posting voucher type a book uses, and says so in the result. Checked once
@@ -45,7 +74,15 @@ These changes are in source and not yet in a published build.
   equalled the sums over the listed vouchers, the ledger buckets equalled
   `trial_balance` for the same year, and each search returned what the same
   criterion selects from the listing; it did not cover a large book, a memorandum,
-  a reversing journal or a voucher withheld for a foreign-currency amount (#1230).
+  a reversing journal or a voucher withheld for a foreign-currency amount. That check
+  covered search and the ledger, month and voucher-type summaries. A second check on
+  7 October 2026 on the same book read the whole year once as `group` and once as
+  `primary_group`: 12 and 8 buckets over the 64 vouchers that count (a cancelled, an optional and
+  an entry-less voucher left out); every group bucket equalled the ledger buckets added up by the
+  trial balance's own parent column, the 18 `subtree_totals` equalled the trial balance rolled up
+  the group tree, and each call took 64 requests (the window's 34 and the group modes' 30, as counted from the code) and
+  about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
+  read, or a held later page (#1230).
 - The approval dialog of `post_import` now takes a voucher on a ledger whose
   name in Tally ends in one line break; until now such a voucher could be
   built and was refused for posting. The approval dialog, and the review
@@ -64,14 +101,35 @@ These changes are in source and not yet in a published build.
 
 - `purchase_register` and `sales_register` now take their `state` from the rule
   `vouchers` uses. A non-empty window is `complete` only when every voucher read
-  was checked against a separate count of the window; a window nothing counted,
-  which only a book small enough to need no census gets (a few dozen vouchers), is
-  `partial` with `reason` `nonempty_window_unqualified`, and its rows are still
-  returned. Before, the registers called such a window `complete` on the
-  company marks and the ledger masters alone, so the same window had two answers.
-  A row's `status` is unchanged. Not measured live: a window admitted against a
-  census through the registers on a large book; the change sends no new request,
-  it uses the census the read already makes (#1031).
+  was checked against a separate count of the window. Before, the registers called
+  such a window `complete` on the company marks and the ledger masters alone, so
+  the same window had two answers. A row's `status` is unchanged. Not measured live:
+  a window admitted against a census through the registers on a large book (#1031).
+- `vouchers`, `voucher_presence`, `purchase_register` and `sales_register` now
+  count a small book's window too (a company with a few dozen vouchers or fewer),
+  where they used to read it without a count. A nonempty window of such a book can
+  now be `complete`, and `voucher_presence` can say `absent` for it, which it
+  could not before. The cost is one more read of the book's vouchers: six more
+  requests to Tally on every call that counts (a `vouchers` call on a small book
+  goes from 16 to 22 requests, `voucher_presence` from 28 to 34); the added time
+  was measured on windows of one voucher, on debug builds, at 0.5 to 2 seconds a
+  call (one run of the day and week calls, three of the presence call), and not
+  on a larger book. `absent` still needs a window proven complete, nothing
+  resembling the proposal, the voucher number of a `manual` type, and a party that was
+  supplied and compared completely: a proposal with no party (a Journal), no manual
+  number, or a party whose comparison was cut short reads `possibly_present` with its
+  reason, however complete the window. A voucher created, altered or deleted between the
+  count and the read now refuses a small book as `voucher_window_part_not_admitted`
+  (cause `part_census_mismatch`), as a large one always did. The Ledger Entries
+  screen reads through `vouchers`' window read, so it counts too and meets the
+  same refusal. An empty window of a small book is answered as before, by the
+  check of an empty window: the count adds its requests there and changes
+  nothing else. `ledger_movement`, `verify_import`, `outstandings` and that check
+  are unchanged. Not measured against a live book: what Tally does when it cannot serve the
+  count, which refuses the call as `volume_unestimated` where the small book used
+  to answer `partial` (it served the count every time in the run above), a
+  larger book, and the registers and the Ledger Entries screen, which use the same
+  count but were not called live (#1029).
 - `profit_and_loss` now compares Tally's `Cost of Sales :` heading with the
   derived cost of sales (Purchase Accounts plus Direct Expenses) even when the
   heading reads zero or empty. Over a non-zero cost of sales such a heading
@@ -115,7 +173,11 @@ These changes are in source and not yet in a published build.
   every line the dialog writes itself stands above that line, and the date
   line says where the two are. That line and the note on the date line count
   toward the dialog's 100-character line limit and its 1,600-character limit.
-  Not measured: either dialog as macOS and Windows draw it, a large book, and
+  Looked at once on each system, with a one-voucher text at all three limits
+  (24 lines, 1,600 characters, a 100-character narration line): on one Mac
+  and on one Windows PC the whole text, its last two lines included, and the
+  buttons were visible without scrolling. Not measured: a smaller screen or a
+  larger display scaling, a batch dialog on either system, a large book, and
   the bills of a ledger whose flag reads No (#1234).
 - Versions 0.3.0 to 0.4.2 refuse to post a batch this version builds. They do
   not read the cash-in-hand and bill-wise records a saved batch now carries,
@@ -446,7 +508,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   run showed (such as cess), an invoice of another shape than the one run (for
   example several goods lines), a sale typed on Tally's screen,
   accounting-invoice mode, a post-dated sale, a `REFERENCE` or a filled
-  `PARTYGSTIN` on a sale, a `REFERENCEDATE` (it is not returned), or a currency
+  `PARTYGSTIN` on a sale, a `REFERENCEDATE` on a sale, or a currency
   other than the book's base. The invoice it was replayed on was imported by
   this project. Its `complete` state rests on the company marks and the ledger
   masters reading the same before and after, not on a separate voucher count

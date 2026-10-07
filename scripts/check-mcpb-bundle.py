@@ -17,6 +17,7 @@ import zipfile
 RESOURCES = ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt", "THIRD_PARTY_LICENSES_RUST.txt")
 DEFAULT_TOOLS = {
     "balance_sheet",
+    "cash_flow",
     "egress_log",
     "ledger_masters",
     "ledger_movement",

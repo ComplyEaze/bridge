@@ -54,8 +54,8 @@ settings (section 4).
   Windows then connects to that computer by itself. Section 3 describes it.
 - **To your AI provider: yes, whatever the assistant reads.** ComplyEaze
   Bridge hands each tool result, including company names, party names,
-  amounts and, when the assistant asks for them, details such as PAN, GSTIN and
-  bank account numbers, to Claude Desktop. Claude Desktop is the host, and it
+  amounts and party GSTINs, and, when the assistant asks for them, details such
+  as PAN and bank account numbers, to Claude Desktop. Claude Desktop is the host, and it
   sends tool results to the AI provider you use as part of the conversation;
   that is the host's behaviour, which this repository cannot show. ComplyEaze Bridge can
   mask party names or drop narration

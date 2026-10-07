@@ -53,9 +53,9 @@ vouchers is off by default. This page is the short path; the
 ## Before you use it with client data
 
 - **What Claude reads goes to your AI provider**, as part of the conversation:
-  company names, party names, amounts and, when it asks for them, details such
-  as PAN, GSTIN and bank account numbers. The **Response redaction** setting
-  can mask party names (`mask_parties`) or drop narration (`drop_narration`);
+  company names, party names, amounts and party GSTINs, and, when it asks for
+  them, details such as PAN and bank account numbers. The **Response redaction**
+  setting can mask party names (`mask_parties`) or drop narration (`drop_narration`);
   neither removes amounts, company names, or PAN and GSTIN numbers. It starts at
   `none`.
 - **Posting is off by default** for a new install; an earlier version may

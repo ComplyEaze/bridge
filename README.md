@@ -89,8 +89,9 @@ whose ledger now points to a different master.
   one across the internet. The Tally connection sends nothing to a ComplyEaze
   server.
 - **Your AI provider sees what the assistant reads**, just as it sees the
-  rest of the conversation: company names, party names, amounts and, when it
-  asks for them, details such as PAN, GSTIN and bank account numbers. You can
+  rest of the conversation: company names, party names, amounts and party
+  GSTINs, and, when it asks for them, details such as PAN and bank account
+  numbers. You can
   mask party names or drop narration. Neither setting hides amounts, company
   names, or PAN and GSTIN numbers. See
   *Before you use it with client data* below.
@@ -311,9 +312,9 @@ See [Security and privacy](./docs/security-and-privacy.md).
 
 **One thing to understand before you use it.** When you ask an AI assistant for
 financial data through Bridge, the assistant's provider sees what it reads —
-company names, party names, amounts and, when it asks for them, details such as
-PAN, GSTIN and bank account numbers. That is a property of using a hosted
-assistant, not of Bridge. Bridge can mask party names or drop narration first
+company names, party names, amounts and party GSTINs, and, when it asks for
+them, details such as PAN and bank account numbers. That is a property of using a
+hosted assistant, not of Bridge. Bridge can mask party names or drop narration first
 (`BRIDGE_AGENT_REDACTION`), but **neither setting removes amounts, company
 names, or PAN and GSTIN numbers** — figures always go with the answer. Decide this
 deliberately for client data.
@@ -408,8 +409,8 @@ server from source, follow the [source MCP setup](./docs/agent/README.md).
 
 Before requesting financial data through an MCP client, the client may send the selected
 Tally result to its AI provider, including company
-identity, party or open-bill details, amounts and, when asked for, details such
-as PAN, GSTIN and bank account numbers. Source installations default
+identity, party or open-bill details, amounts and party GSTINs, and, when asked
+for, details such as PAN and bank account numbers. Source installations default
 to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties` or `drop_narration`
 before launch when that better fits the workflow. These settings mask party
 names or drop narration; they do not remove amounts, company names, or PAN and

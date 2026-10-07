@@ -502,3 +502,9 @@ test("the Atom feed is complete, and has one entry for each blog post, pointing 
   for (const banned of [/\bfree\b/i, /\boffline\b/i, /nothing leaves/i, /\bpreviews?\b/i, /[™®]|&trade;|&reg;/]) assert.doesNotMatch(feed, banned, `feed.xml says ${banned}`);
   assert.doesNotMatch(feed, /(?<!ComplyEaze )\bBridge\b/, "feed.xml names the product as a bare Bridge");
 });
+
+test("the changelog template names the address the deploy writes it to as its canonical one", () => {
+  const html = read("changelog.template.html");
+  assert.equal(html.match(/<link rel="canonical" href="([^"]*)" \/>/g)?.length, 1, "changelog.template.html: exactly one canonical link");
+  assert.match(html, /<link rel="canonical" href="https:\/\/bridge\.complyeaze\.com\/changelog\.html" \/>/, "changelog.template.html: its canonical address is not changelog.html");
+});

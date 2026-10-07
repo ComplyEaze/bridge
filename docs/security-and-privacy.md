@@ -53,23 +53,26 @@ settings (section 4).
   bank statement tool could be given a path that names another computer, and
   Windows then connects to that computer by itself. Section 3 describes it.
 - **To your AI provider: yes, whatever the assistant reads.** ComplyEaze
-  Bridge hands each tool result, including company names, party names,
-  amounts and party GSTINs, and, when the assistant asks for them, details such
-  as PAN and bank account numbers, to Claude Desktop. Claude Desktop is the host, and it
-  sends tool results to the AI provider you use as part of the conversation;
-  that is the host's behaviour, which this repository cannot show. ComplyEaze Bridge can
-  mask party names or drop narration
-  (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting), but neither
-  removes amounts, company names, or PAN and GSTIN numbers. The default is
-  `none`: nothing is masked unless you choose it.
+  Bridge hands each tool result, including company, party and ledger names,
+  amounts, dates, narrations, references and GSTINs and, when the assistant
+  reads ledger details, PAN, bank account numbers, IFSC, email, phone and
+  address, to Claude Desktop. Claude Desktop is the host, and it sends tool
+  results to the AI provider you use as part of the conversation; that is the
+  host's behaviour, which this repository cannot show. ComplyEaze Bridge can
+  shorten party and ledger names and bank account numbers to their first two
+  and last two characters, or drop narrations (`BRIDGE_AGENT_REDACTION`, or the
+  Response redaction setting; one value, not both), but neither hides amounts,
+  company names, PAN, GSTIN, IFSC, contact details or references, and a
+  shortened name can still be identified, not least from the GSTIN or PAN sent
+  beside it. The default is `none`: nothing is masked unless you choose it.
   - `mask_parties` shortens, to their first two and last two characters, the
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase
     register and bank-statement proposals), stock item names and their
     parents, godown and stock-group names and their parents, and three fields
     of a ledger's details: the name on the PAN, the bank account holder's name
-    and the bank details. A name of four characters or fewer is removed
-    entirely. It does not mask amounts, company names, a ledger's parent
+    and the bank details. A name of four characters or fewer is replaced
+    by “…”. It does not mask amounts, company names, a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
     addresses or IFSCs, and a name written inside a narration or reference

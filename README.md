@@ -89,11 +89,14 @@ whose ledger now points to a different master.
   one across the internet. The Tally connection sends nothing to a ComplyEaze
   server.
 - **Your AI provider sees what the assistant reads**, just as it sees the
-  rest of the conversation: company names, party names, amounts and party
-  GSTINs, and, when it asks for them, details such as PAN and bank account
-  numbers. You can
-  mask party names or drop narration. Neither setting hides amounts, company
-  names, or PAN and GSTIN numbers. See
+  rest of the conversation: company, party and ledger names, amounts, dates,
+  narrations, references, GSTINs and, when it reads ledger details, PAN, bank
+  account numbers, IFSC, email, phone and address. The setting takes one value,
+  not both: shorten party and ledger names and bank account numbers to their
+  first two and last two characters (four or fewer become “…”), or drop
+  narrations. Neither hides amounts, company names, PAN, GSTIN, IFSC, contact
+  details or references, and a shortened name can still be identified, not
+  least from the GSTIN or PAN sent beside it. See
   *Before you use it with client data* below.
 - **Posting is off by default in the extension.** If you installed an
   earlier version, check the setting: an earlier default may still be saved as
@@ -312,11 +315,15 @@ See [Security and privacy](./docs/security-and-privacy.md).
 
 **One thing to understand before you use it.** When you ask an AI assistant for
 financial data through Bridge, the assistant's provider sees what it reads —
-company names, party names, amounts and party GSTINs, and, when it asks for
-them, details such as PAN and bank account numbers. That is a property of using a
-hosted assistant, not of Bridge. Bridge can mask party names or drop narration first
-(`BRIDGE_AGENT_REDACTION`), but **neither setting removes amounts, company
-names, or PAN and GSTIN numbers** — figures always go with the answer. Decide this
+company, party and ledger names, amounts, dates, narrations, references, GSTINs
+and, when it reads ledger details, PAN, bank account numbers, IFSC, email, phone
+and address. That is a property of using a hosted assistant, not of Bridge.
+ComplyEaze Bridge can, before sending, shorten party and ledger names and bank
+account numbers to their first two and last two characters (four or fewer
+become “…”), or drop narrations (`BRIDGE_AGENT_REDACTION` takes one value, not
+both). **Neither hides amounts, company names, PAN, GSTIN, IFSC, contact details
+or references, and a shortened name can still be identified, not least from the
+GSTIN or PAN sent beside it** — figures always go with the answer. Decide this
 deliberately for client data.
 
 ## What it costs
@@ -409,12 +416,13 @@ server from source, follow the [source MCP setup](./docs/agent/README.md).
 
 Before requesting financial data through an MCP client, the client may send the selected
 Tally result to its AI provider, including company
-identity, party or open-bill details, amounts and party GSTINs, and, when asked
-for, details such as PAN and bank account numbers. Source installations default
-to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties` or `drop_narration`
-before launch when that better fits the workflow. These settings mask party
-names or drop narration; they do not remove amounts, company names, or PAN and
-GSTIN numbers. The package installation
+identity, party or open-bill details, amounts, dates, narrations, references,
+GSTINs and, when it reads ledger details, PAN, bank account numbers, IFSC, email,
+phone and address. Source installations default to `BRIDGE_AGENT_REDACTION=none`;
+set it to `mask_parties` or `drop_narration` (one value, not both) before launch
+when that better fits the workflow. These settings shorten party and ledger names
+and bank account numbers or drop narrations; they do not hide amounts, company
+names, PAN, GSTIN, IFSC, contact details or references. The package installation
 settings expose the same choices.
 
 For a first result, run `tally_status` to check that TallyPrime and its Licensed

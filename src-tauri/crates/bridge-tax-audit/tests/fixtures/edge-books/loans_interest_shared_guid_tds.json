@@ -1,5 +1,5 @@
 {
- "comment": "loans_interest, bridge#1259 item 2, a firm: tds_in_principal is re-derived by GUID. Loan Pair: two repayments net of TDS share one GUID (the re-derivation sums both, as the figure does). Loan Clash: a repayment net of TDS shares its GUID with a TDS journal that is not counted in taken or repaid, so the re-derivation by GUID takes the journal's TDS too. Both loans open at nil, so no repayment reaches the Rs 20,000 window and no clause 31 row is emitted (two rows of one GUID make the reference refuse the test).",
+ "comment": "loans_interest, bridge#1259 item 2, a firm: tds_in_principal is re-derived by GUID. Loan Pair: two repayments net of TDS share one GUID (the re-derivation sums both, as the figure does). Loan Clash: a repayment net of TDS shares its GUID with a TDS journal that is not counted in taken or repaid, so the re-derivation by GUID takes the journal's TDS too. Loan Wide: a repayment net of TDS shares its GUID with a TDS journal that has no line on the loan, a journal whose only line on the loan is nil, and a Contra with a line on the loan and a TDS line; none is read, and the re-derivation agrees with the figure (the Trial Balance rows leave the Contra out). All three loans open at nil, so no repayment reaches the Rs 20,000 window and no clause 31 row is emitted (two rows of one GUID make the reference refuse the test).",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -50,6 +50,21 @@
     "Loans (Liability)"
    ],
    "guid": "edge-loans_interest_shared_guid_tds-004"
+  },
+  {
+   "name": "Loan Wide",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_shared_guid_tds-005"
+  },
+  {
+   "name": "Other Account",
+   "chain": [
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_shared_guid_tds-006"
   }
  ],
  "tb": [
@@ -57,8 +72,8 @@
    "ledger": "Bank A",
    "opening": 0,
    "debit": 0,
-   "credit": 2700000,
-   "closing": -2700000
+   "credit": 3600000,
+   "closing": -3600000
   },
   {
    "ledger": "Cash",
@@ -82,11 +97,25 @@
    "closing": 2000000
   },
   {
+   "ledger": "Loan Wide",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Other Account",
+   "opening": 0,
+   "debit": 150000,
+   "credit": 0,
+   "closing": 150000
+  },
+  {
    "ledger": "TDS Payable",
    "opening": 0,
    "debit": 0,
-   "credit": 500000,
-   "closing": -500000
+   "credit": 750000,
+   "closing": -750000
   }
  ],
  "vouchers": [
@@ -161,6 +190,74 @@
      -200000
     ]
    ]
+  },
+  {
+   "guid": "g03",
+   "date": "2025-06-14",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan Wide",
+     1000000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ],
+    [
+     "Bank A",
+     -900000
+    ]
+   ]
+  },
+  {
+   "guid": "g03",
+   "date": "2025-06-14",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Other Account",
+     100000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "g03",
+   "date": "2025-06-14",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Loan Wide",
+     0
+    ],
+    [
+     "Other Account",
+     50000
+    ],
+    [
+     "TDS Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "g03",
+   "date": "2025-06-14",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Loan Wide",
+     100000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ]
+   ]
   }
  ],
  "tests": [
@@ -180,6 +277,10 @@
   },
   "Loan Clash": {
    "lender": "Invented Clash Lender",
+   "lender_type": "person"
+  },
+  "Loan Wide": {
+   "lender": "Invented Wide Lender",
    "lender_type": "person"
   }
  },

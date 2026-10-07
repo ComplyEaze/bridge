@@ -36,7 +36,7 @@ At the reference engine (a private repository), commit `ee17d80f` (it holds both
         --with striprtf --with pdfplumber python parity/edge_golden.py ENGINE \
         tests/fixtures/edge-books/NAME.json tests/fixtures/golden
 
-The books are hand-written scenarios, not generated from any data. Each golden was regenerated under four different hash seeds with identical bytes. The 18 committed edge goldens of `loans_interest` regenerate byte-identical at that commit, so none moves.
+The books are hand-written scenarios, not generated from any data. Each golden was regenerated under four different hash seeds with identical bytes. The seven goldens added after the first review were each regenerated under four hash seeds with identical bytes. The 18 committed edge goldens of `loans_interest` regenerate byte-identical at that commit, so none moves.
 
 ## Bytes
 

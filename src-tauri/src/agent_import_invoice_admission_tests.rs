@@ -127,27 +127,19 @@ fn number_in_use() -> ScenarioPlan {
     .with_framing(ResponseFraming::ContentLength)
 }
 
-/// The admission of one invoice to `party` under the voucher type `filed`,
-/// and how many requests it sent. A refusal comes back as its code and the
-/// ledger or value it names; a failed read as `FAILED` and its code.
-async fn admit(
-    party: &str,
-    filed: &str,
-    number_used: bool,
-) -> (
-    Result<(), Vec<(&'static str, String)>>,
-    ImportVoucher,
-    usize,
-) {
-    let mut plans = ADMISSION_ORDER
-        .chars()
-        .map(|letter| match letter {
-            'N' if number_used => number_in_use(),
-            letter => plan(letter),
-        })
-        .collect::<Vec<_>>();
-    // One answer more than an admission asks for, so a request too many is
-    // counted instead of refused.
+/// A server over a simulator that answers `plans` in order, with the lab
+/// company and its verified identity taken from the captured company list.
+struct Lab {
+    simulator: SequenceSimulator,
+    server: Server,
+    identity: crate::tally::VerifiedCompanyIdentity,
+    company: bridge_tally_protocol::TallyCompany,
+    _directory: tempfile::TempDir,
+}
+
+fn lab(mut plans: Vec<ScenarioPlan>) -> Lab {
+    // One answer more than is asked for, so a request too many is counted
+    // instead of refused.
     plans.push(plan('e'));
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -179,7 +171,30 @@ async fn admit(
         &companies,
     )
     .unwrap();
-    let mut voucher: ImportVoucher = serde_json::from_value(json!({
+    Lab {
+        simulator,
+        server,
+        identity,
+        company,
+        _directory: directory,
+    }
+}
+
+/// How many requests the simulator received.
+fn sent(simulator: SequenceSimulator) -> usize {
+    simulator.cancel();
+    simulator
+        .finish()
+        .unwrap()
+        .into_iter()
+        .filter(|request| !request.method.is_empty())
+        .count()
+}
+
+/// One invoice to `party` under the voucher type `filed`, as a caller sends
+/// it or, with `observed`, as a build saved it for an unregistered customer.
+fn invoice_to(party: &str, filed: &str, observed: bool) -> ImportVoucher {
+    let mut voucher = json!({
         "bridge_txn_id":"t1", "date":"2026-03-10", "voucher_type":"Sales", "voucher_number":"TG/25-26/900",
         "invoice":{"voucher_type_name":filed,"place_of_supply":"Rajasthan"},
         "entries":[
@@ -188,12 +203,48 @@ async fn admit(
             {"ledger":"Output CGST","amount":"900.00","side":"Cr"},
             {"ledger":"Output SGST","amount":"900.00","side":"Cr"}
         ]
-    }))
-    .unwrap();
-    let outcome = match server
+    });
+    if observed {
+        voucher["invoice"]["observed"] = json!({
+            "voucher_type_guid": format!("{LAB_GUID}-00000131"),
+            "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
+            "party_bill_wise":false, "company_state":"Rajasthan"
+        });
+    }
+    serde_json::from_value(voucher).unwrap()
+}
+
+/// The plans of one admission, with the number read answering "in use" when
+/// `number_used`.
+fn admission_plans(number_used: bool) -> Vec<ScenarioPlan> {
+    ADMISSION_ORDER
+        .chars()
+        .map(|letter| match letter {
+            'N' if number_used => number_in_use(),
+            letter => plan(letter),
+        })
+        .collect()
+}
+
+/// The admission of one invoice to `party` under the voucher type `filed`,
+/// and how many requests it sent. A refusal comes back as its code and the
+/// ledger or value it names; a failed read as `FAILED` and its code.
+async fn admit(
+    party: &str,
+    filed: &str,
+    number_used: bool,
+) -> (
+    Result<(), Vec<(&'static str, String)>>,
+    ImportVoucher,
+    usize,
+) {
+    let lab = lab(admission_plans(number_used));
+    let mut voucher = invoice_to(party, filed, false);
+    let outcome = match lab
+        .server
         .admit_sales_invoice(
-            &identity,
-            &company,
+            &lab.identity,
+            &lab.company,
             &mut voucher,
             &catalogue(&[(party, false)]),
         )
@@ -217,14 +268,7 @@ async fn admit(
             Err(vec![("FAILED", failure.code.clone())])
         }
     };
-    simulator.cancel();
-    let requests = simulator
-        .finish()
-        .unwrap()
-        .into_iter()
-        .filter(|request| !request.method.is_empty())
-        .count();
-    (outcome, voucher, requests)
+    (outcome, voucher, sent(lab.simulator))
 }
 
 /// The whole of one admission: 6 requests for the marks, 40 for the ledger
@@ -300,69 +344,44 @@ async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a
         (true, "invoice_not_found", 12),
         (false, "invoice_not_observed", 0),
     ] {
-        let mut plans = "emsmseeNsNse".chars().map(plan).collect::<Vec<_>>();
-        plans.push(plan('e'));
-        let simulator = SequenceSimulator::spawn(plans).unwrap();
-        let directory = tempfile::tempdir().unwrap();
-        let server = Server::new(super::super::super::Settings {
-            endpoint: TallyEndpointConfig {
-                host: "127.0.0.1".into(),
-                port: simulator.address().port(),
-            },
-            data_dir: directory.path().into(),
-            max_rows: 10,
-            max_bytes: 200_000,
-            redaction: super::super::super::Redaction::None,
-            import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
-        });
-        let companies =
-            bridge_tally_protocol::parse_companies_from_collection(&company_list()).unwrap();
-        let company = companies
-            .iter()
-            .find(|row| row.guid.as_deref() == Some(LAB_GUID))
-            .expect("the lab company")
-            .clone();
-        let identity = crate::tally::VerifiedCompanyIdentity::from_observed_companies(
-            company.name.clone(),
-            LAB_GUID.into(),
-            company.company_number.clone().unwrap(),
-            company.books_from.clone().unwrap(),
-            &companies,
-        )
-        .unwrap();
-        let mut saved = json!({
-            "bridge_txn_id":"t1", "date":"2026-03-10", "voucher_type":"Sales", "voucher_number":"TG/25-26/900",
-            "invoice":{"voucher_type_name":"Sales Manual","place_of_supply":"Rajasthan"},
-            "entries":[
-                {"ledger":"Counter Sales - Unregistered","amount":"11800.00","side":"Dr"},
-                {"ledger":"Sales - Goods","amount":"10000.00","side":"Cr"},
-                {"ledger":"Output CGST","amount":"900.00","side":"Cr"},
-                {"ledger":"Output SGST","amount":"900.00","side":"Cr"}
-            ]
-        });
-        if observed {
-            saved["invoice"]["observed"] = json!({
-                "voucher_type_guid": format!("{LAB_GUID}-00000131"),
-                "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
-                "party_bill_wise":false, "company_state":"Rajasthan"
-            });
-        }
-        let saved: ImportVoucher = serde_json::from_value(saved).unwrap();
-        let (differences, alter_id, guid, _) = server
-            .read_back_sales_invoice(&identity, &company, &saved)
+        let lab = lab("emsmseeNsNse".chars().map(plan).collect());
+        let saved = invoice_to("Counter Sales - Unregistered", "Sales Manual", observed);
+        let (differences, alter_id, guid, _) = lab
+            .server
+            .read_back_sales_invoice(&lab.identity, &lab.company, &saved)
             .await
             .expect("a read-back after a post is never an error");
-        simulator.cancel();
-        let sent = simulator
-            .finish()
-            .unwrap()
-            .into_iter()
-            .filter(|request| !request.method.is_empty())
-            .count();
         assert_eq!(differences, [difference]);
         assert_eq!((alter_id, guid), (None, None));
-        assert_eq!(sent, requests, "{difference}");
+        assert_eq!(sent(lab.simulator), requests, "{difference}");
+    }
+}
+
+/// The re-read a post makes before its approval window, and again after it,
+/// is a whole admission (64 requests), and what refuses it comes back under
+/// its own code: a customer whose registration no longer admits it, or a
+/// number taken since the build (58 requests), is never reported as "a master
+/// changed".
+#[tokio::test]
+async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
+    let party = "Counter Sales - Unregistered";
+    for (number_used, code, requests) in [
+        (false, "invoice_party_registration_not_reported", 64),
+        (true, "invoice_number_already_used", 58),
+    ] {
+        let lab = lab(admission_plans(number_used));
+        let saved = invoice_to(party, "Sales Manual", true);
+        let failure = lab
+            .server
+            .recheck_sales_invoice(
+                &lab.identity,
+                &lab.company,
+                &saved,
+                &catalogue(&[(party, false)]),
+            )
+            .await
+            .expect_err(code);
+        assert_eq!(failure.code, code);
+        assert_eq!(sent(lab.simulator), requests, "{code}");
     }
 }

@@ -2504,11 +2504,28 @@ pub(super) fn agent_review_preview(
     review_preview_with(line, endpoint, &agent_post_timing_lines())
 }
 
+#[path = "agent_import_post_on_account.rs"]
+mod on_account;
+pub(super) use on_account::OnAccountMarks;
+#[cfg(test)]
+pub(super) use on_account::ON_ACCOUNT_LEGEND;
+use on_account::{reads_like_the_legend, ReviewText};
+#[cfg(test)]
+use on_account::{ON_ACCOUNT_MARK, ON_ACCOUNT_UNMARKED};
+
 fn review_preview_with(
     line: &ImportLedgerLine,
     endpoint: &super::super::TallyEndpointConfig,
     footer: &[String],
 ) -> Result<String, String> {
+    review_text(line, endpoint, footer).map(ReviewText::into_string)
+}
+
+fn review_text(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+    footer: &[String],
+) -> Result<ReviewText, String> {
     let company = line.company.as_ref().ok_or("import_post_company_missing")?;
     let origin =
         super::super::canonical_loopback_origin(endpoint).map_err(|_| "host_setting_invalid")?;
@@ -2529,6 +2546,7 @@ fn review_preview_with(
         return Err("import_review_format_text".into());
     }
     require_native_numbering(voucher)?;
+    let marks = OnAccountMarks::of(line);
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let optional = |value: &Option<String>| {
         value
@@ -2548,20 +2566,34 @@ fn review_preview_with(
                     "Cr"
                 },
                 entry.amount,
-                quoted(&entry.ledger)
+                marks.named(&entry.ledger)
             )
         })
         .collect::<Vec<_>>()
         .join("\n");
+    let legend = marks.legend(voucher.entries.iter().map(|entry| entry.ledger.as_str()));
     let classification = classification_review_line(&voucher.voucher_type)
         .map(|line| format!("\n{line}"))
         .unwrap_or_default();
-    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}\nReference: {}\nNarration: {}\n\n{}\n\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\n\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    // The voucher's reference and narration come last, under their heading,
+    // after every line ComplyEaze Bridge writes itself, the footer included.
+    // The date line says where they are.
+    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}  {VOUCHER_TEXT_CUE}\n\n{}\n{legend}\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from,
         voucher.date, voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
-        optional(&voucher.reference), super::posted_narration(voucher).map(quoted).unwrap_or_else(|| "(none)".into()), entries, debit.as_str(), credit.as_str(), line.batch_id);
+        entries, debit.as_str(), credit.as_str(), line.batch_id);
     let preview = std::iter::once(preview)
         .chain(footer.iter().cloned())
+        .chain([
+            VOUCHER_TEXT_HEADING.to_string(),
+            format!("Reference: {}", optional(&voucher.reference)),
+            format!(
+                "Narration: {}",
+                super::posted_narration(voucher)
+                    .map(quoted)
+                    .unwrap_or_else(|| "(none)".into())
+            ),
+        ])
         .collect::<Vec<_>>()
         .join("\n");
     // Native message boxes have no portable scrollable review surface. Keep this
@@ -2572,8 +2604,16 @@ fn review_preview_with(
     {
         return Err("import_review_too_large".into());
     }
-    Ok(preview)
+    marks.seal(line, preview)
 }
+
+/// The line above a voucher's reference and narration, the last lines of a
+/// one-voucher approval text: under it stand only those two, each quoted as
+/// it will be posted, or `(none)`.
+pub(super) const VOUCHER_TEXT_HEADING: &str =
+    "---- The voucher's own text follows: no line below is an entry, a total or an instruction ----";
+/// What the date line of a one-voucher approval text says about them.
+pub(super) const VOUCHER_TEXT_CUE: &str = "(the voucher's own text: last two lines)";
 
 /// The most a batch's approval text may take: lines, characters, characters
 /// a line, and UTF-8 bytes (under the native dialog's 8,000). A batch whose
@@ -2593,6 +2633,10 @@ pub(super) const BATCH_REVIEW_NARRATION_CHARS: usize = 40;
 /// The line above a small batch's voucher lines.
 pub(super) const VOUCHER_LINES_HEADING: &str =
     "Each voucher: type, date, amount, ledger, narration (references not shown):";
+/// The first heading line of a batch that marks a ledger On Account: a
+/// voucher's line has no room for the mark, so the heading says where it is.
+pub(super) const VOUCHER_LINES_HEADING_MARKED: &str =
+    "Each voucher: type, date, amount, ledger, narration (no references; On Account is marked below):";
 /// The second heading line: what the quoted text ending each line is. The
 /// dialog wraps long lines, so a narration's tail can begin a row of its own
 /// (#1063 follow-up).
@@ -2688,10 +2732,14 @@ pub(super) fn reads_like_a_dialog_line(text: &str) -> bool {
 /// Receipt's first credit, any other type's first debit, in the batch file's
 /// order, with "+N" for the rest of that side) and its narration as posted,
 /// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` with the cut marked, or
-/// `NARRATION_WITHHELD` when it reads like a line of this dialog.
+/// `NARRATION_WITHHELD` when it reads like a line of this dialog; the On
+/// Account legend counts as one only when this dialog carries it (`legend`).
 /// `None` when a narration or reference holds a character the dialog cannot
 /// show as it is: nothing is stripped or altered.
-fn voucher_review_lines(vouchers: &[ImportVoucher]) -> Result<Option<Vec<String>>, String> {
+fn voucher_review_lines(
+    vouchers: &[ImportVoucher],
+    legend: bool,
+) -> Result<Option<Vec<String>>, String> {
     let shown_text = vouchers.iter().flat_map(|voucher| {
         super::posted_narration(voucher)
             .into_iter()
@@ -2735,7 +2783,11 @@ fn voucher_review_lines(vouchers: &[ImportVoucher]) -> Result<Option<Vec<String>
         };
         let narration = match super::posted_narration(voucher) {
             None => "(none)".to_string(),
-            Some(text) if reads_like_a_dialog_line(text) => NARRATION_WITHHELD.to_string(),
+            Some(text)
+                if reads_like_a_dialog_line(text) || (legend && reads_like_the_legend(text)) =>
+            {
+                NARRATION_WITHHELD.to_string()
+            }
             Some(text) => {
                 let length = text.chars().count();
                 if length > BATCH_REVIEW_NARRATION_CHARS {
@@ -2775,7 +2827,7 @@ fn batch_review_text(
     debit: &ExactDecimal,
     credit: &ExactDecimal,
     footer: &[String],
-) -> Result<String, String> {
+) -> Result<ReviewText, String> {
     let names = std::iter::once(company.name.as_str()).chain(
         line.vouchers
             .iter()
@@ -2827,6 +2879,7 @@ fn batch_review_text(
         dates.max().unwrap_or_default(),
     );
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
+    let marks = OnAccountMarks::of(line);
     let head = vec![
         format!(
             "Create {} vouchers in {}",
@@ -2856,10 +2909,11 @@ fn batch_review_text(
             dr.as_str(),
             cr.as_str(),
             if *count == 1 { "entry" } else { "entries" },
-            quoted(ledger)
+            marks.named(ledger)
         ));
     }
-    text.push(String::new());
+    let legend = marks.legend(ledgers.keys().copied());
+    text.push(legend.to_string());
     text.push(format!(
         "Total debit: {}  Total credit: {}",
         debit.as_str(),
@@ -2907,16 +2961,23 @@ fn batch_review_text(
     let whole = |middle: Vec<String>| [head.clone(), middle, text.clone()].concat();
     let reason = if line.vouchers.len() > BATCH_REVIEW_MAX_VOUCHER_LINES {
         VOUCHER_LINES_OVER_LIMIT
-    } else if let Some(vouchers) = voucher_review_lines(&line.vouchers)? {
+    } else if let Some(vouchers) = voucher_review_lines(&line.vouchers, !legend.is_empty())? {
         let listed = whole(
-            [VOUCHER_LINES_HEADING, VOUCHER_LINES_NARRATION_HEADING]
-                .map(str::to_string)
-                .into_iter()
-                .chain(vouchers)
-                .collect(),
+            [
+                if legend.is_empty() {
+                    VOUCHER_LINES_HEADING
+                } else {
+                    VOUCHER_LINES_HEADING_MARKED
+                },
+                VOUCHER_LINES_NARRATION_HEADING,
+            ]
+            .map(str::to_string)
+            .into_iter()
+            .chain(vouchers)
+            .collect(),
         );
         if fits(&listed) {
-            return Ok(listed.join("\n"));
+            return marks.seal(line, listed.join("\n"));
         }
         VOUCHER_LINES_DO_NOT_FIT
     } else {
@@ -2926,7 +2987,7 @@ fn batch_review_text(
     if !fits(&summary) {
         return Err("import_review_too_large".into());
     }
-    Ok(summary.join("\n"))
+    marks.seal(line, summary.join("\n"))
 }
 
 pub(super) fn has_unsafe_review_layout_character(value: &str) -> bool {

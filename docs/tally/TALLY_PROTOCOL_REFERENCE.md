@@ -399,6 +399,9 @@ base revision.
 <a id="12a15-the-ledger-catalogue-can-carry-each-ledgers-isbillwiseon"></a>
 
 [12a.15 The ledger catalogue can carry each ledger's `ISBILLWISEON`](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a15-the-ledger-catalogue-can-carry-each-ledgers-isbillwiseon)
+<a id="12a16-cash-flow-and-its-sibling-built-in-reports-by-name-on-licensed-71"></a>
+
+[12a.16 Cash Flow and its sibling built-in reports by name on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a16-cash-flow-and-its-sibling-built-in-reports-by-name-on-licensed-71)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

@@ -1830,7 +1830,12 @@ fn the_agent_preview_says_when_the_post_happens() {
     // Exactly at the width cap, which refuses only past it: no margin.
     assert_eq!(now.chars().count(), BATCH_REVIEW_MAX_LINE_CHARS, "{now}");
     let single = agent_review_preview(&one, &endpoint).unwrap();
-    assert!(single.ends_with(&format!("\n{now}")), "{single}");
+    // The last line ComplyEaze Bridge writes: only the voucher's own text,
+    // under its heading, follows it.
+    assert!(
+        single.contains(&format!("\n{now}\n{VOUCHER_TEXT_HEADING}\nReference: ")),
+        "{single}"
+    );
     assert!(!admit_fresh_saved_voucher(&one, &endpoint)
         .unwrap()
         .contains(&now));

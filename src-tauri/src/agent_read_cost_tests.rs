@@ -293,7 +293,7 @@ fn the_sentence_leads_with_the_outcome_and_labels_what_is_derived() {
     assert_eq!(
         block(&timings(0, (21, 21_000), vec![]))["say"],
         format!(
-            "The window read took 21 seconds for 0 vouchers.{} No voucher was read, so what a call can carry is not established. A window with no voucher is also read once more, a day wider on each side, to confirm it is empty; that read pays its own census and is not in these figures.",
+            "The window read took 21 seconds for 0 vouchers.{} No voucher was read, so what a call can carry is not established. A window with no voucher is also read once more, a day wider on each side, to confirm it is empty; that read pays its own census when the book is large, and is not in these figures.",
             gaps("21", 10)
         )
     );

@@ -602,8 +602,12 @@ human-approved batch — this ADR does not move.
   window whose rows matched the count voucher for voucher is therefore
   `Complete` and can issue `Absent`, and `vouchers` labels the same read by
   the same rule. A window that the high-water mark alone proved small (a book
-  of a few dozen vouchers) sends no census and stays `Partial`, with reason
-  `nonempty_window_unqualified`. What remains open: the census and the data
+  of a few dozen vouchers) sent no census and stayed `Partial`, with reason
+  `nonempty_window_unqualified`; from #1029 `vouchers`, `voucher_presence` and
+  the registers count it too, so a small book can read `Complete` and issue
+  `Absent`. That count on a small book has not been run against a real Tally
+  (the lab run is pending), and a census Tally cannot serve now refuses the call
+  where the small book used to answer `Partial`. What remains open: the census and the data
   read share one date filter, so a voucher that filter drops is missed by
   both alike and the two agree.
 

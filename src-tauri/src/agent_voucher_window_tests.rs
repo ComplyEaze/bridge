@@ -5686,6 +5686,10 @@ fn the_vouchers_schema_lists_the_groupings_and_the_search_criteria() {
             call(json!({ criterion: "x".repeat(257) })).is_err(),
             "{criterion}"
         );
+    } // The suspense-tag criterion takes `true` and nothing else (#810).
+    assert_eq!(call(json!({"suspense_tagged": true})), Ok(()));
+    for value in [json!(false), json!("true"), json!(1)] {
+        assert!(call(json!({"suspense_tagged": value})).is_err());
     }
 }
 

@@ -83,9 +83,6 @@ These changes are in source and not yet in a published build.
   the group tree, and each call took 64 requests (the window's 34 and the group modes' 30, as counted from the code) and
   about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
   read, or a held later page (#1230).
-
-**Safer or fixed**
-
 - `vouchers` can keep only the vouchers of a ledger whose narration ends in a suspense
   tag ComplyEaze Bridge writes (`suspense_tagged: true` with `ledger`, #810 slice 2):
   "purpose not confirmed" for a cash line answered "don't know", or "UNIDENTIFIED -
@@ -93,7 +90,10 @@ These changes are in source and not yet in a published build.
   `matched.suspense_tag`. It reads the tag from the narration, so a voucher whose
   narration was edited after the tag is not listed and the same text typed by hand
   matches: read the ledger without the filter too. Not measured: a tagged narration
-  read back from a real Tally.
+  read back from a real Tally. The same tag test now also counts, in a build's `suspense_lines`, a voucher whose tag names its ledger in another case, spacing or hyphenation.
+
+**Safer or fixed**
+
 - `purchase_register` and `sales_register` now take their `state` from the rule
   `vouchers` uses. A non-empty window is `complete` only when every voucher read
   was checked against a separate count of the window. Before, the registers called

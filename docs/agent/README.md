@@ -1125,8 +1125,8 @@ has already read and labelled and send no Tally request of their own, so each co
 same `vouchers` call costs. The `group` and `primary_group` summaries also read the ledger
 list and the group list (see below).
 
-**Search.** `voucher_number`, `reference`, `narration_contains` and `amount` keep
-the vouchers that satisfy every criterion given.
+**Search.** `voucher_number`, `reference`, `narration_contains`, `amount` and
+`suspense_tagged` keep the vouchers that satisfy every criterion given.
 
 - `voucher_number` and `reference` are matched whole, ignoring ASCII case and the
   spaces around the term. Numbers repeat across voucher types, so a number can
@@ -1146,9 +1146,9 @@ the vouchers that satisfy every criterion given.
   suspense ledger) keeps the vouchers of that ledger whose narration ends in a
   suspense tag ComplyEaze Bridge writes: `Bridge: purpose not confirmed;
   reclassify` (a cash line answered "don't know") or `UNIDENTIFIED - reallocate
-  from <ledger>` (a party no mapping names; the ledger must be one of the
-  voucher's own, compared as the build compared it: ignoring case, spacing and
-  hyphens; `Bridge: purpose not confirmed; reclassify` is matched exactly). One
+  from <ledger>` (a party no mapping names; the whole tail, the tag's own words
+  and the ledger, is compared as the build compared it, ignoring case, spacing and
+  hyphens, and the ledger must be one of the voucher's own; `Bridge: purpose not confirmed; reclassify` is matched exactly). One
   closing ` [BRIDGE:...]` marker set off by whitespace, as a file imported by hand
   carries, and trailing whitespace are ignored; a second marker, a marker with no
   space before it, or text after the tag means the tag is not at the end and the

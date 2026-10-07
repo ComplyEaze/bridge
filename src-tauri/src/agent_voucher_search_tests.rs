@@ -571,6 +571,9 @@ fn a_narration_that_does_not_end_in_a_tag_is_not_found() {
         // Two markers, or a marker that never closes: not stripped, so the tag is not last.
         format!("UPI | {PURPOSE} {MARKER} {MARKER}"),
         format!("{MARKER} UPI | {PURPOSE} {MARKER}"),
+        // The unidentified tag anywhere but the end.
+        "UPI | UNIDENTIFIED - reallocate from WR2 Sales (checked)".to_string(),
+        "UPI | UNIDENTIFIED - reallocate from WR2 Sales | paid".to_string(),
         // A marker with no space before it is not the hand-import marker.
         format!("UPI | {PURPOSE}{MARKER}"),
         format!("UPI | {PURPOSE} [BRIDGE:547cb4ad"),
@@ -597,4 +600,23 @@ fn a_voucher_with_no_narration_is_not_found() {
     let mut row = captured_rows().remove(2);
     row.as_object_mut().unwrap().remove("narration");
     assert!(suspense_search().apply(vec![row]).is_empty());
+}
+
+#[test]
+fn the_suspense_tag_holds_beside_another_criterion_and_not_when_that_one_fails() {
+    let both = search(
+        json!({"suspense_tagged": true, "ledger": "WR2 Sales", "narration_contains": "upi"}),
+    );
+    let tagged = narrated(&format!("UPI | {PURPOSE}"));
+    let rows = both.apply(tagged.clone());
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["matched"]["narration"], true);
+    assert_eq!(rows[0]["matched"]["suspense_tag"], "purpose_not_confirmed");
+    // The tag holds but the other criterion does not: not listed.
+    let other = search(
+        json!({"suspense_tagged": true, "ledger": "WR2 Sales", "narration_contains": "cheque"}),
+    );
+    assert!(other.apply(tagged).is_empty());
+    // The other criterion holds but there is no tag: not listed.
+    assert!(both.apply(narrated("UPI to X")).is_empty());
 }

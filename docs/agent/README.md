@@ -198,8 +198,8 @@ answer was larger than the response limit (#1033); a count that is equal, lower 
 or sizes anything, and the
 result of a counted read says which it was in `ledger_count_cross_check.status` (`matched`,
 `company_count_lower` or `unavailable`, the last meaning the check did not run). Equality was measured
-on three books only (one synthetic with its answer captured in the tree, two real books read by
-another lane and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
+on three books only (one synthetic with its answer captured in the tree, two real books read separately
+and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
 against the rows the read returns, not by this check. A mark
 above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
 `size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the

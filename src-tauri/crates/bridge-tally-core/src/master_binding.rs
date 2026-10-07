@@ -306,7 +306,7 @@ pub enum BindingBasis {
 ///
 /// Replaces a `Vec` plus two flags, where empty was three different facts and a
 /// consumer reading `is_empty()` was wrong in two of them. That shape had
-/// already been got wrong twice by different lanes; here the compiler makes
+/// already been got wrong twice by different consumers; here the compiler makes
 /// each case an explicit decision instead.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "listing")]

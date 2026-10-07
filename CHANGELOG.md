@@ -121,9 +121,8 @@ These changes are in source and not yet in a published build.
   `refused_ledgers` of `cash_bank_ledger_not_established` lists a ledger where
   one of its entries is first refused, and `refused_ledgers` of the cash-answer
   refusals (in `build_import_xml` and `post_import`) where an answer first
-  names it. Under `mask_parties` a list in name order still showed the
-  alphabetical order of the real names; the order is now the same whether or
-  not party names are masked. The same ledgers are found and refused as before.
+  names it. The order is the same whether or not party names are masked. The
+  same ledgers are found and refused as before.
   Where a list is cut (`ledgers_changed` names eight; a small response cap
   leaves rows of `refused_ledgers` out), which ledgers are named, and how many
   `refused_ledgers_omitted` counts, can differ from before. Other lists are

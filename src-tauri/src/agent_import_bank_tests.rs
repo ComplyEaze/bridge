@@ -2573,10 +2573,9 @@ async fn a_build_naming_either_spelling_of_a_folded_twin_is_refused_without_a_fi
 }
 
 // A refusal lists a batch's ledgers in the batch's own order and never by
-// name: under `mask_parties` the order of masked names would still be the
-// alphabetical order of the real ones. Each test below puts first the ledger
-// that sorts last, reads the answer as the assistant receives it, and holds
-// with the names plain and masked.
+// name, with or without masking. Each test below puts first the ledger that
+// sorts last, reads the answer as the assistant receives it, and holds with
+// the names plain and masked.
 
 const PLAIN_AND_MASKED: [crate::agent::Redaction; 2] = [
     crate::agent::Redaction::None,

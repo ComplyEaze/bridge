@@ -3008,9 +3008,8 @@ fn cash_bank_refusals(
 ) -> CashBankRefusals {
     let mut classified = BTreeMap::<&str, CashBankState>::new();
     // One row per ledger and requirement, in the order the batch's legs are
-    // first refused, never by name: under `mask_parties` a name order would
-    // still be the order of the real names. The order also decides which rows
-    // the budget below keeps.
+    // first refused, never by name, with or without masking. The order also
+    // decides which rows the budget below keeps.
     let mut refused = Vec::<((&str, &'static str), Value)>::new();
     let mut legs = 0_usize;
     for (voucher, side, ledger, requirement) in constrained_legs(payload) {
@@ -3462,10 +3461,9 @@ fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
 }
 
 /// `rows` in the order the batch first names each row's ledger. A list of the
-/// batch's ledgers goes out in this order and never by name: under
-/// `mask_parties` the order of masked names would still be the alphabetical
-/// order of the real ones. A ledger the batch does not name goes last, in its
-/// incoming order; no caller passes one.
+/// batch's ledgers goes out in this order and never by name, with or without
+/// masking. A ledger the batch does not name goes last, in its incoming order;
+/// no caller passes one.
 fn in_batch_order<T>(
     mut rows: Vec<T>,
     payload: &ImportPayload,

@@ -3286,9 +3286,8 @@ async fn a_ledger_replaced_under_its_name_since_the_build_is_refused_before_appr
 }
 
 /// The changed ledgers go out in the order the batch names them and never by
-/// name: under `mask_parties` the order of masked names would still be the
-/// alphabetical order of the real ones. The saved Journal names `WR2 Sales`
-/// before `Cash`.
+/// name, with or without masking. The saved Journal names `WR2 Sales` before
+/// `Cash`.
 #[tokio::test]
 async fn the_changed_ledgers_of_a_refused_post_are_listed_in_the_order_the_batch_names_them() {
     for redaction in [

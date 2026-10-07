@@ -23,13 +23,13 @@ notarized. Each archive has a same-named `.sha256` file and
 a small provenance record on its release so an organization can identify the
 downloaded bytes and source commit.
 
-## At a glance, release 0.4.2
+## At a glance, release 0.5.0
 
-- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range, and one ledger's movement.
-- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, values only, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, and it has not yet been run on a real bank statement.
-- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, and tax-audit flags.
+- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), and one ledger's movement.
+- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, values only, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
+- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags, and Tally's Funds Flow, Ratio Analysis and negative-balance reports.
 
-"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.4.2 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.5.0 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
 ## Before you install
 
@@ -98,10 +98,11 @@ and leave Tally's product/licence mode unchanged. Bridge's checks do not lock
 out changes made directly in Tally or by other software.
 
 Stop Bridge and every client running its connector before upgrading, then restart
-them with the newer version. Release 0.4.2 installs as a second extension beside
+them with the newer version. Release 0.4.2 installed as a second extension beside
 an older release instead of replacing it (its author line changed, and Claude
 Desktop includes the author in an extension's identity; seen on a Mac, not tried
-on Windows): remove the older extension first, in Claude Desktop's Extensions
+on Windows), and we have not measured what release 0.5.0 does to an installed
+0.4.2: remove the older extension first, in Claude Desktop's Extensions
 settings, and do not delete the data folder, which both versions use. The new
 extension does not carry over your settings: enter the Tally port, the posting
 setting (posting starts off), the Terms setting and Response redaction (it
@@ -128,9 +129,10 @@ is sent to the AI provider used for that conversation, so the conversation is
 not wholly local. Choose the package's redaction setting when it suits the
 workflow.
 
-Private MCPB downloads do not update automatically. To upgrade from a release
-older than 0.4.2, remove the older extension in Claude Desktop's Extensions
-settings first (0.4.2 installs beside it, not over it), keep the data folder,
+Private MCPB downloads do not update automatically. To upgrade, remove the
+older extension in Claude Desktop's Extensions settings first (0.4.2 installed
+beside an older one, not over it, and what 0.5.0 does to an installed 0.4.2 has
+not been measured), keep the data folder,
 install the newer release from the same screen, then confirm its version and
 enter your settings again. Use the same screen to uninstall. Neither action changes Tally's
 HTTP gateway configuration.

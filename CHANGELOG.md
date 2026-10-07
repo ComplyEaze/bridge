@@ -22,12 +22,23 @@ counter Tally keeps that moves when vouchers or ledgers change.
 
 **Should I upgrade?**
 
-- **After installing, accept the Terms again.** 0.5.0 names the setting that
-  accepts the Terms for version 2026-10.1, so every tool refuses until you tick
-  it in the extension's settings and quit and reopen Claude Desktop. Whether
-  0.5.0 installs over an existing 0.4.2 as an update, and whether your Tally
-  port, posting and Response redaction settings carry over, has not been tried
-  by us. If Claude Desktop installs it beside the older extension, remove the
+- **After updating, accept the Terms again, and check the posting setting.**
+  0.5.0 names the setting that accepts the Terms for version 2026-10.1, a
+  different setting from the one you accepted for 0.4.2. After updating, tick
+  the new Terms setting in the extension's settings, check that "Allow voucher
+  posting" is as you want it, then quit and reopen Claude Desktop. What we saw:
+  we installed the package our checks built for this release (not the published
+  file) over 0.4.2 on one Mac. It replaced 0.4.2 and kept the Tally host and
+  port, Response redaction and Allow voucher posting as they were (a posting
+  setting that was on stayed on); the old Terms setting was gone and the new one
+  had no value. Before the tick, and before any quit, Claude Desktop did not
+  start ComplyEaze Bridge, and a request to one of its tools failed with a 400
+  error that did not mention the Terms. After the tick was saved Claude Desktop
+  started it at once and a new chat got an answer from it, but the assistant
+  first called an older entry of the extension, which failed with the same
+  error. After Claude Desktop was quit and reopened there was one connector and
+  no error. Not tried: quitting and reopening without the tick, and Windows. If
+  Claude Desktop installs it beside the older extension instead, remove the
   older one first (as for 0.4.2) and enter your settings again (#1010).
 - **If you turn posting on: do not post a batch built by 0.5.0 with an older
   version.** Versions 0.3.0 to 0.4.2 refuse to post a batch built with 0.5.0,
@@ -227,8 +238,8 @@ counter Tally keeps that moves when vouchers or ledgers change.
   at the moment of a post, another Tally connector that can change entries
   without the approval window, and that dealing with a voucher that reaches the
   wrong company remains yours. The setting that accepts the Terms is now named
-  for version 2026-10.1, so the next build asks you to accept the Terms once
-  more; version 2026-10 stays published for the builds that asked for it
+  for version 2026-10.1, so the new setting has to be accepted after an update
+  (see "Should I upgrade?"); version 2026-10 stays published for the builds that asked for it
   (#1010).
 - When a ledger name you gave is not in the book, the candidates now list ahead
   of the others the ledgers that hold every word you typed

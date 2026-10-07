@@ -3523,7 +3523,10 @@ narrated with ACH, NACH, ECS or EMI (each has a notice)."
 /// because a voucher listed as both crediting and debiting a loan has its credit side in the
 /// loan's taken total and its debit side in its repaid total; LOAN-4 (#779 Phase A) holds that
 /// every such voucher is listed with its own two sides, or is an interest or TDS entry, or a
-/// balanced voucher on the loan alone.
+/// balanced voucher on the loan alone. The tie adds the TDS deducted on the loan, less what the
+/// taken and repaid totals already hold of it (`tds_in_principal_<tag>`, published only where
+/// there is some): a repayment booked net of TDS carries its deduction in its loan line
+/// (bridge#1259 item 2).
 pub fn check_invariants(book: &Book, result: &TestResult) -> Result<Vec<String>> {
     check_invariants_with(book, result, NET_REVERSALS)
 }

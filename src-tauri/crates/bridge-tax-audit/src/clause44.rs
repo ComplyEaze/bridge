@@ -1123,6 +1123,29 @@ mod tests {
         );
     }
 
+    /// A ledger in both the depreciation set and the no-supplier list is a depreciation line, as
+    /// the reference places it (measured on it): the depreciation set is read first.
+    #[test]
+    fn a_ledger_in_the_depreciation_set_and_the_no_supplier_list_is_depreciation() {
+        let b = book();
+        let rent = BTreeSet::from(["Rent".to_string()]);
+        let inputs = Inputs {
+            dep_expense_ledgers: rent.clone(),
+            no_supplier_expense_ledgers: rent,
+            ..Inputs::default()
+        };
+        let r = run(&b, &Rules::vendored().unwrap(), &inputs).unwrap();
+        let count = |reason: &str| {
+            let id = format!("{TEST_ID}.no_supplier_{reason}_count");
+            r.figures.iter().find(|f| f.id == id).unwrap().value.clone()
+        };
+        assert_eq!(
+            count("depreciation_or_provision_expense_ledger"),
+            Value::Int(1)
+        );
+        assert_eq!(count("non_supply_expense"), Value::Int(0));
+    }
+
     #[test]
     fn the_module_check_holds_on_the_tests_own_result() {
         let b = book();

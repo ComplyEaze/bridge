@@ -1,0 +1,121 @@
+{
+ "comment": "loans_interest, bridge#1259 item 2, a firm: a voucher that both credits and debits the loan and carries TDS is listed, not counted in taken or repaid, so no tds_in_principal is published for it and LOAN-1 still fires on it.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_two_sided_tds-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_two_sided_tds-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_two_sided_tds-002"
+  },
+  {
+   "name": "Loan Listed",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_two_sided_tds-003"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 500000,
+   "closing": -500000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Loan Listed",
+   "opening": -5000000,
+   "debit": 1000000,
+   "credit": 400000,
+   "closing": -4400000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "s01",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan Listed",
+     1000000
+    ],
+    [
+     "Loan Listed",
+     -400000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan Listed": {
+   "lender": "Invented Listed Lender",
+   "lender_type": "person"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

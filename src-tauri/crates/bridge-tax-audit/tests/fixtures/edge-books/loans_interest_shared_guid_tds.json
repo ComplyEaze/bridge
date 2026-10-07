@@ -1,0 +1,189 @@
+{
+ "comment": "loans_interest, bridge#1259 item 2, a firm: tds_in_principal is re-derived by GUID. Loan Pair: two repayments net of TDS share one GUID (the re-derivation sums both, as the figure does). Loan Clash: a repayment net of TDS shares its GUID with a TDS journal that is not counted in taken or repaid, so the re-derivation by GUID takes the journal's TDS too. Both loans open at nil, so no repayment reaches the Rs 20,000 window and no clause 31 row is emitted (two rows of one GUID make the reference refuse the test).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_shared_guid_tds-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_shared_guid_tds-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_shared_guid_tds-002"
+  },
+  {
+   "name": "Loan Pair",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_shared_guid_tds-003"
+  },
+  {
+   "name": "Loan Clash",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_shared_guid_tds-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2700000,
+   "closing": -2700000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Loan Clash",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 0,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Loan Pair",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 0,
+   "closing": 2000000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 500000,
+   "closing": -500000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "g01",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan Pair",
+     1000000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ],
+    [
+     "Bank A",
+     -900000
+    ]
+   ]
+  },
+  {
+   "guid": "g01",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan Pair",
+     1000000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ],
+    [
+     "Bank A",
+     -900000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan Clash",
+     1000000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ],
+    [
+     "Bank A",
+     -900000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan Clash",
+     200000
+    ],
+    [
+     "TDS Payable",
+     -200000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan Pair": {
+   "lender": "Invented Pair Lender",
+   "lender_type": "person"
+  },
+  "Loan Clash": {
+   "lender": "Invented Clash Lender",
+   "lender_type": "person"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

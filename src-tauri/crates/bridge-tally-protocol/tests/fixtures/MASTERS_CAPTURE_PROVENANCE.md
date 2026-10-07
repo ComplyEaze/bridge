@@ -1,6 +1,6 @@
 # `masters_*` — provenance
 
-Voucher types, godowns, units and stock groups, each read as one native collection with the company GUID computed onto every row. These are the fixtures for the `masters` read (#724 step 1 for voucher types). Every file is a live capture, never hand-written.
+Voucher types, godowns, units, stock groups, cost centres and cost categories, each read as one native collection with the company GUID computed onto every row. These are the fixtures for the `masters` read (#724 step 1 for voucher types). Every file is a live capture, never hand-written.
 
 ## Provenance
 
@@ -38,7 +38,7 @@ Voucher types, godowns, units and stock groups, each read as one native collecti
 | `masters_stock_groups_reads_lab_live.utf16le.xml` | 2998 | `31f0974839de95aba8015df487b3e37e5ccb125deae1efe2999720024ff729ae` | stock groups | 0 |
 | `masters_godowns_reads_lab_live.utf16le.xml` | 4146 | `0d105ecc3a3ade0b2a83ce46f5e0bcdeb0b67c3882b081f3534e5ed15d2e951b` | godowns | 1 |
 
-**Cost centres and cost categories (2026-10-07, about 14:18 IST, licensed TallyPrime 7.1 Silver, `education_mode=false`, `http://127.0.0.1:9001`).** The owner read both books' Cost Centres setting on screen (F11): **No** on both. Five read-only collection requests (the Company-flag reads and the two collection reads of each book are not stored here: three answers are, plus the two request files), one at a time through a recording relay, each answered HTTP 200 with an envelope and `STATUS` 1. The request files are the byte-exact request text the capture kit generated (the production renderer's own output, asserted equal by a test), UTF-16LE with a BOM; the responses are BOM-less UTF-16LE as received.
+**Cost centres and cost categories (2026-10-07, about 14:18 IST, licensed TallyPrime 7.1 Silver, `education_mode=false`, `http://127.0.0.1:9001`).** The owner read both books' Cost Centres setting on screen (F11): **No** on both. Five read-only requests: on `BRIDGE SHAPE LAB` the Company flags, the cost centres and the cost categories, and on `BRIDGE CORPUS FOREX` the Company flags and the cost centres. Three of the five answers are stored here (the two Company-flag answers are not), one at a time through a recording relay, each answered HTTP 200 with an envelope and `STATUS` 1. The request files are the byte-exact request text the capture kit generated (the production renderer's own output, asserted equal by a test), UTF-16LE with a BOM; the responses are BOM-less UTF-16LE as received.
 - **Books:** `BRIDGE SHAPE LAB` (flag No, two cost centres and two cost categories) and `BRIDGE CORPUS FOREX` (flag No, no cost centre defined; its request differs from the SHAPE LAB one only by the company name and is not stored again).
 - **What the captures show:** a book whose setting reads No still returns its cost centres (`Assembly`, `Trading`: parent the reserved root, category `Business Line`) and its cost categories (`Business Line`: revenue Yes, non-revenue No, affects stock No; `Primary Cost Category`: Yes, Yes, No); a book with none defined answers one present, empty `COLLECTION` (`MSTDEPTYPE` 32). Every row carries `BRIDGECOMPANYGUID`.
 - **Not shown by these files:** a larger book, another release (a book whose setting reads Yes is in the next section).

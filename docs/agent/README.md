@@ -347,14 +347,13 @@ book, captured by another lane), so a No setting is not "no centres", and an emp
 answered one) does not say whether the feature is off or none is defined; this
 call does not return the setting. An empty cost-category list is refused
 (`masters_cost_categories_empty`) on the expectation that the predefined Primary Cost
-Category always exists: it was present in all three books captured, each of which had
-cost centres, and the categories of a book with none defined were not captured. The two
+Category always exists: it was present in the two books whose categories were captured (one
+with the setting at No, one at Yes), and the categories of a book with none defined were not captured. The two
 cost collections must carry the `MSTDEPTYPE` Tally printed on every captured answer
 (32 for centres, 16 for categories), or the read is refused as
 `masters_collection_type_unexpected`, so an empty answer that was not resolved to the
-type asked for is not read as "none defined". Under `mask_parties` the names, parents
-and categories of cost centres and categories are masked, as godown and stock-group
-names are. Bridge does not return how a voucher was allocated to a cost centre: no tool
+type asked for is not read as "none defined". Under `mask_parties` the names of cost centres and categories, a cost centre's parent
+and a cost centre's category are masked, as godown and stock-group names are. Bridge does not return how a voucher was allocated to a cost centre: no tool
 reads those allocations yet. A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
 parent that is Tally's reserved root keeps its marker form, as in
@@ -397,8 +396,8 @@ answer with no rows refuses as `masters_voucher_types_empty`, because every
 company has predefined voucher types, and a `cost_categories` answer with no rows as
 `masters_cost_categories_empty`; the other kinds may answer with none.
 
-Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1 (cost centres and
-categories: three synthetic books; see the provenance file) (`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
+Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1 (cost centres: three synthetic books, cost
+categories: two; see the provenance file) (`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
 `Default`, `Automatic` and `Manual` are the only numbering methods observed; any
 other value is returned as `{"unrecognised": "<raw text>"}` rather than refused.
 `default` is Tally's reported value, not evidence that a type numbers

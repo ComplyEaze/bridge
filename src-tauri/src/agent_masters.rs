@@ -103,11 +103,11 @@ impl Server {
             ]),
             MastersKind::Native(NativeMasterKind::CostCentres | NativeMasterKind::CostCategories) => {
                 limitations.extend([
-                    "Cost centres and categories are returned whether or not the company's Cost Centres setting is on: a book with the setting off was read with its two centres and a book with it on with its three, one under another (two synthetic books, the same shape); this call does not return the setting",
+                    "Cost centres and categories are returned whether or not the company's Cost Centres setting is on: a book with the setting off was read with its two centres and two categories and a book with it on with its three centres, one under another, and its one category (two synthetic books, the same shape); this call does not return the setting",
                     "An empty list of cost centres does not say whether the feature is off or no centre is defined; one book with none defined answered an empty list",
-                    "An empty list of cost categories is refused, on the expectation that the predefined Primary Cost Category always exists: it was present in all three books captured, each of which had cost centres, and the categories of a book with none defined were not captured",
+                    "An empty list of cost categories is refused, on the expectation that the predefined Primary Cost Category always exists: it was present in the two books whose categories were captured (one with the setting at No, one at Yes), and the categories of a book with none defined were not captured",
                     "ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool reads those allocations yet, so their absence from any other tool's answer says nothing",
-                    "Measured on three synthetic books (the first two on one release; the third was captured by another lane and its release was not recorded here); centres nested more than one level deep, a centre with an alias beyond its own name and a larger book are not measured, and a larger book is refused when its master mark is too large for the response budget",
+                    "Measured on three synthetic books for cost centres and two for cost categories (the first two on one release; the third was captured by another lane and its release was not recorded here); centres nested more than one level deep, a centre with an alias beyond its own name and a larger book are not measured, and a larger book is refused when its master mark is too large for the response budget",
                 ]);
             }
             MastersKind::Groups => limitations.push(

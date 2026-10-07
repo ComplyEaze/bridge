@@ -3,7 +3,7 @@
 //! every row.
 //!
 //! Evidence: one synthetic book on one licensed `TallyPrime` 7.1 for the first
-//! four kinds, and three synthetic books for cost centres and categories
+//! four kinds, and three synthetic books for cost centres (two for cost categories)
 //! (`tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`; PARTIAL). Every row of
 //! every kind carried the computed `BRIDGECOMPANYGUID`; `NUMBERINGMETHOD`
 //! took `Default`, `Automatic` and `Manual`. How another release or a larger
@@ -748,8 +748,6 @@ pub(crate) fn read_text(
         .map_err(|_| NativeMastersError::Malformed("masters_xml_invalid_escape"))
 }
 
-/// The row's `NAME`, required and not blank. Its `RESERVEDNAME`, when present,
-/// is checked against the name bound too.
 /// For the kinds that name one, the `MSTDEPTYPE` the collection element must
 /// carry (see [`NativeMasterKind::collection_type`]).
 fn require_collection_type(
@@ -776,6 +774,8 @@ fn require_collection_type(
     ))
 }
 
+/// The row's `NAME`, required and not blank. Its `RESERVEDNAME`, when present,
+/// is checked against the name bound too.
 pub(crate) fn name_attribute(element: &BytesStart<'_>) -> Result<String, NativeMastersError> {
     let mut name = None;
     for attribute in element.attributes() {

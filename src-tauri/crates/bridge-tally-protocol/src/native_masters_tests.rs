@@ -1516,6 +1516,28 @@ fn the_two_cost_collections_must_name_their_own_type_so_an_unresolved_one_is_not
         parse(NativeMasterKind::CostCategories, &self_closed),
         type_error
     );
+    // A self-closed collection that does name its type is an empty answer, classified like the
+    // open-and-close form: refused for categories, a zero-row answer for centres.
+    let typed = format!(
+        "{}<COLLECTION MSTDEPTYPE=\"16\"/>{}",
+        &text[..start],
+        &text[end..]
+    );
+    assert_eq!(
+        parse(NativeMasterKind::CostCategories, &typed),
+        Err(NativeMastersError::CostCategoriesEmpty)
+    );
+    let text = response(NativeMasterKind::CostCentres);
+    let (start, _, end) = collection_span(&text);
+    let typed = format!(
+        "{}<COLLECTION MSTDEPTYPE=\"32\"/>{}",
+        &text[..start],
+        &text[end..]
+    );
+    assert!(parse(NativeMasterKind::CostCentres, &typed)
+        .unwrap()
+        .rows
+        .is_empty());
 }
 
 #[test]

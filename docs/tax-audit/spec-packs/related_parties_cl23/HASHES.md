@@ -16,14 +16,13 @@ real assessee, and no figure comes from one.
 ## How the goldens were produced
 
 At the reference engine (a private repository), commit `ee17d80f`, under Python 3.13, with the
-crate's `parity/edge_golden.py` extended by a runner for this test. That runner is kept by the
-reference's maintainers and is not part of this pack: it passes the book's `related_parties` key
-(absent meaning `{}`) through the reference's own configuration reader to the test, and the test's
-own invariant check to the canonical dump, as the reference's pack does. Run from
+crate's own `parity/edge_golden.py`, which runs this test: it passes the book's `related_parties`
+key (absent meaning `{}`) through the reference's own configuration reader to the test, and the
+test's own invariant check to the canonical dump, as the reference's pack does. Run from
 `src-tauri/crates/bridge-tax-audit`, once per book:
 
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
-        --with striprtf --with pdfplumber python EDGE_GOLDEN_WITH_RUNNER ENGINE \
+        --with striprtf --with pdfplumber python parity/edge_golden.py ENGINE \
         BOOK.json OUTDIR
 
 Each run writes `OUTDIR/edge.<book>.related_parties_cl23.json`. Running every book a second time

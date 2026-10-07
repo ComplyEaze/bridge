@@ -2414,6 +2414,7 @@ fn a_record_without_ledger_identities_reads_as_built_before_binding() {
     line.ledger_identities = None;
     let json = serde_json::to_value(&line).unwrap();
     assert!(json.get("ledger_identities").is_none(), "{json}");
+    assert!(json.get("ledger_identities_2").is_none(), "{json}");
     let reread: ImportLedgerLine = serde_json::from_value(json).unwrap();
     assert_eq!(reread.ledger_identities, None);
     // And a current record keeps them across a round trip.
@@ -2421,6 +2422,212 @@ fn a_record_without_ledger_identities_reads_as_built_before_binding() {
     let reread: ImportLedgerLine =
         serde_json::from_value(serde_json::to_value(&line).unwrap()).unwrap();
     assert_eq!(reread.ledger_identities, line.ledger_identities);
+}
+
+/// Every key of a saved batch, by its path in the record, with every optional
+/// record present.
+fn record_key_paths(value: &Value, at: &str, into: &mut std::collections::BTreeSet<String>) {
+    match value {
+        Value::Object(fields) => {
+            for (key, inner) in fields {
+                let path = if at.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{at}.{key}")
+                };
+                record_key_paths(inner, &path, into);
+                into.insert(path);
+            }
+        }
+        Value::Array(items) => {
+            for inner in items {
+                record_key_paths(inner, &format!("{at}[]"), into);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// A saved batch holds exactly these records, and its ledger binding is
+/// written as `ledger_identities_2`, never as the `ledger_identities` that
+/// releases 0.3.0 to 0.4.2 read. Those releases refuse a batch with no binding
+/// they can read and know nothing of the cash-in-hand and bill-wise records, so
+/// this name is what keeps them from posting a batch saved here without those
+/// checks (ADR 0004).
+///
+/// If this test stops compiling or its list has to change because a field
+/// was added, removed or renamed, the releases before that change will not
+/// read the new record either: give the binding a new written name again
+/// (`ledger_identities_3`, keeping every earlier name as a `serde` alias) in
+/// the same change, and update the name here. A release that cannot check a
+/// batch must find no binding in it.
+///
+/// The destructurings name every field and have no `..`, so a field added to
+/// the record or to any struct it holds stops this compiling, whether or not
+/// it is written when empty: the two records that made this necessary were
+/// both optional and skipped when absent, which a list of written keys alone
+/// would not have seen. It is a prompt to think, not a proof: naming the new
+/// field here without renaming the binding passes. What neither part sees: a
+/// new meaning for an existing field, or a new value of `status` or of a
+/// mark's `kind`. A new variant of one of the record's enums is not seen
+/// either; an older release is expected to fail to parse it and so refuse the
+/// whole journal.
+#[test]
+fn a_saved_batch_holds_exactly_these_records() {
+    fn every_field_is_named(line: &ImportLedgerLine) {
+        let ImportLedgerLine {
+            batch_id: _,
+            identity_scheme: _,
+            amends_batch_id: _,
+            company_guid: _,
+            endpoint_origin: _,
+            company,
+            txn_ids: _,
+            date_from: _,
+            date_to: _,
+            sha256: _,
+            built_at: _,
+            status: _,
+            pre_import_mark,
+            vouchers,
+            ledger_identities,
+            cash_in_hand_ledgers,
+            on_account_approved,
+        } = line;
+        if let Some(ImportCompanyTuple {
+            name: _,
+            guid: _,
+            company_number: _,
+            books_from: _,
+        }) = company
+        {}
+        let PreImportMark {
+            kind: _,
+            value: _,
+            master_value: _,
+        } = pre_import_mark;
+        for voucher in vouchers {
+            let ImportVoucher {
+                bridge_txn_id: _,
+                date: _,
+                voucher_type: _,
+                narration: _,
+                reference: _,
+                voucher_number: _,
+                entries,
+            } = voucher;
+            for entry in entries {
+                let ImportEntry {
+                    ledger: _,
+                    amount: _,
+                    side: _,
+                } = entry;
+            }
+        }
+        for bound in ledger_identities.iter().flatten() {
+            let BoundLedger { name: _, guid: _ } = bound;
+        }
+        for cash in cash_in_hand_ledgers.iter().flatten() {
+            let CashInHandLedger {
+                bridge_txn_id: _,
+                ledger: _,
+            } = cash;
+        }
+        for approved in on_account_approved.iter().flatten() {
+            let super::super::bill_wise::OnAccountApproved {
+                ledger: _,
+                party_digest: _,
+            } = approved;
+        }
+    }
+    let (mut line, _) = batch();
+    line.amends_batch_id = Some("bridge-00000000-0000-4000-8000-000000000009".into());
+    line.ledger_identities = Some(recorded(&[("Cash", "g")]));
+    line.cash_in_hand_ledgers =
+        serde_json::from_value(json!([{"bridge_txn_id":"journal-test","ledger":"Cash"}])).unwrap();
+    line.on_account_approved =
+        serde_json::from_value(json!([{"ledger":"Expense","party_digest":"a".repeat(64)}]))
+            .unwrap();
+    line.vouchers[0].voucher_number = Some("7".into());
+    every_field_is_named(&line);
+    let written = serde_json::to_value(&line).unwrap();
+    let mut paths = std::collections::BTreeSet::new();
+    record_key_paths(&written, "", &mut paths);
+    assert_eq!(
+        paths.iter().map(String::as_str).collect::<Vec<_>>(),
+        [
+            "amends_batch_id",
+            "batch_id",
+            "built_at",
+            "cash_in_hand_ledgers",
+            "cash_in_hand_ledgers[].bridge_txn_id",
+            "cash_in_hand_ledgers[].ledger",
+            "company",
+            "company.books_from",
+            "company.company_number",
+            "company.guid",
+            "company.name",
+            "company_guid",
+            "date_from",
+            "date_to",
+            "endpoint_origin",
+            "identity_scheme",
+            "ledger_identities_2",
+            "ledger_identities_2[].guid",
+            "ledger_identities_2[].name",
+            "on_account_approved",
+            "on_account_approved[].ledger",
+            "on_account_approved[].party_digest",
+            "pre_import_mark",
+            "pre_import_mark.kind",
+            "pre_import_mark.master_value",
+            "pre_import_mark.value",
+            "sha256",
+            "status",
+            "txn_ids",
+            "vouchers",
+            "vouchers[].bridge_txn_id",
+            "vouchers[].date",
+            "vouchers[].entries",
+            "vouchers[].entries[].amount",
+            "vouchers[].entries[].ledger",
+            "vouchers[].entries[].side",
+            "vouchers[].narration",
+            "vouchers[].reference",
+            "vouchers[].voucher_number",
+            "vouchers[].voucher_type",
+        ],
+        "{written}"
+    );
+    let reread: ImportLedgerLine = serde_json::from_value(written).unwrap();
+    assert_eq!(reread.ledger_identities, line.ledger_identities);
+}
+
+/// A batch an earlier release saved, as that release journaled it (a captured
+/// journal line, with `ledger_identities`), is still read with its binding, so
+/// its verification and its masters check keep what they compare against; and
+/// written again it carries the binding under the new name only.
+#[test]
+fn a_batch_an_earlier_release_saved_keeps_its_ledger_binding() {
+    let journal = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-journal.jsonl"
+    );
+    let captured: Value = serde_json::from_str(journal.lines().next().unwrap()).unwrap();
+    let bound = captured["ledger_identities"]
+        .as_array()
+        .expect("the captured line holds its binding under the earlier name")
+        .len();
+    assert!(bound > 0);
+    let line: ImportLedgerLine = serde_json::from_value(captured).unwrap();
+    assert_eq!(line.ledger_identities.as_ref().map(Vec::len), Some(bound));
+    assert_eq!(line.cash_in_hand_ledgers, None);
+    assert_eq!(line.on_account_approved, None);
+    let rewritten = serde_json::to_value(&line).unwrap();
+    assert!(rewritten.get("ledger_identities").is_none(), "{rewritten}");
+    assert_eq!(
+        rewritten["ledger_identities_2"].as_array().map(Vec::len),
+        Some(bound)
+    );
 }
 
 #[test]

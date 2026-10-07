@@ -92,6 +92,16 @@ fn digest_of_first_party(refusal: &ToolOutcome) -> String {
         .to_string()
 }
 
+/// The text a tool call answered with, as the assistant receives it.
+fn answered(response: &Value) -> Value {
+    serde_json::from_str(
+        response["content"][0]["text"]
+            .as_str()
+            .expect("a tool call answers with text"),
+    )
+    .expect("the answer is JSON")
+}
+
 fn party_name_of(value: &Value) -> &str {
     value["$bridge_agent_party_name"]
         .as_str()
@@ -198,11 +208,13 @@ async fn an_approved_party_builds_and_the_record_carries_the_approval() {
     let refused = server.build_import_xml(&build_args(None)).await.unwrap();
     let digest = digest_of_first_party(&refused);
     let approvals = json!([{"ledger": PARTY, "party_digest": digest}]);
-    let built = server
-        .build_import_xml(&build_args(Some(approvals)))
-        .await
-        .unwrap();
-    let result = &built.payload["result"];
+    // Through the tool call, as the assistant receives it with no masking set.
+    let built = answered(
+        &server
+            .call_tool("build_import_xml", build_args(Some(approvals)))
+            .await,
+    );
+    let result = &built["result"];
     assert_eq!(
         result["on_account_approved"],
         json!([{"ledger": PARTY, "party_digest": digest}])
@@ -233,7 +245,9 @@ async fn an_approved_party_builds_and_the_record_carries_the_approval() {
 /// With party names masked the refusal's ledger reads like `Br…R4` to the
 /// assistant, so the approval cannot repeat the name: it passes the digest the
 /// refusal listed, with the masked name beside it or none, and the build records
-/// the party's real name.
+/// the party's real name. The build's own answer, taken through the tool call
+/// as the assistant receives it, lists the approved party under the same
+/// masked name, and that answer does not contain the party's real name.
 #[tokio::test]
 async fn an_approval_by_digest_builds_when_party_names_are_masked() {
     let yes = || journal_plans(&[PARTY]);
@@ -258,11 +272,16 @@ async fn an_approval_by_digest_builds_when_party_names_are_masked() {
         } else {
             json!({"party_digest": digest})
         };
-        let built = server
-            .build_import_xml(&build_args(Some(json!([approval]))))
-            .await
-            .unwrap();
-        assert!(built.payload["result"]["batch_id"].is_string());
+        let response = server
+            .call_tool("build_import_xml", build_args(Some(json!([approval]))))
+            .await;
+        let built = answered(&response);
+        assert!(built["result"]["batch_id"].is_string(), "{built}");
+        assert_eq!(
+            built["result"]["on_account_approved"],
+            json!([{"ledger": masked_name, "party_digest": digest}])
+        );
+        assert!(!response.to_string().contains(PARTY), "{response}");
         let saved = server.import_ledger().unwrap().pop().unwrap();
         assert_eq!(
             saved.on_account_approved,
@@ -272,6 +291,134 @@ async fn an_approval_by_digest_builds_when_party_names_are_masked() {
             }])
         );
     }
+}
+
+/// Two approved parties are both listed in the build's answer, each under the
+/// masked name and with the digest the refusal showed for it, and the answer
+/// contains neither real name.
+#[tokio::test]
+async fn every_approved_party_is_listed_under_its_masked_name() {
+    let both = || journal_plans(&[PARTY, SALES]);
+    let simulator =
+        SequenceSimulator::spawn([both()[..REFUSAL_REQUESTS].to_vec(), both()].concat()).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server(directory.path(), simulator.address().port(), 200_000);
+    server.settings.redaction = crate::agent::Redaction::MaskParties;
+    let refused = answered(&server.call_tool("build_import_xml", build_args(None)).await);
+    let parties = refused["result"]["refused_parties"]
+        .as_array()
+        .expect("the refusal lists its parties")
+        .clone();
+    assert_eq!(parties.len(), 2, "{refused}");
+    assert_ne!(parties[0]["ledger"], parties[1]["ledger"]);
+    let approvals: Vec<Value> = parties
+        .iter()
+        .map(|party| json!({"party_digest": party["party_digest"]}))
+        .collect();
+    let response = server
+        .call_tool("build_import_xml", build_args(Some(json!(approvals))))
+        .await;
+    let built = answered(&response);
+    let listed: Vec<Value> = parties
+        .iter()
+        .map(|party| json!({"ledger": party["ledger"], "party_digest": party["party_digest"]}))
+        .collect();
+    assert_eq!(
+        built["result"]["on_account_approved"],
+        json!(listed),
+        "{built}"
+    );
+    for name in [PARTY, SALES] {
+        assert!(!response.to_string().contains(name), "{name}: {response}");
+    }
+}
+
+/// With party names masked, both party lists the assistant receives are in
+/// digest order: the refusal's and the build result's. The digests change with
+/// the endpoint, so the run is repeated until they fall in the opposite order
+/// to the names (a coin toss each time), where name order would show. On that
+/// same run, with no masking, the refusal's list is in name order as before.
+#[tokio::test]
+async fn masked_party_lists_are_in_digest_order_where_it_differs_from_name_order() {
+    let both = || journal_plans(&[PARTY, SALES]);
+    for _ in 0..64 {
+        let refusal = || both()[..REFUSAL_REQUESTS].to_vec();
+        let simulator = SequenceSimulator::spawn([refusal(), refusal(), both()].concat()).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let mut server = server(directory.path(), simulator.address().port(), 200_000);
+        server.settings.redaction = crate::agent::Redaction::MaskParties;
+        let refused = answered(&server.call_tool("build_import_xml", build_args(None)).await);
+        let parties = refused["result"]["refused_parties"]
+            .as_array()
+            .expect("the refusal lists its parties")
+            .clone();
+        assert_eq!(parties.len(), 2, "{refused}");
+        // PARTY sorts before SALES by name; its masked form begins "Br".
+        let digest_of = |starts: &str| {
+            parties
+                .iter()
+                .find(|party| party["ledger"].as_str().unwrap().starts_with(starts))
+                .map(|party| party["party_digest"].as_str().unwrap().to_string())
+                .expect("each party is listed under its masked name")
+        };
+        let (first_by_name, second_by_name) = (digest_of("Br"), digest_of("WR"));
+        if first_by_name < second_by_name {
+            simulator.cancel();
+            continue;
+        }
+        let digests = |list: &Value| -> Vec<String> {
+            list.as_array()
+                .unwrap()
+                .iter()
+                .map(|party| party["party_digest"].as_str().unwrap().to_string())
+                .collect()
+        };
+        let by_digest = vec![second_by_name, first_by_name];
+        assert_eq!(digests(&refused["result"]["refused_parties"]), by_digest);
+        server.settings.redaction = crate::agent::Redaction::None;
+        let unmasked = answered(&server.call_tool("build_import_xml", build_args(None)).await);
+        assert_eq!(
+            unmasked["result"]["refused_parties"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|party| party["ledger"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            [PARTY, SALES],
+            "{unmasked}"
+        );
+        server.settings.redaction = crate::agent::Redaction::MaskParties;
+        // The approvals are given in name order, so the result's order is its
+        // own and not the argument's.
+        let approvals: Vec<Value> = by_digest
+            .iter()
+            .rev()
+            .map(|digest| json!({"party_digest": digest}))
+            .collect();
+        let built = answered(
+            &server
+                .call_tool("build_import_xml", build_args(Some(json!(approvals))))
+                .await,
+        );
+        assert_eq!(
+            digests(&built["result"]["on_account_approved"]),
+            by_digest,
+            "{built}"
+        );
+        // The saved record keeps its own order, by name.
+        let saved = server.import_ledger().unwrap().pop().unwrap();
+        assert_eq!(
+            saved
+                .on_account_approved
+                .unwrap()
+                .iter()
+                .map(|approved| approved.ledger.as_str())
+                .collect::<Vec<_>>(),
+            [PARTY, SALES]
+        );
+        return;
+    }
+    panic!("no run in 64 put the two digests in the opposite order to the names");
 }
 
 #[tokio::test]
@@ -540,7 +687,7 @@ async fn a_bank_batch_names_its_bill_wise_counterparty_and_builds_once_approved(
     args["on_account_approvals"] = json!([{"ledger": PARTY, "party_digest": digest}]);
     let built = server.build_import_xml(&args).await.unwrap();
     assert_eq!(
-        built.payload["result"]["on_account_approved"][0]["ledger"],
+        party_name_of(&built.payload["result"]["on_account_approved"][0]["ledger"]),
         PARTY
     );
     simulator.cancel();

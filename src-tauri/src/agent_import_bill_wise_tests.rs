@@ -858,6 +858,33 @@ fn big_party(ledger: &str, rows: usize) -> BillWiseParty {
     )
 }
 
+/// A party list keeps its order by ledger name unless party names are masked;
+/// masked, it goes by digest, so its order says nothing of the real names.
+#[test]
+fn a_masked_party_list_is_ordered_by_digest_not_by_name() {
+    let listed = || {
+        vec![
+            ("Alpha", "f".repeat(64)),
+            ("Beta", "0".repeat(64)),
+            ("Gamma", "8".repeat(64)),
+        ]
+    };
+    let names = |parties: Vec<(&'static str, String)>| {
+        parties
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        names(in_listing_order(listed(), false, |party| &party.1)),
+        ["Alpha", "Beta", "Gamma"]
+    );
+    assert_eq!(
+        names(in_listing_order(listed(), true, |party| &party.1)),
+        ["Beta", "Gamma", "Alpha"]
+    );
+}
+
 #[test]
 fn a_party_list_that_fits_shows_every_row_and_the_exact_totals() {
     let mixed = party(

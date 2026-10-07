@@ -552,6 +552,54 @@ async fn a_party_typed_as_its_stored_name_is_answered_from_the_spelling_its_vouc
     assert_eq!(detail["state"], "tied", "{detail}");
 }
 
+/// #1085: when the vouchers spell a ledger differently from its own name, an
+/// answer that found no residual row may be a name Tally's outstandings
+/// reports spell otherwise (and so may a bill trail that names none), so the
+/// result says the report's spelling is not established. A ledger whose spellings agree, and an answer that did find
+/// its row, carry no such field. Mutant killed: dropping the spelling
+/// condition, or the state condition.
+#[tokio::test]
+async fn an_empty_answer_for_a_ledger_with_two_spellings_says_the_reports_spelling_is_not_established(
+) {
+    let renamed = |call: Call| async move {
+        let mut plans = detail_plans(captured_window());
+        for plan in &mut plans {
+            let body = plan.fixture.body().replace(
+                "<NAME>Café Naïve Traders</NAME>",
+                "<NAME>Cafe Traders</NAME>",
+            );
+            plan.fixture = Fixture::SyntheticXml(body);
+        }
+        let (result, _) = run(plans, call).await;
+        result.unwrap().0
+    };
+    // Two spellings, no residual row in Tally's report: the field is there.
+    let mut call = Call::new(DetailKind::Unadjusted);
+    call.party = "Cafe Traders";
+    let detail = renamed(call).await;
+    assert_eq!(detail["state"], "no_residual_row_for_party", "{detail}");
+    assert_eq!(detail["report_spelling"], "not_established", "{detail}");
+    // The named-bill detail of a ledger with two spellings that finds no bill: the field is there.
+    let mut call = Call::new(DetailKind::BillTrail);
+    call.party = "Cafe Traders";
+    let detail = renamed(call).await;
+    assert_eq!(detail["state"], "no_named_bill_for_party", "{detail}");
+    assert_eq!(detail["report_spelling"], "not_established", "{detail}");
+    // Two spellings, but the row was found: no field.
+    let mut call = Call::new(DetailKind::Unadjusted);
+    call.party = "Cafe Traders";
+    call.unallocated = vec![residual("102.02")];
+    let detail = renamed(call).await;
+    assert_eq!(detail["state"], "tied", "{detail}");
+    assert!(detail.get("report_spelling").is_none(), "{detail}");
+    // One spelling, no residual row: no field.
+    let call = Call::new(DetailKind::Unadjusted);
+    let (result, _) = run(detail_plans(captured_window()), call).await;
+    let detail = result.unwrap().0;
+    assert_eq!(detail["state"], "no_residual_row_for_party", "{detail}");
+    assert!(detail.get("report_spelling").is_none(), "{detail}");
+}
+
 /// The case of an accented letter is not folded (#1076 decision A, reference
 /// 9.4f): `CAFÉ` asks the user rather than reading `Café`.
 #[tokio::test]

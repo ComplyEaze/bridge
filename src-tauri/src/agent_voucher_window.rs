@@ -765,6 +765,21 @@ impl WindowServed {
     }
 }
 
+/// Whether a window read counts a book whose high-water mark alone shows it
+/// fits one request (#1029).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SmallBooks {
+    /// Read the window as one request without a census: the mark bounds the
+    /// book, and the read says nothing about what the window holds beyond its
+    /// rows.
+    Skip,
+    /// Count the window like a large book, so a read can report the window
+    /// complete and a presence question can be answered absent. Costs the
+    /// census requests a small book otherwise avoids. A mark of zero, a
+    /// company that has never held a voucher, is still not counted.
+    Count,
+}
+
 /// The per-call limits a window read plans under.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct WindowReadLimits {
@@ -773,6 +788,8 @@ pub(super) struct WindowReadLimits {
     /// The most data requests one read may dispatch. [`MAX_PLANNED_READS`] in
     /// production.
     pub(super) max_reads: usize,
+    /// Whether a book small enough to read whole is counted first (#1029).
+    pub(super) small_books: SmallBooks,
 }
 
 impl WindowReadLimits {
@@ -781,6 +798,16 @@ impl WindowReadLimits {
             budget_bytes: WINDOW_READ_BUDGET_BYTES,
             default_bytes_per_voucher: shape.default_wire_bytes_per_voucher(),
             max_reads: MAX_PLANNED_READS,
+            small_books: SmallBooks::Skip,
+        }
+    }
+
+    /// These limits, counting a small book as well (#1029). Only the reads
+    /// that report a window complete or a voucher absent ask for it.
+    pub(super) const fn counting_small_books(self) -> Self {
+        Self {
+            small_books: SmallBooks::Count,
+            ..self
         }
     }
 
@@ -1987,8 +2014,9 @@ async fn read_marks<R: WindowReader>(
 }
 
 /// Establish what `window` holds, cheapest first: the company's voucher
-/// high-water mark bounds every window of the book at once; only when that
-/// bound is not enough is the window itself counted.
+/// high-water mark bounds every window of the book at once; the window itself
+/// is counted when that bound is not enough, or when the caller asks for a
+/// small book to be counted too (`SmallBooks::Count`).
 #[allow(clippy::too_many_arguments)]
 async fn estimate_window_volume<R: WindowReader>(
     reader: &R,
@@ -2010,8 +2038,14 @@ async fn estimate_window_volume<R: WindowReader>(
     let high_water = marks.vouchers;
     // Every voucher carries a distinct AlterID no greater than the high-water
     // mark (§10), so the book — and therefore any window of it — holds at
-    // most `high_water` vouchers.
-    if high_water.saturating_mul(limits.default_bytes_per_voucher) <= limits.budget_bytes {
+    // most `high_water` vouchers. A mark of zero is a company that has never
+    // held a voucher: there is nothing to count, whatever the limits say. A
+    // read that reports completeness or absence counts any other mark however
+    // small the book, so a small or new company can have a window checked
+    // complete and a presence question answered absent (#1029).
+    let fits_one_request =
+        high_water.saturating_mul(limits.default_bytes_per_voucher) <= limits.budget_bytes;
+    if high_water == 0 || (fits_one_request && limits.small_books == SmallBooks::Skip) {
         return Ok(Preflight::Whole {
             census: None,
             marks: None,

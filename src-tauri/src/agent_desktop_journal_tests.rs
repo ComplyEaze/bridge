@@ -487,6 +487,12 @@ fn review_refuses_selected_xml_from_a_superseded_full_record() {
     assert_eq!(review.details.narration.as_deref(), Some("Updated Journal"));
 }
 
+/// The details of a review with one entry marked On Account, as they are
+/// serialised for the screen. The screen's own test
+/// (`scripts/journal-posting-screen.test.tsx`) reads this text from this file
+/// and renders it.
+const MARKED_REVIEW_DETAILS_SENT: &str = r#"{"date":"20260901","reference":null,"narration":null,"entries":[{"ledger":"Expense","side":"Dr","amount":"12.50","onAccount":true},{"ledger":"Cash","side":"Cr","amount":"12.50","onAccount":false}],"onAccountNote":"On Account: a bill-wise ledger when this batch was built. Its entries carry no bill allocation.","totalDebit":"12.5","totalCredit":"12.5"}"#;
+
 /// The review screen marks each entry on a ledger the batch records as
 /// approved to take entries On Account, and carries the native dialog's own
 /// sentence for the mark, as that dialog does next (#1234); a batch that
@@ -532,6 +538,12 @@ fn review_marks_each_entry_on_a_ledger_approved_on_account() {
             flags
         );
         assert_eq!(review.details.on_account_note.as_deref(), note);
+        if note.is_some() {
+            assert_eq!(
+                serde_json::to_string(&review.details).unwrap(),
+                MARKED_REVIEW_DETAILS_SENT
+            );
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, test, vi } from "vitest";
@@ -396,4 +397,11 @@ test("marks an entry sent as On Account and shows its note only when sent (#1234
   const [expense, cash] = review.details.entries;
   expect(await cells({ ...review.details, entries: [{ ...expense, onAccount: true }, { ...cash, onAccount: false }], onAccountNote: note }))
     .toEqual({ marks: ["On Account", null], note: true });
+  // The details of a marked review as the backend serialises them: the text its Rust test
+  // (review_marks_each_entry_on_a_ledger_approved_on_account) compares with its own output.
+  const rust = readFileSync("src-tauri/src/agent_desktop_journal_tests.rs", "utf8");
+  const pinned = /const MARKED_REVIEW_DETAILS_SENT: &str =\s*r#"(.+)"#;/.exec(rust);
+  expect(pinned, "MARKED_REVIEW_DETAILS_SENT was not found in the Rust test file").not.toBeNull();
+  const sent = JSON.parse(pinned![1]);
+  expect(await cells(sent)).toEqual({ marks: ["On Account", null], note: true });
 });

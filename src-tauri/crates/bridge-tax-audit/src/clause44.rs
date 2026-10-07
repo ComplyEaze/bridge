@@ -944,6 +944,8 @@ mod tests {
             &text(&[
                 ("A", " Composition\t".into()),
                 ("B", "\u{a0}COMPOSITION".into()),
+                // The separators U+001C to U+001F are stripped, as Python strips them.
+                ("B2", "\u{1f}Composition\u{1c}".into()),
                 ("C", "Regular".into()),
                 ("D", "".into()),
                 ("E", "  ".into()),
@@ -957,7 +959,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             inputs.composition_ledgers,
-            BTreeSet::from(["A".to_string(), "B".to_string()])
+            BTreeSet::from(["A".to_string(), "B".to_string(), "B2".to_string()])
         );
     }
 
@@ -1112,6 +1114,8 @@ mod tests {
             r.figures.iter().find(|f| f.id == id).unwrap().value.clone()
         };
         assert_eq!(count("  \u{a0} ", "unregistered"), Value::Int(1));
+        // The separators U+001C to U+001F are blank too, as Python strips them.
+        assert_eq!(count("\u{1c}\u{1f}", "unregistered"), Value::Int(1));
         assert_eq!(
             count("  \u{a0} ", "exempt_or_non_gst_supply"),
             Value::Int(0)

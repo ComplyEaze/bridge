@@ -10262,5 +10262,21 @@
   "file": "src/clause44.rs",
   "from": "            .map_or_else(String::new, |l| norm_gstin(&l.gstin))",
   "to": "            .map_or_else(String::new, |l| l.gstin.clone())"
+ },
+ {
+  "id": "CL44-79",
+  "by": "reviewer",
+  "what": "clause44: a GSTIN is trimmed of Unicode white space only, so one of only U+001C to U+001F counts as a GSTIN",
+  "file": "src/clause44.rs",
+  "from": "    support::py_upper(support::py_strip(text))",
+  "to": "    support::py_upper(text.trim())"
+ },
+ {
+  "id": "CL44-80",
+  "by": "reviewer",
+  "what": "clause44: a registration type is trimmed of Unicode white space only, so one padded with U+001C to U+001F is refused",
+  "file": "src/clause44.rs",
+  "from": "                .map(|text| support::py_casefold(support::py_strip(text)))",
+  "to": "                .map(|text| support::py_casefold(text.trim()))"
  }
 ]

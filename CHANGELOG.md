@@ -251,11 +251,12 @@ counter Tally keeps that moves when vouchers or ledgers change.
   in the proof saved from it (the desktop screen names the first eight of
   them); the recorded verdict, and the review dialog that reads it, keep the
   order they were recorded in. Other lists are unchanged (#1234).
-- Under `mask_parties` the approved-party list in the build result now follows
-  the masking setting, as the refusal's list already did, and the party lists
-  `build_import_xml` returns come in the order of the masked values, so the
-  order no longer reveals the names; the order can change from one call to the
-  next (#1234, #1338, #1345).
+- The approved-party list in the build result is new in this release and
+  follows the masking setting, as the refusal's list does. Under
+  `mask_parties` the party lists `build_import_xml` returns come in the order of
+  each party's digest, not of the names, so the order does not follow the
+  alphabet of the real names; the order can change from one call to the next
+  (#1234, #1338, #1345).
 - What redaction does and does not hide is now stated in the extension. Its
   description, its Response redaction setting and the descriptions of the two
   log tools say that redaction only shortens party and ledger names and bank

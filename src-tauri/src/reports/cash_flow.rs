@@ -17,13 +17,14 @@
 //! none is not compared (`Differs` or `NothingToCompare`).
 //!
 //! What it deliberately does not do:
-//! - **Bank OD A/c and Bank OCC A/c.** Whether Tally's Cash Flow counts a
-//!   ledger under them is not measured. A ledger under either with movement in
+//! - **Bank OD A/c and Bank OCC A/c.** Tally's Cash Flow was seen counting one
+//!   Bank OD ledger (a debit, one book); a credit and a Bank OCC ledger were not
+//!   measured. A ledger under either with movement in
 //!   the window stops the check (`MoneyGroupUnmeasured`) instead of being
-//!   guessed at; one without movement is irrelevant to the net.
+//!   guessed at or counted; one without movement is irrelevant to the net.
 //! - **The gross columns and the split by month.** The sum of the months can
-//!   tie while one month is wrong, and the debit and credit columns depend on
-//!   how Tally treats a contra; neither is checked here.
+//!   tie while one month is wrong, and the debit and credit columns each differed from the ledgers' totals while the
+//!   net tied (a contra is the unverified reading); neither is checked here.
 //! - **A ledger it cannot classify.** It is left out of the money set and
 //!   counted when it carries movement: if it was in fact cash or bank, the tie
 //!   fails, and the count says where to look. A tie that holds anyway is not
@@ -46,7 +47,8 @@ use bridge_tally_protocol::{
 /// bank import's group table names.
 const MEASURED_MONEY_GROUPS: [&str; 2] = ["Bank Accounts", "Cash-in-Hand"];
 
-/// Money groups whose treatment in the Cash Flow is not measured. In the group
+/// Money groups the check does not count in the net although Tally's Cash Flow was
+/// seen counting a Bank OD ledger. In the group
 /// tree captured on 7.1 `Bank OCC A/c` is a language alias of the group whose
 /// reserved name is `Bank OD A/c`, so a lookup by reserved name returns the
 /// latter; the second entry covers a build that names it separately.

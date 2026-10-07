@@ -451,7 +451,7 @@ disagree), `not_checked` or `withheld`: the net total is checked; the split into
 can tie while one month is wrong); Tally's debit and credit columns are read but
 not returned: on the two books with credits each column differed from the debit and credit
 totals of the ledgers Tally counts as cash and bank (on one of them including a Bank OD A/c
-ledger) by one common amount while the net tied, and what that amount is has not been established. A month
+ledger) by one common amount in size (the ledgers' columns larger in both) while the net tied, and what that amount is has not been established. A month
 Tally printed with no amounts is returned with an empty `closing`, which is not zero and does not
 say the month had no entries (whether entries that cancel print an empty closing is not measured).
 A negative amount is a debit: cash and bank grew.
@@ -478,7 +478,7 @@ every captured month with an amount the closing is the debit plus the credit, an
 months on a large book was answered at once. Not measured: a ledger under Bank OD A/c or Bank OCC
 A/c in the tool's own run (Tally was seen counting a Bank OD ledger, so the refusal above stands in
 place of a difference; it is covered by tests only), what Tally's debit and credit columns each
-include (each differed from the totals of the ledgers Tally counts as cash and bank by one common amount while the net tied; on one book that set includes a Bank OD A/c ledger), a window
+include (each differed from the totals of the ledgers Tally counts as cash and bank by one common amount in size (the ledgers' columns larger in both) while the net tied; on one book that set includes a Bank OD A/c ledger), a window
 crossing a financial year, optional or post-dated vouchers, a book with several currencies, and a
 large book with cash activity.
 

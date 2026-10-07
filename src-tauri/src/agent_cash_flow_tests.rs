@@ -335,6 +335,7 @@ async fn a_bank_od_ledger_with_movement_refuses_the_result_and_says_why() {
         "{lead}"
     );
     assert!(lead.contains("Bank OD A/c or Bank OCC A/c"), "{lead}");
+    assert!(lead.contains("was seen counting such a ledger"), "{lead}");
     assert!(lead.contains("has to be read in Tally"), "{lead}");
 }
 
@@ -437,10 +438,10 @@ fn row_with(
 }
 
 #[test]
-fn only_the_measured_shape_leaves_the_unmeasured_list_empty() {
+fn only_debit_only_months_in_one_year_leave_the_unmeasured_list_empty() {
     use bridge_tally_protocol::native_cash_flow::NativeCashFlow;
     let flow = |rows| NativeCashFlow { rows };
-    // Debit-only months, a negative closing, inside one March-to-March year: measured.
+    // Debit-only months, a negative closing, inside one March-to-March year: nothing named.
     assert!(unmeasured_shape(&flow(vec![
         row_with(4, None, Some("-10.00")),
         row_with(5, None, None)
@@ -495,6 +496,10 @@ async fn a_tie_that_holds_a_credit_amount_is_observed_but_flagged_and_its_lead_s
     let lead = lead(&response);
     assert!(
         lead.contains("treat each month's figure as unverified"),
+        "{lead}"
+    );
+    assert!(
+        lead.contains("a window from March into April was not run"),
         "{lead}"
     );
     assert!(

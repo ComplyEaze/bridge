@@ -565,7 +565,7 @@ impl CashFlowBasis {
                 "{}: Tally's net cash and bank movement for the whole period equals the cash and bank ledgers of its trial balance. The split into months is Tally's own and has not been checked. Tally's debit and credit columns are not shown, and a negative amount is a debit (cash and bank growing).{} This is Tally's month-wise cash and bank movement, not a cash flow statement under AS 3.",
                 capitalised(&subject),
                 if self.unmeasured_shape {
-                    " This answer holds a credit amount, a positive closing or a window from March into April, a shape that tied to the trial balance in live runs on one synthetic book (two windows) but whose months were not compared with Tally's own Cash Flow screen: the net total agrees, but treat each month's figure as unverified and compare it with Tally's own Cash Flow."
+                    " This answer holds a credit amount, a positive closing or a window from March into April, a shape of which a credit amount and a positive closing tied to the trial balance in live runs on one synthetic book (two windows), a window from March into April was not run, and no month was compared with Tally's own Cash Flow screen: the net total agrees, but treat each month's figure as unverified and compare it with Tally's own Cash Flow."
                 } else {
                     " No month's figure has been checked against Tally's own Cash Flow screen."
                 }

@@ -738,6 +738,14 @@ fn every_captured_row_with_a_credit_closes_at_its_debit_plus_its_credit() {
             );
         }
         assert!(with_amounts >= 3, "{with_amounts} rows carried amounts");
+        // The equation is only evidence if a credit was there to add.
+        assert!(
+            parsed
+                .rows
+                .iter()
+                .any(|row| matches!(row.credit, NativeStatementAmount::Present(_))),
+            "no credit amount in the capture"
+        );
     }
 }
 
@@ -758,6 +766,7 @@ fn a_captured_credit_only_month_keeps_its_debit_empty_and_a_mixed_month_keeps_bo
     let shape =
         parse_native_cash_flow(&response(SHAPE_FY), &window("20250401", "20260331")).unwrap();
     // June 2025 closes positive: credits above debits.
+    assert_eq!(shape.rows[2].month, month(2025, 6));
     assert_eq!(shape.rows[2].closing, present("5500.00"));
 }
 

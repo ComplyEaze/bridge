@@ -599,6 +599,15 @@ fn a_tied_cash_flow_with_an_unmeasured_shape_says_so_in_its_lead() {
         unmeasured.contains("treat each month's figure as unverified"),
         "{unmeasured}"
     );
+    // What was and was not run is stated, not left to the reader.
+    assert!(
+        unmeasured.contains("a window from March into April was not run"),
+        "{unmeasured}"
+    );
+    assert!(
+        unmeasured.contains("no month was compared with Tally's own Cash Flow screen"),
+        "{unmeasured}"
+    );
     assert!(
         !unmeasured.contains("No month's figure has been checked against"),
         "{unmeasured}"

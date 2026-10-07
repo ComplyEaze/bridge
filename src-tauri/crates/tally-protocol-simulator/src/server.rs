@@ -714,6 +714,9 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 #[path = "server_tests.rs"]
 mod tests;
 
+/// Test-only and temporary: it exists because ten recorded request fingerprints predate the voucher read's
+/// REFERENCEDATE (#1257); remove it when those recordings are next captured.
+///
 /// The body with the FIRST `,REFERENCEDATE` (UTF-8 or UTF-16LE) removed: a request that carries the word twice,
 /// or that carries it elsewhere than the field list of the one voucher read, does not equal the recorded one.
 fn without_reference_date_word(body: &[u8]) -> Vec<u8> {
@@ -746,7 +749,9 @@ mod reference_date_word_tests {
             b"A,REFERENCEDATE"
         );
         let wide = |text: &str| -> Vec<u8> {
-            text.encode_utf16().flat_map(|unit| unit.to_le_bytes()).collect()
+            text.encode_utf16()
+                .flat_map(|unit| unit.to_le_bytes())
+                .collect()
         };
         assert_eq!(
             without_reference_date_word(&wide("A,REFERENCEDATE</FETCH>")),

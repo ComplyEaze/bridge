@@ -85,7 +85,7 @@ synthetic company, 2026-10-02). One gateway import of three Payment vouchers, in
   naming the ledger. `LASTVCHID` was the last created voucher's MasterID; `LASTMID` was 0.
 - Read back within a minute, the other two vouchers had been created, in request order. The
   company's voucher mark (`ALTVCHID`) stepped by 2. The rejected voucher took no MasterID and no
-  AlterID. This read-back is recorded in the lab notes and is not committed.
+  AlterID. This read-back is not committed.
 
 In this run `EXCEPTIONS` equalled the number of rejected vouchers (one), and nothing in the answer
 named which voucher it was: the `LINEERROR` names a ledger, not a voucher. The answer alone is

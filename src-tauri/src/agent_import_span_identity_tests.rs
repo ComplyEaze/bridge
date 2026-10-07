@@ -865,26 +865,31 @@ fn an_unsettled_bind_is_left_out_of_the_journal_and_a_later_read_binds() {
     );
 }
 
-/// bridge#626: when a read-back spells an entry's ledger with a line break
-/// at its end, written as two character references, the row keeps the break,
-/// so the entry reads as the one that was sent. This is the parser's half:
-/// what Tally sends for a voucher on such a ledger is a capture still to make.
+/// bridge#626: what the row parser makes of a `LEDGERNAME` that carries a
+/// line break at its end, in the two ways an answer can write one. Written
+/// as two character references, the row's name ends in CR LF. Written as
+/// the two raw characters, the row's name ends in CR LF as well: the parser
+/// does not fold line ends. This compares the parser's output with the text
+/// put into a captured read; it says nothing of what Tally sends for a
+/// voucher on such a ledger, which is a capture still to make.
 #[test]
-fn a_read_back_ledger_name_keeps_a_line_break_written_as_character_references() {
-    let xml = captured(SPAN_READ).replace(
-        ">Test Expense A</LEDGERNAME>",
-        ">Test Expense A&#13;&#10;</LEDGERNAME>",
-    );
-    let rows = parse_import_voucher_rows(&xml, COMPANY_GUID).unwrap();
-    let named: Vec<&str> = rows
-        .iter()
-        .flat_map(|row| &row.entries)
-        .map(|entry| entry.ledger.as_str())
-        .filter(|ledger| ledger.starts_with("Test Expense A"))
-        .collect();
-    assert!(!named.is_empty());
-    assert!(
-        named.iter().all(|ledger| *ledger == "Test Expense A\r\n"),
-        "{named:?}"
-    );
+fn a_read_back_ledger_name_keeps_a_line_break_in_either_spelling() {
+    for spelling in ["&#13;&#10;", "\r\n"] {
+        let xml = captured(SPAN_READ).replace(
+            ">Test Expense A</LEDGERNAME>",
+            &format!(">Test Expense A{spelling}</LEDGERNAME>"),
+        );
+        let rows = parse_import_voucher_rows(&xml, COMPANY_GUID).unwrap();
+        let named: Vec<&str> = rows
+            .iter()
+            .flat_map(|row| &row.entries)
+            .map(|entry| entry.ledger.as_str())
+            .filter(|ledger| ledger.starts_with("Test Expense A"))
+            .collect();
+        assert!(!named.is_empty());
+        assert!(
+            named.iter().all(|ledger| *ledger == "Test Expense A\r\n"),
+            "{spelling:?}: {named:?}"
+        );
+    }
 }

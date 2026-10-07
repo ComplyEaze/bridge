@@ -2815,9 +2815,11 @@ fn refusal_reason_states_the_current_voucher_limit() {
     let numbered = native_post_refusal_reason("import_post_numbered_journal_unsupported", 1);
     assert!(numbered.contains("carries its own number"), "{numbered}");
     for code in ["import_review_layout_text", "import_review_format_text"] {
-        let text = native_post_refusal_reason(code, 1);
-        assert!(text.contains("company name, a ledger name"), "{text}");
-        assert!(text.contains("cannot show faithfully"), "{text}");
+        assert_eq!(
+            native_post_refusal_reason(code, 1),
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name)",
+            "{code}"
+        );
     }
     let dialog = native_post_refusal_reason("import_review_too_large", 1);
     assert!(

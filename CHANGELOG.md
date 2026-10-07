@@ -87,15 +87,22 @@ These changes are in source and not yet in a published build.
   name in Tally ends in one line break; until now such a voucher could be
   built and was refused for posting. The approval dialog, and the review
   dialog if a doubt is recorded after the post, show such a name quoted
-  with the line break written out (`"Name\r\n"`) and add one line saying that
-  the name has a line break stored at its end in Tally. A line break anywhere
-  else in a name, or in any other value, is refused as before. The desktop
-  Journal screen takes no saved Journal that names such a ledger: its review
-  says so and says to use the assistant for it. An approval text that
-  carries both this line and the On Account sentence holds one entry fewer.
+  with the line break written out and the words "Line break" before the
+  quote, on every line that shows the name (`Line break  "Name\r\n"`), and
+  add one line saying what the mark means and that no other name in that
+  text has one. A line break anywhere else in a name is refused as before,
+  and no dialog shows a line break in any other value. The desktop Journal
+  screen takes no saved Journal that names such a ledger, to review or
+  post, or to reconcile once it was sent: it says so and says to use the
+  assistant for it. An approval text that carries both this line and the
+  On Account sentence holds one entry fewer. The mark takes 12 of a line's
+  100 characters and the written-out break 4: a text with a line over the
+  cap is refused, never cut, except that a batch's per-voucher lines give
+  way to a reason line.
   Not measured: such a voucher posted through the dialog against a live
-  Tally, what Tally returns when it is read back (and so whether such a post
-  ends verified), and how macOS and Windows draw the quoted name (#626).
+  Tally, what Tally returns when it is read back (and so whether such a
+  post ends verified), and how macOS and Windows draw and wrap the mark and
+  the quoted name (#626).
 
 **Safer or fixed**
 

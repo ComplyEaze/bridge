@@ -529,7 +529,7 @@ fn render_review_text(
     // One per line: a changed ledger's name is as long as the book made it.
     let ledgers = doubted
         .iter()
-        .map(|ledger| format!("  {}", ledger.quoted()))
+        .map(|ledger| format!("  {}", ledger.shown()))
         .collect::<Vec<_>>()
         .join("\n");
     let note = post::line_break_note(&names)
@@ -552,7 +552,7 @@ fn render_review_text(
             } else {
                 ("Cr", amount.as_str().to_string())
             };
-            Ok(format!("{side} {shown}  {}", ledger.quoted()))
+            Ok(format!("{side} {shown}  {}", ledger.shown()))
         })
         .collect::<Result<Vec<_>, String>>()?
         .join("\n");
@@ -566,6 +566,9 @@ fn render_review_text(
         shown(&narration),
         batch_id,
     );
+    if !post::line_break_names_are_marked(&preview, names.iter().copied()) {
+        return Err(ack_text_refusal(post::ReviewTextRefusal::Layout));
+    }
     Ok(preview)
 }
 
@@ -608,8 +611,15 @@ fn batch_review_preview(
         ),
     )
     .map_err(ack_text_refusal)?;
-    let note = post::line_break_note(&names);
     let (doubted_ledgers, entry_names) = names.split_at(doubted_ledgers.len());
+    // A step doubt lists no doubted ledger: the names it shows are the
+    // entries'.
+    let shown_names = if matches!(kind, DoubtKind::Masters) {
+        &names[..]
+    } else {
+        entry_names
+    };
+    let note = post::line_break_note(shown_names);
     let mut ledgers =
         BTreeMap::<post::ReviewLedgerName, (ExactDecimal, ExactDecimal, usize)>::new();
     for (entry, name) in rows.iter().flat_map(|row| &row.entries).zip(entry_names) {
@@ -643,7 +653,7 @@ fn batch_review_preview(
             text.extend(
                 doubted_ledgers
                     .iter()
-                    .map(|ledger| format!("  {}", ledger.quoted())),
+                    .map(|ledger| format!("  {}", ledger.shown())),
             );
         }
         DoubtKind::BatchStep => {
@@ -694,7 +704,7 @@ fn batch_review_preview(
             dr.as_str(),
             cr.as_str(),
             if *count == 1 { "entry" } else { "entries" },
-            ledger.quoted()
+            ledger.shown()
         ));
     }
     text.extend(note.map(str::to_string));
@@ -717,6 +727,9 @@ fn batch_review_preview(
             .any(|line| line.chars().count() > post::BATCH_REVIEW_MAX_LINE_CHARS)
     {
         return Err("ack_review_too_large".into());
+    }
+    if !post::line_break_names_are_marked(&preview, shown_names.iter().copied()) {
+        return Err(ack_text_refusal(post::ReviewTextRefusal::Layout));
     }
     Ok(preview)
 }

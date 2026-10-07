@@ -7,7 +7,7 @@
 //! elsewhere is not stopped by the type.
 
 use super::super::ImportLedgerLine;
-use super::{ReviewLedgerName, LINE_BREAK_NOTE};
+use super::{line_break_names_are_marked, ReviewLedgerName};
 use std::collections::BTreeSet;
 
 /// What a dialog line shows before the quoted name of a ledger its batch
@@ -25,8 +25,9 @@ pub(in super::super) const ON_ACCOUNT_LEGEND: &str =
 /// mark. No shape here produces one; a shape added later that forgets the
 /// mark is refused with this rather than shown.
 pub(super) const ON_ACCOUNT_UNMARKED: &str = "import_review_on_account_unmarked";
-/// A dialog text that would show a ledger name ending in a line break without
-/// its note, or with no line ending in the quoted name. No shape here produces
+/// A dialog text that does not pass `line_break_names_are_marked`: for one,
+/// a text that would show a ledger name ending in a line break without its
+/// mark or without the line that explains the mark. No shape here produces
 /// one; it is refused as layout text rather than shown.
 const LINE_BREAK_UNMARKED: &str = "import_review_layout_text";
 
@@ -66,14 +67,14 @@ impl<'a> OnAccountMarks<'a> {
             .is_some_and(|recorded| recorded.contains(ledger))
     }
 
-    /// A ledger's name as a dialog line shows it: JSON-quoted, the mark before
-    /// it when the batch records it.
+    /// A ledger's name as a line that carries its amount shows it: the name
+    /// as every line writes it, the mark before it when the batch records it.
     pub(super) fn named(&self, ledger: ReviewLedgerName<'_>) -> String {
-        let quoted = ledger.quoted();
+        let shown = ledger.shown();
         if self.marks(ledger.as_str()) {
-            format!("{ON_ACCOUNT_MARK}{quoted}")
+            format!("{ON_ACCOUNT_MARK}{shown}")
         } else {
-            quoted
+            shown
         }
     }
 
@@ -91,12 +92,12 @@ impl<'a> OnAccountMarks<'a> {
     }
 
     /// The finished text of `line`'s dialog. Refused when a recorded ledger
-    /// the batch names has no marked line in it at all, or the legend is
-    /// missing; and when the batch names a ledger whose name ends in a line
-    /// break and the text lacks the note for it, or has no line ending in the
-    /// quoted name (bridge#626). It is a tripwire for a shape that forgets
-    /// the mark or the note, not a second rendering: which lines carry them
-    /// is pinned by the tests of each shape.
+    /// the batch names has no line that ends in two spaces, its marks and
+    /// its quoted name, or the legend is missing; and when the text does not
+    /// pass [`line_break_names_are_marked`] for the ledgers the batch names
+    /// (bridge#626). It is a tripwire for a shape that forgets a mark or its
+    /// line, not a second rendering: which lines carry them is pinned by the
+    /// tests of each shape.
     pub(super) fn seal(
         &self,
         line: &ImportLedgerLine,
@@ -114,28 +115,19 @@ impl<'a> OnAccountMarks<'a> {
         }
         if marked.any(|ledger| {
             ReviewLedgerName::parse(ledger).map_or(true, |ledger| {
-                let named = self.named(ledger);
+                // The ledger's own line: two spaces, its marks, its name.
+                let named = format!("  {}", self.named(ledger));
                 !preview.lines().any(|shown| shown.ends_with(&named))
             })
         }) {
             return Err(ON_ACCOUNT_UNMARKED.into());
         }
-        // A name that ends in a line break is shown with its note, on a line
-        // that ends in the name.
-        let mut broken = line
+        let named = line
             .vouchers
             .iter()
             .flat_map(|voucher| voucher.entries.iter())
-            .filter_map(|entry| ReviewLedgerName::parse(&entry.ledger).ok())
-            .filter(|ledger| ledger.ends_in_line_break())
-            .peekable();
-        if broken.peek().is_some() && !preview.lines().any(|shown| shown == LINE_BREAK_NOTE) {
-            return Err(LINE_BREAK_UNMARKED.into());
-        }
-        if broken.any(|ledger| {
-            let named = self.named(ledger);
-            !preview.lines().any(|shown| shown.ends_with(&named))
-        }) {
+            .filter_map(|entry| ReviewLedgerName::parse(&entry.ledger).ok());
+        if !line_break_names_are_marked(&preview, named) {
             return Err(LINE_BREAK_UNMARKED.into());
         }
         Ok(ReviewText(preview))

@@ -595,6 +595,13 @@ impl Server {
                 // posted, and must not keep other batches waiting (#725).
                 self.post_approvals
                     .revoke(batch_id, "batch_already_dispatched");
+                // The desktop does not go on to check a sent Journal that
+                // names a ledger whose name ends in a line break: that
+                // check's messages name ledgers as they are (bridge#626).
+                // One not yet sent is refused where its text is made.
+                if scope == PostScope::JournalOnly {
+                    refuse_a_line_break_name_on_the_desktop(&line)?;
+                }
                 return self
                     .verify_import(args)
                     .await
@@ -1540,6 +1547,8 @@ impl Server {
         // Retain batch and endpoint integrity without applying approval-only
         // display restrictions or constructing an approval request.
         let _ = admit_saved_journal_integrity(&snapshot.batch, &self.settings.endpoint)?;
+        // This entry is the desktop's alone, and so is this refusal.
+        refuse_a_line_break_name_on_the_desktop(&snapshot.batch)?;
         self.verify_import(args).await
     }
 
@@ -1662,6 +1671,9 @@ fn reconciliation_failure_payload(
     // have been sent is reconciled, never rebuilt.
     if code == "voucher_text_invalid" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
+    }
+    if code == DESKTOP_LEDGER_LINE_BREAK {
+        payload["result"]["error"]["message"] = json!(DESKTOP_LEDGER_LINE_BREAK_ACTION);
     }
     if code == "tally_endpoint_busy" {
         payload["result"]["error"]["retry_after_s"] =
@@ -2471,11 +2483,14 @@ fn admit_fresh_saved_voucher(
 /// What the desktop answers for a saved Journal that names a ledger whose
 /// name ends in a line break.
 pub(super) const DESKTOP_LEDGER_LINE_BREAK: &str = "import_desktop_ledger_line_break";
+/// What the desktop's post and reconcile say with that code: the message
+/// and the remediation its review gives for the same Journal.
+pub(super) const DESKTOP_LEDGER_LINE_BREAK_ACTION: &str = "This saved Journal names a ledger whose name in Tally ends in a line break, and this screen cannot show such a name. Use the assistant for this Journal: its approval dialog shows such a name with the line break written out, and it can check a Journal that was already posted. If this one was already posted, do not post it again.";
 
 /// The desktop Journal screen shows a ledger's name as it is and has no way
 /// to show a line break at its end, so the desktop takes no saved Journal
-/// that names such a ledger: not to post, and not to review one already
-/// posted (bridge#626).
+/// that names such a ledger: not to review or post, sent or not, and not
+/// to reconcile once it was sent (bridge#626).
 pub(super) fn refuse_a_line_break_name_on_the_desktop(
     line: &ImportLedgerLine,
 ) -> Result<(), String> {
@@ -2800,7 +2815,7 @@ fn voucher_review_lines(
             .collect();
         let shown = |name: &str| {
             ReviewLedgerName::parse(name)
-                .map(ReviewLedgerName::quoted)
+                .map(ReviewLedgerName::shown)
                 .map_err(ReviewTextRefusal::import_code)
         };
         let ledger = match named.as_slice() {
@@ -3053,16 +3068,21 @@ impl ReviewTextRefusal {
 /// line is written from. It is held to the rules for all dialog text, except
 /// that it may end in exactly one CR LF when the rest is a name the build
 /// admits, the one spelling with a line break that a build binds. It is shown
-/// JSON-quoted, so the break is written out (`"Cash\r\n"`) and no control
-/// character reaches the dialog; a text that shows one carries
+/// JSON-quoted, so the break is written out and no control character reaches
+/// the dialog, with [`LINE_BREAK_MARK`] before the quote
+/// (`Line break  "Cash\r\n"`); a text that shows one carries
 /// [`LINE_BREAK_NOTE`] once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct ReviewLedgerName<'a>(&'a str);
 
-/// Said once, on a line of its own, in a dialog showing a name that ends in a
-/// line break.
+/// What every line shows before the quoted name of a ledger whose name ends
+/// in a line break: on the name's own line and outside its quotes, where no
+/// name can write it.
+pub(super) const LINE_BREAK_MARK: &str = "Line break  ";
+/// What the mark says, once, on a line of its own under the lines that name
+/// ledgers.
 pub(super) const LINE_BREAK_NOTE: &str =
-    "A quoted ledger name ending in \\r\\n has a line break stored at the end of its name in Tally.";
+    "Line break: a name that ends in a line break in Tally (shown as \\r\\n). No other name here has one.";
 
 impl<'a> ReviewLedgerName<'a> {
     pub(super) fn parse(name: &'a str) -> Result<Self, ReviewTextRefusal> {
@@ -3082,9 +3102,48 @@ impl<'a> ReviewLedgerName<'a> {
         self.0.ends_with("\r\n")
     }
 
-    pub(super) fn quoted(self) -> String {
-        serde_json::to_string(self.0).expect("string serialization")
+    /// The name as every dialog line shows it, and the only way one is
+    /// written: JSON-quoted, with [`LINE_BREAK_MARK`] before it when it ends
+    /// in a line break.
+    pub(super) fn shown(self) -> String {
+        let quoted = serde_json::to_string(self.0).expect("string serialization");
+        if self.ends_in_line_break() {
+            format!("{LINE_BREAK_MARK}{quoted}")
+        } else {
+            quoted
+        }
     }
+}
+
+/// The check every dialog text passes for the names of `shown` that end in a
+/// line break. The text holds no carriage return. [`LINE_BREAK_NOTE`] is a
+/// line of it when there is such a name. For each such name a line ends in
+/// two spaces, the mark and the quoted name, which is the name's own line.
+/// And the characters `\r\n"`, a written-out break before a closing quote,
+/// stand in the text exactly as often as those marked names do, so none is
+/// shown without its mark. Every value a dialog quotes is refused for a
+/// control character unless it is such a name, a typed backslash is written
+/// doubled, and a quote inside a value has a backslash before it.
+pub(super) fn line_break_names_are_marked<'a>(
+    text: &str,
+    shown: impl IntoIterator<Item = ReviewLedgerName<'a>>,
+) -> bool {
+    let marked: BTreeSet<String> = shown
+        .into_iter()
+        .filter(|name| name.ends_in_line_break())
+        .map(ReviewLedgerName::shown)
+        .collect();
+    !text.contains('\r')
+        && (marked.is_empty() || text.lines().any(|line| line == LINE_BREAK_NOTE))
+        && marked.iter().all(|name| {
+            let own_line = format!("  {name}");
+            text.lines().any(|line| line.ends_with(&own_line))
+        })
+        && text.matches("\\r\\n\"").count()
+            == marked
+                .iter()
+                .map(|name| text.matches(name.as_str()).count())
+                .sum::<usize>()
 }
 
 /// The line or lines under a text's entry or per-ledger lines: the On Account

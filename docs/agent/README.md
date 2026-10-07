@@ -2236,8 +2236,9 @@ supplier bill, a 20,000 customer advance and a 10,000 credit note to a customer,
 `payable` reads 80,000 and only 50,000 of it is owed to a supplier. The direction
 of an `unallocated` amount is the sign of the party's net unallocated balance, so
 an on-account receipt and an on-account payment on one party net into one figure.
-Separating advances, credit and debit notes and on-account amounts by their
-voucher's bill type is tracked in #945.
+For one party, `detail: unadjusted` separates advances, pending credit and debit notes and
+on-account amounts by their voucher's bill type (below). The book-wide `open_bills.kind` and
+`unallocated` figures do not; what is still to be measured is in #1356, the follow-up to #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted

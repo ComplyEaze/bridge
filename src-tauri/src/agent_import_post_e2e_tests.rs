@@ -4290,6 +4290,51 @@ async fn a_failed_readback_reports_changed_masters_with_the_ledger_marked() {
     }
 }
 
+/// The answer of a post whose readback fails lists the changed ledgers in the
+/// order the batch names them too. The saved Journal names `WR2 Sales` before
+/// `Cash`, so the two orders differ; the record keeps the order it was written
+/// in.
+#[tokio::test]
+async fn a_failed_readback_lists_the_changed_ledgers_in_the_order_the_batch_names_them() {
+    let replaced = replaced_once(
+        &replaced_once(
+            &catalogue(),
+            ">61c6de69-1748-461c-ad3f-162cb949df9f-0000001f</GUID>",
+            ">61c6de69-1748-461c-ad3f-162cb949df9f-000000ff</GUID>",
+        ),
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000d0</GUID>",
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000fe</GUID>",
+    );
+    // No readback is scripted, so the read after the post fails.
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(masters_moved_to(8)));
+    plans.extend(paired(replaced));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let _ = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert!(result.get("dispatch").is_none(), "{response}");
+    assert_eq!(
+        result["masters_after_post"]["ledgers"],
+        json!(["WR2 Sales", "Cash"]),
+        "{response}"
+    );
+    assert_eq!(
+        masters_check_of(&server, &line.batch_id)["ledgers"],
+        json!(["Cash", "WR2 Sales"]),
+        "{response}"
+    );
+}
+
 /// A voucher the book already holds that matches the saved batch's row by
 /// accounting fingerprint (date, type, ledgers, amounts, sides) but was posted by
 /// no batch of this journal: entered by hand, before the batch's pre-import mark.

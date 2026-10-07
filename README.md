@@ -27,8 +27,7 @@ Bridge is not made by, or affiliated with, Tally Solutions, and we have not run
 the two side by side. TallyPrime also has its own Bank Statement import, which
 takes statement files in the formats Tally lists for each bank.
 
-**Current release:**
-<!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,
+**Current release:** <!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,
 for Windows x64 and Apple Silicon Macs, as a Claude Desktop extension (an .mcpb
 file); it has not been run in other MCP clients. We check each release before
 we publish it: the release check confirms that each package launches, lists its
@@ -90,8 +89,10 @@ whose ledger now points to a different master.
   one across the internet. The Tally connection sends nothing to a ComplyEaze
   server.
 - **Your AI provider sees what the assistant reads**, just as it sees the
-  rest of the conversation: company names, party names and amounts. You can
-  mask party names or drop narration. Amounts are always sent. See
+  rest of the conversation: company names, party names, amounts and, when it
+  asks for them, details such as PAN, GSTIN and bank account numbers. You can
+  mask party names or drop narration. Neither setting hides amounts, company
+  names, or PAN and GSTIN numbers. See
   *Before you use it with client data* below.
 - **Posting is off by default in the extension.** If you installed an
   earlier version, check the setting: an earlier default may still be saved as
@@ -310,10 +311,12 @@ See [Security and privacy](./docs/security-and-privacy.md).
 
 **One thing to understand before you use it.** When you ask an AI assistant for
 financial data through Bridge, the assistant's provider sees what it reads —
-company names, party names and amounts. That is a property of using a hosted
+company names, party names, amounts and, when it asks for them, details such as
+PAN, GSTIN and bank account numbers. That is a property of using a hosted
 assistant, not of Bridge. Bridge can mask party names or drop narration first
-(`BRIDGE_AGENT_REDACTION`), but **neither setting removes amounts** — figures
-always go with the answer. Decide this deliberately for client data.
+(`BRIDGE_AGENT_REDACTION`), but **neither setting removes amounts, company
+names, or PAN and GSTIN numbers** — figures always go with the answer. Decide this
+deliberately for client data.
 
 ## What it costs
 
@@ -405,10 +408,12 @@ server from source, follow the [source MCP setup](./docs/agent/README.md).
 
 Before requesting financial data through an MCP client, the client may send the selected
 Tally result to its AI provider, including company
-identity, party or open-bill details, and amounts. Source installations default
+identity, party or open-bill details, amounts and, when asked for, details such
+as PAN, GSTIN and bank account numbers. Source installations default
 to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties` or `drop_narration`
 before launch when that better fits the workflow. These settings mask party
-names or drop narration; they do not remove amounts. The package installation
+names or drop narration; they do not remove amounts, company names, or PAN and
+GSTIN numbers. The package installation
 settings expose the same choices.
 
 For a first result, run `tally_status` to check that TallyPrime and its Licensed

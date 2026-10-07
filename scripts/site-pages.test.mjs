@@ -59,7 +59,8 @@ test("every reference on a page is a file the site ships or the deploy writes, o
       if (ref.startsWith("#")) continue;
       // a page may name its own address as its canonical one, and no other address on this site's origin
       if (tag.startsWith('<link rel="canonical"')) {
-        assert.equal(ref, siteOrigin + (name === "index.html" ? "" : name), `${name}: its canonical address is not its own`);
+        // a template is read in place of the page the deploy writes from it (changelog.template.html -> changelog.html)
+        assert.equal(ref, siteOrigin + (name === "index.html" ? "" : name.replace("changelog.template.html", "changelog.html")), `${name}: its canonical address is not its own`);
         continue;
       }
       if (/^[a-z][a-z0-9+.-]*:/i.test(ref) || ref.startsWith("//")) {

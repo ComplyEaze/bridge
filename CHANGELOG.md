@@ -62,7 +62,13 @@ These changes are in source and not yet in a published build.
   could not before. The cost is one more read of the book's vouchers: six more
   requests to Tally on every call that counts (a `vouchers` call on a small book
   goes from 16 to 22 requests, `voucher_presence` from 28 to 34); the added time
-  has not been measured. A voucher created, altered or deleted between the
+  was measured on windows of one voucher, on debug builds, at 0.5 to 2 seconds a
+  call (one run of the day and week calls, three of the presence call), and not
+  on a larger book. `absent` still needs a window proven complete, nothing
+  resembling the proposal, the voucher number of a `manual` type, and a party that was
+  supplied and compared completely: a proposal with no party (a Journal), no manual
+  number, or a party whose comparison was cut short reads `possibly_present` with its
+  reason, however complete the window. A voucher created, altered or deleted between the
   count and the read now refuses a small book as `voucher_window_part_not_admitted`
   (cause `part_census_mismatch`), as a large one always did. The Ledger Entries
   screen reads through `vouchers`' window read, so it counts too and meets the

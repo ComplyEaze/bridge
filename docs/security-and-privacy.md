@@ -1,17 +1,18 @@
 # Security and privacy
 
 This page answers, in one place, what a CA or a firm's IT person asks before
-installing ComplyEaze Bridge next to client books. It describes release 0.4.1
-as read at that release; release 0.4.2, the latest, followed on 3 October 2026, and
-this page was not read again against its tag (the 0.4.2 notes list what changed). It
-was written from a reading of the source code of release 0.4.0, at the tag `mcp-v0.4.0`, on 2 October 2026, and updated
-for 0.4.1 only where the changes between the two tags change an answer on this
-page: the sections on network destinations (3) and on what it reads and
-installs (7). The sentences in those sections that name release 0.4.0 and the
-other answers were not read again against the 0.4.1 tag. It
-was not tested on a running system (see the README's list of what has been
-run). Unless a line says otherwise, each answer rests on reading that source.
-Anything not measured on a running system is marked **Not measured**.
+installing ComplyEaze Bridge next to client books. It describes the source that
+becomes release 0.5.0, read at commit `eb6983ffe` (no 0.5.0 tag exists yet). It
+was written from a reading of the source code of release 0.4.0 (tag
+`mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
+again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
+commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again,
+and neither were the sentences in the other sections that describe 0.4.0 or
+0.4.1 only as history. Earlier releases differ: 0.4.0 to 0.4.2 ask you to
+accept Terms version 2026-10, not 2026-10.1. It was not tested on a running
+system (see the README's list of what has been run). Unless a line says
+otherwise, each answer rests on reading that source. Anything not measured on a
+running system is marked **Not measured**.
 
 To report a vulnerability, see [SECURITY.md](../SECURITY.md).
 
@@ -19,16 +20,19 @@ To report a vulnerability, see [SECURITY.md](../SECURITY.md).
 
 It reads from the TallyPrime running on your own computer, over Tally's own
 local gateway: the loaded companies, ledger masters, other masters as lists
-(voucher types, godowns, units, stock groups, ledger groups), the trial
-balance, Profit and Loss and Balance Sheet, vouchers in a date window,
-outstanding receivables and payables with ageing, ledger movement, a purchase
-register of the tax the books record, and closing stock values per item. It
-also checks ledger names against the book, says which of a list of proposed
-vouchers are already in the book, and can read a password-protected bank
-statement PDF you name (SBI, HDFC or Union Bank of India) to propose vouchers.
-Several of these reads refuse some books rather than answer in part; the
-[changelog](../CHANGELOG.md) lists the limits. The full tool list is in the
-[MCP guide](./agent/README.md).
+(voucher types, godowns, units, stock groups, ledger groups), the trial balance,
+Profit and Loss and Balance Sheet, vouchers in a date window, outstanding
+receivables and payables with ageing, ledger movement, a purchase register of
+the tax the books record, and closing stock values per item. It also reads
+Tally's own Cash Flow for whole months (the month-wise movement of the cash and
+bank ledgers), and can search the vouchers it has read and add them up by
+ledger, month, voucher type or group; adding up by group also reads the ledger
+list and the group list. It also checks ledger names against the book, says
+which of a list of proposed vouchers are already in the book, and can read a
+password-protected bank statement PDF you name (SBI, HDFC or Union Bank of
+India) to propose vouchers. Several of these reads refuse some books rather than
+answer in part; the [changelog](../CHANGELOG.md) lists the limits. The full tool
+list is in the [MCP guide](./agent/README.md).
 
 Four tools read nothing from Tally. They read ComplyEaze Bridge's own files on
 this computer: its receipt log, the evidence it kept for a read, the voucher
@@ -41,8 +45,10 @@ Bridge tool can approve it. The server program also has a setting for posting 2
 to 50 vouchers of one saved batch after one approval; the published extension
 neither offers nor sets it, so it applies only if someone sets it by hand.
 
-Every tool refuses until the Terms of Use are accepted in the extension
-settings (section 4).
+Every tool refuses until the Terms of Use (version 2026-10.1 in 0.5.0) are
+accepted in the extension settings. After installing 0.5.0 that setting is off
+until you accept the new version (section 4). A server started by hand with
+`BRIDGE_TERMS_ACCEPTED` set to `true` or `1` is not asked.
 
 ## 2. Does anything leave my computer?
 
@@ -57,7 +63,11 @@ settings (section 4).
   dates, narrations, references and GSTINs and, when the assistant reads ledger
   details, PAN, bank account numbers, IFSC, MSME or Udyam registration numbers,
   email, phone and address, and, when it builds a voucher file, that file's
-  local path (which can include your computer user name), to Claude Desktop.
+  local path (which can include your computer user name), month-by-month cash
+  and bank movement, totals by ledger, month, voucher type or group, a voucher's reference
+  date, the bill-wise ledgers waiting for your On Account approval with their
+  row dates and amounts, and counts and seconds describing how long a voucher
+  read took (no book data), to Claude Desktop.
   Claude Desktop is the host, and it sends tool results to the AI provider you
   use as part of the conversation; that is the host's behaviour, which this
   repository cannot show. ComplyEaze Bridge can shorten party and ledger names
@@ -70,16 +80,53 @@ settings (section 4).
   - `mask_parties` shortens, to their first two and last two characters, the
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase
-    register and bank-statement proposals), stock item names and their
-    parents, godown and stock-group names and their parents, and three fields
-    of a ledger's details: the name on the PAN, the bank account holder's name
-    and the bank details. A name of four characters or fewer is replaced
-    by “…”. It does not mask amounts, company names, a ledger's parent
+    register, bank-statement proposals, voucher totals by ledger, the ledgers
+    listed under a group total, the ledger named when a group total cannot be
+    given, the list of bill-wise ledgers waiting for approval, the suspense ledger
+    named in a build warning and the ledger in a refused cash-or-bank row), stock
+    item names and their parents, godown and stock-group names and their parents,
+    and three fields of a ledger's details: the name on the PAN, the bank account
+    holder's name and the bank details. A name of four characters or fewer is
+    replaced by “…”. The spelling a ledger's vouchers carry, which is returned
+    beside its name when the two differ, is left out. It does not mask amounts, company names, the names of
+    groups in a group total (shown as the book has them), a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
-    addresses or IFSCs, and a name written inside a narration or reference
-    stays as it is.
-  - `drop_narration` removes narrations and nothing else.
+    addresses or IFSCs, and a name written inside a narration or reference stays
+    as it is.
+  - `drop_narration` removes narrations, and a search of vouchers by a phrase of
+    their narration is refused under it. Apart from the error text noted below,
+    it removes nothing else.
+  - **What the new reads in 0.5.0 send, under each setting.** Under `none`
+    everything below is sent as read.
+    - Cash Flow sends month names, each month's amounts and the net total, and
+      only when the net total ties to the trial balance. When the two differ it
+      sends the two net figures and counts of ledgers instead; in its other
+      refusals it sends at most a count of ledgers. It sends no ledger or party
+      name on any outcome. The only text from the book is the company name, its
+      identifier, company number and books-from date, and the currency.
+      `mask_parties` has nothing to shorten in it, and it holds no narrations.
+    - Voucher search sends the same voucher fields as the vouchers read, with
+      names and narrations treated as that read treats them under each setting.
+    - A summary by ledger, month or voucher type sends the totals and counts,
+      and the voucher numbers, dates, types and Tally identifiers of up to five
+      of the vouchers behind each total. Ledger names in it are shortened under
+      `mask_parties`.
+    - A summary by group sends group names as the book has them under every
+      setting; the ledgers listed under a group total, and the ledger named when
+      a group total cannot be given, are shortened under `mask_parties`.
+    - A voucher's reference date (the `reference_date` field) is a date, the
+      same under every setting.
+    - The list of bill-wise ledgers waiting for your approval sends each
+      ledger's name (shortened under `mask_parties`), the date, voucher type,
+      side and amount of each of its rows with its transaction label, its totals
+      and row count, and a 64-character fingerprint (a short code made from that
+      ledger's rows, the batch and the company). The approved-party list in the
+      build result is shortened the same way.
+    - The note on how long a voucher read took holds counts and seconds, and no
+      book data. Cash Flow, like the trial balance and the two statements, also
+      sends a short summary in words naming the company and the period; the
+      trial balance's also counts its rows.
   - Either setting also leaves out the text of an error Tally returned for a
     line. Any other value stops the extension from starting.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
@@ -96,11 +143,12 @@ settings (section 4).
   transport. It accepts only a loopback address (any `127.x.x.x` address, or
   `::1`) or the name `localhost`, which it maps to `127.0.0.1` without a DNS
   lookup. It refuses anything else, uses no proxy and follows no redirects.
-- In the program code of release 0.4.0 no `complyeaze.com` address remains
+- In the program code of release 0.5.0 no `complyeaze.com` address remains
   outside a test, and the Tally transport is the only code that depends on an
   HTTP client library outside tests. The extension's manifest links to the
-  privacy and terms pages on `bridge.complyeaze.com`; the program does not
-  contact them.
+  privacy and terms pages and the home page on `bridge.complyeaze.com`, and to
+  the project's repository, issues and install guide on `github.com`; the
+  program does not contact any of them.
 - CI checks this in two ways. The
   [egress check](../scripts/check-tally-egress-boundary.mjs) limits which
   source files and crates may hold network code. A second check runs the
@@ -180,18 +228,27 @@ settings (section 4).
   holds no row values.
 - **A terms record** (`terms-acceptance.jsonl`): the extension asks you to
   accept the ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings,
-  and every tool refuses with `terms_not_accepted` until you do. When the
-  server starts with the setting on, it appends a line with the terms version,
-  the time, and that the acceptance came through the setting (once per
-  version; two servers starting together can each add a line). If that line
-  cannot be written, every tool refuses with `terms_record_unavailable`. The
-  line is a local record that the setting was on, not proof of who accepted or
-  of when the box was ticked; it is not sent anywhere.
+  and every tool refuses with `terms_not_accepted` until you do. When the server
+  starts with the setting on, it appends a line with the terms version, the
+  time, and that the acceptance came through the setting (once per version; two
+  servers starting together can each add a line). If that line cannot be
+  written, every tool refuses with `terms_record_unavailable`. The line is a
+  local record that the setting was on, not proof of who accepted or of when the
+  box was ticked; it is not sent anywhere. Accepting 0.5.0 adds a second line,
+  for version 2026-10.1, beside any 2026-10 line from 0.4.0 to 0.4.2.
 - **An import journal** (`agent-import-ledger.jsonl`) and saved batch files
   (`imports/`): the vouchers ComplyEaze Bridge prepared or posted, with their
-  dates, narrations, amounts and ledgers, the proof-of-post files that hold
-  what Tally read back, and a short note when an approval you gave was
-  dropped without being used.
+  dates, narrations, amounts and ledgers, and for each saved batch: each ledger
+  it names with the identifier (GUID) Tally gave it, the ledgers named as
+  Cash-in-Hand for a bank cash answer (with the voucher label), and the
+  bill-wise ledgers you approved to receive entries On Account (with the
+  64-character fingerprint your approval matched when the batch was built, a
+  short code made from that party's rows, the batch and the company; it is kept as a record
+  and is not checked again when the batch is posted). These records hold ledger
+  names and fingerprints, and no new amounts, PAN, bank account numbers or
+  contact details. It also holds the proof-of-post files that hold what Tally
+  read back, and a short note when an approval you gave was dropped without
+  being used.
 - **Bank-statement proposals** (`bank-statements/`): every row of a statement
   you asked it to read, with date, amount, bank reference and narration.
 - **Lock files** with no content, a lock folder (`native-dispatch-leases/`,
@@ -219,7 +276,8 @@ any batch in them has been posted or is waiting to be verified: they are the
 record ComplyEaze Bridge uses to reconcile a post, and without them
 `verify_import` cannot find the batch. The journal is also how it remembers
 which batches and which bank-statement rows it has already sent to Tally, so
-that it can refuse to send one twice. The
+that it can refuse to send one twice. Once 0.5.0 has built a batch in this
+folder, do not run 0.4.2 or earlier over it: they refuse to post that batch. The
 [Privacy Policy](./legal/privacy.md) (section 7) describes archiving the whole
 folder instead of deleting it, and what ComplyEaze Bridge no longer remembers
 afterwards. **Not measured:** what else breaks if
@@ -256,15 +314,26 @@ separator (Windows) or a single slash (a Mac) (section 3); on macOS it refuses a
 password file that other users can read. Its one extra process is a
 second copy of itself that shows the approval window.
 
-The approval window is a system dialog. On macOS it is titled "ComplyEaze
-Bridge — approve one voucher" with the buttons Cancel and Post voucher. On
-Windows it is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and
-Cancel, and No is the default. Only the positive button approves. The window
-closes by itself after two minutes without an answer, and an approval that is
-not used within fifteen minutes, or before the program restarts, is dropped.
-From 0.4.1 a clicked approval is also withdrawn when the post is refused
-before its checks begin (for example when the batch is not found or the
-journal is busy); a refusal inside the checks already withdrew it.
+The approval window is a system dialog. On macOS it is titled "ComplyEaze Bridge
+— approve one voucher" with the buttons Cancel and Post voucher. On Windows it
+is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel, and
+No is the default. Only the positive button approves. The window closes by
+itself after two minutes without an answer, and an approval that is not used
+within fifteen minutes, or before the program restarts, is dropped. From 0.4.1 a
+clicked approval is also withdrawn when the post is refused before its checks
+begin (for example when the batch is not found or the journal is busy); a
+refusal inside the checks already withdrew it. In 0.5.0 a window for one voucher
+puts "On Account" before the name of each ledger you approved for it and shows
+the voucher's own reference and narration as its last two lines; if they hold
+characters it cannot show safely, or do not fit, it refuses. A window for a
+batch of up to ten vouchers lists each on one line (type, date, amount, ledger
+and up to 40 characters of its narration, with no reference) and marks the
+approved ledgers On Account on its totals lines. A batch of more than ten
+vouchers, or whose lines cannot be shown safely or do not fit, shows its totals
+only, with a line saying why, and still asks for your approval, unless a ledger
+or company name cannot be shown safely or the totals do not fit, when it
+refuses. An approval also lapses when Tally's port is busy before anything is
+sent, and you are asked again.
 
 The window covers only ComplyEaze Bridge's own tools. Another Tally connector in
 the same Claude Desktop that can change entries can do so without it.

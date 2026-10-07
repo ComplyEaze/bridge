@@ -441,6 +441,56 @@ async fn replay_note_day(prefix: &str) -> (Value, Value, Vec<String>) {
     replay_recorded(NOTE_DAYS, prefix, 118).await
 }
 
+/// A call recorded before a register counted a small book (#1029) sent no voucher census. The
+/// register now sends one, so the record is given the six legs of that read (company, census,
+/// status, census, status, company) just before the window's own. The census answer is the
+/// window's own recorded response, so the count is derived from the rows the call returned, not
+/// written by hand, and its request is the one the code renders for the call's company and
+/// dates. A record that already holds a census is returned unchanged. A test built on it checks
+/// the register's wiring for a small book, not that Tally's count agrees with its rows: the
+/// census is the call's own data, so only a live small-book run (#1029) can show that.
+fn with_census_a_small_book_now_sends(mut requests: Vec<Value>, arguments: &Value) -> Vec<Value> {
+    const STOCK_LAB_COMPANY: &str = "BRIDGE STOCK LAB";
+    let census_id = "Bridge Agent Voucher Census";
+    if requests
+        .iter()
+        .any(|request| request["request_id"] == census_id)
+    {
+        return requests;
+    }
+    let window = requests
+        .iter()
+        .position(|request| request["request_id"] == "Bridge Agent Vouchers")
+        .expect("the record holds a voucher window read");
+    let census_request = render_agent_voucher_census(
+        STOCK_LAB_COMPANY,
+        &tally_date(arguments["from"].as_str().unwrap()),
+        &tally_date(arguments["to"].as_str().unwrap()),
+        None,
+    )
+    .unwrap();
+    let mut census = requests[window].clone();
+    census["request_id"] = json!(census_id);
+    census["request_sha256"] = json!(sha256_hex(
+        &bridge_tally_protocol::encode_tally_xml_request_utf16le(&census_request)
+    ));
+    // The window's read opens with a company leg (`window - 1`) and its first body is followed
+    // by a status read (`window + 1`).
+    let company = requests[window - 1].clone();
+    let status = requests[window + 1].clone();
+    assert_eq!(status["method"], "GET");
+    let legs = [
+        company.clone(),
+        census.clone(),
+        status.clone(),
+        census,
+        status,
+        company,
+    ];
+    requests.splice(window - 1..window - 1, legs);
+    requests
+}
+
 /// Replays one recorded call (the files `<prefix>_sequence.json` and the responses it names, in
 /// `directory`) and returns the tool's response, the record and the requests that were not the
 /// recorded ones. `expected_requests` is what the call is known to have sent.
@@ -450,13 +500,14 @@ async fn replay_recorded(
     expected_requests: usize,
 ) -> (Value, Value, Vec<String>) {
     let sequence = recorded_json(directory, &format!("{prefix}_sequence.json"));
-    let requests = sequence["requests"].as_array().unwrap();
+    let recorded = sequence["requests"].as_array().unwrap();
     assert_eq!(
-        requests.len(),
+        recorded.len(),
         expected_requests,
         "the record lists every request of the call"
     );
     assert_eq!(sequence["requests_sent"], expected_requests);
+    let requests = with_census_a_small_book_now_sends(recorded.clone(), &sequence["arguments"]);
     let plans = requests
         .iter()
         .map(|request| {
@@ -484,7 +535,7 @@ async fn replay_recorded(
         "every recorded request was sent, no more"
     );
     let mut wrong = Vec::new();
-    for (position, (sent, recorded)) in observed.iter().zip(requests).enumerate() {
+    for (position, (sent, recorded)) in observed.iter().zip(&requests).enumerate() {
         let want = recorded["request_sha256"]
             .as_str()
             .unwrap_or_else(|| recorded_request_sha256(Kind::Status));
@@ -697,19 +748,19 @@ async fn a_taxed_sales_item_invoice_replays_through_the_sales_register_against_i
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["profile"], "agent_sales_register_v1");
-    // This call (96 requests) sent no voucher census, so nothing counted the window's rows:
-    // the label is the one `vouchers` gives the same window, `partial` for
-    // `nonempty_window_unqualified` (#1031), and the rows are returned as before. The live
-    // answer recorded below carries the older label; only its rows are compared.
-    assert_eq!(result["state"], "partial");
-    assert_eq!(result["reason"], "nonempty_window_unqualified");
+    // This call was recorded in 96 requests with no voucher census; a register now counts a
+    // small book too (#1029), so the replay adds the census's six legs (102 requests) and the
+    // window's voucher is admitted against it: `complete`, by the rule `vouchers` uses (#1031).
+    // The live answer recorded below carries the older label; only its rows are compared.
+    assert_eq!(result["state"], "complete");
+    assert!(result["reason"].is_null(), "{result}");
     assert_eq!(
-        response["structuredContent"]["evidence"]["state"], "partial",
+        response["structuredContent"]["evidence"]["state"], "complete",
         "{response}"
     );
-    assert_eq!(
-        response["structuredContent"]["evidence"]["reason_code"],
-        "nonempty_window_unqualified"
+    assert!(
+        response["structuredContent"]["evidence"]["reason_code"].is_null(),
+        "{response}"
     );
     assert_eq!(result["total"], 1);
     assert_eq!(result["vouchers_observed"], 1);

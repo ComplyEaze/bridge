@@ -567,19 +567,21 @@ mod through_the_tool {
         ]
     }
 
-    /// Identity, then the high-water pre-flight and the window, each read in
-    /// its company bracket. The window is the live capture; the rest frames it.
+    /// Identity, then the high-water pre-flight, the window's census (#1029)
+    /// and the window, each read in its company bracket. The window is the
+    /// live capture, and the census counts the same rows; the rest frames it.
     fn plans() -> Vec<ScenarioPlan> {
         let high_water = format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{COMPANY}</GUID><ALTVCHID>3</ALTVCHID><ALTMSTID>224</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>");
         let mut plans = vec![company(), status(), company(), status()];
-        for payload in [high_water, captured_window()] {
+        for payload in [high_water, captured_window(), captured_window()] {
             plans.extend(bracketed(payload));
         }
         plans
     }
 
-    /// The requests [`plans`] answers: identity, then two bracketed reads.
-    const WINDOW_REQUESTS: usize = 4 + 2 * 6;
+    /// The requests [`plans`] answers: identity, then three bracketed reads
+    /// (marks, census, window).
+    const WINDOW_REQUESTS: usize = 4 + 3 * 6;
 
     async fn call(filter: Value) -> Value {
         call_with(filter, false).await.0
@@ -829,7 +831,8 @@ mod through_the_tool {
         window.replace_range(start..end, &voucher);
         let high_water = format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{COMPANY}</GUID><ALTVCHID>3</ALTVCHID><ALTMSTID>224</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>");
         let mut plans = vec![company(), status(), company(), status()];
-        for payload in [high_water, window] {
+        // Marks, then the census and the window, both of the same rows.
+        for payload in [high_water, window.clone(), window] {
             plans.extend(bracketed(payload));
         }
         let (response, _simulator) = call_on(plans, json!({"voucher_class": "Purchase"})).await;

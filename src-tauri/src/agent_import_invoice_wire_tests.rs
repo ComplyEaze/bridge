@@ -296,3 +296,177 @@ fn the_company_state_is_taken_from_the_row_with_the_verified_guid() {
         Err("invoice_company_row_repeated")
     );
 }
+
+/// One of the rehearsal's captured answers (see the PROVENANCE table beside
+/// the fixtures): Tally's own bytes, decoded.
+macro_rules! rehearsal {
+    ($name:literal) => {
+        String::from_utf16(
+            &include_bytes!(concat!(
+                "../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-",
+                $name,
+                ".utf16le.xml"
+            ))
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+}
+
+/// The voucher types as the lab book answered on 7 Oct 2026: the type keyed
+/// for the rehearsal resolves, the predefined Sales type (an Automatic series)
+/// does not, and two raw control characters in a class name do not stop the
+/// read.
+#[test]
+fn the_captured_voucher_types_resolve_the_manual_type_and_refuse_the_automatic_one() {
+    let xml = rehearsal!("voucher-types");
+    assert_eq!(xml.matches('\u{5}').count(), 2);
+    let types = parse_voucher_types(&xml).unwrap();
+    assert_eq!(types.len(), 25);
+    assert_eq!(
+        resolve_voucher_type(&types, "Sales Manual", "Sales"),
+        Ok(ResolvedVoucherType {
+            guid: "ae1490be-52c5-4544-9ffc-4b7da85f9797-00000106".into(),
+            class: "Sales".into(),
+        })
+    );
+    let manual = types.iter().find(|row| row.name == "Sales Manual").unwrap();
+    assert_eq!(
+        (manual.parent.as_str(), manual.reserved_name.as_str()),
+        ("Sales", "")
+    );
+    assert_eq!(
+        manual.series,
+        [("Default".to_string(), "Manual".to_string())]
+    );
+    assert_eq!(
+        resolve_voucher_type(&types, "Sales", "Sales"),
+        Err("invoice_voucher_type_numbering_not_manual")
+    );
+    assert_eq!(
+        resolve_voucher_type(&types, "Sales Manual", "Purchase"),
+        Err("invoice_voucher_type_wrong_class")
+    );
+}
+
+/// The duplicate-number read's three captured answers: a number one invoice
+/// carries, a number nothing carries (a collection with no row, which is an
+/// answer), and a number a Purchase and a Sales voucher share.
+#[test]
+fn the_captured_number_answers_count_only_sales_class_vouchers() {
+    for (name, vouchers, sales) in [
+        ("number-known", 1, 1),
+        ("number-absent", 0, 0),
+        ("number-shared", 2, 1),
+    ] {
+        let xml = match name {
+            "number-known" => rehearsal!("number-known"),
+            "number-absent" => rehearsal!("number-absent"),
+            _ => rehearsal!("number-shared"),
+        };
+        assert_eq!(count_vouchers(&xml), Ok(vouchers), "{name}");
+        assert_eq!(count_sales_vouchers(&xml), Ok(sales), "{name}");
+    }
+}
+
+/// The read-back of the two invoices ComplyEaze Bridge posted and of one keyed
+/// by hand, as Tally answered: every field the comparison reads comes back on
+/// a posted invoice; a keyed one in this book carries no reference.
+#[test]
+fn the_captured_read_backs_carry_every_field_of_a_posted_invoice() {
+    let field = |read: &ReadInvoice, key: &str| read.fields.get(key).cloned();
+    let Ok(Readback::One(registered)) =
+        parse_invoice_readback(&rehearsal!("readback-posted-registered"))
+    else {
+        panic!("one voucher");
+    };
+    for (key, value) in [
+        ("DATE", "20260311"),
+        ("VOUCHERNUMBER", "TG/25-26/002"),
+        ("VOUCHERTYPENAME", "Sales Manual"),
+        ("REFERENCE", "TG/25-26/002"),
+        ("REFERENCEDATE", "20260311"),
+        ("PARTYLEDGERNAME", "TG Buyer Regular RJ"),
+        ("PARTYGSTIN", "08ZZZZZ0000Z1ZQ"),
+        ("STATENAME", "Rajasthan"),
+        ("PLACEOFSUPPLY", "Rajasthan"),
+        ("GSTREGISTRATIONTYPE", "Regular"),
+        ("ISINVOICE", "Yes"),
+        ("ISCANCELLED", "No"),
+        ("ISOPTIONAL", "No"),
+        ("GUID", "ae1490be-52c5-4544-9ffc-4b7da85f9797-0000003e"),
+        ("ALTERID", "64"),
+    ] {
+        assert_eq!(field(&registered, key).as_deref(), Some(value), "{key}");
+    }
+    let legs = registered
+        .legs
+        .iter()
+        .map(|leg| {
+            (
+                leg.ledger.as_str(),
+                leg.amount.as_str(),
+                leg.allocations.len(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        legs,
+        [
+            ("TG Buyer Regular RJ", "-1457.00", 1),
+            ("Sales - Goods", "1234.50", 0),
+            ("Output CGST", "111.11", 0),
+            ("Output SGST", "111.11", 0),
+            ("Round Off", "0.28", 0),
+        ]
+    );
+    assert_eq!(
+        registered.legs[0].allocations,
+        [(
+            Some("TG/25-26/002".to_string()),
+            Some("New Ref".to_string()),
+            "-1457.00".to_string()
+        )]
+    );
+
+    let Ok(Readback::One(unregistered)) =
+        parse_invoice_readback(&rehearsal!("readback-posted-unregistered"))
+    else {
+        panic!("one voucher");
+    };
+    assert_eq!(
+        field(&unregistered, "VOUCHERNUMBER").as_deref(),
+        Some("TG/25-26/003")
+    );
+    assert_eq!(
+        field(&unregistered, "GSTREGISTRATIONTYPE").as_deref(),
+        Some("Unregistered/Consumer")
+    );
+    assert_eq!(field(&unregistered, "PARTYGSTIN"), None);
+    assert_eq!(field(&unregistered, "ALTERID").as_deref(), Some("65"));
+    assert_eq!(unregistered.legs.len(), 4);
+    assert!(unregistered
+        .legs
+        .iter()
+        .all(|leg| leg.allocations.is_empty()));
+
+    let Ok(Readback::One(keyed)) = parse_invoice_readback(&rehearsal!("readback-keyed-registered"))
+    else {
+        panic!("one voucher");
+    };
+    assert_eq!(
+        field(&keyed, "VOUCHERNUMBER").as_deref(),
+        Some("TG/25-26/001")
+    );
+    assert_eq!(
+        field(&keyed, "PARTYGSTIN").as_deref(),
+        Some("08ZZZZZ0000Z1ZQ")
+    );
+    assert_eq!(
+        (field(&keyed, "REFERENCE"), field(&keyed, "REFERENCEDATE")),
+        (None, None)
+    );
+    assert_eq!(keyed.legs.len(), 4);
+}

@@ -4,11 +4,13 @@
 //! The company list, the marks, the book extent, the currencies, the ledger
 //! compliance listing, the paired listing and the groups are Tally's own bytes
 //! from one read of the disposable GST lab book (the `register-e2e` set; its
-//! PROVENANCE table is beside the fixtures). The empty collection is a captured
-//! one. The two answers only an invoice asks for and no capture is committed
-//! for, the voucher types and the company's state, are HAND-WRITTEN below:
-//! regression doubles that prove the order and the plumbing of the reads, not
-//! what Tally answers. The rehearsal's captures replace them.
+//! PROVENANCE table is beside the fixtures). The voucher types and the number
+//! read's answers are Tally's own bytes from the Sales rehearsal on the same
+//! book (the `sales-rehearsal` set, 7 Oct 2026). Two things are not Tally's
+//! bytes and say so: the company's state (HAND-WRITTEN below: the capture of
+//! that read names every company loaded in that Tally) and the bill-wise
+//! catalogue row. The ledger listing predates the rehearsal's two customers,
+//! so no case here is admitted.
 use super::*;
 
 const LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
@@ -44,17 +46,16 @@ fn company_list() -> String {
     utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-extent.utf16le.xml"))
 }
 
-/// HAND-WRITTEN: the predefined Sales type with an Automatic series, and a
-/// user type under it with one Manual series (the shape of the lab's answer).
+/// One of the rehearsal's captured answers (the `sales-rehearsal` set).
+fn rehearsal(bytes: &[u8]) -> String {
+    utf16(bytes)
+}
+
+/// The book's voucher types as Tally answered on 7 Oct 2026: the predefined
+/// Sales type with an Automatic series, and the type keyed for the rehearsal,
+/// `Sales Manual`, with one Manual series.
 fn voucher_types() -> String {
-    format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO><VOUCHERTYPE>0</VOUCHERTYPE></CMPINFO></DESC><DATA><COLLECTION ISMODIFY=\"No\">\
-         <VOUCHERTYPE NAME=\"Sales\" RESERVEDNAME=\"Sales\"><GUID>{LAB_GUID}-0000002c</GUID><PARENT>Sales</PARENT>\
-         <VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Automatic</NUMBERINGMETHOD></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>\
-         <VOUCHERTYPE NAME=\"Sales Manual\" RESERVEDNAME=\"\"><GUID>{LAB_GUID}-00000131</GUID><PARENT>Sales</PARENT>\
-         <VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>\
-         </COLLECTION></DATA></BODY></ENVELOPE>"
-    )
+    rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-voucher-types.utf16le.xml"))
 }
 
 /// HAND-WRITTEN: one row for the company, chosen by GUID, with its state.
@@ -81,7 +82,7 @@ fn plan(letter: char) -> ScenarioPlan {
         'P' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-ledgers-paired.utf16le.xml")),
         'g' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-groups.utf16le.xml")),
         'T' => voucher_types(),
-        'N' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/native-empty-collection.utf16le.xml")),
+        'N' => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml")),
         'C' => company_state(),
         other => panic!("unknown kind {other}"),
     };
@@ -114,17 +115,12 @@ fn catalogue(ledgers: &[(&str, bool)]) -> bridge_tally_protocol::StandardLedgerC
     .unwrap()
 }
 
-/// HAND-WRITTEN: the number read's answer when one Sales voucher carries the
-/// number.
+/// The number read's captured answer when one Sales voucher carries the
+/// number (the rehearsal's hand-keyed invoice).
 fn number_in_use() -> ScenarioPlan {
-    ScenarioPlan::new(Fixture::SyntheticXml(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
-         <VOUCHER><VOUCHERNUMBER>TG/25-26/900</VOUCHERNUMBER><BRIDGEVCHISSALES>Yes</BRIDGEVCHISSALES></VOUCHER>\
-         </COLLECTION></DATA></BODY></ENVELOPE>"
-            .to_string(),
-    ))
-    .with_encoding(WireEncoding::Utf16LeNoBom)
-    .with_framing(ResponseFraming::ContentLength)
+    ScenarioPlan::new(Fixture::SyntheticXml(rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-known.utf16le.xml"))))
+        .with_encoding(WireEncoding::Utf16LeNoBom)
+        .with_framing(ResponseFraming::ContentLength)
 }
 
 /// A server over a simulator that answers `plans` in order, with the lab
@@ -206,7 +202,7 @@ fn invoice_to(party: &str, filed: &str, observed: bool) -> ImportVoucher {
     });
     if observed {
         voucher["invoice"]["observed"] = json!({
-            "voucher_type_guid": format!("{LAB_GUID}-00000131"),
+            "voucher_type_guid": format!("{LAB_GUID}-00000106"),
             "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
             "party_bill_wise":false, "company_state":"Rajasthan"
         });

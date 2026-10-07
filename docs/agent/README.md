@@ -652,7 +652,9 @@ ledgers in a separate census of 13 books, not reproducible from this repository)
 `outstandings` party detail either spelling is exact, a spelling that is two ledgers' is `ledger_ambiguous`,
 and `ledger_match` shows the ledger's own name (with `ledger_row_spelling` when its vouchers spell it
 differently), while the voucher filter and the trail still use the spelling the vouchers carry (#1085). What
-the outstandings report carries for such a ledger is not measured. `ledger_movement` takes its names from
+the outstandings report carries for such a ledger is not measured, so a party detail that finds no bill or
+no unallocated row for a ledger with two spellings carries `report_spelling: not_established`: it may mean
+the report names the ledger differently. `ledger_movement` takes its names from
 another report and is unchanged. Otherwise it
 refuses as `ledger_not_found`, or as `ledger_ambiguous` when several ledgers differ from it only in case
 or whitespace (such as a twin with a trailing line break, §9.4e). Every answer for a named ledger carries `ledger_match`:

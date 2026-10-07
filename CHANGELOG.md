@@ -28,7 +28,9 @@ These changes are in source and not yet in a published build.
   unchanged. Not measured: that Tally accepts the voucher-row spelling when it
   differs from the ledger's own name, what a voucher row carries for such a ledger
   on a book other than the one measured, and what the outstandings report that the
-  trail reads carries for it; that the first name list is the primary language (#1085).
+  trail reads carries for it, so a party detail that finds no bill or no unallocated
+  row for such a ledger says `report_spelling: not_established`; that the first name
+  list is the primary language (#1085).
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
   `amount`), and can add a window up by ledger, month or voucher type

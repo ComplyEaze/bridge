@@ -1164,11 +1164,12 @@ fn captured_utf16le(bytes: &[u8]) -> String {
     .unwrap()
 }
 
-/// `reference_date` (#1257), checked on derived shapes: the captured three-voucher fixture was taken before
-/// the request named REFERENCEDATE, so these injected elements are not evidence of what Tally returns under
-/// this request. They pin the parse of two derived shapes (a populated `YYYYMMDD` element, and an empty one,
-/// derived from observations that are not committed; no capture under this request records them yet) and the
-/// refusal of a value that is not a date.
+/// `reference_date` (#1257), checked on injected shapes: the captured three-voucher fixture was taken before
+/// the request named REFERENCEDATE, so these elements are derived. The shapes Tally sent under this request
+/// (`TYPE="Date"`, empty or `YYYYMMDD`) are tested on captured rows in
+/// `the_captured_rows_give_a_reference_date_only_where_tally_sent_one`; the forms injected here that no capture
+/// shows (no `TYPE` attribute, a self-closing element, a padded value) are accepted by the parse but not
+/// observed. The test also pins the refusal of a value that is not a date.
 #[test]
 fn reference_date_is_optional_a_date_when_present_and_refused_otherwise() {
     let captured = captured_native_vouchers();
@@ -1597,9 +1598,12 @@ fn the_captured_empty_rate_composite_withholds_too() {
 
 #[test]
 fn the_captured_request_is_what_vouchers_renders_today() {
+    // The forex capture was taken before the read named REFERENCEDATE; the one word the read has
+    // added since is captured in `vouchers-reference-date-20260420.request.xml` (tested below).
     let request = include_str!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-composite-20260915.request.xml"
-    );
+    )
+    .replacen("PARTYGSTIN</FETCH>", "PARTYGSTIN,REFERENCEDATE</FETCH>", 1);
     assert_eq!(
         render_agent_vouchers(
             "BRIDGE CORPUS FOREX",
@@ -1610,6 +1614,54 @@ fn the_captured_request_is_what_vouchers_renders_today() {
         .unwrap(),
         request
     );
+}
+
+const SHAPE_LAB_COMPANY_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+
+/// The request the read sends with `REFERENCEDATE` named, as a live read sent it (#1257): captured, not
+/// rendered by hand. Fail-first: the read without the word renders another request.
+#[test]
+fn the_captured_reference_date_request_is_what_vouchers_renders_today() {
+    let request = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-reference-date-20260420.request.xml"
+    );
+    assert_eq!(
+        render_agent_vouchers(
+            "BRIDGE SHAPE LAB",
+            &tally_date("20260420"),
+            &tally_date("20260420"),
+            None
+        )
+        .unwrap(),
+        request
+    );
+    assert!(request.contains("PARTYGSTIN,REFERENCEDATE</FETCH>"));
+}
+
+/// Two voucher rows of a live read of a synthetic book with `REFERENCEDATE` named (#1257): the first has the
+/// element empty (`TYPE="Date"`), the second has it populated with the voucher's own date. Fail-first: before
+/// the element was allow-listed and parsed, neither row carried `reference_date`.
+#[test]
+fn the_captured_rows_give_a_reference_date_only_where_tally_sent_one() {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-reference-date-year-rows.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    assert!(xml.contains("<REFERENCEDATE TYPE=\"Date\"></REFERENCEDATE>"));
+    assert!(xml.contains("<REFERENCEDATE TYPE=\"Date\">20250401</REFERENCEDATE>"));
+    let rows = parse_agent_rows(&xml, SHAPE_LAB_COMPANY_GUID).unwrap();
+    assert_eq!(rows.len(), 2);
+    assert!(rows[0].get("reference_date").is_none());
+    assert!(rows[0].get("reference").is_none());
+    assert_eq!(rows[1]["reference_date"], "20250401");
+    assert_eq!(rows[1]["reference"], "SHAPELAB-MANUAL-1");
+    assert_eq!(rows[1]["date"], "20250401");
 }
 
 /// Synthetic mutation: the captured forex voucher with the party entry's own

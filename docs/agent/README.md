@@ -740,7 +740,8 @@ under Duties & Taxes (#969), and says per entry what the books record. Nothing i
 posted and nothing is inferred. It is a register of the books, not a GST return:
 it does not decide input tax credit eligibility or blocked credit, matches
 nothing against GSTR-2B or any portal, checks no GSTIN (`party_gstin` is returned
-only when the voucher carries one), does not return `REFERENCEDATE` yet, does not
+only when the voucher carries one), returns `reference_date` only when the voucher
+carries one (as Tally sent it, `YYYYMMDD`; measured on one synthetic book, not on a sale), does not
 classify an item invoice's purchase as taxable, and never sums tax across heads
 or vouchers.
 
@@ -781,8 +782,9 @@ or vouchers.
   is no direction field and nothing is called input credit.
 - **Other fields.** `reference`, `party_gstin`, `is_invoice` and `post_dated`
   follow `vouchers` (absent means not observed). Cancelled, optional and
-  post-dated vouchers are returned flagged, not excluded. `REFERENCEDATE` is not
-  returned yet.
+  post-dated vouchers are returned flagged, not excluded. `reference_date` (the
+  voucher's `REFERENCEDATE`, `YYYYMMDD`) is present only where Tally sent one; one synthetic book
+  was read (protocol reference 8.2f), a sale was not.
 - **What `state` means.** The response `state` follows the rule `vouchers` and
   `voucher_presence` use (#985, #1031): a non-empty window is `complete` only when
   every voucher read was checked against a separate count of the window (a census,
@@ -811,7 +813,7 @@ or vouchers.
   `register_ledger_currency_excluded`.
 - **Not measured.** A UI-typed purchase; item invoices whose purchase ledger sits
   in an inventory allocation (`taxable_entries` may be empty for them); books
-  with several currencies; any GSTIN, `REFERENCEDATE`, or cancelled, optional or
+  with several currencies; any GSTIN, a `REFERENCEDATE` on a sale, or cancelled, optional or
   post-dated voucher in the captures the tests use. The captures are one
   synthetic lab book and one month.
 
@@ -877,8 +879,8 @@ rate or return section, and matches nothing against any portal.
   head on a sale; more than one voucher in a window; paging; a company with a
   registration; a tax Tally computes itself (rate or HSN on the item); a sale
   typed on Tally's screen; accounting-invoice mode; a post-dated sale; a
-  `REFERENCE` or a populated `PARTYGSTIN` on a sale; `REFERENCEDATE` (not
-  returned); a ledger or voucher kept in a currency other than the book's base
+  `REFERENCE` or a populated `PARTYGSTIN` on a sale; a `REFERENCEDATE` on a
+  sale; a ledger or voucher kept in a currency other than the book's base
   (the Credit Note run's book defines a second currency, but all of its ledgers
   are in the base).
 - **A row of a kind no capture covers says so, where the row itself shows the

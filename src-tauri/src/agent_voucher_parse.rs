@@ -638,10 +638,10 @@ fn parse_voucher_rows(
                         // REFERENCEDATE (#1257) is the date of the supplier's invoice a voucher's
                         // REFERENCE names. Like EFFECTIVEDATE above, an empty or absent element is
                         // not observed and the key is omitted, never invented as ""; a present value
-                        // must be a date, as DATE must, or the read is refused. The shapes handled
-                        // here (a populated `YYYYMMDD` element, an empty one) are DERIVED from
-                        // observations that are not committed; no capture under this request records
-                        // them yet, and the request here does not name the field until one does.
+                        // must be a date, as DATE must, or the read is refused. Tally sent the
+                        // element on every voucher with `TYPE="Date"`, empty or `YYYYMMDD`, in the
+                        // one live read of one synthetic book (protocol reference §8.2f); other
+                        // forms are accepted if they hold a date but have not been observed.
                         if let Some(reference_date) = row
                             .get("REFERENCEDATE")
                             .map(|value| value.trim())

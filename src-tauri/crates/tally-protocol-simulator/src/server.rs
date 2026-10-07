@@ -35,6 +35,10 @@ pub struct ObservedRequest {
     pub bytes_received: usize,
     pub request_body_bytes: usize,
     pub request_body_sha256: String,
+    /// The same fingerprint of the body with the field-list word `,REFERENCEDATE` removed (UTF-8 or UTF-16LE),
+    /// for tests that pin a request recorded before the voucher read named that field (#1257): equal to
+    /// `request_body_sha256` for every request that does not carry the word.
+    pub request_body_sha256_without_reference_date: String,
     pub request_processed: bool,
     pub cancelled: bool,
     /// The client stopped consuming a response after the request was processed.
@@ -319,6 +323,9 @@ fn serve_request(
         bytes_received: request.len(),
         request_body_bytes: request_body.len(),
         request_body_sha256: hex::encode(Sha256::digest(request_body)),
+        request_body_sha256_without_reference_date: hex::encode(Sha256::digest(
+            without_reference_date_word(request_body),
+        )),
         request_processed: false,
         cancelled: cancelled.load(Ordering::Acquire),
         client_stopped_reading_response: false,
@@ -706,3 +713,24 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 #[cfg(test)]
 #[path = "server_tests.rs"]
 mod tests;
+
+/// The body with every `,REFERENCEDATE` (UTF-8 or UTF-16LE) removed.
+fn without_reference_date_word(body: &[u8]) -> Vec<u8> {
+    let utf16: Vec<u8> = ",REFERENCEDATE"
+        .encode_utf16()
+        .flat_map(|unit| unit.to_le_bytes())
+        .collect();
+    let mut out = Vec::with_capacity(body.len());
+    let mut at = 0;
+    while at < body.len() {
+        if body[at..].starts_with(&utf16) {
+            at += utf16.len();
+        } else if body[at..].starts_with(b",REFERENCEDATE") {
+            at += b",REFERENCEDATE".len();
+        } else {
+            out.push(body[at]);
+            at += 1;
+        }
+    }
+    out
+}

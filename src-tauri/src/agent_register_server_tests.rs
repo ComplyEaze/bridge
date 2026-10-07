@@ -204,8 +204,11 @@ async fn the_sales_register_sends_the_same_requests_and_lists_the_purchase_apart
     let observed = simulator.finish().unwrap();
     assert_eq!(observed.len(), RECORDED_ORDER.len());
     for (position, (request, letter)) in observed.iter().zip(RECORDED_ORDER.chars()).enumerate() {
+        // Recorded before the voucher read named REFERENCEDATE: the request sent is the recorded one
+        // once that one word is removed (the request with the word is captured in
+        // `vouchers-reference-date.PROVENANCE.md`).
         assert_eq!(
-            request.request_body_sha256,
+            request.request_body_sha256_without_reference_date,
             recorded_request_sha256(Kind::of(letter)),
             "request {position} ({letter}) is not the recorded one"
         );
@@ -229,8 +232,11 @@ async fn the_requests_sent_are_the_recorded_ones_in_the_recorded_order() {
     let observed = simulator.finish().unwrap();
     assert_eq!(observed.len(), RECORDED_ORDER.len());
     for (position, (request, letter)) in observed.iter().zip(RECORDED_ORDER.chars()).enumerate() {
+        // Recorded before the voucher read named REFERENCEDATE: the request sent is the recorded one
+        // once that one word is removed (the request with the word is captured in
+        // `vouchers-reference-date.PROVENANCE.md`).
         assert_eq!(
-            request.request_body_sha256,
+            request.request_body_sha256_without_reference_date,
             recorded_request_sha256(Kind::of(letter)),
             "request {position} ({letter}) is not the recorded one"
         );
@@ -482,7 +488,7 @@ async fn replay_recorded(
         let want = recorded["request_sha256"]
             .as_str()
             .unwrap_or_else(|| recorded_request_sha256(Kind::Status));
-        if sent.request_body_sha256 != want {
+        if sent.request_body_sha256_without_reference_date != want {
             wrong.push(format!("request {position} is not the recorded one"));
         }
     }

@@ -10198,5 +10198,69 @@
   "file": "src/clause44.rs",
   "from": "                .map(|text| support::py_casefold(support::py_strip(text)))",
   "to": "                .map(|text| support::py_strip(text).to_lowercase())"
+ },
+ {
+  "id": "CL44-71",
+  "by": "reviewer",
+  "what": "clause44: a voucher with no party is read by its (absent) party ledger's GSTIN, not set aside",
+  "file": "src/clause44.rs",
+  "from": "        if v.party_field.is_empty() {\n            return Class::NoSupplier(Reason::NoParty);",
+  "to": "        if false {\n            return Class::NoSupplier(Reason::NoParty);"
+ },
+ {
+  "id": "CL44-72",
+  "by": "reviewer",
+  "what": "clause44: a ledger in both the depreciation set and the no-supplier list is a non-supply expense, not depreciation",
+  "file": "src/clause44.rs",
+  "from": "        if inputs.dep_expense_ledgers.contains(ledger) {\n            Some(Class::NoSupplier(Reason::DepreciationLedger))",
+  "to": "        if inputs.dep_expense_ledgers.contains(ledger)\n            && !inputs.no_supplier_expense_ledgers.contains(ledger)\n        {\n            Some(Class::NoSupplier(Reason::DepreciationLedger))"
+ },
+ {
+  "id": "CL44-73",
+  "by": "reviewer",
+  "what": "clause44: a forced money category places no line; the party reads it",
+  "file": "src/clause44.rs",
+  "from": "                .and_then(MoneyCategory::forced)\n                .map(|bucket| Class::Bucket {",
+  "to": "                .and_then(|_| None::<Bucket>)\n                .map(|bucket| Class::Bucket {"
+ },
+ {
+  "id": "CL44-74",
+  "by": "reviewer",
+  "what": "clause44: the registration type 'regular' is not accepted",
+  "file": "src/clause44.rs",
+  "from": "    \"regular\",\n",
+  "to": "    \"regular!\",\n"
+ },
+ {
+  "id": "CL44-75",
+  "by": "reviewer",
+  "what": "clause44: the registration type 'unregistered' is not accepted",
+  "file": "src/clause44.rs",
+  "from": "    \"unregistered\",\n",
+  "to": "    \"unregistered!\",\n"
+ },
+ {
+  "id": "CL44-76",
+  "by": "reviewer",
+  "what": "clause44: the registration type 'composition' is not accepted",
+  "file": "src/clause44.rs",
+  "from": "    \"composition\",\n",
+  "to": "    \"composition!\",\n"
+ },
+ {
+  "id": "CL44-77",
+  "by": "reviewer",
+  "what": "clause44: every ledger with a registration type but composition is read as a composition supplier",
+  "file": "src/clause44.rs",
+  "from": "            if folded == \"composition\" {",
+  "to": "            if folded != \"composition\" {"
+ },
+ {
+  "id": "CL44-78",
+  "by": "reviewer",
+  "what": "clause44: the party ledger's GSTIN is not stripped, so one of only spaces counts as a GSTIN",
+  "file": "src/clause44.rs",
+  "from": "            .map_or_else(String::new, |l| norm_gstin(&l.gstin))",
+  "to": "            .map_or_else(String::new, |l| l.gstin.clone())"
  }
 ]

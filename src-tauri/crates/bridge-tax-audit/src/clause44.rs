@@ -1099,6 +1099,30 @@ mod tests {
         r.figures.iter_mut().find(|f| f.id == id).unwrap().value = Value::Int(value);
     }
 
+    /// The party ledger's own GSTIN is read stripped, as the reference reads it (measured on it):
+    /// one that is blank once stripped is no GSTIN, so the supplier is unregistered; a padded one
+    /// is a GSTIN, so the purchase with no tax line is exempt or non-GST.
+    #[test]
+    fn the_party_ledgers_gstin_is_read_stripped() {
+        let count = |gstin: &str, column: &str| {
+            let mut b = book();
+            b.ledgers.get_mut("Landlord").unwrap().gstin = gstin.to_string();
+            let id = format!("{TEST_ID}.{column}_count");
+            let r = result(&b);
+            r.figures.iter().find(|f| f.id == id).unwrap().value.clone()
+        };
+        assert_eq!(count("  \u{a0} ", "unregistered"), Value::Int(1));
+        assert_eq!(
+            count("  \u{a0} ", "exempt_or_non_gst_supply"),
+            Value::Int(0)
+        );
+        assert_eq!(count(" 27landl0000a1y9 ", "unregistered"), Value::Int(0));
+        assert_eq!(
+            count(" 27landl0000a1y9 ", "exempt_or_non_gst_supply"),
+            Value::Int(1)
+        );
+    }
+
     #[test]
     fn the_module_check_holds_on_the_tests_own_result() {
         let b = book();

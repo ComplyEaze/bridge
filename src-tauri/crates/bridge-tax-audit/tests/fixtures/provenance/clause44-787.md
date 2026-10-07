@@ -78,7 +78,8 @@ the Trial Balance through `financial_statements`, and re-derives each cited vouc
 - Not reached by a golden, and asserted in the crate's unit tests instead: a registration type that is not one of
   Tally's, and a money category that is not exactly one of the five (the port refuses either up front,
   `ConfigValueRefused`, naming the table and the ledger, as the reference now does when it reads the client's
-  table); a missing required key; a total or a running sum past i64 (the
+  table; with two or more offending entries the port names the first in the ledgers' sorted order, where the
+  reference names the first as the table was written, which its maintainers say is no part of its contract); a missing required key; a total or a running sum past i64 (the
   port refuses, in the walk and in the module check's Trial Balance sums, where the reference's integers are
   unbounded); CL44-1's columns-against-total branch, CL44-2 and an
   unresolvable cited voucher in CL44-3, none of which the test's own result can reach.
@@ -114,7 +115,8 @@ category is refused. Against the goldens at the previous reference commit the mo
 and the break-up finding's limits; the money book's finding on interest to an individual lender (its limits); and, in
 figures, `c44_core` (`c20`, `c21` and `c22`: round-off beside a journal's lines), `c44_money` (`m03`, a charge on a
 journal with no party, now forced; `m14`, round-off beside a judgement item) and `c44_traps` (`t01`, a PARTYGSTIN of
-spaces). `c44_money` also lost the two category entries the reference now refuses; the figures do not move for that
+spaces, which also takes one CL44-3 violation out of that golden). The party ledger's own GSTIN being read stripped
+is reached by no book; a unit test pins it (`the_party_ledgers_gstin_is_read_stripped`), measured on the reference. `c44_money` also lost the two category entries the reference now refuses; the figures do not move for that
 alone. `c44_placement`, `c44_round_off` and `c44_blank_gstin` are new books from the same generator and seed; the
 existing eight books are otherwise unchanged apart from their comments.
 

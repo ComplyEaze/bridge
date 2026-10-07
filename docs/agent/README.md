@@ -343,12 +343,12 @@ Cost centres and categories are returned whether or not the company's Cost
 Centres setting is on: a book whose setting read No still returned its two
 centres and two categories (one synthetic book), and a book whose setting read Yes
 returned its three centres, one under another, with the same shape (a third synthetic
-book, captured in a separate sitting), so a No setting is not "no centres", and an empty cost-centre list (one synthetic book with none defined
-answered one) does not say whether the feature is off or none is defined; this
+book, captured in a separate sitting), so a No setting is not "no centres", and an empty cost-centre list (one synthetic book with no cost centre defined
+answered an empty list) does not say whether the feature is off or none is defined; this
 call does not return the setting. An empty cost-category list is refused
 (`masters_cost_categories_empty`) on the expectation that the predefined Primary Cost
 Category always exists: it was present in the two books whose categories were captured (one
-with the setting at No, one at Yes), and the categories of a book with none defined were not captured. The two
+with the setting at No, one at Yes), and the categories of a book with no cost centre defined were not captured. The two
 cost collections must carry the `MSTDEPTYPE` Tally printed on every captured answer
 (32 for centres, 16 for categories), or the read is refused as
 `masters_collection_type_unexpected`, so an empty answer that was not resolved to the

@@ -279,8 +279,9 @@ pub enum NativeMastersError {
     /// A present, empty `COLLECTION` for voucher types. Every company has
     /// predefined voucher types, so none is no answer, not a zero-row one.
     VoucherTypesEmpty,
-    /// A present, empty `COLLECTION` for cost categories. Every company has the
-    /// predefined Primary Cost Category, so none is no answer, not a zero-row one.
+    /// A present, empty `COLLECTION` for cost categories. The predefined Primary
+    /// Cost Category is expected in every book (UNVERIFIED for a book with no
+    /// centre), so none is treated as no answer, not a zero-row one.
     CostCategoriesEmpty,
 }
 

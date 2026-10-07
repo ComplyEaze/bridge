@@ -37,7 +37,7 @@ The books are hand-written scenarios, not generated from any data. Each golden w
 | --- | ---: | --- | --- |
 | `loans_interest_tds_in_principal.json` | 4,998 | `5b6a7886a9dba76a1c32a79517d2a49ca000405dc5b4085d4e14bf6ddcb5cd6a` | `edge-books/loans_interest_tds_in_principal.json` |
 | `loans_interest_two_sided_tds.json` | 2,143 | `cec9b83fdb2fe5eb4e11f771d93e7587e4f5382363d2e2620d14e0d8f07bd7f6` | `edge-books/loans_interest_two_sided_tds.json` |
-| `loans_interest_shared_guid_tds.json` | 5,105 | `304fbc77ea5ca27a4abd216a07bf1b69b322f601e97d296288af265d899ba5a3` | `edge-books/loans_interest_shared_guid_tds.json` |
+| `loans_interest_shared_guid_tds.json` | 5,055 | `7b018663b9555eb6aafb9a17b5c3fcc73be921557585543fb8dc1fec4993b988` | `edge-books/loans_interest_shared_guid_tds.json` |
 | `loans_interest_tds_in_principal_untied.json` | 2,245 | `d422042444fed48e114f528b9cf7ce9e6ae01b60c187c5d56f6f8ddc20b2c728` | `edge-books/loans_interest_tds_in_principal_untied.json` |
 | `loans_interest_nil_line_interest_journal.json` | 3,754 | `7f2ef8e684039f281ea77f92295b0baa08602637563cfcdf48c51e09f7b41ccc` | `edge-books/loans_interest_nil_line_interest_journal.json` |
 | `loans_interest_nil_line_taken_rows.json` | 3,422 | `2d789afba12b3ae3688da261f3736d3c7569aa818c1b8ba41754395bfc6a2833` | `edge-books/loans_interest_nil_line_taken_rows.json` |

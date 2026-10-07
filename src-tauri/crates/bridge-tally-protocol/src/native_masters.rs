@@ -481,7 +481,7 @@ pub fn parse_native_masters(
         1 if rows.is_empty() && kind == NativeMasterKind::VoucherTypes => {
             Err(NativeMastersError::VoucherTypesEmpty)
         }
-        // The predefined Primary Cost Category always exists; cost centres may be none
+        // The predefined Primary Cost Category is expected to always exist (UNVERIFIED for a book with no centre); cost centres may be none
         // (a zero-row answer was captured live on a book with none defined).
         1 if rows.is_empty() && kind == NativeMasterKind::CostCategories => {
             Err(NativeMastersError::CostCategoriesEmpty)

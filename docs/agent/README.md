@@ -353,7 +353,7 @@ cost collections must carry the `MSTDEPTYPE` Tally printed on every captured ans
 (32 for centres, 16 for categories), or the read is refused as
 `masters_collection_type_unexpected`, so an empty answer that was not resolved to the
 type asked for is not read as "none defined". Under `mask_parties` the names of cost centres and categories, a cost centre's parent
-and a cost centre's category are masked, as godown and stock-group names are. Bridge does not return how a voucher was allocated to a cost centre: no tool
+and a cost centre's category are masked, as godown and stock-group names are. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool
 reads those allocations yet. A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
 parent that is Tally's reserved root keeps its marker form, as in
@@ -397,7 +397,7 @@ company has predefined voucher types, and a `cost_categories` answer with no row
 `masters_cost_categories_empty`; the other kinds may answer with none.
 
 Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1 (cost centres: three synthetic books, cost
-categories: two; see the provenance file) (`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
+categories: two, the third book's release not recorded; see the provenance file) (`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
 `Default`, `Automatic` and `Manual` are the only numbering methods observed; any
 other value is returned as `{"unrecognised": "<raw text>"}` rather than refused.
 `default` is Tally's reported value, not evidence that a type numbers

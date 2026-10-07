@@ -130,3 +130,16 @@ pub fn parse_day_month_year_hyphenated(text: &str) -> Option<Date> {
         found[1].parse().ok()?,
     )
 }
+
+/// `DD/MM/YYYY`, strict like the hyphenated form: two-digit day and month, so a
+/// cell a spreadsheet has rewritten as `5/9/2026` is refused.
+pub fn parse_day_month_year_slashed(text: &str) -> Option<Date> {
+    static PATTERN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^([0-9]{2})/([0-9]{2})/([0-9]{4})$").unwrap());
+    let found = PATTERN.captures(text)?;
+    Date::new(
+        found[3].parse().ok()?,
+        found[2].parse().ok()?,
+        found[1].parse().ok()?,
+    )
+}

@@ -152,6 +152,9 @@
       "path": "src-tauri/crates/bridge-bank-statement/src/cash.rs"
     },
     {
+      "path": "src-tauri/crates/bridge-bank-statement/src/csv_edge.rs"
+    },
+    {
       "path": "src-tauri/crates/bridge-bank-statement/src/date.rs"
     },
     {

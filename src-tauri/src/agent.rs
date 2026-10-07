@@ -1006,11 +1006,11 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              fewer ledgers may be refused. Summarise by ledger, month or voucher_type instead, \
              and read ledger_masters for each ledger's group. Retrying this call refuses again.",
         ),
-        "group_snapshot_drifted" | "ledger_snapshot_drifted" => Some(
-            "The ledgers, or the groups they sit in, changed in Tally while this call was being \
-             read, so the two reads of them differ and no figure was given. Nothing is wrong \
-             with the book: ask the person whether anyone is editing it, then call this again \
-             once they have stopped.",
+        "group_snapshot_drifted" => Some(
+            "A ledger's group, or a group's place in the tree, changed in Tally while this call \
+             was being read, so the groups read before the window and after it differ and no \
+             group total was given. Nothing is wrong with the book: ask the person whether \
+             anyone is editing it, then call this again once they have stopped.",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(

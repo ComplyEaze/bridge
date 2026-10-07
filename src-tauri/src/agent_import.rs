@@ -1681,11 +1681,7 @@ impl Server {
         company_name: &str,
     ) -> Result<(Vec<super::ledger_candidates::CatalogueLedger>, Evidence), ToolFailure> {
         let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
-        let ledgers = catalogue
-            .spellings()
-            .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
-            .collect();
-        Ok((ledgers, evidence))
+        Ok((resolvable_ledgers(&catalogue), evidence))
     }
 
     /// The same catalogue read, with each ledger's immediate parent group as Tally returned it
@@ -1714,11 +1710,11 @@ impl Server {
         ToolFailure,
     > {
         let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
-        let ledgers = catalogue
-            .spellings()
-            .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
-            .collect();
-        Ok((ledgers, owned_parents(&catalogue), evidence))
+        Ok((
+            resolvable_ledgers(&catalogue),
+            owned_parents(&catalogue),
+            evidence,
+        ))
     }
 
     async fn read_v1_catalogue(
@@ -4107,6 +4103,16 @@ fn served_verification_page(persisted: &[u8], offset: usize) -> Result<(Value, V
 #[cfg(test)]
 #[path = "agent_import_file_tests.rs"]
 mod file_tests;
+
+/// The catalogue's ledgers as a request can reach them: each row spelling with its stored name (#1085).
+fn resolvable_ledgers(
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) -> Vec<super::ledger_candidates::CatalogueLedger> {
+    catalogue
+        .spellings()
+        .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
+        .collect()
+}
 
 /// Each ledger of a catalogue with its immediate parent group as Tally returned it (#1230).
 fn owned_parents(

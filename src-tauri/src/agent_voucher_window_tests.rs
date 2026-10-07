@@ -6227,6 +6227,214 @@ async fn a_later_page_of_a_primary_group_summary_is_served_from_the_held_window(
     assert_eq!(one.requests(), total);
 }
 
+/// The group snapshot with the row of the group `name` rewritten by `edit`.
+fn with_group_row(name: &str, edit: impl Fn(&str) -> String) -> String {
+    let snapshot = wr2_group_snapshot();
+    let start = snapshot
+        .find(&format!("<GROUP NAME=\"{name}\""))
+        .expect("the group is in the snapshot");
+    let end = snapshot[start..].find("</GROUP>").unwrap() + start + "</GROUP>".len();
+    format!(
+        "{}{}{}",
+        &snapshot[..start],
+        edit(&snapshot[start..end]),
+        &snapshot[end..]
+    )
+}
+
+#[tokio::test]
+async fn every_way_a_chain_cannot_be_walked_is_refused_with_its_own_cause_and_the_ledger() {
+    // Derived from the live snapshot, each by one edit to a group row the touched parties sit under.
+    let cases: [(&str, String); 4] = [
+        (
+            "group_name_repeated",
+            with_group_row("Sundry Debtors", |row| format!("{row}{row}")),
+        ),
+        (
+            "reserved_name_missing",
+            with_group_row("Sundry Debtors", |row| {
+                row.replacen(" RESERVEDNAME=\"Sundry Debtors\"", "", 1)
+            }),
+        ),
+        (
+            "cycle",
+            with_group_row("Sundry Debtors", |row| {
+                row.replacen(
+                    "<PARENT TYPE=\"String\">Current Assets</PARENT>",
+                    "<PARENT TYPE=\"String\">Sundry Debtors</PARENT>",
+                    1,
+                )
+            }),
+        ),
+        (
+            "top_group_not_under_root",
+            with_group_row("Current Assets", |row| {
+                let open = row.find("<PARENT TYPE=\"String\">").unwrap();
+                let close = row[open..].find("</PARENT>").unwrap() + open + "</PARENT>".len();
+                format!(
+                    "{}<PARENT TYPE=\"String\"></PARENT>{}",
+                    &row[..open],
+                    &row[close..]
+                )
+            }),
+        ),
+    ];
+    for (cause, snapshot) in cases {
+        assert_ne!(
+            snapshot,
+            wr2_group_snapshot(),
+            "{cause}: the edit changed nothing"
+        );
+        let one = OneServer::spawn(group_summary_plans(
+            (ledger_catalogue(), snapshot.clone()),
+            (ledger_catalogue(), snapshot),
+        ));
+        let response = one.call(json!({"summarise_by": "group"})).await;
+        let refusal = refusal_of(&response);
+        assert_eq!(
+            refusal["code"], "summary_group_unresolved",
+            "{cause}: {refusal}"
+        );
+        assert_eq!(refusal["cause"], cause, "{refusal}");
+        assert!(refusal["ledger"].is_string(), "{cause}: {refusal}");
+    }
+}
+
+#[tokio::test]
+async fn a_parent_tally_returned_that_the_parse_withholds_is_refused_as_no_parent_by_ledger() {
+    // A parent group name that ends in a carriage return and a line feed is not carried by the
+    // catalogue parse, so the ledger has no parent as far as the placements can tell.
+    let catalogue = ledger_catalogue();
+    let start = catalogue
+        .find("<LEDGER NAME=\"Café Naïve Traders\"")
+        .unwrap();
+    let open = catalogue[start..].find("<PARENT TYPE=\"String\">").unwrap() + start;
+    let close = catalogue[open..].find("</PARENT>").unwrap() + open;
+    let unsupported = format!("{}&#13;&#10;{}", &catalogue[..close], &catalogue[close..]);
+    let one = OneServer::spawn(group_summary_plans(
+        (unsupported.clone(), wr2_group_snapshot()),
+        (unsupported, wr2_group_snapshot()),
+    ));
+    let response = one.call(json!({"summarise_by": "group"})).await;
+    let refusal = refusal_of(&response);
+    assert_eq!(refusal["code"], "summary_group_unresolved", "{refusal}");
+    assert_eq!(refusal["cause"], "no_parent", "{refusal}");
+    assert_eq!(refusal["ledger"], "Café Naïve Traders", "{refusal}");
+}
+
+#[tokio::test]
+async fn a_group_summary_with_a_ledger_given_by_its_stored_name_pairs_each_ledger_with_its_own_parent(
+) {
+    // Derived: the ledger's stored name (the `NAME` child) differs from its row spelling (the `NAME`
+    // attribute), as in the book of #1085. The same list serves the name and the placements, so the
+    // ledger resolves by the stored name and each entry is placed under the parent of its own ledger.
+    let catalogue = ledger_catalogue().replace(
+        "<NAME>Café Naïve Traders</NAME>",
+        "<NAME>Cafe Traders</NAME>",
+    );
+    assert_ne!(catalogue, ledger_catalogue());
+    let mut plans = identity_plans();
+    plans.extend(paired(&counted_marks()));
+    plans.extend(paired(&xml_plan(catalogue.clone())));
+    plans.extend(paired(&xml_plan(wr2_group_snapshot())));
+    plans.extend(paired(&counted_marks()));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(catalogue)));
+    plans.extend(paired(&xml_plan(wr2_group_snapshot())));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let response = one
+        .call(json!({"summarise_by": "group", "ledger": "Cafe Traders"}))
+        .await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["ledger_match"]["matched"], "exact", "{result}");
+    assert_eq!(result["ledger_match"]["ledger"], "Cafe Traders", "{result}");
+    assert_eq!(
+        result["ledger_match"]["ledger_row_spelling"], "Café Naïve Traders",
+        "{result}"
+    );
+    // The one voucher that touches the ledger: its debit sits under the ledger's own group, its credit
+    // under the sales ledger's.
+    let buckets = buckets_of(&response);
+    let shape: Vec<(String, Vec<String>)> = buckets
+        .iter()
+        .map(|bucket| {
+            (
+                bucket["group"].as_str().unwrap().to_string(),
+                bucket["members"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|member| member["ledger"].as_str().unwrap().to_string())
+                    .collect(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        shape,
+        vec![
+            (
+                "Sundry Debtors".to_string(),
+                vec!["Café Naïve Traders".to_string()]
+            ),
+            ("Sales Accounts".to_string(), vec!["WR2 Sales".to_string()]),
+        ],
+        "{result}"
+    );
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_group_summary_masks_the_ledger_it_was_asked_about_and_a_primary_group_summary_masks_its_members(
+) {
+    let masked = OneServer::spawn_with(
+        group_summary_plans(masters(), masters()),
+        Redaction::MaskParties,
+    )
+    .call(json!({"summarise_by": "primary_group"}))
+    .await;
+    let text = masked.to_string();
+    for real in ["Café Naïve Traders", "WR2 Sales", "नमस्ते ट्रेडर्स"]
+    {
+        assert!(
+            !text.contains(real),
+            "{real} appears in a masked primary_group summary: {text}"
+        );
+    }
+    assert!(buckets_of(&masked).iter().all(|bucket| bucket["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|m| m["ledger"].is_string())));
+}
+
+#[tokio::test]
+async fn a_group_summary_of_a_window_with_a_withheld_voucher_is_partial_and_says_so() {
+    let mut plans = identity_plans();
+    plans.extend(paired(&counted_marks()));
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(paired(&xml_plan(wr2_group_snapshot())));
+    plans.extend(paired(&counted_marks()));
+    plans.extend(paired(&xml_plan(with_first_voucher_composite(
+        &three_vouchers(),
+    ))));
+    plans.extend(paired(&xml_plan(with_first_voucher_composite(
+        &three_vouchers(),
+    ))));
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(paired(&xml_plan(wr2_group_snapshot())));
+    let one = OneServer::spawn(plans);
+    let response = one.call(json!({"summarise_by": "group"})).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{result}");
+    assert!(
+        result["vouchers_summarised"].as_u64().unwrap() < 3,
+        "{result}"
+    );
+}
+
 #[tokio::test]
 async fn only_a_group_summary_carries_subtree_totals() {
     let one = OneServer::spawn(group_summary_plans(masters(), masters()));

@@ -1167,9 +1167,13 @@ each other.
     is 6 requests; a group summary makes five: the company's marks first, to size the ledger list,
     then the ledger list and the group list before the window and again after it. A book whose
     master-alteration mark is above 11,983 is refused before the ledger list is read
-    (`summary_group_book_too_large`, with `size`): the mark is an upper bound on ledgers (every
-    other master raises it), a ledger row of the standard list is about 1,400 bytes, and one
-    response must stay under 16 MiB. A smaller book may be refused; use the ledger, month or
+    (`summary_group_book_too_large`, with `size`). The limit is provisional and computed, not
+    measured: it is 16 MiB divided by an estimate of 1,400 bytes a ledger. The 16 MiB is a size chosen
+    here (half the transport cap) and not verified as safe for the gateway; the 1,400 is the estimate
+    the compliance ledger read uses, against 1,104 to 1,221 bytes measured once on one synthetic book.
+    The mark is an upper bound on ledgers (every other master raises it), so a smaller book may be
+    refused, and the limit is about half of what the transport's own rule admits for the same list;
+    it will not be raised without a measurement of bytes a ledger on a real list. Then use the ledger, month or
     voucher_type summaries and `ledger_masters` for each ledger's group. A book of thousands of
     ledgers has not been measured; a large book's ledger list is large, and a real book's group buckets may need several
     pages (use `offset`). For ledger totals over a month or more on a large book, `trial_balance` is
@@ -1205,9 +1209,9 @@ counted only that ledger's entries.
 Cost, from the same run (one run, a debug build): a plain read of that year took 34 requests (12
 status checks, 12 company-identity reads, 4 marks reads, the window's count as one paired read of 2
 requests, and its two parts as a paired read each, 4 requests), about 7 s and about 6 MB of answers from
-Tally. This book's mark (111) needed one count read; a large book needs many more. Every `summarise_by` or search call reads the window again at the
+Tally. This book's mark (111) needed one count read; a large book needs many more. Every `ledger`, `month` or `voucher_type` summary or search call reads the window again at the
 same cost (34 requests, 6 to 11 s). `ledger` adds 12 requests, four of them reads of the whole ledger
-list, which grows with the ledger count. For a month or more on a large book, read ledger totals with
+list, which grows with the ledger count; the `group` and `primary_group` summaries add 30 (above). For a month or more on a large book, read ledger totals with
 `trial_balance` instead: it has no month or voucher-type grouping and no search. The same year's
 `trial_balance` took 34 requests and 2.5 s on this book. One day of vouchers took minutes on the largest
 book measured (a voucher mark of about a million; see the cost note on window reads above, #595).

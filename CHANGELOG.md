@@ -40,7 +40,8 @@ These changes are in source and not yet in a published build.
   refuse when any ledger's group chain, or the set of ledgers, changed meanwhile, and
   when a ledger the window touches cannot be placed, so no entry is left out of a
   group total, naming the ledger it could not place. A book whose master-alteration
-  mark is above 11,983 is refused before the ledger list is read. A `group` summary also
+  mark is above 11,983 (a provisional limit, computed and not measured) is refused before the
+  ledger list is read. A `group` summary also
   gives each group's whole figure, descendants included, as `subtree_totals`, and every
   row says what it `covers`. A zero from a counted window is a checked zero. A narration phrase is refused
   where narrations are withheld from the assistant. A summary sums post-dated

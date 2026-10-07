@@ -1033,9 +1033,11 @@ or `read_cost_left_out`, beside `ledgers`) when the two reads together were slow
 enough, with `window_reads: 2` and the same rules: the vouchers are the window's,
 counted once; `observed_seconds` add both reads; `floor_seconds` is each read's own
 gaps between consecutive census reads (the replay sends none, so it is the planned
-read's); the 240 s verdict is the call's, so a window whose planned read fitted can
-read `window_too_long` once the replay is added. The figures cover the two voucher
-reads alone, not the two ledger catalogue reads or the company check. A
+read's); the 240 s verdict is of the two voucher reads together, so a window whose planned
+read fitted can read `window_too_long` once the replay is added. The figures cover
+the two voucher reads alone: not the two ledger catalogue reads, the company check,
+or the wider read an empty window gets in each of the two reads (each pays its own
+census; the verdict is then `not_established`). A
 `ledger_movement` refusal states no block yet. The result of a quick call is
 unchanged.
 

@@ -479,7 +479,7 @@ fn two_reads_of_a_window_count_its_vouchers_once_and_add_their_times() {
     let say = cost["say"].as_str().unwrap();
     assert!(say.contains("reads the window twice"), "{say}");
     assert!(
-        say.starts_with("The window read took 191 seconds for 760 vouchers."),
+        say.starts_with("The two window reads took 191 seconds for 760 vouchers."),
         "{say}"
     );
 }
@@ -556,4 +556,32 @@ fn the_floor_of_two_reads_adds_each_reads_own_census_gaps() {
     // 119 gaps in the first read and 4 in the second, 0.5 s each: 61.5 s, rounded down.
     assert_eq!(cost["floor_seconds"], 61, "{cost}");
     assert_eq!(cost["census_reads"], 125, "{cost}");
+}
+
+/// A window with no voucher is read once more in each of the two reads, and the
+/// sentence says each of them, not one.
+#[test]
+fn an_empty_window_read_twice_says_each_read_pays_its_wider_read() {
+    let empty = timings(1_000, (1, 5_000), vec![]);
+    let replay = timings(1_000, (0, 0), vec![]);
+    let cost = read_cost_of_replayed(&empty, &replay, Ended::Read)
+        .or_else(|| {
+            let slow = timings(1_000, (16, 5_000), vec![]);
+            read_cost_of_replayed(&slow, &replay, Ended::Read)
+        })
+        .expect("a block");
+    assert_eq!(
+        cost["host_240"],
+        json!({"state": "not_established"}),
+        "{cost}"
+    );
+    let say = cost["say"].as_str().unwrap();
+    assert!(say.contains("once more by each of the two reads"), "{say}");
+    // One read says it once, in its own words.
+    let single = read_cost(&timings(1_000, (16, 5_000), vec![]), Ended::Read).expect("a block");
+    let single_say = single["say"].as_str().unwrap();
+    assert!(
+        single_say.contains("also read once more, a day wider"),
+        "{single_say}"
+    );
 }

@@ -335,7 +335,12 @@ pub(super) fn smallest_page_len_of(payload: &Value, key: &str) -> usize {
 fn say(cost: &Cost, ended: Ended, window_reads: u64) -> String {
     let lead = match (ended, cost.vouchers) {
         (Ended::Read, vouchers) => format!(
-            "The window read took {} for {}.",
+            "The {} took {} for {}.",
+            if window_reads > 1 {
+                "two window reads"
+            } else {
+                "window read"
+            },
             seconds(lead_seconds(cost)),
             vouchers_phrase(vouchers)
         ),
@@ -370,6 +375,7 @@ fn say(cost: &Cost, ended: Ended, window_reads: u64) -> String {
         ),
         Fit::TooLong => "That is past 240 seconds, where Claude Desktop's chat app stops a silent call (measured twice, on one Mac build). A shorter window saves the time of its vouchers but pays the same census reads, so how short is enough is not established. For totals over a long period read trial_balance, which reads no vouchers.".to_string(),
         Fit::NotEstablished => match ended {
+            Ended::Read if window_reads > 1 => "No voucher was read, so what a call can carry is not established. A window with no voucher is also read once more by each of the two reads, a day wider on each side, to confirm it is empty; those reads pay their own census and are not in these figures.".to_string(),
             Ended::Read => "No voucher was read, so what a call can carry is not established. A window with no voucher is also read once more, a day wider on each side, to confirm it is empty; that read pays its own census and is not in these figures.".to_string(),
             Ended::Stopped => "The read stopped, so what a call can carry is not established.".to_string(),
         },

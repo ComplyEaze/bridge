@@ -8,7 +8,7 @@
   "figures": [
     {
       "id": "tds_payees.194C_credited_total",
-      "value": 22435372,
+      "value": 22436272,
       "unit": "paise",
       "definition_sha256_16": "c6d791e6cb91b60a",
       "definition_text": "Sum credited to every payee entity credited on a voucher with a 194C-mapped expense ledger line (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
@@ -143,6 +143,20 @@
       ]
     },
     {
+      "id": "tds_payees.194C_row_21b_a_194C_4839ec36_007",
+      "value": 900,
+      "unit": "paise",
+      "definition_sha256_16": "1cddd9621059b988",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 4839ec36) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-x11",
+          "label": "Journal CJ/11 on 2026-01-22"
+        }
+      ]
+    },
+    {
       "id": "tds_payees.194C_row_21b_a_194C_fc09beb6_001",
       "value": 3107500,
       "unit": "paise",
@@ -180,7 +194,7 @@
     },
     {
       "id": "tds_payees.194C_row_21b_a_total_194C_4839ec36",
-      "value": 10010372,
+      "value": 10011272,
       "unit": "paise",
       "definition_sha256_16": "29d16989bc5335c3",
       "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 4839ec36) listed there, summed. Each is its own item in clause 21(b); this total is not.",
@@ -215,7 +229,7 @@
     },
     {
       "id": "tds_payees.194C_row_credited_194C_4839ec36",
-      "value": 10010372,
+      "value": 10011272,
       "unit": "paise",
       "definition_sha256_16": "1f64333fd3df83b9",
       "definition_text": "Total credited to one payee entity (tag 4839ec36) under 194C, summed across every population voucher touching a mapped expense ledger.",
@@ -249,6 +263,11 @@
           "kind": "voucher",
           "id": "ti-x06",
           "label": "Journal CJ/06 on 2026-01-21"
+        },
+        {
+          "kind": "voucher",
+          "id": "ti-x11",
+          "label": "Journal CJ/11 on 2026-01-22"
         }
       ]
     },
@@ -614,6 +633,10 @@
         {
           "name": "payment_a:006",
           "figure_id": "tds_payees.194C_row_21b_a_194C_4839ec36_006"
+        },
+        {
+          "name": "payment_a:007",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_4839ec36_007"
         }
       ],
       "evidence": [
@@ -646,16 +669,21 @@
           "kind": "voucher",
           "id": "ti-x06",
           "label": "Journal CJ/06 on 2026-01-21"
+        },
+        {
+          "kind": "voucher",
+          "id": "ti-x11",
+          "label": "Journal CJ/11 on 2026-01-22"
         }
       ],
       "title_sha256_16": "8eaee7b8a29c82d3",
       "title_text": "Payee over the 194C limit",
-      "limits_sha256_16": "89d0b0b726c1cb39",
+      "limits_sha256_16": "d6e6863129e718f6",
       "limits_text": [
         "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
         "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
         "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
-        "6 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable."
+        "7 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable."
       ],
       "ask_client_sha256_16": "b53cfcd0738b684c",
       "ask_client_text": [

@@ -176,7 +176,7 @@
         {
           "kind": "voucher",
           "id": "ti-s04",
-          "label": "Journal RJ/04 on 2025-06-05"
+          "label": "Journal RJ/04 on 2025-07-05"
         }
       ]
     },
@@ -213,7 +213,7 @@
         {
           "kind": "voucher",
           "id": "ti-s04",
-          "label": "Journal RJ/04 on 2025-06-05"
+          "label": "Journal RJ/04 on 2025-07-05"
         }
       ]
     },
@@ -351,7 +351,7 @@
         {
           "kind": "voucher",
           "id": "ti-s05",
-          "label": "Journal FJ/05 on 2025-08-10"
+          "label": "Journal FJ/05 on 2025-09-10"
         }
       ]
     },
@@ -387,7 +387,7 @@
         {
           "kind": "voucher",
           "id": "ti-s05",
-          "label": "Journal FJ/05 on 2025-08-10"
+          "label": "Journal FJ/05 on 2025-09-10"
         },
         {
           "kind": "voucher",
@@ -446,7 +446,7 @@
         {
           "kind": "voucher",
           "id": "ti-s09",
-          "label": "Journal FJ/09 on 2025-11-14"
+          "label": "Journal FJ/09 on 2025-12-12"
         }
       ]
     },
@@ -468,7 +468,7 @@
         {
           "kind": "voucher",
           "id": "ti-s09",
-          "label": "Journal FJ/09 on 2025-11-14"
+          "label": "Journal FJ/09 on 2025-12-12"
         }
       ]
     },
@@ -719,7 +719,7 @@
         {
           "kind": "voucher",
           "id": "ti-s04",
-          "label": "Journal RJ/04 on 2025-06-05"
+          "label": "Journal RJ/04 on 2025-07-05"
         }
       ],
       "title_sha256_16": "f5a268f4e0a27356",
@@ -818,7 +818,7 @@
         {
           "kind": "voucher",
           "id": "ti-s05",
-          "label": "Journal FJ/05 on 2025-08-10"
+          "label": "Journal FJ/05 on 2025-09-10"
         },
         {
           "kind": "voucher",
@@ -871,7 +871,7 @@
         {
           "kind": "voucher",
           "id": "ti-s09",
-          "label": "Journal FJ/09 on 2025-11-14"
+          "label": "Journal FJ/09 on 2025-12-12"
         }
       ],
       "title_sha256_16": "f26004e6593524fc",

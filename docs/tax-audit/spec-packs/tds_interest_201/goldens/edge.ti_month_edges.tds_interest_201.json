@@ -175,11 +175,263 @@
       "evidence": []
     },
     {
+      "id": "tds_interest_201.interest_if_not_deducted_0eeb64cf",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "592f9ed2a3c375c3",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) (row 8 tag 0eeb64cf): the pre-deduction rate for the months from the deductible date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m07",
+          "label": "Journal CJ/07 on 2026-10-01"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_3bfae88a",
+      "value": 20,
+      "unit": "paise",
+      "definition_sha256_16": "2c87ebfe47e50e3b",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) (row 5 tag 3bfae88a): the pre-deduction rate for the months from the deductible date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m04",
+          "label": "Journal CJ/04 on 2026-09-01"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_698702e0",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "150ee3a45bc3e639",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) (row 1 tag 698702e0): the pre-deduction rate for the months from the deductible date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m08",
+          "label": "Journal CJ/08 on 2026-09-30"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_6b5a2ce7",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "51dd48893bce7eb1",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) (row 0 tag 6b5a2ce7): the pre-deduction rate for the months from the deductible date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m09",
+          "label": "Journal CJ/09 on 2026-10-15"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_8a4834a5",
+      "value": 240,
+      "unit": "paise",
+      "definition_sha256_16": "6656b63c2d35a231",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) (row 3 tag 8a4834a5): the pre-deduction rate for the months from the deductible date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m02",
+          "label": "Journal CJ/02 on 2025-10-01"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_cb024259",
+      "value": 5200,
+      "unit": "paise",
+      "definition_sha256_16": "642779f77d2bccf8",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) (row 2 tag cb024259): the pre-deduction rate for the months from the deductible date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m01",
+          "label": "Journal CJ/01 on 2025-09-30"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_dfc10126",
+      "value": 20,
+      "unit": "paise",
+      "definition_sha256_16": "04e04ddf6aee1d90",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) (row 6 tag dfc10126): the pre-deduction rate for the months from the deductible date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m05",
+          "label": "Journal CJ/05 on 2026-09-29"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_f4de7474",
+      "value": 40,
+      "unit": "paise",
+      "definition_sha256_16": "c53d7c3525da5a79",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) (row 4 tag f4de7474): the pre-deduction rate for the months from the deductible date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m03",
+          "label": "Journal CJ/03 on 2026-08-31"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_ff088f18",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "6f25819d59bbf30c",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) (row 7 tag ff088f18): the pre-deduction rate for the months from the deductible date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m06",
+          "label": "Journal CJ/06 on 2026-09-30"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_own_date_0eeb64cf",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "0d5a860d17ec742c",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) and each credit's tax ran from that credit's own date (row 8 tag 0eeb64cf): each credit's share of the tax at the pre-deduction rate, rounded on its own.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m07",
+          "label": "Journal CJ/07 on 2026-10-01"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_own_date_3bfae88a",
+      "value": 20,
+      "unit": "paise",
+      "definition_sha256_16": "bb51fa662336719b",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) and each credit's tax ran from that credit's own date (row 5 tag 3bfae88a): each credit's share of the tax at the pre-deduction rate, rounded on its own.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m04",
+          "label": "Journal CJ/04 on 2026-09-01"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_own_date_698702e0",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f7c90f918b284f22",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) and each credit's tax ran from that credit's own date (row 1 tag 698702e0): each credit's share of the tax at the pre-deduction rate, rounded on its own.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m08",
+          "label": "Journal CJ/08 on 2026-09-30"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_own_date_6b5a2ce7",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "b1f699dcd44a366e",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) and each credit's tax ran from that credit's own date (row 0 tag 6b5a2ce7): each credit's share of the tax at the pre-deduction rate, rounded on its own.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m09",
+          "label": "Journal CJ/09 on 2026-10-15"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_own_date_8a4834a5",
+      "value": 240,
+      "unit": "paise",
+      "definition_sha256_16": "90b2e0f907c211df",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) and each credit's tax ran from that credit's own date (row 3 tag 8a4834a5): each credit's share of the tax at the pre-deduction rate, rounded on its own.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m02",
+          "label": "Journal CJ/02 on 2025-10-01"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_own_date_cb024259",
+      "value": 5200,
+      "unit": "paise",
+      "definition_sha256_16": "314f1ee12b234d98",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) and each credit's tax ran from that credit's own date (row 2 tag cb024259): each credit's share of the tax at the pre-deduction rate, rounded on its own.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m01",
+          "label": "Journal CJ/01 on 2025-09-30"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_own_date_dfc10126",
+      "value": 20,
+      "unit": "paise",
+      "definition_sha256_16": "6f01b7d65a025094",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) and each credit's tax ran from that credit's own date (row 6 tag dfc10126): each credit's share of the tax at the pre-deduction rate, rounded on its own.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m05",
+          "label": "Journal CJ/05 on 2026-09-29"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_own_date_f4de7474",
+      "value": 40,
+      "unit": "paise",
+      "definition_sha256_16": "7866b3af70bd18d8",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) and each credit's tax ran from that credit's own date (row 4 tag f4de7474): each credit's share of the tax at the pre-deduction rate, rounded on its own.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m03",
+          "label": "Journal CJ/03 on 2026-08-31"
+        }
+      ]
+    },
+    {
+      "id": "tds_interest_201.interest_if_not_deducted_own_date_ff088f18",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "865d2f846335f6e4",
+      "definition_text": "s.201(1A) interest if the tax is still not deducted at as_of (2026-09-30) and each credit's tax ran from that credit's own date (row 7 tag ff088f18): each credit's share of the tax at the pre-deduction rate, rounded on its own.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "ti-m06",
+          "label": "Journal CJ/06 on 2026-09-30"
+        }
+      ]
+    },
+    {
       "id": "tds_interest_201.interest_max_0eeb64cf",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "38497febd5b53edd",
-      "definition_text": "s.201(1A) interest, maximum bound (row 8 tag 0eeb64cf): any unsupplied leg is assumed still outstanding through as_of (2026-09-30).",
+      "definition_sha256_16": "77875024ee40fe6c",
+      "definition_text": "s.201(1A) interest, maximum bound (row 8 tag 0eeb64cf), if the tax was deducted and not deposited: the largest over every deduction date from the deductible date to as_of (2026-09-30), at the pre-deduction rate to that date and the post-deduction rate from it.",
       "evidence": [
         {
           "kind": "voucher",
@@ -190,10 +442,10 @@
     },
     {
       "id": "tds_interest_201.interest_max_3bfae88a",
-      "value": 20,
+      "value": 50,
       "unit": "paise",
-      "definition_sha256_16": "53017be9d5fb0aa6",
-      "definition_text": "s.201(1A) interest, maximum bound (row 5 tag 3bfae88a): any unsupplied leg is assumed still outstanding through as_of (2026-09-30).",
+      "definition_sha256_16": "08be84c0d151608c",
+      "definition_text": "s.201(1A) interest, maximum bound (row 5 tag 3bfae88a), if the tax was deducted and not deposited: the largest over every deduction date from the deductible date to as_of (2026-09-30), at the pre-deduction rate to that date and the post-deduction rate from it.",
       "evidence": [
         {
           "kind": "voucher",
@@ -206,8 +458,8 @@
       "id": "tds_interest_201.interest_max_698702e0",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "8a419c0ab4695fcc",
-      "definition_text": "s.201(1A) interest, maximum bound (row 1 tag 698702e0): any unsupplied leg is assumed still outstanding through as_of (2026-09-30).",
+      "definition_sha256_16": "6e654f16cf065b5a",
+      "definition_text": "s.201(1A) interest, maximum bound (row 1 tag 698702e0), if the tax was deducted and not deposited: the largest over every deduction date from the deductible date to as_of (2026-09-30), at the pre-deduction rate to that date and the post-deduction rate from it.",
       "evidence": [
         {
           "kind": "voucher",
@@ -220,8 +472,8 @@
       "id": "tds_interest_201.interest_max_6b5a2ce7",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "c61636240d8a9133",
-      "definition_text": "s.201(1A) interest, maximum bound (row 0 tag 6b5a2ce7): any unsupplied leg is assumed still outstanding through as_of (2026-09-30).",
+      "definition_sha256_16": "5de373ca7046f1ed",
+      "definition_text": "s.201(1A) interest, maximum bound (row 0 tag 6b5a2ce7), if the tax was deducted and not deposited: the largest over every deduction date from the deductible date to as_of (2026-09-30), at the pre-deduction rate to that date and the post-deduction rate from it.",
       "evidence": [
         {
           "kind": "voucher",
@@ -232,10 +484,10 @@
     },
     {
       "id": "tds_interest_201.interest_max_8a4834a5",
-      "value": 240,
+      "value": 380,
       "unit": "paise",
-      "definition_sha256_16": "300c596b67870a3c",
-      "definition_text": "s.201(1A) interest, maximum bound (row 3 tag 8a4834a5): any unsupplied leg is assumed still outstanding through as_of (2026-09-30).",
+      "definition_sha256_16": "f20c5ff63f3bc8d9",
+      "definition_text": "s.201(1A) interest, maximum bound (row 3 tag 8a4834a5), if the tax was deducted and not deposited: the largest over every deduction date from the deductible date to as_of (2026-09-30), at the pre-deduction rate to that date and the post-deduction rate from it.",
       "evidence": [
         {
           "kind": "voucher",
@@ -246,10 +498,10 @@
     },
     {
       "id": "tds_interest_201.interest_max_cb024259",
-      "value": 5200,
+      "value": 8000,
       "unit": "paise",
-      "definition_sha256_16": "1167a24acb8f6df3",
-      "definition_text": "s.201(1A) interest, maximum bound (row 2 tag cb024259): any unsupplied leg is assumed still outstanding through as_of (2026-09-30).",
+      "definition_sha256_16": "d62529a4c3bc3401",
+      "definition_text": "s.201(1A) interest, maximum bound (row 2 tag cb024259), if the tax was deducted and not deposited: the largest over every deduction date from the deductible date to as_of (2026-09-30), at the pre-deduction rate to that date and the post-deduction rate from it.",
       "evidence": [
         {
           "kind": "voucher",
@@ -260,10 +512,10 @@
     },
     {
       "id": "tds_interest_201.interest_max_dfc10126",
-      "value": 20,
+      "value": 30,
       "unit": "paise",
-      "definition_sha256_16": "13a6399564b010b6",
-      "definition_text": "s.201(1A) interest, maximum bound (row 6 tag dfc10126): any unsupplied leg is assumed still outstanding through as_of (2026-09-30).",
+      "definition_sha256_16": "1f415d90ce012634",
+      "definition_text": "s.201(1A) interest, maximum bound (row 6 tag dfc10126), if the tax was deducted and not deposited: the largest over every deduction date from the deductible date to as_of (2026-09-30), at the pre-deduction rate to that date and the post-deduction rate from it.",
       "evidence": [
         {
           "kind": "voucher",
@@ -274,10 +526,10 @@
     },
     {
       "id": "tds_interest_201.interest_max_f4de7474",
-      "value": 40,
+      "value": 70,
       "unit": "paise",
-      "definition_sha256_16": "4c13e2b89b551904",
-      "definition_text": "s.201(1A) interest, maximum bound (row 4 tag f4de7474): any unsupplied leg is assumed still outstanding through as_of (2026-09-30).",
+      "definition_sha256_16": "433623104df93c5f",
+      "definition_text": "s.201(1A) interest, maximum bound (row 4 tag f4de7474), if the tax was deducted and not deposited: the largest over every deduction date from the deductible date to as_of (2026-09-30), at the pre-deduction rate to that date and the post-deduction rate from it.",
       "evidence": [
         {
           "kind": "voucher",
@@ -290,8 +542,8 @@
       "id": "tds_interest_201.interest_max_ff088f18",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "ee30ff20d5fe43ff",
-      "definition_text": "s.201(1A) interest, maximum bound (row 7 tag ff088f18): any unsupplied leg is assumed still outstanding through as_of (2026-09-30).",
+      "definition_sha256_16": "4a862d82d7028611",
+      "definition_text": "s.201(1A) interest, maximum bound (row 7 tag ff088f18), if the tax was deducted and not deposited: the largest over every deduction date from the deductible date to as_of (2026-09-30), at the pre-deduction rate to that date and the post-deduction rate from it.",
       "evidence": [
         {
           "kind": "voucher",
@@ -304,8 +556,8 @@
       "id": "tds_interest_201.interest_max_own_date_0eeb64cf",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "45f9776661f5898e",
-      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 8 tag 0eeb64cf): each credit's share of the tax, to as_of (2026-09-30). Each credit's share is rounded on its own, so this can be a paisa less than the row's maximum where the two readings date the credits alike.",
+      "definition_sha256_16": "b42c56b4b565e543",
+      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 8 tag 0eeb64cf): each credit's share of the tax, the largest over every deduction date from the credit's own date to as_of (2026-09-30). Each credit's share is rounded on its own, so this may differ from the row's maximum where the two readings date the credits alike.",
       "evidence": [
         {
           "kind": "voucher",
@@ -316,10 +568,10 @@
     },
     {
       "id": "tds_interest_201.interest_max_own_date_3bfae88a",
-      "value": 20,
+      "value": 50,
       "unit": "paise",
-      "definition_sha256_16": "665e14d7620c48fa",
-      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 5 tag 3bfae88a): each credit's share of the tax, to as_of (2026-09-30). Each credit's share is rounded on its own, so this can be a paisa less than the row's maximum where the two readings date the credits alike.",
+      "definition_sha256_16": "9982e7755f4ab2ed",
+      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 5 tag 3bfae88a): each credit's share of the tax, the largest over every deduction date from the credit's own date to as_of (2026-09-30). Each credit's share is rounded on its own, so this may differ from the row's maximum where the two readings date the credits alike.",
       "evidence": [
         {
           "kind": "voucher",
@@ -332,8 +584,8 @@
       "id": "tds_interest_201.interest_max_own_date_698702e0",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "26ef7f428d5e8869",
-      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 1 tag 698702e0): each credit's share of the tax, to as_of (2026-09-30). Each credit's share is rounded on its own, so this can be a paisa less than the row's maximum where the two readings date the credits alike.",
+      "definition_sha256_16": "f711d7fe983edb06",
+      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 1 tag 698702e0): each credit's share of the tax, the largest over every deduction date from the credit's own date to as_of (2026-09-30). Each credit's share is rounded on its own, so this may differ from the row's maximum where the two readings date the credits alike.",
       "evidence": [
         {
           "kind": "voucher",
@@ -346,8 +598,8 @@
       "id": "tds_interest_201.interest_max_own_date_6b5a2ce7",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "d140c6027f79db6c",
-      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 0 tag 6b5a2ce7): each credit's share of the tax, to as_of (2026-09-30). Each credit's share is rounded on its own, so this can be a paisa less than the row's maximum where the two readings date the credits alike.",
+      "definition_sha256_16": "c126a78baf162dd5",
+      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 0 tag 6b5a2ce7): each credit's share of the tax, the largest over every deduction date from the credit's own date to as_of (2026-09-30). Each credit's share is rounded on its own, so this may differ from the row's maximum where the two readings date the credits alike.",
       "evidence": [
         {
           "kind": "voucher",
@@ -358,10 +610,10 @@
     },
     {
       "id": "tds_interest_201.interest_max_own_date_8a4834a5",
-      "value": 240,
+      "value": 380,
       "unit": "paise",
-      "definition_sha256_16": "73ea4bce0f615dea",
-      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 3 tag 8a4834a5): each credit's share of the tax, to as_of (2026-09-30). Each credit's share is rounded on its own, so this can be a paisa less than the row's maximum where the two readings date the credits alike.",
+      "definition_sha256_16": "6ccc21eae14e997f",
+      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 3 tag 8a4834a5): each credit's share of the tax, the largest over every deduction date from the credit's own date to as_of (2026-09-30). Each credit's share is rounded on its own, so this may differ from the row's maximum where the two readings date the credits alike.",
       "evidence": [
         {
           "kind": "voucher",
@@ -372,10 +624,10 @@
     },
     {
       "id": "tds_interest_201.interest_max_own_date_cb024259",
-      "value": 5200,
+      "value": 8000,
       "unit": "paise",
-      "definition_sha256_16": "0a8459274ca4df30",
-      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 2 tag cb024259): each credit's share of the tax, to as_of (2026-09-30). Each credit's share is rounded on its own, so this can be a paisa less than the row's maximum where the two readings date the credits alike.",
+      "definition_sha256_16": "6c4959a630b6da4d",
+      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 2 tag cb024259): each credit's share of the tax, the largest over every deduction date from the credit's own date to as_of (2026-09-30). Each credit's share is rounded on its own, so this may differ from the row's maximum where the two readings date the credits alike.",
       "evidence": [
         {
           "kind": "voucher",
@@ -386,10 +638,10 @@
     },
     {
       "id": "tds_interest_201.interest_max_own_date_dfc10126",
-      "value": 20,
+      "value": 30,
       "unit": "paise",
-      "definition_sha256_16": "5a8fc6f36a145b89",
-      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 6 tag dfc10126): each credit's share of the tax, to as_of (2026-09-30). Each credit's share is rounded on its own, so this can be a paisa less than the row's maximum where the two readings date the credits alike.",
+      "definition_sha256_16": "2375300a70554a90",
+      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 6 tag dfc10126): each credit's share of the tax, the largest over every deduction date from the credit's own date to as_of (2026-09-30). Each credit's share is rounded on its own, so this may differ from the row's maximum where the two readings date the credits alike.",
       "evidence": [
         {
           "kind": "voucher",
@@ -400,10 +652,10 @@
     },
     {
       "id": "tds_interest_201.interest_max_own_date_f4de7474",
-      "value": 40,
+      "value": 70,
       "unit": "paise",
-      "definition_sha256_16": "8b63b42770650aad",
-      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 4 tag f4de7474): each credit's share of the tax, to as_of (2026-09-30). Each credit's share is rounded on its own, so this can be a paisa less than the row's maximum where the two readings date the credits alike.",
+      "definition_sha256_16": "89ec579e07be95ee",
+      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 4 tag f4de7474): each credit's share of the tax, the largest over every deduction date from the credit's own date to as_of (2026-09-30). Each credit's share is rounded on its own, so this may differ from the row's maximum where the two readings date the credits alike.",
       "evidence": [
         {
           "kind": "voucher",
@@ -416,8 +668,8 @@
       "id": "tds_interest_201.interest_max_own_date_ff088f18",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "597677d12d615c76",
-      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 7 tag ff088f18): each credit's share of the tax, to as_of (2026-09-30). Each credit's share is rounded on its own, so this can be a paisa less than the row's maximum where the two readings date the credits alike.",
+      "definition_sha256_16": "550ac092c4b0c444",
+      "definition_text": "s.201(1A) interest, maximum bound, if each credit's tax ran from that credit's own date rather than from the day the aggregate was crossed (row 7 tag ff088f18): each credit's share of the tax, the largest over every deduction date from the credit's own date to as_of (2026-09-30). Each credit's share is rounded on its own, so this may differ from the row's maximum where the two readings date the credits alike.",
       "evidence": [
         {
           "kind": "voucher",
@@ -706,7 +958,7 @@
     },
     {
       "id": "tds_interest_201.months_stage2_max_3bfae88a",
-      "value": 0,
+      "value": 1,
       "unit": "count",
       "definition_sha256_16": "4bd4fda4668a8b77",
       "definition_text": "s.201(1A) post-deduction months (or part), maximum bound, row 5 tag 3bfae88a.",
@@ -730,7 +982,7 @@
     },
     {
       "id": "tds_interest_201.months_stage2_max_8a4834a5",
-      "value": 0,
+      "value": 12,
       "unit": "count",
       "definition_sha256_16": "afd235643413e183",
       "definition_text": "s.201(1A) post-deduction months (or part), maximum bound, row 3 tag 8a4834a5.",
@@ -738,7 +990,7 @@
     },
     {
       "id": "tds_interest_201.months_stage2_max_cb024259",
-      "value": 0,
+      "value": 13,
       "unit": "count",
       "definition_sha256_16": "f65174d5b7185cb3",
       "definition_text": "s.201(1A) post-deduction months (or part), maximum bound, row 2 tag cb024259.",
@@ -746,7 +998,7 @@
     },
     {
       "id": "tds_interest_201.months_stage2_max_dfc10126",
-      "value": 0,
+      "value": 1,
       "unit": "count",
       "definition_sha256_16": "59f6282e79719fa0",
       "definition_text": "s.201(1A) post-deduction months (or part), maximum bound, row 6 tag dfc10126.",
@@ -754,7 +1006,7 @@
     },
     {
       "id": "tds_interest_201.months_stage2_max_f4de7474",
-      "value": 0,
+      "value": 2,
       "unit": "count",
       "definition_sha256_16": "7e8c04553a36b08b",
       "definition_text": "s.201(1A) post-deduction months (or part), maximum bound, row 4 tag f4de7474.",
@@ -1240,7 +1492,7 @@
     },
     {
       "id": "tds_interest_201.total_interest_max_higher_rates_paise",
-      "value": 5520,
+      "value": 8530,
       "unit": "paise",
       "definition_sha256_16": "b8f0e5b18987b4a3",
       "definition_text": "Sum of each row's maximum with every credit's tax from its own date (interest_max_own_date_<row>, or interest_max_<row> where a row has no such figure) in the higher-rate scenario: every row at a payee's higher rate, and every row at a single rate -- never a payee's row at the other rate as well.",
@@ -1248,7 +1500,7 @@
     },
     {
       "id": "tds_interest_201.total_interest_max_lower_rates_paise",
-      "value": 5520,
+      "value": 8530,
       "unit": "paise",
       "definition_sha256_16": "ad0207bd38488903",
       "definition_text": "Sum of each row's maximum with every credit's tax from its own date (interest_max_own_date_<row>, or interest_max_<row> where a row has no such figure) in the lower-rate scenario: every row at a payee's lower rate, and every row at a single rate -- never a payee's row at the other rate as well.",
@@ -1256,7 +1508,7 @@
     },
     {
       "id": "tds_interest_201.total_interest_max_paise",
-      "value": 5520,
+      "value": 8530,
       "unit": "paise",
       "definition_sha256_16": "7d9ce284cc0c4c0c",
       "definition_text": "The ceiling of the combined range: the higher-rate scenario's maximum, each credit's tax running from its own date (one reading of s.194C(5) and its proviso, pending the CA's confirmation).",
@@ -1322,6 +1574,14 @@
           "figure_id": "tds_interest_201.deductible_date_cb024259"
         },
         {
+          "name": "tranche_1_interest_if_not_deducted",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_cb024259"
+        },
+        {
+          "name": "tranche_1_interest_if_not_deducted_own_date",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_own_date_cb024259"
+        },
+        {
           "name": "tranche_1_interest_max",
           "figure_id": "tds_interest_201.interest_max_cb024259"
         },
@@ -1340,6 +1600,14 @@
         {
           "name": "tranche_2_deductible_date",
           "figure_id": "tds_interest_201.deductible_date_8a4834a5"
+        },
+        {
+          "name": "tranche_2_interest_if_not_deducted",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_8a4834a5"
+        },
+        {
+          "name": "tranche_2_interest_if_not_deducted_own_date",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_own_date_8a4834a5"
         },
         {
           "name": "tranche_2_interest_max",
@@ -1362,6 +1630,14 @@
           "figure_id": "tds_interest_201.deductible_date_f4de7474"
         },
         {
+          "name": "tranche_3_interest_if_not_deducted",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_f4de7474"
+        },
+        {
+          "name": "tranche_3_interest_if_not_deducted_own_date",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_own_date_f4de7474"
+        },
+        {
           "name": "tranche_3_interest_max",
           "figure_id": "tds_interest_201.interest_max_f4de7474"
         },
@@ -1380,6 +1656,14 @@
         {
           "name": "tranche_4_deductible_date",
           "figure_id": "tds_interest_201.deductible_date_3bfae88a"
+        },
+        {
+          "name": "tranche_4_interest_if_not_deducted",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_3bfae88a"
+        },
+        {
+          "name": "tranche_4_interest_if_not_deducted_own_date",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_own_date_3bfae88a"
         },
         {
           "name": "tranche_4_interest_max",
@@ -1402,6 +1686,14 @@
           "figure_id": "tds_interest_201.deductible_date_dfc10126"
         },
         {
+          "name": "tranche_5_interest_if_not_deducted",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_dfc10126"
+        },
+        {
+          "name": "tranche_5_interest_if_not_deducted_own_date",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_own_date_dfc10126"
+        },
+        {
           "name": "tranche_5_interest_max",
           "figure_id": "tds_interest_201.interest_max_dfc10126"
         },
@@ -1422,6 +1714,14 @@
           "figure_id": "tds_interest_201.deductible_date_ff088f18"
         },
         {
+          "name": "tranche_6_interest_if_not_deducted",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_ff088f18"
+        },
+        {
+          "name": "tranche_6_interest_if_not_deducted_own_date",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_own_date_ff088f18"
+        },
+        {
           "name": "tranche_6_interest_max",
           "figure_id": "tds_interest_201.interest_max_ff088f18"
         },
@@ -1440,6 +1740,14 @@
         {
           "name": "tranche_7_deductible_date",
           "figure_id": "tds_interest_201.deductible_date_0eeb64cf"
+        },
+        {
+          "name": "tranche_7_interest_if_not_deducted",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_0eeb64cf"
+        },
+        {
+          "name": "tranche_7_interest_if_not_deducted_own_date",
+          "figure_id": "tds_interest_201.interest_if_not_deducted_own_date_0eeb64cf"
         },
         {
           "name": "tranche_7_interest_max",
@@ -1497,11 +1805,12 @@
       ],
       "title_sha256_16": "02f5ceb3e5b1db69",
       "title_text": "Possible s.201(1A) interest on a 194H shortfall for one payee -- 7 tranches -- range pending deposit evidence",
-      "limits_sha256_16": "c7d33fca4cb66a73",
+      "limits_sha256_16": "31684d010f2376f5",
       "limits_text": [
         "Books/documents alone cannot establish the actual deduction/collection and deposit dates; challans, the TAN and (for the pre-deduction leg) Form 26A are needed before any single interest amount can be confirmed -- this is a range, not a computed liability.",
         "Tie this range to the quarterly TDS statement (Form 26Q) filed for each credit: TRACES computes s.201(1A) interest from the dates of credit or payment and of deduction reported there. Where the statement reports other dates, or omits a credit, the route is a correction statement filed through TRACES; the interest then follows the dates as corrected.",
-        "No payee return-filing date was supplied, so the Form 26A (first proviso to s.201(1)) relief scenario could not be computed for this row; the maximum bound above assumes tax remains undeducted through as_of.",
+        "Where the date of deduction is not known, the interest is computed two ways as at 2026-09-30. If the tax is still not deducted: at the pre-deduction rate to 2026-09-30. If it was deducted and not deposited: the largest amount over every possible date of deduction up to 2026-09-30, at the pre-deduction rate to that date and the post-deduction rate from it; a month that both periods touch is counted at both rates. Both count calendar months or part of one, and no month after 2026-09-30; a count by periods of thirty days is not computed and may give a higher figure.",
+        "No payee return-filing date was supplied, so the Form 26A (first proviso to s.201(1)) relief scenario could not be computed for this row.",
         "Taken on the credits that attract TDS under s.194H (as read here, pending the CA's confirmation of that reading): once the payee's aggregate in the financial year exceeds the limit, every credit, the earlier ones from the date the aggregate is crossed. The aggregate is gross and a crossing is never undone: a reversal lowers nothing. One the client's list classifies as reversing a particular bill, or as an error, is named on the payee's finding but not applied, pending bill-wise detail from the books.",
         "Whether this payee's credits were foreseeable is not classified in the client's list of payees, so the maximum runs each credit's tax from its own date. If the work was genuinely one-off, the CA may instead run the earlier credits from the day the year's total crossed the limit: classify the payee to show that range."
       ],

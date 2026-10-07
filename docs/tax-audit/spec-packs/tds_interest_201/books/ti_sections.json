@@ -1,5 +1,5 @@
 {
- "comment": "A firm's payees under the other sections, one rule each: 11 rows, 9 findings; one payee is classified foreseeable and none one-off, so there is no one-off total. Dogwood Estates (s.194-I, each month on its own, lower rate 2% and higher rate 10%): s01 and s02 make April Rs 55,000, over the monthly limit on 25 April, so both are one tranche dated 25 April; s03 makes May exactly Rs 50,000, not over, no tranche; s04 makes June Rs 50,000.01, a tranche dated 5 June. Elm Associates (s.194J professional, one rate, 10%; classified foreseeable): s05 and s06 pass Rs 50,000 on 10 October, one tranche of Rs 50,000.01; s07 credits the same payee Rs 45,000 of technical fees, a separate category that stays within its limit and gives no row. Fir Labs (s.194J technical, one rate, 2%): s08 is Rs 50,000.01. Gum Designs (s.194J royalty, no rate settled by the category: lower 2%, higher 10%): s09. Hazel Ventures (s.194J, a s.28(va) sum, likewise two rates): s10. Ivy Agency (s.194H, one rate, 2%): s11 is Rs 20,000.01.",
+ "comment": "A firm's payees under the other sections, one rule each: 11 rows, 9 findings; one payee is classified foreseeable and none one-off, so there is no one-off total. Dogwood Estates (s.194-I, each month on its own, lower rate 2% and higher rate 10%): s01 and s02 make April Rs 55,000, over the monthly limit on 25 April, so both are one tranche dated 25 April; s03 makes May exactly Rs 50,000, not over, no tranche; s04 makes July Rs 50,000.01, a tranche dated 5 July. Elm Associates (s.194J professional, one rate, 10%; classified foreseeable): s05 and s06 pass Rs 50,000 on 10 October, one tranche of Rs 50,000.01; s07 credits the same payee Rs 45,000 of technical fees, a separate category that stays within its limit and gives no row. Fir Labs (s.194J technical, one rate, 2%): s08 is Rs 50,000.01. Gum Designs (s.194J royalty, no rate settled by the category: lower 2%, higher 10%): s09. Hazel Ventures (s.194J, a s.28(va) sum, likewise two rates): s10. Ivy Agency (s.194H, one rate, 2%): s11 is Rs 20,000.01.",
  "groups": {
   "Capital Account": null,
   "Current Assets": null,
@@ -271,7 +271,7 @@
   },
   {
    "guid": "ti-s04",
-   "date": "2025-06-05",
+   "date": "2025-07-05",
    "base_type": "Journal",
    "number": "RJ/04",
    "lines": [
@@ -287,7 +287,7 @@
   },
   {
    "guid": "ti-s05",
-   "date": "2025-08-10",
+   "date": "2025-09-10",
    "base_type": "Journal",
    "number": "FJ/05",
    "lines": [
@@ -351,7 +351,7 @@
   },
   {
    "guid": "ti-s09",
-   "date": "2025-11-14",
+   "date": "2025-12-12",
    "base_type": "Journal",
    "number": "FJ/09",
    "lines": [

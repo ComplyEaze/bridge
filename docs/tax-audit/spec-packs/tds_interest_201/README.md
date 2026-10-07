@@ -1,6 +1,6 @@
 # Spec pack: `tds_interest_201` (the s.201(1A) interest range on TDS that two other tests find undeducted)
 
-The goldens in this pack were produced by the reference engine at commit `ee17d80f` and are the
+The goldens in this pack were produced by the reference engine at commit `10717095` and are the
 contract; this note explains them and cites [`docs/tax-audit/parity-spec-v1.md`](../../parity-spec-v1.md)
 (parity spec sections 1, 2.1, 2.2, 3, 3.1, 4, 5, 6, 7, 10 and 11, as relevant); where the note and a
 golden differ, the golden wins and the reference's maintainers should be told on the pull request or
@@ -35,10 +35,14 @@ credits that attract TDS, split into tranches by the day each became deductible,
 every tranche a range of interest under s.201(1A):
 
 - a **minimum** of 0, because no date of deduction or of deposit is known;
-- a **maximum** at the pre-deduction rate (1% in the rules) for every month or part of a month from
-  the day the tax became deductible to a fixed as-of date, as if the tax were still not deducted;
-- a second maximum, the **own-date maximum**, that runs each credit of the tranche from that
-  credit's own date instead of from the tranche's date.
+- a **still-not-deducted amount**, at the pre-deduction rate (1% in the rules) for every month or
+  part of a month from the day the tax became deductible to a fixed as-of date, as if the tax were
+  still not deducted;
+- a **maximum**, the largest amount over every possible date of deduction from that day to the as-of
+  date: the pre-deduction rate up to the date of deduction and the post-deduction rate (1.5% in the
+  rules) from it, as if the tax had been deducted and not deposited;
+- both of these again with each credit of the tranche run from that credit's own date instead of
+  from the tranche's date: the **own-date** still-not-deducted amount and the **own-date maximum**.
 
 It then raises one finding per payee and rate, and totals the rows in two rate scenarios that are
 never added together. It concludes nothing: every finding has confidence `needs_document`, and no
@@ -243,7 +247,7 @@ On origin/master:
 - **Vouchers that share a GUID.** The reference at `ee17d80f` keeps one credit per voucher in both
   input tests and in the tranches. The crate's two ports key a row's credits by voucher GUID. The
   three goldens of `ti_shared_guid` are the reference's; a port of this test needs the two input
-  ports brought to that reading first.
+  ports brought to that reading first (issue #1243).
 - **One limit text of `partners_40b_194t`** was reworded in the reference after the crate's port:
   regenerating the crate's committed edge goldens of the two input tests at `ee17d80f` reproduced
   24 of 25 byte for byte, and `edge.partners_tds_mixed.partners_40b_194t.json` differs in that one
@@ -290,7 +294,7 @@ A row's tag is the first 8 hexadecimal characters of the SHA-1 of the UTF-8 text
 first row of `ti_placeholder` that text is `194H:<row id>_single_rate_2025-07-14:0`, with the row id
 its `tds_payees` golden shows.
 
-### 3.2 The thirteen figures of a row
+### 3.2 The fifteen figures of a row
 
 | Figure id | Unit | Value | Evidence |
 | --- | --- | --- | --- |
@@ -303,25 +307,49 @@ its `tds_payees` golden shows.
 | `months_stage1_min_<tag>` | count | 0 | none |
 | `months_stage1_max_<tag>` | count | months from the deductible date to the as-of date | none |
 | `months_stage2_min_<tag>` | count | 0 | none |
-| `months_stage2_max_<tag>` | count | 0 | none |
+| `months_stage2_max_<tag>` | count | the same count as `months_stage1_max_<tag>` | none |
 | `interest_min_<tag>` | paise | 0 | the row's |
-| `interest_max_<tag>` | paise | interest on the row's tax for `months_stage1_max` months | the row's |
-| `interest_max_own_date_<tag>` | paise | the sum, over the row's credits, of interest on the credit's tax for the months from the credit's own date to the as-of date | the row's |
+| `interest_if_not_deducted_<tag>` | paise | interest on the row's tax at the pre-deduction rate for `months_stage1_max` months | the row's |
+| `interest_max_<tag>` | paise | the maximum (below) on the row's tax from the deductible date | the row's |
+| `interest_if_not_deducted_own_date_<tag>` | paise | the sum, over the row's credits, of interest on the credit's tax at the pre-deduction rate for the months from the credit's own date to the as-of date | the row's |
+| `interest_max_own_date_<tag>` | paise | the sum, over the row's credits, of the maximum (below) on the credit's tax from the credit's own date | the row's |
 
 **Months** ("month or part of a month") from a start date to an end date: 0 when the end is on or
 before the start; otherwise the number of calendar months the span touches,
 `(end year - start year) * 12 + (end month - start month) + 1`. Days are not counted: 29 September
-to 30 September is 1 month, 31 August to 30 September is 2, and the as-of date itself or any later
-date is 0 (`ti_month_edges`).
+to 30 September is 1 month, 31 August to 30 September is 2, and a span that starts on the as-of date
+itself or on any later date is 0 (`ti_month_edges`).
 
-**Interest** on a tax for a number of months is at the rules' `rate_before_deduction_bp`:
+**Interest** on a tax at a rate for a number of months is
 `(tax * rate * months + 5000) div 10000` paise, rounded half up, and 0 when the tax, the rate or the
-months is 0 or less (`ti_rounding`). The post-deduction rate prices nothing on these rows; it is
-published as a figure only.
+months is 0 or less (`ti_rounding`). The pre-deduction rate is the rules' `rate_before_deduction_bp`
+and the post-deduction rate their `rate_after_deduction_bp`.
 
-Each credit's interest in the own-date maximum is rounded on its own, so where every credit of a
-tranche has the tranche's date the own-date maximum can still differ from the maximum by a paisa,
-either way (`ti_rounding`'s Oak Transit and Palm Freight).
+**The maximum** on a tax from a start date is found by trying every day D from the start date to the
+as-of date, both included: the interest on the tax at the pre-deduction rate for the months from the
+start date to D, plus the interest on it at the post-deduction rate for the months from D to the
+as-of date, each of the two rounded on its own. The maximum is the largest of those sums, and 0 when
+the start date is after the as-of date. A month that both periods touch is counted in both, so the
+largest is not always at the start date:
+
+- `ti_month_edges`' m04, tax Rs 20.00 from 1 September 2026: deducted that day, 1 month at 1.5%,
+  30 paise; deducted on the 2nd, September at 1% and again at 1.5%, 50 paise, the maximum;
+- m03, from 31 August 2026, a month end: deducted that day, 2 months at 1.5%, 60 paise; deducted on
+  1 September, 2 months at 1% and 1 at 1.5%, 70 paise, the maximum;
+- m05, from 29 September 2026: deducted that day 30 paise, the maximum; the only later day is the
+  as-of date, 1 month at 1% and nothing after, 20 paise, which is also its still-not-deducted
+  amount;
+- `ti_rounding`'s x11, tax 9 paise from 22 January 2026: 1 paisa if deducted that day or the day
+  after, and 2 paise if deducted on 1 June, where 6 months at 1% and 4 months at 1.5% are 0.54 paise
+  each and each rounds up. A port that tries only the start date and the day after it fails that
+  golden.
+
+The maximum is never below the still-not-deducted amount: deducted on the as-of date itself gives
+that amount.
+
+Each credit's part of an own-date figure is rounded on its own, so where every credit of a tranche
+has the tranche's date an own-date figure can still differ from the plain one by a paisa, either way
+(`ti_rounding`'s Oak Transit and Palm Freight).
 
 **Definitions** are compared by hash (parity spec section 4); take the fixed words from the
 goldens. They carry these variable parts:
@@ -332,7 +360,8 @@ goldens. They carry these variable parts:
 - `tax_<tag>`: after its fixed sentence, a space and the row's basis, then for a `lower_rate` or
   `higher_rate` row one more fixed sentence saying which of the two rates it is. The five basis
   texts are in `ti_194c` (194C), `ti_sections` (194I, 194J, 194H) and `ti_partners` (194T);
-- `interest_max_<tag>` and `interest_max_own_date_<tag>`: the as-of date, ISO;
+- `interest_if_not_deducted_<tag>`, `interest_max_<tag>` and the two own-date figures: the as-of
+  date, ISO;
 - the three rate figures of README section 5: the table's `authority` and `status`.
 
 ### 3.3 Evidence labels
@@ -360,7 +389,7 @@ ref kept once.
 ### 4.2 When a group gets a finding
 
 A group gets a finding only when the plain maximum, `interest_max_<tag>`, of at least one of its rows is
-above 0; the own-date maximum plays no part. A group whose
+above 0; the own-date maximum and the still-not-deducted amounts play no part. A group whose
 tranches all fall on or after the as-of date has its row figures and counts in the totals, and no
 finding and no group figure (`ti_month_edges`' m08 and m09).
 
@@ -380,8 +409,9 @@ rate.
 - **confidence**: `needs_document`.
 - **facts**: `tax` names `group_tax_<group id>`; then for the n-th listed row
   `tranche_<n>_deductible_date`, `tranche_<n>_tax`, `tranche_<n>_interest_min`,
-  `tranche_<n>_interest_max` and `tranche_<n>_interest_max_own_date`, each naming that row's
-  figure.
+  `tranche_<n>_interest_max`, `tranche_<n>_interest_if_not_deducted`,
+  `tranche_<n>_interest_max_own_date` and `tranche_<n>_interest_if_not_deducted_own_date`, each
+  naming that row's figure.
 - **evidence**: the group's.
 - **title**:
   `Possible s.201(1A) interest on a <section> shortfall for one payee<rate phrase> -- <n> tranche<s> -- range pending deposit evidence`,
@@ -393,11 +423,13 @@ rate.
   2. tie the range to the quarterly statement (every finding);
   3. the rate is the test's own default: only when the rules have no `[s201_1a]` table
      (`ti_rules_default`);
-  4. no payee filing date, so no Form 26A figure (every finding);
-  5. the row's basis;
-  6. for an `unclassified` payee one text, for a `one_off` payee another, for a `foreseeable` payee
+  4. the date of deduction is not known, so the interest is computed two ways (every finding); this
+     text carries the as-of date, ISO, in four places;
+  5. no payee filing date, so no Form 26A figure (every finding);
+  6. the row's basis;
+  7. for an `unclassified` payee one text, for a `one_off` payee another, for a `foreseeable` payee
      none (`ti_194c` and `ti_partners` have all three);
-  7. the deductor status is unresolved: only when the row's flag is set.
+  8. the deductor status is unresolved: only when the row's flag is set.
 - **ask the client**: two fixed items.
 
 ### 4.4 Population note
@@ -433,6 +465,9 @@ sum as `total_interest_max_<sc>_rates_paise` but taking the plain maximum, `inte
 the `one_off` rows; and `total_interest_max_one_off_at_crossing_paise`, the higher scenario's.
 `ti_sections` has a `foreseeable` payee and no `one_off` one, and does not have them.
 
+Every total of interest other than the minimum is built from maxima. No total is published for the
+still-not-deducted amounts; the rows carry them.
+
 None of these figures has evidence.
 
 ## 6. When there is no row
@@ -451,26 +486,39 @@ input tests and the two tranche tables do, so a book they refuse stops the run b
 
 The check reads only the published figures. For every tag that has an `interest_min_<tag>` figure,
 in ascending order of tag, it reads that row's `tax`, `section`, `deductible_date`, `deducted_date`,
-`paid_date`, `interest_min` and `interest_max` figures, and the `as_of` and three rate figures, and
-recomputes the two bounds with its own copies of the months and interest rules of README
-section 3.2. For a row whose deducted date is `not supplied` the recomputed minimum is 0 and the
-recomputed maximum is the interest on the tax at `rate_before_deduction_bp` for the months from the
-deductible date to the as-of date. It does not look at the own-date maximum, the months figures,
-the group figures or the totals.
+`paid_date`, `interest_min`, `interest_max` and `interest_if_not_deducted` figures, and the `as_of`
+and three rate figures, and recomputes them with its own copies of the months and interest rules of
+README section 3.2. For a row whose deducted date is `not supplied` the recomputed minimum is 0, the
+recomputed still-not-deducted amount is the interest on the tax at `rate_before_deduction_bp` for
+the months from the deductible date to the as-of date, and the recomputed maximum is the largest of
+the sums of README section 3.2. The reference's check does not try every day for that: it tries the
+deductible date, the day after it when the as-of date is later, and the first day of every later
+calendar month up to the as-of date's. A day's two month counts depend only on its calendar month
+unless it is the deductible date or the as-of date, and the as-of date is one of the days tried or
+has an earlier day of its own month among them, which counts the same first period and a second. So
+the two methods give one maximum, and a port may use either in its check. The check does not look at
+the own-date figures, the months figures, the group figures or the totals.
 
-Its five messages, exactly, each beginning `TDSI-1: <tag>: `:
+Its six messages, exactly, each beginning `TDSI-1: <tag>: `:
 
 - `missing a figure needed for independent recomputation`, when the row's tax, section, deductible
   date, minimum or maximum figure is absent; the row is then not checked further;
 - `negative bound (min=<minimum>, max=<maximum>)`;
 - `min <minimum> > max <maximum>`;
 - `published interest_min <minimum> != independently recomputed <value>`;
-- `published interest_max <maximum> != independently recomputed <value>`.
+- `published interest_max <maximum> != independently recomputed <value>`;
+- `published interest_if_not_deducted <amount> != independently recomputed <value>`, where the
+  amount is `None` when a row with no deducted date lacks the figure, and the value is `None` when
+  a row that should have no such figure carries one.
 
 **None of them can fire on a row the caller builds**, and no golden shows one. The test always
 publishes the figures the first message looks for; no bound is below 0; the minimum of a caller's
-row is 0; and the recomputation repeats the rule that produced the figures. That was also measured:
-the rows of README section 11's books, 16,699 rows, gave no violation. The goldens still pin the
+row is 0; and the recomputation repeats the rule that produced the figures. That was also measured.
+At the commit this pack was first made from (`ee17d80f`), on the rows of README section 11's books,
+16,699 rows, the first five messages never fired. At this commit the check was run on every row of
+this pack's books and on 126,672 invented rows with no deducted date (deductible dates up to four
+years before the as-of date, leap days and month ends, taxes from 1 paisa up, thirteen pairs of
+rates), each compared with a search of every day: no violation and no difference. The goldens still pin the
 check's own arithmetic: a port whose check counted months or rounded differently from its test
 would fire on these books and fail them (HASHES.md).
 
@@ -480,8 +528,8 @@ Every golden carries the book-level and result-level reports of parity spec sect
 
 - `ti_shared_guid`, in all three of its goldens: POP-5 at book level on each of the three GUIDs that
   two regular vouchers share (`2 in-books vouchers share this GUID`). In its `tds_interest_201`
-  golden POP-4 fires five times at result level, subject `tds_interest_201`, detail
-  `voucher:ti-g-void`: once for each of the four figures of the CJ/05 row that carry evidence and
+  golden POP-4 fires seven times at result level, subject `tds_interest_201`, detail
+  `voucher:ti-g-void`: once for each of the six figures of the CJ/05 row that carry evidence and
   once for the finding, because that voucher's GUID is also a cancelled voucher's. Its `tds_payees`
   golden has the same POP-4 three times.
 - Every other report of every edge golden is empty: each book's vouchers tie to its Trial Balance
@@ -518,6 +566,8 @@ The test accepts rows that no run of the reference can give it. They were looked
 caller on the fourteen books of this pack, on 24 of the crate's 25 committed edge books for the two
 input tests (the 25th, `tds_payees_gross_gst`, names a partner with no ledgers, which
 `partners_40b_194t` refuses) and on 2,000 randomly built invented books: 2,038 books, 16,699 rows.
+That run was made at `ee17d80f`, on the books as they then were; the caller, the tranche rule and
+the two input tests are byte for byte the same at `10717095`, and it was not repeated.
 On every one of those rows the section was one of the five of README section 2.2, the deducted date
 and the paid date were absent, there was no payee filing date, and the group, the rate, the basis
 and at least one credit were present. So no golden shows, and this pack does not specify:
@@ -526,7 +576,8 @@ and at least one credit were present. So no golden shows, and this pack does not
   figures in place of the four of README section 3.2. The rate figure `rate_206c_bp` is published
   all the same;
 - **a row with a deducted date**, with or without a paid date, which the test would price in two
-  legs, the second at `rate_after_deduction_bp`, and would not give an own-date maximum;
+  legs, the second at `rate_after_deduction_bp`, and would give no still-not-deducted amount and no
+  own-date figure;
 - **a row with a payee filing date** (the Form 26A route), which would add three figures to the row
   and a fact to its finding, and move the two counts and the two relief totals of README section 5
   off the values given there;
@@ -550,16 +601,23 @@ evidence for how they behave.
 
 ### 11.3 Rules no golden pins
 
-Each of these was changed alone in a copy of the reference and no golden changed (HASHES.md):
+Each of these was changed alone in a copy of the reference at `10717095` and no golden changed:
 
 - **the group tax summed over the listed rows instead of all rows**: an unlisted row has a tax
   of 0;
 - **the combined floor taken from the higher scenario instead of the lower**: both are 0;
 - **the test for a s.206C section removed**: no row has one;
-- **the module check's two comparisons removed**: they never fire (README section 7).
+- **the module check's two comparisons removed**: they never fire (README section 7);
+- **the module check not looking at the still-not-deducted amount**: its message never fires
+  either;
 - **a group's finding gated on the larger of its rows' two maxima instead of the plain maximum**
-  (README section 4.2): the two differ only for a tranche dated on or after the as-of date whose
-  credits are dated before it, and no book has one.
+  (README section 4.2): no book has a group in which the two differ;
+- **a group's finding gated on its rows' still-not-deducted amounts instead of their maxima**: the
+  two differ only for a group whose every row has a still-not-deducted amount of 0 and one of whose
+  rows has a maximum above 0, and no book has one (no row in any book has the one at 0 and the other
+  above it);
+- **the search for the maximum stopping the day before the as-of date**: on no row of any book does
+  trying the as-of date add to the maximum.
 
 And these cannot be told apart by any book:
 
@@ -569,7 +627,9 @@ And these cannot be told apart by any book:
   these findings;
 - passing by a payee that is only possibly over: it has no tranche either way.
 
-Every rule HASHES.md lists changes at least one golden when it alone is changed.
+Every rule in the first table of HASHES.md changed at least one golden when it alone was changed at
+`10717095`. Its other three tables are as measured at `ee17d80f`; HASHES.md says what was not run
+again.
 
 ## 12. Behaviour that may look like a defect
 
@@ -578,14 +638,26 @@ them in the port:
 
 - **The whole tax is priced even when the books show it deducted.** `ti_base`'s b01 credits the
   payee net of TDS on a ledger classified as TDS payable; `tds_payees` reports that TDS as seen,
-  and the row's tax is still the full amount with a maximum running to the as-of date. The minimum
-  of 0 is the only sign of it.
+  and the row's tax is still the full amount, priced with no date of deduction as every row is. The
+  minimum of 0 is the only sign of it.
 - **A firm can be told its deductor status is unresolved.** `ti_placeholder`: the status is
   `deductor`, and the payee's finding still carries the limit about an unresolved status, because
   the turnover is marked a placeholder. That limit points to a finding of `tds_payees` which does
   not exist on that book.
-- **The own-date maximum can be a paisa above the maximum** when every credit has the tranche's
-  date (`ti_rounding`); its definition speaks only of a paisa less.
+- **An own-date figure can differ from the plain one by a paisa, either way,** when every credit
+  has the tranche's date (`ti_rounding`): each credit is rounded on its own.
+- **The maximum counts the month of deduction twice.** Deducted the day after the tax became
+  deductible, that month is counted at the pre-deduction rate and again at the post-deduction rate,
+  so the maximum is above the post-deduction rate for the whole span (`ti_month_edges`' m04: 50
+  paise, not 30).
+- **A maximum can be reached months after the deductible date** on a tax of a few paise, where each
+  period's interest rounds up on its own (`ti_rounding`'s x11).
+- **No total is published for the still-not-deducted amounts.** Every total of interest but the
+  minimum is built from maxima.
+- **A limit says a count by periods of thirty days may give a higher figure,** and the test computes
+  none.
+- **The post-deduction months figure is the whole span** on every row, although no date of
+  deduction is known: either period can be the whole span.
 - **A payee with no name can be classified.** `ti_names`' n06: the foreseeability list names the
   text `(payee not named)`, `tds_payees` reports the entry as matching nothing, and the caller
   applies it.
@@ -622,8 +694,8 @@ it reaches, voucher by voucher. The period is the default, 1 April 2025 to 31 Ma
 | `ti_placeholder` | 2 | 2 | The flag from a placeholder turnover, on a payee and not on a partner. |
 | `ti_status_unknown` | 1 | 1 | The flag from an `unknown` status. |
 | `ti_rules_default` | 2 | 2 | Rules without `[s201_1a]`, `[s206c_7]`, `[s194j]` and `[s194t]`. |
-| `ti_month_edges` | 9 | 1 | 0, 1, 2, 12 and 13 months; the as-of date and each side of it; figures with no finding. |
-| `ti_rounding` | 16 | 6 | Half-up rounding of tax and of interest, at the half and just under it; a tranche with no tax; the own-date maximum a paisa above and a paisa below the maximum. |
+| `ti_month_edges` | 9 | 1 | 0, 1, 2, 12 and 13 months; the as-of date and each side of it; a deductible date on a month end, on the first of a month and on the day before the as-of date; figures with no finding. |
+| `ti_rounding` | 18 | 6 | Half-up rounding of tax and of interest, at the half and just under it; a tranche with no tax; a maximum found only by trying every date of deduction; an own-date figure a paisa above and a paisa below the plain one. |
 | `ti_shared_guid` | 5 | 2 | Vouchers sharing a GUID as separate credits, in two tranches and in one; identical twins cited once; a GUID shared with a cancelled voucher; POP-5 and POP-4. |
 | `ti_names` | 6 | 6 | Exact matching of foreseeability names (composed and decomposed letters, Devanagari, double spaces, case); labels with Unicode, padded and empty numbers; a classified payee with no name. |
 

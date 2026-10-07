@@ -166,7 +166,7 @@
         {
           "kind": "voucher",
           "id": "ti-c06",
-          "label": "Journal CJ/06 on 2025-11-05"
+          "label": "Journal CJ/06 on 2025-10-28"
         }
       ]
     },
@@ -336,7 +336,7 @@
         {
           "kind": "voucher",
           "id": "ti-c06",
-          "label": "Journal CJ/06 on 2025-11-05"
+          "label": "Journal CJ/06 on 2025-10-28"
         }
       ]
     },
@@ -783,7 +783,7 @@
         {
           "kind": "voucher",
           "id": "ti-c06",
-          "label": "Journal CJ/06 on 2025-11-05"
+          "label": "Journal CJ/06 on 2025-10-28"
         }
       ],
       "title_sha256_16": "8eaee7b8a29c82d3",

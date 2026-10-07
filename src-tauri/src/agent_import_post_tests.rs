@@ -2472,6 +2472,12 @@ fn record_key_paths(value: &Value, at: &str, into: &mut std::collections::BTreeS
 /// mark's `kind`. A new variant of one of the record's enums is not seen
 /// either; an older release is expected to fail to parse it and so refuse the
 /// whole journal.
+///
+/// The `invoice` record of a Sales voucher did not rename the binding: it is
+/// written on a Sales voucher only, and a release that does not know the
+/// record does not know the Sales type either, so it fails to parse the line
+/// and refuses the whole journal (releases up to 0.4.2 also find no binding
+/// they read).
 #[test]
 fn a_saved_batch_holds_exactly_these_records() {
     fn every_field_is_named(line: &ImportLedgerLine) {
@@ -2514,8 +2520,25 @@ fn a_saved_batch_holds_exactly_these_records() {
                 narration: _,
                 reference: _,
                 voucher_number: _,
+                invoice,
                 entries,
             } = voucher;
+            // One pattern names every field of the record and of what it holds.
+            if let Some(super::super::invoice::InvoiceDetail {
+                voucher_type_name: _,
+                place_of_supply: _,
+                round_off_ledger: _,
+                observed:
+                    Some(super::super::invoice::InvoiceObserved {
+                        voucher_type_guid: _,
+                        party_gstin: _,
+                        party_state: _,
+                        party_registration_type: _,
+                        party_bill_wise: _,
+                        company_state: _,
+                    }),
+            }) = invoice
+            {}
             for entry in entries {
                 let ImportEntry {
                     ledger: _,
@@ -2549,6 +2572,15 @@ fn a_saved_batch_holds_exactly_these_records() {
         serde_json::from_value(json!([{"ledger":"Expense","party_digest":"a".repeat(64)}]))
             .unwrap();
     line.vouchers[0].voucher_number = Some("7".into());
+    // Every key an invoice record can write, on a voucher of any type: only
+    // the keys are pinned here.
+    line.vouchers[0].invoice = serde_json::from_value(json!({
+        "voucher_type_name":"Sales", "place_of_supply":"Rajasthan", "round_off_ledger":"Round Off",
+        "observed":{"voucher_type_guid":"g", "party_gstin":"08ZZZZZ0000Z1ZQ",
+            "party_state":"Rajasthan", "party_registration_type":"Regular",
+            "party_bill_wise":true, "company_state":"Rajasthan"}
+    }))
+    .unwrap();
     every_field_is_named(&line);
     let written = serde_json::to_value(&line).unwrap();
     let mut paths = std::collections::BTreeSet::new();
@@ -2592,6 +2624,17 @@ fn a_saved_batch_holds_exactly_these_records() {
             "vouchers[].entries[].amount",
             "vouchers[].entries[].ledger",
             "vouchers[].entries[].side",
+            "vouchers[].invoice",
+            "vouchers[].invoice.observed",
+            "vouchers[].invoice.observed.company_state",
+            "vouchers[].invoice.observed.party_bill_wise",
+            "vouchers[].invoice.observed.party_gstin",
+            "vouchers[].invoice.observed.party_registration_type",
+            "vouchers[].invoice.observed.party_state",
+            "vouchers[].invoice.observed.voucher_type_guid",
+            "vouchers[].invoice.place_of_supply",
+            "vouchers[].invoice.round_off_ledger",
+            "vouchers[].invoice.voucher_type_name",
             "vouchers[].narration",
             "vouchers[].reference",
             "vouchers[].voucher_number",

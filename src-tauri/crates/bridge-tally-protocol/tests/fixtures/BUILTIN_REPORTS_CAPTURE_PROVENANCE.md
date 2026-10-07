@@ -36,3 +36,20 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 | `builtin_ratio_analysis_probe_b_fy_live.utf16le.xml` | 3636 | `bd2b6621da370413ea602929e4e8bf760a243fc55cedb911c11739134a3dd635` | Ratio Analysis, 23 name and value pairs (not read by any parser) |
 | `builtin_sales_register_fy_request.utf16le.xml` | 772 | `71ac0fb926d28e10423edd7f10df646bedb74fe63545b40500f3f9d6ac341ae1` | request, Sales Register, 2025-04-01 to 2026-03-31 |
 | `builtin_sales_register_probe_b_fy_live.utf16le.xml` | 5888 | `61981e3281f26d1d9fab6199089dd78b5bc5ecbbc1ed6641b899413f8d22c80b` | Sales Register, 12 month rows (not read by any parser) |
+
+## Added 2026-10-07: Cash Flow on three more synthetic books
+
+- **Date and instance:** 2026-10-07, attended, one request at a time, licensed TallyPrime 7.1 Silver (`education_mode=false`). Every answer was HTTP 200 with `/status` healthy after it.
+- **Sender:** a lab script (`curl`, not `bridge_mcp`) sending a plain envelope (`TALLYREQUEST` Export, `TYPE` Data, `ID` Cash Flow, `SVCURRENTCOMPANY`, `SVFROMDATE`, `SVTODATE`), UTF-16LE with a BOM. The request files are not committed: the sent bytes were pinned by SHA-256 before sending (the table), and the three Cash Flow request files above carry the product's own rendering. Responses are **BOM-less UTF-16LE**, exactly as received.
+- **What the captures show:**
+  - `BRIDGE AMEND LAB`, April to September 2026 (6 rows): the debit, credit and closing columns, with two months of credit only (debit empty), one month with both, and three months with every amount empty. On every row with an amount the closing equals the debit plus the credit (a debit negative).
+  - `BRIDGE SHAPE LAB`, 2025-04-01 to 2026-03-31 (12 rows): two months with both columns (one closing positive), a month of credit only and nine with every amount empty. The same equation holds on every row with an amount.
+  - `BRIDGE CORPUS DENSE` (about 30,000 vouchers), the same year: 12 rows, all 36 amounts empty, 5,502 bytes in 0.1 s. The lab's earlier reading of that book is that it has no cash or bank activity; this answer alone cannot tell that from a report that did not compute, and its timing is a no-activity lower bound only.
+  - The net total (the sum of every closing) tied to the debit plus credit totals of the ledgers under Cash-in-Hand and Bank Accounts for `BRIDGE AMEND LAB` (Cash and one bank ledger). For `BRIDGE SHAPE LAB` it tied only when a ledger of the Bank OD A/c group was counted as well (one ledger, a debit only); the ledgers under Cash-in-Hand and Bank Accounts alone differ from Tally's net by exactly that ledger's net. On both books the Cash Flow's debit column and credit column each differed from the same ledgers' debit and credit totals by one common amount (a transfer between two of the money ledgers is the leading but untested reading), while the net tied.
+- **Not established:** a Bank OD A/c credit, a Bank OCC A/c ledger, what the two columns each include, a financial-year crossing, optional or post-dated vouchers, a several-currency book's Cash Flow, a large book with cash activity.
+
+| file | bytes | sha256 | content | sent-bytes sha256 |
+| --- | --- | --- | --- | --- |
+| `builtin_cash_flow_amend_lab_apr_sep_live.utf16le.xml` | 2876 | `9c0e4946165e784d00987713a0b1d81651191eb78621c305e064c13600bd08e0` | Cash Flow, 6 month rows, credits present | `eb8c282b7f35bdfe204e37f46db8aae9ccd521bd77220593d20bdffd3018d266` |
+| `builtin_cash_flow_shape_lab_fy_live.utf16le.xml` | 5622 | `f384c5e7b2bfaa4affc8e8941d2e11f8d724a0563cc0f2626812ef42f17ebf3c` | Cash Flow, 12 month rows, both columns and a positive closing | `3e462f1cfa31b3ca68ee9efbf4c663cb9331918bfec2a156633f82122454664a` |
+| `builtin_cash_flow_corpus_dense_fy_empty_live.utf16le.xml` | 5502 | `54667ddd7f613d50c11c3a97b06a57c78eec7b9105878463769c97851c75801a` | Cash Flow, 12 month rows, every amount empty | `d518f28d13549a353b4f9d4de57d844801b1a95b31f1647cd498266bb40ab43d` |

@@ -12,6 +12,12 @@ const CASH_FLOW_APR_JUN: &[u8] =
     include_bytes!("../tests/fixtures/builtin_cash_flow_probe_b_apr_jun_live.utf16le.xml");
 const CASH_FLOW_JUNE: &[u8] =
     include_bytes!("../tests/fixtures/builtin_cash_flow_probe_b_june_live.utf16le.xml");
+const AMEND_APR_SEP: &[u8] =
+    include_bytes!("../tests/fixtures/builtin_cash_flow_amend_lab_apr_sep_live.utf16le.xml");
+const SHAPE_FY: &[u8] =
+    include_bytes!("../tests/fixtures/builtin_cash_flow_shape_lab_fy_live.utf16le.xml");
+const CORPUS_DENSE_FY: &[u8] =
+    include_bytes!("../tests/fixtures/builtin_cash_flow_corpus_dense_fy_empty_live.utf16le.xml");
 const EMPTY_ENVELOPE: &[u8] =
     include_bytes!("../tests/fixtures/builtin_negative_ledgers_probe_b_fy_empty_live.utf16le.xml");
 const UNKNOWN_REPORT: &[u8] =
@@ -692,4 +698,82 @@ fn every_error_has_its_own_stable_code() {
     unique.dedup();
     assert_eq!(unique.len(), codes.len());
     assert!(codes.iter().all(|code| code.starts_with("cash_flow_")));
+}
+
+// ---- the answers of 2026-10-07 on three more lab books ----
+
+/// A row's debit and credit added: what Tally printed as the closing.
+fn debit_plus_credit(row: &NativeCashFlowRow) -> ExactDecimal {
+    let part = |amount: &NativeStatementAmount| match amount {
+        NativeStatementAmount::Present(value) => value.clone(),
+        NativeStatementAmount::Empty => ExactDecimal::zero(),
+    };
+    part(&row.debit).checked_add(&part(&row.credit)).unwrap()
+}
+
+#[test]
+fn every_captured_row_with_a_credit_closes_at_its_debit_plus_its_credit() {
+    // BRIDGE AMEND LAB (April to September 2026) and BRIDGE SHAPE LAB (year 2025-26): months with a
+    // credit only, months with both columns, and a positive closing. A debit is negative.
+    for (bytes, from, to) in [
+        (AMEND_APR_SEP, "20260401", "20260930"),
+        (SHAPE_FY, "20250401", "20260331"),
+    ] {
+        let parsed = parse_native_cash_flow(&response(bytes), &window(from, to)).unwrap();
+        let mut with_amounts = 0;
+        for row in &parsed.rows {
+            if row.closing == NativeStatementAmount::Empty {
+                assert_eq!(row.debit, NativeStatementAmount::Empty);
+                assert_eq!(row.credit, NativeStatementAmount::Empty);
+                continue;
+            }
+            with_amounts += 1;
+            let NativeStatementAmount::Present(closing) = &row.closing else {
+                unreachable!()
+            };
+            assert!(
+                closing.numeric_eq(&debit_plus_credit(row)),
+                "{:?}",
+                row.month
+            );
+        }
+        assert!(with_amounts >= 3, "{with_amounts} rows carried amounts");
+    }
+}
+
+#[test]
+fn a_captured_credit_only_month_keeps_its_debit_empty_and_a_mixed_month_keeps_both() {
+    let amend =
+        parse_native_cash_flow(&response(AMEND_APR_SEP), &window("20260401", "20260930")).unwrap();
+    // April 2026: a credit and nothing else.
+    assert_eq!(amend.rows[0].month, month(2026, 4));
+    assert_eq!(amend.rows[0].debit, NativeStatementAmount::Empty);
+    assert_eq!(amend.rows[0].credit, present("21371.00"));
+    assert_eq!(amend.rows[0].closing, present("21371.00"));
+    // July 2026: both, and the closing is the smaller net figure.
+    assert_eq!(amend.rows[3].month, month(2026, 7));
+    assert_eq!(amend.rows[3].debit, present("-33501.00"));
+    assert_eq!(amend.rows[3].credit, present("15810.00"));
+    assert_eq!(amend.rows[3].closing, present("-17691.00"));
+    let shape =
+        parse_native_cash_flow(&response(SHAPE_FY), &window("20250401", "20260331")).unwrap();
+    // June 2025 closes positive: credits above debits.
+    assert_eq!(shape.rows[2].closing, present("5500.00"));
+}
+
+#[test]
+fn a_whole_year_with_every_amount_empty_parses_to_twelve_empty_rows() {
+    // BRIDGE CORPUS DENSE: Tally's answer for a year in which the lab's earlier reading found no cash
+    // or bank activity. Empty is kept as empty, twelve times: not zero, and not a missing row.
+    let parsed =
+        parse_native_cash_flow(&response(CORPUS_DENSE_FY), &window("20250401", "20260331"))
+            .unwrap();
+    assert_eq!(parsed.rows.len(), 12);
+    assert_eq!(parsed.rows[0].month, month(2025, 4));
+    assert_eq!(parsed.rows[11].month, month(2026, 3));
+    for row in &parsed.rows {
+        assert_eq!(row.debit, NativeStatementAmount::Empty);
+        assert_eq!(row.credit, NativeStatementAmount::Empty);
+        assert_eq!(row.closing, NativeStatementAmount::Empty);
+    }
 }

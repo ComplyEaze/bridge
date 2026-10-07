@@ -424,8 +424,10 @@ The top-level `state` is `observed` when the months are returned and
   and a count of ledgers with movement whose group could not be resolved, which is
   where to look. Neither figure is the cash movement.
 - `cash_flow_money_group_unmeasured`: a ledger under Bank OD A/c or Bank OCC A/c
-  has movement in the window, and whether Tally's Cash Flow counts such a ledger
-  has not been measured. `months` is `null`.
+  has movement in the window. Tally's Cash Flow was seen counting one such ledger
+  (debit only, one book), which the tie does not count, so the refusal stands in
+  place of a difference; it is covered by tests and has not been seen against Tally,
+  and a Bank OD credit and a Bank OCC ledger were not measured. `months` is `null`.
 - `cash_flow_nothing_to_compare`: nothing could be tied. Either neither the cash and
   bank ledgers of the trial balance nor Tally's Cash Flow carry an amount for the
   window (an empty amount is not a zero), or both sides net to zero, which would be
@@ -446,7 +448,9 @@ counts it the net total differs and the result is `not_established`.
 `checks` says per field what was `checked`, `differs` (compared, and the figures
 disagree), `not_checked` or `withheld`: the net total is checked; the split into months is Tally's own and is not checked (a total
 can tie while one month is wrong); Tally's debit and credit columns are read but
-not returned, because how a contra is counted in them is not measured. A month
+not returned: on the two books with credits each column differed from the ledgers'
+debit and credit totals in the trial balance by the same amount while the net tied,
+and what that amount is has not been established. A month
 Tally printed with no amounts is returned with an empty `closing`, which is not zero and does not
 say the month had no entries (whether entries that cancel print an empty closing is not measured).
 A negative amount is a debit: cash and bank grew.
@@ -463,14 +467,19 @@ The refusals above reach the caller as an `isError` result whose `error.code` is
 `cash_flow_read_failed` and whose `error.cause` is the code named (the window codes
 are the `error.code` itself).
 
-The tool itself has not yet been run against Tally. Tally's Cash Flow answers were captured
-with a lab script on one synthetic company on licensed TallyPrime 7.1 (inflows into one bank
-and one cash ledger only): the sum of the months' debits tied to the trial balance's debit
-totals for the same window to the paisa, on three windows. Those trial balance figures were
-read at the time and are not kept as committed bytes; the check the tool applies (the months'
-closing figures against debit plus credit) was equal to that on all three captures only because
-the credit column was empty. Not measured: an outflow, a contra, a Bank OD A/c ledger, a month with
-both an inflow and an outflow, a book with several currencies, and a large book.
+The tool was run against Tally on two synthetic books on licensed TallyPrime 7.1 (2026-10-07,
+one call at a time through a recording relay): on five windows the net total tied to the trial
+balance and the months were returned (three windows with debits only; two with a credit amount,
+one of them with a positive closing as well), and a quiet window with no cash or bank amount was
+answered as `cash_flow_nothing_to_compare`. An independent recomputation from the raw bytes
+agreed with the tool on all six. Tally's own answers were also captured on three more books: on
+every captured month with an amount the closing is the debit plus the credit, and a year of empty
+months on a large book was answered at once. Not measured: a ledger under Bank OD A/c or Bank OCC
+A/c in the tool's own run (Tally was seen counting a Bank OD ledger, so the refusal above stands in
+place of a difference; it is covered by tests only), what Tally's debit and credit columns each
+include (each differed from the ledgers' totals by the same amount while the net tied), a window
+crossing a financial year, optional or post-dated vouchers, a book with several currencies, and a
+large book with cash activity.
 
 ### Stock Summary
 

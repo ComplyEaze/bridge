@@ -2867,6 +2867,9 @@ mod source_tests;
 #[path = "agent_import_index_tests.rs"]
 mod index_tests;
 
+#[path = "agent_import_number_identity_tests.rs"]
+mod number_identity_tests;
+
 fn test_duplicates(observed: &[ReadVoucher]) -> Result<Vec<Value>, String> {
     let identities = observed
         .iter()

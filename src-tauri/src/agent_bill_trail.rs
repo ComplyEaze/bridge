@@ -933,6 +933,19 @@ impl Server {
         .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
         detail["party"] = party_json;
         detail["ledger_match"] = ledger_match_json(&resolved, &party, self.settings.redaction);
+        // The bills are matched on the spelling the vouchers carry. When that is
+        // not the ledger's own name, what Tally's outstandings reports call the
+        // ledger is not established, so an answer that found nothing may be a
+        // name that did not match (#1085); say so in the result, not only in
+        // the parameter text.
+        if party != resolved.name()
+            && matches!(
+                detail["state"].as_str(),
+                Some("no_named_bill_for_party" | "no_residual_row_for_party")
+            )
+        {
+            detail["report_spelling"] = json!("not_established");
+        }
         detail["as_of"] = json!(as_of);
         detail["window"] = window;
         Ok((detail, evidence))

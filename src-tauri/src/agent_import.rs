@@ -291,7 +291,25 @@ pub(super) struct ImportLedgerLine {
     /// read bound it to (bridge#239). A post refuses when any of them now
     /// resolves to another GUID. Absent on records built before this field
     /// existed: such a batch is refused for posting and must be rebuilt.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ///
+    /// Written as `ledger_identities_2`. Releases 0.3.0 to 0.4.2 read only
+    /// `ledger_identities`, find none, and refuse the batch as built before
+    /// this record (`import_batch_predates_ledger_binding`), which is their
+    /// one refusal of a record they cannot check. They do not read the two
+    /// records below, so without this they would post a batch this build
+    /// saved, with neither check. The old name is still read, for a batch one
+    /// of them saved. No writer may write both names: a record carrying both
+    /// does not parse, and the journal reader refuses the whole history on a
+    /// record it cannot parse. When a record is added to or removed from a saved
+    /// batch, write this one under a new name again and keep every earlier
+    /// name as an alias: `a_saved_batch_holds_exactly_these_records` stops
+    /// compiling, or fails, until that is looked at.
+    #[serde(
+        default,
+        rename = "ledger_identities_2",
+        alias = "ledger_identities",
+        skip_serializing_if = "Option::is_none"
+    )]
     ledger_identities: Option<Vec<BoundLedger>>,
     /// Each ledger a bank cash answer named as cash in hand, with the voucher
     /// it was answered for (#815). The build refused any outside Cash-in-Hand,
@@ -307,9 +325,10 @@ pub(super) struct ImportLedgerLine {
     /// consistency binding. `Some(vec![])` when the build found
     /// no bill-wise ledger among those it names. Absent on records built
     /// before this field existed: such a batch is refused for posting and must
-    /// be rebuilt. An older binary after a rollback ignores the field (this
-    /// struct does not deny unknown fields) and would post such a batch
-    /// without the check.
+    /// be rebuilt. A release older than this field does not read it (this
+    /// struct does not deny unknown fields); releases 0.3.0 to 0.4.2 refuse
+    /// the batch for the ledger binding they cannot find instead (see
+    /// `ledger_identities`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     on_account_approved: Option<Vec<bill_wise::OnAccountApproved>>,
 }
@@ -914,16 +933,19 @@ impl Server {
                 bill_wise::bill_wise_parties(&payload.vouchers, &observed_flags);
             let verdict = bill_wise::judge_approvals(&approvals, &parties, &bill_wise_context)
                 .map_err(approval_invalid)?;
+            let names_masked = self.settings.redaction == super::Redaction::MaskParties;
             if !verdict.unapproved.is_empty() {
+                let unapproved =
+                    bill_wise::in_listing_order(verdict.unapproved, names_masked, |party| &party.1);
                 let (refused, omitted) = bill_wise::refused_parties_json(
-                    &verdict.unapproved,
+                    &unapproved,
                     refusal_diagnostic_budget(self.settings.max_bytes),
                 );
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                         "state":"refused", "reason":"bill_wise_party_unapproved",
                         "refused_parties":refused,
-                        "refused_party_count":verdict.unapproved.len(),
+                        "refused_party_count":unapproved.len(),
                         "refused_parties_omitted":omitted,
                         "bill_wise_response_sha256":[catalogue_evidence.response_sha256.clone()],
                         "next_step":BILL_WISE_UNAPPROVED_NEXT_STEP
@@ -1165,10 +1187,17 @@ impl Server {
                     "live_evidence": live_evidence(&line.vouchers),
                     "verification_preflight": verification_preflight,
                     "identity_scheme": line.identity_scheme,
-                    // The bill-wise ledgers a person approved, each with the
-                    // digest the approval was tied to, and the catalogue
-                    // response the flags came from (#1234).
-                    "on_account_approved": line.on_account_approved,
+                    // The bill-wise ledgers a person approved, each name
+                    // marked as a party name, with the digest the approval
+                    // was tied to, and the catalogue response the flags came
+                    // from (#1234).
+                    "on_account_approved": line.on_account_approved.as_ref().map(|approved| {
+                        bill_wise::approved_json(&bill_wise::in_listing_order(
+                            approved.clone(),
+                            names_masked,
+                            |party| &party.party_digest,
+                        ))
+                    }),
                     "bill_wise_response_sha256": [catalogue_evidence.response_sha256.clone()],
                     // The fifth element of §9.13's identity tuple. It is
                     // recorded on the batch and compared on dispatch, but a

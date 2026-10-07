@@ -727,7 +727,9 @@ ledgers in a separate census of 13 books, not reproducible from this repository)
 `outstandings` party detail either spelling is exact, a spelling that is two ledgers' is `ledger_ambiguous`,
 and `ledger_match` shows the ledger's own name (with `ledger_row_spelling` when its vouchers spell it
 differently), while the voucher filter and the trail still use the spelling the vouchers carry (#1085). What
-the outstandings report carries for such a ledger is not measured. `ledger_movement` takes its names from
+the outstandings report carries for such a ledger is not measured, so a party detail that finds no bill or
+no unallocated row for a ledger with two spellings carries `report_spelling: not_established`: it may mean
+the report names the ledger differently. `ledger_movement` takes its names from
 another report and is unchanged. Otherwise it
 refuses as `ledger_not_found`, or as `ledger_ambiguous` when several ledgers differ from it only in case
 or whitespace (such as a twin with a trailing line break, §9.4e). Every answer for a named ledger carries `ledger_match`:
@@ -1758,14 +1760,25 @@ Existing batch files and proofs keep their formats; new journal fields are
 optional on read, and no database migration or background queue is introduced.
 Disabling the switch and restarting the connector removes posting from tool
 availability without deleting reconciliation evidence.
-**Keep this connector version for recovery.** The journal reader refuses any
-record carrying a field it does not know. So after a native post, an older
-connector refuses the whole journal, including reconciliation of batches it
+**Keep this connector version for recovery.** The journal reader refuses a
+dispatch or status record, or a voucher, carrying a field it does not know; a
+saved batch's own record can carry fields an older connector does not read. So
+after a native post attempted with 0.4.2 or later, a connector older than 0.4.2
+refuses the whole journal, including reconciliation of batches it
 wrote itself. Since bridge#579, each native dispatch intent records the
-REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post made
-with this version, the dispatch intent also records the pre-POST voucher mark and
-the journal a binding record, which an older connector refuses: do not downgrade
-after posting with it. A downgrade before that first post is harmless.
+REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post attempted
+with 0.4.2 or later, the dispatch intent also records the pre-POST voucher mark and
+the journal a binding record, which a connector older than 0.4.2 refuses: do not
+downgrade after posting with it. A downgrade before that first post leaves the
+journal readable, and versions 0.3.0 to 0.4.2 then refuse to post a batch this
+version built (`import_batch_predates_ledger_binding`, nothing posted): they
+cannot make the cash-in-hand and bill-wise checks it was built with. Their
+message for that refusal says "Build the batch again"; it was written for
+batches older than they are, and for a batch this version built it is the wrong
+step. Reinstall this version (or a newer one) and post the batch from it. What
+an older version builds and posts itself, the same batch built again included,
+has neither check. 0.2.0 and earlier have no such refusal: do not run them over a
+data folder this version has built in.
 
 This is a bounded first posting slice, not blanket host/licence qualification.
 A ledger mapper is unnecessary for exact existing names: `validate_masters`

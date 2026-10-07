@@ -53,9 +53,11 @@ vouchers is off by default. This page is the short path; the
 ## Before you use it with client data
 
 - **What Claude reads goes to your AI provider**, as part of the conversation:
-  company names, party names and amounts. The **Response redaction** setting
-  can mask party names (`mask_parties`) or drop narration (`drop_narration`);
-  neither removes amounts. It starts at `none`.
+  company names, party names, amounts and party GSTINs, and, when it asks for
+  them, details such as PAN and bank account numbers. The **Response redaction**
+  setting can mask party names (`mask_parties`) or drop narration (`drop_narration`);
+  neither removes amounts, company names, or PAN and GSTIN numbers. It starts at
+  `none`.
 - **Posting is off by default** for a new install; an earlier version may
   have saved it on, so check the setting. If you turn it on, each voucher waits
   for your approval in a separate ComplyEaze Bridge window. No ComplyEaze

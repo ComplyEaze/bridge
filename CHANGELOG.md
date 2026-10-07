@@ -64,7 +64,8 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **How:** ComplyEaze Bridge does not update itself. Follow the
   [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
   (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
-  Desktop, Settings, Extensions, install the new file; (3) keep ComplyEaze
+  Desktop, Settings, Extensions, install the new file (remove a release older than
+  0.4.2 first, and see the first bullet above if two entries are listed); (3) keep ComplyEaze
   Bridge's data folder; (4) tick the new Terms setting, check that the extension shows 0.5.0 and
   that "Allow voucher posting" is as you want it, and enter your other settings
   again only if they were cleared; (5) quit Claude Desktop

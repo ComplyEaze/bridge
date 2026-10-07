@@ -210,7 +210,8 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   extension, which failed the same way; after Claude Desktop was quit and reopened there was one
   connector and the company list was returned. The record is the maintainer's
   dated notes, kept privately. What was not run: the published file, quitting and
-  reopening without ticking the box, a fresh install, and Windows.
+  reopening without ticking the box, installing over a release older than 0.4.2,
+  a fresh install, and Windows.
 - The bank-statement path through its fourth step, on a Mac, on 4 and 5 October
   2026, with that same CI-built 0.4.2 candidate (installed on 3 October; not the
   published file), against licensed TallyPrime Silver 7.1 holding the lab's own
@@ -420,8 +421,9 @@ it. Before you do, know what it is and is not:
   was not tried: remove it first. If Settings, Extensions lists two ComplyEaze
   Bridge entries (as happened when 0.4.2 was installed beside an older release),
   remove the older
-  entry before you use either and enter your settings in the new one, including
-  Response redaction, which starts at none.
+  entry before you use either, enter your settings in the new one, including
+  Response redaction, which starts at none, tick the new Terms setting, and quit
+  and reopen Claude Desktop.
 
 The Bridge **desktop application** is a separate program and has no published
 installer; building it from source is described under *Contributor quick start*

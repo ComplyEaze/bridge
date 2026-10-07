@@ -145,13 +145,13 @@ workflow.
 
 Private MCPB downloads do not update automatically. To upgrade, keep the data
 folder, install the newer release from the Extensions screen in Claude Desktop's
-settings, then confirm its version. On one Mac the package built for 0.5.0
-replaced 0.4.2 and kept its Tally port, Response redaction and posting setting
+settings, then confirm its version. On one Mac the package our checks built for 0.5.0
+(not the published file) replaced 0.4.2 and kept its Tally port, Response redaction and posting setting
 (see above): there, tick the new Terms setting and check the posting setting,
 then quit and reopen Claude Desktop. Installing over a release older than 0.4.2
 was not tried: remove it first. If
 Settings, Extensions lists two ComplyEaze Bridge entries instead (as happened
 when 0.4.2 was installed beside an older release), remove
-the older entry before you use either and enter your settings in the new one.
-Use the same screen to uninstall. Neither action changes Tally's
+the older entry before you use either, enter your settings in the new one, tick
+the new Terms setting, and quit and reopen Claude Desktop. Use the same screen to uninstall. Neither action changes Tally's
 HTTP gateway configuration.

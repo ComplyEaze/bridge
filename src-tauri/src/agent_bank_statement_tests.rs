@@ -496,6 +496,14 @@ async fn refusals_name_a_category_and_a_row_never_the_statement() {
     assert!(!wrong.to_string().contains("not-the-password"));
 
     fs::write(&password_file, PASSWORD).unwrap();
+    // a scan reaches the person under its own name, not as a layout change
+    let scan_directory = tempfile::tempdir().unwrap();
+    let (scan, scan_password) =
+        statement_files(scan_directory.path(), "scan-image-only.pdf", PASSWORD);
+    let scanned = server
+        .call_tool("parse_bank_statement", arguments(&scan, &scan_password))
+        .await;
+    assert_eq!(error_code(&scanned), Some("statement_no_readable_text"));
     for (key, value, expected) in [
         (
             "account_label",

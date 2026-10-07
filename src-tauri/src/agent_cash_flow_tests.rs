@@ -199,7 +199,7 @@ async fn a_net_that_ties_returns_the_months_and_says_what_was_checked() {
     assert_eq!(months[1]["closing"], json!({"state": "empty"}));
     assert_eq!(result["net_total"]["state"], "checked");
     assert_eq!(result["net_total"]["value"], "-4950.00");
-    // Debit-only months in one year: the measured shape, so nothing is flagged.
+    // Debit-only months in one year: the shape every window of the first captures had, so nothing is flagged.
     assert_eq!(result["unmeasured_in_this_answer"], json!([]));
     assert_eq!(
         result["basis"],
@@ -227,7 +227,7 @@ async fn a_net_that_ties_returns_the_months_and_says_what_was_checked() {
         "{lead}"
     );
     assert!(
-        lead.contains("No month with an outflow has been measured"),
+        lead.contains("No month's figure has been checked against"),
         "{lead}"
     );
     assert!(
@@ -335,6 +335,7 @@ async fn a_bank_od_ledger_with_movement_refuses_the_result_and_says_why() {
         "{lead}"
     );
     assert!(lead.contains("Bank OD A/c or Bank OCC A/c"), "{lead}");
+    assert!(lead.contains("was seen counting such a ledger"), "{lead}");
     assert!(lead.contains("has to be read in Tally"), "{lead}");
 }
 
@@ -437,10 +438,10 @@ fn row_with(
 }
 
 #[test]
-fn only_the_measured_shape_leaves_the_unmeasured_list_empty() {
+fn only_debit_only_months_in_one_year_leave_the_unmeasured_list_empty() {
     use bridge_tally_protocol::native_cash_flow::NativeCashFlow;
     let flow = |rows| NativeCashFlow { rows };
-    // Debit-only months, a negative closing, inside one March-to-March year: measured.
+    // Debit-only months, a negative closing, inside one March-to-March year: nothing named.
     assert!(unmeasured_shape(&flow(vec![
         row_with(4, None, Some("-10.00")),
         row_with(5, None, None)
@@ -498,7 +499,11 @@ async fn a_tie_that_holds_a_credit_amount_is_observed_but_flagged_and_its_lead_s
         "{lead}"
     );
     assert!(
-        !lead.contains("No month with an outflow has been measured"),
+        lead.contains("a window from March into April was not run"),
+        "{lead}"
+    );
+    assert!(
+        !lead.contains("No month's figure has been checked against"),
         "{lead}"
     );
 }

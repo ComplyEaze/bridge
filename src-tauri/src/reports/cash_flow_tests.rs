@@ -37,6 +37,15 @@ const CASH_FLOW_APR_JUN: &[u8] = include_bytes!(
 const CASH_FLOW_JUNE: &[u8] = include_bytes!(
     "../../crates/bridge-tally-protocol/tests/fixtures/builtin_cash_flow_probe_b_june_live.utf16le.xml"
 );
+const CASH_FLOW_AMEND_APR_SEP: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/builtin_cash_flow_amend_lab_apr_sep_live.utf16le.xml"
+);
+const CASH_FLOW_SHAPE_FY: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/builtin_cash_flow_shape_lab_fy_live.utf16le.xml"
+);
+const CASH_FLOW_CORPUS_DENSE_FY: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/builtin_cash_flow_corpus_dense_fy_empty_live.utf16le.xml"
+);
 
 fn groups() -> Vec<TallyNamedMaster> {
     parse_native_group_snapshot(GROUPS, GROUPS_GUID).unwrap()
@@ -244,8 +253,8 @@ fn an_inflow_and_an_outflow_in_one_ledger_net_in_the_tie() {
 }
 
 #[test]
-fn a_bank_od_ledger_with_movement_is_refused_until_it_has_been_measured() {
-    // synthetic: Tally's cash flow may or may not count a Bank OD A/c ledger; unmeasured.
+fn a_bank_od_ledger_with_movement_is_refused_because_the_check_does_not_count_it() {
+    // synthetic: Tally was seen counting a Bank OD A/c ledger (one book); the check does not, so it refuses.
     let rows = vec![
         row("W1 Bank", "Bank Accounts", "-100.00", ""),
         row("HDFC CC", "Bank OD A/c", "-250.00", ""),
@@ -460,4 +469,81 @@ fn the_refusal_codes_are_stable_and_distinct() {
         money_ledgers: 1,
     };
     assert_eq!(tied.refusal_code(), None);
+}
+
+// ---- the answers of 2026-10-07 on three more lab books (provenance: BUILTIN_REPORTS_CAPTURE_PROVENANCE.md) ----
+
+#[test]
+fn a_book_with_outflows_and_credits_ties_when_the_columns_are_added() {
+    // The money rows of the Trial Balance Bridge read for the same window (BRIDGE AMEND LAB, April to
+    // September 2026): each ledger's debit and credit are both present. Tally's closing is the debit
+    // plus the credit, so the window's net is -4,000.00 + 36,923.00 - 46,501.00 + 19,811.00.
+    let rows = vec![
+        row("Cash", "Cash-in-Hand", "-4000.00", "36923.00"),
+        row("Test Bank", "Bank Accounts", "-46501.00", "19811.00"),
+    ];
+    let result = check(
+        rows,
+        &captured(CASH_FLOW_AMEND_APR_SEP, "20260401", "20260930"),
+    );
+    assert_tied(&result, "6233.00", 2);
+}
+
+#[test]
+fn a_bank_od_ledger_with_movement_is_refused_by_the_check_and_is_what_the_difference_is() {
+    // BRIDGE SHAPE LAB, financial year 2025-26. The money rows of the Trial Balance Bridge read for the
+    // same window. Tally's own Cash Flow net, 5,735.50, equals the three ledgers of Cash-in-Hand and
+    // Bank Accounts (8,335.50) PLUS the debit of `HDFC CC`, a Bank OD A/c ledger (-2,600.00): Tally
+    // counts a ledger of that group in its cash and bank set.
+    let cash_flow = captured(CASH_FLOW_SHAPE_FY, "20250401", "20260331");
+    let money = || {
+        vec![
+            row(
+                "Bank of Baroda CA",
+                "Bank Accounts",
+                "-28464.50",
+                "52735.00",
+            ),
+            row("Cash", "Cash-in-Hand", "-37000.00", "21065.00"),
+            row("Shape Reparent Probe 20260922", "Bank Accounts", "", ""),
+        ]
+    };
+    let mut with_bank_od = money();
+    with_bank_od.push(row("HDFC CC", "Bank OD A/c", "-2600.00", ""));
+    // The check does not count a Bank OD ledger that Tally was seen counting, so it refuses instead of tying.
+    assert_eq!(
+        check(with_bank_od, &cash_flow),
+        CashFlowCheck::MoneyGroupUnmeasured { ledgers: 1 }
+    );
+    // Without that row the two sides differ by exactly the Bank OD ledger's net.
+    match check(money(), &cash_flow) {
+        CashFlowCheck::Differs {
+            tally_net,
+            ledger_net,
+            money_ledgers,
+            ..
+        } => {
+            assert_eq!(money_ledgers, 3);
+            assert!(tally_net.numeric_eq(&decimal("5735.50")));
+            assert!(ledger_net.numeric_eq(&decimal("8335.50")));
+            // The gap is exactly the Bank OD ledger's net.
+            let with_bank_od = ledger_net.checked_add(&decimal("-2600.00")).unwrap();
+            assert!(with_bank_od.numeric_eq(&tally_net));
+        }
+        other => panic!("expected a difference, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_whole_year_of_empty_months_over_money_rows_with_no_amount_has_nothing_to_compare() {
+    // BRIDGE CORPUS DENSE (about 30,000 vouchers): twelve month rows, every amount empty. The lab's
+    // earlier reading of that book is that it has no cash or bank activity; this answer alone cannot
+    // tell that from a report that did not compute, so the check reports no comparison, never a tie.
+    let cash_flow = captured(CASH_FLOW_CORPUS_DENSE_FY, "20250401", "20260331");
+    assert_eq!(cash_flow.rows.len(), 12);
+    let rows = vec![
+        row("Cash", "Cash-in-Hand", "", ""),
+        row("A Bank", "Bank Accounts", "", ""),
+    ];
+    assert_eq!(check(rows, &cash_flow), CashFlowCheck::NothingToCompare);
 }

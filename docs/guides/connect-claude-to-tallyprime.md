@@ -52,12 +52,18 @@ vouchers is off by default. This page is the short path; the
 
 ## Before you use it with client data
 
-- **What Claude reads goes to your AI provider**, as part of the conversation:
-  company names, party names, amounts and party GSTINs, and, when it asks for
-  them, details such as PAN and bank account numbers. The **Response redaction**
-  setting can mask party names (`mask_parties`) or drop narration (`drop_narration`);
-  neither removes amounts, company names, or PAN and GSTIN numbers. It starts at
-  `none`.
+- **What Claude reads goes to your AI provider**, as part of the conversation,
+  including company, party and ledger names, amounts, dates, narrations,
+  references, GSTINs and, when it reads ledger details, PAN, bank account
+  numbers, IFSC, MSME or Udyam registration numbers, email, phone and address,
+  and, when it builds a voucher file, that file's local path (which can include
+  your computer user name). The **Response redaction** setting takes one value,
+  not both: shorten party and ledger names and bank account numbers to their
+  first two and last two characters (`mask_parties`; four or fewer become “…”),
+  or drop narrations (`drop_narration`). Neither hides amounts, company names,
+  PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or
+  references, and a shortened name can still be identified, not least from the
+  GSTIN or PAN sent beside it. It starts at `none`.
 - **Posting is off by default** for a new install; an earlier version may
   have saved it on, so check the setting. If you turn it on, each voucher waits
   for your approval in a separate ComplyEaze Bridge window. No ComplyEaze

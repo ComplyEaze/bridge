@@ -7,22 +7,24 @@
 //! check is on the **net**, and only the net: the sum of the months' closing
 //! amounts must equal the sum of `debit + credit` over every ledger whose
 //! predefined group is Cash-in-Hand or Bank Accounts (a debit negative, a
-//! credit positive: the trial balance's convention, protocol reference §5.6; the
-//! sign and meaning of the Cash Flow's own credit column are not measured, and
-//! its closing figure was measured only where the credit column was empty). On
+//! credit positive: the trial balance's convention, protocol reference §5.6; on
+//! every captured month with an amount Tally's closing was the debit plus the
+//! credit, but the Cash Flow's own debit and credit columns each differed from
+//! the ledgers' totals while the net tied). On
 //! the trial balance side a contra between two such ledgers moves both and nets
-//! to nothing; how Tally's own Cash Flow prints a contra is not measured. Both
+//! to nothing; how Tally's own Cash Flow prints a contra is not established. Both
 //! sides must carry an amount: an empty amount is not a zero, and a side with
 //! none is not compared (`Differs` or `NothingToCompare`).
 //!
 //! What it deliberately does not do:
-//! - **Bank OD A/c and Bank OCC A/c.** Whether Tally's Cash Flow counts a
-//!   ledger under them is not measured. A ledger under either with movement in
+//! - **Bank OD A/c and Bank OCC A/c.** Tally's Cash Flow was seen counting one
+//!   Bank OD ledger (a debit, one book); a credit and a Bank OCC ledger were not
+//!   measured. A ledger under either with movement in
 //!   the window stops the check (`MoneyGroupUnmeasured`) instead of being
-//!   guessed at; one without movement is irrelevant to the net.
+//!   guessed at or counted; one without movement is irrelevant to the net.
 //! - **The gross columns and the split by month.** The sum of the months can
-//!   tie while one month is wrong, and the debit and credit columns depend on
-//!   how Tally treats a contra; neither is checked here.
+//!   tie while one month is wrong, and the debit and credit columns each differed from the ledgers' totals while the
+//!   net tied (a contra is the unverified reading); neither is checked here.
 //! - **A ledger it cannot classify.** It is left out of the money set and
 //!   counted when it carries movement: if it was in fact cash or bank, the tie
 //!   fails, and the count says where to look. A tie that holds anyway is not
@@ -45,7 +47,8 @@ use bridge_tally_protocol::{
 /// bank import's group table names.
 const MEASURED_MONEY_GROUPS: [&str; 2] = ["Bank Accounts", "Cash-in-Hand"];
 
-/// Money groups whose treatment in the Cash Flow is not measured. In the group
+/// Money groups the check does not count in the net although Tally's Cash Flow was
+/// seen counting a Bank OD ledger. In the group
 /// tree captured on 7.1 `Bank OCC A/c` is a language alias of the group whose
 /// reserved name is `Bank OD A/c`, so a lookup by reserved name returns the
 /// latter; the second entry covers a build that names it separately.
@@ -76,7 +79,8 @@ pub(crate) enum CashFlowCheck {
         unclassified_with_movement: usize,
     },
     /// A ledger under Bank OD A/c or Bank OCC A/c has movement in the window,
-    /// and whether Tally's Cash Flow counts it is not measured.
+    /// and Tally's Cash Flow was seen counting one such ledger, which this check
+    /// does not count.
     MoneyGroupUnmeasured { ledgers: usize },
     /// Nothing to tie: neither side carries an amount (no cash or bank ledger
     /// with an amount, and every month of Tally's Cash Flow empty; an empty

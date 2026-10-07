@@ -466,6 +466,10 @@
       "path": "src-tauri/src/agent_import_post_location.rs"
     },
     {
+      "path": "src-tauri/src/agent_import_post_on_account.rs",
+      "reason": "Decides which ledgers an approval dialog marks On Account, and holds the check every dialog text passes before a person is asked to approve a post."
+    },
+    {
       "path": "src-tauri/src/agent_import_span_identity.rs",
       "reason": "binds a native post's vouchers to the Tally vouchers its own POST created; a change there can attribute a posted voucher to the wrong Tally object, which is a false posted_verified"
     },

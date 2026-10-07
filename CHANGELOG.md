@@ -102,7 +102,11 @@ These changes are in source and not yet in a published build.
   every line the dialog writes itself stands above that line, and the date
   line says where the two are. That line and the note on the date line count
   toward the dialog's 100-character line limit and its 1,600-character limit.
-  Not measured: either dialog as macOS and Windows draw it, a large book, and
+  Looked at once on each system, with a one-voucher text at all three limits
+  (24 lines, 1,600 characters, a 100-character narration line): on one Mac
+  and on one Windows PC the whole text, its last two lines included, and the
+  buttons were visible without scrolling. Not measured: a smaller screen or a
+  larger display scaling, a batch dialog on either system, a large book, and
   the bills of a ledger whose flag reads No (#1234).
 - Versions 0.3.0 to 0.4.2 refuse to post a batch this version builds. They do
   not read the cash-in-hand and bill-wise records a saved batch now carries,

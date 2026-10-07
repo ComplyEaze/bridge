@@ -3616,6 +3616,27 @@ async fn a_window_counted_whole_refuses_a_read_short_of_its_census() {
     );
 }
 
+/// #1029: the same refusal on a SMALL book. A mark of 3 fits one request, yet the
+/// window is counted, and a read that returns fewer vouchers than the count named
+/// is refused with the typed code, cause and counts, as for a large book.
+#[tokio::test]
+async fn a_small_books_window_counted_whole_refuses_a_read_short_of_its_count() {
+    let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
+    plans.extend(paired(&mark(3)));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(vouchers_kept(2))));
+    let response = call_vouchers_over(plans).await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], PART_NOT_ADMITTED, "{response}");
+    assert_eq!(error["cause"], PART_CENSUS_MISMATCH, "{response}");
+    assert_eq!(
+        error["counts"],
+        json!({"returned": 2, "counted": 3}),
+        "{response}"
+    );
+}
+
 /// A licence that drops to Education while a read is in flight: the opening
 /// bracket said licensed, the closing one says Education. Which mode served
 /// the read is unknown, so a read Education would have served empty is refused,

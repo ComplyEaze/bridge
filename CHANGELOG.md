@@ -59,7 +59,7 @@ These changes are in source and not yet in a published build.
   `primary_group`: 12 and 8 buckets over the 64 vouchers that count (a cancelled, an optional and
   an entry-less voucher left out); every group bucket equalled the ledger buckets added up by the
   trial balance's own parent column, the 18 `subtree_totals` equalled the trial balance rolled up
-  the group tree, and each call took 64 requests (the window's 34 and the group modes' 30) and
+  the group tree, and each call took 64 requests (the window's 34 and the group modes' 30, as counted from the code) and
   about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
   read, or a held later page (#1230).
 

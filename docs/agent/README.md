@@ -1168,7 +1168,7 @@ each other.
     misleading answer, so there is no "unplaced" bucket. A ledger no voucher of the window touches
     does not matter. A voucher withheld for a foreign-currency amount is still in no bucket (the
     result is `partial`, as for every summary).
-  - Cost, by construction and not measured: 30 requests on top of the window read, with or without
+  - Cost, counted from the code and measured once in total (64 requests a call in the live run below): 30 requests on top of the window read, with or without
     `ledger` (its name is resolved against the same ledger list). A paired, identity-bracketed read
     is 6 requests; a group summary makes five: the company's marks first, to size the ledger list,
     then the ledger list and the group list before the window and again after it. A book whose
@@ -1200,10 +1200,10 @@ A summary over a `partial` window is only as complete as that window: `state` an
 
 **Group summaries checked once against a live Tally** (7 October 2026; TallyPrime 7.1 Silver; a debug build of the
 pull request's head, which is not in a published build, with the response budget raised to 2,000,000; the
-synthetic book of 67 vouchers read above, plus one voucher dated after its year; read-only, one request at a
+synthetic book of 67 vouchers of the 6 October check below, plus one voucher dated after its year; read-only, one request at a
 time). `summarise_by: group` over the year: `complete`, 12 buckets, 64 vouchers summarised, with exclusions
 `cancelled` 1, `no_accounting_entries` 1 and `optional` 1 (together the book's 67), 18 `subtree_totals`. Every
-bucket's debit, credit and voucher count equalled the first run's ledger buckets added up by the trial
+bucket's debit, credit and voucher count equalled the 6 October run's ledger buckets added up by the trial
 balance's own parent column; `totals`, `vouchers_summarised` and the exclusions equalled that run's; the
 `subtree_totals` equalled the trial balance rolled up the group tree; each `chain`, `primary_group` and
 `members` list agreed with the book's group tree. `summarise_by: primary_group`: `complete`, 8 buckets, the

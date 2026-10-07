@@ -1509,7 +1509,7 @@ statutory dues classified as TDS payable, on every voucher that posts to the loa
         // A voucher counted in taken or repaid already holds its TDS in its loan line (Loan Dr
         // 10,000 / TDS Cr 1,000 / Bank Cr 9,000 is a repayment of 10,000): LOAN-1 adds
         // tds_on_loan for the deductions outside those totals, so it is told what to leave out.
-        // Published only where such a voucher carries TDS (bridge#1259 item 2). A voucher listed
+        // Published where a taken or repaid voucher carries TDS lines (bridge#1259 item 2). A voucher listed
         // as both crediting and debiting the loan is not read this way: LOAN-1 firing on one
         // carrying TDS stays.
         let in_principal: BTreeSet<usize> = rows
@@ -3524,11 +3524,13 @@ narrated with ACH, NACH, ECS or EMI (each has a notice)."
 /// loan's taken total and its debit side in its repaid total; LOAN-4 (#779 Phase A) holds that
 /// every such voucher is listed with its own two sides, or is an interest or TDS entry, or a
 /// balanced voucher on the loan alone. The tie adds the TDS deducted on the loan, less what the
-/// taken and repaid totals already hold of it (`tds_in_principal_<tag>`, published only where
-/// there is some): a repayment booked net of TDS carries its deduction in its loan line
+/// taken and repaid totals already hold of it (`tds_in_principal_<tag>`, published where a taken
+/// or repaid voucher carries TDS lines): a repayment booked net of TDS carries its deduction in its loan line
 /// (bridge#1259 item 2). Its re-derivation reads vouchers by GUID, as the reference does: on a GUID
 /// a voucher outside the taken and repaid rows shares, it reads that voucher too and the line can
-/// fire while the tie holds. Refs go in (id, label) order; the reference's, per id, is not fixed.
+/// fire while the tie holds. It reads the published TDS ledger names as the figure holds them (an
+/// empty name among others too; an empty figure as none), where LOAN-4 leaves the empty name out.
+/// Refs go in (id, label) order; the reference's, per id, is not fixed.
 pub fn check_invariants(book: &Book, result: &TestResult) -> Result<Vec<String>> {
     check_invariants_with(book, result, NET_REVERSALS)
 }

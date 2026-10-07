@@ -72,8 +72,8 @@ actually on.
 5. Save the extension settings, then quit Claude Desktop completely and reopen
    it. (On that Mac Claude Desktop
    started Bridge as soon as the settings were saved and a new chat got an answer
-   from it, but the assistant first called an older entry of the extension, which
-   failed with the same error; after Claude Desktop was quit and reopened there
+   from it, but the assistant first called a leftover second entry for the same extension,
+   which failed with the same error; after Claude Desktop was quit and reopened there
    was one connector and no error.) In a new chat, use **Connectors** to confirm Bridge is connected.
 
 Voucher file preparation and bank-statement parsing are available by default;
@@ -109,18 +109,19 @@ an older release instead of replacing it (its author line changed, and Claude
 Desktop includes the author in an extension's identity; seen on a Mac, not tried
 on Windows). The package our checks built for release 0.5.0, installed on one Mac
 over 0.4.2, replaced it as an update: one extension at version 0.5.0, the Tally
-host and port, Response redaction and the posting setting as they were (a posting
+port, Response redaction and the posting setting as they were (a posting
 setting that was on stayed on), the old Terms setting gone and no value for the
 new one (version 2026-10.1). This was not tried with the published file or on
-Windows. So after updating, check the posting setting, tick the Terms setting and
+Windows. So after updating, tick the Terms setting, check the posting setting, then
 quit and reopen Claude Desktop; on that Mac, before the tick, Claude Desktop did
 not start Bridge and a request to one of its tools failed with a 400 error that
-did not mention the Terms. If Claude Desktop installs it beside an
-older extension instead, remove the older extension first, in Claude Desktop's
-Extensions settings, and do not delete the data folder, which both versions use,
-then enter the Tally port, the posting setting (posting starts off), the Terms
-setting and Response redaction (it starts at none; set it again if you had
-shortened or masked names). Dispatch coordination uses the operating system's
+did not mention the Terms. Installing over a release older than 0.4.2 was not
+tried: remove such a release first. If Settings,
+Extensions then lists two ComplyEaze Bridge entries (as happened when 0.4.2 was
+installed beside an older release), remove the older entry before you use
+either, and do not delete the data folder, which both versions use. Then enter the Tally port, the posting setting (posting starts
+off), the Terms setting and Response redaction (it starts at none; set it again
+if you had shortened or masked names), and quit and reopen Claude Desktop. Dispatch coordination uses the operating system's
 local app-data folder on Windows and account home on macOS, independently of
 launcher environment variables. Older processes may use a different coordination path.
 Keep the recovery data when upgrading. New posting attempts add a native request
@@ -145,8 +146,12 @@ workflow.
 Private MCPB downloads do not update automatically. To upgrade, keep the data
 folder, install the newer release from the Extensions screen in Claude Desktop's
 settings, then confirm its version. On one Mac the package built for 0.5.0
-replaced 0.4.2 and kept its settings (see above): there, tick the new Terms
-setting and check the posting setting. If Claude Desktop installs the new
-extension beside the older one instead, as 0.4.2 did beside an older release,
-remove the older extension first and enter your settings again. Use the same screen to uninstall. Neither action changes Tally's
+replaced 0.4.2 and kept its Tally port, Response redaction and posting setting
+(see above): there, tick the new Terms setting and check the posting setting,
+then quit and reopen Claude Desktop. Installing over a release older than 0.4.2
+was not tried: remove it first. If
+Settings, Extensions lists two ComplyEaze Bridge entries instead (as happened
+when 0.4.2 was installed beside an older release), remove
+the older entry before you use either and enter your settings in the new one.
+Use the same screen to uninstall. Neither action changes Tally's
 HTTP gateway configuration.

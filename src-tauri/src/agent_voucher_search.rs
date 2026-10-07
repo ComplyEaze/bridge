@@ -27,6 +27,10 @@ pub(super) struct VoucherSearch {
     /// The unsigned canonical amount, compared by numeric value with the absolute value of
     /// each ledger entry of a voucher.
     amount: Option<bridge_tally_core::ExactDecimal>,
+    /// Only vouchers whose narration ends in a suspense tag Bridge writes. Always together
+    /// with the `ledger` selector, so "on the suspense ledger" is decided by the ledger and
+    /// the tag only classifies those vouchers.
+    suspense_tagged: bool,
 }
 
 fn search_failure(code: &str) -> ToolFailure {
@@ -77,10 +81,26 @@ impl VoucherSearch {
             Some(text) => Some(search_amount(&text)?),
             None => None,
         };
+        let suspense_tagged = match args.get("suspense_tagged") {
+            None => false,
+            Some(Value::Bool(true)) => true,
+            Some(_) => return Err(search_failure("search_suspense_tagged_invalid")),
+        };
+        if suspense_tagged {
+            // A tag alone cannot say what is still in suspense (a reallocated voucher keeps
+            // its tag), and a narration filter under redaction would leak by probing.
+            if optional_string(args, "ledger")?.is_none_or(|ledger| ledger.trim().is_empty()) {
+                return Err(search_failure("search_suspense_tagged_needs_ledger"));
+            }
+            if redaction == Redaction::DropNarration {
+                return Err(search_failure("search_narration_redacted"));
+            }
+        }
         if voucher_number.is_none()
             && reference.is_none()
             && narration.is_none()
             && amount.is_none()
+            && !suspense_tagged
         {
             return Ok(None);
         }
@@ -89,6 +109,7 @@ impl VoucherSearch {
             reference,
             narration,
             amount,
+            suspense_tagged,
         }))
     }
 
@@ -136,6 +157,27 @@ impl VoucherSearch {
             }
             matched.insert("narration".to_string(), json!(true));
         }
+        if self.suspense_tagged {
+            let narration = row["narration"].as_str()?;
+            let ledgers = row["amounts"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|entry| entry["ledger"].as_str());
+            let tag = bridge_bank_statement::proposals::suspense_tag(
+                without_trailing_marker(narration),
+                ledgers,
+            )?;
+            matched.insert(
+                "suspense_tag".to_string(),
+                json!(match tag {
+                    bridge_bank_statement::proposals::SuspenseTag::PurposeNotConfirmed => {
+                        "purpose_not_confirmed"
+                    }
+                    bridge_bank_statement::proposals::SuspenseTag::Unidentified => "unidentified",
+                }),
+            );
+        }
         if let Some(wanted) = &self.amount {
             // A withheld voucher has no amounts to compare: it passes this criterion unjudged.
             if row.get(WITHHELD_MARKER).is_none() {
@@ -161,6 +203,26 @@ impl VoucherSearch {
             }
         }
         Some(Value::Object(matched))
+    }
+}
+
+/// A narration without trailing whitespace and without the one closing ` [BRIDGE:...]` marker a
+/// hand-imported file carries after it, set off by a space (a native post sends none). A
+/// narration with two markers, a marker with no space before it, or a marker that is not the
+/// last thing in it keeps its marker, so its tag is not at the end and does not match.
+fn without_trailing_marker(narration: &str) -> &str {
+    let text = narration.trim_end();
+    let Some(start) = text
+        .rfind(super::agent_import::NARRATION_MARKER_PREFIX)
+        .filter(|start| text[..*start].ends_with(char::is_whitespace))
+    else {
+        return text;
+    };
+    let closes_last = text.ends_with(']') && text[start..].matches(']').count() == 1;
+    if closes_last && super::agent_import::narration_markers(text).count() == 1 {
+        text[..start].trim_end()
+    } else {
+        text
     }
 }
 

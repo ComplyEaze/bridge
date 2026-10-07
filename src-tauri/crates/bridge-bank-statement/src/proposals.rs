@@ -63,15 +63,17 @@ pub fn suspense_tag<'a>(
     ledgers: impl IntoIterator<Item = &'a str>,
 ) -> Option<SuspenseTag> {
     if narration.ends_with(&format!(" | {PURPOSE_NOT_CONFIRMED}")) {
-        Some(SuspenseTag::PurposeNotConfirmed)
-    } else if ledgers
-        .into_iter()
-        .any(|ledger| narration.ends_with(&format!(" | {UNIDENTIFIED} {ledger}")))
-    {
-        Some(SuspenseTag::Unidentified)
-    } else {
-        None
+        return Some(SuspenseTag::PurposeNotConfirmed);
     }
+    // The loose fold `build` decided "unidentified" by (`ledger_key`), applied to both
+    // sides: a book that reads the ledger back in another case or spacing must still
+    // match the tag written for it.
+    let folded = ledger_key(narration);
+    ledgers
+        .into_iter()
+        .filter(|ledger| !ledger_key(ledger).is_empty())
+        .any(|ledger| folded.ends_with(&ledger_key(&format!(" | {UNIDENTIFIED} {ledger}"))))
+        .then_some(SuspenseTag::Unidentified)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

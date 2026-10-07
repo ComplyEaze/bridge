@@ -1125,8 +1125,8 @@ has already read and labelled and send no Tally request of their own, so each co
 same `vouchers` call costs. The `group` and `primary_group` summaries also read the ledger
 list and the group list (see below).
 
-**Search.** `voucher_number`, `reference`, `narration_contains` and `amount` keep
-the vouchers that satisfy every criterion given.
+**Search.** `voucher_number`, `reference`, `narration_contains`, `amount` and
+`suspense_tagged` keep the vouchers that satisfy every criterion given.
 
 - `voucher_number` and `reference` are matched whole, ignoring ASCII case and the
   spaces around the term. Numbers repeat across voucher types, so a number can
@@ -1142,6 +1142,31 @@ the vouchers that satisfy every criterion given.
   against the absolute value of every ledger entry of a voucher, so it finds an
   invoice total and a tax line alike (checked live on an invoice-mode Purchase: 900.25 found its CGST and State Tax lines; an invoice total was not searched, nor an item invoice with stock lines). Each item carries `matched.amount_entries`,
   the positions in its `amounts` that equalled the amount.
+- `suspense_tagged: true` (only `true`, and only together with `ledger`, the
+  suspense ledger) keeps the vouchers of that ledger whose narration ends in a
+  suspense tag ComplyEaze Bridge writes: `Bridge: purpose not confirmed;
+  reclassify` (a cash line answered "don't know") or `UNIDENTIFIED - reallocate
+  from <ledger>` (a party no mapping names; the whole tail, the tag's own words
+  and the ledger, is compared as the build compared it, ignoring case, spacing and
+  hyphens, and the ledger must be one of the voucher's own; `Bridge: purpose not confirmed; reclassify` is matched exactly). One
+  closing ` [BRIDGE:...]` marker set off by whitespace, as a file imported by hand
+  carries, and trailing whitespace are ignored; a second marker, a marker with no
+  space before it, or text after the tag means the tag is not at the end and the
+  voucher is not listed. The tag must name one of the voucher's own ledgers, not
+  necessarily the `ledger` you gave. Cancelled and optional vouchers are listed
+  too; each item carries its flags. Each item says which tag in
+  `matched.suspense_tag` (`purpose_not_confirmed` or `unidentified`). The tag
+  classifies; it does not define what is in suspense: a voucher on the ledger
+  whose narration was edited after the tag is not listed, and the same text
+  typed by hand matches, so a listing is not proof that ComplyEaze Bridge wrote
+  the voucher. Read the ledger without the filter too, and treat every voucher
+  left over as still in suspense. Refused as `search_suspense_tagged_needs_ledger`
+  without `ledger`, and `search_narration_redacted` where narrations are withheld.
+  A value other than `true` never reaches the search: the argument check of a
+  tool call refuses it as `argument_invalid:suspense_tagged`
+  (`search_suspense_tagged_invalid` is the search's own second guard). Not measured: a
+  tagged narration read back from a real Tally (no capture holds one), including
+  a hand import and a narration near the 2000-character limit.
 - A blank or over-long term, a narration phrase under three characters and an
   amount that is not a plain positive decimal are refused before the window is read (the identity read has already happened)
   (`search_criterion_empty`, `search_criterion_too_long`,

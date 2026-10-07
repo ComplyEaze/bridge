@@ -365,6 +365,23 @@ fn only_a_tag_where_build_writes_it_marks_a_suspense_line() {
     ));
 }
 
+/// A book that reads the ledger back in another case or spacing still matches the tag
+/// written for it, by the same loose fold `build` decided "unidentified" with; a ledger
+/// the tag does not name, or a blank one, never does.
+#[test]
+fn the_unidentified_tag_matches_its_ledger_under_the_builds_own_fold() {
+    let tag = "x | UNIDENTIFIED - reallocate from Suspense A/c-2";
+    assert!(suspense_tagged(tag, ["Bank", "SUSPENSE A/C 2"]));
+    assert!(suspense_tagged(tag, ["suspense  a/c-2"]));
+    assert!(!suspense_tagged(tag, ["Suspense A/c"]));
+    assert!(!suspense_tagged(tag, ["Bank", "Cash"]));
+    // A blank ledger name must not make the bare tag text match.
+    assert!(!suspense_tagged(
+        "x | UNIDENTIFIED - reallocate from",
+        ["", "  ", "-", "--"]
+    ));
+}
+
 /// Only an explicit "don't know" reaches suspense, and it says so in the
 /// narration with its own tag, never the unidentified-party tag.
 #[test]

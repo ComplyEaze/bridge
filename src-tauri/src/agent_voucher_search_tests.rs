@@ -469,3 +469,154 @@ fn searches_the_live_answers_do_not_cover_still_equal_the_independent_selection(
         assert_eq!(found.len(), expected, "{args}: the count on the live rows");
     }
 }
+
+// -- #810 slice 2: the suspense tag. The rows are the captured three vouchers; a narration is
+// replaced on a parsed row to carry a tag, so the tagged rows are derived, not live captures. The
+// marker's UUID has the shape of the captured `[BRIDGE:...]` read-backs (not a version 4 UUID).
+
+const PURPOSE: &str = "Bridge: purpose not confirmed; reclassify";
+const MARKER: &str = "[BRIDGE:547cb4ad-9457-8ee7-a1b2-0123456789ab]";
+
+fn suspense_search() -> VoucherSearch {
+    search(json!({"suspense_tagged": true, "ledger": "WR2 Sales"}))
+}
+
+/// The third captured voucher, which touches "WR2 Sales", with this narration.
+fn narrated(narration: &str) -> Vec<Value> {
+    let mut row = captured_rows().remove(2);
+    row["narration"] = json!(narration);
+    vec![row]
+}
+
+fn tag_of(narration: &str) -> Option<String> {
+    let rows = suspense_search().apply(narrated(narration));
+    rows.first()
+        .map(|row| row["matched"]["suspense_tag"].as_str().unwrap().to_string())
+}
+
+#[test]
+fn a_suspense_tag_search_needs_the_ledger_and_true_and_a_visible_narration() {
+    assert_eq!(
+        refusal(json!({"suspense_tagged": true})),
+        "search_suspense_tagged_needs_ledger"
+    );
+    assert_eq!(
+        refusal(json!({"suspense_tagged": true, "ledger": "  "})),
+        "search_suspense_tagged_needs_ledger"
+    );
+    for value in [json!(false), json!("true"), json!(1)] {
+        assert_eq!(
+            refusal(json!({"suspense_tagged": value, "ledger": "WR2 Sales"})),
+            "search_suspense_tagged_invalid"
+        );
+    }
+    let redacted = VoucherSearch::from_args(
+        &json!({"suspense_tagged": true, "ledger": "WR2 Sales"}),
+        Redaction::DropNarration,
+    )
+    .expect_err("refused where narrations are withheld");
+    assert_eq!(redacted.code, "search_narration_redacted");
+    // With a neutral criterion beside it, the search differs from the same search without it.
+    assert_ne!(
+        search(json!({"suspense_tagged": true, "ledger": "WR2 Sales", "amount": "1"})),
+        search(json!({"ledger": "WR2 Sales", "amount": "1"}))
+    );
+}
+
+#[test]
+fn a_narration_that_ends_in_either_tag_is_found_with_its_kind() {
+    assert_eq!(
+        tag_of(&format!("UPI to X | {PURPOSE}")).as_deref(),
+        Some("purpose_not_confirmed")
+    );
+    // Whatever the tag names must be a ledger of the voucher itself.
+    assert_eq!(
+        tag_of("UPI | UNIDENTIFIED - reallocate from WR2 Sales").as_deref(),
+        Some("unidentified")
+    );
+    // Trailing whitespace is not text after the tag.
+    assert_eq!(
+        tag_of(&format!("UPI | {PURPOSE}  ")).as_deref(),
+        Some("purpose_not_confirmed")
+    );
+    // Under the fold the build decided by: case and spacing differ.
+    assert_eq!(
+        tag_of("UPI | UNIDENTIFIED - reallocate from wr2  sales").as_deref(),
+        Some("unidentified")
+    );
+}
+
+#[test]
+fn the_one_marker_a_hand_import_adds_after_the_tag_is_ignored() {
+    assert_eq!(
+        tag_of(&format!("UPI | {PURPOSE} {MARKER}")).as_deref(),
+        Some("purpose_not_confirmed")
+    );
+    assert_eq!(
+        tag_of(&format!(
+            "UPI | UNIDENTIFIED - reallocate from WR2 Sales {MARKER} "
+        ))
+        .as_deref(),
+        Some("unidentified")
+    );
+}
+
+#[test]
+fn a_narration_that_does_not_end_in_a_tag_is_not_found() {
+    for narration in [
+        // The tag's text anywhere but the end: a party or account label.
+        format!("{PURPOSE} paid to X"),
+        format!("UPI | {PURPOSE} (checked)"),
+        format!("UPI | {PURPOSE} {MARKER} later note"),
+        // Two markers, or a marker that never closes: not stripped, so the tag is not last.
+        format!("UPI | {PURPOSE} {MARKER} {MARKER}"),
+        format!("{MARKER} UPI | {PURPOSE} {MARKER}"),
+        // The unidentified tag anywhere but the end.
+        "UPI | UNIDENTIFIED - reallocate from WR2 Sales (checked)".to_string(),
+        "UPI | UNIDENTIFIED - reallocate from WR2 Sales | paid".to_string(),
+        // A marker with no space before it is not the hand-import marker.
+        format!("UPI | {PURPOSE}{MARKER}"),
+        format!("UPI | {PURPOSE} [BRIDGE:547cb4ad"),
+        // No separator before the tag.
+        format!("UPI{PURPOSE}"),
+        // A ledger the voucher does not touch; a tag with no ledger at all.
+        "UPI | UNIDENTIFIED - reallocate from Suspense".to_string(),
+        "UPI | UNIDENTIFIED - reallocate from".to_string(),
+        String::new(),
+    ] {
+        assert_eq!(tag_of(&narration), None, "{narration:?}");
+    }
+}
+
+#[test]
+fn none_of_the_captured_narrations_is_a_suspense_tag() {
+    let rows = captured_rows();
+    assert_eq!(rows.len(), 3);
+    assert!(suspense_search().apply(rows).is_empty());
+}
+
+#[test]
+fn a_voucher_with_no_narration_is_not_found() {
+    let mut row = captured_rows().remove(2);
+    row.as_object_mut().unwrap().remove("narration");
+    assert!(suspense_search().apply(vec![row]).is_empty());
+}
+
+#[test]
+fn the_suspense_tag_holds_beside_another_criterion_and_not_when_that_one_fails() {
+    let both = search(
+        json!({"suspense_tagged": true, "ledger": "WR2 Sales", "narration_contains": "upi"}),
+    );
+    let tagged = narrated(&format!("UPI | {PURPOSE}"));
+    let rows = both.apply(tagged.clone());
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["matched"]["narration"], true);
+    assert_eq!(rows[0]["matched"]["suspense_tag"], "purpose_not_confirmed");
+    // The tag holds but the other criterion does not: not listed.
+    let other = search(
+        json!({"suspense_tagged": true, "ledger": "WR2 Sales", "narration_contains": "cheque"}),
+    );
+    assert!(other.apply(tagged).is_empty());
+    // The other criterion holds but there is no tag: not listed.
+    assert!(both.apply(narrated("UPI to X")).is_empty());
+}

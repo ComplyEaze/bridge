@@ -4,6 +4,25 @@
   "display_name": "ComplyEaze Bridge",
   "version": "0.4.2",
   "description": "Ask about the TallyPrime books on this computer, and prepare Journal, Payment, Receipt and Contra vouchers as a local file. Posting is off until you turn it on below; then it posts one voucher at a time, each after you approve it in a native dialog. What it reads, amounts included, goes to your AI provider; Response redaction can only shorten party and ledger names and bank account numbers or drop narrations.",
+  "long_description": "ComplyEaze Bridge lets Claude Desktop read the TallyPrime books on your own computer. It is built for chartered accountants, CA firms and accountants. You can ask about the trial balance, outstanding receivables and payables with ageing, ledger movement and vouchers, the purchase and sales registers and the stock summary, and have it prepare Journal, Payment, Receipt and Contra vouchers as a local file.\n\nPosting to Tally is off until you turn it on in this extension's settings. When it is on, each voucher is posted only after you approve it in a window on your computer.\n\nWhat Claude reads from your books goes to your AI provider as part of the chat, including company, party and ledger names, amounts, dates, narrations, references, GSTINs and, when it reads ledger details, PAN, bank account numbers, IFSC, MSME or Udyam registration numbers, email, phone and address, and, when it builds a voucher file, that file's local path (which can include your computer user name). The Response redaction setting takes one value, not both: it can shorten party and ledger names and bank account numbers, or drop narrations. It does not hide amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or references, and a shortened name can still be identified, not least from the GSTIN or PAN sent beside it.\n\nComplyEaze Bridge talks to TallyPrime's own XML gateway on a loopback address, so it cannot be pointed at a remote Tally host (it cannot tell whether that local port is forwarded to another machine; on a Mac, TallyPrime runs in a Windows virtual machine with its port forwarded to the Mac). It is packaged for Windows x64 and Apple Silicon Macs, and has not been run in MCP clients other than Claude Desktop. ComplyEaze Bridge is open source under the Apache License 2.0 and is not made by or affiliated with Tally Solutions.",
+  "keywords": [
+    "tally",
+    "tallyprime",
+    "tally prime",
+    "accounting",
+    "india",
+    "vouchers",
+    "chartered accountant",
+    "mcp",
+    "claude desktop"
+  ],
+  "homepage": "https://bridge.complyeaze.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ComplyEaze/bridge"
+  },
+  "support": "https://github.com/ComplyEaze/bridge/issues",
+  "documentation": "https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md",
   "author": {
     "name": "ComplyEaze contributors"
   },

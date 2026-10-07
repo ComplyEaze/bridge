@@ -82,8 +82,9 @@ These changes are in source and not yet in a published build.
   nothing else. `ledger_movement`, `verify_import`, `outstandings` and that check
   are unchanged. Not measured against a live book: what Tally does when it cannot serve the
   count, which refuses the call as `volume_unestimated` where the small book used
-  to answer `partial` (it served the count every time in the run above), and a
-  larger book (#1029).
+  to answer `partial` (it served the count every time in the run above), a
+  larger book, and the registers and the Ledger Entries screen, which use the same
+  count but were not called live (#1029).
 - `profit_and_loss` now compares Tally's `Cost of Sales :` heading with the
   derived cost of sales (Purchase Accounts plus Direct Expenses) even when the
   heading reads zero or empty. Over a non-zero cost of sales such a heading

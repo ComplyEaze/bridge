@@ -289,3 +289,80 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
         assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
     }
 }
+
+/// A posted invoice's read-back, on the same captured book: the marks are read
+/// first (6 requests), then the invoice by type and number (6). An answer with
+/// no voucher in it (a captured empty collection) is a difference, never a
+/// pass, and so is a saved invoice with no observation, which sends nothing.
+#[tokio::test]
+async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a_difference() {
+    for (observed, difference, requests) in [
+        (true, "invoice_not_found", 12),
+        (false, "invoice_not_observed", 0),
+    ] {
+        let mut plans = "emsmseeNsNse".chars().map(plan).collect::<Vec<_>>();
+        plans.push(plan('e'));
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = Server::new(super::super::super::Settings {
+            endpoint: TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().into(),
+            max_rows: 10,
+            max_bytes: 200_000,
+            redaction: super::super::super::Redaction::None,
+            import_enabled: true,
+            writes_enabled: false,
+            batch_post_enabled: false,
+        });
+        let companies =
+            bridge_tally_protocol::parse_companies_from_collection(&company_list()).unwrap();
+        let company = companies
+            .iter()
+            .find(|row| row.guid.as_deref() == Some(LAB_GUID))
+            .expect("the lab company")
+            .clone();
+        let identity = crate::tally::VerifiedCompanyIdentity::from_observed_companies(
+            company.name.clone(),
+            LAB_GUID.into(),
+            company.company_number.clone().unwrap(),
+            company.books_from.clone().unwrap(),
+            &companies,
+        )
+        .unwrap();
+        let mut saved = json!({
+            "bridge_txn_id":"t1", "date":"2026-03-10", "voucher_type":"Sales", "voucher_number":"TG/25-26/900",
+            "invoice":{"voucher_type_name":"Sales Manual","place_of_supply":"Rajasthan"},
+            "entries":[
+                {"ledger":"Counter Sales - Unregistered","amount":"11800.00","side":"Dr"},
+                {"ledger":"Sales - Goods","amount":"10000.00","side":"Cr"},
+                {"ledger":"Output CGST","amount":"900.00","side":"Cr"},
+                {"ledger":"Output SGST","amount":"900.00","side":"Cr"}
+            ]
+        });
+        if observed {
+            saved["invoice"]["observed"] = json!({
+                "voucher_type_guid": format!("{LAB_GUID}-00000131"),
+                "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
+                "party_bill_wise":false, "company_state":"Rajasthan"
+            });
+        }
+        let saved: ImportVoucher = serde_json::from_value(saved).unwrap();
+        let (differences, alter_id, guid, _) = server
+            .read_back_sales_invoice(&identity, &company, &saved)
+            .await
+            .expect("a read-back after a post is never an error");
+        simulator.cancel();
+        let sent = simulator
+            .finish()
+            .unwrap()
+            .into_iter()
+            .filter(|request| !request.method.is_empty())
+            .count();
+        assert_eq!(differences, [difference]);
+        assert_eq!((alter_id, guid), (None, None));
+        assert_eq!(sent, requests, "{difference}");
+    }
+}

@@ -6296,7 +6296,16 @@ async fn every_way_a_chain_cannot_be_walked_is_refused_with_its_own_cause_and_th
             "{cause}: {refusal}"
         );
         assert_eq!(refusal["cause"], cause, "{refusal}");
-        assert!(refusal["ledger"].is_string(), "{cause}: {refusal}");
+        // The first unplaced ledger is one of the three parties the window touches.
+        assert!(
+            [
+                "Café Naïve Traders",
+                "WR2 XML Café Naïve Ledger 01A01A2F",
+                "नमस्ते ट्रेडर्स"
+            ]
+            .contains(&refusal["ledger"].as_str().unwrap_or_default()),
+            "{cause}: {refusal}"
+        );
     }
 }
 
@@ -6387,8 +6396,7 @@ async fn a_group_summary_with_a_ledger_given_by_its_stored_name_pairs_each_ledge
 }
 
 #[tokio::test]
-async fn a_group_summary_masks_the_ledger_it_was_asked_about_and_a_primary_group_summary_masks_its_members(
-) {
+async fn a_primary_group_summary_masks_its_members_under_mask_parties() {
     let masked = OneServer::spawn_with(
         group_summary_plans(masters(), masters()),
         Redaction::MaskParties,
@@ -6396,18 +6404,25 @@ async fn a_group_summary_masks_the_ledger_it_was_asked_about_and_a_primary_group
     .call(json!({"summarise_by": "primary_group"}))
     .await;
     let text = masked.to_string();
-    for real in ["Café Naïve Traders", "WR2 Sales", "नमस्ते ट्रेडर्स"]
-    {
+    let members: Vec<String> = buckets_of(&masked)
+        .iter()
+        .flat_map(|bucket| bucket["members"].as_array().unwrap().clone())
+        .map(|member| member["ledger"].as_str().unwrap().to_string())
+        .collect();
+    // The window touches four ledgers; each is listed under a label that is not its name.
+    assert_eq!(members.len(), 4, "{masked}");
+    for real in [
+        "Café Naïve Traders",
+        "WR2 Sales",
+        "नमस्ते ट्रेडर्स",
+        "WR2 XML Café Naïve Ledger 01A01A2F",
+    ] {
         assert!(
             !text.contains(real),
             "{real} appears in a masked primary_group summary: {text}"
         );
+        assert!(!members.iter().any(|label| label == real), "{real}");
     }
-    assert!(buckets_of(&masked).iter().all(|bucket| bucket["members"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .all(|m| m["ledger"].is_string())));
 }
 
 #[tokio::test]
@@ -6429,8 +6444,11 @@ async fn a_group_summary_of_a_window_with_a_withheld_voucher_is_partial_and_says
     let response = one.call(json!({"summarise_by": "group"})).await;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{result}");
+    // The composite voucher is in no bucket: two of the three vouchers are summarised, and the
+    // result says the totals are short by the withheld one.
+    assert_eq!(result["vouchers_summarised"], 2, "{result}");
     assert!(
-        result["vouchers_summarised"].as_u64().unwrap() < 3,
+        result["coverage"].is_string() || result["withheld_vouchers"].is_array(),
         "{result}"
     );
 }

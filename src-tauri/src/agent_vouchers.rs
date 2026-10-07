@@ -255,8 +255,9 @@ const SUMMARY_BASIS: &str = "every voucher the window, selectors and search sele
 /// 16 MiB is this code's own choice, half the transport cap (UNVERIFIED as a safe size for the gateway).
 const GROUP_LEDGER_LIST_LIMIT_BYTES: u64 = 16 * 1024 * 1024;
 /// A ledger row of the standard list is estimated at 1,400 bytes, the estimate the compliance ledger read
-/// uses; the rows measured so far were 1,104 to 1,221 bytes (PARTIAL: one synthetic book), so the
-/// estimate is high on purpose.
+/// uses. That read measured 1,104 bytes a ledger on a synthetic book of 1,989 ledgers and 1,221 on a real
+/// book of about 9,500, on its own list without balances (PARTIAL here: that this list has the same row shape
+/// is not established), so the estimate is high on purpose.
 const GROUP_LEDGER_LIST_BYTES_PER_LEDGER: u64 = 1_400;
 /// Rule: refuse above this master-alteration mark. The mark is an upper bound on ledgers (every other master
 /// raises it too), so a smaller book may be refused; the limit is the response limit over the per-ledger

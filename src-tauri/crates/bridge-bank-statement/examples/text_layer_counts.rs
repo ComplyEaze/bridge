@@ -8,6 +8,10 @@
 //! OCR layer uses); how many words and how many numeric characters
 //! `extract_pages` sees; and which refusal, if any, `extract_pages` gives.
 //!
+//! The password file's permission check (no group or other access) exists on
+//! Unix only; on Windows the file is read without one. This is an example run
+//! by hand on the owner's own machine, not a shipped tool.
+//!
 //! PDFium can be bound once per process, so there are two runs: without
 //! `--extract` it counts characters; with `--extract` it reports what
 //! `extract_pages` reads or refuses.

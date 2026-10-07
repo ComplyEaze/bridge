@@ -282,9 +282,13 @@ pub fn extract_pages(engine: &PdfEngine, pdf: &[u8], password: &str) -> Result<V
 ///
 /// A scan whose only text is an invisible layer then has no words and is
 /// refused as `no_readable_text`. A mixed document (some pages scans with such
-/// a layer, some text) is not refused here: the scanned pages read as empty,
-/// and the balance chain may not see the missing rows (a scanned trailing page
-/// could truncate a statement silently).
+/// a layer, some text) is not refused here: the scanned pages read as empty.
+/// Rows missing from them are caught by the closing-balance control, and for
+/// SBI and HDFC by the printed totals, under a refusal that does not say why;
+/// they pass silently only when the missing rows net to zero on a bank that
+/// prints no totals (Union Bank). A refusal of its own for such a page would be
+/// the loud form; it is not added because no real file shows how often a
+/// genuine statement carries a page of invisible text only.
 fn is_drawn(character: &PdfPageTextChar<'_>) -> bool {
     !matches!(
         character.render_mode(),

@@ -250,6 +250,14 @@
       "reason": "Tests pinning the Cash Flow request to its captured bytes and the parser's and window's refusals, on the live captures; a weakened test lets a month be misplaced or an empty answer pass unseen."
     },
     {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_funds_flow.rs",
+      "reason": "Funds Flow read: renders the report request and parses the answer with the Cash Flow's closed grammar over whole months, keeping Tally's three columns under neutral names; a defect swaps two columns, places a month in the wrong year or reads an empty or refused answer as a funds flow."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_funds_flow_tests.rs",
+      "reason": "Tests pinning the Funds Flow request to its captured bytes, the parse of the live capture and the mapping of each shared refusal to its own variant; a weakened test lets a swapped column or an empty answer pass unseen."
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_ledger_collection.rs"
     },
     {

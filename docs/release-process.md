@@ -616,8 +616,7 @@ every note for them first, and for maintainers second.
 
 **Rhythm**
 
-- Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) at most every two
-  weeks, and only when both of
+- Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) only when both of
   these hold: at least one user-visible change has landed, and CI is green on
   both hosts. A master push may show the native, bundle and seam jobs skipped
   when the merge queue ran them on that same commit; its job summary names the

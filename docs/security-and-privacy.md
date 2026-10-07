@@ -19,7 +19,7 @@ To report a vulnerability, see [SECURITY.md](../SECURITY.md).
 
 It reads from the TallyPrime running on your own computer, over Tally's own
 local gateway: the loaded companies, ledger masters, other masters as lists
-(voucher types, godowns, units, stock groups, ledger groups), the trial
+(voucher types, godowns, units, stock groups, cost centres, cost categories, ledger groups), the trial
 balance, Profit and Loss and Balance Sheet, vouchers in a date window,
 outstanding receivables and payables with ageing, ledger movement, a purchase
 register of the tax the books record, and closing stock values per item. It
@@ -71,7 +71,7 @@ settings (section 4).
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase
     register and bank-statement proposals), stock item names and their
-    parents, godown and stock-group names and their parents, and three fields
+    parents, godown, stock-group, cost-centre and cost-category names and their parents, and the category a cost centre belongs to, and three fields
     of a ledger's details: the name on the PAN, the bank account holder's name
     and the bank details. A name of four characters or fewer is replaced
     by “…”. It does not mask amounts, company names, a ledger's parent

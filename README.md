@@ -61,7 +61,7 @@ with no figures, to a log on this computer.
 | `ledger_movement` | A ledger’s opening, debits, credits and closing for a period | Nothing |
 | `list_companies` | The companies loaded in TallyPrime (start here) | Nothing |
 | `local_data_report` | What ComplyEaze Bridge keeps on this computer | Nothing |
-| `masters` | Voucher types, godowns, units, stock groups or account groups | Nothing |
+| `masters` | Voucher types, godowns, units, stock groups, cost centres, cost categories or account groups | Nothing |
 | `outstandings` | Receivables and payables with ageing, the top parties and the open bills | Nothing |
 | `parse_bank_statement` | Reads a password-protected SBI, HDFC or Union Bank of India statement PDF and proposes Payment, Receipt and Contra vouchers | A private proposals file on this computer |
 | `profit_and_loss` | The Profit and Loss for a date range, by primary group (a book with stock items is expected to be refused) | Nothing |

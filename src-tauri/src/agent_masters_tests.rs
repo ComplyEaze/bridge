@@ -53,10 +53,15 @@ fn capture(kind: &str) -> String {
         "cost_categories" => include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/masters_cost_categories_shape_lab_live.utf16le.xml"
         ),
+        // The parity book (setting at Yes), scrubbed: three centres, one under another.
+        "cost_centres_parity" => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_cost_centres_parity_flag_yes_live.utf16le.xml"
+        ),
         _ => panic!("no capture for {kind}"),
     };
     decode(bytes)
         .replace(CAPTURE_GUID, GUID)
+        .replace("7c0de000-0000-4000-8000-0000000000a1", GUID)
         .replace("de2e15f2-6d42-4715-b6e7-b7a95a68abe8", GUID)
 }
 
@@ -260,7 +265,7 @@ async fn an_unknown_or_missing_kind_is_refused_before_any_read() {
 }
 
 #[test]
-fn the_tool_definition_admits_only_the_five_kinds_and_states_the_size_limits() {
+fn the_tool_definition_admits_only_the_seven_kinds_and_states_the_size_limits() {
     let definitions = tool_definitions(false, false);
     let tool = definitions
         .as_array()
@@ -308,7 +313,9 @@ fn the_tool_definition_admits_only_the_five_kinds_and_states_the_size_limits() {
     assert!(description.contains("masters_too_large"));
     assert!(description.contains("Education mode is refused"));
     // What `mask_parties` masks, and why the rest is not masked.
-    assert!(description.contains("godown and stock-group names and their parents are masked"));
+    assert!(description.contains(
+        "godown, stock-group, cost-centre and cost-category names, their parents and a cost centre's category are masked"
+    ));
     assert!(description.contains("configuration labels, not counterparties"));
     assert!(description.contains("masters_voucher_types_empty"));
 }
@@ -539,6 +546,14 @@ async fn cost_centres_read_end_to_end_with_their_category_although_the_setting_i
             .as_str()
             .unwrap()
             .contains("whether or not the company's Cost Centres setting is on")));
+    assert!(page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line
+            .as_str()
+            .unwrap()
+            .contains("does not return how a voucher was allocated")));
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
@@ -557,14 +572,24 @@ async fn cost_categories_read_end_to_end_with_their_allocation_flags() {
     assert_eq!(line["allocates_revenue"], true);
     assert_eq!(line["allocates_non_revenue"], false);
     assert_eq!(line["affects_stock"], false);
+    assert!(line.get("parent").is_some(), "the key stays, null");
     assert_eq!(line["parent"], Value::Null);
+    assert!(page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line
+            .as_str()
+            .unwrap()
+            .contains("predefined Primary Cost Category always exists")));
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
 #[tokio::test]
 async fn a_category_that_affects_stock_is_returned_as_such() {
     // The captured answer holds only categories that do not affect stock; the one flag of the last
-    // row is changed in the captured bytes, so the output is read from the wire and not defaulted.
+    // row is changed in the captured bytes, so the output is read from the wire and not defaulted,
+    // and all three flags of both rows are asserted so that a swap of two flags shows.
     let captured = capture("cost_categories");
     let flag = "<AFFECTSSTOCK TYPE=\"Logical\">No</AFFECTSSTOCK>";
     let at = captured.rfind(flag).expect("a flag");
@@ -581,15 +606,22 @@ async fn a_category_that_affects_stock_is_returned_as_such() {
         .map(|row| {
             (
                 row["name"].as_str().unwrap().to_string(),
-                row["affects_stock"].clone(),
+                json!([
+                    row["allocates_revenue"],
+                    row["allocates_non_revenue"],
+                    row["affects_stock"]
+                ]),
             )
         })
         .collect::<Vec<_>>();
     assert_eq!(
         stock_flags,
         [
-            ("Business Line".to_string(), json!(false)),
-            ("Primary Cost Category".to_string(), json!(true)),
+            ("Business Line".to_string(), json!([true, false, false])),
+            (
+                "Primary Cost Category".to_string(),
+                json!([true, true, true])
+            ),
         ]
     );
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
@@ -641,11 +673,41 @@ async fn cost_centre_and_category_names_and_categories_are_masked_under_mask_par
             json!(mask("Primary Cost Category"))
         ]
     );
+    // The rows, not the limitations: a limitation names the predefined category in plain text.
     for plain in ["Business Line", "Primary Cost Category"] {
-        assert!(!response.to_string().contains(plain), "{plain}");
+        assert!(!page["masters"].to_string().contains(plain), "{plain}");
     }
     assert_eq!(page["masters"][0]["allocates_revenue"], json!(true));
+    // A null parent keeps its key under masking: it is not dropped as if it were text.
+    for row in page["masters"].as_array().unwrap() {
+        assert!(row.get("parent").is_some(), "{row}");
+        assert_eq!(row["parent"], Value::Null);
+    }
     assert_eq!(one.requests(), 2 * FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_child_cost_centre_under_mask_parties_has_its_parent_masked_and_the_root_left() {
+    // The parity book: two centres at the top level and one under another.
+    let one = OneServer::spawn_with(
+        first_page_plans(capture("cost_centres_parity"), 14),
+        Redaction::MaskParties,
+    );
+    let response = one.call(args("cost_centres", 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(
+        names_and_parents(page),
+        [
+            (mask("Parity CC A"), json!("\u{fffd}#4; Primary")),
+            (mask("Parity CC A1"), json!(mask("Parity CC A"))),
+            (mask("Parity CC B"), json!("\u{fffd}#4; Primary")),
+        ]
+    );
+    for row in page["masters"].as_array().unwrap() {
+        assert_eq!(row["category"], json!(mask("Primary Cost Category")));
+    }
+    assert!(!response.to_string().contains("Parity CC"));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
 #[tokio::test]

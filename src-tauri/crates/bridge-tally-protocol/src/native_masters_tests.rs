@@ -1033,7 +1033,8 @@ fn only_xml_whitespace_may_sit_between_elements() {
 }
 
 /// Every company has predefined voucher types, so a present, empty voucher-type
-/// collection is refused; the other kinds may answer with none.
+/// collection is refused, as is a cost-category one (the predefined Primary Cost
+/// Category is expected in every book); the other kinds may answer with none.
 #[test]
 fn a_voucher_type_collection_with_no_rows_is_refused_and_the_other_kinds_may_be_empty() {
     let kind = NativeMasterKind::VoucherTypes;
@@ -1404,12 +1405,14 @@ fn every_fixture_row_fits_the_worst_row_bytes_of_its_kind() {
 #[test]
 fn the_worst_row_bytes_follow_the_documented_arithmetic() {
     // 2 * (fixed + 6 * 128 * (slots + 4)), worked by hand: fixed 1,200, 800,
-    // 700, 750 and slots 5, 4, 4, 4.
+    // 700, 750, 800, 950 and slots 5, 4, 4, 4, 5, 3.
     for (kind, bytes) in [
         (NativeMasterKind::VoucherTypes, 16_224),
         (NativeMasterKind::Godowns, 13_888),
         (NativeMasterKind::Units, 13_688),
         (NativeMasterKind::StockGroups, 13_788),
+        (NativeMasterKind::CostCentres, 15_424),
+        (NativeMasterKind::CostCategories, 12_652),
     ] {
         assert_eq!(masters_worst_row_bytes(kind), bytes, "{kind:?}");
     }
@@ -1446,7 +1449,7 @@ fn the_cost_centre_capture_reads_both_centres_with_their_category_and_root_paren
     assert_eq!(
         rows[0].detail,
         NativeMasterDetail::CostCentre {
-            category: Some("Business Line".to_string())
+            category: "Business Line".to_string()
         }
     );
     assert!(is_tally_reserved_root(rows[0].parent.as_deref().unwrap()));
@@ -1455,26 +1458,63 @@ fn the_cost_centre_capture_reads_both_centres_with_their_category_and_root_paren
 }
 
 #[test]
-fn a_cost_centre_without_a_category_has_none_and_a_blank_one_too() {
-    let without = edited(
-        NativeMasterKind::CostCentres,
-        "<CATEGORY TYPE=\"String\">Business Line</CATEGORY>",
-        "",
-    );
-    let rows = parse(NativeMasterKind::CostCentres, &without).unwrap().rows;
+fn a_cost_centre_without_a_category_or_with_a_blank_one_is_refused_not_read_as_none() {
+    // Every captured centre carried a category (the default one where none was chosen), so a
+    // missing or blank one is an answer that was not read, not a centre with no category.
+    for replacement in ["", "<CATEGORY TYPE=\"String\">  </CATEGORY>"] {
+        let changed = edited(
+            NativeMasterKind::CostCentres,
+            "<CATEGORY TYPE=\"String\">Business Line</CATEGORY>",
+            replacement,
+        );
+        assert_eq!(
+            parse(NativeMasterKind::CostCentres, &changed),
+            Err(NativeMastersError::RowFieldInvalid("category")),
+            "{replacement:?}"
+        );
+    }
     assert_eq!(
-        rows[0].detail,
-        NativeMasterDetail::CostCentre { category: None }
+        NativeMastersError::RowFieldInvalid("category").code(),
+        "masters_row_field_invalid:category"
     );
-    let blank = edited(
-        NativeMasterKind::CostCentres,
-        "<CATEGORY TYPE=\"String\">Business Line</CATEGORY>",
-        "<CATEGORY TYPE=\"String\">  </CATEGORY>",
-    );
-    let rows = parse(NativeMasterKind::CostCentres, &blank).unwrap().rows;
+}
+
+#[test]
+fn the_two_cost_collections_must_name_their_own_type_so_an_unresolved_one_is_not_read_as_empty() {
+    // The `MSTDEPTYPE` of every captured answer (32 for centres, 16 for categories), the zero-row
+    // answer included. A collection that does not carry its own is refused, whether it holds rows
+    // or none: an empty answer that was not resolved to the type asked for says nothing.
+    let type_error = Err(NativeMastersError::Malformed(
+        "masters_collection_type_unexpected",
+    ));
+    for (kind, own, other) in [
+        (NativeMasterKind::CostCentres, "32", "16"),
+        (NativeMasterKind::CostCategories, "16", "32"),
+    ] {
+        let text = response(kind);
+        let own_attribute = format!("MSTDEPTYPE=\"{own}\"");
+        assert!(text.contains(&own_attribute), "{kind:?}");
+        let wrong = text.replace(&own_attribute, &format!("MSTDEPTYPE=\"{other}\""));
+        let absent = text.replace(&own_attribute, "");
+        assert_eq!(parse(kind, &wrong), type_error.clone(), "{kind:?} wrong");
+        assert_eq!(parse(kind, &absent), type_error.clone(), "{kind:?} absent");
+        // The right type parses, and it is the capture itself.
+        assert!(parse(kind, &text).is_ok(), "{kind:?}");
+    }
+    // The captured zero-row cost-centre answer carries its type and is a valid answer; the same
+    // answer without it is refused, and so is a self-closed collection that names none.
+    assert!(forex_cost_centres().contains("MSTDEPTYPE=\"32\""));
+    let no_type = forex_cost_centres().replace("MSTDEPTYPE=\"32\"", "");
     assert_eq!(
-        rows[0].detail,
-        NativeMasterDetail::CostCentre { category: None }
+        parse_native_masters(NativeMasterKind::CostCentres, &no_type, FOREX_COMPANY),
+        type_error
+    );
+    let text = response(NativeMasterKind::CostCategories);
+    let (start, _, end) = collection_span(&text);
+    let self_closed = format!("{}<COLLECTION/>{}", &text[..start], &text[end..]);
+    assert_eq!(
+        parse(NativeMasterKind::CostCategories, &self_closed),
+        type_error
     );
 }
 
@@ -1654,7 +1694,7 @@ fn a_book_with_the_setting_at_yes_reads_its_three_centres_one_under_another() {
         assert_eq!(
             row.detail,
             NativeMasterDetail::CostCentre {
-                category: Some("Primary Cost Category".to_string())
+                category: "Primary Cost Category".to_string()
             }
         );
     }
@@ -1694,5 +1734,8 @@ fn the_flag_yes_answers_are_company_bound_like_the_others() {
         &include_bytes!("../tests/fixtures/masters_cost_centres_parity_flag_yes_live.utf16le.xml")
             [..],
     );
-    assert!(parse_native_masters(NativeMasterKind::CostCentres, &centres, COMPANY).is_err());
+    assert_eq!(
+        parse_native_masters(NativeMasterKind::CostCentres, &centres, COMPANY),
+        Err(NativeMastersError::RowGuidForeign)
+    );
 }

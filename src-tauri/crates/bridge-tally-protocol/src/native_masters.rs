@@ -2,7 +2,8 @@
 //! groups, cost centres and cost categories, each read as one Collection with the company GUID computed onto
 //! every row.
 //!
-//! Evidence: one synthetic book on one licensed `TallyPrime` 7.1
+//! Evidence: one synthetic book on one licensed `TallyPrime` 7.1 for the first
+//! four kinds, and three synthetic books for cost centres and categories
 //! (`tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`; PARTIAL). Every row of
 //! every kind carried the computed `BRIDGECOMPANYGUID`; `NUMBERINGMETHOD`
 //! took `Default`, `Automatic` and `Manual`. How another release or a larger
@@ -122,8 +123,23 @@ impl NativeMasterKind {
         }
     }
 
+    /// The `MSTDEPTYPE` Tally printed on the `COLLECTION` element of every
+    /// captured cost-centre (32) and cost-category (16) answer, including the
+    /// zero-row one. It is required for those two kinds, so that an empty
+    /// collection that was not resolved to the type asked for is not read as
+    /// "none defined". The other kinds carry no such requirement.
+    const fn collection_type(self) -> Option<&'static str> {
+        match self {
+            Self::CostCentres => Some("32"),
+            Self::CostCategories => Some("16"),
+            Self::VoucherTypes | Self::Godowns | Self::Units | Self::StockGroups => None,
+        }
+    }
+
     /// Characters of one row that do not grow with its names: 1,200, 800, 700
-    /// and 750 for voucher types, godowns, units and stock groups. The largest
+    /// and 750 for voucher types, godowns, units and stock groups, and 800 and
+    /// 950 for cost centres and cost categories (their largest captured rows,
+    /// counted the same way, are 636 and 723 characters). The largest
     /// SHAPE LAB row, counted from its opening to its closing tag with the
     /// capture's line ends and its names included, is 900, 567, 474 and 524
     /// characters, so these carry headroom over that one synthetic book
@@ -212,10 +228,11 @@ pub enum NativeMasterDetail {
         decimal_places: u8,
         simple: bool,
     },
-    /// The category a cost centre belongs to, as the text Tally sent; absent or
-    /// blank is `None`.
+    /// The category a cost centre belongs to, as the text Tally sent. Every
+    /// captured centre carried one (the default `Primary Cost Category` where
+    /// none was chosen), so an absent or blank one is refused, not read as none.
     CostCentre {
-        category: Option<String>,
+        category: String,
     },
     CostCategory {
         allocates_revenue: bool,
@@ -289,6 +306,7 @@ impl NativeMastersError {
                 "allocate_revenue" => "masters_row_field_invalid:allocate_revenue",
                 "allocate_non_revenue" => "masters_row_field_invalid:allocate_non_revenue",
                 "affects_stock" => "masters_row_field_invalid:affects_stock",
+                "category" => "masters_row_field_invalid:category",
                 _ => "masters_row_field_invalid",
             },
             Self::DuplicateGuid => "masters_row_duplicate_guid",
@@ -374,6 +392,7 @@ pub fn parse_native_masters(
                     continue;
                 }
                 if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
+                    require_collection_type(&element, kind)?;
                     collections += 1;
                 } else if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) {
                     if name != kind.element() {
@@ -411,6 +430,7 @@ pub fn parse_native_masters(
                     record_status(&mut status, String::new())?;
                 } else if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION"
                 {
+                    require_collection_type(&element, kind)?;
                     collections += 1;
                 } else if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) {
                     return Err(if name == kind.element() {
@@ -601,7 +621,8 @@ fn parse_row(
             category: fields
                 .remove("CATEGORY")
                 .map(|text| text.trim().to_string())
-                .filter(|text| !text.is_empty()),
+                .filter(|text| !text.is_empty())
+                .ok_or(NativeMastersError::RowFieldInvalid("category"))?,
         },
         NativeMasterKind::CostCategories => NativeMasterDetail::CostCategory {
             allocates_revenue: required_yes_no(&mut fields, "ALLOCATEREVENUE", "allocate_revenue")?,
@@ -729,6 +750,32 @@ pub(crate) fn read_text(
 
 /// The row's `NAME`, required and not blank. Its `RESERVEDNAME`, when present,
 /// is checked against the name bound too.
+/// For the kinds that name one, the `MSTDEPTYPE` the collection element must
+/// carry (see [`NativeMasterKind::collection_type`]).
+fn require_collection_type(
+    element: &BytesStart<'_>,
+    kind: NativeMasterKind,
+) -> Result<(), NativeMastersError> {
+    let Some(expected) = kind.collection_type() else {
+        return Ok(());
+    };
+    for attribute in element.attributes() {
+        let attribute =
+            attribute.map_err(|_| NativeMastersError::Malformed("masters_attribute_malformed"))?;
+        if attribute.key.as_ref().eq_ignore_ascii_case(b"MSTDEPTYPE") {
+            let value = attribute
+                .normalized_value(quick_xml::XmlVersion::Implicit1_0)
+                .map_err(|_| NativeMastersError::Malformed("masters_attribute_malformed"))?;
+            if value.trim() == expected {
+                return Ok(());
+            }
+        }
+    }
+    Err(NativeMastersError::Malformed(
+        "masters_collection_type_unexpected",
+    ))
+}
+
 pub(crate) fn name_attribute(element: &BytesStart<'_>) -> Result<String, NativeMastersError> {
     let mut name = None;
     for attribute in element.attributes() {

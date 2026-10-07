@@ -337,19 +337,25 @@ Use `masters` with `company_guid` and one `kind`: `voucher_types`, `godowns`,
 kind, for example a voucher type's numbering method (`automatic`, `manual` or
 `default`, as Tally reports it) and its `active` and `optional` flags. Each row
 carries `name`, `guid`, `master_id`, `alter_id` and `parent`; units add
-`decimal_places` and `simple`; cost centres add `category` (null when none) and
+`decimal_places` and `simple`; cost centres add `category` (always present: a centre without one is refused as `masters_row_field_invalid:category`) and
 cost categories `allocates_revenue`, `allocates_non_revenue` and `affects_stock`.
 Cost centres and categories are returned whether or not the company's Cost
 Centres setting is on: a book whose setting read No still returned its two
 centres and two categories (one synthetic book), and a book whose setting read Yes
-returned its three centres, one under another, with the same shape (a second synthetic
-book), so a No setting is not "no centres", and an empty cost-centre list (one synthetic book with none defined
+returned its three centres, one under another, with the same shape (a third synthetic
+book, captured by another lane), so a No setting is not "no centres", and an empty cost-centre list (one synthetic book with none defined
 answered one) does not say whether the feature is off or none is defined; this
 call does not return the setting. An empty cost-category list is refused
-(`masters_cost_categories_empty`): the predefined Primary Cost Category always
-exists. Under `mask_parties` the names, parents and categories of cost centres
-and categories are masked, as godown and stock-group names are. How a voucher
-was allocated to a centre is in the `vouchers` read, not here. A `groups` row carries `name`,
+(`masters_cost_categories_empty`) on the expectation that the predefined Primary Cost
+Category always exists: it was present in all three books captured, each of which had
+cost centres, and the categories of a book with none defined were not captured. The two
+cost collections must carry the `MSTDEPTYPE` Tally printed on every captured answer
+(32 for centres, 16 for categories), or the read is refused as
+`masters_collection_type_unexpected`, so an empty answer that was not resolved to the
+type asked for is not read as "none defined". Under `mask_parties` the names, parents
+and categories of cost centres and categories are masked, as godown and stock-group
+names are. Bridge does not return how a voucher was allocated to a cost centre: no tool
+reads those allocations yet. A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
 parent that is Tally's reserved root keeps its marker form, as in
 `trial_balance`. Alias names are not returned.
@@ -388,10 +394,11 @@ extent shows the book moved, which is reported instead
 (`masters_extent_changed`). A response Bridge cannot read refuses at once with
 a `masters_*` cause, without waiting for the closing extent. A `voucher_types`
 answer with no rows refuses as `masters_voucher_types_empty`, because every
-company has predefined voucher types; the other kinds may answer with none.
+company has predefined voucher types, and a `cost_categories` answer with no rows as
+`masters_cost_categories_empty`; the other kinds may answer with none.
 
-Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1
-(`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
+Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1 (cost centres and
+categories: three synthetic books; see the provenance file) (`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
 `Default`, `Automatic` and `Manual` are the only numbering methods observed; any
 other value is returned as `{"unrecognised": "<raw text>"}` rather than refused.
 `default` is Tally's reported value, not evidence that a type numbers
@@ -405,9 +412,9 @@ characters a name, four aliases a master) that no capture has measured; a row
 that breaks them refuses the read as `masters_row_exceeds_bound`. No counts or
 hints (the company's `NUM*` fields), stock items or writes are part of this tool.
 
-Under `mask_parties`, godown and stock-group names and their `parent` values
-are masked like a party name, because a job-work godown or a supplier-named
-stock group can carry a party's name; Tally's reserved root as a parent is a
+Under `mask_parties`, godown, stock-group, cost-centre and cost-category names, their `parent`
+values and a cost centre's `category` are masked like a party name, because a job-work
+godown, a supplier-named stock group or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is a
 fixed marker and is left as it is. Voucher-type, unit and account-group names
 are not masked: they are configuration labels, not counterparties.
 

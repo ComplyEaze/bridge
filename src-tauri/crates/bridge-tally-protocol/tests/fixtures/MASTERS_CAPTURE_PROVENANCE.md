@@ -38,10 +38,10 @@ Voucher types, godowns, units and stock groups, each read as one native collecti
 | `masters_stock_groups_reads_lab_live.utf16le.xml` | 2998 | `31f0974839de95aba8015df487b3e37e5ccb125deae1efe2999720024ff729ae` | stock groups | 0 |
 | `masters_godowns_reads_lab_live.utf16le.xml` | 4146 | `0d105ecc3a3ade0b2a83ce46f5e0bcdeb0b67c3882b081f3534e5ed15d2e951b` | godowns | 1 |
 
-**Cost centres and cost categories (2026-10-07, about 14:18 IST, licensed TallyPrime 7.1 Silver, `education_mode=false`, `http://127.0.0.1:9001`).** The owner read both books' Cost Centres setting on screen (F11): **No** on both. Five read-only collection requests, one at a time through a recording relay, each answered HTTP 200 with an envelope and `STATUS` 1. The request files are the byte-exact request text the capture kit generated (the production renderer's own output, asserted equal by a test), UTF-16LE with a BOM; the responses are BOM-less UTF-16LE as received.
+**Cost centres and cost categories (2026-10-07, about 14:18 IST, licensed TallyPrime 7.1 Silver, `education_mode=false`, `http://127.0.0.1:9001`).** The owner read both books' Cost Centres setting on screen (F11): **No** on both. Five read-only collection requests (the Company-flag reads and the two collection reads of each book are not stored here: three answers are, plus the two request files), one at a time through a recording relay, each answered HTTP 200 with an envelope and `STATUS` 1. The request files are the byte-exact request text the capture kit generated (the production renderer's own output, asserted equal by a test), UTF-16LE with a BOM; the responses are BOM-less UTF-16LE as received.
 - **Books:** `BRIDGE SHAPE LAB` (flag No, two cost centres and two cost categories) and `BRIDGE CORPUS FOREX` (flag No, no cost centre defined; its request differs from the SHAPE LAB one only by the company name and is not stored again).
 - **What the captures show:** a book whose setting reads No still returns its cost centres (`Assembly`, `Trading`: parent the reserved root, category `Business Line`) and its cost categories (`Business Line`: revenue Yes, non-revenue No, affects stock No; `Primary Cost Category`: Yes, Yes, No); a book with none defined answers one present, empty `COLLECTION` (`MSTDEPTYPE` 32). Every row carries `BRIDGECOMPANYGUID`.
-- **Not shown:** a book whose setting reads Yes, a larger book, another release.
+- **Not shown by these files:** a larger book, another release (a book whose setting reads Yes is in the next section).
 
 | file | bytes | sha256 | kind | rows |
 |---|---|---|---|---|
@@ -53,7 +53,7 @@ Voucher types, godowns, units and stock groups, each read as one native collecti
 
 ### Cost centres and categories on a book with the setting at Yes (captured 2026-10-07 by another lane)
 
-A third synthetic book, the parity lab, whose Cost Centres setting read Yes (the Company flag `ISCOSTCENTRESON`, equal to the owner's screen), captured through the same collection requests as the files above. The fixtures are **scrubbed copies**: the company GUID prefix is replaced with a synthetic one and the lab names `RB1 CC A`, `RB1 CC A1` and `RB1 CC B` with `Parity CC A`, `Parity CC A1` and `Parity CC B`; the structure and every other byte of the answers are as received (BOM-less UTF-16LE, `&#4;` kept in `PARENT`). The originals are 6,806 and 4,458 bytes.
+A third synthetic book, the parity lab, whose Cost Centres setting read Yes (the Company flag `ISCOSTCENTRESON`, equal to the owner's screen), captured through the same collection requests as the files above (that capture records no release or licence; the capturing lane reported licensed TallyPrime 7.1 Silver). The fixtures are **scrubbed copies**: the company GUID prefix is replaced with a synthetic one and the three lab centre names with `Parity CC A`, `Parity CC A1` and `Parity CC B`; the structure and every other byte of the answers are as received (BOM-less UTF-16LE, `&#4;` kept in `PARENT`). The originals are 6,806 and 4,458 bytes.
 
 | file | bytes | sha256 | content |
 | --- | --- | --- | --- |

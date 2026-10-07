@@ -1033,8 +1033,8 @@ fn only_xml_whitespace_may_sit_between_elements() {
 }
 
 /// Every company has predefined voucher types, so a present, empty voucher-type
-/// collection is refused, as is a cost-category one (the predefined Primary Cost
-/// Category is expected in every book); the other kinds may answer with none.
+/// collection is refused; the other kinds may answer with none (an empty cost-category
+/// collection is refused by `an_empty_cost_category_answer_is_refused_because_the_primary_category_always_exists`).
 #[test]
 fn a_voucher_type_collection_with_no_rows_is_refused_and_the_other_kinds_may_be_empty() {
     let kind = NativeMasterKind::VoucherTypes;
@@ -1602,6 +1602,26 @@ fn an_empty_cost_category_answer_is_refused_because_the_primary_category_always_
         NativeMastersError::CostCategoriesEmpty.code(),
         "masters_cost_categories_empty"
     );
+}
+
+#[test]
+fn a_cost_category_row_that_carries_a_parent_has_none() {
+    // A category has no parent: a PARENT element on the wire is not read as one.
+    let text = response(NativeMasterKind::CostCategories);
+    let tag = "<COSTCATEGORY NAME=\"Business Line\"";
+    let at = text.find(tag).unwrap();
+    let open_end = at + text[at..].find('>').unwrap() + 1;
+    let changed = format!(
+        "{}<PARENT TYPE=\"String\">Business Line</PARENT>{}",
+        &text[..open_end],
+        &text[open_end..]
+    );
+    assert_ne!(changed, text);
+    let rows = parse(NativeMasterKind::CostCategories, &changed)
+        .unwrap()
+        .rows;
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().all(|row| row.parent.is_none()), "{rows:?}");
 }
 
 #[test]

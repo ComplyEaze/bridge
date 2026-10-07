@@ -34,14 +34,18 @@
 //! this port reads the defaults, whose numbers equal the reference's tables (a test pins them).
 //!
 //! The row walk generalises `cash_payments_40a3`'s s.269ST walk over a money set, a direction and
-//! a grain. A figure id the reference would repeat (two ledgers sharing a tag, a two-line journal
-//! on one ledger) is refused with an error, as the reference's `fig` raises, never a panic.
+//! a grain. Each voucher is its own [`VoucherKey`] (#1243): the voucher grain, a row's per-voucher
+//! shares and lines and the count of vouchers with no reference are by that key, so two vouchers
+//! sharing a GUID (blank, or repeated) are two vouchers; a citation still names the GUID. A
+//! journal-transfer row id that would repeat takes its place among those sharing it as a suffix.
+//! A figure id the reference would still repeat (two ledgers sharing a tag) is refused with an
+//! error, as the reference's `fig` raises, never a panic.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 
-use crate::book::{Book, Voucher};
+use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::documents::{AisRow, BankStatementDoc};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
@@ -166,25 +170,25 @@ pub fn s194n_recipient_type(entity_type: Option<&str>) -> Option<Recipient> {
 }
 
 /// One row: its total and the vouchers behind it, by GUID and label (two vouchers sharing a GUID are
-/// both kept unless their refs are identical, #1195), and per GUID the party's share of those vouchers against their
+/// both kept unless their refs are identical, #1195), and per voucher the party's share of it against its
 /// own money line in the row's mode and direction (see `parity/PORT-NOTE-HVR.md`).
 #[derive(Default)]
 pub struct Row<'a> {
     pub paise: i64,
     pub vouchers: BTreeMap<(String, String), &'a Voucher>,
-    /// GUID -> (share, line), each added per voucher as it is read, so two vouchers sharing a GUID
-    /// add together and one voucher's line is never set against two vouchers' shares.
-    pub lines: BTreeMap<String, (i64, i64)>,
+    /// Voucher -> (share, line), so one voucher's line is never set against another's share, even
+    /// where the two share a GUID (#1243).
+    pub lines: BTreeMap<VoucherKey, (i64, i64)>,
     /// The unidentified-party row only: the names its vouchers print, shown with it and never used
     /// to key or attribute.
     names: PrintedNames,
 }
 
 impl<'a> Row<'a> {
-    fn add(&mut self, v: &'a Voucher, share: i64, line: i64) -> Result<()> {
+    fn add(&mut self, vk: &VoucherKey, v: &'a Voucher, share: i64, line: i64) -> Result<()> {
         self.paise = add(self.paise, share)?;
         self.vouchers.insert((v.guid.clone(), voucher_label(v)), v);
-        let slot = self.lines.entry(v.guid.clone()).or_insert((0, 0));
+        let slot = self.lines.entry(vk.clone()).or_insert((0, 0));
         *slot = (add(slot.0, share)?, add(slot.1, line)?);
         Ok(())
     }
@@ -244,19 +248,21 @@ pub struct Exclusions<'c> {
     pub counterparty_types: &'c BTreeMap<String, String>,
 }
 
-/// The reference's `compute_mode_rows`: `(key_fn(v), party ledger) -> row` over non-Contra
-/// vouchers with a money leg in `direction` on `mode_set`; `other_money` is never a party.
+/// The reference's `compute_mode_rows`: `(key_fn(voucher's key, v), party ledger) -> row` over
+/// non-Contra vouchers with a money leg in `direction` on `mode_set`; `other_money` is never a
+/// party. The voucher grain keys by the voucher's own key (`|k, _| k.clone()`, the reference's
+/// `BY_VOUCHER`), never its GUID.
 pub fn mode_rows<'a, K: Ord>(
     pop: &[&'a Voucher],
     book: &Book,
     mode_set: &BTreeSet<String>,
     other_money: &BTreeSet<String>,
     direction: Direction,
-    key_fn: impl Fn(&Voucher) -> K,
+    key_fn: impl Fn(&VoucherKey, &Voucher) -> K,
     x: &Exclusions<'_>,
 ) -> Result<Rows<'a, K>> {
     let mut rows: Rows<'a, K> = BTreeMap::new();
-    for &v in pop {
+    for (vk, v) in voucher_keys(pop)? {
         if v.base_type == "Contra" {
             continue;
         }
@@ -330,25 +336,26 @@ pub fn mode_rows<'a, K: Ord>(
         }
         if !party_amounts.is_empty() {
             for (ledger, amt) in party_amounts {
-                let row = rows.entry((key_fn(v), ledger)).or_default();
-                row.add(v, amt, line)?;
+                let row = rows.entry((key_fn(&vk, v), ledger)).or_default();
+                row.add(&vk, v, amt, line)?;
             }
         } else if fallback_total > 0 {
             // Pooled by the key alone (the day, or the reference), whatever name each voucher
             // prints: a split per printed name or per voucher lost one person's cash across
             // vouchers. The row keeps every usable printed name, to show with it.
             let row = rows
-                .entry((key_fn(v), UNIDENTIFIED_PARTY.to_string()))
+                .entry((key_fn(&vk, v), UNIDENTIFIED_PARTY.to_string()))
                 .or_default();
             row.names.note(v, [mode_set, other_money]);
-            row.add(v, fallback_total, line)?;
+            row.add(&vk, v, fallback_total, line)?;
         }
     }
     Ok(rows)
 }
 
 /// Limb (b): `(reference, party) -> row` for vouchers with a non-empty reference, and the count of
-/// qualifying vouchers whose reference is blank.
+/// qualifying vouchers whose reference is blank, counted as vouchers by their own keys (#1243: as
+/// distinct GUIDs, a voucher with no reference was hidden by one sharing its GUID that has one).
 fn bill_reference_rows<'a>(
     pop: &[&'a Voucher],
     book: &Book,
@@ -357,21 +364,23 @@ fn bill_reference_rows<'a>(
     direction: Direction,
     x: &Exclusions<'_>,
 ) -> Result<(Rows<'a, String>, usize)> {
-    let all = mode_rows(pop, book, cash, bank, direction, |v| v.reference.clone(), x)?;
+    let all = mode_rows(
+        pop,
+        book,
+        cash,
+        bank,
+        direction,
+        |_, v| v.reference.clone(),
+        x,
+    )?;
     let rows: Rows<'a, String> = all
         .into_iter()
         .filter(|((reference, _), _)| !reference.is_empty())
         .collect();
-    let with_money_leg = mode_rows(pop, book, cash, bank, direction, |v| v.guid.clone(), x)?;
-    let with_ref: BTreeSet<&String> = rows
-        .values()
-        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))
-        .collect();
-    let all_guids: BTreeSet<&String> = with_money_leg
-        .values()
-        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))
-        .collect();
-    let skipped = all_guids.difference(&with_ref).count();
+    let with_money_leg = mode_rows(pop, book, cash, bank, direction, |k, _| k.clone(), x)?;
+    let with_ref: BTreeSet<&VoucherKey> = rows.values().flat_map(|r| r.lines.keys()).collect();
+    let all_vouchers: BTreeSet<&VoucherKey> = with_money_leg.keys().map(|(k, _)| k).collect();
+    let skipped = all_vouchers.difference(&with_ref).count();
     Ok((rows, skipped))
 }
 
@@ -522,7 +531,8 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
             };
             for grain in ["day", "voucher"] {
                 let prefix = format!("{mode_name}_{dir}_{grain}");
-                // Both grains, one shape: the day grain keys by date, the voucher grain by GUID.
+                // Both grains, one shape: the day grain keys by date, the voucher grain by the
+                // voucher's own key, never its GUID, which two vouchers can share (#1243).
                 let day_rows = if grain == "day" {
                     Some(mode_rows(
                         &pop,
@@ -530,7 +540,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                         mode_set,
                         other_money,
                         direction,
-                        |v| v.date.clone(),
+                        |_, v| v.date.clone(),
                         &x,
                     )?)
                 } else {
@@ -543,7 +553,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                         mode_set,
                         other_money,
                         direction,
-                        |v| v.guid.clone(),
+                        |k, _| k.clone(),
                         &x,
                     )?)
                 } else {
@@ -918,10 +928,30 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
         ));
     }
     keyed.sort_by(|a, b| a.0.cmp(&b.0)); // stable, as Python's sorted: ties keep line order
-    for ((_, h), j) in keyed {
+
+    // A row's id is its voucher's GUID hash and its ledger's tag. Two lines can share both (two
+    // blank-GUID journals, one GUID on two journals, or both lines of one journal on one ledger,
+    // which the reference refused as a duplicate figure id): each takes its place among those
+    // sharing it, in this order, as a suffix, and every other id is as before (#1243).
+    let base_ids: Vec<String> = keyed
+        .iter()
+        .map(|((_, h), j)| format!("{}_{h}", hash8(&j.voucher.guid)))
+        .collect();
+    let mut sharing: BTreeMap<&str, usize> = BTreeMap::new();
+    for base in &base_ids {
+        *sharing.entry(base.as_str()).or_insert(0) += 1;
+    }
+    let mut place: BTreeMap<&str, usize> = BTreeMap::new();
+    for (((_, h), j), base) in keyed.iter().zip(&base_ids) {
         let v = j.voucher;
         let vh = hash8(&v.guid);
-        let rid = format!("{vh}_{h}");
+        let rid = if sharing[base.as_str()] > 1 {
+            let k = place.entry(base.as_str()).or_insert(0);
+            *k += 1;
+            format!("{base}_{k}")
+        } else {
+            base.clone()
+        };
         let v_ref = EvidenceRef::with_label("voucher", &v.guid, &voucher_label(v));
         let f_amt = r.fig(
             &format!("journal_transfer_amount_{rid}"),
@@ -1273,7 +1303,7 @@ mod tests {
                 &cash,
                 &none,
                 Direction::Receipt,
-                |v| v.date.clone(),
+                |_, v| v.date.clone(),
                 &x,
             );
             rows.unwrap().into_keys().map(|(_, party)| party).collect()
@@ -1288,7 +1318,7 @@ mod tests {
         // voucher also filed as g1 whose cash is debited Rs 1 lakh and credited Rs 20,000 back (so
         // its share, Rs 80,000, differs from its line, the debit only), and g3 (Rs 50,000, share =
         // line). The row (Rs 2.8 lakh) is over the limit; its cash line is Rs 3 lakh, summed per
-        // voucher, both g1 vouchers added together.
+        // voucher, each g1 voucher on its own (#1243).
         let voucher = |guid: &str, on: &str, base_type: &str, lines: &[(&str, i64)]| Voucher {
             guid: guid.to_string(),
             date: TallyDate::parse(on).unwrap(),

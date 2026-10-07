@@ -83,12 +83,12 @@ until you accept the new version (section 4). A server started by hand with
     register, bank-statement proposals, voucher totals by ledger, the ledgers
     listed under a group total, the ledger named when a group total cannot be
     given, the list of bill-wise ledgers waiting for approval, the suspense ledger
-    named in a build warning, the ledger in a refused cash-or-bank row, and a
-    ledger's own spelling beside the spelling its vouchers carry), stock item
-    names and their parents, godown and stock-group names and their parents, and
-    three fields of a ledger's details: the name on the PAN, the bank account
+    named in a build warning and the ledger in a refused cash-or-bank row), stock
+    item names and their parents, godown and stock-group names and their parents,
+    and three fields of a ledger's details: the name on the PAN, the bank account
     holder's name and the bank details. A name of four characters or fewer is
-    replaced by “…”. It does not mask amounts, company names, the names of
+    replaced by “…”. The spelling a ledger's vouchers carry, which is returned
+    beside its name when the two differ, is left out. It does not mask amounts, company names, the names of
     groups in a group total (shown as the book has them), a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal

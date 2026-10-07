@@ -255,6 +255,16 @@ fn others_than<'a>(v: &'a Voucher, ledger: &str) -> BTreeSet<&'a str> {
         .collect()
 }
 
+/// [`others_than`] without the ledgers on nil lines: a ledger on a nil line is no posting
+/// (bridge#1259 item 3, as `two_sided` and the loan listing read it).
+fn posted_others_than<'a>(v: &'a Voucher, ledger: &str) -> BTreeSet<&'a str> {
+    v.lines
+        .iter()
+        .filter(|l| l.ledger != ledger && l.amount_paise != 0)
+        .map(|l| l.ledger.as_str())
+        .collect()
+}
+
 /// A Python list of strings as `repr()` prints it.
 fn py_repr_list(items: &[String]) -> String {
     let inner: Vec<String> = items.iter().map(|s| py_repr_str(s)).collect();
@@ -458,7 +468,10 @@ fn compute_loan_rows<'a>(
         if loan_amt == 0 {
             continue;
         }
-        let others = others_than(v, loan_ledger);
+        // A ledger on a nil line is no posting: a nil line beside an interest journal left it "not
+        // only the interest ledger and TDS", and a nil cash line made a bank loan a cash one
+        // (bridge#1259 item 3).
+        let others = posted_others_than(v, loan_ledger);
         // rest = others - (tds - ils): the other lines, besides TDS ledgers that are not also this
         // loan's interest ledgers.
         let rest: BTreeSet<&str> = others
@@ -1493,6 +1506,36 @@ statutory dues classified as TDS payable, on every voucher that posts to the loa
             ),
             ev_tds.clone(),
         )?;
+        // A voucher counted in taken or repaid already holds its TDS in its loan line (Loan Dr
+        // 10,000 / TDS Cr 1,000 / Bank Cr 9,000 is a repayment of 10,000): LOAN-1 adds
+        // tds_on_loan for the deductions outside those totals, so it is told what to leave out.
+        // Published only where such a voucher carries TDS (bridge#1259 item 2). A voucher listed
+        // as both crediting and debiting the loan is not read this way: LOAN-1 firing on one
+        // carrying TDS stays.
+        let in_principal: BTreeSet<usize> = rows
+            .taken
+            .iter()
+            .chain(&rows.repaid)
+            .map(|x| x.at)
+            .collect();
+        let principal_tds: Vec<(usize, i128)> = tds_by_voucher
+            .iter()
+            .copied()
+            .filter(|(at, _)| in_principal.contains(at))
+            .collect();
+        if !principal_tds.is_empty() {
+            r.fig(
+                &format!("tds_in_principal_{h}"),
+                paise(principal_tds.iter().map(|&(_, x)| x).sum())?,
+                Unit::Paise,
+                &format!(
+                    "Of the TDS deducted on loan ledger (tag {h}), the part on the vouchers counted \
+in its taken or repaid totals (a repayment booked net of TDS, say), summed. It is inside the TDS \
+figure beside it, and is shown so the loan's movement can be checked against the Trial Balance."
+                ),
+                voucher_refs(principal_tds.iter().map(|&(at, _)| pop[at])),
+            )?;
+        }
         // (c) of #779 Phase A: a listed voucher carrying the loan's interest ledger or a TDS ledger
         // leaves its interest out of interest_total and its TDS in tds_on_loan. The threshold is
         // open where the interest crosses it in some reading of those interest lines and not in
@@ -3543,6 +3586,17 @@ pub fn check_invariants_with(
         }
     }
 
+    let pop = book.population()?;
+    // The TDS ledgers run() published (tds_payable_ledgers: the configuration, not a group), read
+    // back by LOAN-1 and LOAN-4.
+    let tds_read: BTreeSet<String> = figures
+        .get(format!("{prefix}tds_payable_ledgers").as_str())
+        .map(|f| lines_of(f))
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|x| !x.is_empty())
+        .collect();
+
     // LOAN-1
     let marker = format!("{prefix}interest_total_");
     for (fid, fig) in &figures {
@@ -3568,21 +3622,54 @@ pub fn check_invariants_with(
         // outside taken/repaid: the loan moved by the interest net of every TDS deduction on it.
         let tds_on_loan = value(format!("{prefix}tds_on_loan_{h}"));
         let interest = int_of(fig);
-        let expected_movement = -taken_total + repaid_total - interest + tds_on_loan;
+        // ... except the TDS on a voucher counted in taken or repaid, whose loan line holds it
+        // (bridge#1259 item 2). It is re-derived from the vouchers the figure cites, by GUID, on
+        // the TDS ledgers run() published, so a TDS line read wrongly on a taken or repaid voucher
+        // cannot cancel inside the tie.
+        let principal_id = format!("{prefix}tds_in_principal_{h}");
+        let tds_in_principal = value(principal_id.clone());
+        if let Some(principal) = figures.get(principal_id.as_str()) {
+            let cited: BTreeSet<&str> = principal
+                .evidence
+                .iter()
+                .filter(|e| e.kind == "voucher")
+                .map(|e| e.id.as_str())
+                .collect();
+            let derived: i128 = pop
+                .iter()
+                .filter(|v| {
+                    cited.contains(v.guid.as_str())
+                        && v.base_type != "Contra"
+                        && v.lines
+                            .iter()
+                            .any(|l| l.ledger == **name && l.amount_paise != 0)
+                })
+                .map(|v| -net_on(v, &tds_read))
+                .sum();
+            if derived != tds_in_principal {
+                out.push(format!(
+                    "LOAN-1: {name} (tag {h}) tds_in_principal_{h} says {tds_in_principal}p but \
+the lines on the TDS ledgers of the vouchers it cites on this loan are {derived}p"
+                ));
+            }
+        }
+        let expected_movement =
+            -taken_total + repaid_total - interest + tds_on_loan - tds_in_principal;
         let movement = i128::from(tb_row.closing_paise) - i128::from(tb_row.opening_paise);
         let diff = expected_movement - movement;
         if diff.abs() > tol {
             out.push(format!(
                 "LOAN-1: {name} (tag {h}) expected FY movement {expected_movement}p (= -taken \
-{taken_total}p + repaid {repaid_total}p - interest {interest}p + TDS {tds_on_loan}p) does not tie \
+{taken_total}p + repaid {repaid_total}p - interest {interest}p + TDS {}p) does not tie \
 the TB movement {movement}p (opening {}p, closing {}p); difference {diff}p -- a voucher on this \
 loan ledger was likely dropped from or wrongly added to the population.",
-                tb_row.opening_paise, tb_row.closing_paise
+                tds_on_loan - tds_in_principal,
+                tb_row.opening_paise,
+                tb_row.closing_paise
             ));
         }
     }
 
-    let pop = book.population()?;
     let mut pop_by_guid: HashMap<&str, Vec<&Voucher>> = HashMap::new();
     for v in &pop {
         pop_by_guid.entry(v.guid.as_str()).or_default().push(v);
@@ -3835,6 +3922,7 @@ possible_misposted_interest_{h} does not cite it: the entry is not asked about."
                 let stray: Vec<String> = v
                     .lines
                     .iter()
+                    .filter(|l| l.amount_paise != 0)
                     .map(|l| l.ledger.as_str())
                     .filter(|l| *l != loan.as_str() && !foreign.contains(l) && !under_duties(l))
                     .collect::<BTreeSet<_>>()
@@ -3871,16 +3959,9 @@ vouchers it cites net {on_loan}p.",
     // a credit and a debit line on it is either listed -- a two_sided_gross_credit/debit figure
     // pair citing it, equal to the voucher's own credit and debit lines on the loan -- or read as
     // interest: its every other non-zero line is one of the loan's interest ledgers or a TDS ledger
-    // run() published (tds_payable_ledgers: the configuration, not a group), with no other loan's
+    // run() published (tds_read, above), with no other loan's
     // line; a voucher on the loan alone is listed only if it does not balance. A listed voucher
     // that does not credit and debit the loan is named too.
-    let tds_read: BTreeSet<String> = figures
-        .get(format!("{prefix}tds_payable_ledgers").as_str())
-        .map(|f| lines_of(f))
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|x| !x.is_empty())
-        .collect();
     for fid in figures.keys() {
         let Some(h) = fid.strip_prefix(&format!("{prefix}interest_total_")) else {
             continue;
@@ -4047,7 +4128,7 @@ are {debit_pop}p",
                 .filter(|(_, v)| v.base_type != "Contra")
                 .filter(|(_, v)| {
                     paired.iter().any(|loan| {
-                        let rest: Vec<&str> = others_than(v, loan)
+                        let rest: Vec<&str> = posted_others_than(v, loan)
                             .into_iter()
                             .filter(|o| !tds_of.get(loan).is_some_and(|t| t.contains(*o)))
                             .collect();

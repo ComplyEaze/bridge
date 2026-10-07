@@ -108,6 +108,8 @@ fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
             "REFERENCE",
             "ISINVOICE",
             "PARTYGSTIN",
+            // Same inertness trap: `reference_date` is parsed only if the request names it (#1257).
+            "REFERENCEDATE",
         ] {
             assert!(fields.iter().any(|value| value == field), "missing {field}");
         }

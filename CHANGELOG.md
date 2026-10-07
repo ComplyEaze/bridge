@@ -18,6 +18,11 @@ These changes are in source and not yet in a published build.
 
 **New**
 
+- `vouchers`, `changes` and the sales and purchase registers now return `reference_date`, a voucher's
+  `REFERENCEDATE` (`YYYYMMDD`), where the voucher has one (#1257). Checked once against a
+  live TallyPrime 7.1 on one synthetic book: the element came back on every voucher, empty on all but one
+  and filled on that one (a Purchase) and on a voucher keyed for the check; it was not checked on a sale or on
+  another voucher type, and a value that is not a date refuses the read.
 - `vouchers` and the `outstandings` party detail now reach a ledger by either
   spelling of its name when Tally's own name for it differs in case or symbols from the
   spelling its vouchers carry (26 of 4,017 ledgers in a separate census of 13 books,
@@ -451,7 +456,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   run showed (such as cess), an invoice of another shape than the one run (for
   example several goods lines), a sale typed on Tally's screen,
   accounting-invoice mode, a post-dated sale, a `REFERENCE` or a filled
-  `PARTYGSTIN` on a sale, a `REFERENCEDATE` (it is not returned), or a currency
+  `PARTYGSTIN` on a sale, a `REFERENCEDATE` on a sale, or a currency
   other than the book's base. The invoice it was replayed on was imported by
   this project. Its `complete` state rests on the company marks and the ledger
   masters reading the same before and after, not on a separate voucher count

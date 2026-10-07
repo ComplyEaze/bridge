@@ -663,6 +663,27 @@ no row, and refuses a name no type carries (ASCII case ignored) as `unknown_vouc
 
 ---
 
+### 8.2f `REFERENCEDATE` on the voucher `FETCH` — **VERIFIED 2026-10-07; TallyPrime 7.1, one synthetic book**
+
+**Scope: TallyPrime 7.1 Silver, licensed, `education_mode: false`, synthetic company `BRIDGE SHAPE LAB`, one
+read of its year (67 vouchers, 134 data rows with the paired read) and one read of one day (one voucher).**
+Requests and responses retained with sha256 in the capture's provenance file
+(`vouchers-reference-date.PROVENANCE.md` in the agent fixtures).
+
+Adding `REFERENCEDATE` to the end of the voucher `FETCH` list (after `PARTYGSTIN`, §8.2c) returned the element
+on every voucher:
+
+- **Shape.** `<REFERENCEDATE TYPE="Date">…</REFERENCEDATE>` on all 134 data rows of the year read and on the day read's
+  row. Empty (`<REFERENCEDATE TYPE="Date"></REFERENCEDATE>`) on 132 rows (66 vouchers); populated with `YYYYMMDD`
+  on two rows (one Purchase whose reference date is its own voucher date and which has a `REFERENCE`) and on the
+  day read's row (a reference date five days before its voucher date).
+- **One variable.** With the word removed, the data requests are byte-equal to the reads without it; with the
+  `REFERENCEDATE` elements and the company counter block (`CMPINFO`) removed, the data responses are byte-equal to
+  the reads without it. The word adds 50 characters a voucher (100 bytes on the wire as UTF-16), about 0.24% of the year's response.
+- **Not shown.** A reference date on another voucher type, a voucher with a `REFERENCE` and no reference date,
+  another release, another book. `reference_date` is returned as Tally sent it (`YYYYMMDD`); a value that is not
+  a date refuses the read (`voucher_reference_date_invalid`).
+
 ### 8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**
 
 **Scope: TallyPrime 7.1 Silver, licensed, one company, 28 ledger masters (2026-09-12) and 36 (2026-09-30).** Captured from

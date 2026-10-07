@@ -1,0 +1,864 @@
+{
+ "comment": "partners_40b_194t: the three label lists that break a same-day tie by the key (the TDS seen, the TDS on a shared ledger attributed to no one, the negative net credits), each with vouchers of one day whose keys' order differs from the books' order, and in the first and the third from the GUIDs' order too (on the shared ledger the keys' order is the GUIDs' order); fourteen and thirteen labels, so the 'and N more' cut falls inside the tie.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Capital Account": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Fixed Assets": null
+ },
+ "ledgers": [
+  {
+   "name": "A Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "adv-fb5ee2-000"
+  },
+  {
+   "name": "C Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "adv-fb5ee2-001"
+  },
+  {
+   "name": "D Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "adv-fb5ee2-002"
+  },
+  {
+   "name": "Interest A",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "adv-fb5ee2-003"
+  },
+  {
+   "name": "Remuneration A",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "adv-fb5ee2-004"
+  },
+  {
+   "name": "Interest Shared",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "adv-fb5ee2-005"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "adv-fb5ee2-006"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "adv-fb5ee2-007"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "A Capital",
+   "opening": -30000000,
+   "debit": 750000,
+   "credit": 29250000,
+   "closing": -58500000
+  },
+  {
+   "ledger": "C Capital",
+   "opening": -30000000,
+   "debit": 0,
+   "credit": 3000000,
+   "closing": -33000000
+  },
+  {
+   "ledger": "D Capital",
+   "opening": -30000000,
+   "debit": 0,
+   "credit": 3000000,
+   "closing": -33000000
+  },
+  {
+   "ledger": "Interest A",
+   "opening": 0,
+   "debit": 24500000,
+   "credit": 750000,
+   "closing": 23750000
+  },
+  {
+   "ledger": "Remuneration A",
+   "opening": 0,
+   "debit": 8000000,
+   "credit": 0,
+   "closing": 8000000
+  },
+  {
+   "ledger": "Interest Shared",
+   "opening": 0,
+   "debit": 41100000,
+   "credit": 0,
+   "closing": 41100000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 6760000,
+   "closing": -6760000
+  },
+  {
+   "ledger": "Bank",
+   "opening": 90000000,
+   "debit": 0,
+   "credit": 31590000,
+   "closing": 58410000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "g",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     1100000
+    ],
+    [
+     "A Capital",
+     -990000
+    ],
+    [
+     "TDS Payable",
+     -110000
+    ]
+   ],
+   "number": "A01"
+  },
+  {
+   "guid": "g\u0001",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     1200000
+    ],
+    [
+     "A Capital",
+     -1080000
+    ],
+    [
+     "TDS Payable",
+     -120000
+    ]
+   ],
+   "number": "A02"
+  },
+  {
+   "guid": "",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     1300000
+    ],
+    [
+     "A Capital",
+     -1170000
+    ],
+    [
+     "TDS Payable",
+     -130000
+    ]
+   ],
+   "number": "A03"
+  },
+  {
+   "guid": "g",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     1400000
+    ],
+    [
+     "A Capital",
+     -1260000
+    ],
+    [
+     "TDS Payable",
+     -140000
+    ]
+   ],
+   "number": "A04"
+  },
+  {
+   "guid": "g\u0000",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     1500000
+    ],
+    [
+     "A Capital",
+     -1350000
+    ],
+    [
+     "TDS Payable",
+     -150000
+    ]
+   ],
+   "number": "A05"
+  },
+  {
+   "guid": "",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     1600000
+    ],
+    [
+     "A Capital",
+     -1440000
+    ],
+    [
+     "TDS Payable",
+     -160000
+    ]
+   ],
+   "number": "A06"
+  },
+  {
+   "guid": "g\u000000000001x",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     1700000
+    ],
+    [
+     "A Capital",
+     -1530000
+    ],
+    [
+     "TDS Payable",
+     -170000
+    ]
+   ],
+   "number": "A07"
+  },
+  {
+   "guid": "\u0000",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     1800000
+    ],
+    [
+     "A Capital",
+     -1620000
+    ],
+    [
+     "TDS Payable",
+     -180000
+    ]
+   ],
+   "number": "A08"
+  },
+  {
+   "guid": "g",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     1900000
+    ],
+    [
+     "A Capital",
+     -1710000
+    ],
+    [
+     "TDS Payable",
+     -190000
+    ]
+   ],
+   "number": "A09"
+  },
+  {
+   "guid": "\u000000000002z",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     2000000
+    ],
+    [
+     "A Capital",
+     -1800000
+    ],
+    [
+     "TDS Payable",
+     -200000
+    ]
+   ],
+   "number": "A10"
+  },
+  {
+   "guid": "",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     2100000
+    ],
+    [
+     "A Capital",
+     -1890000
+    ],
+    [
+     "TDS Payable",
+     -210000
+    ]
+   ],
+   "number": "A11"
+  },
+  {
+   "guid": "G",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     2200000
+    ],
+    [
+     "A Capital",
+     -1980000
+    ],
+    [
+     "TDS Payable",
+     -220000
+    ]
+   ],
+   "number": "A12"
+  },
+  {
+   "guid": "g-\u00e9",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     2300000
+    ],
+    [
+     "A Capital",
+     -2070000
+    ],
+    [
+     "TDS Payable",
+     -230000
+    ]
+   ],
+   "number": "A13"
+  },
+  {
+   "guid": "g",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest A",
+     2400000
+    ],
+    [
+     "A Capital",
+     -2160000
+    ],
+    [
+     "TDS Payable",
+     -240000
+    ]
+   ],
+   "number": "A14"
+  },
+  {
+   "guid": "g",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Remuneration A",
+     4000000
+    ],
+    [
+     "A Capital",
+     -3600000
+    ],
+    [
+     "TDS Payable",
+     -400000
+    ]
+   ],
+   "number": "A21"
+  },
+  {
+   "guid": "",
+   "date": "2025-12-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Remuneration A",
+     4000000
+    ],
+    [
+     "A Capital",
+     -3600000
+    ],
+    [
+     "TDS Payable",
+     -400000
+    ]
+   ],
+   "number": "A22"
+  },
+  {
+   "guid": "g",
+   "date": "2025-10-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "A Capital",
+     50000
+    ],
+    [
+     "Interest A",
+     -50000
+    ]
+   ],
+   "number": "A31"
+  },
+  {
+   "guid": "g\u0000!",
+   "date": "2025-10-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "A Capital",
+     100000
+    ],
+    [
+     "Interest A",
+     -100000
+    ]
+   ],
+   "number": "A32"
+  },
+  {
+   "guid": "",
+   "date": "2025-10-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "A Capital",
+     150000
+    ],
+    [
+     "Interest A",
+     -150000
+    ]
+   ],
+   "number": "A33"
+  },
+  {
+   "guid": "g\u0000b",
+   "date": "2025-10-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "A Capital",
+     200000
+    ],
+    [
+     "Interest A",
+     -200000
+    ]
+   ],
+   "number": "A34"
+  },
+  {
+   "guid": "",
+   "date": "2025-10-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "A Capital",
+     250000
+    ],
+    [
+     "Interest A",
+     -250000
+    ]
+   ],
+   "number": "A35"
+  },
+  {
+   "guid": "h",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     2100000
+    ],
+    [
+     "Bank",
+     -1890000
+    ],
+    [
+     "TDS Payable",
+     -210000
+    ]
+   ],
+   "number": "S01"
+  },
+  {
+   "guid": "g",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     2200000
+    ],
+    [
+     "Bank",
+     -1980000
+    ],
+    [
+     "TDS Payable",
+     -220000
+    ]
+   ],
+   "number": "S02"
+  },
+  {
+   "guid": "",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     2300000
+    ],
+    [
+     "Bank",
+     -2070000
+    ],
+    [
+     "TDS Payable",
+     -230000
+    ]
+   ],
+   "number": "S03"
+  },
+  {
+   "guid": "f",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     2400000
+    ],
+    [
+     "Bank",
+     -2160000
+    ],
+    [
+     "TDS Payable",
+     -240000
+    ]
+   ],
+   "number": "S04"
+  },
+  {
+   "guid": "g",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     2500000
+    ],
+    [
+     "Bank",
+     -2250000
+    ],
+    [
+     "TDS Payable",
+     -250000
+    ]
+   ],
+   "number": "S05"
+  },
+  {
+   "guid": "",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     2600000
+    ],
+    [
+     "Bank",
+     -2340000
+    ],
+    [
+     "TDS Payable",
+     -260000
+    ]
+   ],
+   "number": "S06"
+  },
+  {
+   "guid": "g",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     2700000
+    ],
+    [
+     "Bank",
+     -2430000
+    ],
+    [
+     "TDS Payable",
+     -270000
+    ]
+   ],
+   "number": "S07"
+  },
+  {
+   "guid": "",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     2800000
+    ],
+    [
+     "Bank",
+     -2520000
+    ],
+    [
+     "TDS Payable",
+     -280000
+    ]
+   ],
+   "number": "S08"
+  },
+  {
+   "guid": "g",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     2900000
+    ],
+    [
+     "Bank",
+     -2610000
+    ],
+    [
+     "TDS Payable",
+     -290000
+    ]
+   ],
+   "number": "S09"
+  },
+  {
+   "guid": "",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     3000000
+    ],
+    [
+     "Bank",
+     -2700000
+    ],
+    [
+     "TDS Payable",
+     -300000
+    ]
+   ],
+   "number": "S10"
+  },
+  {
+   "guid": "g",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     3100000
+    ],
+    [
+     "Bank",
+     -2790000
+    ],
+    [
+     "TDS Payable",
+     -310000
+    ]
+   ],
+   "number": "S11"
+  },
+  {
+   "guid": "",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     3200000
+    ],
+    [
+     "Bank",
+     -2880000
+    ],
+    [
+     "TDS Payable",
+     -320000
+    ]
+   ],
+   "number": "S12"
+  },
+  {
+   "guid": "g",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     3300000
+    ],
+    [
+     "Bank",
+     -2970000
+    ],
+    [
+     "TDS Payable",
+     -330000
+    ]
+   ],
+   "number": "S13"
+  },
+  {
+   "guid": "c-own",
+   "date": "2025-12-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     3000000
+    ],
+    [
+     "C Capital",
+     -3000000
+    ]
+   ],
+   "number": "C01"
+  },
+  {
+   "guid": "d-own",
+   "date": "2025-12-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Shared",
+     3000000
+    ],
+    [
+     "D Capital",
+     -3000000
+    ]
+   ],
+   "number": "D01"
+  }
+ ],
+ "tests": [
+  "partners_40b_194t"
+ ],
+ "entity_type": "firm",
+ "partners": {
+  "pa": {
+   "capital_ledgers": [
+    "A Capital"
+   ],
+   "interest_ledger": "Interest A",
+   "remuneration_ledger": "Remuneration A"
+  },
+  "pc": {
+   "capital_ledgers": [
+    "C Capital"
+   ],
+   "interest_ledger": "Interest Shared"
+  },
+  "pd": {
+   "capital_ledgers": [
+    "D Capital"
+   ],
+   "interest_ledger": "Interest Shared"
+  }
+ },
+ "deed": {
+  "interest_rate_bp": 1200
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

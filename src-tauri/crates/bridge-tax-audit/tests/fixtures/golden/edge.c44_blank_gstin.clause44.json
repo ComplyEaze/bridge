@@ -8,21 +8,31 @@
   "figures": [
     {
       "id": "clause44.exempt_or_non_gst_supply_count",
-      "value": 1,
+      "value": 3,
       "unit": "count",
       "definition_sha256_16": "974c7a36d9344882",
       "definition_text": "Expense lines classified 'exempt_or_non_gst_supply'.",
       "evidence": [
         {
           "kind": "voucher",
-          "id": "x01",
-          "label": "Purchase P-1 on 2025-04-10"
+          "id": "g01",
+          "label": "Purchase P-1 on 2025-05-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "g06",
+          "label": "Purchase P-6 on 2025-05-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "g07",
+          "label": "Purchase P-7 on 2025-05-08"
         }
       ]
     },
     {
       "id": "clause44.exempt_or_non_gst_supply_paise",
-      "value": 194442,
+      "value": 328448,
       "unit": "paise",
       "definition_sha256_16": "c09808b2acff12ca",
       "definition_text": "Sum of expenditure, category 'exempt_or_non_gst_supply'.",
@@ -158,26 +168,15 @@
     },
     {
       "id": "clause44.population_excluded_expense_count",
-      "value": 4,
+      "value": 0,
       "unit": "count",
       "definition_sha256_16": "16f563a87c2b2d51",
       "definition_text": "Expenditure-group lines on POST-DATED vouchers (excluded from the books population) -- a named reconciling item: the raw TB export is not always population-filtered for a post-dated voucher (see check CL44-1), so these must be added back before tying to the TB. Optional and cancelled vouchers are NOT included here -- checked on data, the TB excludes both just as the books population does, so adding them back would overstate this figure.",
-      "evidence": [
-        {
-          "kind": "excluded_voucher",
-          "id": "x02",
-          "label": "Purchase P-2 on 2026-03-30"
-        },
-        {
-          "kind": "excluded_voucher",
-          "id": "x03",
-          "label": "Journal J-2 on 2026-03-31"
-        }
-      ]
+      "evidence": []
     },
     {
       "id": "clause44.population_excluded_expense_paise",
-      "value": 297689,
+      "value": 0,
       "unit": "paise",
       "definition_sha256_16": "6dbce00c1853eabb",
       "definition_text": "Sum of expenditure-group lines on post-dated, population-excluded vouchers.",
@@ -185,15 +184,21 @@
     },
     {
       "id": "clause44.registered_composition_count",
-      "value": 0,
+      "value": 1,
       "unit": "count",
       "definition_sha256_16": "93bcbbddaec5c154",
       "definition_text": "Expense lines classified 'registered_composition'.",
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "g03",
+          "label": "Purchase P-3 on 2025-05-04"
+        }
+      ]
     },
     {
       "id": "clause44.registered_composition_paise",
-      "value": 0,
+      "value": 92641,
       "unit": "paise",
       "definition_sha256_16": "1f4730c630a671d8",
       "definition_text": "Sum of expenditure, category 'registered_composition'.",
@@ -201,15 +206,21 @@
     },
     {
       "id": "clause44.registered_other_than_composition_count",
-      "value": 0,
+      "value": 1,
       "unit": "count",
       "definition_sha256_16": "93ef4dd569fb0737",
       "definition_text": "Expense lines classified 'registered_other_than_composition'.",
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "g02",
+          "label": "Purchase P-2 on 2025-05-03"
+        }
+      ]
     },
     {
       "id": "clause44.registered_other_than_composition_paise",
-      "value": 0,
+      "value": 100221,
       "unit": "paise",
       "definition_sha256_16": "39a002038f56f019",
       "definition_text": "Sum of expenditure, category 'registered_other_than_composition'.",
@@ -217,7 +228,7 @@
     },
     {
       "id": "clause44.total_expenditure_paise",
-      "value": 194442,
+      "value": 704353,
       "unit": "paise",
       "definition_sha256_16": "073b6e286df50c91",
       "definition_text": "Sum of every bucket and no-supplier/judgement-reason figure above (books-POPULATION only); tied in check_invariants (CL44-1), TOGETHER WITH population_excluded_expense_paise below, to the financial_statements test's own TB-based expenditure definition (purchases + direct_expenses + indirect_expenses), independent of this walk.",
@@ -225,15 +236,26 @@
     },
     {
       "id": "clause44.unregistered_count",
-      "value": 0,
+      "value": 2,
       "unit": "count",
       "definition_sha256_16": "70e8c2734ce8f94c",
       "definition_text": "Expense lines classified 'unregistered'.",
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "g04",
+          "label": "Purchase P-4 on 2025-05-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "g05",
+          "label": "Purchase P-5 on 2025-05-06"
+        }
+      ]
     },
     {
       "id": "clause44.unregistered_paise",
-      "value": 0,
+      "value": 183043,
       "unit": "paise",
       "definition_sha256_16": "594f33d4e0f14407",
       "definition_text": "Sum of expenditure, category 'unregistered'.",
@@ -344,8 +366,38 @@
       "evidence": [
         {
           "kind": "voucher",
-          "id": "x01",
-          "label": "Purchase P-1 on 2025-04-10"
+          "id": "g01",
+          "label": "Purchase P-1 on 2025-05-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "g02",
+          "label": "Purchase P-2 on 2025-05-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "g03",
+          "label": "Purchase P-3 on 2025-05-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "g04",
+          "label": "Purchase P-4 on 2025-05-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "g05",
+          "label": "Purchase P-5 on 2025-05-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "g06",
+          "label": "Purchase P-6 on 2025-05-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "g07",
+          "label": "Purchase P-7 on 2025-05-08"
         }
       ],
       "title_sha256_16": "6ca5bdb4e1a6a5cb",
@@ -376,28 +428,7 @@
     "POP-3",
     "POP-5"
   ],
-  "book_invariant_violations": [
-    {
-      "invariant": "POP-1",
-      "subject": "Alpha Traders",
-      "detail": "vouchers -194442 vs TB movement -345211 paise"
-    },
-    {
-      "invariant": "POP-1",
-      "subject": "Bank A",
-      "detail": "vouchers 547401 vs TB movement 400481 paise"
-    },
-    {
-      "invariant": "POP-1",
-      "subject": "Hardware Purchases",
-      "detail": "vouchers 194442 vs TB movement 305228 paise"
-    },
-    {
-      "invariant": "POP-1",
-      "subject": "Office Expenses",
-      "detail": "vouchers 0 vs TB movement 186903 paise"
-    }
-  ],
+  "book_invariant_violations": [],
   "result_invariants_evaluated": [
     "EVID-1",
     "POP-4",

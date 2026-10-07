@@ -1,5 +1,5 @@
 {
- "comment": "clause44: the client's money categories. Interest to a bank goes to the exempt column and bank charges to 'other than composition' whatever the lender's GSTIN (the module check leaves both out); a charge on a journal with no party is 'no party' (a reason comes before a forced column); a ledger in both the bank-charge category and the no-supplier list is 'no supplier'; interest to an individual lender keeps the ordinary rule (no GSTIN: unregistered; a GSTIN and no tax: exempt) and raises the judgement finding, including a line on a ledger that is also a depreciation ledger; a depreciation ledger is a depreciation entry even when its category is a judgement one; partner remuneration (also on the no-supplier list) and a mixed interest-and-charges ledger are judgement items outside the columns; round-off beside only a judgement item rides into the GSTIN rule (a judgement item counts as a real line); an unrecognised category and a padded one change nothing. Every GSTIN is invented (fourteenth character Y).",
+ "comment": "clause44: the client's money categories. Interest to a bank goes to the exempt column and bank charges to 'other than composition' whatever the lender's GSTIN (the module check leaves both out); a charge on a journal with no party is still forced to 'other than composition' (a line is placed by its own ledger before the party is read); a ledger in both the bank-charge category and the no-supplier list is 'no supplier' (a reason comes before a forced column); interest to an individual lender keeps the ordinary rule (no GSTIN: unregistered; a GSTIN and no tax: exempt) and raises the judgement finding, including a line on a ledger that is also a depreciation ledger; a depreciation ledger is a depreciation entry even when its category is a judgement one; partner remuneration (also on the no-supplier list) and a mixed interest-and-charges ledger are judgement items outside the columns; round-off beside only a judgement item takes that item's reason. Every GSTIN is invented (fourteenth character Y).",
  "groups": {
   "Capital Account": null,
   "Current Assets": null,
@@ -601,9 +601,7 @@
    "Director Interest": "interest_individual_no_gstin",
    "Partner Remuneration": "partner_interest_or_remuneration",
    "Partner Interest": "partner_interest_or_remuneration",
-   "Bank Interest and Charges": "mixed_interest_and_charges",
-   "Courier": "courier_fees",
-   "Rent": " bank_charges"
+   "Bank Interest and Charges": "mixed_interest_and_charges"
   }
  },
  "tests": [

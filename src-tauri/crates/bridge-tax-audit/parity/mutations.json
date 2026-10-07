@@ -9725,7 +9725,7 @@
   "what": "loans_interest: LOAN-1 does not name a TDS in principal that its cited vouchers do not give",
   "file": "src/loans_interest.rs",
   "from": "            if derived != tds_in_principal {",
-  "to": "            if derived != tds_in_principal && derived < 0 {"
+  "to": "            if derived != tds_in_principal && false {"
  },
  {
   "id": "L1259-12",
@@ -9774,5 +9774,45 @@
   "file": "src/loans_interest.rs",
   "from": "            .chain(&rows.repaid)\n            .map(|x| x.at)\n            .collect();",
   "to": "            .chain(&rows.repaid)\n            .map(|x| x.at)\n            .chain(rows.listed.iter().copied())\n            .collect();"
+ },
+ {
+  "id": "L1259-18",
+  "by": "reviewer-sonnet",
+  "what": "loans_interest: a voucher's posted other ledgers no longer leave out the ledger asked about",
+  "file": "src/loans_interest.rs",
+  "from": "        .filter(|l| l.ledger != ledger && l.amount_paise != 0)\n",
+  "to": "        .filter(|l| (l.ledger != ledger || true) && l.amount_paise != 0)\n"
+ },
+ {
+  "id": "L1259-19",
+  "by": "reviewer-sonnet",
+  "what": "loans_interest: tds_in_principal takes the TDS of every voucher with TDS as its value, its evidence unchanged",
+  "file": "src/loans_interest.rs",
+  "from": "                paise(principal_tds.iter().map(|&(_, x)| x).sum())?,",
+  "to": "                paise(tds_by_voucher.iter().map(|&(_, x)| x).sum())?,"
+ },
+ {
+  "id": "L1259-20",
+  "by": "reviewer-sonnet",
+  "what": "loans_interest: LOAN-1 adds the TDS in principal to the expected movement instead of leaving it out",
+  "file": "src/loans_interest.rs",
+  "from": "-taken_total + repaid_total - interest + tds_on_loan - tds_in_principal;",
+  "to": "-taken_total + repaid_total - interest + tds_on_loan + tds_in_principal;"
+ },
+ {
+  "id": "L1259-21",
+  "by": "reviewer-sonnet",
+  "what": "loans_interest: LOAN-1 re-derives the TDS in principal from no TDS ledger at all",
+  "file": "src/loans_interest.rs",
+  "from": "                .map(|v| -net_on(v, &tds_read))\n                .sum();\n            if derived != tds_in_principal {",
+  "to": "                .map(|v| -net_on(v, &BTreeSet::new()))\n                .sum();\n            if derived != tds_in_principal {"
+ },
+ {
+  "id": "L1259-22",
+  "by": "reviewer-sonnet",
+  "what": "loans_interest: LOAN-1 re-derives the TDS in principal from every voucher on the loan, not only the GUIDs the figure cites",
+  "file": "src/loans_interest.rs",
+  "from": "                    cited.contains(v.guid.as_str())\n",
+  "to": "                    (cited.contains(v.guid.as_str()) || true)\n"
  }
 ]

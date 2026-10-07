@@ -37,7 +37,9 @@ fn present(value: &str) -> NativeStatementAmount {
     NativeStatementAmount::Present(ExactDecimal::parse(value).unwrap())
 }
 
-fn invalid_response(code: &'static str) -> Result<NativeNegativeStock, NativeNegativeStockError> {
+fn invalid_response(
+    code: &'static str,
+) -> Result<NativeNegativeStockListing, NativeNegativeStockError> {
     Err(NativeNegativeStockError::InvalidResponse(code))
 }
 
@@ -131,7 +133,7 @@ fn an_unknown_report_name_is_a_reported_failure_by_structure_and_a_bare_response
 }
 
 #[test]
-fn a_failure_signal_anywhere_beats_the_rows_whether_self_closed_or_not() {
+fn a_failure_signal_beside_the_rows_beats_them_and_one_inside_a_row_is_a_shape_error() {
     for tail in ["<LINEERROR>x</LINEERROR>", "<STATUS/>", "<ERROR/>"] {
         let xml = mutate("</ENVELOPE>", &format!("{tail}</ENVELOPE>"));
         assert_eq!(
@@ -166,7 +168,7 @@ fn an_amount_that_is_not_a_plain_signed_decimal_is_refused() {
 }
 
 #[test]
-fn an_unreadable_quantity_is_counted_unread_and_does_not_refuse_the_answer() {
+fn an_unreadable_quantity_is_read_as_unread_and_does_not_refuse_the_answer() {
     let xml = mutate(
         "<DSPCLQTY>100 Box</DSPCLQTY>",
         "<DSPCLQTY>1 000 Box</DSPCLQTY>",
@@ -242,7 +244,7 @@ fn a_closing_without_its_value_a_repeated_column_and_unknown_elements_are_refuse
     );
     let two_closings = mutate(
         "<DSPSTKINFO><DSPSTKCL><DSPCLQTY>100 Box</DSPCLQTY>",
-        "<DSPSTKINFO><DSPSTKCL><DSPCLAMTA>1</DSPCLAMTA></DSPSTKCL><DSPSTKCL><DSPCLQTY>100 Box</DSPCLQTY>",
+        "<DSPSTKINFO><DSPSTKCL><DSPCLQTY>1 Box</DSPCLQTY><DSPCLRATE>1</DSPCLRATE><DSPCLAMTA>1</DSPCLAMTA></DSPSTKCL><DSPSTKCL><DSPCLQTY>100 Box</DSPCLQTY>",
     );
     assert_eq!(
         parse_native_negative_stock(&two_closings),
@@ -304,14 +306,108 @@ fn text_a_wrapper_and_a_cut_response_are_refused() {
 
 #[test]
 fn every_error_has_its_own_stable_code() {
-    let codes = [
-        NativeNegativeStockError::TallyReportedFailure.code(),
-        NativeNegativeStockError::UnknownReport.code(),
-        NativeNegativeStockError::EmptyEnvelope.code(),
-        NativeNegativeStockError::InvalidAmount.code(),
-        NativeNegativeStockError::DuplicateItem.code(),
-    ];
-    let unique: std::collections::HashSet<_> = codes.iter().collect();
-    assert_eq!(unique.len(), codes.len());
+    assert_eq!(
+        [
+            NativeNegativeStockError::TallyReportedFailure.code(),
+            NativeNegativeStockError::UnknownReport.code(),
+            NativeNegativeStockError::EmptyEnvelope.code(),
+            NativeNegativeStockError::InvalidAmount.code(),
+            NativeNegativeStockError::DuplicateItem.code(),
+        ],
+        [
+            "negative_stock_tally_reported_failure",
+            "negative_stock_report_unknown",
+            "negative_stock_empty_envelope",
+            "negative_stock_amount_invalid",
+            "negative_stock_item_duplicated",
+        ]
+    );
     assert_eq!(NativeNegativeStockError::InvalidResponse("x").code(), "x");
+}
+
+#[test]
+fn an_absent_quantity_or_rate_is_refused_while_an_empty_one_is_read() {
+    // The capture shows all three columns on every row; an absent element is not an empty one.
+    let no_rate = mutate("<DSPCLRATE>25.00</DSPCLRATE>", "");
+    assert_eq!(
+        parse_native_negative_stock(&no_rate),
+        invalid_response("negative_stock_column_missing")
+    );
+    let no_quantity = mutate("<DSPCLQTY>100 Box</DSPCLQTY>", "");
+    assert_eq!(
+        parse_native_negative_stock(&no_quantity),
+        invalid_response("negative_stock_column_missing")
+    );
+    let empty_rate = mutate("<DSPCLRATE>25.00</DSPCLRATE>", "<DSPCLRATE/>");
+    assert_eq!(
+        parse_native_negative_stock(&empty_rate).unwrap().items[0].rate,
+        NativeStatementAmount::Empty
+    );
+    let twice = mutate(
+        "<DSPCLQTY>100 Box</DSPCLQTY>",
+        "<DSPCLQTY>100 Box</DSPCLQTY><DSPCLQTY>1 Box</DSPCLQTY>",
+    );
+    assert_eq!(
+        parse_native_negative_stock(&twice),
+        invalid_response("negative_stock_closing_shape")
+    );
+    let bad_rate = mutate(
+        "<DSPCLRATE>25.00</DSPCLRATE>",
+        "<DSPCLRATE>25,00</DSPCLRATE>",
+    );
+    assert_eq!(
+        parse_native_negative_stock(&bad_rate),
+        Err(NativeNegativeStockError::InvalidAmount)
+    );
+}
+
+#[test]
+fn the_remaining_shape_refusals_each_return_their_own_code() {
+    let cases: [(String, &str); 8] = [
+        (
+            mutate("</ENVELOPE>", "<DSPEXTRA/></ENVELOPE>"),
+            "negative_stock_unexpected_empty_element",
+        ),
+        (
+            mutate("</ENVELOPE>", "<![CDATA[x]]></ENVELOPE>"),
+            "negative_stock_unexpected_content",
+        ),
+        (
+            mutate(
+                "<DSPDISPNAME>Cleaning Kit A</DSPDISPNAME>",
+                "<DSPDISPNAME>A</DSPDISPNAME><DSPDISPNAME>B</DSPDISPNAME>",
+            ),
+            "negative_stock_name_shape",
+        ),
+        (
+            mutate(
+                "<DSPSTKINFO><DSPSTKCL><DSPCLQTY>100 Box</DSPCLQTY>",
+                "<DSPSTKINFO></DSPSTKINFO><DSPSTKINFO><DSPSTKCL><DSPCLQTY>100 Box</DSPCLQTY>",
+            ),
+            "negative_stock_closing_missing",
+        ),
+        (
+            "<REPORT></REPORT>".to_string(),
+            "negative_stock_root_not_envelope",
+        ),
+        (
+            "<ENVELOPE><HEADER><DSPEXTRA>1</DSPEXTRA></HEADER></ENVELOPE>".to_string(),
+            "negative_stock_unexpected_element",
+        ),
+        (
+            mutate("<DSPCLQTY>100 Box</DSPCLQTY>", "<DSPCLQTY><X/></DSPCLQTY>"),
+            "negative_stock_text_invalid",
+        ),
+        (
+            mutate("</DSPSTKCL>", "<DSPEXTRA><X/></DSPEXTRA></DSPSTKCL>"),
+            "negative_stock_text_invalid",
+        ),
+    ];
+    for (xml, code) in cases {
+        assert_eq!(
+            parse_native_negative_stock(&xml),
+            invalid_response(code),
+            "{code}"
+        );
+    }
 }

@@ -266,7 +266,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_negative_stock_tests.rs",
-      "reason": "Tests pinning the Negative Stock request to its captured bytes and the parser's refusals, on the live capture; a weakened test lets an empty answer or a malformed row pass unseen."
+      "reason": "Tests pinning the Negative Stock request to its captured bytes, the parse of the live capture, and the parser's refusals on mutated copies of it; a weakened test lets an empty answer or a malformed row pass unseen."
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_outstandings/compute.rs"

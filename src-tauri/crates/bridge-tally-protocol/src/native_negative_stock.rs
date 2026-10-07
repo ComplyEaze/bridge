@@ -5,7 +5,8 @@
 //! company, so a caller must bracket the read with identity and extent reads.
 //! The answer is the Stock Summary's item grammar: top-level children alternate
 //! `DSPACCNAME` (one `DSPDISPNAME`) and `DSPSTKINFO` (one `DSPSTKCL` holding
-//! `DSPCLQTY`, `DSPCLRATE` and `DSPCLAMTA`). On the one book measured it listed
+//! `DSPCLQTY`, `DSPCLRATE` and `DSPCLAMTA`, all three present on the capture, so
+//! all three are required here; a present element may be empty). On the one book measured it listed
 //! exactly the items whose closing quantity is below zero or whose closing value
 //! is a credit (§12a.16); that rule was observed on one book and is not applied
 //! here: this module only reads the list, closed, and says what it could not.
@@ -41,10 +42,13 @@ pub fn render_native_negative_stock_request(
     render_built_in_report_request(REPORT_ID, company, period)
 }
 
-/// One listed item, each figure exactly as Tally printed it. An empty rate or
-/// value is not zero.
+/// One item Tally listed in this report, each rate and value exactly as Tally
+/// printed it (an empty one is not zero). Being listed does not make it negative
+/// by itself: four of the five captured items have a positive quantity (and a
+/// credit value), so the quantity is kept for the caller's own check and is not
+/// serialized, and no serialized form of an item says "negative".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct NativeNegativeStockItem {
+pub struct NativeListedStockItem {
     pub name: String,
     /// The closing quantity, signed as Tally sent it (`-50.000 Kgs` is a negative stock).
     #[serde(skip)]
@@ -54,8 +58,8 @@ pub struct NativeNegativeStockItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct NativeNegativeStock {
-    pub items: Vec<NativeNegativeStockItem>,
+pub struct NativeNegativeStockListing {
+    pub items: Vec<NativeListedStockItem>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -111,6 +115,14 @@ impl From<NativeStatementError> for NativeNegativeStockError {
     }
 }
 
+/// Element text, with a failure of the shared reader named in this module's codes.
+fn text(
+    reader: &mut Reader<&[u8]>,
+    name: quick_xml::name::QName<'_>,
+) -> Result<String, NativeNegativeStockError> {
+    read_text(reader, name).map_err(|_| invalid("negative_stock_text_invalid"))
+}
+
 fn invalid(code: &'static str) -> NativeNegativeStockError {
     NativeNegativeStockError::InvalidResponse(code)
 }
@@ -136,7 +148,7 @@ fn is_wrapper(name: &[u8]) -> bool {
 /// and an item named twice.
 pub fn parse_native_negative_stock(
     xml: &str,
-) -> Result<NativeNegativeStock, NativeNegativeStockError> {
+) -> Result<NativeNegativeStockListing, NativeNegativeStockError> {
     let sanitized = sanitize_invalid_numeric_references(xml);
     let mut reader = Reader::from_str(&sanitized);
     reader.config_mut().trim_text(false);
@@ -145,7 +157,7 @@ pub fn parse_native_negative_stock(
     let mut wrapper_depth = 0_usize;
     let mut wrapper_seen = false;
     let mut pending_name: Option<String> = None;
-    let mut items: Vec<NativeNegativeStockItem> = Vec::new();
+    let mut items: Vec<NativeListedStockItem> = Vec::new();
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element) => {
@@ -168,7 +180,7 @@ pub fn parse_native_negative_stock(
                     wrapper_depth += 1;
                     wrapper_seen = true;
                 } else if wrapper_depth > 0 && name.as_slice() == b"VERSION" {
-                    read_text(&mut reader, element.name())?;
+                    text(&mut reader, element.name())?;
                 } else if wrapper_depth > 0 {
                     return Err(invalid("negative_stock_unexpected_element"));
                 } else if name.as_slice() == b"DSPACCNAME" {
@@ -235,7 +247,7 @@ pub fn parse_native_negative_stock(
     if !items.iter().all(|item| seen.insert(item.name.as_str())) {
         return Err(NativeNegativeStockError::DuplicateItem);
     }
-    Ok(NativeNegativeStock { items })
+    Ok(NativeNegativeStockListing { items })
 }
 
 /// `DSPACCNAME` holding exactly one non-blank `DSPDISPNAME` text element.
@@ -251,7 +263,7 @@ fn read_item_name(
                 if element.name().as_ref().eq_ignore_ascii_case(b"DSPDISPNAME")
                     && name.is_none() =>
             {
-                name = Some(read_text(reader, element.name())?);
+                name = Some(text(reader, element.name())?);
             }
             Event::End(element) if element.name().as_ref() == block.as_slice() => {
                 return name
@@ -269,9 +281,9 @@ fn read_item_row(
     reader: &mut Reader<&[u8]>,
     block: &BytesStart<'_>,
     name: String,
-) -> Result<NativeNegativeStockItem, NativeNegativeStockError> {
+) -> Result<NativeListedStockItem, NativeNegativeStockError> {
     let block = block.name().as_ref().to_vec();
-    let mut item: Option<NativeNegativeStockItem> = None;
+    let mut item: Option<NativeListedStockItem> = None;
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element)
@@ -288,13 +300,14 @@ fn read_item_row(
     }
 }
 
-/// `DSPSTKCL` holding `DSPCLQTY`, `DSPCLRATE` and `DSPCLAMTA`, each at most once
-/// and `DSPCLAMTA` exactly once; an element may be self-closed (empty).
+/// `DSPSTKCL` holding `DSPCLQTY`, `DSPCLRATE` and `DSPCLAMTA`, each exactly once
+/// and in any order; an element may be empty (an absent one is refused, not read
+/// as empty).
 fn read_closing(
     reader: &mut Reader<&[u8]>,
     block: &BytesStart<'_>,
     name: String,
-) -> Result<NativeNegativeStockItem, NativeNegativeStockError> {
+) -> Result<NativeListedStockItem, NativeNegativeStockError> {
     let block = block.name().as_ref().to_vec();
     let (mut quantity_text, mut rate, mut value): (Option<String>, Option<String>, Option<String>) =
         (None, None, None);
@@ -303,7 +316,7 @@ fn read_closing(
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element) => {
                 let key = element.name().as_ref().to_ascii_uppercase();
-                let text = read_text(reader, element.name())?;
+                let text = text(reader, element.name())?;
                 match key.as_slice() {
                     b"DSPCLQTY" if !quantity_seen => {
                         quantity_seen = true;
@@ -324,15 +337,20 @@ fn read_closing(
                 }
             }
             Event::End(element) if element.name().as_ref() == block.as_slice() => {
+                let (Some(rate), true) = (rate, quantity_seen) else {
+                    return Err(invalid("negative_stock_column_missing"));
+                };
                 let value = value.ok_or(invalid("negative_stock_value_missing"))?;
-                return Ok(NativeNegativeStockItem {
+                return Ok(NativeListedStockItem {
                     name,
                     quantity: match quantity(quantity_text) {
                         Ok(None) => NativeQuantityRead::Empty,
                         Ok(Some(read)) => NativeQuantityRead::Read(read),
+                        // Text that is not `<number> <unit>` (an over-long unit included) is
+                        // read as unread, never as a value.
                         Err(_) => NativeQuantityRead::Unread,
                     },
-                    rate: amount(rate.as_deref().unwrap_or(""))?,
+                    rate: amount(&rate)?,
                     value: amount(&value)?,
                 });
             }

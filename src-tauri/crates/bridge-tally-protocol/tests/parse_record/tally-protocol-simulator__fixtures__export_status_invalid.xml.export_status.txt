@@ -1,0 +1,4 @@
+# fixture: ../tally-protocol-simulator/fixtures/export_status_invalid.xml
+# parser: export_status
+# source: synthetic: not evidence of what Tally sends
+Err(Tally returned an invalid application STATUS)

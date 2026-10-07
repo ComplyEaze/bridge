@@ -1,0 +1,13 @@
+# fixture: tests/fixtures/stock-lab-day/stock_lab_taxed_day_currencies_response.utf16le.xml
+# parser: parse_company_currency
+# source: captured
+Ok(CompanyCurrency {
+    symbol: "₹",
+    mailing_name: "INR",
+    currency_count: 1,
+    decimal_places: 2,
+    is_inr: true,
+    names: [
+        "₹",
+    ],
+})

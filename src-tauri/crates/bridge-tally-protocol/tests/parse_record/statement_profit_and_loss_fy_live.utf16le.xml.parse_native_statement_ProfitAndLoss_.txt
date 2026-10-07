@@ -1,0 +1,26 @@
+# fixture: tests/fixtures/statement_profit_and_loss_fy_live.utf16le.xml
+# parser: parse_native_statement(ProfitAndLoss)
+# source: captured
+Ok(NativeStatement {
+    kind: ProfitAndLoss,
+    lines: [
+        NativeStatementLine {
+            name: "Cost of Sales :",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "-4250.00",
+                ),
+            ),
+        },
+        NativeStatementLine {
+            name: "Purchase Accounts",
+            sub: Present(
+                ExactDecimal(
+                    "-4250.00",
+                ),
+            ),
+            main: Empty,
+        },
+    ],
+})

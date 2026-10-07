@@ -1,0 +1,7 @@
+# fixture: tests/fixtures/agent/native-ledger-catalogue.utf16le.xml
+# parser: parse_standard_ledger_identity_observation(WR2)
+# source: captured
+Ok(StandardLedgerIdentityObservation {
+    company_guid: "61c6de69-1748-461c-ad3f-162cb949df9f",
+    ledger_count: 9,
+})

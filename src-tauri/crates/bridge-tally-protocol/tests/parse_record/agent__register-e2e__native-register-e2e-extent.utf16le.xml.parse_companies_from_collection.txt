@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/agent/register-e2e/native-register-e2e-extent.utf16le.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "BRIDGE GST RECON LAB",
+        guid: Some(
+            "ae1490be-52c5-4544-9ffc-4b7da85f9797",
+        ),
+        company_number: Some(
+            "100017",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+])

@@ -1,0 +1,25 @@
+# fixture: tests/fixtures/agent/escape-lab-ledger-catalogue.utf16le.xml
+# parser: parse_standard_ledger_catalog_with_identities(ESCAPE LAB)
+# source: captured
+Ok(StandardLedgerCatalog {
+    entries: [
+        StandardLedgerCatalogEntry {
+            name: "Cash",
+            stored_name: None,
+            guid: "21463ec7-c236-44fb-a06d-20f0ad8a6df3-0000001f",
+            parent: Some(
+                "Cash-in-Hand",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Profit & Loss A/c",
+            stored_name: None,
+            guid: "21463ec7-c236-44fb-a06d-20f0ad8a6df3-0000001e",
+            parent: Some(
+                "�#4; Primary",
+            ),
+            parent_unsupported: false,
+        },
+    ],
+})

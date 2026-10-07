@@ -10190,5 +10190,13 @@
   "file": "src/clause44.rs",
   "from": "        for (ledger, value) in money_category_by_ledger {",
   "to": "        for (ledger, value) in money_category_by_ledger.iter().rev() {"
+ },
+ {
+  "id": "CL44-70",
+  "by": "author",
+  "what": "clause44: a registration type is lower-cased instead of case-folded before it is compared",
+  "file": "src/clause44.rs",
+  "from": "                .map(|text| support::py_casefold(support::py_strip(text)))",
+  "to": "                .map(|text| support::py_strip(text).to_lowercase())"
  }
 ]

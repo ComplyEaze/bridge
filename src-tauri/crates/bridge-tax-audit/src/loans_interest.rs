@@ -3593,14 +3593,16 @@ pub fn check_invariants_with(
 
     let pop = book.population()?;
     // The TDS ledgers run() published (tds_payable_ledgers: the configuration, not a group), read
-    // back by LOAN-1 and LOAN-4.
+    // back by LOAN-1 and LOAN-4. LOAN-1 reads the figure's lines as they are, an empty text being no
+    // ledger at all but an empty name beside another being a ledger; only LOAN-4 leaves the empty
+    // name out (`tds_read_loan4`).
     let tds_read: BTreeSet<String> = figures
         .get(format!("{prefix}tds_payable_ledgers").as_str())
+        .filter(|f| matches!(&f.value, Value::Text(t) if !t.is_empty()))
         .map(|f| lines_of(f))
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|x| !x.is_empty())
-        .collect();
+        .unwrap_or_default();
+    let tds_read_loan4: BTreeSet<String> =
+        tds_read.iter().filter(|x| !x.is_empty()).cloned().collect();
 
     // LOAN-1
     let marker = format!("{prefix}interest_total_");
@@ -3964,7 +3966,7 @@ vouchers it cites net {on_loan}p.",
     // a credit and a debit line on it is either listed -- a two_sided_gross_credit/debit figure
     // pair citing it, equal to the voucher's own credit and debit lines on the loan -- or read as
     // interest: its every other non-zero line is one of the loan's interest ledgers or a TDS ledger
-    // run() published (tds_read, above), with no other loan's
+    // run() published (tds_read_loan4, above), with no other loan's
     // line; a voucher on the loan alone is listed only if it does not balance. A listed voucher
     // that does not credit and debit the loan is named too.
     for fid in figures.keys() {
@@ -4026,7 +4028,7 @@ debits it {debit}p, but its listed record shows {shown_credit}p and {}p.",
                     .any(|o| *o != loan.as_str() && loan_names.contains(*o))
                 || !others
                     .iter()
-                    .all(|o| ils.contains(*o) || tds_read.contains(*o))
+                    .all(|o| ils.contains(*o) || tds_read_loan4.contains(*o))
             {
                 out.push(format!(
                     "LOAN-4: voucher {} (guid {}) both credits ({credit}p) and debits ({debit}p) loan \

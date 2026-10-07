@@ -265,12 +265,12 @@ impl VoucherType {
 // its first request, and a post refuses a saved one, so evidence has to arrive
 // before the file can.
 //
-// Sales is NOT here. Its invoice shape rests on reads of hand-keyed invoices
-// and on hand imports (§9.16); no invoice built here has been posted and read
-// back. It joins this list in the change that adds to §9.16, from one lab
-// rehearsal: the duplicate-number read finding a known invoice, Tally taking
-// this element set, every read-back field coming back, and the company's
-// STATENAME beside the GST registration state of a keyed invoice.
+// Sales is NOT here. One lab rehearsal (7 Oct 2026, §9.16) showed the
+// duplicate-number read finding a known invoice, Tally taking two of the
+// element sets, every read-back field coming back, and the company's
+// STATENAME equal to the GST registration state of a keyed invoice. It joins
+// this list when what that rehearsal left owed is done (ADR 0004): the
+// invoice's number in the pre-post identity check first.
 const LIVE_QUALIFIED_VOUCHER_TYPES: &[VoucherType] = &[
     VoucherType::Journal,
     VoucherType::Payment,

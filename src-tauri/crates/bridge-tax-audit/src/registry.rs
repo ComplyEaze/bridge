@@ -164,6 +164,12 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::party_monthly_on(e, b, r),
     },
     PortedTest {
+        id: "questionnaire_cl13",
+        // The accrual-journal count and the four answer figures, on every book.
+        min_figures: 5,
+        run_on: |e, b, r, _| crate::questionnaire_cl13_on(e, b, r),
+    },
+    PortedTest {
         id: "read_scope",
         min_figures: 1,
         run_on: |_, b, r, _| crate::read_scope_on(b, r),

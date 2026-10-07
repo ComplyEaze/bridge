@@ -55,6 +55,7 @@ pub mod loans_interest;
 pub mod partners_40b_194t;
 pub mod party_identity;
 pub mod party_monthly;
+pub mod questionnaire_cl13;
 pub mod read;
 pub mod read_scope;
 pub mod registry;
@@ -1419,6 +1420,23 @@ pub fn stock_on(
     let inputs = stock_read::stock_inputs(engagement.raw_cfg.get("stock"), book.stock.as_ref())?;
     let result = stock::run(book, rules, &inputs)?;
     let module_check = stock::check_invariants(book, &result, &inputs)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `questionnaire_cl13` on a book and return its canonical parity dump, with the module's own
+/// QCL-1 check. As the reference's pack runs it, the `stock` port runs first on the same book and
+/// its result is passed in, so the closing-stock finding carries its pointer; a missing or
+/// malformed stock part refuses here, as [`stock_on`] does, and never becomes "no stock result".
+pub fn questionnaire_cl13_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let inputs = stock_read::stock_inputs(engagement.raw_cfg.get("stock"), book.stock.as_ref())?;
+    let stock_result = stock::run(book, rules, &inputs)?;
+    let result = questionnaire_cl13::run(book, rules, &bound.period, Some(&stock_result))?;
+    let module_check = questionnaire_cl13::check_invariants(book, &bound.period, &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 

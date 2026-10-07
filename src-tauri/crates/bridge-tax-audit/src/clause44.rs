@@ -5,17 +5,35 @@
 //! Purchase Accounts, Direct Expenses or Indirect Expenses is counted once: either in one of the
 //! clause's four columns, decided per voucher from its supplier's GSTIN, or under a closed reason
 //! outside them (no supplier by nature, a depreciation entry, a money item the CA must judge, no
-//! party, or a party that is itself a P&L ledger). The reference's prose says "debit-side line";
-//! its walk, ported here, takes every nonzero line, so a credit on an expense ledger reduces its
+//! party, or a party that is itself a P&L ledger). A credit on an expense ledger reduces its
 //! column.
 //!
+//! A line is placed by its own ledger before its voucher's party is read, in this order (the first
+//! hit wins): the depreciation set, a judgement money category, the no-supplier list, a forced
+//! money category (interest to a bank or NBFC to the exempt column, bank charges to "other than
+//! composition", whatever the party, a journal with none included). Only a line none of these
+//! places is read by the party: no party, a party that is itself a P&L ledger, else the GSTIN rule.
+//! A plain round-off line (a round-off ledger with no placement of its own) is shown where the line
+//! it rounds is shown: the voucher's first other expenditure line that the party reads, else its
+//! first other expenditure line, else (it is alone, or beside only lines that are no expenditure)
+//! it is a non-supply expense. It takes that line's column or reason and, when that column was
+//! forced, its forced mark.
+//!
 //! The supplier's GSTIN is the voucher's own `PARTYGSTIN` first, then its party ledger's GSTIN (the
-//! master's flat `PARTYGSTIN`, else its registration in force on the period's last day). Any text
-//! that is not blank counts as a GSTIN, as in the reference, so "URP" or "NA" reads as registered.
+//! master's flat `PARTYGSTIN`, else its registration in force on the period's last day); a
+//! `PARTYGSTIN` that is blank once stripped is no GSTIN, so the ledger's is read. Any other text
+//! counts as a GSTIN, as in the reference, so "URP" or "NA" reads as registered.
 //! Composition status and the money categories are client
 //! configuration, never read from a ledger name. Two categories settle the column by statute
 //! (interest to a bank or NBFC, bank charges); the rest leave the ordinary rule in place or put
 //! the line outside the four columns for the CA.
+//!
+//! The two client tables are read once, at the boundary ([`Inputs::new`]): a registration type that
+//! is not one of Tally's (after strip and case fold) and a money category that is not exactly one
+//! of the five are refused, naming the table and the ledger. The reference refuses the same values
+//! when it reads the table. It names the first offending entry in the table's written order; this
+//! port holds the table sorted by its bound ledger names, so it names the first in that order (a
+//! difference only when a table has more than one offending entry, and one no golden can show).
 //!
 //! The voucher's own PARTYGSTIN is read as the reference reads it, but a populated value has not
 //! yet been seen on the wire: the tag is verified present and empty, its populated form is not
@@ -23,7 +41,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::book::{Book, Voucher, VoucherStatus};
+use crate::book::{Book, LedgerLine, Voucher, VoucherStatus};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::rules::Rules;
@@ -119,8 +137,7 @@ impl Reason {
     }
 }
 
-/// `[clause44].money_category_by_ledger`'s values. Text the reference does not recognise is no
-/// category, as there.
+/// `[clause44].money_category_by_ledger`'s values: exactly one of five spellings, parsed once.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MoneyCategory {
     /// Interest or discount to a bank or NBFC: forced to the exempt column (N12 entry 27(a)).
@@ -177,46 +194,58 @@ pub struct Inputs {
     pub no_supplier_expense_ledgers: BTreeSet<String>,
     /// `[roles].round_off_ledgers`.
     pub round_off_ledgers: BTreeSet<String>,
-    /// `[clause44].money_category_by_ledger`, recognised values only.
+    /// `[clause44].money_category_by_ledger`.
     pub money_category_by_ledger: BTreeMap<String, MoneyCategory>,
 }
 
-fn shape_error(location: &str, ledger: &str) -> AuditError {
-    AuditError::refused(
-        "CLAUSE44-config-shape",
-        format!("{TEST_ID}: {location}.{ledger:?} is not text"),
-    )
+/// Tally's registration types as a ledger master writes them, stripped and case-folded, and blank.
+const REGISTRATION_TYPES: [&str; 7] = [
+    "",
+    "regular",
+    "regular - sez",
+    "composition",
+    "unregistered",
+    "consumer",
+    "unregistered/consumer",
+];
+
+fn refusal(table: &'static str, ledger: &str) -> AuditError {
+    AuditError::ConfigValueRefused {
+        table,
+        name: ledger.to_string(),
+    }
 }
 
 impl Inputs {
-    /// Type the two ledger maps (keys already bound). A value that is not text is refused up
-    /// front, naming the location and the ledger, whether or not a line reaches it: a deliberate,
-    /// stated divergence on input no golden covers. The reference validates neither map; it
-    /// raises only when a line reaches a truthy non-text registration type or an unhashable money
-    /// category, and reads every other non-text value as no status or no category. Text the
-    /// reference does not recognise is kept as it keeps it: no composition status, no money
-    /// category.
+    /// Type the two ledger maps (keys already bound), refusing the first offending entry of a
+    /// table, registration types first, with [`AuditError::ConfigValueRefused`] naming the table
+    /// and the ledger, whether or not a line reaches it. A registration type must be text that is
+    /// one of [`REGISTRATION_TYPES`] once stripped and case-folded; a money category must be text
+    /// that is exactly one of the five (no strip, no case fold, no blank). The reference refuses
+    /// the same values, and before this it read a mistyped one as no status or no category.
     pub fn new(
         registration_type_by_ledger: &BTreeMap<String, toml::Value>,
         money_category_by_ledger: &BTreeMap<String, toml::Value>,
     ) -> Result<Self> {
         let mut composition_ledgers = BTreeSet::new();
         for (ledger, value) in registration_type_by_ledger {
-            let text = value
+            let table = "roles.gst_registration_type_by_ledger";
+            let folded = value
                 .as_str()
-                .ok_or_else(|| shape_error("roles.gst_registration_type_by_ledger", ledger))?;
-            if support::py_casefold(support::py_strip(text)) == "composition" {
+                .map(|text| support::py_casefold(support::py_strip(text)))
+                .filter(|folded| REGISTRATION_TYPES.contains(&folded.as_str()))
+                .ok_or_else(|| refusal(table, ledger))?;
+            if folded == "composition" {
                 composition_ledgers.insert(ledger.clone());
             }
         }
         let mut categories = BTreeMap::new();
         for (ledger, value) in money_category_by_ledger {
-            let text = value
+            let category = value
                 .as_str()
-                .ok_or_else(|| shape_error("clause44.money_category_by_ledger", ledger))?;
-            if let Some(category) = MoneyCategory::parse(text) {
-                categories.insert(ledger.clone(), category);
-            }
+                .and_then(MoneyCategory::parse)
+                .ok_or_else(|| refusal("clause44.money_category_by_ledger", ledger))?;
+            categories.insert(ledger.clone(), category);
         }
         Ok(Self {
             composition_ledgers,
@@ -276,12 +305,11 @@ fn add(a: i64, b: i64) -> Result<i64> {
 }
 
 fn compute<'a>(book: &'a Book, inputs: &Inputs) -> Result<Computed<'a>> {
+    // The voucher's own PARTYGSTIN, unless it is blank once stripped; then its party ledger's.
     let supplier_gstin = |v: &Voucher| -> String {
-        if !v.party_gstin.is_empty() {
-            return norm_gstin(&v.party_gstin);
-        }
-        if v.party_field.is_empty() {
-            return String::new();
+        let own = norm_gstin(&v.party_gstin);
+        if !own.is_empty() {
+            return own;
         }
         book.ledgers
             .get(&v.party_field)
@@ -292,6 +320,50 @@ fn compute<'a>(book: &'a Book, inputs: &Inputs) -> Result<Computed<'a>> {
             .iter()
             .any(|l| l.amount_paise != 0 && inputs.tax_ledgers.contains(&l.ledger))
     };
+    // Where the line's own ledger places it, whatever its voucher's party; `None` when the
+    // ledger says nothing and the party reads the line. The order is the precedence.
+    let own_placement = |ledger: &str| -> Option<Class> {
+        let category = inputs.money_category_by_ledger.get(ledger).copied();
+        if inputs.dep_expense_ledgers.contains(ledger) {
+            Some(Class::NoSupplier(Reason::DepreciationLedger))
+        } else if category.is_some_and(MoneyCategory::is_judgement) {
+            Some(Class::NoSupplier(Reason::JudgementMoneyItem))
+        } else if inputs.no_supplier_expense_ledgers.contains(ledger) {
+            Some(Class::NoSupplier(Reason::NonSupplyExpense))
+        } else {
+            category
+                .and_then(MoneyCategory::forced)
+                .map(|bucket| Class::Bucket {
+                    bucket,
+                    forced: true,
+                })
+        }
+    };
+    // A round-off ledger with a placement of its own is placed like any line.
+    let plain_round_off =
+        |ledger: &str| inputs.round_off_ledgers.contains(ledger) && own_placement(ledger).is_none();
+    // What the voucher's party makes of a line its own ledger leaves open.
+    let read_by_party = |v: &Voucher| -> Class {
+        if v.party_field.is_empty() {
+            return Class::NoSupplier(Reason::NoParty);
+        }
+        if primary_in(book, &v.party_field, &PL_LEDGER_GROUPS) {
+            return Class::NoSupplier(Reason::PartyIsPlLedger);
+        }
+        let bucket = if supplier_gstin(v).is_empty() {
+            Bucket::Unregistered
+        } else if inputs.composition_ledgers.contains(&v.party_field) {
+            Bucket::Composition
+        } else if has_gst(v) {
+            Bucket::OtherRegistered
+        } else {
+            Bucket::ExemptNonGst
+        };
+        Class::Bucket {
+            bucket,
+            forced: false,
+        }
+    };
 
     let mut rows = Vec::new();
     let mut bucket_totals: BTreeMap<Bucket, (usize, i64)> =
@@ -301,70 +373,47 @@ fn compute<'a>(book: &'a Book, inputs: &Inputs) -> Result<Computed<'a>> {
     let mut judgement_candidate = (0usize, 0i64);
 
     for v in book.population()? {
-        // A round-off line rides with the voucher's own supplier when the voucher has a real
-        // expenditure line; on its own it has no supplier.
-        let has_real_line = v.lines.iter().any(|l| {
-            is_expenditure_line(book, &l.ledger, l.amount_paise)
-                && !inputs.dep_expense_ledgers.contains(&l.ledger)
-                && !inputs.no_supplier_expense_ledgers.contains(&l.ledger)
-                && !inputs.round_off_ledgers.contains(&l.ledger)
-        });
-        for l in &v.lines {
-            if !is_expenditure_line(book, &l.ledger, l.amount_paise) {
-                continue;
-            }
-            let category = inputs.money_category_by_ledger.get(&l.ledger).copied();
-            if category == Some(MoneyCategory::InterestIndividualNoGstin) {
+        let lines: Vec<&LedgerLine> = v
+            .lines
+            .iter()
+            .filter(|l| is_expenditure_line(book, &l.ledger, l.amount_paise))
+            .collect();
+        let by_party = read_by_party(v);
+        let class_of = |ledger: &str| own_placement(ledger).unwrap_or(by_party);
+        // A plain round-off line is shown where the line it rounds is shown: the voucher's first
+        // other expenditure line that the party reads, else its first other expenditure line,
+        // else (nothing to round) a non-supply expense.
+        let others: Vec<&&LedgerLine> = lines
+            .iter()
+            .filter(|l| !plain_round_off(&l.ledger))
+            .collect();
+        let round_off_class = others
+            .iter()
+            .find(|l| own_placement(&l.ledger).is_none())
+            .or(others.first())
+            .map_or(Class::NoSupplier(Reason::NonSupplyExpense), |l| {
+                class_of(&l.ledger)
+            });
+        for l in lines {
+            if inputs.money_category_by_ledger.get(&l.ledger)
+                == Some(&MoneyCategory::InterestIndividualNoGstin)
+            {
                 judgement_candidate.0 += 1;
                 judgement_candidate.1 = add(judgement_candidate.1, l.amount_paise)?;
             }
-            let round_off = inputs.round_off_ledgers.contains(&l.ledger);
-            let reason = if inputs.dep_expense_ledgers.contains(&l.ledger) {
-                Some(Reason::DepreciationLedger)
-            } else if category.is_some_and(MoneyCategory::is_judgement) {
-                Some(Reason::JudgementMoneyItem)
-            } else if inputs.no_supplier_expense_ledgers.contains(&l.ledger)
-                || (round_off && !has_real_line)
-            {
-                Some(Reason::NonSupplyExpense)
-            } else if round_off {
-                None
-            } else if v.party_field.is_empty() {
-                Some(Reason::NoParty)
-            } else if primary_in(book, &v.party_field, &PL_LEDGER_GROUPS) {
-                Some(Reason::PartyIsPlLedger)
+            let class = if plain_round_off(&l.ledger) {
+                round_off_class
             } else {
-                None
+                class_of(&l.ledger)
             };
-            let class = match reason {
-                Some(reason) => {
-                    let t = reason_totals.get_mut(&reason).expect("every reason");
-                    t.0 += 1;
-                    t.1 = add(t.1, l.amount_paise)?;
-                    Class::NoSupplier(reason)
-                }
-                None => {
-                    let (bucket, forced) = match category.and_then(MoneyCategory::forced) {
-                        Some(bucket) => (bucket, true),
-                        None => {
-                            let bucket = if supplier_gstin(v).is_empty() {
-                                Bucket::Unregistered
-                            } else if inputs.composition_ledgers.contains(&v.party_field) {
-                                Bucket::Composition
-                            } else if has_gst(v) {
-                                Bucket::OtherRegistered
-                            } else {
-                                Bucket::ExemptNonGst
-                            };
-                            (bucket, false)
-                        }
-                    };
-                    let t = bucket_totals.get_mut(&bucket).expect("every bucket");
-                    t.0 += 1;
-                    t.1 = add(t.1, l.amount_paise)?;
-                    Class::Bucket { bucket, forced }
+            let (count, paise) = match class {
+                Class::NoSupplier(reason) => reason_totals.get_mut(&reason).expect("every reason"),
+                Class::Bucket { bucket, .. } => {
+                    bucket_totals.get_mut(&bucket).expect("every bucket")
                 }
             };
+            *count += 1;
+            *paise = add(*paise, l.amount_paise)?;
             rows.push(Row {
                 voucher: v,
                 ledger: &l.ledger,
@@ -435,9 +484,10 @@ fn evidence_for(rows: &[Row], pred: impl Fn(&Row) -> bool) -> Vec<EvidenceRef> {
 pub fn run(book: &Book, rules: &Rules, inputs: &Inputs) -> Result<TestResult> {
     let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
     r.population_note = "Books population (optional, cancelled and post-dated vouchers excluded): \
-every debit-side line on a ledger under Purchase Accounts, Direct Expenses or Indirect Expenses (the \
-expense groups of the financial statements' profit and loss account), attributed to the voucher's \
-own PARTYLEDGERNAME. Expenditure-group lines on POST-DATED excluded vouchers are reported separately \
+every line with an amount on a ledger under Purchase Accounts, Direct Expenses or Indirect Expenses \
+(the expense groups of the financial statements' profit and loss account), attributed to the \
+voucher's own PARTYLEDGERNAME; a credit on such a ledger (a purchase return, a debit note) reduces \
+its column. Expenditure-group lines on POST-DATED excluded vouchers are reported separately \
 as population_excluded_expense_paise (optional/cancelled vouchers are NOT -- see that figure's own \
 definition), never silently dropped from the TB tie (CL44-1)."
         .into();
@@ -605,8 +655,10 @@ signals show."
                 .into(),
             "Composition status comes from a caller-supplied ledger map read off the ledger \
 master's own GSTREGISTRATIONTYPE; a ledger missing from that map is treated as not composition \
-(the overwhelmingly common case), which can only move a row within the registered total, never \
-out of it."
+(the overwhelmingly common case). A composition supplier missing from it is then shown under \
+'other than composition' when the voucher carries input tax and under 'exempt or non-GST supply' \
+when it carries none, as a composition dealer's bill does: confirm the list of composition \
+suppliers."
                 .into(),
             "Total expenditure is NOT reduced for depreciation or other non-cash items -- GN 79.2: \
 depreciation and bad debts are not divided across columns 3 to 7 but stay 'included in the amount \
@@ -619,8 +671,8 @@ than 'no supplier'. Review the list."
                 .into(),
             "Money-category classification (2026-09-17 correction, from our review of clause \
 44's money items): interest/discount to a bank or NBFC is FORCED to column 3 (N12 entry 27(a), \
-exempt) and bank charges/fees are FORCED to column 5 (N12 para 2(zk), taxable) -- a ledger of \
-either kind not on that list instead falls through to the ordinary GSTIN-derived path, which can \
+exempt) and bank charges/fees are FORCED to column 5 (N12 para 2(zk), taxable), whatever the \
+voucher's party (a journal with none included) -- a ledger of either kind not on that list instead falls through to the ordinary GSTIN-derived path, which can \
 misclassify it (e.g. a bank ledger with no GSTIN in the master would otherwise read \
 'unregistered'). A ledger mixing interest and charges that cannot be shown separately from the \
 books, and partners' interest/remuneration, are NEVER placed in column 3 or 5 -- see the \
@@ -654,8 +706,9 @@ supply is not settled"
             evidence: judgement_evidence,
             confidence: Confidence::JudgementRequired,
             limits: vec![
-                "These lines are counted in the 'unregistered' column above (the conservative \
-default) because the lender has no GSTIN; but whether a non-business individual lender's interest \
+                "These lines are counted where the voucher's party puts them: in the 'unregistered' \
+column above (the conservative default) when that party has no GSTIN, and under 'no party ledger \
+on voucher' on a journal that names none. Whether a non-business individual lender's interest \
 is a 'supply' at all under s.7(1)(a) is not settled from primary text -- if it is not a supply, \
 the correct clause-44 treatment is to leave the item out of the base entirely, not report it as an \
 unregistered supply."
@@ -836,58 +889,150 @@ mod tests {
             .collect()
     }
 
+    const REGISTRATION_TABLE: &str = "roles.gst_registration_type_by_ledger";
+    const MONEY_TABLE: &str = "clause44.money_category_by_ledger";
+
+    /// The table and the ledger a refusal names, read from the typed variant.
     fn refused(err: AuditError) -> (&'static str, String) {
         match err {
-            AuditError::Refused { code, detail } => (code, detail),
-            other => panic!("not a refusal: {other}"),
+            AuditError::ConfigValueRefused { table, name } => (table, name),
+            other => panic!("not a refused config value: {other}"),
         }
     }
 
-    #[test]
-    fn a_map_value_that_is_not_text_is_refused_naming_its_location_and_ledger() {
-        let none = BTreeMap::new();
-        let err = Inputs::new(&text(&[("Beta", toml::Value::Integer(1))]), &none).unwrap_err();
-        assert_eq!(
-            refused(err),
-            (
-                "CLAUSE44-config-shape",
-                "clause44: roles.gst_registration_type_by_ledger.\"Beta\" is not text".to_string()
-            )
-        );
-        let err =
-            Inputs::new(&none, &text(&[("Fees", toml::Value::Array(Vec::new()))])).unwrap_err();
-        assert_eq!(
-            refused(err),
-            (
-                "CLAUSE44-config-shape",
-                "clause44: clause44.money_category_by_ledger.\"Fees\" is not text".to_string()
-            )
-        );
+    fn not_text() -> Vec<toml::Value> {
+        vec![
+            toml::Value::Integer(0),
+            toml::Value::Float(1.5),
+            toml::Value::Boolean(true),
+            toml::Value::Array(vec!["composition".into()]),
+            toml::Value::Table(toml::map::Map::new()),
+        ]
     }
 
     #[test]
-    fn composition_is_read_stripped_and_case_folded_and_unknown_text_is_no_category() {
+    fn a_registration_type_that_is_not_one_of_tallys_is_refused_naming_the_ledger() {
+        let none = BTreeMap::new();
+        let mistyped: Vec<toml::Value> = [
+            "composition scheme",
+            "Composit ion",
+            "Regular Dealer",
+            "unknown",
+            "regular\u{0}",
+            "regular - sez.",
+        ]
+        .iter()
+        .map(|t| (*t).into())
+        .chain(not_text())
+        .collect();
+        for value in mistyped {
+            let err = Inputs::new(&text(&[("Beta", value.clone())]), &none).unwrap_err();
+            assert_eq!(
+                refused(err),
+                (REGISTRATION_TABLE, "Beta".to_string()),
+                "{value:?}"
+            );
+        }
+    }
+
+    /// Every registration type Tally writes is accepted once stripped and case-folded, blank
+    /// included; only a composition one is a composition supplier. "Unregi\u{17f}tered" folds to
+    /// "unregistered" (a case fold, not a lower-casing).
+    #[test]
+    fn each_registration_type_is_accepted_stripped_and_case_folded() {
         let inputs = Inputs::new(
             &text(&[
                 ("A", " Composition\t".into()),
                 ("B", "\u{a0}COMPOSITION".into()),
                 ("C", "Regular".into()),
-                ("D", "composition scheme".into()),
+                ("D", "".into()),
+                ("E", "  ".into()),
+                ("F", " REGULAR - SEZ\t".into()),
+                ("G", "Unregi\u{17f}tered".into()),
+                ("H", "CONSUMER".into()),
+                ("I", " Unregistered/Consumer ".into()),
             ]),
-            &text(&[
-                ("E", "bank_charges".into()),
-                ("F", " bank_charges".into()),
-                ("G", "courier_fees".into()),
-            ]),
+            &BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
             inputs.composition_ledgers,
             BTreeSet::from(["A".to_string(), "B".to_string()])
         );
+    }
+
+    #[test]
+    fn a_money_category_that_is_not_exactly_one_of_the_five_is_refused_naming_the_ledger() {
+        let none = BTreeMap::new();
+        let mistyped: Vec<toml::Value> = [
+            " bank_charges",
+            "bank_charges ",
+            "Bank_Charges",
+            "INTEREST_BANK_NBFC",
+            "",
+            "courier_fees",
+            "bank charges",
+        ]
+        .iter()
+        .map(|t| (*t).into())
+        .chain(not_text())
+        .collect();
+        for value in mistyped {
+            let err = Inputs::new(&none, &text(&[("Fees", value.clone())])).unwrap_err();
+            assert_eq!(refused(err), (MONEY_TABLE, "Fees".to_string()), "{value:?}");
+        }
+    }
+
+    #[test]
+    fn each_of_the_five_money_categories_is_accepted_as_written() {
+        let inputs = Inputs::new(
+            &BTreeMap::new(),
+            &text(&[
+                ("A", "interest_bank_nbfc".into()),
+                ("B", "bank_charges".into()),
+                ("C", "interest_individual_no_gstin".into()),
+                ("D", "partner_interest_or_remuneration".into()),
+                ("E", "mixed_interest_and_charges".into()),
+            ]),
+        )
+        .unwrap();
         assert_eq!(
             inputs.money_category_by_ledger,
-            BTreeMap::from([("E".to_string(), MoneyCategory::BankCharges)])
+            BTreeMap::from([
+                ("A".to_string(), MoneyCategory::InterestBankNbfc),
+                ("B".to_string(), MoneyCategory::BankCharges),
+                ("C".to_string(), MoneyCategory::InterestIndividualNoGstin),
+                (
+                    "D".to_string(),
+                    MoneyCategory::PartnerInterestOrRemuneration
+                ),
+                ("E".to_string(), MoneyCategory::MixedInterestAndCharges),
+            ])
+        );
+    }
+
+    /// The first offending entry of a table names the refusal; the registration table is read
+    /// before the money one, as the reference's pack reads them.
+    #[test]
+    fn the_first_offending_entry_is_the_one_named_and_registration_types_come_first() {
+        let registration = text(&[
+            ("A", "Regular".into()),
+            ("B", "Composit".into()),
+            ("C", toml::Value::Integer(5)),
+        ]);
+        let money = text(&[
+            ("P", "bank_charges".into()),
+            ("Q", toml::Value::Integer(5)),
+            ("R", "Bank_Charges".into()),
+        ]);
+        assert_eq!(
+            refused(Inputs::new(&registration, &money).unwrap_err()),
+            (REGISTRATION_TABLE, "B".to_string())
+        );
+        let sound = text(&[("A", "Regular".into())]);
+        assert_eq!(
+            refused(Inputs::new(&sound, &money).unwrap_err()),
+            (MONEY_TABLE, "Q".to_string())
         );
     }
 

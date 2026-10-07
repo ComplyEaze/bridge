@@ -2222,4 +2222,53 @@ mod clause44_inputs_tests {
             )])
         );
     }
+
+    /// A mistyped value in either client table reaches the test's inputs as the typed refusal,
+    /// naming the table and the ledger as bound.
+    #[test]
+    fn clause44_inputs_refuse_a_mistyped_registration_type_or_money_category() {
+        let ledger = |name: &str| {
+            let ledger = book::Ledger {
+                name: name.to_string(),
+                parent: "Indirect Expenses".to_string(),
+                chain: vec!["Indirect Expenses".to_string()],
+                chain_complete: true,
+                master_opening_paise: 0,
+                pan: String::new(),
+                gstin: String::new(),
+                guid: String::new(),
+                masterid: None,
+            };
+            (name.to_string(), ledger)
+        };
+        let book = book::Book {
+            ledgers: [ledger("Comp"), ledger("Bank Int")].into_iter().collect(),
+            ..Default::default()
+        };
+        let refused = |registration: &str, money: &str| {
+            let text = format!(
+                "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
+                 start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
+                 bank_groups = []\ntax_ledgers = {{}}\nround_off_ledgers = []\n\
+                 no_supplier_expense_ledgers = []\n\
+                 gst_registration_type_by_ledger = {{ \"Comp\" = \"{registration}\" }}\n\
+                 \n[depreciation]\nblock_by_ledger = {{}}\nopening_wdv_paise = {{}}\n\
+                 dep_expense_ledgers = []\n\n[clause44]\n\
+                 money_category_by_ledger = {{ \"Bank Int\" = \"{money}\" }}\n"
+            );
+            let e = Engagement::from_toml_for_read(&text).unwrap();
+            match clause44_inputs(&e.bind(&book).unwrap().0).unwrap_err() {
+                AuditError::ConfigValueRefused { table, name } => (table, name),
+                other => panic!("not a refused config value: {other}"),
+            }
+        };
+        assert_eq!(
+            refused("Composit", "bank_charges"),
+            ("roles.gst_registration_type_by_ledger", "Comp".to_string())
+        );
+        assert_eq!(
+            refused("Composition", "Bank_Charges"),
+            ("clause44.money_category_by_ledger", "Bank Int".to_string())
+        );
+    }
 }

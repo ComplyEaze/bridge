@@ -638,7 +638,7 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
             "It does not show what the AI provider received.",
             "amounts included, is sent to the AI provider",
             "redaction can only shorten party and ledger names and bank account numbers or drop narrations",
-            "and does not hide anything else, including amounts, company names, PAN, GSTIN, IFSC, contact details, references or a name written inside a narration or reference",
+            "and does not hide amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or references; under mask_parties a name written inside a narration or reference stays as it is",
             "Never tell the user that no data has left their computer.",
             "no figures or book content",
             catalog::READ_RECEIPT_SENTENCE,

@@ -129,6 +129,43 @@ def ending_at(edge, x, text):
     return (x, text)
 
 
+class Drawn:
+    """A page that is not plain text lines: its own content operators, and
+    whether it places the one small image (`/Im1`). A statement re-scanned by a
+    phone app, or printed to PDF, reaches the parser as pages like these."""
+
+    def __init__(self, ops, image=False):
+        self.ops = ops
+        self.image = image
+
+
+# An 8x8 8-bit grey image, uncompressed: a mid-grey field with one dark pixel
+# per row, so it is not a blank page.
+IMAGE_SIZE = 8
+IMAGE_DATA = bytes(
+    (40 if column == row else 200)
+    for row in range(IMAGE_SIZE) for column in range(IMAGE_SIZE))
+
+
+def full_page_image(width, height):
+    return f"q {width:g} 0 0 {height:g} 0 0 cm /Im1 Do Q"
+
+
+def path_glyphs(height, lines):
+    """Text drawn as filled rectangles, one per non-space character, at the
+    positions `content` would put the characters: what a printer driver writes
+    when it converts glyphs to outlines. No text object, so no extractable text."""
+    ops = []
+    for top, cells in lines:
+        for x, text in cells:
+            for index, character in enumerate(text):
+                if character != " ":
+                    left = x + index * GLYPH
+                    bottom = height - top - 0.629 * FONT_SIZE
+                    ops.append(f"{left:.3f} {bottom:.3f} {GLYPH * 0.8:.3f} {FONT_SIZE * 0.7:.3f} re f")
+    return "\n".join(ops)
+
+
 def write_pdf(pages, width, height, user, owner, seed, rotate=0):
     file_id = hashlib.md5(seed.encode("ascii")).digest()
     owner_value = owner_entry(owner, user)
@@ -138,17 +175,32 @@ def write_pdf(pages, width, height, user, owner, seed, rotate=0):
     objects = {}
     page_numbers = []
     next_number = 5
+    drawn = [page for page in pages if isinstance(page, Drawn) and page.image]
+    image_number = None
+    if drawn:
+        # numbered after every page and stream, so a fixture without an image
+        # is byte-identical to what this script wrote before images existed
+        image_number = 5 + 2 * len(pages)
+        image = rc4(object_key(key, image_number), IMAGE_DATA)
+        objects[image_number] = (
+            f"<< /Type /XObject /Subtype /Image /Width {IMAGE_SIZE} /Height {IMAGE_SIZE} "
+            f"/ColorSpace /DeviceGray /BitsPerComponent 8 /Length {len(image)} >>\nstream\n"
+        ).encode("ascii") + image + b"\nendstream"
     for page_lines in pages:
         page_number, stream_number = next_number, next_number + 1
         next_number += 2
         page_numbers.append(page_number)
-        stream = rc4(object_key(key, stream_number), content(height, page_lines))
+        uses_image = isinstance(page_lines, Drawn) and page_lines.image
+        body = page_lines.ops.encode("latin-1") if isinstance(page_lines, Drawn) \
+            else content(height, page_lines)
+        stream = rc4(object_key(key, stream_number), body)
         objects[stream_number] = (
             f"<< /Length {len(stream)} >>\nstream\n".encode("ascii")
             + stream + b"\nendstream")
+        xobject = f" /XObject << /Im1 {image_number} 0 R >>" if uses_image else ""
         objects[page_number] = (
             f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width:g} {height:g}] /Rotate {rotate} "
-            f"/Resources << /Font << /F1 3 0 R >> >> /Contents {stream_number} 0 R >>"
+            f"/Resources << /Font << /F1 3 0 R >>{xobject} >> /Contents {stream_number} 0 R >>"
         ).encode("ascii")
     objects[1] = b"<< /Type /Catalog /Pages 2 0 R >>"
     kids = " ".join(f"{n} 0 R" for n in page_numbers)
@@ -350,6 +402,12 @@ UBI_PAGE_2 = (
 )
 
 
+# What a phone scanner app prints over a page: words, and no digit.
+SCAN_STAMP = (
+    (820, [(28, "SCANNED WITH A PHONE APP")]),
+)
+
+
 FIXTURES = {
     # opened with the user password
     "hdfc-synthetic.pdf": dict(
@@ -369,6 +427,30 @@ FIXTURES = {
     "ubi-synthetic.pdf": dict(
         pages=[UBI_PAGE_1, UBI_PAGE_2], width=595, height=842,
         user="synthetic-user-7788", owner="synthetic-owner-unused-c", seed="ubi"),
+    # No text at all: a statement re-scanned by a phone app is one image per page
+    "scan-image-only.pdf": dict(
+        pages=[Drawn(full_page_image(638, 842), image=True)] * 2, width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-d", seed="scan"),
+    # No text object either: the HDFC page 1 lines, every character drawn as a
+    # filled path, as a printer driver writes them
+    "print-to-pdf-vector-glyphs.pdf": dict(
+        pages=[Drawn(path_glyphs(842, HDFC_PAGE_1))], width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-e", seed="vector"),
+    # A scan with a visible stamp from the scanner app: real text, but no figures
+    "scan-with-visible-stamp.pdf": dict(
+        pages=[Drawn(full_page_image(638, 842) + "\n"
+                     + content(842, SCAN_STAMP).decode("latin-1"),
+                     image=True)],
+        width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-f", seed="stamp"),
+    # Real text, with a logo image and a light path watermark: must still read
+    "hdfc-logo-and-watermark.pdf": dict(
+        pages=[Drawn("q 40 0 0 40 20 770 cm /Im1 Do Q\n"
+                     "q 0.9 g 0.7 0.7 -0.7 0.7 120 300 cm 0 0 360 60 re f Q\n"
+                     + content(842, HDFC_PAGE_1).decode("latin-1"),
+                     image=True)],
+        width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-g", seed="logo"),
 }
 
 

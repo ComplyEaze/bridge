@@ -1,12 +1,14 @@
 use super::{
     arg_usize, combine_evidence, company_currency_read, company_high_water_read, company_json,
-    native_group_snapshot_read, normalized_date, optional_string, parse_company_high_water,
-    party_name, required_string, sha256_hex, sha256_json, standard_ledger_catalog_read, Evidence,
-    Server, ToolFailure, ToolOutcome, VOUCHER_CHECKPOINT_NOT_OBSERVED,
+    import_ledger_catalogue_read, native_group_snapshot_read, normalized_date, optional_string,
+    parse_company_high_water, party_name, required_string, sha256_hex, sha256_json,
+    standard_ledger_catalog_read, Evidence, Server, ToolFailure, ToolOutcome,
+    VOUCHER_CHECKPOINT_NOT_OBSERVED,
 };
 use crate::tally::agent_read_request::AgentReadRequest;
 use crate::tally::standard_ledger_catalog::{
-    admit_standard_ledger_catalog_request, parse_standard_ledger_catalog_response,
+    admit_standard_ledger_catalog_request, parse_import_ledger_catalog_response,
+    parse_standard_ledger_catalog_response,
 };
 use bridge_tally_core::master_binding::{
     self, twin_fold_keys, BindingBasis, BindingStatus, Candidates, EntityBinding, MasterCatalog,
@@ -23,6 +25,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{Seek, SeekFrom, Write};
 
+#[path = "agent_import_bill_wise.rs"]
+mod bill_wise;
 #[path = "agent_import_cash_bank.rs"]
 mod cash_bank;
 use cash_bank::{CashBankState, LegRequirement, ObservedMasters};
@@ -287,7 +291,25 @@ pub(super) struct ImportLedgerLine {
     /// read bound it to (bridge#239). A post refuses when any of them now
     /// resolves to another GUID. Absent on records built before this field
     /// existed: such a batch is refused for posting and must be rebuilt.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ///
+    /// Written as `ledger_identities_2`. Releases 0.3.0 to 0.4.2 read only
+    /// `ledger_identities`, find none, and refuse the batch as built before
+    /// this record (`import_batch_predates_ledger_binding`), which is their
+    /// one refusal of a record they cannot check. They do not read the two
+    /// records below, so without this they would post a batch this build
+    /// saved, with neither check. The old name is still read, for a batch one
+    /// of them saved. No writer may write both names: a record carrying both
+    /// does not parse, and the journal reader refuses the whole history on a
+    /// record it cannot parse. When a record is added to or removed from a saved
+    /// batch, write this one under a new name again and keep every earlier
+    /// name as an alias: `a_saved_batch_holds_exactly_these_records` stops
+    /// compiling, or fails, until that is looked at.
+    #[serde(
+        default,
+        rename = "ledger_identities_2",
+        alias = "ledger_identities",
+        skip_serializing_if = "Option::is_none"
+    )]
     ledger_identities: Option<Vec<BoundLedger>>,
     /// Each ledger a bank cash answer named as cash in hand, with the voucher
     /// it was answered for (#815). The build refused any outside Cash-in-Hand,
@@ -297,6 +319,18 @@ pub(super) struct ImportLedgerLine {
     /// refused for posting and must be rebuilt.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     cash_in_hand_ledgers: Option<Vec<CashInHandLedger>>,
+    /// Each bill-wise ledger (`ISBILLWISEON` Yes) for which the caller supplied
+    /// an approval, with the digest that tied it to this batch's exact content
+    /// (#1234). Bridge cannot tell whether a person said yes: the digest is a
+    /// consistency binding. `Some(vec![])` when the build found
+    /// no bill-wise ledger among those it names. Absent on records built
+    /// before this field existed: such a batch is refused for posting and must
+    /// be rebuilt. A release older than this field does not read it (this
+    /// struct does not deny unknown fields); releases 0.3.0 to 0.4.2 refuse
+    /// the batch for the ledger binding they cannot find instead (see
+    /// `ledger_identities`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    on_account_approved: Option<Vec<bill_wise::OnAccountApproved>>,
 }
 
 /// A ledger a bank cash answer named as cash in hand, and the voucher built
@@ -613,7 +647,7 @@ impl Server {
                     evidence.clone(),
                 ))
             })?;
-        annotate_folded_twins(&mut report, &names, ledger_masters.parents());
+        annotate_folded_twins(&mut report, &names, ledger_masters.catalog().parents());
         let hash = sha256_json(&catalogue);
         Ok(ToolOutcome {
             payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"masters": report, "catalogue_evidence_sha256": hash}}),
@@ -679,7 +713,12 @@ impl Server {
         // admits them exactly as it admits inline vouchers.
         let resolved =
             super::bank_statement::resolve_import_arguments(&self.settings.data_dir, args)?;
-        let args = &resolved.args;
+        // The approvals are not part of the payload (`parse_payload` refuses
+        // unknown fields, and a post builds `ImportPayload` literals), so the
+        // key is taken out here and judged once the flags have been read.
+        let mut args = resolved.args.clone();
+        let approvals = bill_wise::take_approvals(&mut args).map_err(approval_invalid)?;
+        let args = &args;
         let mut payload = parse_payload(args)?;
         validate_payload(&payload)?;
         // After the whole of `validate_payload`: in a batch with several
@@ -712,8 +751,16 @@ impl Server {
             accumulated = combine_evidence(accumulated.clone(), catalogue_evidence.clone());
             let requested_names = requested_ledger_names(&payload);
             let mut report = masters_for_payload(&payload, &catalogue)?;
-            annotate_folded_twins(&mut report, &requested_names, ledger_masters.parents());
+            annotate_folded_twins(&mut report, &requested_names, ledger_masters.catalog().parents());
             if report.iter().any(|value| value["match_state"] != "exact") {
+                let report = in_batch_order(
+                    requested_names.iter().zip(report).collect(),
+                    &payload.vouchers,
+                    |(name, _)| name.as_str(),
+                )
+                .into_iter()
+                .map(|(_, master)| master)
+                .collect::<Vec<_>>();
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                         "state":"refused", "reason":"masters_not_exact", "masters":report,
@@ -725,7 +772,11 @@ impl Server {
                     truncated: false,
                 });
             }
-            let twins = folded_twins(&requested_names, ledger_masters.parents());
+            let twins = in_batch_order(
+                folded_twins(&requested_names, ledger_masters.catalog().parents()),
+                &payload.vouchers,
+                |twins| twins.requested.as_str(),
+            );
             if !twins.is_empty() {
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
@@ -746,6 +797,7 @@ impl Server {
             // Bind each named ledger to the GUID this read observed (#239): a
             // post refuses a ledger renamed and replaced under its name since.
             let build_binding = ledger_masters
+                .catalog()
                 .bind_selected(requested_ledger_names(&payload))
                 .map_err(|_| "import_masters_changed".to_string())?
                 .pairs()
@@ -755,14 +807,15 @@ impl Server {
                 })
                 .collect::<Vec<_>>();
             // Only a payload carrying a cash/bank voucher reads the group
-            // collection, so a Journal-only batch keeps the request sequence its
-            // own qualification was measured on.
+            // collection. Every payload, a Journal-only one included, reads
+            // each named ledger's bill-wise flag (#1234), from the ledger list
+            // it already reads, so no request is added.
             let mut group_evidence = None;
             let mut statement_warnings: Vec<Value> = Vec::new();
             if renders_bank_shape(&payload.vouchers) || !resolved.cash_ledgers.is_empty() {
                 let (groups, evidence) = self.read_group_collection(&identity, &company.name).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence.clone());
-                let observed = ObservedMasters::new(ledger_masters.parents(), groups);
+                let observed = ObservedMasters::new(ledger_masters.catalog().parents(), groups);
                 let refusals =
                     cash_bank_refusals(&payload, &observed, self.settings.max_bytes);
                 if refusals.is_refused() {
@@ -802,7 +855,7 @@ impl Server {
                 }
                 if let Some(ledgers) = &resolved.statement_ledgers {
                     let findings = statement_ledger_findings(ledgers, &observed, |name| {
-                        ledger_masters.parents().any(|(known, _)| known == name)
+                        ledger_masters.catalog().parents().any(|(known, _)| known == name)
                     });
                     if findings.bank_in_cash_in_hand {
                         let row = refused_ledger_row(
@@ -865,10 +918,61 @@ impl Server {
                     });
                 }
             }
+            // Which of the named ledgers keep bills in Tally, as the catalogue
+            // read above said it (#1234: the flag rides the
+            // catalogue the build already reads, so no further request is made
+            // and the catalogue repeat below holds the flags to the same
+            // byte-for-byte stability as the names). Entries on such a ledger
+            // with no bill allocation land On Account (#1234). Judged after the
+            // already-posted check, so nobody is asked to approve a batch that
+            // is refused for that reason, and before the mark, so a refusal
+            // here costs no further read. A later check can still refuse a
+            // batch whose approval was asked.
+            let digest_company = import_company_tuple(&company)?;
+            let digest_endpoint = super::canonical_loopback_origin(&self.settings.endpoint)
+                .map_err(|_| "host_setting_invalid".to_string())?;
+            let bill_wise_context = bill_wise::DigestContext {
+                company: &digest_company,
+                endpoint_origin: &digest_endpoint,
+                amends_batch_id: payload.amends_batch_id.as_deref(),
+                batch_content: bill_wise::batch_content_digest(&payload.vouchers),
+            };
+            let observed_flags = bill_wise::ObservedBillWise::from_catalogue(
+                &ledger_masters,
+                bill_wise::named_ledgers(&payload),
+            );
+            let parties =
+                bill_wise::bill_wise_parties(&payload.vouchers, &observed_flags);
+            let verdict = bill_wise::judge_approvals(&approvals, &parties, &bill_wise_context)
+                .map_err(approval_invalid)?;
+            let names_masked = self.settings.redaction == super::Redaction::MaskParties;
+            if !verdict.unapproved.is_empty() {
+                let unapproved =
+                    bill_wise::in_listing_order(verdict.unapproved, names_masked, |party| &party.1);
+                let (refused, omitted) = bill_wise::refused_parties_json(
+                    &unapproved,
+                    refusal_diagnostic_budget(self.settings.max_bytes),
+                );
+                return Ok(ToolOutcome {
+                    payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
+                        "state":"refused", "reason":"bill_wise_party_unapproved",
+                        "refused_parties":refused,
+                        "refused_party_count":unapproved.len(),
+                        "refused_parties_omitted":omitted,
+                        "bill_wise_response_sha256":[catalogue_evidence.response_sha256.clone()],
+                        "next_step":BILL_WISE_UNAPPROVED_NEXT_STEP
+                    }}),
+                    evidence: accumulated.clone(),
+                    company_guid: Some(payload.company_guid),
+                    truncated: false,
+                });
+            }
+            let on_account_approved = verdict.approved;
             let (mark, mark_evidence) = self.pre_import_mark(&company, &identity).await?;
             accumulated = combine_evidence(accumulated.clone(), mark_evidence.clone());
-            let (_, repeated_catalogue_evidence) =
-                self.read_ledger_catalogue(&identity, &company.name).await?;
+            let (_, _, _, repeated_catalogue_evidence) = self
+                .read_import_ledger_catalogue(&identity, &company.name)
+                .await?;
             accumulated = combine_evidence(accumulated.clone(), repeated_catalogue_evidence.clone());
             // Compare the complete captured catalogue, including identities and parents.
             // This proves stability across these observations, not an atomic snapshot.
@@ -886,6 +990,10 @@ impl Server {
                     return Err("import_groups_changed".to_string().into());
                 }
             }
+            // The flags came in the catalogue rows, so the byte comparison above
+            // already holds them to the stability it holds the names to: a
+            // ledger switched to or from bill-wise between the two reads is
+            // `import_catalogue_changed`.
             let (date_from, date_to) = match &lineage {
                 // The window must hold each voucher where it is now as well as
                 // where the amendment moves it, or both checks miss it.
@@ -1018,6 +1126,7 @@ impl Server {
                         })
                         .collect(),
                 ),
+                on_account_approved: Some(on_account_approved),
             };
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));
@@ -1058,12 +1167,9 @@ impl Server {
                 native_post_refusal.as_deref(),
                 post_voucher_limit,
                 renders_bank_shape(&line.vouchers),
-                line.vouchers.iter().any(|voucher| {
-                    voucher
-                        .voucher_type
-                        .bank_shape()
-                        .is_some_and(|shape| shape.party_side().is_some())
-                }),
+                line.on_account_approved
+                    .as_deref()
+                    .is_some_and(|approved| !approved.is_empty()),
                 line.vouchers.iter().any(|voucher| {
                     voucher.voucher_type.bank_shape().is_some() && voucher.entries.len() > 2
                 }),
@@ -1093,6 +1199,18 @@ impl Server {
                     "live_evidence": live_evidence(&line.vouchers),
                     "verification_preflight": verification_preflight,
                     "identity_scheme": line.identity_scheme,
+                    // The bill-wise ledgers a person approved, each name
+                    // marked as a party name, with the digest the approval
+                    // was tied to, and the catalogue response the flags came
+                    // from (#1234).
+                    "on_account_approved": line.on_account_approved.as_ref().map(|approved| {
+                        bill_wise::approved_json(&bill_wise::in_listing_order(
+                            approved.clone(),
+                            names_masked,
+                            |party| &party.party_digest,
+                        ))
+                    }),
+                    "bill_wise_response_sha256": [catalogue_evidence.response_sha256.clone()],
                     // The fifth element of §9.13's identity tuple. It is
                     // recorded on the batch and compared on dispatch, but a
                     // hand import never reaches that check — so the operator
@@ -1484,7 +1602,8 @@ impl Server {
             };
             let mut proof = proof;
             if let Some(masters) = &masters_after_post {
-                proof["masters_after_post"] = masters.clone();
+                proof["masters_after_post"] =
+                    served_masters_verdict(masters.clone(), &line.vouchers);
             }
             // Whether a person's recorded review still covers this doubt and
             // this voucher (#239). Beside the verdict, never instead of it.
@@ -1583,57 +1702,117 @@ impl Server {
         Ok(())
     }
 
+    /// The V1 ledger catalogue, for the reads outside the import family that
+    /// need row spellings alone (presence, the drift re-read after a voucher
+    /// window); `read_resolvable_ledgers` serves the tools that resolve a name.
     pub(super) async fn read_ledger_catalogue(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
     ) -> Result<(Vec<String>, Evidence), ToolFailure> {
-        let (names, _, _, evidence) = self
-            .read_import_ledger_catalogue(identity, company_name)
-            .await?;
-        Ok((names, evidence))
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        Ok((catalogue.names().map(str::to_string).collect(), evidence))
     }
 
-    async fn read_import_ledger_catalogue(
+    /// The catalogue's ledgers as a request can reach them, for the tools that
+    /// resolve a typed ledger name (#1085). The same V1 read as
+    /// `read_ledger_catalogue`, which keeps the row spellings alone.
+    pub(super) async fn read_resolvable_ledgers(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(Vec<super::ledger_candidates::CatalogueLedger>, Evidence), ToolFailure> {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        Ok((resolvable_ledgers(&catalogue), evidence))
+    }
+
+    /// The same catalogue read, with each ledger's immediate parent group as Tally returned it
+    /// (`None` when it returned none), for the group summaries of `vouchers` (#1230).
+    pub(super) async fn read_ledger_parents(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(Vec<(String, Option<String>)>, Evidence), ToolFailure> {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        Ok((owned_parents(&catalogue), evidence))
+    }
+
+    /// One catalogue read that serves both a typed ledger name (the spellings it resolves against) and
+    /// the group placements (each ledger's parent), so a group summary with `ledger` reads the list once.
+    pub(super) async fn read_resolvable_ledgers_with_parents(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<
+        (
+            Vec<super::ledger_candidates::CatalogueLedger>,
+            Vec<(String, Option<String>)>,
+            Evidence,
+        ),
+        ToolFailure,
+    > {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        Ok((
+            resolvable_ledgers(&catalogue),
+            owned_parents(&catalogue),
+            evidence,
+        ))
+    }
+
+    async fn read_v1_catalogue(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(bridge_tally_protocol::StandardLedgerCatalog, Evidence), ToolFailure> {
+        let read = standard_ledger_catalog_read(company_name)
+            .map_err(|_| "company_name_invalid".to_string())?;
+        admit_standard_ledger_catalog_request(read.as_str().to_string())
+            .map_err(|_| "ledger_export_invalid".to_string())?;
+        let (xml, evidence) = self.post_read(identity, read).await?;
+        let catalogue =
+            parse_standard_ledger_catalog_response(&xml, company_name, identity.company_guid())
+                .map_err(|error| catalogue_failure(error, &evidence))?;
+        Ok((catalogue, evidence))
+    }
+
+    /// The import family's ledger catalogue: V1's rows, each with its
+    /// `ISBILLWISEON` (#1234), so one read answers both which
+    /// ledgers exist and which keep bills. Used by the build, `validate_masters`,
+    /// the post and the queue's re-read.
+    pub(super) async fn read_import_ledger_catalogue(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
     ) -> Result<
         (
             Vec<String>,
-            bridge_tally_protocol::StandardLedgerCatalog,
+            bridge_tally_protocol::StandardLedgerCatalogV2,
             AgentReadRequest,
             Evidence,
         ),
         ToolFailure,
     > {
-        let read = standard_ledger_catalog_read(company_name)
+        let read = import_ledger_catalogue_read(company_name)
             .map_err(|_| "company_name_invalid".to_string())?;
         let request = admit_standard_ledger_catalog_request(read.as_str().to_string())
             .map_err(|_| "ledger_export_invalid".to_string())?;
         let (xml, evidence) = self.post_read(identity, read).await?;
         let catalogue =
-            parse_standard_ledger_catalog_response(&xml, company_name, identity.company_guid())
-                .map_err(|error| {
-                    // `code` keeps naming what failed; the cause says why, which
-                    // every catalogue refusal used to leave out (bridge#634).
-                    let mut failure = ToolFailure::from("ledger_export_invalid".to_string())
-                        .with_prior_evidence(evidence.clone());
-                    failure.cause = Some(error.safe_code());
-                    failure
-                })?;
+            parse_import_ledger_catalog_response(&xml, company_name, identity.company_guid())
+                .map_err(|error| catalogue_failure(error, &evidence))?;
         Ok((
-            catalogue.names().map(str::to_string).collect(),
+            catalogue.catalog().names().map(str::to_string).collect(),
             catalogue,
             request,
             evidence,
         ))
     }
 
-    /// The company's group tree, read only when a payload needs one leg
-    /// classified as cash or bank. A ledger row carries a single `PARENT` hop
-    /// and no `PARENTSTRUCTURE`, so the group identities live here.
-    async fn read_group_collection(
+    /// The company's group tree, read when a payload needs one leg
+    /// classified as cash or bank and for the group summaries of `vouchers`. A
+    /// ledger row carries a single `PARENT` hop and no `PARENTSTRUCTURE`, so the
+    /// group identities live here.
+    pub(super) async fn read_group_collection(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
@@ -1677,13 +1856,19 @@ impl Server {
         (from, to): (&str, &str),
         source: super::WindowPlanSource,
     ) -> Result<VerificationWindowRead, ToolFailure> {
+        // The window comes from the stored batch, not a tool argument: it is
+        // parsed here, where it enters the window layer.
+        let (from, to) = (
+            super::parse_window_date(from)?,
+            super::parse_window_date(to)?,
+        );
         let shape = super::VoucherReadShape::ImportVerification;
         let read = self
             .read_voucher_window(
                 identity,
                 company,
-                from,
-                to,
+                &from,
+                &to,
                 shape,
                 source,
                 super::WindowReadLimits::for_shape(shape),
@@ -2271,7 +2456,9 @@ fn import_company_tuple(
                 .books_from
                 .as_deref()
                 .ok_or_else(|| "company_identity_incomplete".to_string())?,
-        )?,
+        )?
+        .as_str()
+        .to_string(),
     })
 }
 
@@ -2280,6 +2467,30 @@ fn nonempty_company_field(value: &str) -> Result<String, String> {
         .then(|| value.to_string())
         .ok_or_else(|| "company_identity_incomplete".to_string())
 }
+
+/// A catalogue answer that cannot be used: `code` keeps naming what failed; the
+/// cause says why, which every catalogue refusal used to leave out (bridge#634).
+fn catalogue_failure(
+    error: bridge_tally_protocol::StandardLedgerCatalogError,
+    evidence: &Evidence,
+) -> ToolFailure {
+    let mut failure = ToolFailure::from("ledger_export_invalid".to_string())
+        .with_prior_evidence(evidence.clone());
+    failure.cause = Some(error.safe_code());
+    failure
+}
+
+fn approval_invalid(error: bill_wise::ApprovalError) -> ToolFailure {
+    let mut failure = ToolFailure::from("on_account_approval_invalid".to_string());
+    failure.cause = Some(error.cause());
+    failure
+}
+
+const BILL_WISE_UNAPPROVED_NEXT_STEP: &str = "No file was written. Each party listed is a ledger that keeps bills in Tally. An entry on it with no bill allocation lands On Account, and the person must then match it to a bill in Tally by hand. Show the person each party with its row_count, its debit_total and credit_total, and the rows listed, and say how many more rows there are (rows_omitted, refused_parties_omitted); raise BRIDGE_AGENT_MAX_BYTES to list them all. Ask whether each party's entries may be posted On Account, one party per question. Only for the parties the person says yes to, build again with on_account_approvals: a list with one {party_digest} for each, the digest copied from this answer (a ledger copied beside it is not read, so a masked name does no harm). The digest ties the approval to this exact batch, this company and this endpoint, and changing any row changes every party's digest, so the person is asked again. It does not prove that a person said yes, and a hand import of the file is not checked at all: never approve on the person's behalf. When the batch is posted, the native approval dialog marks each approved party On Account, from this build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines). That dialog is one answer for the whole batch and asks nothing about any one party, so it does not replace these questions. If this batch amends an earlier one, importing it also replaces any bill allocations the person made in Tally.";
+
+const BILL_WISE_NONE_NOTE: &str = "Checked: none of the ledgers this batch names is a bill-wise ledger, as read from Tally in the ledger list during this build. ComplyEaze Bridge reads the ledger list again before posting and refuses the post (import_bill_wise_changed) if a named ledger has become bill-wise since. This reads each ledger's own bill-wise setting, not the company's bill-wise feature. A hand import of the file is not checked at all.";
+
+const BILL_WISE_APPROVED_NOTE: &str = "Entries on the bill-wise ledgers listed in on_account_approved carry no bill allocation, so each amount lands On Account and must be matched to bills in Tally afterwards. Each has an approval digest that matches this batch; ComplyEaze Bridge cannot tell whether a person said yes. If this batch is posted natively, the approval dialog marks each of these ledgers On Account, from this build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines); a hand import of the file shows no dialog. Any other ledger this batch names that has become bill-wise by the time of posting is refused (import_bill_wise_changed).";
 
 /// Why `post_import` would refuse a saved batch, for the build's warning. The
 /// code is the one `post_import` returns; the text only explains it. A code
@@ -2306,6 +2517,9 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
         "import_review_too_large" => {
             "the approval text does not fit in one native dialog".to_string()
         }
+        "import_review_on_account_unmarked" => {
+            "the approval text would leave an approved bill-wise ledger without its On Account mark".to_string()
+        }
         _ => "post_import refuses this batch for the same reason".to_string(),
     }
 }
@@ -2315,7 +2529,7 @@ fn build_import_guidance(
     native_post_refusal: Option<&str>,
     voucher_limit: usize,
     bank_types: bool,
-    names_a_counterparty: bool,
+    on_account_approved: bool,
     multi_entry_bank: bool,
 ) -> (Value, &'static str) {
     let preflight_warning =
@@ -2328,11 +2542,10 @@ fn build_import_guidance(
     // this is emitted at build time, before which one happens is known.
     let company_identity_warning =
         "Confirm the loaded company before importing. A mismatched SVCURRENTCOMPANY is verified to post into whatever company Tally has loaded, with CREATED=1 and no error, so naming a company does not aim the write. Compare the whole identity immediately before importing — endpoint origin, name, GUID, company number and books-from, all five. Not the GUID alone, because a year-end split gives the child its parent's GUID; and not the company fields alone, because a second local Tally can hold a copy of the same company and a hand import is never checked against the endpoint this batch was built from. The endpoint_origin this batch recorded is returned beside it. Prefer an instance with no other company loaded.";
-    // §9.13: every party amount in the observed import landed On Account, and
-    // that is explicitly not established as correct for a book that reconciles
-    // bills. Bridge cannot yet tell the two kinds of book apart — the ledger
-    // catalogue it reads carries no bill-wise flag — so the limit is stated
-    // rather than silently accepted on the operator's behalf.
+    // §9.13: every party amount in the observed import landed On Account.
+    // The build now reads each named ledger's bill-wise flag and has a person
+    // approve each bill-wise party (#1234), so what is stated is what was
+    // checked and what that check cannot show.
     // The controlled repeat observed in §9.8 does not establish unknown-outcome
     // recovery. Every voucher type retains its original identity and uses
     // read-only reconciliation; Journal is not an exception.
@@ -2357,9 +2570,11 @@ fn build_import_guidance(
     let release_evidence_warning = bank_types.then_some(
         "The Payment, Receipt and Contra file shapes were measured on licensed TallyPrime 7.1 Gold only. This endpoint's observed product, release, tier and mode are returned beside this batch. Release and tier are recorded as evidence on this path rather than used as an admission gate, so a build against a different release is neither refused nor proven.",
     );
-    let allocation_warning = names_a_counterparty.then_some(
-        "This batch names a counterparty on a Payment or Receipt and carries no bill allocation, so each amount lands On Account. If that ledger is configured for bill-wise accounting, the entry will need allocating in Tally afterwards; ComplyEaze Bridge does not read that configuration and cannot warn per ledger.",
-    );
+    let allocation_warning = if on_account_approved {
+        BILL_WISE_APPROVED_NOTE
+    } else {
+        BILL_WISE_NONE_NOTE
+    };
     // bridge#466: the shape rests on narrower live evidence than two entries.
     // Comments and docs are not what an operator reads, so the result says so
     // itself, beside the party choice it made.
@@ -2373,7 +2588,7 @@ fn build_import_guidance(
             .chain(std::iter::once(repeat_warning))
             .chain(stale_classification_warning)
             .chain(release_evidence_warning)
-            .chain(allocation_warning)
+            .chain(std::iter::once(allocation_warning))
             .chain(multi_entry_warning)
             .collect::<Vec<_>>())
     };
@@ -2826,7 +3041,10 @@ fn cash_bank_refusals(
     max_bytes: usize,
 ) -> CashBankRefusals {
     let mut classified = BTreeMap::<&str, CashBankState>::new();
-    let mut refused = BTreeMap::<(&str, &'static str), Value>::new();
+    // One row per ledger and requirement, in the order the batch's legs are
+    // first refused, never by name, with or without masking. The order also
+    // decides which rows the budget below keeps.
+    let mut refused = Vec::<((&str, &'static str), Value)>::new();
     let mut legs = 0_usize;
     for (voucher, side, ledger, requirement) in constrained_legs(payload) {
         let state = classified
@@ -2842,7 +3060,11 @@ fn cash_bank_refusals(
             LegRequirement::Money => "cash_bank",
             LegRequirement::Counterparty => "not_cash_bank",
         };
-        refused.entry((ledger, requires)).or_insert_with(|| {
+        if refused.iter().any(|(row, _)| *row == (ledger, requires)) {
+            continue;
+        }
+        refused.push((
+            (ledger, requires),
             json!({
                 "ledger": party_name(ledger),
                 "requires": requires,
@@ -2852,13 +3074,14 @@ fn cash_bank_refusals(
                 // One voucher a caller can open to see the problem, rather
                 // than every voucher that repeats it.
                 "first_bridge_txn_id": voucher.bridge_txn_id,
-            })
-        });
+            }),
+        ));
     }
     let mut budget = refusal_diagnostic_budget(max_bytes);
     let distinct = refused.len();
     let ledgers = refused
-        .into_values()
+        .into_iter()
+        .map(|(_, row)| row)
         // Filter rather than stop at the first row that will not fit: an
         // oversized row is one long ledger name, not a reason to discard every
         // shorter refusal behind it. Budget is only spent on rows that are
@@ -2937,7 +3160,7 @@ fn contains_reserved_marker(value: &str) -> bool {
 /// in the exact Tally form used in the generated XML and verification window.
 fn normalize_payload_dates(payload: &mut ImportPayload) -> Result<(), String> {
     for voucher in &mut payload.vouchers {
-        voucher.date = normalized_date(&voucher.date)?;
+        voucher.date = normalized_date(&voucher.date)?.as_str().to_string();
     }
     Ok(())
 }
@@ -2948,25 +3171,30 @@ fn validate_dates(payload: &ImportPayload, books_from: Option<&str>) -> Result<(
     let today = super::tally_host_today();
     for voucher in &payload.vouchers {
         let date = normalized_date(&voucher.date)?;
-        if date < from || date > today {
+        if date < from || date.as_str() > today.as_str() {
             return Err("voucher_date_outside_company_extent".to_string());
         }
     }
     Ok(())
 }
 
-fn validate_import_dates_for_profile(
-    payload: &ImportPayload,
-    profile: &ImportProfileObservation,
-) -> Result<(), String> {
-    let boundary_profile = if matches!(
+/// The date boundaries this licence's mode admits.
+fn boundary_profile_for(profile: &ImportProfileObservation) -> DateBoundaryProfile {
+    if matches!(
         profile.admission_key.1.as_str(),
         "education" | "educational"
     ) {
         DateBoundaryProfile::EducationRestricted
     } else {
         DateBoundaryProfile::ModeAgnostic
-    };
+    }
+}
+
+fn validate_import_dates_for_profile(
+    payload: &ImportPayload,
+    profile: &ImportProfileObservation,
+) -> Result<(), String> {
+    let boundary_profile = boundary_profile_for(profile);
     for voucher in &payload.vouchers {
         let date = bridge_tally_core::TallyDate::parse(voucher.date.clone())
             .map_err(|_| "voucher_date_invalid".to_string())?;
@@ -3178,14 +3406,15 @@ fn requested_master_report(
 /// cash-in-hand answer's ledger outside Cash-in-Hand
 /// (`cash_ledger_not_cash_in_hand`), else another answer's ledger under
 /// Suspense A/c (`cash_answer_ledger_in_suspense`). One row per ledger with the
-/// reserved group it reaches, bounded like the cash/bank refusal.
+/// reserved group it reaches, in the order the answers first name them and
+/// never by name, bounded like the cash/bank refusal.
 fn answered_ledger_refusals(
     required: &[super::bank_statement::AnsweredCashLedger],
     observed: &ObservedMasters,
     max_bytes: usize,
 ) -> Option<(&'static str, Vec<Value>, usize)> {
-    let mut not_cash = BTreeMap::<&str, Value>::new();
-    let mut in_suspense = BTreeMap::<&str, Value>::new();
+    let mut not_cash = Vec::<(&str, Value)>::new();
+    let mut in_suspense = Vec::<(&str, Value)>::new();
     for need in required {
         let state = observed.classify(&need.ledger);
         let (refused, requires) = if need.cash_in_hand && !state.is_cash_in_hand() {
@@ -3195,9 +3424,12 @@ fn answered_ledger_refusals(
         } else {
             continue;
         };
-        refused.entry(need.ledger.as_str()).or_insert_with(|| {
-            refused_ledger_row(&need.ledger, requires, &state, Some(&need.bridge_txn_id))
-        });
+        if !refused.iter().any(|(ledger, _)| *ledger == need.ledger) {
+            refused.push((
+                need.ledger.as_str(),
+                refused_ledger_row(&need.ledger, requires, &state, Some(&need.bridge_txn_id)),
+            ));
+        }
     }
     let (reason, refused) = if !not_cash.is_empty() {
         ("cash_ledger_not_cash_in_hand", not_cash)
@@ -3207,8 +3439,10 @@ fn answered_ledger_refusals(
         return None;
     };
     let mut budget = refusal_diagnostic_budget(max_bytes);
-    let (rows, omitted) =
-        super::bank_statement::bounded(refused.into_values().collect(), &mut budget);
+    let (rows, omitted) = super::bank_statement::bounded(
+        refused.into_iter().map(|(_, row)| row).collect(),
+        &mut budget,
+    );
     Some((reason, rows, omitted))
 }
 
@@ -3260,6 +3494,41 @@ fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
     })
 }
 
+/// `rows` in the order the batch first names each row's ledger. A list of the
+/// batch's ledgers goes out in this order and never by name, with or without
+/// masking. A ledger the batch does not name goes last, in its incoming order:
+/// the lists built from the batch hold none, and a recorded verdict names the
+/// ledgers the batch was bound to.
+fn in_batch_order<T>(
+    mut rows: Vec<T>,
+    vouchers: &[ImportVoucher],
+    ledger: impl for<'a> Fn(&'a T) -> &'a str,
+) -> Vec<T> {
+    rows.sort_by_cached_key(|row| {
+        vouchers
+            .iter()
+            .flat_map(|voucher| &voucher.entries)
+            .position(|entry| entry.ledger == ledger(row))
+            .unwrap_or(usize::MAX)
+    });
+    rows
+}
+
+/// A masters verdict as an answer carries it: the ledgers it names in the order
+/// the batch names them (`in_batch_order`), not the order they were recorded
+/// in. The recorded verdict is left as it was saved: a recorded review is bound
+/// to its bytes.
+fn served_masters_verdict(mut verdict: Value, vouchers: &[ImportVoucher]) -> Value {
+    if let Some(ledgers) = verdict.get_mut("ledgers").and_then(Value::as_array_mut) {
+        *ledgers = in_batch_order(std::mem::take(ledgers), vouchers, |ledger| {
+            ledger.as_str().unwrap_or_default()
+        });
+    }
+    verdict
+}
+
+/// The ledgers a batch names, each once, in name order. A list of them sent to
+/// the caller is put `in_batch_order` first.
 fn requested_ledger_names(payload: &ImportPayload) -> Vec<String> {
     payload
         .vouchers
@@ -3516,7 +3785,9 @@ fn render_voucher_xml(
         let amount = match entry.side { EntrySide::Dr => format!("-{}", entry.amount), EntrySide::Cr => entry.amount.clone() };
         format!("<ALLLEDGERENTRIES.LIST><LEDGERNAME>{}</LEDGERNAME><ISDEEMEDPOSITIVE>{}</ISDEEMEDPOSITIVE><AMOUNT>{}</AMOUNT></ALLLEDGERENTRIES.LIST>", xml_escape(&entry.ledger), entry.side.tally_positive(), amount)
     }).collect::<String>();
-    let date = normalized_date(&voucher.date).unwrap_or_default();
+    let date = normalized_date(&voucher.date)
+        .map(|date| date.as_str().to_string())
+        .unwrap_or_default();
     // §9.13: the imported Payment/Receipt/Contra files carried EFFECTIVEDATE
     // beside DATE, and named the party on the side opposite the money. The
     // Journal shape qualified in §9.8 carries neither element, and is left
@@ -3926,3 +4197,23 @@ fn served_verification_page(persisted: &[u8], offset: usize) -> Result<(Value, V
 #[cfg(test)]
 #[path = "agent_import_file_tests.rs"]
 mod file_tests;
+
+/// The catalogue's ledgers as a request can reach them: each row spelling with its stored name (#1085).
+fn resolvable_ledgers(
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) -> Vec<super::ledger_candidates::CatalogueLedger> {
+    catalogue
+        .spellings()
+        .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
+        .collect()
+}
+
+/// Each ledger of a catalogue with its immediate parent group as Tally returned it (#1230).
+fn owned_parents(
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) -> Vec<(String, Option<String>)> {
+    catalogue
+        .parents()
+        .map(|(ledger, parent)| (ledger.to_string(), parent.map(str::to_string)))
+        .collect()
+}

@@ -113,12 +113,20 @@ impl Server {
                 .map_err(|error| error.safe_reason_code().to_string())?;
 
             let read = self
-                .read_entry_wildcard_window(&identity, &company.name, &from, &to, None)
+                .read_entry_wildcard_window(
+                    &identity,
+                    &company.name,
+                    &from,
+                    &to,
+                    None,
+                    SmallBooks::Count,
+                )
                 .await?;
             accumulate(&mut accumulated, read.all_evidence());
             let source_marks = read.witness.as_ref().map(|witness| witness.marks);
             let counted = read.counted();
-            let rows = validate_then_filter_voucher_rows(read.rows, &from, &to, None)?;
+            let rows =
+                validate_then_filter_voucher_rows(read.rows, from.as_str(), to.as_str(), None)?;
 
             // The window is independent evidence about which ledgers exist.
             // A row posting to an unlisted ledger proves the first catalogue
@@ -202,7 +210,8 @@ impl Server {
             // absent value here means "never read", not "the voucher has
             // none". Declaring that keeps a proposal whose own REMOTEID was
             // never compared out of `absent`.
-            let window = book_window(&from, &to, read, &rows).map_err(presence_code)?;
+            let window =
+                book_window(from.as_str(), to.as_str(), read, &rows).map_err(presence_code)?;
             let request = PresenceRequest::new(&window, &catalog, &numbering, &proposals)
                 .map_err(presence_code)?;
             let report = book_presence::assess(&request);
@@ -488,7 +497,7 @@ fn parse_proposals(
         .ok_or_else(|| "vouchers_required".to_string())?;
     let invalid = || "argument_invalid:vouchers".to_string();
     struct RawProposal {
-        date: String,
+        date: bridge_tally_core::TallyDate,
         voucher_type: String,
         voucher_number: Option<String>,
         party: Option<String>,
@@ -591,7 +600,7 @@ fn parse_proposals(
         .enumerate()
         .map(|(position, voucher)| ProposedVoucherInput {
             position,
-            date: &voucher.date,
+            date: voucher.date.as_str(),
             voucher_type: &voucher.voucher_type,
             voucher_number: voucher.voucher_number.as_deref(),
             remote_id: None,

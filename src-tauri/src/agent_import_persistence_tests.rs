@@ -198,7 +198,7 @@ async fn staged_build_failures_retain_recorded_batch_identity_through_framing() 
         "company":{"name":"WR2 Unicode Lab", "guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
             "company_number":"100004", "books_from":"20260401"},
         "txn_ids":[metadata["caller_id"]], "date_from":"20260907", "date_to":"20260907",
-        "sha256":metadata["import_file_sha256"], "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "sha256":metadata["import_file_sha256"], "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water", "value":8, "master_value":219},
         "vouchers":[{"bridge_txn_id":metadata["caller_id"], "date":"20260907",
             "voucher_type":"Journal", "narration":"Bridge MCP batch namespace qualification",

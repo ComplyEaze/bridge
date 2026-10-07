@@ -429,6 +429,18 @@ budget. That is
 a mark of 43 or more for the `vouchers` and `voucher_presence` shape (384 KiB a voucher) and 171 or
 more for the import-verification shape (96 KiB a voucher) that the read-back after a post uses.
 
+**Deviation, 6 Oct 2026 (#1029).** The two paragraphs above, and rule 2 of §11c.3 ("sent undivided,
+exactly as before"), describe the build the table below was measured on. Since #1029 `vouchers`,
+`voucher_presence` and the registers read a census on a small book as well, whatever its mark (a mark
+of zero is never counted), so the "no census" rows below describe the earlier build for those tools.
+`ledger_movement`, the read-back after a post, `outstandings` and the widened read that corroborates an
+empty window still read a small book undivided and uncounted. The 22 and 34 request counts for a small
+book came from scripted doubles and were then measured on one synthetic book of eight vouchers on 7 Oct 2026
+(a `vouchers` call 16 to 22 requests, `voucher_presence` 28 to 34, every request served; the six more are two
+census reads, two company-extent reads and two status reads). **Confidence: PARTIAL**: one book, one run of the
+day and week calls and three of the presence call, debug builds, windows of one voucher. This change does not alter a larger
+book's path (from the code); a larger book's census cost was not measured here.
+
 | Call | Book | Window label | Verdicts | Requests |
 | --- | --- | --- | --- | --- |
 | `vouchers`, a day with one voucher | census read | `complete`, total 1 | | 22 |
@@ -702,7 +714,7 @@ The Company collection fetched with `Name, GUID, NUMLEDGERS` (request `BridgeCom
 `COMPANY` row per loaded company, whatever `SVCURRENTCOMPANY` named, each row `NAME`, `GUID` and
 `NUMLEDGERS` (a number with a leading space, as `ALTMSTID` is): present on 31 of 31 rows, in 0.09 s for
 18.7 KB. The synthetic 4,339-ledger book's value, 4,339, equalled its catalogue and AlterID-census counts, and two
-real stock-heavy books, about 900 and about 2,600 ledgers, read by another lane, also equalled their censuses
+real stock-heavy books, about 900 and about 2,600 ledgers, read separately, also equalled their censuses
 (recorded in #938 only; the tree holds the synthetic book's capture, and the counts of the two other kept rows,
 6 and 123, are not compared with a census anywhere in this tree). That is three books, one of them captured here: what `NUMLEDGERS` counts for a book with deleted or hidden ledgers, and on another Tally
 version, is not measured. Bridge therefore uses it only to refuse: a census that counted fewer ledgers than the
@@ -1478,6 +1490,45 @@ balance for its reference beside it, rather than netting allocations on an unver
 
 ---
 
+### 12a.15 The ledger catalogue can carry each ledger's `ISBILLWISEON`
+
+**PARTIAL: VERIFIED on five synthetic licensed 7.1 Silver books (`BRIDGE OUTSTANDINGS LAB`, `BRIDGE GST RECON LAB`,
+`BRIDGE AMEND LAB`, `BRIDGE SHAPE LAB`, `WR2 Unicode Lab`), reads only, 6 Oct 2026; not measured on a large book.** The request is
+`StandardLedgerCatalogV2`: the `StandardLedgerCatalogV1` request (`List of Ledgers`, NATIVEMETHOD `Name`, `GUID`,
+`Parent`, the two company computes) plus one more line, `<NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>`, rendered by
+Bridge's own profile code and sent over the gateway by a reads-only sitting. What was observed:
+
+- Every ledger row carried exactly one `<ISBILLWISEON TYPE="Logical">` element, `Yes` or `No`: 17 of 17 and 43 of 43
+  rows on the first two books, 19 of 19, 44 of 44 and 9 of 9 on the other three.
+- The rows (GUID, name, parent) were the V1 answer's rows, and the flags equalled, by name, the flags of the same book's
+  outstandings ledger snapshot (10 `Yes` of 17 and 10 of 43).
+- Ledgers under groups where bill-wise tracking is not offered (cash, bank, duties, income, expense, purchase, sales and
+  the root) answered `No`, never an empty element: 6 of 17 and 26 of 43 rows.
+- Four ledgers whose names end in a carriage return and line feed (three on the amend book, one on the shape book) came
+  back with the name as an escaped attribute and a flag: `No` for the three on the amend book, `Yes` for the one on
+  the shape book (pinned by a protocol test).
+- The same request sent twice answered with byte-identical bodies on the first two books. The answer was about 8 to 9
+  percent larger than V1's and took under 0.4 s.
+- A flag in a form other than `Yes` or `No` was not seen; Bridge's parser accepts only those two and refuses a row with
+  no flag, so a V1 answer is never read as "no ledger keeps bills".
+
+Not shown: a book above a few thousand ledgers (size and time), or a ledger whose flag reads `No` yet holds bills
+(company-wide bill-wise settings, §12a.5).
+
+### 12a.16 Cash Flow and its sibling built-in reports by name on licensed 7.1
+
+**PARTIAL: VERIFIED 2026-10-06, licensed TallyPrime 7.1 Silver** (`education_mode=false`), attended, one request at a time. Two synthetic companies, one run each (one repeated request answered byte for byte the same). Nothing here is evidence about a client book. This extends §12a.1 and §12a.11 to six more report names. Every request is §12a.1's envelope with `<ID>` set to the name; every answer was HTTP 200 with `/status` healthy after it, and no dialog appeared at the Tally screen. Fixtures: the `builtin_*` files and `BUILTIN_REPORTS_CAPTURE_PROVENANCE.md`.
+
+- **Cash Flow.** No `HEADER` or `STATUS`. One `DSPPERIOD` (a month name, **with no year**) then one `DSPACCINFO` per month, holding `DSPDRAMT/DSPDRAMTA`, `DSPCRAMT/DSPCRAMTA` and `DSPCLAMT/DSPCLAMTA`. A full year gave 12 rows, 2025-04-01 to 2025-06-30 gave 3 (Tally accepted a day-30 end and answered with those three months, unlike the day 1, 2 and 31 rule of Education mode; whether it computed the figures to the 30th was not separated from month rounding) and one month gave 1. **A month with no activity is a row with every amount empty, not a missing row**, and an empty amount is not zero (§7). A debit is negative, as in the trial balance. The closing figure is the month's own: May's equalled May's debit alone. The credit column was empty in every row of this book, so the sign and meaning of a credit, and a closing figure with both columns present, were unmeasured on this book (the 2026-10-07 captures below measure them).
+  - **The tie.** On the book (one cash ledger and one bank ledger, receipts only), the sum of the months' debits equalled the debit totals of the ledgers under Cash-in-Hand and Bank Accounts read by `trial_balance` for the same window, to the paisa (the trial balance responses were not kept, so that side is a recorded reading, not committed bytes), for the year (17,975,981.22), April to June (7,263,013.22) and June (5,472,348.20). **Not measured on that book:** an outflow, a contra, a Bank OD A/c ledger, a month with both (the 2026-10-07 books below measured a Bank OD ledger and months with both columns, and showed a credit column; a contra and the direction of a credit stayed unverified), a window that is not whole months, a several-currency book, optional or post-dated vouchers, a large book.
+  - **Three more books, 2026-10-07 (licensed 7.1 Silver, synthetic books, one request each; fixtures `builtin_cash_flow_*` and the provenance file).** VERIFIED on `BRIDGE AMEND LAB` and `BRIDGE SHAPE LAB`: with credits present, **a row's closing is its debit plus its credit** (a debit negative) on every row with an amount: a month of credit only (empty debit), a month with both, a positive closing. **The net total (the sum of the closings) ties to the trial balance's debit plus credit over the ledgers under Cash-in-Hand and Bank Accounts** on AMEND LAB (VERIFIED, one window); on SHAPE LAB it ties only with the ledger under Bank OD A/c added (VERIFIED, below). The trial balance figures are those `trial_balance` returned for the same window at the time (recorded readings; the responses are kept privately, not committed), and the tests type the rows from them. **Bank OD:** `HDFC CC` (group `Bank OD A/c`, a debit of 2,600.00 in the year and in April 2025, no credit) is **counted in Tally's Cash Flow**: without it the two sides differ by exactly its net. VERIFIED for that one ledger, one book, debit only, on whole windows that contain its movement; a Bank OD credit, a Bank OCC A/c ledger and a ledger inside a subgroup of Bank OD A/c were not measured. PARTIAL: the debit column and the credit column each differed from the debit and credit totals of the ledgers Tally counts as cash and bank (on SHAPE LAB including the Bank OD ledger) by one common amount in size (the ledgers' columns larger in both) (AMEND LAB 17,000.00, SHAPE LAB 37,600.00) while the net tied; without the Bank OD ledger the SHAPE LAB columns differ by 35,000.00 and 37,600.00; that a transfer between money ledgers (a contra) is counted in the ledgers' columns and left out of Tally's is the leading reading and is UNVERIFIED. PARTIAL: `BRIDGE CORPUS DENSE` (about 30,000 vouchers) answered the year as 12 rows with every amount empty in 0.1 s, as predicted for a book whose earlier trial balance showed no cash or bank movement; this answer alone cannot tell that from a report that did not compute, and the timing is a no-activity lower bound, not a cost for a large book. The tie rule that a net of two empties compares nothing, and two zero nets are not a tie, rests on these answers and is built in `reports::cash_flow`.
+- **Funds Flow** gave the same month-row shape. On the same book Dr is the working capital at the start of the month, Cr at its end, and `CL` = Cr - Dr is the month's change; June's three figures equalled the trial balance's opening, closing and movement of Sundry Debtors, Bank Accounts and Cash-in-Hand. Which groups Tally counts as working capital is not measured.
+- **Sales Register** gave the same month-row shape with Dr empty, Cr the month's sales and `CL` the running total. The year's total (the last month's `CL`) equalled the sales ledger's credit in the trial balance; the Sales Accounts group total was 21.00 higher, the ledger that three journals posted to, which the register leaves out.
+- **Ratio Analysis** gave 23 `RATIONAME` / `RATIOVALUE` pairs. Money values are **rendered text**: Indian digit grouping and a Dr or Cr suffix (`6,31,22,592.83 Dr`); ratios are text too (`0.00 : 1`, `99.88 %`, `260.75 days`); several values are present and empty. The exact-decimal parser refuses them. A current ratio of `0.00 : 1` was a division by zero (no current liabilities) rather than a zero ratio.
+- **Negative Stock** (a book with 11 stock items) listed 5 in the Stock Summary item shape (`DSPACCNAME`, `DSPSTKINFO/DSPSTKCL` with `DSPCLQTY`, `DSPCLRATE`, `DSPCLAMTA`): four items of positive quantity whose closing value was a credit (§12a.13's sign rule) and one of quantity `-50.000 Kgs`. The three items with a debit closing value and the three with no quantity or value were not listed. So the listed set was exactly the items whose closing quantity is below zero or whose closing value is a credit (one book; as at the window end, or at any point in it, is not measured).
+- **Negative Ledgers** answered an empty `<ENVELOPE>` on a book with no ledger whose balance is on the side opposite its group's usual side. **Inconclusive:** an empty envelope cannot be told from a report that was not rendered (§12a.11), and its row shape is unseen. It was recognised as a report (an unknown name is refused, below).
+- **An unknown report name** answered `STATUS` 0 in a `HEADER` and a `LINEERROR` "Could not find Report '<name>'!" in `BODY` / `DATA`, with no dialog and the gateway healthy afterwards. §12a.1 measured a bare `RESPONSE` "Unknown Request" on another build, so the text and the shape of the refusal differ by build; classify by structure (`STATUS` 0 with a `LINEERROR`, or a bare `RESPONSE`), not by text.
+
 ## 13. Open questions
 
 | Question | Why it matters |
@@ -1537,3 +1588,4 @@ balance for its reference beside it, rather than netting allocations on an unver
 | 2026-10-02 | §11f: how long Claude Desktop (chat app, macOS, bundle version 2.19675.0) waited on one tool call: silent calls of 20, 55, 75 and 130 s were answered, a 250 s call was cancelled at 240 s with `Request timed out` in two runs and the server was not stopped within a minute of the cancel; no `progressToken` was offered on six calls, so the effect of progress is unanswered; no Tally request. PARTIAL, one run per case |
 | 2026-10-02 | §12a.13: `NUMSTOCKITEMS` against the item rows after create, create-on-existing, rename, alias, move to another group, an inventory purchase and two bulk imports of 20 items on one synthetic licensed 7.1 Silver company: equal at every point; this alias was not counted as an item and added a name entry to the row; a Create on an existing item changed no field of those read; a parent-only Alter changed, of the fields read, only the parent. For a ledger, §9.4g records (one run, PARTIAL) that a Create on an existing name with a changed parent, bill-wise flag and opening balance replaced all three, also answering `CREATED=0, ALTERED=1`: the two master types gave different results here, and neither result is generalised to the other. PARTIAL, one item each, once; not measured: screen-created items, delete with vouchers, merge, a reload. |
 | 2026-10-03 | §12a.3: a whole `outstandings` call (release build from master 7b994e65) on the book of the 1-Dec-2108 due date: state `complete`, 52 requests with none refused, 4.0 s, 1,498 open bills in a page of 500 and a 181,044-byte result. PARTIAL, one run, one book; not measured: the 2108 bill's row in a live response (not on the page: the page runs oldest-due first and the bill is not yet due), the later pages, other books or directions. |
+| 2026-10-06 | §12a.15: the ledger catalogue request with one more native method (`IsBillWiseOn`) returned exactly one `Yes` or `No` `ISBILLWISEON` on every ledger of five synthetic licensed 7.1 Silver books, equal, on the two books where it was compared, to the outstandings snapshot's flags, with the cash, bank and duty ledgers answering `No` and four CR LF ledger names answering a flag (three `No`, one `Yes`). VERIFIED for those books (the captures of four are committed; the GST RECON LAB answer is not); no large book |

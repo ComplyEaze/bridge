@@ -281,7 +281,12 @@ fn nothing_else_dispatches_an_mcp_tool_call() {
 fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
     let manifest: Value =
         serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
-    let key = format!("accept_terms_{}", TERMS_VERSION.replace('-', "_"));
+    let key = format!("accept_terms_{}", TERMS_VERSION.replace(['-', '.'], "_"));
+    assert!(
+        key.bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_'),
+        "{key}"
+    );
     assert_eq!(manifest["manifest_version"], "0.2");
     assert_eq!(
         manifest["privacy_policies"],
@@ -315,4 +320,33 @@ fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
             assert_ne!(option["required"], true, "{name}");
         }
     }
+}
+
+#[test]
+fn the_published_terms_carry_the_version_this_build_asks_for_and_the_section_the_setting_names() {
+    // The setting you tick, the version recorded and the text published at
+    // /terms must name one version, and the posting setting points at the
+    // "9.2 Posting" heading of that text by name.
+    let terms = include_str!("../../docs/legal/terms.md");
+    assert!(
+        terms
+            .lines()
+            .any(|line| line == format!("**Version:** {TERMS_VERSION}")),
+        "docs/legal/terms.md does not carry **Version:** {TERMS_VERSION}"
+    );
+    assert!(
+        terms
+            .lines()
+            .any(|line| line.starts_with("9.2 **Posting.**")),
+        "docs/legal/terms.md has no 9.2 **Posting.** paragraph"
+    );
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    let posting = manifest["user_config"]["enable_writes"]["description"]
+        .as_str()
+        .unwrap();
+    assert!(
+        posting.contains("Terms of Use section 9.2 (Posting)"),
+        "the posting setting no longer points at Terms section 9.2 (Posting)"
+    );
 }

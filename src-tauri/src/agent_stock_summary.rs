@@ -78,8 +78,7 @@ impl Server {
         let guid = required_string(args, "company_guid")?;
         // Before any read: an unsupported date or a filter that cannot be
         // honoured costs no Tally request.
-        let as_of = TallyDate::parse(normalized_date(required_string(args, "as_of")?)?)
-            .map_err(|_| "invalid_date".to_string())?;
+        let as_of = normalized_date(required_string(args, "as_of")?)?;
         let as_of = StockSummaryAsOf::new(as_of).map_err(|error| error.code().to_string())?;
         let wanted = item_filter(args)?;
         let (company, identity, mut prior) = self.verified_company(guid).await?;

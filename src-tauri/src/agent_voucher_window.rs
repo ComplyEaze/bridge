@@ -173,6 +173,14 @@ impl AlterIdSpan {
     }
 }
 
+/// A window date that reaches this layer as text from a read or a stored
+/// record, not from a tool argument (whose date [`normalized_date`] parses):
+/// parsed once, by the caller, and carried as a [`TallyDate`] into every
+/// request rendered from it (#861).
+pub(super) fn parse_window_date(value: &str) -> Result<TallyDate, ToolFailure> {
+    TallyDate::parse(value).map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
+}
+
 /// One request of a divided window: a date range, and for a part of one day, the
 /// AlterID span of that day it covers.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -757,6 +765,21 @@ impl WindowServed {
     }
 }
 
+/// Whether a window read counts a book whose high-water mark alone shows it
+/// fits one request (#1029).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SmallBooks {
+    /// Read the window as one request without a census: the mark bounds the
+    /// book, and the read says nothing about what the window holds beyond its
+    /// rows.
+    Skip,
+    /// Count the window like a large book, so a read can report the window
+    /// complete and a presence question can be answered absent. Costs the
+    /// census requests a small book otherwise avoids. A mark of zero, a
+    /// company that has never held a voucher, is still not counted.
+    Count,
+}
+
 /// The per-call limits a window read plans under.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct WindowReadLimits {
@@ -765,6 +788,8 @@ pub(super) struct WindowReadLimits {
     /// The most data requests one read may dispatch. [`MAX_PLANNED_READS`] in
     /// production.
     pub(super) max_reads: usize,
+    /// Whether a book small enough to read whole is counted first (#1029).
+    pub(super) small_books: SmallBooks,
 }
 
 impl WindowReadLimits {
@@ -773,6 +798,16 @@ impl WindowReadLimits {
             budget_bytes: WINDOW_READ_BUDGET_BYTES,
             default_bytes_per_voucher: shape.default_wire_bytes_per_voucher(),
             max_reads: MAX_PLANNED_READS,
+            small_books: SmallBooks::Skip,
+        }
+    }
+
+    /// These limits, counting a small book as well (#1029). Only the reads
+    /// that report a window complete or a voucher absent ask for it.
+    pub(super) const fn counting_small_books(self) -> Self {
+        Self {
+            small_books: SmallBooks::Count,
+            ..self
         }
     }
 
@@ -1111,12 +1146,6 @@ fn fold_evidence(target: &mut Option<Evidence>, next: Evidence) {
 /// `TallyDate::next_day` refuses the same overflow with.
 const TALLY_DATE_OVERFLOW: &str = "tally_date_overflow";
 
-/// A window's date as it enters this layer: parsed once, here, and carried as
-/// a [`TallyDate`] into every request rendered from it (#861).
-fn parse_window_date(value: &str) -> Result<TallyDate, ToolFailure> {
-    TallyDate::parse(value).map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
-}
-
 /// A date as a planning day. A [`TallyDate`] is a valid Gregorian date in years
 /// 1 to 9999, all inside `NaiveDate`'s range, so this does not fail; it keeps
 /// the typed refusal rather than a panic should that ever change.
@@ -1307,8 +1336,8 @@ impl<'a> AuditWindowReader<'a> {
         self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
-        from: &str,
-        to: &str,
+        from: &TallyDate,
+        to: &TallyDate,
         shape: VoucherReadShape,
         limits: WindowReadLimits,
         parse: P,
@@ -1522,8 +1551,8 @@ impl Server {
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
-        from: &str,
-        to: &str,
+        from: &TallyDate,
+        to: &TallyDate,
         shape: VoucherReadShape,
         source: WindowPlanSource,
         limits: WindowReadLimits,
@@ -1575,8 +1604,8 @@ pub(super) async fn read_voucher_window_with<R, T, P>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
     company: &str,
-    from: &str,
-    to: &str,
+    from: &TallyDate,
+    to: &TallyDate,
     shape: VoucherReadShape,
     source: WindowPlanSource,
     limits: WindowReadLimits,
@@ -1593,10 +1622,9 @@ where
     {
         return Err(AUDIT_WINDOW_NEEDS_ITS_OWN_MARKS.to_string().into());
     }
-    let (from, to) = (parse_window_date(from)?, parse_window_date(to)?);
-    let timed = TimedReader::new(reader, &from, &to);
+    let timed = TimedReader::new(reader, from, to);
     let read = read_voucher_window_timed(
-        &timed, identity, company, &from, &to, shape, source, limits, parse,
+        &timed, identity, company, from, to, shape, source, limits, parse,
     )
     .await;
     let timings = timed.into_timings();
@@ -1986,8 +2014,9 @@ async fn read_marks<R: WindowReader>(
 }
 
 /// Establish what `window` holds, cheapest first: the company's voucher
-/// high-water mark bounds every window of the book at once; only when that
-/// bound is not enough is the window itself counted.
+/// high-water mark bounds every window of the book at once; the window itself
+/// is counted when that bound is not enough, or when the caller asks for a
+/// small book to be counted too (`SmallBooks::Count`).
 #[allow(clippy::too_many_arguments)]
 async fn estimate_window_volume<R: WindowReader>(
     reader: &R,
@@ -2009,8 +2038,14 @@ async fn estimate_window_volume<R: WindowReader>(
     let high_water = marks.vouchers;
     // Every voucher carries a distinct AlterID no greater than the high-water
     // mark (§10), so the book — and therefore any window of it — holds at
-    // most `high_water` vouchers.
-    if high_water.saturating_mul(limits.default_bytes_per_voucher) <= limits.budget_bytes {
+    // most `high_water` vouchers. A mark of zero is a company that has never
+    // held a voucher: there is nothing to count, whatever the limits say. A
+    // read that reports completeness or absence counts any other mark however
+    // small the book, so a small or new company can have a window checked
+    // complete and a presence question answered absent (#1029).
+    let fits_one_request =
+        high_water.saturating_mul(limits.default_bytes_per_voucher) <= limits.budget_bytes;
+    if high_water == 0 || (fits_one_request && limits.small_books == SmallBooks::Skip) {
         return Ok(Preflight::Whole {
             census: None,
             marks: None,

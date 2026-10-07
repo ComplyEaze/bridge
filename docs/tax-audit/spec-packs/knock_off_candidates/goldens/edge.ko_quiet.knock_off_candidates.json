@@ -26,16 +26,16 @@
       "id": "knock_off_candidates.t2_candidate_total_paise",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "c81320270dcf7017",
-      "definition_text": "Bank and cash lines of the vouchers whose narration names a party ledger not on the voucher, summed -- a candidate total, not a reportable amount.",
+      "definition_sha256_16": "632d4e6d37fe2fa0",
+      "definition_text": "Bank and cash lines of the vouchers whose narration names a party ledger with no amount on the voucher, summed -- a candidate total, not a reportable amount. A Contra, or any voucher whose every line with an amount is on a bank or cash ledger, counts the larger side of its bank and cash lines once.",
       "evidence": []
     },
     {
       "id": "knock_off_candidates.t2_embedded_candidate_total_paise",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "2f59fc886c1b62be",
-      "definition_text": "Bank and cash lines of the vouchers whose narration holds a party's name only inside a longer name, summed -- a candidate total, not a reportable amount.",
+      "definition_sha256_16": "d05db920a7570d3e",
+      "definition_text": "Bank and cash lines of the vouchers whose narration holds a party's name only inside a longer name, summed -- a candidate total, not a reportable amount. A Contra, or any voucher whose every line with an amount is on a bank or cash ledger, counts the larger side of its bank and cash lines once.",
       "evidence": []
     },
     {
@@ -58,8 +58,8 @@
       "id": "knock_off_candidates.t2_row_count",
       "value": 0,
       "unit": "count",
-      "definition_sha256_16": "a8baff95bb52e678",
-      "definition_text": "Bank or cash vouchers whose narration names, as whole words, a party ledger not on the voucher.",
+      "definition_sha256_16": "a97fd3650bae7d7b",
+      "definition_text": "Bank or cash vouchers whose narration names, as whole words, a party ledger with no amount on the voucher.",
       "evidence": []
     }
   ],

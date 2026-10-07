@@ -45,8 +45,10 @@ test("desktop command invokes the one shared selected-voucher operation", async 
   // limits, as `read_entry_window_shaped` does (neither pattern may cross into
   // another function); a type filter alone switches it
   // to the class-resolving shape (#625). The ledger catalogue is read before
-  // and again after it.
-  assert.match(vouchers, /read_ledger_catalogue(?:(?!\bfn\s)[\s\S])*?read_entry_window_rows\((?:(?!\bfn\s)[\s\S])*?read_ledger_catalogue/);
+  // and again after it: before, `read_resolvable_ledgers` keeps both spellings of
+  // each ledger so a typed name resolves by either (#1085); after, the drift check
+  // `read_ledger_catalogue` stays on the spelling the voucher rows carry.
+  assert.match(vouchers, /read_resolvable_ledgers\b(?:(?!\bfn\s)[\s\S])*?read_entry_window_rows\((?:(?!\bfn\s)[\s\S])*?read_ledger_catalogue\b/);
   assert.match(vouchers, /async fn read_entry_window_rows(?:(?!\bfn\s)[\s\S])*?self\.read_voucher_window\((?:(?!\bfn\s)[\s\S])*?WindowReadLimits::for_shape\(shape\)/);
   assert.match(vouchers, /type_selector\.is_some\(\) \{\s*VoucherReadShape::ClassEntryWildcard\s*\} else \{\s*VoucherReadShape::EntryWildcard/);
   assert.match(vouchers, /fn read_entry_wildcard_window[\s\S]*?VoucherReadShape::EntryWildcard/);

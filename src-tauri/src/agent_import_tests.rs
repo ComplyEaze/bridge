@@ -267,6 +267,7 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
     let initial = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -443,6 +444,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -546,6 +548,7 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -635,6 +638,7 @@ fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -809,6 +813,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -844,6 +849,7 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1066,6 +1072,7 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1159,6 +1166,7 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1229,6 +1237,7 @@ fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1293,6 +1302,7 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
     let mut line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1364,6 +1374,7 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1431,6 +1442,7 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1492,6 +1504,7 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1897,6 +1910,69 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
         // high-water read verify_import now makes (protocol reference §11c).
         assert_eq!(simulator.finish().expect("requests").len(), 56);
     }
+}
+
+/// A V2 catalogue answer with every ledger's flag set here: the names in
+/// `bill_wise` Yes, every other No.
+///
+/// A REGRESSION DOUBLE over a live capture (AGENTS.md P1): only the flag column
+/// is rewritten; names, GUIDs, parents and layout are the capture's. It
+/// exercises the build's and the post's own rules. What Tally answers to the
+/// V2 request is pinned on the captures themselves
+/// (`agent_import_bill_wise_tests.rs`, `tests/standard_ledger_catalogue_rows.rs`).
+pub(super) fn with_bill_wise_flags(catalogue: &str, bill_wise: &[&str]) -> String {
+    const OPEN: &str = "<LEDGER NAME=\"";
+    const FLAG: &str = "<ISBILLWISEON TYPE=\"Logical\">";
+    let mut out = String::with_capacity(catalogue.len());
+    let mut rest = catalogue;
+    while let Some(start) = rest.find(OPEN) {
+        let after = &rest[start + OPEN.len()..];
+        let name = &after[..after.find('"').expect("a ledger name closes")];
+        let name = name
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#13;", "\r")
+            .replace("&#10;", "\n");
+        let row_end = after.find("</LEDGER>").expect("a ledger closes");
+        let flag_at = after[..row_end]
+            .find(FLAG)
+            .expect("a V2 row carries its flag")
+            + FLAG.len();
+        let flag_end = flag_at + after[flag_at..].find('<').expect("the flag closes");
+        out.push_str(&rest[..start + OPEN.len() + flag_at]);
+        out.push_str(if bill_wise.contains(&name.as_str()) {
+            "Yes"
+        } else {
+            "No"
+        });
+        out.push_str(&after[flag_end..row_end]);
+        rest = &after[row_end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The import cycle with its two ledger catalogue answers (offsets 5 and 7) the
+/// V2 answer the import family reads (#1234): the same book, each
+/// ledger's `ISBILLWISEON` in the row, none of them bill-wise. Every other
+/// reader of the cycle keeps the V1 answers.
+fn import_family_cycle_plans() -> Vec<ScenarioPlan> {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    );
+    let words = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+    let catalogue = with_bill_wise_flags(
+        &String::from_utf16(&words).expect("captured native V2 catalogue"),
+        &[],
+    );
+    let mut plans = import_cycle_plans();
+    for index in [5, 7] {
+        plans[index].fixture = Fixture::SyntheticXml(catalogue.clone());
+    }
+    plans
 }
 
 fn import_cycle_plans() -> Vec<ScenarioPlan> {
@@ -2750,6 +2826,11 @@ fn refusal_reason_states_the_current_voucher_limit() {
     );
     let too_large = native_post_refusal_reason("import_post_batch_too_large", 50);
     assert!(too_large.contains("(50)"), "{too_large}");
+    let unmarked = native_post_refusal_reason("import_review_on_account_unmarked", 1);
+    assert!(
+        unmarked.contains("without its On Account mark"),
+        "{unmarked}"
+    );
     // An unlisted code keeps its own name in the warning and a neutral reason.
     let (warnings, _) =
         build_import_guidance(true, Some("import_something_new"), 1, false, false, false);
@@ -2797,8 +2878,11 @@ mod qualification_tests;
 #[path = "agent_import_bank_tests.rs"]
 mod bank_tests;
 
+#[path = "agent_import_bill_wise_build_tests.rs"]
+mod bill_wise_build_tests;
+
 fn qualified_import_cycle_plans() -> Vec<ScenarioPlan> {
-    let cycle = import_cycle_plans();
+    let cycle = import_family_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
     [
         probe.clone(),
@@ -2935,6 +3019,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         batch_id: "batch-dispatched-endpoint".into(),
         identity_scheme: Some(ImportIdentityScheme::BatchV1),
         amends_batch_id: None,
@@ -3898,6 +3983,7 @@ fn divergent_verification() -> Value {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,

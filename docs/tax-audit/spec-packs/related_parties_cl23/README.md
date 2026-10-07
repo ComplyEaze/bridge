@@ -61,9 +61,9 @@ object with three optional keys:
 
 In the reference's pack this is the client configuration's `[related_parties]` table, passed through
 verbatim; in the edge books it is the top-level key `related_parties`, and an absent key means an
-empty table. The goldens cover these shapes only. A value that is not an object, a ledger list that
-is not a list of text, or a relationship that is not text is not covered by any golden; ask before
-choosing a behaviour for it.
+empty table. The goldens cover these shapes only. A value that is not an object or a ledger list that
+is not a list of text is not covered by any golden; ask before choosing a behaviour for it. A
+relationship that is not text is refused (section 10).
 
 ### 2.5 Binding of the ledger names (before the test runs)
 
@@ -268,8 +268,8 @@ empty except where a book is built to trip them:
 
 - Persons are processed in key order by code point; natures in vocabulary order. Neither order
   shows in a dump, because figures, findings, facts, evidence and violations are all sorted
-  (parity spec section 6), but key order decides which person's figure is the duplicate when two
-  tags collide (section 10).
+  (parity spec section 6), but key order decides which person's refusal is named when more than one
+  relationship is not text (section 10).
 - Clause lists keep their authored order (section 3.1).
 
 ## 9. What the test never does
@@ -284,10 +284,17 @@ empty except where a book is built to trip them:
 
 ## 10. Not covered by any golden
 
-- **Two person keys with the same tag.** The reference stops with an error on the duplicate figure
-  id (measured with the invented keys `Person PXD` and `Person ACOW`, which share tag `773442d1`;
-  no golden is possible). A port must refuse such a table rather than merge or drop a person; ask
-  for the refusal's exact form before choosing one.
+- **Two person keys with the same tag.** For a non-empty table the reference refuses it with a typed
+  error that names the tag and every key sharing it, sorted (measured with the invented keys
+  `Person PXD` and `Person ACOW`, which share tag `773442d1`). The test returns no result and no
+  golden is possible. A port must refuse such a table rather than merge or drop a person; the exact
+  refusal form is the port's own.
+- **A relationship that is not text.** For a non-empty table the reference refuses it with a typed
+  error that names the person key. The keys are checked in sorted order, each for text before the
+  tags are compared, so a table with both a non-text relationship and a tag collision gets the
+  non-text refusal. A person whose `relationship` key is absent has the text `""`, not a refusal.
+  The test returns no result and no golden is possible; the exact refusal form is the port's own.
+  (An empty table is not refused: the test returns `applicable` `no` first.)
 - A table value of the wrong shape (section 2.2), and a voucher of unknown status (the edge-book
   shape cannot express one).
 

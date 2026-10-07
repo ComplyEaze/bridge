@@ -1699,6 +1699,7 @@ fn render_accounting_voucher_xml(
     attribution_id: Uuid,
 ) -> Result<String, String> {
     let date = normalized_date(&voucher.date)?;
+    let date = date.as_str();
     let bank = is_bank_shape(&voucher.voucher_type);
     let mut lines: Vec<&BookLedgerLine> = voucher.ledger_lines.iter().collect();
     if bank {
@@ -1817,6 +1818,7 @@ fn render_invoice_voucher_xml(
     attribution_id: Uuid,
 ) -> Result<String, String> {
     let date = normalized_date(&voucher.date)?;
+    let date = date.as_str();
     let party = voucher
         .party
         .as_deref()
@@ -2109,7 +2111,9 @@ fn voucher_already_verified(expected: &BookVoucher, observed: &[ObservedVoucher]
     // observed row is always already in that form; the ledger amount must be
     // the *signed* wire amount (§9.13's Dr-negative convention), since
     // book.json stores an unsigned magnitude plus a side.
-    let expected_date = normalized_date(&expected.date).unwrap_or_else(|_| expected.date.clone());
+    let expected_date = normalized_date(&expected.date)
+        .map(|date| date.as_str().to_string())
+        .unwrap_or_else(|_| expected.date.clone());
     let expected_marker = lab_marker_id(&expected.source_guid).to_string();
     let expected_narration_text = narration_text(expected.narration.as_deref());
     observed.iter().any(|row| {
@@ -2149,7 +2153,9 @@ fn voucher_already_verified(expected: &BookVoucher, observed: &[ObservedVoucher]
 /// the 2026-09-14 rehearsal stop (`readback_mismatch`, no field-level
 /// detail available at all).
 fn voucher_mismatch_detail(expected: &BookVoucher, observed: &[ObservedVoucher]) -> Value {
-    let expected_date = normalized_date(&expected.date).unwrap_or_else(|_| expected.date.clone());
+    let expected_date = normalized_date(&expected.date)
+        .map(|date| date.as_str().to_string())
+        .unwrap_or_else(|_| expected.date.clone());
     let expected_marker = lab_marker_id(&expected.source_guid).to_string();
     let expected_narration_text = narration_text(expected.narration.as_deref());
     let expected_number = expected.voucher_number.as_deref().unwrap_or("(none)");

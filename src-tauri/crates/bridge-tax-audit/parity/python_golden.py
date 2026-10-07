@@ -45,7 +45,11 @@ it. `statutory_dues_43b` reads the optional `[statutory_dues]` table (`nature_by
 `salary_expense_ledgers`). `partners_40b_194t` reads the optional `[partners]` table, with its `deed`
 popped out, as the reference's `partners_config` returns it. `books_examined` reads nothing beyond the
 book; the names of the documents the reference's pack loaded with the read are caller data:
-`--documents-read FILE` reads them from a JSON list of text, in the pack's order (none without it). With --read DIR, the [snapshot] table is replaced in memory by that read with
+`--documents-read FILE` reads them from a JSON list of text, in the pack's order (none without it).
+`clause21a_candidates` reads the optional `[clause21a].extra_terms` through the reference's own reader and the
+`[partners]` interest and remuneration ledgers, as the reference's pack passes them, and runs on the crate's
+vendored keyword table (`rules/clause21a_keywords.toml`), refused unless it is the reference's own file byte for
+byte (`require_vendored_clause21a_keywords`). With --read DIR, the [snapshot] table is replaced in memory by that read with
 allow_unbracketed_read = true -- the same switch the engine's own read-format parity gate applies
 -- so a legacy client config can be run against its wrapped read without editing it.
 
@@ -132,6 +136,30 @@ def _specified_persons_40a2b(c):
 def _trial_balance(c):
     from tae.audit_tests import trial_balance
     return trial_balance, trial_balance.run(c.eng, c.rules)
+
+
+CLAUSE21A_KEYWORDS = Path(__file__).resolve().parent.parent / "rules" / "clause21a_keywords.toml"
+
+
+def require_vendored_clause21a_keywords(module):
+    """The crate's keyword table (rules/clause21a_keywords.toml) is the reference's own file, byte for byte:
+    refuse to run against a reference whose table has moved on, so a golden is never made from different words."""
+    if module.KEYWORDS.read_bytes() != CLAUSE21A_KEYWORDS.read_bytes():
+        raise SystemExit("rules/clause21a_keywords.toml is not the reference's tae/rules/clause21a_keywords.toml")
+
+
+def _clause21a_candidates(c):
+    """As tae/pack.py calls it: the client's [clause21a].extra_terms through the reference's own reader, and the
+    partners' interest and remuneration ledgers from the [partners] table (the deed popped out), each kept when
+    truthy; the keyword table is the crate's copy of the reference's."""
+    from tae.audit_tests import clause21a_candidates
+    from tae.config import clause21a_extra_terms, partners_config
+    require_vendored_clause21a_keywords(clause21a_candidates)
+    partners, _deed = partners_config(c.cfg)
+    return clause21a_candidates, clause21a_candidates.run(
+        c.eng, c.rules, clause21a_extra_terms(c.cfg),
+        frozenset(led for q in partners.values() for led in (q.get("interest_ledger"), q.get("remuneration_ledger"))
+                  if led))
 
 
 def _cash_book_integrity(c):
@@ -461,6 +489,7 @@ RUNNERS = {
     "cash_44ab": _cash_44ab,
     "cash_book_integrity": _cash_book_integrity,
     "cash_payments_40a3": _cash_payments_40a3,
+    "clause21a_candidates": _clause21a_candidates,
     "counter_cheques_40a3": _counter_cheques_40a3,
     "creditor_ageing_43bh": _creditor_ageing_43bh,
     "depreciation": _depreciation,

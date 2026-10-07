@@ -28,12 +28,12 @@ use bridge_tax_audit::rules::Rules;
 use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
-    cash_book_integrity, cash_payments_40a3, counter_cheques_40a3, creditor_ageing_43bh,
-    entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t,
-    party_identity, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b,
-    stale_balances_41_1, statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as,
-    trial_balance, twentysixas_receipts, PartnersConfig, RelatedPartiesConfig, Tds26asConfig,
-    TdsConfig,
+    cash_book_integrity, cash_payments_40a3, clause21a_candidates, counter_cheques_40a3,
+    creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest,
+    partners_40b_194t, party_identity, party_monthly, read_scope, related_parties_cl23,
+    specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock, stock_read,
+    tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
+    RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -737,6 +737,25 @@ fn check(name: &str) {
                 assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
                 continue;
             }
+            "clause21a_candidates" => {
+                // As `parity/edge_golden.py` runs it: the client's extra terms through the crate's
+                // own reader of `[clause21a]`, and the partners' interest and remuneration ledgers.
+                let clause21a = s.get("clause21a_extra_terms").map(|x| {
+                    toml::Value::Table(toml::Table::from_iter([(
+                        "extra_terms".to_string(),
+                        toml_of(x),
+                    )]))
+                });
+                let extra = clause21a_candidates::extra_terms(clause21a.as_ref()).unwrap();
+                let partner_ledgers = clause21a_candidates::partner_ledgers(&partners(&s)).unwrap();
+                let r = clause21a_candidates::run(&book, &rules, &extra, &partner_ledgers).unwrap();
+                // The reference module has no check_invariants: an empty evaluated list.
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
+            }
             "read_scope" => {
                 let r = read_scope::run(&book, &rules).unwrap();
                 let rust = canonical_test_result(&book, &r, None).unwrap();
@@ -1030,13 +1049,14 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 24] = [
+const EDGE_TESTS: [&str; 25] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
     "books_examined",
     "cash_book_integrity",
     "cash_payments_40a3",
+    "clause21a_candidates",
     "counter_cheques_40a3",
     "creditor_ageing_43bh",
     "entity_269st_gap",

@@ -71,6 +71,7 @@ impl Server {
             // voucher created above the first read's AlterID ceilings refuses
             // it, where the two old-ceiling snapshots alone would still match.
             let marks = opening_read.witness.as_ref().map(|witness| witness.marks);
+            let opening_timings = opening_read.timings;
             let closing_read = self
                 .read_movement_vouchers(
                     &identity,
@@ -175,8 +176,22 @@ impl Server {
                 .collect::<Vec<_>>();
             let truncated = offset.saturating_add(rows.len()) < total;
             let next_offset = truncated.then_some(offset + rows.len());
+            let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": if opening_unobserved {"partial"} else {"complete"}, "partial_reason": opening_unobserved.then_some("opening_balance_not_observed"), "ledger_match": selected.as_ref().map(|found| found.to_json(self.settings.redaction)), "ledgers": rows, "offset": offset, "next_offset": next_offset, "voucher_rows_observed": voucher_rows_observed, "balance_basis": "tally_period_opening_plus_direct_voucher_movement", "evidence_method": "runtime_ledger_opening_at_from_plus_literal_window_entries"}});
+            // What the two window reads cost, when it is worth saying, goes in the
+            // result beside the ledgers (#1239); the replay is the second read.
+            let mut cost = json!({});
+            super::read_cost::add_read_cost_of_replayed(
+                &mut cost,
+                super::read_cost::smallest_page_len_of(&payload, "ledgers"),
+                (&opening_timings, &closing_read.timings),
+                super::read_cost::Ended::Read,
+                self.settings.max_bytes,
+            );
+            if let (Some(result), Some(cost)) = (payload["result"].as_object_mut(), cost.as_object()) {
+                result.extend(cost.iter().map(|(key, value)| (key.clone(), value.clone())));
+            }
             Ok(ToolOutcome {
-                payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": if opening_unobserved {"partial"} else {"complete"}, "partial_reason": opening_unobserved.then_some("opening_balance_not_observed"), "ledger_match": selected.as_ref().map(|found| found.to_json(self.settings.redaction)), "ledgers": rows, "offset": offset, "next_offset": next_offset, "voucher_rows_observed": voucher_rows_observed, "balance_basis": "tally_period_opening_plus_direct_voucher_movement", "evidence_method": "runtime_ledger_opening_at_from_plus_literal_window_entries"}}),
+                payload,
                 evidence: evidence.clone(),
                 company_guid: Some(guid.to_string()),
                 truncated,
@@ -248,6 +263,7 @@ impl Server {
             .await?;
         let preflight = read.preflight_evidence;
         let closing = read.closing_evidence;
+        let timings = read.timings;
         let witness = read.witness;
         let marks = witness
             .as_ref()
@@ -286,6 +302,7 @@ impl Server {
                 closing,
                 reads,
                 witness,
+                timings,
             }),
             Err(failure) => Err(failure.with_prior_evidence(
                 [preflight, Some(evidence), closing]
@@ -309,6 +326,8 @@ struct MovementWindowRead {
     reads: Vec<WindowPart>,
     /// What the corroborating replay must carry.
     witness: Option<WindowWitness>,
+    /// What this window read did, for the call's `read_cost` (#1239).
+    timings: super::voucher_window::WindowReadTimings,
 }
 
 /// Which column a ledger entry moves, taken from `AMOUNT`'s own sign.

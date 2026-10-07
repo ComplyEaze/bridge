@@ -566,6 +566,16 @@ pub(super) enum UnmatchedCause {
     /// voucher Tally rejected, and twins in one batch defeat matching by
     /// content.
     ReportedNotCreated,
+    /// A later verification, reading the saved answer of the batch's own
+    /// post: it reported every counter, `CREATED 0`, `EXCEPTIONS` equal to
+    /// the vouchers sent and every other counter zero; for a batch of two
+    /// or more, the post itself also recorded that the company's voucher
+    /// mark moved by what Tally reported creating. That is all that is
+    /// claimed. The voucher may since have been entered by hand in another
+    /// form, so it is never read as not created: it stays
+    /// `sent_not_attributed`, and its next step says what Tally reported
+    /// when it was sent (bridge#1108).
+    ReportedNotCreatedWhenSent,
     /// Anything else, including no recorded answer: an edit in Tally is as
     /// likely as absence, so the voucher is `sent_not_attributed`.
     NotEstablished,
@@ -590,8 +600,21 @@ pub(super) fn unmatched_cause(
         return UnmatchedCause::NotEstablished;
     };
     let step_confirms = sent == 1 || voucher_step == Some(0);
-    if sent >= 1
-        && step_confirms
+    if step_confirms && answer_reported_none_created(counters, sent) && unmatched == sent {
+        UnmatchedCause::ReportedNotCreated
+    } else {
+        UnmatchedCause::NotEstablished
+    }
+}
+
+/// Whether a post's answer has the captured shape of a post Tally rejected
+/// whole: every counter reported, `CREATED 0`, `EXCEPTIONS` equal to the
+/// `sent` vouchers and every other counter zero (§9.2; bridge#1108).
+fn answer_reported_none_created(
+    counters: &bridge_tally_protocol::TallyImportResult,
+    sent: u64,
+) -> bool {
+    sent >= 1
         && counters.counter_presence.all_reported()
         && counters.created == 0
         && counters.altered == 0
@@ -600,11 +623,27 @@ pub(super) fn unmatched_cause(
         && counters.errors == 0
         && counters.cancelled == 0
         && counters.exceptions == sent
-        && unmatched == sent
-    {
-        UnmatchedCause::ReportedNotCreated
-    } else {
-        UnmatchedCause::NotEstablished
+}
+
+/// The cause for vouchers a LATER verification of a post of `sent` cannot
+/// find, from what that post left on record: the saved answer's shape and,
+/// for a batch of two or more, `step_matched`, the post's own verdict that
+/// the company's voucher mark moved by what Tally reported creating (the
+/// same guard the post's own readback applies, read from its record because
+/// the mark may have moved since for other reasons). A voucher may have been
+/// entered by hand since, so nothing here is read as not created.
+pub(super) fn later_unmatched_cause(
+    counters: Option<&bridge_tally_protocol::TallyImportResult>,
+    sent: usize,
+    step_matched: bool,
+) -> UnmatchedCause {
+    match (counters, u64::try_from(sent)) {
+        (Some(counters), Ok(sent))
+            if (sent == 1 || step_matched) && answer_reported_none_created(counters, sent) =>
+        {
+            UnmatchedCause::ReportedNotCreatedWhenSent
+        }
+        _ => UnmatchedCause::NotEstablished,
     }
 }
 
@@ -644,13 +683,34 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
     }
 }
 
+/// The next step of a voucher a later verification cannot find when the saved
+/// answer of its post reported it as not created
+/// (`UnmatchedCause::ReportedNotCreatedWhenSent`).
+pub(super) const REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP: &str = "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered by hand with a different date, voucher type, ledger or amount: look for it in Tally first, and enter it in Tally's voucher entry screen only if it is not there; do not import its file through Tally's Import menu. ComplyEaze Bridge will not send this saved voucher again.";
+
+/// Rewrites a later verification of a post whose saved answer reported its
+/// vouchers as not created: a voucher not found by its content stays
+/// `sent_not_attributed`, never `not_found`, with the next step that says
+/// what Tally reported when it was sent.
+pub(super) fn mark_sent_after_reported_not_created(result: &mut Value) {
+    mark_not_found_with(
+        result,
+        "sent_not_attributed",
+        Some(REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP),
+    );
+}
+
 fn mark_not_found_as(result: &mut Value, status: &str) {
+    mark_not_found_with(result, status, plain_next_step(status));
+}
+
+fn mark_not_found_with(result: &mut Value, status: &str, next_step: Option<&str>) {
     let mut moved = 0_u64;
     if let Some(vouchers) = result["vouchers"].as_array_mut() {
         for voucher in vouchers {
             if voucher["status"] == "not_found" || voucher["status"] == "bound_not_in_window" {
                 voucher["status"] = json!(status);
-                voucher["next_step"] = json!(plain_next_step(status));
+                voucher["next_step"] = json!(next_step);
                 moved += 1;
             }
         }

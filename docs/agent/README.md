@@ -1651,9 +1651,16 @@ counted, and none of them is found, they are `tally_reported_not_created`
 instead (bridge#1108). For a batch this also needs the company's voucher mark
 read on both sides of the post and unmoved. The person is told to check that
 each is not in Tally and enter it there by hand, not through Tally's Import
-menu. A later `verify_import` never reads the post's answer, since someone may
-have entered a voucher by hand and edited it since: it reads
-`sent_not_attributed`. A partly created batch is never read as not created: a
+menu. A later check (`verify_import`, a repeated `post_import`, or the check
+before a review is recorded) never reads a voucher as not created, since
+someone may have entered it by hand and edited it since: it reads
+`sent_not_attributed`. When the post's saved answer had that shape (every
+counter reported, none created, one exception for each voucher sent, nothing
+else counted), and for a batch the post itself recorded its voucher step as
+matching, the `next_step` of each voucher the check cannot find says that
+Tally reported the voucher as not created when it was sent, and to look for it
+in Tally before entering it by hand; the status and the batch's state are the
+same. A partly created batch is never read as not created: a
 count does not say which voucher Tally rejected, and two vouchers of one batch
 with the same content defeat matching by content. A binding refusal is final: an
 edit to one voucher of a batch in Tally before the binding is made

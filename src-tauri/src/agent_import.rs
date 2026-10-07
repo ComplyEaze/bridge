@@ -1496,27 +1496,41 @@ impl Server {
                 // Tally created none of its vouchers and none is found (for a
                 // batch, with the voucher mark measured unmoved), say so
                 // (bridge#1108); otherwise an edit in Tally is as likely. Only
-                // the post's own readback reads that answer: by a later
-                // verification someone may have entered a voucher by hand and
-                // edited it.
-                let counters = current_dispatch
-                    .then(|| {
-                        dispatch_response
-                            .as_ref()
-                            .and_then(|response| response.outcome.as_ref())
-                            .map(|outcome| outcome.counters())
-                    })
-                    .flatten();
-                let voucher_step =
-                    verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark);
-                match verification::unmatched_cause(
-                    counters,
-                    line.vouchers.len(),
-                    verification::unmatched_count(&result),
-                    voucher_step,
-                ) {
+                // the post's own readback reads a voucher as not created: by
+                // a later verification someone may have entered it by hand
+                // and edited it, so a later one keeps `sent_not_attributed`
+                // and only says, in the voucher's next step, what that answer
+                // reported when the voucher was sent.
+                let answer = dispatch_response
+                    .as_ref()
+                    .and_then(|response| response.outcome.as_ref())
+                    .map(|outcome| outcome.counters());
+                let cause = if current_dispatch {
+                    verification::unmatched_cause(
+                        answer,
+                        line.vouchers.len(),
+                        verification::unmatched_count(&result),
+                        verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark),
+                    )
+                } else {
+                    // The post's own verdict on its voucher step, for a batch.
+                    // Read only where it decides, and never a way for this
+                    // check to fail: no record reads as not matched.
+                    let step_matched = answer.is_some()
+                        && line.vouchers.len() > 1
+                        && self
+                            .imports_dir()
+                            .ok()
+                            .and_then(|imports| read_masters_check(&imports, &line.batch_id))
+                            .is_some_and(|check| check["batch_step"]["state"] == "matched");
+                    verification::later_unmatched_cause(answer, line.vouchers.len(), step_matched)
+                };
+                match cause {
                     verification::UnmatchedCause::ReportedNotCreated => {
                         verification::mark_reported_not_created(&mut result)
+                    }
+                    verification::UnmatchedCause::ReportedNotCreatedWhenSent => {
+                        verification::mark_sent_after_reported_not_created(&mut result)
                     }
                     verification::UnmatchedCause::NotEstablished => {
                         verification::mark_sent_not_attributed(&mut result)

@@ -249,6 +249,12 @@ Contra vouchers, and 5 Journals).
   needs the voucher mark measured unmoved across the post. It reads
   Tally's answer together with that absence and, like
   `sent_not_attributed`, sits outside the absence qualification gate. A
+  later verification never gives that status: a voucher it cannot find
+  stays `sent_not_attributed`, and when the post's saved answer had that
+  counter shape its next step says what Tally reported when the voucher
+  was sent. For a batch it also needs the post's own recorded verdict
+  that its voucher step matched what Tally reported creating; the mark is
+  not read again for this, since it may have moved for other reasons. A
   refusal is final, so an edit made in Tally to one voucher
   before a deferred bind refuses the binding of the whole batch.
 - **Known limits:** identical twins are bound by position alone, since they

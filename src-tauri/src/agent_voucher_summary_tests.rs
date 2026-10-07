@@ -1004,6 +1004,7 @@ fn the_live_primary_group_buckets_add_the_group_buckets_under_each_primary_group
             bridge_tally_core::ExactDecimal,
         ),
     > = BTreeMap::new();
+    assert!(!by_group.is_empty(), "the live window has group buckets");
     for bucket in &by_group {
         let entry = want
             .entry(primary_of(bucket["group"].as_str().unwrap()))
@@ -1022,6 +1023,7 @@ fn the_live_primary_group_buckets_add_the_group_buckets_under_each_primary_group
             .checked_add(&decimal(bucket["credit"].as_str().unwrap()))
             .unwrap();
     }
+    assert!(!primary.is_empty(), "the live window has primary buckets");
     assert_eq!(primary.len(), want.len());
     for bucket in &primary {
         let name = bucket["group"].as_str().unwrap();
@@ -1073,8 +1075,9 @@ fn a_group_bucket_names_its_chain_and_members_that_add_up_to_it() {
     for bucket in &buckets {
         let members = bucket["members"].as_array().unwrap();
         let total = bucket["members_total"].as_u64().unwrap() as usize;
-        assert_eq!(bucket["members_complete"], total <= MAX_MEMBERS_PER_BUCKET);
-        assert_eq!(members.len(), total.min(MAX_MEMBERS_PER_BUCKET));
+        // The bound is written out, not read from the constant under test.
+        assert_eq!(bucket["members_complete"], total <= 10);
+        assert_eq!(members.len(), total.min(10));
         if bucket["members_complete"] == true {
             let (mut debit, mut credit) = (
                 bridge_tally_core::ExactDecimal::zero(),
@@ -1394,6 +1397,34 @@ fn presented_name(bucket: &Value) -> String {
         .as_str()
         .unwrap()
         .to_string()
+}
+
+const LIVE_GROUP_ANSWERS: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-shape-lab-fy.group-live-answers.json"
+);
+
+/// The two group modes over the committed rows and snapshots give, bucket for bucket, what the live calls of
+/// 7 October 2026 answered (`vouchers-shape-lab-fy-groups.PROVENANCE.md`). Fail-first: before the placement
+/// and the group modes existed there was no such answer to give.
+#[test]
+fn the_group_summaries_equal_the_answers_of_the_live_calls() {
+    let live: Value =
+        serde_json::from_str(LIVE_GROUP_ANSWERS).expect("the live group answers parse");
+    let by_group = live_group_summary(SummaryGroup::Group);
+    assert_equals_live(&by_group, &live["group"], "group");
+    assert_eq!(
+        Value::Array(by_group.subtree_totals.clone()),
+        live["group"]["subtree_totals"],
+        "group: subtree totals"
+    );
+    assert_eq!(
+        json!(by_group.subtree_total_count),
+        live["group"]["subtree_totals_total"]
+    );
+    assert_eq!(by_group.buckets.len(), 12);
+    let by_primary = live_group_summary(SummaryGroup::PrimaryGroup);
+    assert_equals_live(&by_primary, &live["primary_group"], "primary_group");
+    assert_eq!(by_primary.buckets.len(), 8);
 }
 
 #[test]

@@ -431,6 +431,21 @@ fn a_chain_whose_top_group_has_no_parent_is_not_taken_for_one_under_the_root() {
 }
 
 #[test]
+fn each_walk_gap_has_its_own_code() {
+    for (gap, code) in [
+        (AncestryGap::NoParent, "no_parent"),
+        (AncestryGap::ReachedRoot, "reached_root"),
+        (AncestryGap::GroupAbsent, "group_absent"),
+        (AncestryGap::GroupNameRepeated, "group_name_repeated"),
+        (AncestryGap::ReservedNameMissing, "reserved_name_missing"),
+        (AncestryGap::Cycle, "cycle"),
+        (AncestryGap::Exhausted, "exhausted"),
+    ] {
+        assert_eq!(gap_code(gap), code);
+    }
+}
+
+#[test]
 fn every_code_a_refusal_can_carry_survives_the_trip_through_text() {
     // A refusal's cause travels as text and comes back through `static_gap_code`; a code missing
     // from that list would read as `unknown`.

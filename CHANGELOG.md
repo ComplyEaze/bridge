@@ -54,8 +54,14 @@ These changes are in source and not yet in a published build.
   `trial_balance` for the same year, and each search returned what the same
   criterion selects from the listing; it did not cover a large book, a memorandum,
   a reversing journal or a voucher withheld for a foreign-currency amount. That check
-  covered search and the ledger, month and voucher-type summaries; the group and
-  primary-group summaries have not been run against a live Tally (#1230).
+  covered search and the ledger, month and voucher-type summaries. A second check on
+  7 October 2026 on the same book read the whole year once as `group` and once as
+  `primary_group`: 12 and 8 buckets over the 64 vouchers that count (a cancelled, an optional and
+  an entry-less voucher left out); every group bucket equalled the ledger buckets added up by the
+  trial balance's own parent column, the 18 `subtree_totals` equalled the trial balance rolled up
+  the group tree, and each call took 64 requests (the window's 34 and the group modes' 30) and
+  about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
+  read, or a held later page (#1230).
 
 **Safer or fixed**
 

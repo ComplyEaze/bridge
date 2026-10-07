@@ -1137,7 +1137,7 @@ each other.
     every group above it), so they do not add up to `totals`. Every page carries them. When
     `subtree_totals_complete` is false the groups past the 60th are not in the answer: the groups
     directly under the root are all in `primary_group`, and any other group's figure is the sum of
-    its member ledgers' buckets (read with `ledger`, or narrow the window).
+    its member ledgers' buckets (sum them from a `summarise_by: ledger` call, or narrow the window).
   - A `group` bucket carries `reserved_name` (empty for a group the book's user made), `chain`
     (every group from it up to the one under the root, nearest first, each with `name` and
     `reserved_name`) and `primary_group`. A user group is its own bucket, however deep it sits.
@@ -1188,13 +1188,28 @@ each other.
     the cheaper read.
   - A later page comes from the held window with the placements it was read with, so it reads no
     masters.
-  - Not measured live: the group summaries have not been run against a live Tally. The tests use a
-    live ledger catalogue and group snapshot of the synthetic book and the same book's
-    `trial_balance` (its parent column comes from the same ledger collection, so it checks the
-    placement logic, while its amounts are independent), and scripted answers for the call itself,
-    with a group snapshot derived from the live one for the end-to-end tests.
+  - Checked once against a live Tally, and what was not (see the paragraph below): one run on one
+    synthetic book. The tests also use a live ledger catalogue and group snapshot of that book and
+    the same book's `trial_balance` (its parent column comes from the same ledger collection, so it
+    checks the placement logic, while its amounts are independent), and scripted answers for the
+    call itself, with a group snapshot derived from the live one for the end-to-end tests. Not
+    measured: a large book, a group renamed or moved while a window is read, a held later page, the
+    drift refusals.
 
 A summary over a `partial` window is only as complete as that window: `state` and `reason` say which, and `basis` does not repeat them.
+
+**Group summaries checked once against a live Tally** (7 October 2026; TallyPrime 7.1 Silver; a debug build of the
+pull request's head, which is not in a published build, with the response budget raised to 2,000,000; the
+synthetic book of 67 vouchers read above, plus one voucher dated after its year; read-only, one request at a
+time). `summarise_by: group` over the year: `complete`, 12 buckets, 64 vouchers summarised, with exclusions
+`cancelled` 1, `no_accounting_entries` 1 and `optional` 1 (together the book's 67), 18 `subtree_totals`. Every
+bucket's debit, credit and voucher count equalled the first run's ledger buckets added up by the trial
+balance's own parent column; `totals`, `vouchers_summarised` and the exclusions equalled that run's; the
+`subtree_totals` equalled the trial balance rolled up the group tree; each `chain`, `primary_group` and
+`members` list agreed with the book's group tree. `summarise_by: primary_group`: `complete`, 8 buckets, the
+same 64 vouchers and totals. Cost: 64 requests a call (34 for the window and 30 for the group modes, as
+counted from the code), about 10.6 and 11.1 seconds; the answers were 45 KB and 24 KB. One run each, a debug
+build; no large book, no group renamed or moved while a window was read, no held later page.
 
 **Checked once against a live Tally** (6 October 2026; TallyPrime 7.1 Silver; a debug build of master at
 4c30f3f9f, which is not in a published build, with the response budget raised to 2,000,000 (the largest

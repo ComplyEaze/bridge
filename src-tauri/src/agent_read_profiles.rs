@@ -185,7 +185,7 @@ fn render_windowed_vouchers(
 /// The FETCH list for LAB-ONLY inventory-entry reads (`lab_read_inventory`,
 /// feature `lab-writes`). Unlike [`AGENT_VOUCHER_FETCH`], this asks for
 /// `ALLINVENTORYENTRIES.*` instead of `ALLLEDGERENTRIES.*` -- no shipped tool
-/// reads inventory today (see the plan-research note §4.2), so this shape is
+/// reads voucher inventory entries today, so this shape is
 /// exploratory pending a live capture, not a qualified/compatibility-evidenced
 /// read.
 #[cfg(feature = "lab-writes")]

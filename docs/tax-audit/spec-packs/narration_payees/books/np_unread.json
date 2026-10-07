@@ -1,0 +1,1025 @@
+{
+ "comment": "Narrations that name no payee: fifty-nine payments of Wages from Bank A, none read, so there is no payee row; all are in unresolved_bank_total (97105 paise) and in the one finding, recipient_not_read. First UPI layout: u01 no hyphen after the name; u02 an empty name; u03 a name starting with a digit; u04 a space before the name; u05 a space before the first hyphen; u06 an underscore, u07 a slash and u08 a comma in the name; u09 text before UPI-; u10 slashes in place of hyphens; u11 no hyphen after UPI. IMPS: u12 text before IMPS-; u20 no reference; u21 a space and u22 a letter in the reference; u23 no hyphen after the name; u24 a name starting with a digit; u25 a space in place of the first hyphen. NEFT: u30 CR in place of DR; u31 an empty code; u32 a space in the code; u33 no hyphen after the name; u34 no DR; u35 a space before the hyphen after DR; u36 another word in place of NEFT; u37 NEFT-SELF; u38 text before NEFT. Second UPI layout: u40 (Bank Acc) and u41 (Phone Pe, in lower and mixed case) are the two placeholders, 3134 paise together in placeholder_payee_total; u42 a name field of digits; u43 an empty reference; u44 a letter in the reference; u45 CR in place of DR; u46 no slash after the name; u47 an empty name field; u48 a space before the hyphen; u49 a transfer with no UPI part; u50 NEFT in place of UPI; u51 a name field of one space; u52 text before TO TRANSFER. Cheque: u60 SELF; u61 SELF after WITHDRAWAL BY; u62 a name that only begins with SELF (SELFMADE MILLS); u63 CASH PAID TO and a name; u64 a name that only begins with CASH PAID TO (CASH PAID TOWER); u65 an ampersand, u66 a digit and u67 an apostrophe in the name; u68 two hyphens; u69 a name starting with a full stop; u70 CHQ RETURN; u71 no hyphen; u72 a digit after WITHDRAWAL BY; u73 no name; u74 a digit before the name. Others: u80 an empty narration, u81 no narration, u82 spaces only, u83 a narration in no form read.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_unread-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_unread-001"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_unread-002"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 97105,
+   "closing": -97105
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 97105,
+   "credit": 0,
+   "closing": 97105
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "u01",
+   "date": "2025-04-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS",
+   "lines": [
+    [
+     "Wages",
+     101
+    ],
+    [
+     "Bank A",
+     -101
+    ]
+   ]
+  },
+  {
+   "guid": "u02",
+   "date": "2025-04-03",
+   "base_type": "Payment",
+   "narration": "UPI--ALPHA.T@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     155
+    ],
+    [
+     "Bank A",
+     -155
+    ]
+   ]
+  },
+  {
+   "guid": "u03",
+   "date": "2025-04-04",
+   "base_type": "Payment",
+   "narration": "UPI-9 STAR-WAGES",
+   "lines": [
+    [
+     "Wages",
+     211
+    ],
+    [
+     "Bank A",
+     -211
+    ]
+   ]
+  },
+  {
+   "guid": "u04",
+   "date": "2025-04-05",
+   "base_type": "Payment",
+   "narration": "UPI- ALPHA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     269
+    ],
+    [
+     "Bank A",
+     -269
+    ]
+   ]
+  },
+  {
+   "guid": "u05",
+   "date": "2025-04-06",
+   "base_type": "Payment",
+   "narration": "UPI -ALPHA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     329
+    ],
+    [
+     "Bank A",
+     -329
+    ]
+   ]
+  },
+  {
+   "guid": "u06",
+   "date": "2025-04-07",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA_T-WAGES",
+   "lines": [
+    [
+     "Wages",
+     374
+    ],
+    [
+     "Bank A",
+     -374
+    ]
+   ]
+  },
+  {
+   "guid": "u07",
+   "date": "2025-04-08",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA/T-WAGES",
+   "lines": [
+    [
+     "Wages",
+     421
+    ],
+    [
+     "Bank A",
+     -421
+    ]
+   ]
+  },
+  {
+   "guid": "u08",
+   "date": "2025-04-09",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA,T-WAGES",
+   "lines": [
+    [
+     "Wages",
+     487
+    ],
+    [
+     "Bank A",
+     -487
+    ]
+   ]
+  },
+  {
+   "guid": "u09",
+   "date": "2025-04-10",
+   "base_type": "Payment",
+   "narration": "PAID UPI-ALPHA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     538
+    ],
+    [
+     "Bank A",
+     -538
+    ]
+   ]
+  },
+  {
+   "guid": "u10",
+   "date": "2025-04-11",
+   "base_type": "Payment",
+   "narration": "UPI/ALPHA/WAGES",
+   "lines": [
+    [
+     "Wages",
+     591
+    ],
+    [
+     "Bank A",
+     -591
+    ]
+   ]
+  },
+  {
+   "guid": "u11",
+   "date": "2025-04-12",
+   "base_type": "Payment",
+   "narration": "UPIALPHA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     646
+    ],
+    [
+     "Bank A",
+     -646
+    ]
+   ]
+  },
+  {
+   "guid": "u12",
+   "date": "2025-04-13",
+   "base_type": "Payment",
+   "narration": "REF IMPS-4021-BETA STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     686
+    ],
+    [
+     "Bank A",
+     -686
+    ]
+   ]
+  },
+  {
+   "guid": "u20",
+   "date": "2025-04-14",
+   "base_type": "Payment",
+   "narration": "IMPS-BETA STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     745
+    ],
+    [
+     "Bank A",
+     -745
+    ]
+   ]
+  },
+  {
+   "guid": "u21",
+   "date": "2025-04-15",
+   "base_type": "Payment",
+   "narration": "IMPS-40 21-BETA STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     806
+    ],
+    [
+     "Bank A",
+     -806
+    ]
+   ]
+  },
+  {
+   "guid": "u22",
+   "date": "2025-04-16",
+   "base_type": "Payment",
+   "narration": "IMPS-A40-BETA STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     852
+    ],
+    [
+     "Bank A",
+     -852
+    ]
+   ]
+  },
+  {
+   "guid": "u23",
+   "date": "2025-04-17",
+   "base_type": "Payment",
+   "narration": "IMPS-4021-BETA STORES",
+   "lines": [
+    [
+     "Wages",
+     900
+    ],
+    [
+     "Bank A",
+     -900
+    ]
+   ]
+  },
+  {
+   "guid": "u24",
+   "date": "2025-04-18",
+   "base_type": "Payment",
+   "narration": "IMPS-4021-7 STAR-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     950
+    ],
+    [
+     "Bank A",
+     -950
+    ]
+   ]
+  },
+  {
+   "guid": "u25",
+   "date": "2025-04-19",
+   "base_type": "Payment",
+   "narration": "IMPS 4021-BETA STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1002
+    ],
+    [
+     "Bank A",
+     -1002
+    ]
+   ]
+  },
+  {
+   "guid": "u30",
+   "date": "2025-04-20",
+   "base_type": "Payment",
+   "narration": "NEFT CR-ZZBK77-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     1056
+    ],
+    [
+     "Bank A",
+     -1056
+    ]
+   ]
+  },
+  {
+   "guid": "u31",
+   "date": "2025-04-21",
+   "base_type": "Payment",
+   "narration": "NEFT DR--GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     1112
+    ],
+    [
+     "Bank A",
+     -1112
+    ]
+   ]
+  },
+  {
+   "guid": "u32",
+   "date": "2025-04-22",
+   "base_type": "Payment",
+   "narration": "NEFT DR-ZZ BK-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     1170
+    ],
+    [
+     "Bank A",
+     -1170
+    ]
+   ]
+  },
+  {
+   "guid": "u33",
+   "date": "2025-04-23",
+   "base_type": "Payment",
+   "narration": "NEFT DR-ZZBK77-GAMMA MILLS",
+   "lines": [
+    [
+     "Wages",
+     1230
+    ],
+    [
+     "Bank A",
+     -1230
+    ]
+   ]
+  },
+  {
+   "guid": "u34",
+   "date": "2025-04-24",
+   "base_type": "Payment",
+   "narration": "NEFT-ZZBK77-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     1275
+    ],
+    [
+     "Bank A",
+     -1275
+    ]
+   ]
+  },
+  {
+   "guid": "u35",
+   "date": "2025-04-25",
+   "base_type": "Payment",
+   "narration": "NEFT DR -ZZBK77-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     1322
+    ],
+    [
+     "Bank A",
+     -1322
+    ]
+   ]
+  },
+  {
+   "guid": "u36",
+   "date": "2025-04-26",
+   "base_type": "Payment",
+   "narration": "IFT DR-ZZBK77-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     1388
+    ],
+    [
+     "Bank A",
+     -1388
+    ]
+   ]
+  },
+  {
+   "guid": "u37",
+   "date": "2025-04-27",
+   "base_type": "Payment",
+   "narration": "NEFT-SELF",
+   "lines": [
+    [
+     "Wages",
+     1439
+    ],
+    [
+     "Bank A",
+     -1439
+    ]
+   ]
+  },
+  {
+   "guid": "u38",
+   "date": "2025-04-28",
+   "base_type": "Payment",
+   "narration": "BY NEFT DR-ZZBK77-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     1492
+    ],
+    [
+     "Bank A",
+     -1492
+    ]
+   ]
+  },
+  {
+   "guid": "u40",
+   "date": "2025-05-01",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/BANK ACC/ZZBK/DELTAWORKS/PAY",
+   "lines": [
+    [
+     "Wages",
+     1547
+    ],
+    [
+     "Bank A",
+     -1547
+    ]
+   ]
+  },
+  {
+   "guid": "u41",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "to transfer-upi/dr/5 12/Phone Pe/zzbk/billpay/pay",
+   "lines": [
+    [
+     "Wages",
+     1587
+    ],
+    [
+     "Bank A",
+     -1587
+    ]
+   ]
+  },
+  {
+   "guid": "u42",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/40 217/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1646
+    ],
+    [
+     "Bank A",
+     -1646
+    ]
+   ]
+  },
+  {
+   "guid": "u43",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR//DELTA/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1707
+    ],
+    [
+     "Bank A",
+     -1707
+    ]
+   ]
+  },
+  {
+   "guid": "u44",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5A/DELTA/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1753
+    ],
+    [
+     "Bank A",
+     -1753
+    ]
+   ]
+  },
+  {
+   "guid": "u45",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/CR/5/DELTA/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1801
+    ],
+    [
+     "Bank A",
+     -1801
+    ]
+   ]
+  },
+  {
+   "guid": "u46",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/DELTA",
+   "lines": [
+    [
+     "Wages",
+     1851
+    ],
+    [
+     "Bank A",
+     -1851
+    ]
+   ]
+  },
+  {
+   "guid": "u47",
+   "date": "2025-05-08",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5//ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1903
+    ],
+    [
+     "Bank A",
+     -1903
+    ]
+   ]
+  },
+  {
+   "guid": "u48",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER -UPI/DR/5/DELTA/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1957
+    ],
+    [
+     "Bank A",
+     -1957
+    ]
+   ]
+  },
+  {
+   "guid": "u49",
+   "date": "2025-05-10",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-INB RENT",
+   "lines": [
+    [
+     "Wages",
+     2013
+    ],
+    [
+     "Bank A",
+     -2013
+    ]
+   ]
+  },
+  {
+   "guid": "u50",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-NEFT/DR/5/DELTA/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2071
+    ],
+    [
+     "Bank A",
+     -2071
+    ]
+   ]
+  },
+  {
+   "guid": "u51",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/ /ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2131
+    ],
+    [
+     "Bank A",
+     -2131
+    ]
+   ]
+  },
+  {
+   "guid": "u52",
+   "date": "2025-05-13",
+   "base_type": "Payment",
+   "narration": "BY TO TRANSFER-UPI/DR/5/DELTA/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2176
+    ],
+    [
+     "Bank A",
+     -2176
+    ]
+   ]
+  },
+  {
+   "guid": "u60",
+   "date": "2025-05-14",
+   "base_type": "Payment",
+   "narration": "SELF - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2223
+    ],
+    [
+     "Bank A",
+     -2223
+    ]
+   ]
+  },
+  {
+   "guid": "u61",
+   "date": "2025-05-15",
+   "base_type": "Payment",
+   "narration": "WITHDRAWAL BY SELF - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2289
+    ],
+    [
+     "Bank A",
+     -2289
+    ]
+   ]
+  },
+  {
+   "guid": "u62",
+   "date": "2025-05-16",
+   "base_type": "Payment",
+   "narration": "SELFMADE MILLS - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2340
+    ],
+    [
+     "Bank A",
+     -2340
+    ]
+   ]
+  },
+  {
+   "guid": "u63",
+   "date": "2025-05-17",
+   "base_type": "Payment",
+   "narration": "CASH PAID TO EPSILON - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2393
+    ],
+    [
+     "Bank A",
+     -2393
+    ]
+   ]
+  },
+  {
+   "guid": "u64",
+   "date": "2025-05-18",
+   "base_type": "Payment",
+   "narration": "CASH PAID TOWER - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2448
+    ],
+    [
+     "Bank A",
+     -2448
+    ]
+   ]
+  },
+  {
+   "guid": "u65",
+   "date": "2025-05-19",
+   "base_type": "Payment",
+   "narration": "ZETA & SONS - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2488
+    ],
+    [
+     "Bank A",
+     -2488
+    ]
+   ]
+  },
+  {
+   "guid": "u66",
+   "date": "2025-05-20",
+   "base_type": "Payment",
+   "narration": "ZETA 2 - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2547
+    ],
+    [
+     "Bank A",
+     -2547
+    ]
+   ]
+  },
+  {
+   "guid": "u67",
+   "date": "2025-05-21",
+   "base_type": "Payment",
+   "narration": "ZETA'S - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2608
+    ],
+    [
+     "Bank A",
+     -2608
+    ]
+   ]
+  },
+  {
+   "guid": "u68",
+   "date": "2025-05-22",
+   "base_type": "Payment",
+   "narration": "ZETA - ETA - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2654
+    ],
+    [
+     "Bank A",
+     -2654
+    ]
+   ]
+  },
+  {
+   "guid": "u69",
+   "date": "2025-05-23",
+   "base_type": "Payment",
+   "narration": ".ZETA - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2702
+    ],
+    [
+     "Bank A",
+     -2702
+    ]
+   ]
+  },
+  {
+   "guid": "u70",
+   "date": "2025-05-24",
+   "base_type": "Payment",
+   "narration": "ZETA - CHQ RETURN",
+   "lines": [
+    [
+     "Wages",
+     2752
+    ],
+    [
+     "Bank A",
+     -2752
+    ]
+   ]
+  },
+  {
+   "guid": "u71",
+   "date": "2025-05-25",
+   "base_type": "Payment",
+   "narration": "ZETA CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2804
+    ],
+    [
+     "Bank A",
+     -2804
+    ]
+   ]
+  },
+  {
+   "guid": "u72",
+   "date": "2025-05-26",
+   "base_type": "Payment",
+   "narration": "WITHDRAWAL BY 7 - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2858
+    ],
+    [
+     "Bank A",
+     -2858
+    ]
+   ]
+  },
+  {
+   "guid": "u73",
+   "date": "2025-05-27",
+   "base_type": "Payment",
+   "narration": " - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2914
+    ],
+    [
+     "Bank A",
+     -2914
+    ]
+   ]
+  },
+  {
+   "guid": "u74",
+   "date": "2025-05-28",
+   "base_type": "Payment",
+   "narration": "7 ZETA - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2972
+    ],
+    [
+     "Bank A",
+     -2972
+    ]
+   ]
+  },
+  {
+   "guid": "u80",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "",
+   "lines": [
+    [
+     "Wages",
+     3032
+    ],
+    [
+     "Bank A",
+     -3032
+    ]
+   ]
+  },
+  {
+   "guid": "u81",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     3077
+    ],
+    [
+     "Bank A",
+     -3077
+    ]
+   ]
+  },
+  {
+   "guid": "u82",
+   "date": "2025-06-03",
+   "base_type": "Payment",
+   "narration": "   ",
+   "lines": [
+    [
+     "Wages",
+     3124
+    ],
+    [
+     "Bank A",
+     -3124
+    ]
+   ]
+  },
+  {
+   "guid": "u83",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "narration": "ACH DEBIT ZETA",
+   "lines": [
+    [
+     "Wages",
+     3190
+    ],
+    [
+     "Bank A",
+     -3190
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

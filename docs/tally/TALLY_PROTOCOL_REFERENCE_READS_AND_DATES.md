@@ -692,10 +692,10 @@ same head, and folding one into the other would hide which spelling a book uses.
 
 **`SGST/UTGST` was measured on 2026-09-30 by writing it.** A raw `ACTION="Create"` master import of
 one ledger under Duties & Taxes with `TAXTYPE` `GST` and `GSTDUTYHEAD` literally `SGST/UTGST` was
-answered `CREATED=1 ERRORS=0` (recorded in the session log, not retained here). The read-back is
+answered `CREATED=1 ERRORS=0` (not retained here). The read-back is
 what this repository retains: the second capture returns `SGST/UTGST` verbatim with `TAXTYPE` `GST`
 on two ledgers. The value was not among the spellings tried on 2026-09-12 (`SGST` and six others,
-all silently dropped; recorded in the lane's notes, not retained here). Not established: whether
+all silently dropped; not retained here). Not established: whether
 Tally's own screens offer that spelling, or which books carry it.
 
 **`TAXTYPE` qualifies the head and the two can contradict.** Four states, and all four are

@@ -811,7 +811,11 @@ impl Server {
             admit_build_binding(line.ledger_identities.as_deref(), &ledger_binding).map_err(
                 |refusal| {
                     if let BuildBindingRefusal::Changed(ledgers) = &refusal {
-                        ledgers_changed = Some(ledgers.clone());
+                        // Before the list is cut to the few a refusal names.
+                        ledgers_changed =
+                            Some(in_batch_order(ledgers.clone(), &payload, |ledger| {
+                                ledger.as_str()
+                            }));
                     }
                     ToolFailure::from(refusal.code().to_string())
                 },

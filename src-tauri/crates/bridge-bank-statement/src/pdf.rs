@@ -23,8 +23,19 @@
 //!   a non-embedded base-14 font and takes its ascent from that face, where
 //!   poppler uses the standard AFM metrics. A shift that is uniform within a
 //!   font changes neither line grouping nor anchors; a line mixing two
-//!   non-embedded fonts could group differently from `pdftotext`, which the
-//!   balance replay would then have to catch. Embedded fonts were not measured.
+//!   non-embedded fonts could group differently from `pdftotext`. What would
+//!   catch that depends on what the difference reaches. The balance replay
+//!   proves amounts, and for SBI and HDFC so do the printed control totals
+//!   (Union Bank prints none). The date parse refuses a date cell holding
+//!   anything but one well-formed date, the account-number line has a refusal
+//!   of its own, and so does Union Bank's page footer. Nothing proves narration
+//!   or reference text: words a grouping difference moves into a narration
+//!   change the row's transaction identity (which hashes the narration); words
+//!   moved into a narration or a reference cell can change the party or
+//!   reference read from the row; and no amount check sees either. In #1310
+//!   the statement-period line was refused only because two of its words fell
+//!   in the date column; the same line's dates entering the narration went
+//!   unseen. Embedded fonts were not measured.
 //!
 //! Coordinates are converted to the top-left page space of `pdftotext`,
 //! relative to the crop box (or the media box when a page has no crop box).
@@ -244,7 +255,36 @@ pub fn extract_pages(engine: &PdfEngine, pdf: &[u8], password: &str) -> Result<V
         });
         out.push(assemble_words(glyphs));
     }
+    require_readable_text(&out)?;
     Ok(out)
+}
+
+/// Refuse a document whose words carry no numeric character at all: a scan, a
+/// printout with glyphs drawn as paths, or a scan with only a scanner app's
+/// stamp. Such a document would otherwise be refused further on under a name
+/// that points at the wrong fix (`no_account_number_line` or
+/// `page_sequence_unproven`).
+///
+/// Judged on the whole document, so an image-only terms page inside a bank PDF
+/// does not trigger it. A numeric character (Unicode Nd, Nl or No, a superset of
+/// what the account check's `\d` reads) is the test because every statement that
+/// gets past `parse::require_account_match` has one (its account-number line), so
+/// this renames a refusal that was certain; it cannot refuse a statement that is
+/// read today. Residual: a scan whose text layer carries a digit (an OCR layer, or a
+/// stamp that prints a date) is not caught here and is still refused or read as
+/// before, by the balance chain and the account check.
+fn require_readable_text(pages: &[Page]) -> Result<(), Refusal> {
+    let has_figures = pages
+        .iter()
+        .flatten()
+        .any(|word| word.text.chars().any(char::is_numeric));
+    if has_figures {
+        return Ok(());
+    }
+    Err(Refusal::new(
+        "no_readable_text",
+        "no figures could be read from the PDF: a scan, a printed copy or an image has none",
+    ))
 }
 
 #[cfg(test)]

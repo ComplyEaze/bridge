@@ -291,7 +291,25 @@ pub(super) struct ImportLedgerLine {
     /// read bound it to (bridge#239). A post refuses when any of them now
     /// resolves to another GUID. Absent on records built before this field
     /// existed: such a batch is refused for posting and must be rebuilt.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ///
+    /// Written as `ledger_identities_2`. Releases 0.3.0 to 0.4.2 read only
+    /// `ledger_identities`, find none, and refuse the batch as built before
+    /// this record (`import_batch_predates_ledger_binding`), which is their
+    /// one refusal of a record they cannot check. They do not read the two
+    /// records below, so without this they would post a batch this build
+    /// saved, with neither check. The old name is still read, for a batch one
+    /// of them saved. No writer may write both names: a record carrying both
+    /// does not parse, and the journal reader refuses the whole history on a
+    /// record it cannot parse. When a record is added to or removed from a saved
+    /// batch, write this one under a new name again and keep every earlier
+    /// name as an alias: `a_saved_batch_holds_exactly_these_records` stops
+    /// compiling, or fails, until that is looked at.
+    #[serde(
+        default,
+        rename = "ledger_identities_2",
+        alias = "ledger_identities",
+        skip_serializing_if = "Option::is_none"
+    )]
     ledger_identities: Option<Vec<BoundLedger>>,
     /// Each ledger a bank cash answer named as cash in hand, with the voucher
     /// it was answered for (#815). The build refused any outside Cash-in-Hand,
@@ -307,9 +325,10 @@ pub(super) struct ImportLedgerLine {
     /// consistency binding. `Some(vec![])` when the build found
     /// no bill-wise ledger among those it names. Absent on records built
     /// before this field existed: such a batch is refused for posting and must
-    /// be rebuilt. An older binary after a rollback ignores the field (this
-    /// struct does not deny unknown fields) and would post such a batch
-    /// without the check.
+    /// be rebuilt. A release older than this field does not read it (this
+    /// struct does not deny unknown fields); releases 0.3.0 to 0.4.2 refuse
+    /// the batch for the ledger binding they cannot find instead (see
+    /// `ledger_identities`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     on_account_approved: Option<Vec<bill_wise::OnAccountApproved>>,
 }
@@ -734,6 +753,14 @@ impl Server {
             let mut report = masters_for_payload(&payload, &catalogue)?;
             annotate_folded_twins(&mut report, &requested_names, ledger_masters.catalog().parents());
             if report.iter().any(|value| value["match_state"] != "exact") {
+                let report = in_batch_order(
+                    requested_names.iter().zip(report).collect(),
+                    &payload,
+                    |(name, _)| name.as_str(),
+                )
+                .into_iter()
+                .map(|(_, master)| master)
+                .collect::<Vec<_>>();
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                         "state":"refused", "reason":"masters_not_exact", "masters":report,
@@ -745,7 +772,11 @@ impl Server {
                     truncated: false,
                 });
             }
-            let twins = folded_twins(&requested_names, ledger_masters.catalog().parents());
+            let twins = in_batch_order(
+                folded_twins(&requested_names, ledger_masters.catalog().parents()),
+                &payload,
+                |twins| twins.requested.as_str(),
+            );
             if !twins.is_empty() {
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
@@ -914,16 +945,19 @@ impl Server {
                 bill_wise::bill_wise_parties(&payload.vouchers, &observed_flags);
             let verdict = bill_wise::judge_approvals(&approvals, &parties, &bill_wise_context)
                 .map_err(approval_invalid)?;
+            let names_masked = self.settings.redaction == super::Redaction::MaskParties;
             if !verdict.unapproved.is_empty() {
+                let unapproved =
+                    bill_wise::in_listing_order(verdict.unapproved, names_masked, |party| &party.1);
                 let (refused, omitted) = bill_wise::refused_parties_json(
-                    &verdict.unapproved,
+                    &unapproved,
                     refusal_diagnostic_budget(self.settings.max_bytes),
                 );
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                         "state":"refused", "reason":"bill_wise_party_unapproved",
                         "refused_parties":refused,
-                        "refused_party_count":verdict.unapproved.len(),
+                        "refused_party_count":unapproved.len(),
                         "refused_parties_omitted":omitted,
                         "bill_wise_response_sha256":[catalogue_evidence.response_sha256.clone()],
                         "next_step":BILL_WISE_UNAPPROVED_NEXT_STEP
@@ -1165,10 +1199,17 @@ impl Server {
                     "live_evidence": live_evidence(&line.vouchers),
                     "verification_preflight": verification_preflight,
                     "identity_scheme": line.identity_scheme,
-                    // The bill-wise ledgers a person approved, each with the
-                    // digest the approval was tied to, and the catalogue
-                    // response the flags came from (#1234).
-                    "on_account_approved": line.on_account_approved,
+                    // The bill-wise ledgers a person approved, each name
+                    // marked as a party name, with the digest the approval
+                    // was tied to, and the catalogue response the flags came
+                    // from (#1234).
+                    "on_account_approved": line.on_account_approved.as_ref().map(|approved| {
+                        bill_wise::approved_json(&bill_wise::in_listing_order(
+                            approved.clone(),
+                            names_masked,
+                            |party| &party.party_digest,
+                        ))
+                    }),
                     "bill_wise_response_sha256": [catalogue_evidence.response_sha256.clone()],
                     // The fifth element of §9.13's identity tuple. It is
                     // recorded on the batch and compared on dispatch, but a
@@ -2966,7 +3007,10 @@ fn cash_bank_refusals(
     max_bytes: usize,
 ) -> CashBankRefusals {
     let mut classified = BTreeMap::<&str, CashBankState>::new();
-    let mut refused = BTreeMap::<(&str, &'static str), Value>::new();
+    // One row per ledger and requirement, in the order the batch's legs are
+    // first refused, never by name, with or without masking. The order also
+    // decides which rows the budget below keeps.
+    let mut refused = Vec::<((&str, &'static str), Value)>::new();
     let mut legs = 0_usize;
     for (voucher, side, ledger, requirement) in constrained_legs(payload) {
         let state = classified
@@ -2982,7 +3026,11 @@ fn cash_bank_refusals(
             LegRequirement::Money => "cash_bank",
             LegRequirement::Counterparty => "not_cash_bank",
         };
-        refused.entry((ledger, requires)).or_insert_with(|| {
+        if refused.iter().any(|(row, _)| *row == (ledger, requires)) {
+            continue;
+        }
+        refused.push((
+            (ledger, requires),
             json!({
                 "ledger": party_name(ledger),
                 "requires": requires,
@@ -2992,13 +3040,14 @@ fn cash_bank_refusals(
                 // One voucher a caller can open to see the problem, rather
                 // than every voucher that repeats it.
                 "first_bridge_txn_id": voucher.bridge_txn_id,
-            })
-        });
+            }),
+        ));
     }
     let mut budget = refusal_diagnostic_budget(max_bytes);
     let distinct = refused.len();
     let ledgers = refused
-        .into_values()
+        .into_iter()
+        .map(|(_, row)| row)
         // Filter rather than stop at the first row that will not fit: an
         // oversized row is one long ledger name, not a reason to discard every
         // shorter refusal behind it. Budget is only spent on rows that are
@@ -3323,14 +3372,15 @@ fn requested_master_report(
 /// cash-in-hand answer's ledger outside Cash-in-Hand
 /// (`cash_ledger_not_cash_in_hand`), else another answer's ledger under
 /// Suspense A/c (`cash_answer_ledger_in_suspense`). One row per ledger with the
-/// reserved group it reaches, bounded like the cash/bank refusal.
+/// reserved group it reaches, in the order the answers first name them and
+/// never by name, bounded like the cash/bank refusal.
 fn answered_ledger_refusals(
     required: &[super::bank_statement::AnsweredCashLedger],
     observed: &ObservedMasters,
     max_bytes: usize,
 ) -> Option<(&'static str, Vec<Value>, usize)> {
-    let mut not_cash = BTreeMap::<&str, Value>::new();
-    let mut in_suspense = BTreeMap::<&str, Value>::new();
+    let mut not_cash = Vec::<(&str, Value)>::new();
+    let mut in_suspense = Vec::<(&str, Value)>::new();
     for need in required {
         let state = observed.classify(&need.ledger);
         let (refused, requires) = if need.cash_in_hand && !state.is_cash_in_hand() {
@@ -3340,9 +3390,12 @@ fn answered_ledger_refusals(
         } else {
             continue;
         };
-        refused.entry(need.ledger.as_str()).or_insert_with(|| {
-            refused_ledger_row(&need.ledger, requires, &state, Some(&need.bridge_txn_id))
-        });
+        if !refused.iter().any(|(ledger, _)| *ledger == need.ledger) {
+            refused.push((
+                need.ledger.as_str(),
+                refused_ledger_row(&need.ledger, requires, &state, Some(&need.bridge_txn_id)),
+            ));
+        }
     }
     let (reason, refused) = if !not_cash.is_empty() {
         ("cash_ledger_not_cash_in_hand", not_cash)
@@ -3352,8 +3405,10 @@ fn answered_ledger_refusals(
         return None;
     };
     let mut budget = refusal_diagnostic_budget(max_bytes);
-    let (rows, omitted) =
-        super::bank_statement::bounded(refused.into_values().collect(), &mut budget);
+    let (rows, omitted) = super::bank_statement::bounded(
+        refused.into_iter().map(|(_, row)| row).collect(),
+        &mut budget,
+    );
     Some((reason, rows, omitted))
 }
 
@@ -3405,6 +3460,28 @@ fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
     })
 }
 
+/// `rows` in the order the batch first names each row's ledger. A list of the
+/// batch's ledgers goes out in this order and never by name, with or without
+/// masking. A ledger the batch does not name goes last, in its incoming order;
+/// no caller passes one.
+fn in_batch_order<T>(
+    mut rows: Vec<T>,
+    payload: &ImportPayload,
+    ledger: impl for<'a> Fn(&'a T) -> &'a str,
+) -> Vec<T> {
+    rows.sort_by_cached_key(|row| {
+        payload
+            .vouchers
+            .iter()
+            .flat_map(|voucher| &voucher.entries)
+            .position(|entry| entry.ledger == ledger(row))
+            .unwrap_or(usize::MAX)
+    });
+    rows
+}
+
+/// The ledgers a batch names, each once, in name order. A list of them sent to
+/// the caller is put `in_batch_order` first.
 fn requested_ledger_names(payload: &ImportPayload) -> Vec<String> {
     payload
         .vouchers

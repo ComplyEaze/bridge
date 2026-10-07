@@ -3121,7 +3121,7 @@ fn education_company_plan() -> ScenarioPlan {
     xml_plan(education)
 }
 
-/// Lane A's capture: what Education serves a movement or voucher read that
+/// A capture of what Education serves for a movement or voucher read that
 /// starts on a day other than the 1st, 2nd or 31st (an empty collection).
 fn education_empty_part_plan() -> ScenarioPlan {
     xml_plan(captured_utf16(include_bytes!(

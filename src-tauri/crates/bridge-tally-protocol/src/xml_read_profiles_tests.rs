@@ -503,7 +503,7 @@ fn audit_fetch_lists_carry_what_a_silent_default_would_hide() {
         assert!(vouchers.iter().any(|field| field == required), "{required}");
     }
     // An absent quantity, rate or amount on a goods line is read as none,
-    // and the stock movement is silently dropped (Lane B, 2026-09-21).
+    // and the stock movement is silently dropped.
     for prefix in [
         "ALLLEDGERENTRIES.INVENTORYALLOCATIONS",
         "ALLINVENTORYENTRIES",

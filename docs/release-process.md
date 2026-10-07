@@ -117,7 +117,7 @@ reviewer: some-github-login
   request that only deletes old acknowledgements (a cleanup) passes.
 - An acknowledgement is append-only for its own pull request: an existing one is
   never modified. After merge it means nothing, and old files may be cleaned up.
-- The branch name is not the file name, so a lane branch is fine.
+- The branch name is not the file name, so any branch name is fine.
 - The number is known only once the pull request is open, so the first run of a
   pull request that touches a pinned path fails with `found 0` until
   `pr-<N>.txt` is pushed to its branch. That is expected, not a breakage: open

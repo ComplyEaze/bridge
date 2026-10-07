@@ -710,7 +710,7 @@ The Company collection fetched with `Name, GUID, NUMLEDGERS` (request `BridgeCom
 `COMPANY` row per loaded company, whatever `SVCURRENTCOMPANY` named, each row `NAME`, `GUID` and
 `NUMLEDGERS` (a number with a leading space, as `ALTMSTID` is): present on 31 of 31 rows, in 0.09 s for
 18.7 KB. The synthetic 4,339-ledger book's value, 4,339, equalled its catalogue and AlterID-census counts, and two
-real stock-heavy books, about 900 and about 2,600 ledgers, read by another lane, also equalled their censuses
+real stock-heavy books, about 900 and about 2,600 ledgers, read separately, also equalled their censuses
 (recorded in #938 only; the tree holds the synthetic book's capture, and the counts of the two other kept rows,
 6 and 123, are not compared with a census anywhere in this tree). That is three books, one of them captured here: what `NUMLEDGERS` counts for a book with deleted or hidden ledgers, and on another Tally
 version, is not measured. Bridge therefore uses it only to refuse: a census that counted fewer ledgers than the

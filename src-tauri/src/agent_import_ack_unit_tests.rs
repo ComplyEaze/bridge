@@ -1184,3 +1184,126 @@ fn a_masters_record_past_the_record_bound_is_unreadable() {
     std::fs::write(&path, padded(ledger::MAX_RECORD_BYTES + 1)).unwrap();
     assert_eq!(read_masters_record_raw(&path), Err(()));
 }
+
+/// bridge#626: a ledger name that ends in one CR LF is shown in the review
+/// of one voucher quoted, with the break written out, whether the doubt or
+/// an entry names it, and the note stands once above the batch line. The
+/// same break at the end of the narration, the company name or the voucher
+/// number is refused.
+#[test]
+fn a_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
+    let mut voucher = row_json(2, "Paid");
+    voucher["amounts"][0]["ledger"] = json!("Ledger 0\r\n");
+    let voucher: ReadVoucher = serde_json::from_value(voucher).unwrap();
+    let named = json!({"state":"posted_under_changed_masters","ledgers":["Cash\r\n"]});
+    let note_lines = |preview: &str| {
+        preview
+            .lines()
+            .filter(|shown| *shown == post::LINE_BREAK_NOTE)
+            .count()
+    };
+    let preview = review_preview(BATCH, MARKER, "Books", &named, &voucher).unwrap();
+    let lines: Vec<&str> = preview.lines().collect();
+    assert!(lines.contains(&r#"  "Cash\r\n""#), "{preview}");
+    let entry = lines
+        .iter()
+        .position(|shown| *shown == r#"Dr 1.00  "Ledger 0\r\n""#)
+        .unwrap_or_else(|| panic!("{preview}"));
+    assert_eq!(
+        lines[entry + 1..entry + 4],
+        [
+            "Dr 1.00  \"Ledger 1\"",
+            "A quoted ledger name ending in \\r\\n has a line break stored at the end of its name in Tally.",
+            &format!("Batch: {BATCH}"),
+        ],
+        "{preview}"
+    );
+    assert_eq!(note_lines(&preview), 1);
+    assert!(
+        !preview
+            .chars()
+            .any(|shown| shown.is_control() && shown != '\n'),
+        "{preview:?}"
+    );
+    // The note costs one line, and only a text that shows such a name has it.
+    let plain = review_preview(BATCH, MARKER, "Books", &doubt(), &row(2, "Paid")).unwrap();
+    assert_eq!(note_lines(&plain), 0);
+    assert_eq!(lines.len(), plain.lines().count() + 1);
+    for (doubt, voucher) in [(&named, &row(2, "Paid")), (&doubt(), &voucher)] {
+        let preview = review_preview(BATCH, MARKER, "Books", doubt, voucher).unwrap();
+        assert_eq!(note_lines(&preview), 1, "{preview}");
+    }
+    let mut numbered = row_json(2, "Paid");
+    numbered["voucher_number"] = json!("2\r\n");
+    let numbered: ReadVoucher = serde_json::from_value(numbered).unwrap();
+    for (source, preview) in [
+        (
+            "narration",
+            review_preview(BATCH, MARKER, "Books", &doubt(), &row(2, "Paid\r\n")),
+        ),
+        (
+            "company",
+            review_preview(BATCH, MARKER, "Books\r\n", &doubt(), &row(2, "Paid")),
+        ),
+        (
+            "voucher number",
+            review_preview(BATCH, MARKER, "Books", &doubt(), &numbered),
+        ),
+    ] {
+        assert_eq!(
+            preview,
+            Err("ack_review_layout_text".to_string()),
+            "{source}"
+        );
+    }
+}
+
+/// The review of a batch shows such a name the same way, in the doubt's list
+/// and on its per-ledger totals line, with the note once above the batch line.
+#[test]
+fn a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
+    let line = posted_batch(3);
+    let plain_rows = batch_rows(&line);
+    let mut rows = plain_rows.clone();
+    for row in &mut rows {
+        row.entries[0].ledger = "Ledger 0\r\n".into();
+    }
+    let rows = rows.iter().collect::<Vec<_>>();
+    let masters = json!({"state":"posted_under_changed_masters","ledgers":["Cash\r\n"]});
+    let preview =
+        batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &rows).unwrap();
+    let lines: Vec<&str> = preview.lines().collect();
+    assert!(lines.contains(&r#"  "Cash\r\n""#), "{preview}");
+    let totals = lines
+        .iter()
+        .position(|shown| *shown == r#"Dr 3  Cr 0  3 entries  "Ledger 0\r\n""#)
+        .unwrap_or_else(|| panic!("{preview}"));
+    assert_eq!(
+        lines[totals + 1..totals + 4],
+        [
+            "Dr 3  Cr 0  3 entries  \"Ledger 1\"",
+            post::LINE_BREAK_NOTE,
+            &format!("Batch: {BATCH}"),
+        ],
+        "{preview}"
+    );
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|shown| **shown == post::LINE_BREAK_NOTE)
+            .count(),
+        1
+    );
+    assert!(
+        !preview
+            .chars()
+            .any(|shown| shown.is_control() && shown != '\n'),
+        "{preview:?}"
+    );
+    let plain_rows = plain_rows.iter().collect::<Vec<_>>();
+    let plain: Value = serde_json::from_slice(MASTERS_DOUBT).unwrap();
+    let plain =
+        batch_review_preview(&line, DoubtKind::Masters, "Books", &plain, &plain_rows).unwrap();
+    assert!(!plain.contains(post::LINE_BREAK_NOTE));
+    assert_eq!(lines.len(), plain.lines().count() + 1);
+}

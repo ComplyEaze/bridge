@@ -123,6 +123,7 @@ impl DesktopJournalService {
     ) -> Result<DesktopJournalReview, String> {
         if snapshot.dispatched {
             let _ = admit_saved_journal_integrity(&snapshot.batch, &self.server.settings.endpoint)?;
+            super::post::refuse_a_line_break_name_on_the_desktop(&snapshot.batch)?;
         } else {
             let _ = admit_saved_journal(&snapshot.batch, &self.server.settings.endpoint)?;
         }

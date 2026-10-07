@@ -198,10 +198,21 @@ fn service_recording(
     endpoint: TallyEndpointConfig,
     on_account: Value,
 ) -> (DesktopJournalService, ImportLedgerLine) {
+    service_debiting(root, voucher_number, endpoint, on_account, "Expense")
+}
+
+/// A service holding one saved Journal that debits `debit_ledger`.
+fn service_debiting(
+    root: PathBuf,
+    voucher_number: Option<&str>,
+    endpoint: TallyEndpointConfig,
+    on_account: Value,
+    debit_ledger: &str,
+) -> (DesktopJournalService, ImportLedgerLine) {
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-00000000-0000-4000-8000-000000000001", "identity_scheme":"batch_v1", "company_guid":"00000000-0000-4000-8000-000000000002", "endpoint_origin":super::super::canonical_loopback_origin(&endpoint).unwrap(),
         "company":{"name":"Synthetic Accounts","guid":"00000000-0000-4000-8000-000000000002","company_number":"100001","books_from":"20260401"}, "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901","sha256":"","built_at":"2026-09-07T00:00:00Z","status":"built", "on_account_approved":on_account,"pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
-        "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal","voucher_number":voucher_number,"entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Cash","amount":"12.50","side":"Cr"}]}]
+        "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal","voucher_number":voucher_number,"entries":[{"ledger":debit_ledger,"amount":"12.50","side":"Dr"},{"ledger":"Cash","amount":"12.50","side":"Cr"}]}]
     })).unwrap();
     line.sha256 = sha256_hex(
         render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id).as_bytes(),
@@ -728,4 +739,48 @@ fn the_desktop_message_names_the_ledgers_the_result_lists() {
         "masters_after_post": {"ledgers": ["Cash"]},
     }));
     assert_eq!(other, "Reconcile.");
+}
+
+/// bridge#626: the desktop's review takes no saved Journal that names a
+/// ledger whose name ends in a line break, before or after it was posted:
+/// its screen shows a name as it is.
+#[test]
+fn a_journal_naming_a_ledger_that_ends_in_a_line_break_is_refused_on_the_desktop() {
+    let directory = tempfile::tempdir().unwrap();
+    let (service, line) = service_debiting(
+        directory.path().join("agent"),
+        None,
+        TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9001,
+        },
+        json!([]),
+        "Expense\r\n",
+    );
+    let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+    std::fs::write(
+        service
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        &xml,
+    )
+    .unwrap();
+    assert_eq!(
+        service.review_selected_xml(xml.as_bytes()).unwrap_err(),
+        "import_desktop_ledger_line_break"
+    );
+    service
+        .server
+        .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_native(
+            &line,
+            "a".repeat(64),
+            uuid::Uuid::new_v4(),
+        ))
+        .unwrap();
+    assert_eq!(
+        service.review_selected_xml(xml.as_bytes()).unwrap_err(),
+        "import_desktop_ledger_line_break"
+    );
 }

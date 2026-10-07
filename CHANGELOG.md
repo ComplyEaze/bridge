@@ -46,6 +46,19 @@ These changes are in source and not yet in a published build.
   `trial_balance` for the same year, and each search returned what the same
   criterion selects from the listing; it did not cover a large book, a memorandum,
   a reversing journal or a voucher withheld for a foreign-currency amount (#1230).
+- The approval dialog of `post_import` now takes a voucher on a ledger whose
+  name in Tally ends in one line break; until now such a voucher could be
+  built and was refused for posting. The approval dialog, and the review
+  dialog if a doubt is recorded after the post, show such a name quoted
+  with the line break written out (`"Name\r\n"`) and add one line saying that
+  the name has a line break stored at its end in Tally. A line break anywhere
+  else in a name, or in any other value, is refused as before. The desktop
+  Journal screen takes no saved Journal that names such a ledger: its review
+  says so and says to use the assistant for it. An approval text that
+  carries both this line and the On Account sentence holds one entry fewer.
+  Not measured: such a voucher posted through the dialog against a live
+  Tally, what Tally returns when it is read back (and so whether such a post
+  ends verified), and how macOS and Windows draw the quoted name (#626).
 
 **Safer or fixed**
 

@@ -2761,21 +2761,6 @@ fn a_masters_doubt_after_the_post_downgrades_a_clean_verified_post() {
     );
 }
 
-/// bridge#626 slice 1 changes no post code: this pins the refusal that already
-/// applies to a ledger name ending in CR LF. Such a name can now be built and
-/// imported from the file, but the native dialog cannot yet show it so that an
-/// operator can tell it from its twin; slice 2 changes that, and this test.
-#[test]
-fn native_preview_refuses_a_ledger_name_ending_in_a_line_break() {
-    let (mut line, endpoint) = batch();
-    line.vouchers[0].entries[0].ledger.push_str("\r\n");
-    refresh_batch_sha256(&mut line);
-    assert_eq!(
-        admit_saved_journal(&line, &endpoint).unwrap_err(),
-        "import_review_layout_text"
-    );
-}
-
 /// A batch of two for the N-voucher paths. Admission still posts one voucher,
 /// so these call each generalized piece directly.
 fn batch_of_two() -> ImportLedgerLine {
@@ -3733,6 +3718,147 @@ fn a_one_voucher_text_ends_with_the_vouchers_own_text() {
     assert!(VOUCHER_TEXT_HEADING.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS);
 }
 
+// bridge#626: a ledger name that ends in one CR LF, the one spelling with a
+// line break a build binds, is shown in the dialogs with the break written out.
+
+/// What a dialog admits as a ledger name: any name the rules for dialog text
+/// admit, and one that ends in exactly one CR LF when the rest is a name the
+/// build admits.
+#[test]
+fn a_ledger_name_may_end_in_exactly_one_line_break() {
+    use ReviewTextRefusal::{Format, Layout};
+    for (name, expected) in [
+        ("Cash", Ok(())),
+        ("Cash\r\n", Ok(())),
+        ("Cash\n", Err(Layout)),
+        ("Cash\r", Err(Layout)),
+        ("Cash\n\r", Err(Layout)),
+        ("Cash\r\n\r\n", Err(Layout)),
+        ("Ca\r\nsh", Err(Layout)),
+        ("Ca\r\nsh\r\n", Err(Layout)),
+        ("\r\n", Err(Layout)),
+        ("Cash\t", Err(Layout)),
+        ("Cash\t\r\n", Err(Layout)),
+        ("Ca\u{200b}sh", Err(Format)),
+        ("Ca\u{200b}sh\r\n", Err(Layout)),
+        ("Ca\u{200d}sh\r\n", Err(Format)),
+        ("Cash\u{2028}\r\n", Err(Layout)),
+        ("Cash\u{85}\r\n", Err(Layout)),
+        (" \r\n", Err(Layout)),
+    ] {
+        assert_eq!(
+            ReviewLedgerName::parse(name).map(|_| ()),
+            expected,
+            "{name:?}"
+        );
+    }
+    // A layout character in any value is reported before a format character
+    // in any other, whichever of them is the ledger name.
+    for (text, ledger) in [("Pa\u{200b}id", "Cash\n"), ("Pa\nid", "Ca\u{200b}sh")] {
+        assert_eq!(
+            admit_review_text([text], [ledger]).unwrap_err(),
+            Layout,
+            "{text:?} {ledger:?}"
+        );
+    }
+    assert_eq!(
+        admit_review_text(["Pa\u{200b}id"], ["Cash\r\n"]).unwrap_err(),
+        Format
+    );
+    // The break is written out; four typed characters read differently.
+    let shown = |name| ReviewLedgerName::parse(name).unwrap().quoted();
+    assert_eq!(shown("Cash\r\n"), r#""Cash\r\n""#);
+    assert_eq!(shown(r"Cash\r\n"), r#""Cash\\r\\n""#);
+    assert!(LINE_BREAK_NOTE.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS);
+}
+
+/// An assistant's one-voucher text shows such a name quoted with its break
+/// written out, with the note once, under the entries and the On Account
+/// sentence and above the totals; no control character but the text's own
+/// line ends is in it. Only a ledger name is taken so: the same break in the
+/// narration, the reference or the company name is refused as before.
+#[test]
+fn a_one_voucher_text_shows_a_line_break_at_the_end_of_a_ledger_name() {
+    let (plain, endpoint) = batch();
+    let mut line = plain.clone();
+    line.vouchers[0].entries[0].ledger = "Expense\r\n".into();
+    refresh_batch_sha256(&mut line);
+    let text = agent_review_preview(&line, &endpoint).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    let entry = lines
+        .iter()
+        .position(|shown| *shown == r#"Dr 12.50  "Expense\r\n""#)
+        .unwrap_or_else(|| panic!("{text}"));
+    assert_eq!(lines[entry + 1], r#"Cr 12.50  "Cash""#, "{text}");
+    assert_eq!(lines[entry + 2], LINE_BREAK_NOTE, "{text}");
+    assert!(lines[entry + 3].starts_with("Total debit: "), "{text}");
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|shown| **shown == LINE_BREAK_NOTE)
+            .count(),
+        1
+    );
+    assert!(
+        !text
+            .chars()
+            .any(|shown| shown.is_control() && shown != '\n'),
+        "{text:?}"
+    );
+    // The note stands in the line that is blank without it, so the text has
+    // the line count of the same voucher without the break.
+    let without = agent_review_preview(&plain, &endpoint).unwrap();
+    assert_eq!(lines.len(), without.lines().count());
+    assert!(!without.contains(LINE_BREAK_NOTE));
+    // With an approved ledger: the sentence, then the note.
+    approve_on_account(&mut line, &["Expense\r\n"]);
+    let marked = agent_review_preview(&line, &endpoint).unwrap();
+    let marked: Vec<&str> = marked.lines().collect();
+    let entry = marked
+        .iter()
+        .position(|shown| *shown == r#"Dr 12.50  On Account  "Expense\r\n""#)
+        .expect("the marked entry");
+    assert_eq!(
+        marked[entry + 2..entry + 4],
+        [ON_ACCOUNT_LEGEND, LINE_BREAK_NOTE]
+    );
+    // With both, the text is one line longer.
+    assert_eq!(marked.len(), lines.len() + 1);
+    for spoil in [
+        |line: &mut ImportLedgerLine| line.vouchers[0].narration = Some("Paid\r\n".into()),
+        |line: &mut ImportLedgerLine| line.vouchers[0].reference = Some("REF\r\n".into()),
+        |line: &mut ImportLedgerLine| line.company.as_mut().unwrap().name.push_str("\r\n"),
+        |line: &mut ImportLedgerLine| line.vouchers[0].entries[1].ledger = "Cash\n".into(),
+    ] {
+        let mut spoiled = plain.clone();
+        spoil(&mut spoiled);
+        assert_eq!(
+            agent_review_preview(&spoiled, &endpoint).unwrap_err(),
+            "import_review_layout_text"
+        );
+    }
+}
+
+/// The desktop Journal route takes no such name: its screen shows a ledger's
+/// name as it is. An assistant's post of the same saved batch is admitted,
+/// by the check the build uses to say whether a batch can be posted.
+#[test]
+fn the_desktop_route_refuses_a_ledger_name_ending_in_a_line_break() {
+    let (mut line, endpoint) = batch();
+    line.vouchers[0].entries[0].ledger = "Expense\r\n".into();
+    refresh_batch_sha256(&mut line);
+    assert_eq!(
+        review_preview_for(&line, &endpoint, PostScope::JournalOnly).unwrap_err(),
+        "import_desktop_ledger_line_break"
+    );
+    assert_eq!(
+        admit_saved_journal(&line, &endpoint).unwrap_err(),
+        "import_desktop_ledger_line_break"
+    );
+    assert!(review_preview_for(&line, &endpoint, PostScope::Vouchers).is_ok());
+    assert!(admit_saved_voucher(&line, &endpoint, PostScope::Vouchers, 1).is_ok());
+}
+
 /// Records `ledgers` on `line` as approved to take entries On Account, the
 /// way the build does once the caller's approvals matched (#1234).
 fn approve_on_account(line: &mut ImportLedgerLine, ledgers: &[&str]) {
@@ -4211,5 +4337,164 @@ fn a_batch_that_marks_nothing_is_shown_whole() {
             "After a timeout, reconcile this batch; do not rebuild or resend it.",
         ]
         .join("\n")
+    );
+}
+
+/// A batch shows such a name the same way, on its per-ledger totals line and
+/// on a voucher line, with the note once under the totals lines: in the line
+/// that is blank without it, or after the On Account sentence. A break
+/// anywhere else in a name is refused as before.
+#[test]
+fn a_batch_text_shows_a_line_break_at_the_end_of_a_ledger_name() {
+    let (plain, endpoint) = batch_of_every_type();
+    let mut line = plain.clone();
+    for entry in line
+        .vouchers
+        .iter_mut()
+        .flat_map(|voucher| &mut voucher.entries)
+    {
+        if entry.ledger == "Party A" {
+            entry.ledger = "Party A\r\n".into();
+        }
+    }
+    let text = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        ledger_block(&text),
+        [
+            "Dr 5  Cr 15  2 entries  \"Bank\"",
+            "Dr 40  Cr 17.5  3 entries  \"Cash\"",
+            "Dr 12.5  Cr 0  1 entry  \"Expense\"",
+            r#"Dr 0  Cr 40  1 entry  "Party A\r\n""#,
+            "Dr 15  Cr 0  1 entry  \"Party B\"",
+            "A quoted ledger name ending in \\r\\n has a line break stored at the end of its name in Tally.",
+        ],
+        "{text}"
+    );
+    assert!(
+        voucher_block(&text)
+            .contains(&r#"Receipt 20260902  40  "Party A\r\n"  "Synthetic test only""#),
+        "{text}"
+    );
+    assert!(
+        !text
+            .chars()
+            .any(|shown| shown.is_control() && shown != '\n'),
+        "{text:?}"
+    );
+    let without = review_preview_with(&plain, &endpoint, &[]).unwrap();
+    assert_eq!(text.lines().count(), without.lines().count());
+    assert!(!without.contains(LINE_BREAK_NOTE));
+
+    approve_on_account(&mut line, &["Party A\r\n"]);
+    let marked = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        ledger_block(&marked)[3..],
+        [
+            r#"Dr 0  Cr 40  1 entry  On Account  "Party A\r\n""#,
+            "Dr 15  Cr 0  1 entry  \"Party B\"",
+            ON_ACCOUNT_LEGEND,
+            LINE_BREAK_NOTE,
+        ],
+        "{marked}"
+    );
+    assert_eq!(marked.lines().count(), text.lines().count() + 1);
+    // Two such names, one note.
+    for entry in line
+        .vouchers
+        .iter_mut()
+        .flat_map(|voucher| &mut voucher.entries)
+    {
+        if entry.ledger == "Party B" {
+            entry.ledger = "Party B\r\n".into();
+        }
+    }
+    let two = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert!(two.contains(r#""Party B\r\n""#), "{two}");
+    assert_eq!(
+        two.lines()
+            .filter(|shown| *shown == LINE_BREAK_NOTE)
+            .count(),
+        1,
+        "{two}"
+    );
+
+    for name in ["Party\r\nA", "Party A\r\n\r\n", "Party A\n"] {
+        let mut spoiled = plain.clone();
+        spoiled.vouchers[1].entries[1].ledger = name.into();
+        assert_eq!(
+            review_preview_with(&spoiled, &endpoint, &[]).unwrap_err(),
+            "import_review_layout_text",
+            "{name:?}"
+        );
+    }
+}
+
+/// When a batch names a ledger whose name ends in a line break, `seal`
+/// passes its dialog text only if the note is there and a line ends in the
+/// quoted name. A batch that names no such ledger needs neither.
+#[test]
+fn a_dialog_text_without_the_line_break_note_is_refused() {
+    let (plain, endpoint) = batch();
+    let mut line = plain.clone();
+    line.vouchers[0].entries[0].ledger = "Expense\r\n".into();
+    let text = agent_review_preview(&line, &endpoint).unwrap();
+    let marks = OnAccountMarks::of(&line);
+    let seal = |text: String| marks.seal(&line, text).map(ReviewText::into_string);
+    assert_eq!(seal(text.clone()).unwrap(), text);
+    let without_note = text.replace(&format!("\n{LINE_BREAK_NOTE}\n"), "\n\n");
+    assert_ne!(without_note, text);
+    assert_eq!(seal(without_note).unwrap_err(), "import_review_layout_text");
+    let without_name = text.replace(r#""Expense\r\n""#, "\"Expense\"");
+    assert_ne!(without_name, text);
+    assert_eq!(seal(without_name).unwrap_err(), "import_review_layout_text");
+    let other_text = agent_review_preview(&plain, &endpoint).unwrap();
+    assert!(!other_text.contains(LINE_BREAK_NOTE));
+    assert!(OnAccountMarks::of(&plain).seal(&plain, other_text).is_ok());
+    // The same for a batch's text.
+    let (mut batch, endpoint) = batch_of_every_type();
+    batch.vouchers[1].entries[1].ledger = "Party A\r\n".into();
+    let text = review_preview_with(&batch, &endpoint, &[]).unwrap();
+    let marks = OnAccountMarks::of(&batch);
+    let without_note = text.replace(&format!("\n{LINE_BREAK_NOTE}\n"), "\n\n");
+    assert_ne!(without_note, text);
+    assert_eq!(
+        marks
+            .seal(&batch, without_note)
+            .map(ReviewText::into_string),
+        Err("import_review_layout_text".to_string())
+    );
+    let without_name = text.replace(r#""Party A\r\n""#, "\"Party A\"");
+    assert_ne!(without_name, text);
+    assert_eq!(
+        marks
+            .seal(&batch, without_name)
+            .map(ReviewText::into_string),
+        Err("import_review_layout_text".to_string())
+    );
+}
+
+/// The note takes a line of its own when the text also carries the On
+/// Account sentence, so an assistant's bank voucher with both holds one entry
+/// fewer: five fit the 24 lines and six do not. With the note alone, six fit.
+#[test]
+fn a_bank_voucher_with_the_note_and_the_on_account_sentence_fits_one_entry_fewer() {
+    let (_, endpoint) = batch();
+    let voucher = |parties: usize, approved: bool| {
+        let mut line = payment_with(parties, |index| match index {
+            0 => "Party 0\r\n".into(),
+            _ => format!("Party {index}"),
+        });
+        if approved {
+            approve_on_account(&mut line, &["Party 0\r\n"]);
+        }
+        line
+    };
+    let note_alone = agent_review_preview(&voucher(5, false), &endpoint).unwrap();
+    assert_eq!(note_alone.lines().count(), 24, "{note_alone}");
+    let both = agent_review_preview(&voucher(4, true), &endpoint).unwrap();
+    assert_eq!(both.lines().count(), 24, "{both}");
+    assert_eq!(
+        agent_review_preview(&voucher(5, true), &endpoint).unwrap_err(),
+        "import_review_too_large"
     );
 }

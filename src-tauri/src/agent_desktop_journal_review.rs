@@ -97,6 +97,10 @@ impl DesktopJournalError {
                 "This saved Journal was built before ComplyEaze Bridge began checking bill-wise ledgers, so it cannot be posted from here.",
                 "First check in Tally that this Journal was not already entered by hand, then build it again and choose the new file. Do not post this one, and do not import it in Tally without checking its ledgers: an entry on a ledger that keeps bills would land On Account.",
             ),
+            post::DESKTOP_LEDGER_LINE_BREAK => (
+                "This saved Journal names a ledger whose name in Tally ends in a line break, and this screen cannot show such a name.",
+                "Use the assistant for this Journal: its approval dialog shows such a name with the line break written out, and it can check a Journal that was already posted. If this one was already posted, do not post it again.",
+            ),
             "file_picker_failed" => (
                 "ComplyEaze Bridge could not open the native file picker.",
                 "Close any modal dialogs and choose the Journal file again.",

@@ -864,3 +864,27 @@ fn an_unsettled_bind_is_left_out_of_the_journal_and_a_later_read_binds() {
         Some(super::super::ledger::PostSpanVerdict::Bound(expected))
     );
 }
+
+/// bridge#626: when a read-back spells an entry's ledger with a line break
+/// at its end, written as two character references, the row keeps the break,
+/// so the entry reads as the one that was sent. This is the parser's half:
+/// what Tally sends for a voucher on such a ledger is a capture still to make.
+#[test]
+fn a_read_back_ledger_name_keeps_a_line_break_written_as_character_references() {
+    let xml = captured(SPAN_READ).replace(
+        ">Test Expense A</LEDGERNAME>",
+        ">Test Expense A&#13;&#10;</LEDGERNAME>",
+    );
+    let rows = parse_import_voucher_rows(&xml, COMPANY_GUID).unwrap();
+    let named: Vec<&str> = rows
+        .iter()
+        .flat_map(|row| &row.entries)
+        .map(|entry| entry.ledger.as_str())
+        .filter(|ledger| ledger.starts_with("Test Expense A"))
+        .collect();
+    assert!(!named.is_empty());
+    assert!(
+        named.iter().all(|ledger| *ledger == "Test Expense A\r\n"),
+        "{named:?}"
+    );
+}

@@ -3,7 +3,7 @@
   "name": "bridge-tally",
   "display_name": "ComplyEaze Bridge",
   "version": "0.4.2",
-  "description": "Ask about the TallyPrime books on this computer, and prepare Journal, Payment, Receipt and Contra vouchers as a local file. Posting is off until you turn it on below; then it posts one voucher at a time, each after you approve it in a native dialog. What it reads, amounts included, goes to your AI provider; Response redaction can only mask party names or drop narration.",
+  "description": "Ask about the TallyPrime books on this computer, and prepare Journal, Payment, Receipt and Contra vouchers as a local file. Posting is off until you turn it on below; then it posts one voucher at a time, each after you approve it in a native dialog. What it reads, amounts included, goes to your AI provider; Response redaction can only shorten party and ledger names and bank account numbers or drop narrations.",
   "author": {
     "name": "ComplyEaze contributors"
   },
@@ -50,7 +50,7 @@
     "redaction": {
       "type": "string",
       "title": "Response redaction",
-      "description": "What to hide from your AI provider: none, mask_parties (masks party names) or drop_narration (removes narration). Neither hides amounts. Any other value stops the connector from starting.",
+      "description": "What to hide from your AI provider: none, mask_parties (shortens party and ledger names and bank account numbers to their first two and last two characters) or drop_narration (removes narrations). Neither hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or references. Any other value stops the connector from starting.",
       "default": "none"
     },
     "enable_writes": {

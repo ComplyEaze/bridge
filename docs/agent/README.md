@@ -44,9 +44,13 @@ creation with `agent_data_dir_encoding_invalid`; no lossy path alias is used.
 Before requesting financial data through an MCP client, the client may send the selected
 Tally result to its AI provider, including company
 identity, party or open-bill details, and amounts. An unset
-`BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` masks party names
-(in `stock_summary` it also masks stock item names and stock-group parents; GUIDs
-and Tally's reserved root stay plain) and `drop_narration` drops narration. Neither setting removes amounts. Set the
+`BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
+names and bank account numbers to their first two and last two characters (a name of
+four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
+and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
+drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
+GSTIN, IFSC, MSME or Udyam registration numbers or contact details, and the bank statement tool's `account_last4` (the last
+four digits of the statement's account number) is sent under every setting. Set the
 environment variable before launch when that better fits the workflow.
 
 On Unix, new data directories use mode `0700`; an existing data directory
@@ -2236,8 +2240,9 @@ supplier bill, a 20,000 customer advance and a 10,000 credit note to a customer,
 `payable` reads 80,000 and only 50,000 of it is owed to a supplier. The direction
 of an `unallocated` amount is the sign of the party's net unallocated balance, so
 an on-account receipt and an on-account payment on one party net into one figure.
-Separating advances, credit and debit notes and on-account amounts by their
-voucher's bill type is tracked in #945.
+For one party, `detail: unadjusted` separates advances, pending credit and debit notes and
+on-account amounts by their voucher's bill type (below). The book-wide `open_bills.kind` and
+`unallocated` figures do not; what is still to be measured is in #1356, the follow-up to #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted

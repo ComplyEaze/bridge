@@ -811,7 +811,12 @@ impl Server {
             admit_build_binding(line.ledger_identities.as_deref(), &ledger_binding).map_err(
                 |refusal| {
                     if let BuildBindingRefusal::Changed(ledgers) = &refusal {
-                        ledgers_changed = Some(ledgers.clone());
+                        // Before the list is cut to the few a refusal names.
+                        ledgers_changed = Some(in_batch_order(
+                            ledgers.clone(),
+                            &payload.vouchers,
+                            |ledger| ledger.as_str(),
+                        ));
                     }
                     ToolFailure::from(refusal.code().to_string())
                 },
@@ -1377,7 +1382,12 @@ impl Server {
                 masters_after_post,
                 line.vouchers.len() > 1,
             );
-            masters_verdict = Some(masters_after_post.clone());
+            // Ordered here for the answer of a failed readback; a verification
+            // that succeeds orders its own.
+            masters_verdict = Some(served_masters_verdict(
+                masters_after_post.clone(),
+                &line.vouchers,
+            ));
             let mut proof = self
                 .verify_import_after_current_dispatch(
                     args,

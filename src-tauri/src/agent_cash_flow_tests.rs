@@ -142,6 +142,15 @@ async fn call_observed(
     from: &str,
     to: &str,
 ) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, usize) {
+    call_observed_under(plans, from, to, Redaction::None).await
+}
+
+async fn call_observed_under(
+    plans: Vec<ScenarioPlan>,
+    from: &str,
+    to: &str,
+    redaction: Redaction,
+) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, usize) {
     let expected = plans.len();
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -153,7 +162,7 @@ async fn call_observed(
         data_dir: directory.path().into(),
         max_rows: 500,
         max_bytes: 200_000,
-        redaction: Redaction::None,
+        redaction,
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
@@ -554,5 +563,104 @@ async fn a_window_that_is_not_whole_months_is_refused_before_any_cash_flow_reque
         assert_eq!(error["code"], code, "{from}..{to}: {response}");
         // Nothing past the date boundary was sent.
         assert_eq!(sent, total, "{from}..{to}");
+    }
+}
+
+// ---- redaction: what `mask_parties` and `drop_narration` change in a Cash Flow answer ----
+
+/// Every string value in a JSON document, keys left out.
+fn string_values(value: &Value, into: &mut Vec<String>) {
+    match value {
+        Value::String(text) => into.push(text.clone()),
+        Value::Array(items) => items.iter().for_each(|item| string_values(item, into)),
+        Value::Object(map) => map.values().for_each(|item| string_values(item, into)),
+        _ => {}
+    }
+}
+
+/// The response with the read time and the duration, which differ between any two calls, removed.
+fn without_the_clock(response: &Value) -> Value {
+    fn strip(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                map.remove("read_at");
+                map.remove("duration_ms");
+                map.values_mut().for_each(strip);
+            }
+            Value::Array(items) => items.iter_mut().for_each(strip),
+            _ => {}
+        }
+    }
+    let mut copy = response.clone();
+    strip(&mut copy);
+    copy
+}
+
+/// The ledger names of the captured trial balance every scripted call here reads.
+fn fixture_ledger_names() -> Vec<String> {
+    let report = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
+    );
+    let mut names = Vec::new();
+    let mut rest = report;
+    while let Some(at) = rest.find("<LEDGER NAME=\"") {
+        rest = &rest[at + "<LEDGER NAME=\"".len()..];
+        let end = rest.find('"').unwrap();
+        if end > 0 {
+            names.push(rest[..end].replace("&amp;", "&"));
+        }
+    }
+    names
+}
+
+#[tokio::test]
+async fn the_four_outcomes_of_a_cash_flow_read_the_same_under_every_redaction_and_name_no_ledger() {
+    // The Cash Flow answer holds month names, amounts and the company name, and no ledger or party
+    // name on any outcome, so a redaction setting has nothing to change in it. Each of the four
+    // outcomes is scripted twice per setting from the same captured reads; the answers must be
+    // equal apart from the read time, and no ledger name of the captured trial balance may appear
+    // anywhere in them.
+    let names = fixture_ledger_names();
+    assert!(names.len() >= 4, "{names:?}");
+    assert!(
+        names.contains(&"Ageing Customer A".to_string()),
+        "{names:?}"
+    );
+    let outcomes: [(&str, fn() -> Vec<ScenarioPlan>, &str); 4] = [
+        ("tied", || plans("-4950.00"), "observed"),
+        ("differs", || plans("-4949.00"), "not_established"),
+        (
+            "money group unmeasured",
+            || plans_with("-4950.00", cash_under("Bank OD A/c")),
+            "not_established",
+        ),
+        (
+            "nothing to compare",
+            || plans_with("", cash_under("Sundry Debtors")),
+            "not_established",
+        ),
+    ];
+    for (label, scripted, state) in outcomes {
+        let (plain, _, _) =
+            call_observed_under(scripted(), "2026-04-01", "2026-06-30", Redaction::None).await;
+        assert_eq!(result(&plain)["state"], state, "{label}");
+        for redaction in [Redaction::MaskParties, Redaction::DropNarration] {
+            let (other, _, _) =
+                call_observed_under(scripted(), "2026-04-01", "2026-06-30", redaction).await;
+            assert_eq!(
+                without_the_clock(&other),
+                without_the_clock(&plain),
+                "{label}: the answer changed under a redaction setting"
+            );
+        }
+        let mut strings = Vec::new();
+        string_values(&plain, &mut strings);
+        for name in &names {
+            assert!(
+                !strings.iter().any(|text| text == name),
+                "{label}: the ledger name {name:?} is in the answer"
+            );
+        }
+        assert!(!plain.to_string().contains("Ageing"), "{label}");
     }
 }

@@ -253,11 +253,48 @@ fn a_row_counts_as_carried_only_when_the_file_says_it_is_a_voucher() {
 }
 
 #[test]
+fn a_negative_amount_on_the_bank_ledger_is_refused_by_the_reader() {
+    for side in ["Dr", "Cr"] {
+        let refused = StatementFile::read(&document(vec![voucher(&[(
+            "Synthetic Bank Ledger",
+            "-1.00",
+            side,
+        )])]))
+        .err();
+        assert_eq!(
+            refused,
+            Some("proposals_file_invalid".to_string()),
+            "{side}"
+        );
+    }
+    // a negative amount on another ledger is never read
+    assert!(StatementFile::read(&document(vec![voucher(&[("Rent", "-1.00", "Dr")])])).is_ok());
+}
+
+#[test]
+fn a_statement_of_one_day_is_a_whole_window_and_a_reversed_one_is_refused() {
+    let mut one_day = document(vec![]);
+    one_day["window"] = json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-01", "whole_statement": true});
+    assert_eq!(
+        StatementFile::read(&one_day).unwrap().window,
+        Ok((date(2026, 8, 1), date(2026, 8, 1)))
+    );
+    let mut reversed = document(vec![]);
+    reversed["window"] = json!({"first_row_date": "2026-08-02", "last_row_date": "2026-08-01", "whole_statement": true});
+    assert_eq!(
+        StatementFile::read(&reversed).err(),
+        Some("proposals_file_invalid".to_string())
+    );
+}
+
+#[test]
 fn only_an_exact_bank_ledger_name_counts() {
     let vouchers = vec![voucher(&[
         ("synthetic bank ledger", "300.00", "Dr"),
-        ("Synthetic Bank Ledger ", "300.00", "Cr"),
+        ("Synthetic Bank Ledger ", "120.00", "Cr"),
     ])];
+    // neither spelling is the bank ledger, so neither counts; a reader that
+    // folded case or trimmed would net 180.00
     assert_eq!(
         StatementFile::read(&document(vouchers))
             .unwrap()
@@ -1116,6 +1153,29 @@ async fn a_statement_whose_first_row_is_the_books_first_day_is_read_not_refused(
     );
 }
 
+/// The journal check before a build takes the shared import-admission lock; a
+/// build or post holding it exclusively makes the tie-out refuse as busy,
+/// before any ledger is read (the simulator holds only the company check).
+#[tokio::test]
+async fn an_import_holding_the_admission_lock_makes_a_before_build_tie_out_refuse_as_busy() {
+    let simulator = SequenceSimulator::spawn(company_check()).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path(), Some(simulator.address()));
+    let file = publish(
+        directory.path(),
+        &proposals(BANK, Some(whole("2026-08-01", "2026-08-07"))),
+    );
+    let admission = server.lock_import_admission().unwrap();
+    let busy = tie_out(&server, &file, "before_build").await;
+    drop(admission);
+    assert_eq!(busy["isError"], true, "{busy}");
+    assert_eq!(
+        busy["structuredContent"]["result"]["error"]["code"],
+        "import_admission_busy"
+    );
+    drop(simulator);
+}
+
 #[tokio::test]
 async fn a_bank_ledger_the_book_does_not_have_is_not_established_not_an_error() {
     let (response, requests) = three_reads(
@@ -1383,6 +1443,13 @@ async fn open_cash_lines_and_skipped_rows_stop_only_the_projection() {
     assert_eq!(
         before["structuredContent"]["result"]["rows_without_voucher"],
         2
+    );
+    // the opening gap is established and the closing is not: the evidence is
+    // partial and names the first reason
+    assert_eq!(before["structuredContent"]["evidence"]["state"], "partial");
+    assert_eq!(
+        before["structuredContent"]["evidence"]["reason_code"],
+        "rows_without_voucher"
     );
 }
 

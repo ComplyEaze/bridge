@@ -263,7 +263,12 @@ fn proposals_net(document: &Value, bank_ledger: &str) -> Result<BankSide, String
             if entry["ledger"].as_str().ok_or_else(invalid)? != bank_ledger {
                 continue;
             }
-            let amount = BankSide::from_printed(entry["amount"].as_str().ok_or_else(invalid)?)?;
+            let printed = entry["amount"].as_str().ok_or_else(invalid)?;
+            // A voucher entry's amount is unsigned: its side says the direction.
+            if printed.starts_with('-') {
+                return Err(invalid());
+            }
+            let amount = BankSide::from_printed(printed)?;
             net = match entry["side"].as_str() {
                 Some("Dr") => net.plus(&amount)?,
                 Some("Cr") => net.minus(&amount)?,

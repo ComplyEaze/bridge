@@ -311,7 +311,10 @@ impl From<NativeMastersError> for NativeStockError {
             | NativeMastersError::RowFieldInvalid(_)
             | NativeMastersError::DuplicateGuid
             | NativeMastersError::DuplicateName
-            | NativeMastersError::VoucherTypesEmpty => Self::Malformed("stock_response_malformed"),
+            | NativeMastersError::VoucherTypesEmpty
+            | NativeMastersError::CostCategoriesEmpty => {
+                Self::Malformed("stock_response_malformed")
+            }
         }
     }
 }

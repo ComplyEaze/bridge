@@ -43,9 +43,10 @@ These changes are in source and not yet in a published build.
   five windows (three with only debits, two with a credit amount, one of them
   with a positive closing as well) and a quiet window was answered as nothing to
   compare. Tally's own answers were captured on four synthetic books in all, one
-  of them a year of empty months on a large book. A contra, a window ending in
-  February, a window crossing a financial year, optional or post-dated vouchers,
-  a several-currency book and a large book with cash activity are not measured.
+  of them a year of empty months on a large book. A Bank OD credit or a Bank OCC ledger, a contra, a month with entries that
+  cancel, a window ending in February, a window crossing a financial year,
+  optional or post-dated vouchers, a several-currency book and a large book with
+  cash activity are not measured.
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
   `amount`), and can add a window up by ledger, month or voucher type

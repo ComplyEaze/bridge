@@ -510,7 +510,7 @@ fn a_bank_od_ledger_with_movement_is_refused_by_the_check_and_is_what_the_differ
     };
     let mut with_bank_od = money();
     with_bank_od.push(row("HDFC CC", "Bank OD A/c", "-2600.00", ""));
-    // The check does not count a Bank OD ledger that Tally counts, so it refuses instead of tying.
+    // The check does not count a Bank OD ledger that Tally was seen counting, so it refuses instead of tying.
     assert_eq!(
         check(with_bank_od, &cash_flow),
         CashFlowCheck::MoneyGroupUnmeasured { ledgers: 1 }

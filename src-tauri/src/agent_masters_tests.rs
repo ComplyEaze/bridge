@@ -710,6 +710,84 @@ async fn a_child_cost_centre_under_mask_parties_has_its_parent_masked_and_the_ro
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
+/// A refusal of the read at once, after the first page: the same request count as the other
+/// refusals of a bad answer (no closing extent, identity or mode read).
+const REFUSED_AT_ONCE: usize = 4 + 3 + 4 + 4;
+
+async fn refused_cause(kind: &str, answer: String) -> (String, usize) {
+    let mut plans = through_opening_extent(14, MARK);
+    pair(&mut plans, xml(answer));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(args(kind, 0, 500, None)).await;
+    assert_eq!(error(&refused)["code"], "masters_read_failed", "{refused}");
+    (
+        error(&refused)["cause"].as_str().unwrap().to_string(),
+        one.requests(),
+    )
+}
+
+#[tokio::test]
+async fn a_cost_centre_without_a_category_is_refused_through_the_tool() {
+    let changed = capture("cost_centres").replacen(
+        "<CATEGORY TYPE=\"String\">Business Line</CATEGORY>",
+        "",
+        1,
+    );
+    assert_ne!(changed, capture("cost_centres"));
+    let (cause, requests) = refused_cause("cost_centres", changed).await;
+    assert_eq!(cause, "masters_row_field_invalid:category");
+    assert_eq!(requests, REFUSED_AT_ONCE);
+}
+
+#[tokio::test]
+async fn a_cost_collection_that_does_not_carry_its_own_type_is_refused_through_the_tool() {
+    for (kind, own, other) in [
+        ("cost_centres", "MSTDEPTYPE=\"32\"", "MSTDEPTYPE=\"16\""),
+        ("cost_categories", "MSTDEPTYPE=\"16\"", "MSTDEPTYPE=\"32\""),
+    ] {
+        let captured = capture(kind);
+        assert!(captured.contains(own), "{kind}");
+        let (cause, requests) = refused_cause(kind, captured.replace(own, other)).await;
+        assert_eq!(cause, "masters_collection_type_unexpected", "{kind}");
+        assert_eq!(requests, REFUSED_AT_ONCE, "{kind}");
+    }
+}
+
+#[tokio::test]
+async fn an_empty_cost_category_answer_is_refused_through_the_tool() {
+    let captured = capture("cost_categories");
+    let start = captured.find("<COLLECTION").unwrap();
+    let open_end = start + captured[start..].find('>').unwrap() + 1;
+    let close = captured.find("</COLLECTION>").unwrap();
+    let empty = format!("{}{}", &captured[..open_end], &captured[close..]);
+    let (cause, requests) = refused_cause("cost_categories", empty).await;
+    assert_eq!(cause, "masters_cost_categories_empty");
+    assert_eq!(requests, REFUSED_AT_ONCE);
+}
+
+#[tokio::test]
+async fn a_cost_category_row_that_carries_a_parent_returns_none() {
+    // A category has no parent: a PARENT on the wire is not read as one, and the key stays.
+    let captured = capture("cost_categories");
+    let tag = "<COSTCATEGORY NAME=\"Business Line\"";
+    let at = captured.find(tag).unwrap();
+    let open_end = at + captured[at..].find('>').unwrap() + 1;
+    let changed = format!(
+        "{}<PARENT TYPE=\"String\">Business Line</PARENT>{}",
+        &captured[..open_end],
+        &captured[open_end..]
+    );
+    let one = OneServer::spawn(first_page_plans(changed, 14));
+    let response = one.call(args("cost_categories", 0, 500, None)).await;
+    let rows = result(&response)["masters"].as_array().unwrap().clone();
+    assert_eq!(rows.len(), 2);
+    for row in &rows {
+        assert!(row.get("parent").is_some(), "the key stays: {row}");
+        assert_eq!(row["parent"], Value::Null, "{row}");
+    }
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
 #[tokio::test]
 async fn voucher_types_have_no_size_check_before_the_read() {
     // A mark no godown, unit or stock group read would be admitted at.

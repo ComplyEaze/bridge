@@ -397,7 +397,7 @@ company has predefined voucher types, and a `cost_categories` answer with no row
 `masters_cost_categories_empty`; the other kinds may answer with none.
 
 Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1 (cost centres: three synthetic books, cost
-categories: two, the third book's release not recorded; see the provenance file) (`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
+categories: two; the third book's sitting recorded TallyPrime 7.1, licence Silver, Education mode off in its own status read, which is not committed; see the provenance file) (`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
 `Default`, `Automatic` and `Manual` are the only numbering methods observed; any
 other value is returned as `{"unrecognised": "<raw text>"}` rather than refused.
 `default` is Tally's reported value, not evidence that a type numbers

@@ -1572,6 +1572,8 @@ fn the_cost_category_capture_reads_the_three_allocation_flags() {
 
 #[test]
 fn a_book_with_no_cost_centre_answers_an_empty_collection_that_is_a_zero_row_answer() {
+    // No row is read here, so no company binding is exercised: only that a typed, empty answer
+    // is a zero-row answer.
     let rows = parse_native_masters(
         NativeMasterKind::CostCentres,
         &forex_cost_centres(),
@@ -1751,7 +1753,7 @@ fn the_parity_book_cost_category_is_the_predefined_one_with_its_flags() {
 }
 
 #[test]
-fn the_flag_yes_answers_are_company_bound_like_the_others() {
+fn the_flag_yes_cost_centre_answer_is_company_bound() {
     let centres = parity(
         &include_bytes!("../tests/fixtures/masters_cost_centres_parity_flag_yes_live.utf16le.xml")
             [..],

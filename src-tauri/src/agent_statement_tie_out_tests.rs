@@ -1089,6 +1089,33 @@ async fn a_book_that_matches_the_statement_at_both_ends_is_tied() {
     );
 }
 
+/// The company's books begin on 2026-04-01: a statement whose first row is
+/// dated that very day is inside the books, not before them.
+#[tokio::test]
+async fn a_statement_whose_first_row_is_the_books_first_day_is_read_not_refused() {
+    let (response, requests) = three_reads(
+        book("-1000.00", "-2150.00", "-1000.00"),
+        BANK,
+        whole("2026-04-01", "2026-04-07"),
+        "after_post",
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    assert_eq!(
+        figures(&response),
+        [
+            amount("tied", "0.00"),
+            amount("tied", "0.00"),
+            amount("tied", "0.00")
+        ]
+    );
+    assert_eq!(requests.len(), ALL_READS);
+    assert_eq!(
+        ledger_read_dates(&requests),
+        ["20260401", "20260408", "20260401"]
+    );
+}
+
 #[tokio::test]
 async fn a_bank_ledger_the_book_does_not_have_is_not_established_not_an_error() {
     let (response, requests) = three_reads(

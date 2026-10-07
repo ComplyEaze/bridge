@@ -7,10 +7,16 @@
 //! the Cash Flow's, used as they are ([`crate::native_cash_flow`]); this module
 //! adds the request and keeps Tally's three columns under neutral names.
 //!
+//! Only one answer was captured: the twelve months of one financial year of one
+//! book. A shorter or year-crossing window, and a book with no working-capital
+//! ledger, were not captured; the window type accepts any whole-month window of
+//! up to twelve months because the Cash Flow's does.
+//!
 //! What the columns mean is NOT decided here. On the one book measured, `Dr`
 //! equalled the working capital at the start of the month, `Cr` at its end, and
 //! `CL` was `Cr - Dr`, with June tying to the trial balance's debtors, bank and
-//! cash; which groups Tally counts as working capital was not measured. Nothing
+//! cash (a recorded reading: the trial balance responses were not kept); which
+//! groups Tally counts as working capital was not measured. Nothing
 //! here applies that reading, and nothing ties the figures to anything.
 use serde::Serialize;
 use std::fmt;
@@ -55,7 +61,9 @@ pub enum NativeFundsFlowError {
     TallyReportedFailure,
     /// A bare `RESPONSE`: Tally did not recognise the report name (§12a.1).
     UnknownReport,
-    /// An empty `ENVELOPE`: a report that was not rendered, never "no activity".
+    /// An empty `ENVELOPE`: treated as a report that was not rendered, never as
+    /// "no activity" (no empty Funds Flow answer was captured; the Cash Flow's
+    /// months all printed rows, empty ones included).
     EmptyEnvelope,
     /// An amount that is not a plain signed decimal.
     InvalidAmount,

@@ -11,6 +11,8 @@ const LIVE: &[u8] =
     include_bytes!("../tests/fixtures/builtin_funds_flow_probe_b_fy_live.utf16le.xml");
 const REQUEST: &[u8] =
     include_bytes!("../tests/fixtures/builtin_funds_flow_fy_request.utf16le.xml");
+// A stand-in: no empty Funds Flow answer was captured, so the empty envelope of another
+// built-in report (Negative Ledgers) exercises the shared empty-answer path.
 const EMPTY_ENVELOPE: &[u8] =
     include_bytes!("../tests/fixtures/builtin_negative_ledgers_probe_b_fy_empty_live.utf16le.xml");
 const UNKNOWN_REPORT: &[u8] =
@@ -143,7 +145,7 @@ fn any_other_refusal_is_one_variant_that_names_the_shared_grammars_code() {
     let error = refused.unwrap_err();
     assert_eq!(error.code(), "funds_flow_response_refused");
     assert_eq!(error.detail(), Some("cash_flow_unexpected_empty_element"));
-    // A column repeated inside a row, and a period without its row, reach the same variant.
+    // A column repeated inside a row, and a row without its period, reach the same variant.
     let repeated = mutate(
         "<DSPDRAMT><DSPDRAMTA>-1.00</DSPDRAMTA></DSPDRAMT>",
         "<DSPDRAMT><DSPDRAMTA>-1.00</DSPDRAMTA></DSPDRAMT><DSPDRAMT><DSPDRAMTA>2.00</DSPDRAMTA></DSPDRAMT>",

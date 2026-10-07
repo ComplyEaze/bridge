@@ -588,12 +588,44 @@ fn without_the_clock(response: &Value) -> Value {
                 map.values_mut().for_each(strip);
             }
             Value::Array(items) => items.iter_mut().for_each(strip),
+            // The response carries the same answer again as text in `content`: compare it parsed.
+            Value::String(text) if text.starts_with('{') => {
+                if let Ok(mut parsed) = serde_json::from_str::<Value>(text) {
+                    strip(&mut parsed);
+                    *value = parsed;
+                }
+            }
             _ => {}
         }
     }
     let mut copy = response.clone();
     strip(&mut copy);
     copy
+}
+
+/// The paths at which two JSON documents differ, for a failure message that can be read.
+fn differing_paths(left: &Value, right: &Value, at: &str, into: &mut Vec<String>) {
+    match (left, right) {
+        (Value::Object(a), Value::Object(b)) => {
+            for key in a
+                .keys()
+                .chain(b.keys())
+                .collect::<std::collections::BTreeSet<_>>()
+            {
+                match (a.get(key), b.get(key)) {
+                    (Some(x), Some(y)) => differing_paths(x, y, &format!("{at}/{key}"), into),
+                    _ => into.push(format!("{at}/{key} (present on one side only)")),
+                }
+            }
+        }
+        (Value::Array(a), Value::Array(b)) if a.len() == b.len() => {
+            for (index, (x, y)) in a.iter().zip(b).enumerate() {
+                differing_paths(x, y, &format!("{at}[{index}]"), into);
+            }
+        }
+        _ if left == right => {}
+        _ => into.push(format!("{at}: {left} != {right}")),
+    }
 }
 
 /// The ledger names of the captured trial balance every scripted call here reads.
@@ -647,10 +679,16 @@ async fn the_four_outcomes_of_a_cash_flow_read_the_same_under_every_redaction_an
         for redaction in [Redaction::MaskParties, Redaction::DropNarration] {
             let (other, _, _) =
                 call_observed_under(scripted(), "2026-04-01", "2026-06-30", redaction).await;
-            assert_eq!(
-                without_the_clock(&other),
-                without_the_clock(&plain),
-                "{label}: the answer changed under a redaction setting"
+            let mut paths = Vec::new();
+            differing_paths(
+                &without_the_clock(&plain),
+                &without_the_clock(&other),
+                "",
+                &mut paths,
+            );
+            assert!(
+                paths.is_empty(),
+                "{label}: the answer changed under a redaction setting at {paths:?}"
             );
         }
         let mut strings = Vec::new();
@@ -661,6 +699,11 @@ async fn the_four_outcomes_of_a_cash_flow_read_the_same_under_every_redaction_an
                 "{label}: the ledger name {name:?} is in the answer"
             );
         }
-        assert!(!plain.to_string().contains("Ageing"), "{label}");
+        // A longer name must not appear inside any text either (a short one such as "Cash" is a
+        // common word of the lead, and is covered by the exact-value check above).
+        let everything = plain.to_string();
+        for name in names.iter().filter(|name| name.len() > 5) {
+            assert!(!everything.contains(name.as_str()), "{label}: {name:?}");
+        }
     }
 }

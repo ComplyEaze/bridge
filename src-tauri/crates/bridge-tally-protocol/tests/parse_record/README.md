@@ -11,8 +11,10 @@ captures, so they are kept out of `tests/fixtures/` and its provenance and byte-
   variant. A few types whose own `Debug` hides fields are rendered field by field instead.
 - An error that comes from the XML library itself is recorded as `Err(xml library error)`, never by
   the library's name or text.
+- A record that is an error shows which refusal the parser reaches first, not how the rest of the
+  fixture's content parses. A fixture whose every row is an error is recorded only that far.
 
-**Full and hashed records.** A rendering up to 32 KB is committed in full (`.txt`). A longer one is
+**Full and hashed records.** A rendering up to 128 KB is committed in full (`.txt`). A longer one is
 committed as its SHA-256 and its length (`.sha256`).
 
 **Checking.** `cargo test -p bridge-tally-protocol --test captured_parse_record` compares every

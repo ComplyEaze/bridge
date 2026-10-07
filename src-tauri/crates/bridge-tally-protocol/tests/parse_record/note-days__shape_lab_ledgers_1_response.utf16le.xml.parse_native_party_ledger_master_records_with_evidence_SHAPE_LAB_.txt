@@ -1,0 +1,2884 @@
+# fixture: tests/fixtures/note-days/shape_lab_ledgers_1_response.utf16le.xml
+# parser: parse_native_party_ledger_master_records_with_evidence(SHAPE LAB)
+# source: captured
+Ok(ParsedExport {
+    records: [
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Bank of Baroda CA",
+                    parent: Returned(
+                        "Bank Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ce",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ce",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "206",
+                ),
+            },
+            alter_id: Some(
+                "208",
+            ),
+            raw_source_sha256: "0d4902f719cf3c0da26ffc923aacf707a63bb88e53351d3b08a5edeb4aeacf13",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Capital A/c",
+                    parent: Returned(
+                        "Capital Account",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "-1000000.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e9",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e9",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "233",
+                ),
+            },
+            alter_id: Some(
+                "234",
+            ),
+            raw_source_sha256: "5aa75d9c8975bf6d6f0c3cb38d43ac7ba036cce0d2f4d0a5920610641e3e6ee0",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Cash",
+                    parent: Returned(
+                        "Cash-in-Hand",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000001f",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000001f",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "31",
+                ),
+            },
+            alter_id: Some(
+                "32",
+            ),
+            raw_source_sha256: "7dc2f7740600e41bcffbd9e819bc60d2977f3213bbfd9d623433866398268597",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Cess",
+                    parent: Returned(
+                        "Duties & Taxes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "GST",
+                    ),
+                    gst_duty_head: Recognized {
+                        raw: "Cess",
+                        head: Cess,
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e4",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e4",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "228",
+                ),
+            },
+            alter_id: Some(
+                "229",
+            ),
+            raw_source_sha256: "d083bf1128e212862259d5da69b5c242053ec56fca7872627c430bf8f464aa27",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "CGST",
+                    parent: Returned(
+                        "Duties & Taxes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "GST",
+                    ),
+                    gst_duty_head: Recognized {
+                        raw: "CGST",
+                        head: Cgst,
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e1",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e1",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "225",
+                ),
+            },
+            alter_id: Some(
+                "226",
+            ),
+            raw_source_sha256: "ebfe1a06fb5535f202fd23829f379f3498b42b1ae5d1f412d8d5dd741a63aca2",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Chem Supplier 1",
+                    parent: Returned(
+                        "Chemical Suppliers",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ff",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ff",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "255",
+                ),
+            },
+            alter_id: Some(
+                "256",
+            ),
+            raw_source_sha256: "8cdd43ee90353b56718f7930af7b378d00732cd80f207ce3c6a3b0fe6fe5320c",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Chem Supplier 2",
+                    parent: Returned(
+                        "Chemical Suppliers",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000100",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000100",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "256",
+                ),
+            },
+            alter_id: Some(
+                "257",
+            ),
+            raw_source_sha256: "7a31de7ce043beaf50a100b9970393e99d82231e187666a3ee56bd2f5f42fd74",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Chem Supplier 3",
+                    parent: Returned(
+                        "Chemical Suppliers",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000101",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000101",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "257",
+                ),
+            },
+            alter_id: Some(
+                "258",
+            ),
+            raw_source_sha256: "242aa41d064f38e06f93bedf3345e3cbbde04f0f29f67528b888117a673170e4",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Chem Supplier 4",
+                    parent: Returned(
+                        "Chemical Suppliers",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000102",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000102",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "258",
+                ),
+            },
+            alter_id: Some(
+                "259",
+            ),
+            raw_source_sha256: "e5b342c60caf32e02289402af08c4d626b6be4e8b8a471abdb8cec440542e6c7",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "CRLF Supplier\r\n",
+                    parent: Returned(
+                        "Chemical Suppliers",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000118",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000118",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "280",
+                ),
+            },
+            alter_id: Some(
+                "282",
+            ),
+            raw_source_sha256: "cfe06815dd3cf477a232bfb33b4b30945af8d1557e678ad8cdf52af6f6109551",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Discount Allowed",
+                    parent: Returned(
+                        "Indirect Expenses",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000eb",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000eb",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "235",
+                ),
+            },
+            alter_id: Some(
+                "236",
+            ),
+            raw_source_sha256: "fe2b37e0b5bf8c8eaeb297195a81f53c63b37f8be5e8ab32c687900482bacc77",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Discount Received",
+                    parent: Returned(
+                        "Indirect Incomes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ec",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ec",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "236",
+                ),
+            },
+            alter_id: Some(
+                "237",
+            ),
+            raw_source_sha256: "f8fc59bc8271c0ab465b2d88e94c9c64d49e009b00fc8ff24d443910de6d5113",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Drawings",
+                    parent: Returned(
+                        "Capital Account",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ea",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ea",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "234",
+                ),
+            },
+            alter_id: Some(
+                "235",
+            ),
+            raw_source_sha256: "c3ba0f8d10a3b634c77bff5cc102cdaf042dc468770b455199bbf0ae77f9242f",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Freight Inward",
+                    parent: Returned(
+                        "Direct Expenses",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ed",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ed",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "237",
+                ),
+            },
+            alter_id: Some(
+                "238",
+            ),
+            raw_source_sha256: "9b79863c5e798bc1bf2df8382f32ef093aead460959444b012c6453fa5135889",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "HDFC CC",
+                    parent: Returned(
+                        "Bank OD A/c",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "-250000.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e7",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e7",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "231",
+                ),
+            },
+            alter_id: Some(
+                "232",
+            ),
+            raw_source_sha256: "f81eedb756aa7a0c3d5e380676bf7afc7fcb4bbfa6d9b622dccc62d3ba08dc6a",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "IGST",
+                    parent: Returned(
+                        "Duties & Taxes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "GST",
+                    ),
+                    gst_duty_head: Recognized {
+                        raw: "IGST",
+                        head: Igst,
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e3",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e3",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "227",
+                ),
+            },
+            alter_id: Some(
+                "228",
+            ),
+            raw_source_sha256: "e2f1fce13186af127f0eafe963e2d24f1c20b531f0b915566802b1435418df47",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Naive Chemicals & Co Correct",
+                    parent: Returned(
+                        "Chemical Suppliers",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000117",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000117",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "279",
+                ),
+            },
+            alter_id: Some(
+                "281",
+            ),
+            raw_source_sha256: "3576f3dd321b7a296918d7fef942e9c0b976602eff5876bdfdc522b7d7cef6e0",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Näive Chemicals &amp; Co.",
+                    parent: Returned(
+                        "Chemical Suppliers",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000103",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000103",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "259",
+                ),
+            },
+            alter_id: Some(
+                "260",
+            ),
+            raw_source_sha256: "e11229a2ce2d5a94fc5890cbbc134c208cf91579186b495cfa773a2737c008f2",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Outstation Buyer 1",
+                    parent: Returned(
+                        "Trade Debtors - Outstation",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fc",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fc",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "252",
+                ),
+            },
+            alter_id: Some(
+                "253",
+            ),
+            raw_source_sha256: "e57877fe149918562980d66792759e3a9aeb7670d134fa3ce4157b530a5cc730",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Outstation Buyer 2",
+                    parent: Returned(
+                        "Trade Debtors - Outstation",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fd",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fd",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "253",
+                ),
+            },
+            alter_id: Some(
+                "254",
+            ),
+            raw_source_sha256: "b6b61fb8d192ecdd47a941da5ac3b61fee3701ec22915a6af0bf8d996c6a3879",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Outstation Buyer 3",
+                    parent: Returned(
+                        "Trade Debtors - Outstation",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fe",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fe",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "254",
+                ),
+            },
+            alter_id: Some(
+                "255",
+            ),
+            raw_source_sha256: "f8b0db03dc3b78c582cfc6093c7a2bcc4f2c1458b5faf4ef37b4d961257c0f27",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Power Charges",
+                    parent: Returned(
+                        "Power and Fuel",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ee",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ee",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "238",
+                ),
+            },
+            alter_id: Some(
+                "239",
+            ),
+            raw_source_sha256: "d70500eddd8f1873456f290d6bb63e20f375cd95feb37b0e4a62762909a29a5a",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Profit & Loss A/c",
+                    parent: Returned(
+                        "�#4; Primary",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000001e",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000001e",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "30",
+                ),
+            },
+            alter_id: Some(
+                "31",
+            ),
+            raw_source_sha256: "3e5fc53583c82dd7b62f2a045fdd9888c8aed42bd0c29a56ddd72c7c9eab4fd3",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Purchase - Exempt",
+                    parent: Returned(
+                        "Purchase Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f1",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f1",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "241",
+                ),
+            },
+            alter_id: Some(
+                "242",
+            ),
+            raw_source_sha256: "2bb02136b005f4a4aad54334774cc6d8ccd9d697941c8622c2ec53a90abf597f",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Purchase - Interstate",
+                    parent: Returned(
+                        "Purchase Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f0",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f0",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "240",
+                ),
+            },
+            alter_id: Some(
+                "241",
+            ),
+            raw_source_sha256: "5db94f090a0233284e108e0ab06dc2b67938c0517f3cbc667153d022edc501bf",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Purchase - Local",
+                    parent: Returned(
+                        "Purchase Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ef",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ef",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "239",
+                ),
+            },
+            alter_id: Some(
+                "240",
+            ),
+            raw_source_sha256: "01a5391fcac0439eaa77e6333d968c79a4c728faf58dec4ab429f7ec000498ad",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Round Off",
+                    parent: Returned(
+                        "Indirect Expenses",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e6",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e6",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "230",
+                ),
+            },
+            alter_id: Some(
+                "231",
+            ),
+            raw_source_sha256: "cff3ca86497945c769b1c1c502f63c350280f188c6cc09a8a2e1197824ba5834",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Sales - Exempt",
+                    parent: Returned(
+                        "Sales Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f4",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f4",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "244",
+                ),
+            },
+            alter_id: Some(
+                "245",
+            ),
+            raw_source_sha256: "fdae19e2ae3241888c918982d44b3f184767d92471b7f1826b7930d342b56477",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Sales - Interstate",
+                    parent: Returned(
+                        "Sales Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f3",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f3",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "243",
+                ),
+            },
+            alter_id: Some(
+                "244",
+            ),
+            raw_source_sha256: "22fb04248ffbea7134bde3423052da25efabab74b45a6db1f1794938854c24bb",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Sales - Local",
+                    parent: Returned(
+                        "Sales Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f2",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f2",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "242",
+                ),
+            },
+            alter_id: Some(
+                "243",
+            ),
+            raw_source_sha256: "ff4856dec9a821fddf6b2ac3b56957590301d514e561e7ec0617fc50d3c74d71",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Sales - Nil Rated",
+                    parent: Returned(
+                        "Sales Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f5",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f5",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "245",
+                ),
+            },
+            alter_id: Some(
+                "246",
+            ),
+            raw_source_sha256: "9bd2421973fd9da92e4b046abbf34ee452a32ac5e0932bac178e1d819c46a4c2",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Shape Buyer 1",
+                    parent: Returned(
+                        "Trade Debtors - Local",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f6",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f6",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "246",
+                ),
+            },
+            alter_id: Some(
+                "261",
+            ),
+            raw_source_sha256: "efb53883347586e8099f346ba07a045ac952894935c51f37cf1099372b8ec57e",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Shape Buyer 2",
+                    parent: Returned(
+                        "Trade Debtors - Local",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f7",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f7",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "247",
+                ),
+            },
+            alter_id: Some(
+                "248",
+            ),
+            raw_source_sha256: "0310bd44c08825506b2bbbf009f5a215815bd4ce3a6510fa4b4dfb5325b1a6ff",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Shape Buyer 3",
+                    parent: Returned(
+                        "Trade Debtors - Local",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f8",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f8",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "248",
+                ),
+            },
+            alter_id: Some(
+                "249",
+            ),
+            raw_source_sha256: "97f80bbb89d4ee64d96385dd30e2e881ad237e3ea443070d0f601e1bf54d3bda",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Shape Buyer 4",
+                    parent: Returned(
+                        "Trade Debtors - Local",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f9",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f9",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "249",
+                ),
+            },
+            alter_id: Some(
+                "250",
+            ),
+            raw_source_sha256: "ffcb6918e1efdc7ead9cfddd8241714bfc9fa8a4ac68af8b312d6f56d526a84a",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Shape Buyer 5",
+                    parent: Returned(
+                        "Trade Debtors - Local",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fa",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fa",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "250",
+                ),
+            },
+            alter_id: Some(
+                "251",
+            ),
+            raw_source_sha256: "25bf1ad9e3f782c47c09152610d30a8adc7ac8e93fc9e9cd96e64fcadc570028",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Shape Buyer 6",
+                    parent: Returned(
+                        "Trade Debtors - Local",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fb",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fb",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "251",
+                ),
+            },
+            alter_id: Some(
+                "252",
+            ),
+            raw_source_sha256: "34f79f0f463688985cecc5f38c95f8cf5f5081827c74db69a5ee4aef1887273b",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Shape Reparent Probe 20260922",
+                    parent: Returned(
+                        "Bank Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000119",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000119",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "281",
+                ),
+            },
+            alter_id: Some(
+                "289",
+            ),
+            raw_source_sha256: "32525a066abba4dbe56a2032275209fa5186557a573f4c0a411673c22ab9307b",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "State Tax",
+                    parent: Returned(
+                        "Duties & Taxes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "GST",
+                    ),
+                    gst_duty_head: Recognized {
+                        raw: "State Tax",
+                        head: StateTax,
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e2",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e2",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "226",
+                ),
+            },
+            alter_id: Some(
+                "227",
+            ),
+            raw_source_sha256: "4ee7c05bd51da3c13a521c794efe11023de2e61c530de115f3dd9b5787182121",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "TDS Payable",
+                    parent: Returned(
+                        "Duties & Taxes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e5",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e5",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "229",
+                ),
+            },
+            alter_id: Some(
+                "230",
+            ),
+            raw_source_sha256: "4563add620973ec7ad21545480df94487c465c96570b54cb372c8501f2bff250",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Trailing Newline Supplier&#13;&#10;",
+                    parent: Returned(
+                        "Chemical Suppliers",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000104",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000104",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "260",
+                ),
+            },
+            alter_id: Some(
+                "262",
+            ),
+            raw_source_sha256: "fa82afbf3b04d2bfa419e31099745221eb36ed5c3da74400fbb67997f3e8cad9",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Transport Charges",
+                    parent: Returned(
+                        "Indirect Expenses",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000cf",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000cf",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "207",
+                ),
+            },
+            alter_id: Some(
+                "209",
+            ),
+            raw_source_sha256: "e5fc1dcfcc388bfe3a7dcc0ab8619ab84e3300ffe3db5b37ff1d472fecacefbc",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "USD Import Supplier",
+                    parent: Returned(
+                        "Chemical Suppliers",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000105",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000105",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "261",
+                ),
+            },
+            alter_id: Some(
+                "263",
+            ),
+            raw_source_sha256: "954db563c9daba31dac56d5b12c68ef3661cad6acbe4405e2f29a60ca48ce39b",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Working Capital Loan",
+                    parent: Returned(
+                        "Secured Loans",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "-500000.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e8",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e8",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "232",
+                ),
+            },
+            alter_id: Some(
+                "233",
+            ),
+            raw_source_sha256: "e2c02d8a618f4a6956b38c6656ada092da29ce1400d51cc5115e4bcebb5a3744",
+        },
+    ],
+    evidence: ExportEvidence {
+        company_context: None,
+        schema: None,
+        object_type: None,
+        observed_record_count: Some(
+            44,
+        ),
+        source_record_count: None,
+        identified_record_count: 44,
+        duplicate_identities: [],
+        company_guid_prefix_match_count: 44,
+        company_guid_prefix_mismatch_count: 0,
+    },
+})

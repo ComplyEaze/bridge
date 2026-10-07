@@ -60,9 +60,11 @@ use bridge_tally_protocol::{
 use sha2::{Digest, Sha256};
 
 /// A rendering longer than this is recorded as its SHA-256 and length, not in full.
-/// Measured on the first recording (bridge#1198): 251 renderings, 2,029,341 bytes in all; at
-/// 32 KB, 9 are hashed and 842,982 bytes are committed in full.
-const FULL_RECORD_CAP: usize = 32 * 1024;
+/// The maintainers' choice on bridge#1404, so that the heaviest captures (party masters, ledger
+/// sources, the dense trial balance) are read in full where a parser change most needs it.
+/// Measured at this cap: 256 renderings, 2,033,320 bytes in all; 1 is hashed (529,929 bytes) and
+/// 1,503,391 bytes are committed in full.
+const FULL_RECORD_CAP: usize = 128 * 1024;
 
 /// Writes every record from today's parsers. Refused where `CI` is set.
 const RECORD_VAR: &str = "BRIDGE_RECORD_PARSES";
@@ -2671,8 +2673,22 @@ fn every_parse_matches_its_record() {
     );
 }
 
+/// Whether a fixture's name marks it as a request: `_request` or `.request` just before its
+/// extension (`.xml`, `.utf8.xml` or `.utf16le.xml`). A word `request` elsewhere in the name does
+/// not, so a response fixture named that way still needs a row or a reason.
+fn is_request_name(name: &str) -> bool {
+    let Some(stem) = name.strip_suffix(".xml") else {
+        return false;
+    };
+    let stem = stem
+        .strip_suffix(".utf16le")
+        .or_else(|| stem.strip_suffix(".utf8"))
+        .unwrap_or(stem);
+    stem.ends_with("_request") || stem.ends_with(".request")
+}
+
 /// Every response fixture under `tests/fixtures/`, as a path from the crate directory: every file
-/// but documentation, generators, line-delimited journals and requests (named `*request*`).
+/// but documentation, generators, line-delimited journals and requests ([`is_request_name`]).
 fn response_fixtures(root: &Path) -> BTreeSet<String> {
     let mut found = BTreeSet::new();
     let mut pending = vec![root.to_path_buf()];
@@ -2692,7 +2708,7 @@ fn response_fixtures(root: &Path) -> BTreeSet<String> {
             let skipped = [".md", ".py", ".json", ".jsonl", ".txt"]
                 .iter()
                 .any(|ext| name.ends_with(ext));
-            if !skipped && !name.contains("request") {
+            if !skipped && !is_request_name(name) {
                 let relative = path.strip_prefix(crate_dir()).expect("under the crate");
                 found.insert(relative.to_string_lossy().replace('\\', "/"));
             }
@@ -2778,6 +2794,28 @@ fn coverage_names_each_way_the_table_drifts() {
             "tests/fixtures/c.xml is named as not recorded but is no response fixture",
         ]
     );
+}
+
+/// Only the ending of a fixture's name marks it as a request.
+#[test]
+fn only_the_ending_of_a_name_marks_a_request() {
+    for name in [
+        "ledgers_request.xml",
+        "ledgers.request.xml",
+        "ledgers_request.utf16le.xml",
+        "ledgers.request.utf8.xml",
+    ] {
+        assert!(is_request_name(name), "{name}");
+    }
+    for name in [
+        "request_ledgers.xml",
+        "ledgers_request_echo.utf16le.xml",
+        "ledgers_request.txt",
+        "ledgersrequest.xml",
+        "ledgers.utf16le.xml",
+    ] {
+        assert!(!is_request_name(name), "{name}");
+    }
 }
 
 /// A rendering of exactly the cap is kept in full and one byte more is hashed; a mismatch names the

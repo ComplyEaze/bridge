@@ -659,27 +659,57 @@ async fn the_four_outcomes_of_a_cash_flow_read_the_same_under_every_redaction_an
         "{names:?}"
     );
     type Scripted = fn() -> Vec<ScenarioPlan>;
-    let outcomes: [(&str, Scripted, &str); 4] = [
-        ("tied", || plans("-4950.00"), "observed"),
-        ("differs", || plans("-4949.00"), "not_established"),
+    // Each outcome is pinned by its state and its reason, so a mis-scripted one fails here.
+    let outcomes: [(&str, Scripted, &str, Option<&str>); 4] = [
+        ("tied", || plans("-4950.00"), "observed", None),
+        (
+            "differs",
+            || plans("-4949.00"),
+            "not_established",
+            Some("cash_flow_differs_from_trial_balance"),
+        ),
         (
             "money group unmeasured",
             || plans_with("-4950.00", cash_under("Bank OD A/c")),
             "not_established",
+            Some("cash_flow_money_group_unmeasured"),
         ),
         (
             "nothing to compare",
             || plans_with("", cash_under("Sundry Debtors")),
             "not_established",
+            Some("cash_flow_nothing_to_compare"),
         ),
     ];
-    for (label, scripted, state) in outcomes {
+    for (label, scripted, state, reason) in outcomes {
         let (plain, _, _) =
             call_observed_under(scripted(), "2026-04-01", "2026-06-30", Redaction::None).await;
         assert_eq!(result(&plain)["state"], state, "{label}");
+        match reason {
+            Some(code) => assert_eq!(result(&plain)["reason"], code, "{label}"),
+            None => assert!(result(&plain).get("reason").is_none(), "{label}"),
+        }
+        // The text copy of the answer is there and is the same answer, so comparing it is not vacuous.
+        let text = plain["content"][0]["text"].as_str().expect("a text copy");
+        let parsed: Value = serde_json::from_str(text).expect("the text copy is JSON");
+        assert_eq!(
+            parsed["state"],
+            plain["structuredContent"]["result"]["state"]
+        );
         for redaction in [Redaction::MaskParties, Redaction::DropNarration] {
             let (other, _, _) =
                 call_observed_under(scripted(), "2026-04-01", "2026-06-30", redaction).await;
+            // The clock is removed before comparing, so check first that both sides carry it.
+            for side in [&plain, &other] {
+                assert!(
+                    side["structuredContent"]["evidence"]["read_at"].is_string(),
+                    "{label}"
+                );
+                assert!(
+                    side["structuredContent"]["evidence"]["duration_ms"].is_number(),
+                    "{label}"
+                );
+            }
             let mut paths = Vec::new();
             differing_paths(
                 &without_the_clock(&plain),
@@ -700,11 +730,20 @@ async fn the_four_outcomes_of_a_cash_flow_read_the_same_under_every_redaction_an
                 "{label}: the ledger name {name:?} is in the answer"
             );
         }
-        // A longer name must not appear inside any text either (a short one such as "Cash" is a
-        // common word of the lead, and is covered by the exact-value check above).
+        // A longer name must not appear inside any text either. A short one such as "Cash" is a
+        // common word of the lead ("Cash Flow"), so it is searched in its quoted forms.
         let everything = plain.to_string();
         for name in names.iter().filter(|name| name.len() > 5) {
             assert!(!everything.contains(name.as_str()), "{label}: {name:?}");
+        }
+        for name in names.iter().filter(|name| name.len() <= 5) {
+            for quoted in [
+                format!("\\\"{name}\\\""),
+                format!("\u{201c}{name}\u{201d}"),
+                format!("'{name}'"),
+            ] {
+                assert!(!everything.contains(&quoted), "{label}: {quoted}");
+            }
         }
     }
 }

@@ -28,8 +28,10 @@ pub const MAX_SEQUENCE_REQUESTS: usize = 128;
 pub struct ObservedRequest {
     pub method: String,
     pub path: String,
-    /// Sanitized transport metadata used by integration tests. The simulator
-    /// never retains arbitrary request headers or the request body.
+    /// The request body as received, for a test that must see which dates or
+    /// names a request carried. Headers are never retained.
+    pub request_body: Vec<u8>,
+    /// Sanitized transport metadata used by integration tests.
     pub request_content_type_is_tally_xml_utf16: bool,
     pub request_content_type_is_plain_tally_xml: bool,
     pub bytes_received: usize,
@@ -317,6 +319,7 @@ fn serve_request(
         request_content_type_is_tally_xml_utf16: has_tally_xml_utf16_content_type(&request),
         request_content_type_is_plain_tally_xml: has_plain_tally_xml_content_type(&request),
         bytes_received: request.len(),
+        request_body: request_body.to_vec(),
         request_body_bytes: request_body.len(),
         request_body_sha256: hex::encode(Sha256::digest(request_body)),
         request_processed: false,

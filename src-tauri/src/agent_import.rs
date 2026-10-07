@@ -2245,6 +2245,26 @@ impl Server {
         }
     }
 
+    /// Whether the import journal already holds a batch of this company, sent
+    /// or found posted, with a row of `vouchers` (a statement file's vouchers,
+    /// in the shape a build takes). The same check a build makes before it
+    /// writes an import file.
+    pub(super) fn import_journal_holds_rows_of(
+        &self,
+        company_guid: &str,
+        vouchers: &Value,
+    ) -> Result<bool, String> {
+        let vouchers: Vec<ImportVoucher> = serde_json::from_value(vouchers.clone())
+            .map_err(|_| "proposals_file_invalid".to_string())?;
+        let _admission_lock = self.lock_import_admission_shared()?;
+        Ok(self
+            .import_vouchers_already_posted_while_admitted(
+                &canonical_batch_guid(company_guid),
+                &vouchers,
+            )?
+            .is_some())
+    }
+
     fn latest_import_snapshot(
         &self,
         batch_id: &str,

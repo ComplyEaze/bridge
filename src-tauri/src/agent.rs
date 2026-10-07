@@ -77,6 +77,8 @@ use voucher_summary::{SummaryGroup, SummaryRequest};
 mod movement;
 #[path = "agent_register.rs"]
 mod register;
+#[path = "agent_statement_tie_out.rs"]
+mod statement_tie_out;
 #[path = "agent_statements.rs"]
 mod statements;
 #[path = "agent_trial_balance.rs"]
@@ -2069,6 +2071,7 @@ impl Server {
             "purchase_register" => self.register(register::RegisterKind::Purchase, args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
             "sales_register" => self.register(register::RegisterKind::Sales, args).await,
+            "statement_tie_out" => self.statement_tie_out(args).await,
             "stock_summary" => self.stock_summary(args).await,
             "tally_status" => {
                 let (result, evidence) = self.status().await?;

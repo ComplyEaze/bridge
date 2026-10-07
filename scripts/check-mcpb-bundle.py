@@ -28,6 +28,7 @@ DEFAULT_TOOLS = {
     "purchase_register",
     "read_evidence",
     "sales_register",
+    "statement_tie_out",
     "stock_summary",
     "tally_status",
     "trial_balance",

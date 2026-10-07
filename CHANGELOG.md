@@ -46,6 +46,14 @@ These changes are in source and not yet in a published build.
   `trial_balance` for the same year, and each search returned what the same
   criterion selects from the listing; it did not cover a large book, a memorandum,
   a reversing journal or a voucher withheld for a foreign-currency amount (#1230).
+- `statement_tie_out` is a new read-only tool: after `parse_bank_statement`, it says
+  whether the bank ledger in Tally stands where the statement says it stood at the
+  start and at the end of the statement's dates, as three gaps (book less
+  statement), before an import or after one made by hand. It covers whole
+  statements only, names no cause and writes nothing. It returns the two dates and
+  the gaps, not the balances, though a gap plus the statement balance you supplied
+  gives the book's. It is not yet run against a live book; the parse's proposals
+  file now also records the statement's first and last dates.
 
 **Safer or fixed**
 

@@ -498,6 +498,10 @@
       "path": "src-tauri/src/agent_responses.rs"
     },
     {
+      "path": "src-tauri/src/agent_statement_tie_out.rs",
+      "reason": "decides what the statement tie-out reads from Tally and returns to the assistant: the three ledger reads, the gaps computed from a bank statement's own balances, and the not-established states that keep it from claiming a tie it did not observe"
+    },
+    {
       "path": "src-tauri/src/agent_statements.rs"
     },
     {

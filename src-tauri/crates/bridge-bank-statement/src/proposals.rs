@@ -151,6 +151,13 @@ pub struct StatementRecord {
 pub struct Build {
     pub proposals: Vec<Proposal>,
     pub records: Vec<StatementRecord>,
+    /// The earliest and latest date any row prints, over every row before the
+    /// date window: not the first and last row in printed order, and not the
+    /// window's own edges. `None` only when there are no rows.
+    pub span: Option<(Date, Date)>,
+    /// How many rows the date window left out. Zero means the window is the
+    /// whole statement.
+    pub rows_outside_window: usize,
 }
 
 /// Everything `build` needs besides the rows and the mapping.
@@ -340,6 +347,8 @@ pub fn build(
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut statement_ids = BTreeSet::new();
     let mut window_ids = BTreeSet::new();
+    let mut span: Option<(Date, Date)> = None;
+    let mut rows_outside_window = 0;
     for (index, row) in rows.iter().enumerate() {
         let number = index + 1;
         let raw_date = strip(row.get(DATE));
@@ -355,9 +364,13 @@ pub fn build(
         };
         let txn_id = transaction_id(options.account_number, date, row);
         statement_ids.insert(txn_id.clone());
+        span = Some(span.map_or((date, date), |(first, last)| {
+            (first.min(date), last.max(date))
+        }));
         if options.date_from.is_some_and(|from| date < from)
             || options.date_to.is_some_and(|to| date > to)
         {
+            rows_outside_window += 1;
             continue;
         }
         window_ids.insert(txn_id.clone());
@@ -576,7 +589,12 @@ pub fn build(
             "no statement row falls inside the date window; the window does not overlap the statement",
         ));
     }
-    Ok(Build { proposals, records })
+    Ok(Build {
+        proposals,
+        records,
+        span,
+        rows_outside_window,
+    })
 }
 
 /// What [`selfcheck`] counted.

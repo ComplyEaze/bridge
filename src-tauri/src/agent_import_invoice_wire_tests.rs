@@ -301,20 +301,14 @@ fn the_company_state_is_taken_from_the_row_with_the_verified_guid() {
 /// the fixtures): Tally's own bytes, decoded. In the two read-backs of the
 /// registered customer's invoices one token, the customer's GSTIN, is a
 /// substitute named in that table.
-macro_rules! rehearsal {
-    ($name:literal) => {
-        String::from_utf16(
-            &include_bytes!(concat!(
-                "../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-",
-                $name,
-                ".utf16le.xml"
-            ))
+fn rehearsal(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
             .chunks_exact(2)
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
             .collect::<Vec<_>>(),
-        )
-        .unwrap()
-    };
+    )
+    .unwrap()
 }
 
 /// The voucher types as the lab book answered on 7 Oct 2026: the type keyed
@@ -323,7 +317,7 @@ macro_rules! rehearsal {
 /// read.
 #[test]
 fn the_captured_voucher_types_resolve_the_manual_type_and_refuse_the_automatic_one() {
-    let xml = rehearsal!("voucher-types");
+    let xml = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-voucher-types.utf16le.xml"));
     assert_eq!(xml.matches('\u{5}').count(), 2);
     let types = parse_voucher_types(&xml).unwrap();
     assert_eq!(types.len(), 25);
@@ -364,9 +358,9 @@ fn the_captured_number_answers_count_only_sales_class_vouchers() {
         ("number-shared", 2, 1),
     ] {
         let xml = match name {
-            "number-known" => rehearsal!("number-known"),
-            "number-absent" => rehearsal!("number-absent"),
-            _ => rehearsal!("number-shared"),
+            "number-known" => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-known.utf16le.xml")),
+            "number-absent" => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml")),
+            _ => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-shared.utf16le.xml")),
         };
         assert_eq!(count_vouchers(&xml), Ok(vouchers), "{name}");
         assert_eq!(count_sales_vouchers(&xml), Ok(sales), "{name}");
@@ -380,7 +374,7 @@ fn the_captured_number_answers_count_only_sales_class_vouchers() {
 fn the_captured_read_backs_carry_every_field_of_a_posted_invoice() {
     let field = |read: &ReadInvoice, key: &str| read.fields.get(key).cloned();
     let Ok(Readback::One(registered)) =
-        parse_invoice_readback(&rehearsal!("readback-posted-registered"))
+        parse_invoice_readback(&rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-registered.utf16le.xml")))
     else {
         panic!("one voucher");
     };
@@ -434,7 +428,7 @@ fn the_captured_read_backs_carry_every_field_of_a_posted_invoice() {
     );
 
     let Ok(Readback::One(unregistered)) =
-        parse_invoice_readback(&rehearsal!("readback-posted-unregistered"))
+        parse_invoice_readback(&rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-unregistered.utf16le.xml")))
     else {
         panic!("one voucher");
     };
@@ -454,7 +448,7 @@ fn the_captured_read_backs_carry_every_field_of_a_posted_invoice() {
         .iter()
         .all(|leg| leg.allocations.is_empty()));
 
-    let Ok(Readback::One(keyed)) = parse_invoice_readback(&rehearsal!("readback-keyed-registered"))
+    let Ok(Readback::One(keyed)) = parse_invoice_readback(&rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-keyed-registered.utf16le.xml")))
     else {
         panic!("one voucher");
     };

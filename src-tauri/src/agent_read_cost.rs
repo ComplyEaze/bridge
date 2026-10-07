@@ -360,8 +360,13 @@ fn say(cost: &Cost, ended: Ended, window_reads: u64) -> String {
         } else {
             ""
         };
+        let census = if window_reads > 1 {
+            "Across the two reads the census took"
+        } else {
+            "This book's census took"
+        };
         format!(
-            " This book's census took {at_least}{} reads, and the 0.5 second gate keeps consecutive reads that far apart, so at least {} of this call went on the gaps between them (derived).",
+            " {census} {at_least}{} reads, and the 0.5 second gate keeps consecutive reads that far apart, so at least {} of this call went on the gaps between them (derived).",
             cost.census_reads,
             seconds(cost.floor_ms / 1000)
         )

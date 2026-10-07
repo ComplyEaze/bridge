@@ -585,3 +585,27 @@ fn an_empty_window_read_twice_says_each_read_pays_its_wider_read() {
         "{single_say}"
     );
 }
+
+/// The floor sentence of a pair says the census was across the two reads, not "this
+/// book's" (a replay that sent census reads of its own would otherwise be hidden
+/// in a figure that reads as the book's alone); a single read keeps its words.
+#[test]
+fn the_floor_sentence_of_a_pair_says_the_census_was_across_the_two_reads() {
+    let second = timings(1_000, (5, 2_000), vec![part(760, 21_000)]);
+    let pair = replayed_block(&largest_book_day(), &second);
+    let say = pair["say"].as_str().unwrap();
+    assert!(
+        say.contains("Across the two reads the census took 125 reads"),
+        "{say}"
+    );
+    assert!(!say.contains("This book's census took"), "{say}");
+    assert_eq!(pair["window_reads"], 2, "{pair}");
+    let single = block(&largest_book_day())["say"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        single.contains("This book's census took 120 reads"),
+        "{single}"
+    );
+}

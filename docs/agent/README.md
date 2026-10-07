@@ -408,7 +408,9 @@ statement under AS 3. The window must be whole months: `from` the 1st of a month
 refused before any trial balance or report request, after the status and company reads (`cash_flow_window_not_month_start`,
 `cash_flow_window_not_month_end`, `cash_flow_window_too_many_months`; a window starting
 before the book is `trial_balance_before_books`; a reversed window is `invalid_date_range`).
-Education mode and a book with several currency masters are refused, as for the statements.
+Education mode (`trial_balance_education_unqualified`) and a book with several currency
+masters (`company_base_currency_undetermined`) are refused before any Cash Flow request, as
+for the statements.
 
 The months are returned only once the **net total** of the whole window has been
 compared with the trial balance read for the same window and found equal: the

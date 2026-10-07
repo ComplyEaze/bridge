@@ -78,10 +78,15 @@ fn pair(plans: &mut Vec<ScenarioPlan>, response: ScenarioPlan) {
 /// The reads up to the date boundary, which is where a window that is not whole
 /// months is refused: identity, then the status and mode probe.
 fn plans_to_the_boundary() -> Vec<ScenarioPlan> {
+    plans_to_the_boundary_probing(companies())
+}
+
+/// The same reads, with `probed` as the answer to the status and mode probe.
+fn plans_to_the_boundary_probing(probed: String) -> Vec<ScenarioPlan> {
     let companies = xml(companies());
     let mut plans = Vec::new();
-    pair(&mut plans, companies.clone());
-    plans.extend([status(), companies]);
+    pair(&mut plans, companies);
+    plans.extend([status(), xml(probed)]);
     plans
 }
 
@@ -564,6 +569,77 @@ async fn a_window_that_is_not_whole_months_is_refused_before_any_cash_flow_reque
         // Nothing past the date boundary was sent.
         assert_eq!(sent, total, "{from}..{to}");
     }
+}
+
+// ---- the refusals the Cash Flow shares with the statements (#1347) ----
+
+/// A `cash_flow` call that must be refused with `code` once `plans` have been answered: the
+/// whole refusal, and every planned request sent and no other. Each set of plans ends before the
+/// Trial Balance report, so the Cash Flow request (later in the bracket) was never sent.
+async fn assert_refused_before_the_cash_flow(
+    plans: Vec<ScenarioPlan>,
+    from: &str,
+    to: &str,
+    code: &str,
+) {
+    let total = plans.len();
+    let (response, sent, _) = call(plans, from, to).await;
+    assert_eq!(response["isError"], true, "{code}: {response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"],
+        json!({"code": code, "message": "ComplyEaze Bridge refused this operation."}),
+        "{response}"
+    );
+    assert_eq!(sent, total, "{code}: no request past the refusal");
+}
+
+#[tokio::test]
+async fn education_mode_is_refused_before_any_cash_flow_request() {
+    let education = companies().replace(
+        "<EDUMODE TYPE=\"Logical\">No</EDUMODE>",
+        "<EDUMODE TYPE=\"Logical\">Yes</EDUMODE>",
+    );
+    assert_ne!(education, companies());
+    assert_refused_before_the_cash_flow(
+        plans_to_the_boundary_probing(education),
+        "2026-04-01",
+        "2026-06-30",
+        "trial_balance_education_unqualified",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn a_window_before_the_books_is_refused_before_any_cash_flow_request() {
+    // The book extent says the books begin on 1 April 2024.
+    let mut plans = plans_to_the_boundary();
+    plans.push(xml(companies()));
+    pair(&mut plans, xml(extents()));
+    assert_refused_before_the_cash_flow(
+        plans,
+        "2024-01-01",
+        "2024-03-31",
+        "trial_balance_before_books",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn a_several_currency_book_is_refused_before_any_cash_flow_request() {
+    let currencies = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+    ));
+    let mut plans = plans_to_the_boundary();
+    plans.push(xml(companies()));
+    pair(&mut plans, xml(extents()));
+    pair(&mut plans, xml(currencies));
+    assert_refused_before_the_cash_flow(
+        plans,
+        "2026-04-01",
+        "2026-06-30",
+        "company_base_currency_undetermined",
+    )
+    .await;
 }
 
 // ---- redaction: what `mask_parties` and `drop_narration` change in a Cash Flow answer ----

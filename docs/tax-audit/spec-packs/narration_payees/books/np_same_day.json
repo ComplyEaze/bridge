@@ -1,0 +1,417 @@
+{
+ "comment": "Several payments to one payee on one day; Wages from Bank A unless said. d01: one payment of 3500000 paise to ALPHA TRADERS, over the single-sum limit and, being one payment, not a same-day row. d02 and d03: BETA STORES twice, on two days. d04 to d07: GAMMA MILLS, two days with two payments each (4000000, one by UPI and one by IMPS, and 3500000): two same-day rows for a payee that is over no limit. d08 to d11: DELTA WORKS, over the aggregate limit (10500000) and with a same-day pair of 6000000: in both findings. d12 and d13: two names joined by one handle and paid on one day: one same-day row, labelled with both names. d14 and d15: two payees on one day. d16 to d18: KAPPA on one day, paid once by bank, once in cash (not_through_bank_total) and once by a transfer whose narration is not read (unresolved_bank_total): one bank payment with a payee, so no same-day row. d19 and d20: LAMBDA twice on one day, the second booked to Driver Advances, which is not read: no same-day row, and the second is listed as a debit to another ledger. Four same-day rows, same_day_total 17500000; two payees over a limit.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_same_day-200"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_same_day-201"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_same_day-202"
+  },
+  {
+   "name": "Driver Advances",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-np_same_day-203"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 41500000,
+   "closing": -41500000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2000000,
+   "closing": -2000000
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 41500000,
+   "credit": 0,
+   "closing": 41500000
+  },
+  {
+   "ledger": "Driver Advances",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 0,
+   "closing": 2000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "d01",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3500000
+    ],
+    [
+     "Bank A",
+     -3500000
+    ]
+   ]
+  },
+  {
+   "guid": "d02",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d03",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d04",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d05",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "narration": "IMPS-41-GAMMA MILLS-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d06",
+   "date": "2025-06-20",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "d07",
+   "date": "2025-06-20",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "d08",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "d09",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "d10",
+   "date": "2025-07-02",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "d11",
+   "date": "2025-07-03",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank A",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "d12",
+   "date": "2025-08-11",
+   "base_type": "Payment",
+   "narration": "UPI-ETA ONE-ETA.H@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d13",
+   "date": "2025-08-11",
+   "base_type": "Payment",
+   "narration": "UPI-ETA TWO-ETA.H@QQBK",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d14",
+   "date": "2025-09-09",
+   "base_type": "Payment",
+   "narration": "UPI-THETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d15",
+   "date": "2025-09-09",
+   "base_type": "Payment",
+   "narration": "UPI-IOTA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d16",
+   "date": "2025-10-10",
+   "base_type": "Payment",
+   "narration": "UPI-KAPPA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d17",
+   "date": "2025-10-10",
+   "base_type": "Payment",
+   "narration": "KAPPA paid in cash",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Cash",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d18",
+   "date": "2025-10-10",
+   "base_type": "Payment",
+   "narration": "KAPPA BY TRANSFER",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d19",
+   "date": "2025-11-11",
+   "base_type": "Payment",
+   "narration": "UPI-LAMBDA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "d20",
+   "date": "2025-11-11",
+   "base_type": "Payment",
+   "narration": "UPI-LAMBDA-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

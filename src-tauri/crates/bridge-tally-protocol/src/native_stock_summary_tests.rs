@@ -150,6 +150,22 @@ fn report_of(text: &str) -> Result<NativeStockReport, NativeStockError> {
     parse_native_stock_summary_report(text)
 }
 
+/// A parsed report's total, its present amounts and its empty ones. The lines
+/// have tests of their own.
+fn counts_of(
+    report: Result<NativeStockReport, NativeStockError>,
+) -> Result<(Option<ExactDecimal>, usize, usize), NativeStockError> {
+    report.map(|report| match report {
+        NativeStockReport::Lines {
+            total,
+            present,
+            empty,
+            ..
+        } => (total, present, empty),
+        NativeStockReport::Empty => panic!("a report with lines"),
+    })
+}
+
 /// The gate over an items text, a count and a report text, as the runtime
 /// chains them: a report that does not parse is the read's error.
 fn gate_with(
@@ -1125,12 +1141,8 @@ fn the_worst_row_bytes_follow_the_documented_arithmetic() {
 #[test]
 fn the_report_capture_totals_its_amounts_and_equals_the_items_closing_value_sum() {
     assert_eq!(
-        report_of(&report_response()),
-        Ok(NativeStockReport::Lines {
-            total: Some(decimal("3000.01")),
-            present: 3,
-            empty: 0,
-        })
+        counts_of(report_of(&report_response())),
+        Ok((Some(decimal("3000.01")), 3, 0))
     );
     // The capture's tie: the report total is the items' closing-value sum, and
     // the company's own item count is the rows read.
@@ -1190,6 +1202,7 @@ fn the_totals_are_compared_by_value_not_by_spelling() {
         total: Some(decimal("3000.010")),
         present: 1,
         empty: 0,
+        lines: Vec::new(),
     };
     assert!(matches!(
         gate_rows(|_| {}, ELEVEN, &report),
@@ -1229,12 +1242,8 @@ fn an_empty_envelope_and_a_report_with_no_amount_are_answers() {
     }
     // Every amount empty: lines, and no total. Not a total of zero.
     assert_eq!(
-        report_of(&report_with_amounts(["", "", ""])),
-        Ok(NativeStockReport::Lines {
-            total: None,
-            present: 0,
-            empty: 3
-        })
+        counts_of(report_of(&report_with_amounts(["", "", ""]))),
+        Ok((None, 0, 3))
     );
 }
 
@@ -1408,12 +1417,8 @@ fn a_match_needs_a_value_on_the_items_side_and_a_total_on_the_reports() {
     let no_values = |item: &mut NativeStockItem| item.closing.value = None;
     let zero_total = report_of(&report_with_amounts(["0.00", "0.00", "0.00"])).unwrap();
     assert_eq!(
-        zero_total,
-        NativeStockReport::Lines {
-            total: Some(decimal("0.00")),
-            present: 3,
-            empty: 0,
-        }
+        counts_of(Ok(zero_total.clone())),
+        Ok((Some(decimal("0.00")), 3, 0))
     );
     // No item carries a value and the report totals zero: the items' sum of
     // nothing is zero too, but nothing was compared. Not a match.
@@ -1496,12 +1501,8 @@ fn an_empty_amount_is_counted_and_left_out_never_read_as_zero() {
         "<DSPCLAMTA></DSPCLAMTA>",
     );
     assert_eq!(
-        report_of(&report),
-        Ok(NativeStockReport::Lines {
-            total: Some(decimal("-11499.99")),
-            present: 2,
-            empty: 1,
-        })
+        counts_of(report_of(&report)),
+        Ok((Some(decimal("-11499.99")), 2, 1))
     );
     // The two Packaging items' closing values are empty too: the sums agree,
     // and the empty amount is reported beside the match.
@@ -1700,9 +1701,9 @@ fn totals_after(edit: impl Fn(&mut NativeStockItem)) -> NativeStockTotals {
 fn the_totals_count_the_items_and_withhold_a_sum_when_any_closing_value_is_empty() {
     let totals = totals_of(&items_response());
     // Four closing values are empty: Zero Stock Item holds -50 Kgs with none,
-    // and three items have neither a quantity nor a value. Quantities are
-    // withheld; the one count that concerns them is of those Bridge could not
-    // read, which is none here.
+    // and three items have neither a quantity nor a value. The one count
+    // that concerns quantities is of those Bridge could not read, which is none
+    // here.
     assert_eq!(
         totals,
         NativeStockTotals {
@@ -1986,11 +1987,12 @@ fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
             "guid": format!("{COMPANY}-0000010c"),
             "parent": "Raw Chemicals",
             "base_unit": "Kgs",
-            "closing": {"value": "-1000.00"},
+            "closing": {"value": "-1000.00", "quantity": {"state": "not_compared"}},
         })
     );
-    // No quantity is serialized, on any item: it is read (the parse tests above
-    // assert it) and withheld.
+    // The quantity as read is not serialized as itself, on any item (the parse
+    // tests above assert it is read): a parsed row says only that nothing has
+    // compared it with the report, and the gate's tests cover what agrees.
     assert_eq!(
         item(&items, "Caustic Soda Flakes").closing.quantity,
         quantity_of("400.000", "Kgs")
@@ -1999,7 +2001,7 @@ fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
         let closing = &serde_json::to_value(row).unwrap()["closing"];
         assert_eq!(
             closing.as_object().unwrap().keys().collect::<Vec<_>>(),
-            ["value"],
+            ["quantity", "value"],
             "{}",
             row.name
         );
@@ -2015,7 +2017,10 @@ fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
         );
     }
     let empty = serde_json::to_value(item(&items, "Cleaning Kit B")).unwrap();
-    assert_eq!(empty["closing"], serde_json::json!({"value": null}));
+    assert_eq!(
+        empty["closing"],
+        serde_json::json!({"value": null, "quantity": {"state": "not_compared"}})
+    );
     let totals = serde_json::to_value(totals_of(&items_response())).unwrap();
     assert_eq!(
         totals,
@@ -2130,4 +2135,278 @@ fn every_code_carries_the_stock_prefix_but_the_company_flags_refusals() {
         NativeStockError::from(NativeMastersError::RowWithoutName),
         NativeStockError::RowWithoutName
     );
+}
+
+// A sale of an item that held none, as Tally answered it (§12a.13): the item
+// rows and the plain Stock Summary of one synthetic company, two items. The
+// capture's company GUID prefix and its item names are replaced; nothing else is.
+const SALE_COMPANY: &str = "7f3c9a10-5b2d-4e6a-9c41-0d2e8b6a1f37";
+const TWO: NativeStockItemCount = NativeStockItemCount::Reported(2);
+
+fn sale_items() -> String {
+    utf16le(&include_bytes!("../tests/fixtures/stock_items_negative_sale_lab_live.utf16le.xml")[..])
+}
+
+fn sale_report() -> String {
+    utf16le(
+        &include_bytes!(
+            "../tests/fixtures/stock_summary_report_negative_sale_lab_live.utf16le.xml"
+        )[..],
+    )
+}
+
+/// The gate over the sale capture's items and report texts, and the items it
+/// returned: the read must have matched.
+fn sale_closings(items: &str, report: &str) -> Vec<(String, NativeQuantityAgreement)> {
+    let rows = parse_native_stock_items(items, SALE_COMPANY).unwrap().rows;
+    let report = report_of(report).unwrap();
+    match gate_stock_summary(rows, TWO, &report).unwrap() {
+        NativeStockGate::ValueTotalMatched { items, .. } => items
+            .into_iter()
+            .map(|item| (item.name, item.closing.agreement))
+            .collect(),
+        other => panic!("the sale capture matches its report: {other:?}"),
+    }
+}
+
+fn agreement_of_item(closings: &[(String, NativeQuantityAgreement)], name: &str) -> String {
+    closings
+        .iter()
+        .find(|(item, _)| item == name)
+        .unwrap_or_else(|| panic!("no item {name}"))
+        .1
+        .code()
+        .to_string()
+}
+
+#[test]
+fn the_report_keeps_each_lines_name_quantity_and_amount() {
+    let NativeStockReport::Lines { lines, .. } = report_of(&sale_report()).unwrap() else {
+        panic!("the capture has lines");
+    };
+    assert_eq!(
+        lines,
+        vec![
+            NativeReportLine {
+                name: "Lab Item NEG".to_string(),
+                quantity: quantity_of("-5", "Nos"),
+                amount: None,
+            },
+            NativeReportLine {
+                name: "Lab Item POS".to_string(),
+                quantity: quantity_of("18", "Nos"),
+                amount: Some(decimal("-186.00")),
+            },
+        ]
+    );
+}
+
+#[test]
+fn a_negative_quantity_with_no_value_is_returned_where_the_report_shows_the_same() {
+    let closings = sale_closings(&sale_items(), &sale_report());
+    assert_eq!(
+        closings,
+        vec![
+            (
+                "Lab Item NEG".to_string(),
+                NativeQuantityAgreement::Agreed(NativeStockQuantity {
+                    amount: decimal("-5"),
+                    unit: "Nos".to_string(),
+                })
+            ),
+            (
+                "Lab Item POS".to_string(),
+                NativeQuantityAgreement::Agreed(NativeStockQuantity {
+                    amount: decimal("18"),
+                    unit: "Nos".to_string(),
+                })
+            ),
+        ]
+    );
+    // What the caller sees: the quantity under `closing`, and none where none agreed.
+    let rows = parse_native_stock_items(&sale_items(), SALE_COMPANY)
+        .unwrap()
+        .rows;
+    let mut neg = rows[0].clone();
+    assert_eq!(neg.name, "Lab Item NEG");
+    assert_eq!(
+        serde_json::to_value(&neg.closing).unwrap(),
+        serde_json::json!({"value": null, "quantity": {"state": "not_compared"}})
+    );
+    neg.closing.agreement = closings[0].1.clone();
+    assert_eq!(
+        serde_json::to_value(&neg.closing).unwrap(),
+        serde_json::json!({
+            "value": null,
+            "quantity": {"state": "agreed", "amount": "-5", "unit": "Nos"}
+        })
+    );
+}
+
+#[test]
+fn a_report_line_that_says_something_else_returns_no_quantity() {
+    // Another quantity, another unit, no quantity, and an amount where the item has none:
+    // each leaves the item's quantity out, and leaves the other item alone.
+    for (from, to) in [
+        ("<DSPCLQTY>-5 Nos</DSPCLQTY>", "<DSPCLQTY>-6 Nos</DSPCLQTY>"),
+        ("<DSPCLQTY>-5 Nos</DSPCLQTY>", "<DSPCLQTY>-5 Box</DSPCLQTY>"),
+        ("<DSPCLQTY>-5 Nos</DSPCLQTY>", "<DSPCLQTY></DSPCLQTY>"),
+        ("<DSPCLAMTA></DSPCLAMTA>", "<DSPCLAMTA>0.00</DSPCLAMTA>"),
+    ] {
+        let closings = sale_closings(&sale_items(), &replaced(&sale_report(), from, to));
+        assert_eq!(
+            agreement_of_item(&closings, "Lab Item NEG"),
+            "report_differs",
+            "{to}"
+        );
+        assert_eq!(
+            agreement_of_item(&closings, "Lab Item POS"),
+            "agreed",
+            "{to}"
+        );
+    }
+    // The same quantity written with another number of decimals is the same quantity.
+    let closings = sale_closings(
+        &sale_items(),
+        &replaced(
+            &sale_report(),
+            "<DSPCLQTY>-5 Nos</DSPCLQTY>",
+            "<DSPCLQTY>-5.000 Nos</DSPCLQTY>",
+        ),
+    );
+    assert_eq!(agreement_of_item(&closings, "Lab Item NEG"), "agreed");
+}
+
+#[test]
+fn an_item_the_report_has_no_line_for_or_names_twice_returns_no_quantity() {
+    // Another name: no line carries the item's.
+    let renamed = replaced(&sale_report(), "Lab Item NEG", "Lab Item NEGATIVE");
+    let closings = sale_closings(&sale_items(), &renamed);
+    assert_eq!(
+        agreement_of_item(&closings, "Lab Item NEG"),
+        "report_has_no_line"
+    );
+    assert_eq!(agreement_of_item(&closings, "Lab Item POS"), "agreed");
+    // The same name in another case is another name: a line is tied to an item by its
+    // exact name, and an item that matches only ignoring case has no line.
+    let shouted = replaced(&sale_report(), "Lab Item NEG", "LAB ITEM NEG");
+    let closings = sale_closings(&sale_items(), &shouted);
+    assert_eq!(
+        agreement_of_item(&closings, "Lab Item NEG"),
+        "report_has_no_line"
+    );
+    assert_eq!(agreement_of_item(&closings, "Lab Item POS"), "agreed");
+    // The second line takes the first's name: the name no longer ties to one line.
+    let twice = replaced(&sale_report(), "Lab Item POS", "Lab Item NEG");
+    let closings = sale_closings(&sale_items(), &twice);
+    assert_eq!(
+        agreement_of_item(&closings, "Lab Item NEG"),
+        "report_name_not_unique"
+    );
+    assert_eq!(
+        agreement_of_item(&closings, "Lab Item POS"),
+        "report_has_no_line"
+    );
+}
+
+#[test]
+fn an_item_with_no_quantity_or_one_bridge_cannot_read_returns_none() {
+    let none_sent = replaced(
+        &sale_items(),
+        "<CLOSINGBALANCE TYPE=\"Quantity\">-5 Nos</CLOSINGBALANCE>",
+        "<CLOSINGBALANCE TYPE=\"Quantity\"></CLOSINGBALANCE>",
+    );
+    let closings = sale_closings(&none_sent, &sale_report());
+    assert_eq!(agreement_of_item(&closings, "Lab Item NEG"), "none_sent");
+    let compound = replaced(
+        &sale_items(),
+        "<CLOSINGBALANCE TYPE=\"Quantity\">-5 Nos</CLOSINGBALANCE>",
+        "<CLOSINGBALANCE TYPE=\"Quantity\">-5 Box of 10 Nos</CLOSINGBALANCE>",
+    );
+    let closings = sale_closings(&compound, &sale_report());
+    assert_eq!(agreement_of_item(&closings, "Lab Item NEG"), "unread");
+    assert_eq!(agreement_of_item(&closings, "Lab Item POS"), "agreed");
+}
+
+#[test]
+fn no_quantity_of_the_eleven_item_capture_agrees_because_its_report_lists_only_groups() {
+    // The first capture's three report lines are its top-level stock groups: every item
+    // sits below one, so it has no line of its own and nothing is returned.
+    let NativeStockReport::Lines { lines, .. } = report_of(&report_response()).unwrap() else {
+        panic!("the capture has lines");
+    };
+    assert_eq!(
+        lines
+            .iter()
+            .map(|line| line.name.as_str())
+            .collect::<Vec<_>>(),
+        ["Finished Kits", "Packaging", "Raw Chemicals"]
+    );
+    let NativeStockGate::ValueTotalMatched { items, .. } =
+        gate(&items_response(), &report_response())
+    else {
+        panic!("the capture ties");
+    };
+    assert_eq!(items.len(), 11);
+    for item in &items {
+        // An item with no quantity says so first; every other one is inside its group.
+        let wanted = if item.closing.quantity == NativeQuantityRead::Empty {
+            "none_sent"
+        } else {
+            "inside_stock_group"
+        };
+        assert_eq!(item.closing.agreement.code(), wanted, "{}", item.name);
+    }
+}
+
+#[test]
+fn an_item_inside_a_group_of_its_own_name_gets_no_quantity_from_the_groups_line() {
+    // A line that carries an item's name, unit, quantity and amount is not the item's when
+    // the item's own parent is a stock group: the report lists only what sits directly
+    // under the root, so that line is a group's. An edit of the captured row's PARENT.
+    let in_a_group = replaced(
+        &sale_items(),
+        "<PARENT TYPE=\"String\">&#4; Primary</PARENT>",
+        "<PARENT TYPE=\"String\">Some Group</PARENT>",
+    );
+    let closings = sale_closings(&in_a_group, &sale_report());
+    assert_eq!(
+        agreement_of_item(&closings, "Lab Item NEG"),
+        "inside_stock_group"
+    );
+    assert_eq!(agreement_of_item(&closings, "Lab Item POS"), "agreed");
+}
+
+#[test]
+fn an_item_whose_parent_was_not_sent_is_not_matched_to_a_line() {
+    let no_parent = replaced(
+        &sale_items(),
+        "<PARENT TYPE=\"String\">&#4; Primary</PARENT>",
+        "<PARENT TYPE=\"String\"></PARENT>",
+    );
+    let closings = sale_closings(&no_parent, &sale_report());
+    assert_eq!(
+        agreement_of_item(&closings, "Lab Item NEG"),
+        "report_has_no_line"
+    );
+    assert_eq!(agreement_of_item(&closings, "Lab Item POS"), "agreed");
+}
+
+#[test]
+fn a_report_quantity_bridge_cannot_read_never_refuses_the_read() {
+    // The report's quantity text was ignored before: a compound unit, or a unit over the
+    // name bound, leaves the item's quantity out and does not refuse anything.
+    for text in ["-5 Box of 10 Nos", &format!("-5 {}", "n".repeat(300))] {
+        let report = replaced(
+            &sale_report(),
+            "<DSPCLQTY>-5 Nos</DSPCLQTY>",
+            &format!("<DSPCLQTY>{text}</DSPCLQTY>"),
+        );
+        let closings = sale_closings(&sale_items(), &report);
+        assert_eq!(
+            agreement_of_item(&closings, "Lab Item NEG"),
+            "report_differs"
+        );
+        assert_eq!(agreement_of_item(&closings, "Lab Item POS"), "agreed");
+    }
 }

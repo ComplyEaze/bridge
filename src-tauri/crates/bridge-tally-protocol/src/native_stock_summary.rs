@@ -2,8 +2,8 @@
 //! stock item count, its stock items with their closing value, and Tally's own
 //! Stock Summary report. Items are returned only when their closing values add
 //! up to the report's top-level lines and are not fewer than the count
-//! ([`gate_stock_summary`]). A quantity is read and never returned: nothing
-//! checks it.
+//! ([`gate_stock_summary`]). A quantity is returned only where one line of the
+//! plain Stock Summary agrees with the item row ([`NativeQuantityAgreement`]).
 //!
 //! Evidence: one synthetic book on one licensed `TallyPrime` 7.1
 //! (`tests/fixtures/STOCK_CAPTURE_PROVENANCE.md`; PARTIAL), and, by role, one
@@ -164,9 +164,10 @@ pub struct NativeStockQuantity {
     pub unit: String,
 }
 
-/// What a quantity element held. No quantity leaves Bridge while nothing checks
-/// it, so one Bridge cannot read (a compound unit, or a unit with a space in
-/// it) is counted and does not refuse the read.
+/// What a quantity element held. A quantity leaves Bridge only where the report
+/// agrees with it ([`NativeQuantityAgreement`]); one Bridge cannot read (a
+/// compound unit, or a unit with a space in it) is counted and does not refuse
+/// the read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NativeQuantityRead {
     /// An empty or absent element: not zero.
@@ -185,13 +186,83 @@ impl NativeQuantityRead {
     }
 }
 
+/// Whether a closing quantity is returned, and why not when it is not. A
+/// quantity leaves Bridge only where Tally's own plain Stock Summary shows the
+/// same item by name with the same quantity and the same amount (`Agreed`); the
+/// report is the only second source, and it has a line only for what sits
+/// directly under the root (§12a.13).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NativeQuantityAgreement {
+    /// The rows as parsed: nothing has compared them with the report yet.
+    NotCompared,
+    /// The item's quantity and the one report line named like it are equal, and
+    /// so are their amounts.
+    Agreed(NativeStockQuantity),
+    /// The item row carried no quantity: nothing was sent, which is not zero.
+    NoneSent,
+    /// The row's quantity is not `<number> <unit>` (a compound unit, or a unit
+    /// with a space in it).
+    Unread,
+    /// The item's own `PARENT` is not the root (a stock group; any other text
+    /// gets this state too, which only withholds), so it cannot have a line of
+    /// its own in a report that lists only what sits directly under the root. A
+    /// line that carries its name belongs to something else (a group of that name).
+    InsideStockGroup,
+    /// The item sits directly under the root and no line of the report carries its
+    /// name: it has nothing to show, or the report shows it under another name (an
+    /// alias, a spacing or entity difference), or the name differs in case. Also
+    /// given when its parent was not sent, whatever a line shows.
+    NoReportLine,
+    /// More than one line of the report carries the item's name.
+    NameNotUnique,
+    /// A line carries the item's name and says something else: another
+    /// quantity, another unit, no quantity, or another amount.
+    ReportDiffers,
+}
+
+impl NativeQuantityAgreement {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::NotCompared => "not_compared",
+            Self::Agreed(_) => "agreed",
+            Self::NoneSent => "none_sent",
+            Self::Unread => "unread",
+            Self::InsideStockGroup => "inside_stock_group",
+            Self::NoReportLine => "report_has_no_line",
+            Self::NameNotUnique => "report_name_not_unique",
+            Self::ReportDiffers => "report_differs",
+        }
+    }
+}
+
+impl Serialize for NativeQuantityAgreement {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let agreed = match self {
+            Self::Agreed(quantity) => Some(quantity),
+            _ => None,
+        };
+        let mut map = serializer.serialize_map(Some(if agreed.is_some() { 3 } else { 1 }))?;
+        map.serialize_entry("state", self.code())?;
+        if let Some(quantity) = agreed {
+            map.serialize_entry("amount", &quantity.amount)?;
+            map.serialize_entry("unit", &quantity.unit)?;
+        }
+        map.end()
+    }
+}
+
 /// A quantity and a value. The value is `None` where Tally sent an empty or
-/// absent element: not zero. The quantity is read but never serialized: nothing
-/// checks it, so it is withheld.
+/// absent element: not zero. The quantity as read is never serialized by
+/// itself: it leaves only as `agreement`, and only where the report agrees.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NativeStockPosition {
     #[serde(skip)]
     pub quantity: NativeQuantityRead,
+    /// What the second source said of the quantity; `NotCompared` until the
+    /// gate has compared them.
+    #[serde(rename = "quantity")]
+    pub agreement: NativeQuantityAgreement,
     /// A plain signed decimal exactly as Tally sends it: the sign is kept and
     /// never flipped. A negative value is a debit, which is stock held
     /// (§12a.13).
@@ -663,18 +734,23 @@ fn position(
     value_key: &'static str,
 ) -> Result<NativeStockPosition, NativeStockError> {
     Ok(NativeStockPosition {
-        quantity: match quantity(fields.remove(quantity_key)) {
-            Ok(Some(quantity)) => NativeQuantityRead::Read(quantity),
-            Ok(None) => NativeQuantityRead::Empty,
-            // Outside the grammar (a compound unit, a unit with a space in
-            // it): unread, and the row is still read. No quantity is returned.
-            Err(NativeStockError::QuantityUnparseable) => NativeQuantityRead::Unread,
-            // A unit over the name bound breaks the row-size premise, which
-            // is not about the grammar: it still refuses.
-            Err(error) => return Err(error),
-        },
+        quantity: quantity_read(fields.remove(quantity_key))?,
+        agreement: NativeQuantityAgreement::NotCompared,
         value: value(fields.remove(value_key))?,
     })
+}
+
+/// A quantity element as what it held. Outside the grammar (a compound unit, a
+/// unit with a space in it) is unread, and the row is still read. A unit over
+/// the name bound breaks the row-size premise, which is not about the grammar:
+/// it still refuses.
+fn quantity_read(text: Option<String>) -> Result<NativeQuantityRead, NativeStockError> {
+    match quantity(text) {
+        Ok(Some(quantity)) => Ok(NativeQuantityRead::Read(quantity)),
+        Ok(None) => Ok(NativeQuantityRead::Empty),
+        Err(NativeStockError::QuantityUnparseable) => Ok(NativeQuantityRead::Unread),
+        Err(error) => Err(error),
+    }
 }
 
 /// The strict quantity grammar: `^-?[0-9]+(\.[0-9]+)? <unit>$` after trimming,
@@ -716,8 +792,18 @@ fn value(text: Option<String>) -> Result<Option<ExactDecimal>, NativeStockError>
     }
 }
 
+/// One top-level line of the plain Stock Summary: a stock group, or an item
+/// that sits directly under the root. The report does not say which; nothing
+/// but its name ties a line to an item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeReportLine {
+    pub name: String,
+    pub quantity: NativeQuantityRead,
+    pub amount: Option<ExactDecimal>,
+}
+
 /// Tally's own Stock Summary, as far as the gate needs it: the sum of its
-/// top-level closing amounts.
+/// top-level closing amounts, and each line's name, quantity and amount.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NativeStockReport {
     Lines {
@@ -726,6 +812,8 @@ pub enum NativeStockReport {
         present: usize,
         /// Amount elements that were empty: counted, never read as zero.
         empty: usize,
+        /// Every line, in document order.
+        lines: Vec<NativeReportLine>,
     },
     /// An empty `ENVELOPE`: not told apart from a report Tally did not render
     /// (§12a.11), so never read as zero.
@@ -751,6 +839,8 @@ pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport,
     let mut pairs = 0_usize;
     let mut amounts = Vec::<ExactDecimal>::new();
     let mut empty = 0_usize;
+    let mut lines = Vec::<NativeReportLine>::new();
+    let mut line_name = String::new();
     loop {
         match reader.read_event().map_err(|_| malformed_xml())? {
             Event::Start(element) => {
@@ -769,14 +859,20 @@ pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport,
                 refuse_error_element(&name)?;
                 match name.as_slice() {
                     b"DSPACCNAME" if !expect_info => {
-                        read_report_name(&mut reader)?;
+                        line_name = read_report_name(&mut reader)?;
                         expect_info = true;
                     }
                     b"DSPSTKINFO" if expect_info => {
-                        match read_report_info(&mut reader)? {
-                            Some(amount) => amounts.push(amount),
+                        let (quantity, amount) = read_report_info(&mut reader)?;
+                        match &amount {
+                            Some(amount) => amounts.push(amount.clone()),
                             None => empty += 1,
                         }
+                        lines.push(NativeReportLine {
+                            name: std::mem::take(&mut line_name),
+                            quantity,
+                            amount,
+                        });
                         pairs += 1;
                         expect_info = false;
                     }
@@ -829,6 +925,7 @@ pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport,
             },
             present: amounts.len(),
             empty,
+            lines,
         }
     })
 }
@@ -837,32 +934,30 @@ fn report_shape(code: &'static str) -> NativeStockError {
     NativeStockError::Malformed(code)
 }
 
-/// `DSPACCNAME` holding exactly one non-blank `DSPDISPNAME` text element.
-fn read_report_name(reader: &mut Reader<&[u8]>) -> Result<(), NativeStockError> {
-    let mut named = false;
+/// `DSPACCNAME` holding exactly one non-blank `DSPDISPNAME` text element;
+/// returns that text, trimmed.
+fn read_report_name(reader: &mut Reader<&[u8]>) -> Result<String, NativeStockError> {
+    let mut named = None;
     loop {
         match reader.read_event().map_err(|_| malformed_xml())? {
             Event::Start(element) => {
                 let name = upper(element.name());
                 refuse_error_element(&name)?;
-                if name != b"DSPDISPNAME" || named {
+                if name != b"DSPDISPNAME" || named.is_some() {
                     return Err(report_shape("stock_report_name_shape"));
                 }
-                if read_text(reader, element.name())?.trim().is_empty() {
+                let text = read_text(reader, element.name())?;
+                if text.trim().is_empty() {
                     return Err(report_shape("stock_report_name_empty"));
                 }
-                named = true;
+                named = Some(text.trim().to_string());
             }
             Event::Empty(element) => {
                 refuse_error_element(&upper(element.name()))?;
                 return Err(report_shape("stock_report_name_shape"));
             }
             Event::End(element) if upper(element.name()) == b"DSPACCNAME" => {
-                return if named {
-                    Ok(())
-                } else {
-                    Err(report_shape("stock_report_name_missing"))
-                };
+                return named.ok_or_else(|| report_shape("stock_report_name_missing"));
             }
             Event::Text(text) => refuse_stray_text(&text)?,
             _ => return Err(report_shape("stock_report_name_shape")),
@@ -870,10 +965,12 @@ fn read_report_name(reader: &mut Reader<&[u8]>) -> Result<(), NativeStockError> 
     }
 }
 
-/// `DSPSTKINFO` holding exactly one `DSPSTKCL`; returns its closing amount, or
-/// `None` where that amount was empty.
-fn read_report_info(reader: &mut Reader<&[u8]>) -> Result<Option<ExactDecimal>, NativeStockError> {
-    let mut amount = None;
+/// `DSPSTKINFO` holding exactly one `DSPSTKCL`; returns its closing quantity
+/// and its closing amount, which is `None` where that amount was empty.
+fn read_report_info(
+    reader: &mut Reader<&[u8]>,
+) -> Result<(NativeQuantityRead, Option<ExactDecimal>), NativeStockError> {
+    let mut closing = (NativeQuantityRead::Empty, None);
     let mut closings = 0_usize;
     loop {
         match reader.read_event().map_err(|_| malformed_xml())? {
@@ -884,7 +981,7 @@ fn read_report_info(reader: &mut Reader<&[u8]>) -> Result<Option<ExactDecimal>, 
                 if name != b"DSPSTKCL" || closings > 1 {
                     return Err(report_shape("stock_report_info_shape"));
                 }
-                amount = read_report_closing(reader)?;
+                closing = read_report_closing(reader)?;
             }
             Event::Empty(element) => {
                 refuse_error_element(&upper(element.name()))?;
@@ -892,7 +989,7 @@ fn read_report_info(reader: &mut Reader<&[u8]>) -> Result<Option<ExactDecimal>, 
             }
             Event::End(element) if upper(element.name()) == b"DSPSTKINFO" => {
                 return if closings == 1 {
-                    Ok(amount)
+                    Ok(closing)
                 } else {
                     Err(report_shape("stock_report_info_shape"))
                 };
@@ -904,11 +1001,13 @@ fn read_report_info(reader: &mut Reader<&[u8]>) -> Result<Option<ExactDecimal>, 
 }
 
 /// `DSPSTKCL` holding `DSPCLQTY`, `DSPCLRATE` and `DSPCLAMTA`, each at most
-/// once and `DSPCLAMTA` exactly once. Only the amount is read.
+/// once and `DSPCLAMTA` exactly once. The quantity and the amount are read; the
+/// rate is not.
 fn read_report_closing(
     reader: &mut Reader<&[u8]>,
-) -> Result<Option<ExactDecimal>, NativeStockError> {
+) -> Result<(NativeQuantityRead, Option<ExactDecimal>), NativeStockError> {
     let mut amount = None;
+    let mut quantity = NativeQuantityRead::Empty;
     let (mut amount_seen, mut quantity_seen, mut rate_seen) = (false, false, false);
     loop {
         let (name, text) = match reader.read_event().map_err(|_| malformed_xml())? {
@@ -924,7 +1023,7 @@ fn read_report_closing(
             }
             Event::End(element) if upper(element.name()) == b"DSPSTKCL" => {
                 return if amount_seen {
-                    Ok(amount)
+                    Ok((quantity, amount))
                 } else {
                     Err(report_shape("stock_report_amount_missing"))
                 };
@@ -946,22 +1045,26 @@ fn read_report_closing(
                     ),
                 };
             }
-            b"DSPCLQTY" if !quantity_seen => quantity_seen = true,
+            b"DSPCLQTY" if !quantity_seen => {
+                quantity_seen = true;
+                // The report's quantity text was ignored before: whatever it holds, it
+                // never refuses the read. Text Bridge cannot read is unread.
+                quantity = quantity_read(Some(text)).unwrap_or(NativeQuantityRead::Unread);
+            }
             b"DSPCLRATE" if !rate_seen => rate_seen = true,
             _ => return Err(report_shape("stock_report_closing_shape")),
         }
     }
 }
 
-/// What the items add up to, as a caller reports it beside them. Quantities
-/// are withheld; the one count that concerns them says how many Bridge could
-/// not read.
+/// What the items add up to, as a caller reports it beside them. The one count
+/// that concerns quantities says how many Bridge could not read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NativeStockTotals {
     pub item_count: usize,
     pub empty_closing_value_count: usize,
     /// Closing quantities Bridge could not read (a compound unit, or a unit
-    /// with a space in it). They are withheld like every quantity.
+    /// with a space in it). They are returned as `unread`, never as a quantity.
     pub closing_quantity_unread_count: usize,
     /// The sum of the closing values, at the scale of the values it adds, or
     /// `None` (with `partial`) whenever any item's closing value is empty: an
@@ -1121,15 +1224,22 @@ pub fn gate_stock_summary(
         NativeStockReport::Lines {
             total: Some(report_total),
             empty,
+            lines,
             ..
         } => match items_total {
-            Some(sum) if sum.numeric_eq(report_total) => NativeStockGate::ValueTotalMatched {
-                totals: NativeStockTotals::of(&items)?,
-                items,
-                total: report_total.clone(),
-                report_empty_amounts: *empty,
-                item_count,
-            },
+            Some(sum) if sum.numeric_eq(report_total) => {
+                let mut items = items;
+                for item in &mut items {
+                    item.closing.agreement = agreement_of(item, lines);
+                }
+                NativeStockGate::ValueTotalMatched {
+                    totals: NativeStockTotals::of(&items)?,
+                    items,
+                    total: report_total.clone(),
+                    report_empty_amounts: *empty,
+                    item_count,
+                }
+            }
             None if report_total.is_zero() => NativeStockGate::NotComparable,
             items_total => NativeStockGate::Differs {
                 items_total,
@@ -1147,6 +1257,51 @@ pub fn gate_stock_summary(
             }
         }
     })
+}
+
+/// Whether an item's closing quantity may be returned: only where exactly one
+/// line of Tally's plain Stock Summary carries the item's name and agrees with
+/// the item on the unit, the quantity and the amount (two empty amounts agree).
+/// The report lists only what sits directly under the root: an item inside a
+/// stock group, one with nothing to show, or one the report names differently
+/// has no line of its own, so such an item's quantity is not returned.
+fn agreement_of(item: &NativeStockItem, lines: &[NativeReportLine]) -> NativeQuantityAgreement {
+    let own = match &item.closing.quantity {
+        NativeQuantityRead::Empty => return NativeQuantityAgreement::NoneSent,
+        NativeQuantityRead::Unread => return NativeQuantityAgreement::Unread,
+        NativeQuantityRead::Read(quantity) => quantity,
+    };
+    // The plain report lists only what sits directly under the root. An item inside a
+    // stock group has no line of its own, whatever a line of the same name shows: that
+    // line is the group's (§12a.13). A parent that was not sent proves neither.
+    match item.parent.as_deref() {
+        Some(parent) if !crate::is_tally_reserved_root(parent) => {
+            return NativeQuantityAgreement::InsideStockGroup
+        }
+        Some(_) => {}
+        None => return NativeQuantityAgreement::NoReportLine,
+    }
+    let mut named = lines.iter().filter(|line| line.name == item.name);
+    let Some(line) = named.next() else {
+        return NativeQuantityAgreement::NoReportLine;
+    };
+    if named.next().is_some() {
+        return NativeQuantityAgreement::NameNotUnique;
+    }
+    let same_quantity = line
+        .quantity
+        .read()
+        .is_some_and(|shown| shown.unit == own.unit && shown.amount.numeric_eq(&own.amount));
+    let same_amount = match (&line.amount, &item.closing.value) {
+        (None, None) => true,
+        (Some(shown), Some(own)) => shown.numeric_eq(own),
+        _ => false,
+    };
+    if same_quantity && same_amount {
+        NativeQuantityAgreement::Agreed(own.clone())
+    } else {
+        NativeQuantityAgreement::ReportDiffers
+    }
 }
 
 #[cfg(test)]

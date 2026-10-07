@@ -524,17 +524,44 @@ read is the only thing `stock_summary` checks, and `checks` says so field by
 field. They are for investigation only (`use` says so); neither is a stock value
 or a total, and the items' side adds only the closing values present.
 
-**Quantities are withheld.** Nothing checks a quantity yet, so none is returned.
-`checks` says per field what is `checked`, `not_checked` or `withheld`: the
-closing-value total is checked; each value on its own, the names, parents and base
-units, whether the date was honoured and whether the item list is complete are
-not; the closing quantity is withheld. A quantity Bridge could not read (a compound
-unit, or a unit with a space in it) is counted in
-`totals.closing_quantity_unread_count` and does not refuse the read.
+**A quantity is returned only where Tally agrees with it.** `checks` says per
+field what is `checked`, `checked_per_item` or `not_checked`: the closing-value
+total is checked; the closing quantity is checked item by item; each value on its
+own, the names, parents and base units, whether the date was honoured and whether
+the item list is complete are not.
+
+An item's `closing.quantity` is an object with a `state`. It is `agreed`, with
+`amount` and `unit`, only where Tally's own plain Stock Summary has exactly one
+line with the item's name, and that line shows the same quantity, the same unit
+and the same amount (two empty amounts agree). Every other state says why no
+quantity is returned:
+
+- `none_sent`: Tally sent no closing quantity, which is not zero.
+- `unread`: the quantity is a compound unit, or has a unit with a space in it. It
+  is also counted in `totals.closing_quantity_unread_count` and does not refuse
+  the read.
+- `inside_stock_group`: the item's own parent is not the root, that is a stock
+  group (any other parent text gets this state too, which only withholds). The
+  report lists only what sits directly under the root (it is not expanded), so the
+  item has no line of its own, whatever a line of the same name shows.
+- `report_has_no_line`: the item sits directly under the root and no line of the
+  report carries its name: it has nothing to show, or the report names it
+  differently (an alias, a spacing difference, a case difference). It is also
+  given when Tally sent no parent for the item, whatever a line shows.
+- `report_name_not_unique`: more than one line carries the item's name.
+- `report_differs`: a line carries the item's name and shows another quantity,
+  another unit, no quantity, or another amount.
+
+The report does not say whether a line is a stock group or an item, so a line is
+tied to an item by its name, quantity, unit and amount and by the item sitting
+directly under the root. A quantity below
+zero is returned like any other: on one synthetic book, a sale of an item that held
+none left a stock line of `-5 Nos` with no value, in the item rows and in the
+report alike (protocol reference §12a.13).
 
 Each item carries `name`, `guid`, `parent`, `base_unit` and `closing`; `closing`
-holds `value` only (a plain signed decimal exactly as Tally sends it: the sign is
-kept and never flipped). It is `null` where Tally sent none,
+holds `value` (a plain signed decimal exactly as Tally sends it: the sign is
+kept and never flipped) and `quantity`. The value is `null` where Tally sent none,
 which is not zero, and is counted in `totals` (`empty_closing_value_count`); a
 value Tally sent as `0.00` is a value. The opening quantity and value are read but
 not returned, because their as-at date is unmeasured.
@@ -618,7 +645,8 @@ Evidence: one synthetic book on one licensed TallyPrime 7.1
 protocol reference §12a.13), and the tie once on a client book. The size bound
 rests on the same assumed limits as `masters` (128 characters a name, four aliases)
 and a fixed-size allowance for a row that one synthetic book has measured. No
-quantity, no godown or batch split and no rates are returned. A book in which no
+godown or batch split and no rates are returned, and a quantity only where the
+report agrees (above). A book in which no
 item has a closing value returns no item today; it waits for a capture of such a
 book.
 

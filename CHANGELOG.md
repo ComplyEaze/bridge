@@ -18,6 +18,14 @@ These changes are in source and not yet in a published build.
 
 **New**
 
+- `stock_summary` now returns an item's closing quantity, `closing.quantity` with its `amount` and `unit`, where
+  Tally's own plain Stock Summary has exactly one line with the item's name and shows the same quantity, unit
+  and amount; every other item says why none is returned (`none_sent`, `unread`, `inside_stock_group`,
+  `report_has_no_line`, `report_name_not_unique`, `report_differs`) (part of #1233). That report lists only what
+  sits directly under the root, so an item inside a stock group returns none. Checked against two real captures
+  of one synthetic book taken after a sale of an item that had no stock: Tally kept it as `-5 Nos` with no
+  value, in the item rows and in the report alike, and the tool now returns it. Not run through the tool on a live Tally, and
+  not measured: a book whose stock sits in groups, a compound unit, other releases, and a group that carries an item's name.
 - `vouchers`, `changes` and the sales and purchase registers now return `reference_date`, a voucher's
   `REFERENCEDATE` (`YYYYMMDD`), where the voucher has one (#1257). Checked once against a
   live TallyPrime 7.1 on one synthetic book: the element came back on every voucher, empty on all but one

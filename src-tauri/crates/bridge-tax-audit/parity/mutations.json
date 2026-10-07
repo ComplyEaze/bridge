@@ -3572,7 +3572,7 @@
   "by": "author",
   "what": "LOAN-4 reads no TDS ledger, naming an interest entry net of TDS",
   "file": "src/loans_interest.rs",
-  "from": "                    .all(|o| ils.contains(*o) || tds_read.contains(*o))",
+  "from": "                    .all(|o| ils.contains(*o) || tds_read_loan4.contains(*o))",
   "to": "                    .all(|o| ils.contains(*o))"
  },
  {

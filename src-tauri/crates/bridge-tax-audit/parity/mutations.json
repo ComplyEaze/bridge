@@ -10526,5 +10526,101 @@
   "file": "tests/no_internal_wording.rs",
   "from": "                .any(|w| text[..i].ends_with(w))",
   "to": "                .any(|w| text[..i].to_lowercase().ends_with(w))"
+ },
+ {
+  "id": "P1243-PAR-32",
+  "by": "author",
+  "what": "partners_40b_194t: the negative net credits of one day are named in the reverse of key order",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                reversals.sort_by(|a, b| (&a.0.date, a.1).cmp(&(&b.0.date, b.1)));",
+  "to": "                reversals.sort_by(|a, b| (&a.0.date, b.1).cmp(&(&b.0.date, a.1)));"
+ },
+ {
+  "id": "P1243-PAR-33",
+  "by": "author",
+  "what": "partners_40b_194t: the negative net credits of one day are named by GUID, not by key",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                reversals.sort_by(|a, b| (&a.0.date, a.1).cmp(&(&b.0.date, b.1)));",
+  "to": "                reversals.sort_by(|a, b| (&a.0.date, &a.0.guid).cmp(&(&b.0.date, &b.0.guid)));"
+ },
+ {
+  "id": "P1243-PAR-34",
+  "by": "author",
+  "what": "partners_40b_194t: the TDS seen on one day is named in the reverse of key order",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    first12(&by_date(&seen))",
+  "to": "                    first12(&{\n                        let mut o: Vec<(&VoucherKey, &&Voucher)> = seen.iter().collect();\n                        o.sort_by(|a, b| (&a.1.date, b.0).cmp(&(&b.1.date, a.0)));\n                        o.into_iter().map(|(_, v)| voucher_label(v)).collect::<Vec<String>>()\n                    })"
+ },
+ {
+  "id": "P1243-PAR-35",
+  "by": "author",
+  "what": "partners_40b_194t: the TDS of one day attributed to no one is named in the reverse of key order",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                let l = by_date(&unattributed);",
+  "to": "                let l: Vec<String> = {\n                    let mut o: Vec<(&VoucherKey, &&Voucher)> = unattributed.iter().collect();\n                    o.sort_by(|a, b| (&a.1.date, b.0).cmp(&(&b.1.date, a.0)));\n                    o.into_iter().map(|(_, v)| voucher_label(v)).collect()\n                };"
+ },
+ {
+  "id": "P1243-PAR-36",
+  "by": "author",
+  "what": "partners_40b_194t: vouchers of one day are named by GUID, not by key (a GUID that sorts between two keys of a shared one moves)",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));",
+  "to": "                ordered.sort_by(|a, b| (&a.1.date, &a.1.guid).cmp(&(&b.1.date, &b.1.guid)));"
+ },
+ {
+  "id": "P1243-TDS-28",
+  "by": "author",
+  "what": "tds_payees: the TDS seen on one day is named in the reverse of key order",
+  "file": "src/tds_payees.rs",
+  "from": "    ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));",
+  "to": "    ordered.sort_by(|a, b| (&a.1.date, b.0).cmp(&(&b.1.date, a.0)));"
+ },
+ {
+  "id": "P1243-TDS-29",
+  "by": "author",
+  "what": "tds_payees: the TDS seen on one day is named by GUID, not by key (a GUID that sorts between two keys of a shared one moves)",
+  "file": "src/tds_payees.rs",
+  "from": "    ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));",
+  "to": "    ordered.sort_by(|a, b| (&a.1.date, &a.1.guid).cmp(&(&b.1.date, &b.1.guid)));"
+ },
+ {
+  "id": "P1243-HVR-16",
+  "by": "author",
+  "what": "high_value_register: journal rows share a suffix sequence only within one GUID, so two GUIDs of one hash repeat an id",
+  "file": "src/high_value_register.rs",
+  "from": "    let mut sharing: BTreeMap<&str, usize> = BTreeMap::new();\n    for base in &base_ids {\n        *sharing.entry(base.as_str()).or_insert(0) += 1;\n    }\n    let mut place: BTreeMap<&str, usize> = BTreeMap::new();\n    for (((_, h), j), base) in keyed.iter().zip(&base_ids) {\n        let v = j.voucher;\n        let vh = hash8(&v.guid);\n        let rid = if sharing[base.as_str()] > 1 {\n            let k = place.entry(base.as_str()).or_insert(0);",
+  "to": "    let by_guid: Vec<String> = keyed\n        .iter()\n        .map(|((_, h), j)| format!(\"{}\\u{0}{h}\", j.voucher.guid))\n        .collect();\n    let mut sharing: BTreeMap<&str, usize> = BTreeMap::new();\n    for g in &by_guid {\n        *sharing.entry(g.as_str()).or_insert(0) += 1;\n    }\n    let mut place: BTreeMap<&str, usize> = BTreeMap::new();\n    for ((((_, h), j), base), g) in keyed.iter().zip(&base_ids).zip(&by_guid) {\n        let v = j.voucher;\n        let vh = hash8(&v.guid);\n        let rid = if sharing[g.as_str()] > 1 {\n            let k = place.entry(g.as_str()).or_insert(0);"
+ },
+ {
+  "id": "P1243-BKQ-16",
+  "by": "author",
+  "what": "book_keeping_quality: Contra rows share a suffix sequence only within one GUID, so two GUIDs of one hash repeat an id",
+  "file": "src/book_keeping_quality.rs",
+  "from": "        *sharing.entry(guid_hash12(&v.guid)).or_default() += 1;\n    }\n    let mut place: BTreeMap<String, usize> = BTreeMap::new();\n    for (_, v, cash_amount) in ordered {\n        let base = guid_hash12(&v.guid);\n        let h = if sharing[&base] > 1 {\n            let n = place.entry(base.clone()).or_default();",
+  "to": "        *sharing.entry(v.guid.clone()).or_default() += 1;\n    }\n    let mut place: BTreeMap<String, usize> = BTreeMap::new();\n    for (_, v, cash_amount) in ordered {\n        let base = guid_hash12(&v.guid);\n        let h = if sharing[&v.guid] > 1 {\n            let n = place.entry(v.guid.clone()).or_default();"
+ },
+ {
+  "id": "P1243-BKQ-17",
+  "by": "author",
+  "what": "book_keeping_quality: Contra rows of one day take their suffixes in the reverse of key order",
+  "file": "src/book_keeping_quality.rs",
+  "from": "    ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));\n    // A row's id is a hash of its voucher's GUID",
+  "to": "    ordered.sort_by(|a, b| (&a.1.date, b.0).cmp(&(&b.1.date, a.0)));\n    // A row's id is a hash of its voucher's GUID"
+ },
+ {
+  "id": "P1243-BKQ-18",
+  "by": "reviewer-opus",
+  "what": "book_keeping_quality: a Contra row takes a suffix only when its own GUID has more than one row, though rows of another GUID share its id hash",
+  "file": "src/book_keeping_quality.rs",
+  "from": "        *sharing.entry(guid_hash12(&v.guid)).or_default() += 1;\n    }\n    let mut place: BTreeMap<String, usize> = BTreeMap::new();\n    for (_, v, cash_amount) in ordered {\n        let base = guid_hash12(&v.guid);\n        let h = if sharing[&base] > 1 {",
+  "to": "        *sharing.entry(v.guid.clone()).or_default() += 1;\n    }\n    let mut place: BTreeMap<String, usize> = BTreeMap::new();\n    for (_, v, cash_amount) in ordered {\n        let base = guid_hash12(&v.guid);\n        let h = if sharing[&v.guid] > 1 {"
+ },
+ {
+  "id": "P1243-HVR-17",
+  "by": "reviewer-opus",
+  "what": "high_value_register: journal rows of one day and one ledger take their suffixes smallest amount first, not in the books' order",
+  "file": "src/high_value_register.rs",
+  "from": "    keyed.sort_by(|a, b| a.0.cmp(&b.0)); // stable, as Python's sorted: ties keep line order",
+  "to": "    keyed.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.amount_paise.cmp(&b.1.amount_paise))); // stable, as Python's sorted: ties keep line order"
  }
 ]

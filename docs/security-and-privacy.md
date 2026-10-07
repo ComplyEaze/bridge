@@ -52,19 +52,20 @@ settings (section 4).
 - **A Windows network path, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The
   bank statement tool could be given a path that names another computer, and
   Windows then connects to that computer by itself. Section 3 describes it.
-- **To your AI provider: yes, whatever the assistant reads.** ComplyEaze
-  Bridge hands each tool result, including company, party and ledger names,
-  amounts, dates, narrations, references and GSTINs and, when the assistant
-  reads ledger details, PAN, bank account numbers, IFSC, email, phone and
-  address, to Claude Desktop. Claude Desktop is the host, and it sends tool
-  results to the AI provider you use as part of the conversation; that is the
-  host's behaviour, which this repository cannot show. ComplyEaze Bridge can
-  shorten party and ledger names and bank account numbers to their first two
-  and last two characters, or drop narrations (`BRIDGE_AGENT_REDACTION`, or the
-  Response redaction setting; one value, not both), but neither hides amounts,
-  company names, PAN, GSTIN, IFSC, contact details or references, and a
-  shortened name can still be identified, not least from the GSTIN or PAN sent
-  beside it. The default is `none`: nothing is masked unless you choose it.
+- **To your AI provider: yes, whatever the assistant reads.** ComplyEaze Bridge
+  hands each tool result, including company, party and ledger names, amounts,
+  dates, narrations, references and GSTINs and, when the assistant reads ledger
+  details, PAN, bank account numbers, IFSC, MSME or Udyam registration numbers,
+  email, phone and address, to Claude Desktop. Claude Desktop is the host, and
+  it sends tool results to the AI provider you use as part of the conversation;
+  that is the host's behaviour, which this repository cannot show. ComplyEaze
+  Bridge can shorten party and ledger names and bank account numbers to their
+  first two and last two characters, or drop narrations
+  (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting; one value, not
+  both), but neither hides amounts, company names, PAN, GSTIN, IFSC, MSME or
+  Udyam registration numbers, contact details or references, and a shortened
+  name can still be identified, not least from the GSTIN or PAN sent beside it.
+  The default is `none`: nothing is masked unless you choose it.
   - `mask_parties` shortens, to their first two and last two characters, the
     names of ledgers and parties wherever a tool returns them (in vouchers,
     ledger lists, the trial balance and statements, outstandings, the purchase

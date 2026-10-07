@@ -86,6 +86,19 @@ These changes are in source and not yet in a published build.
   approval is the assistant's word, not proof that a person said yes, and a hand
   import of the file is not checked. Not measured: a large book, and the bills
   of a ledger whose flag reads No (#1234).
+- Versions 0.3.0 to 0.4.2 refuse to post a batch this version builds. They do
+  not read the cash-in-hand and bill-wise records a saved batch now carries,
+  so after a rollback they could have posted it with neither check; the batch's
+  ledger binding is now saved under a name they do not read, and they refuse a
+  batch with no binding before any approval window or request to Tally
+  (`import_batch_predates_ledger_binding`, nothing posted). Their message for
+  that refusal says "Build the batch again"; for a batch this version built,
+  reinstall this version (or a newer one) and post the batch from it instead,
+  because a batch built again on an older version has neither check. A batch an
+  earlier version saved is read as before. Which versions can read the import
+  history is unchanged: from the first post attempted with 0.4.2 or later,
+  only 0.4.2 and later read it. 0.2.0 and earlier have no such refusal: do not
+  run them over a data folder this version has built in (#1234).
 - The posting setting is shorter and names its four known limits in plainer
   words, and Terms of Use section 9.2 (version 2026-10.1, effective 7 October
   2026) now lists the same limits and more: a company or ledger renamed or opened

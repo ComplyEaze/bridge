@@ -48,7 +48,7 @@ neither offers nor sets it, so it applies only if someone sets it by hand.
 Every tool refuses until the Terms of Use (version 2026-10.1 in 0.5.0) are
 accepted in the extension settings. After installing 0.5.0 that setting is off
 until you accept the new version (section 4). A server started by hand with
-`BRIDGE_TERMS_ACCEPTED` set is not asked.
+`BRIDGE_TERMS_ACCEPTED` set to `true` or `1` is not asked.
 
 ## 2. Does anything leave my computer?
 
@@ -92,33 +92,39 @@ until you accept the new version (section 4). A server started by hand with
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
     addresses or IFSCs, and a name written inside a narration or reference stays
     as it is.
-  - `drop_narration` removes narrations, and a search of vouchers by a phrase
-    of their narration is refused under it. It removes nothing else.
+  - `drop_narration` removes narrations, and a search of vouchers by a phrase of
+    their narration is refused under it. Apart from the error text noted below,
+    it removes nothing else.
   - **What the new reads in 0.5.0 send, under each setting.** Under `none`
     everything below is sent as read.
     - Cash Flow sends month names, each month's amounts and the net total, and
-      only when the net total ties to the trial balance; otherwise it sends two
-      net figures and counts of ledgers. It sends no ledger or party name on any
-      outcome: the only text from the book is the company name and the currency.
+      only when the net total ties to the trial balance. When the two differ it
+      sends the two net figures and counts of ledgers instead; in its other
+      refusals it sends at most a count of ledgers. It sends no ledger or party
+      name on any outcome. The only text from the book is the company name, its
+      identifier, company number and books-from date, and the currency.
       `mask_parties` has nothing to shorten in it, and it holds no narrations.
     - Voucher search sends the same voucher fields as the vouchers read, with
       names and narrations treated as that read treats them under each setting.
-    - A summary by ledger, month or voucher type sends the totals and counts, and
-      the voucher numbers, dates, types and Tally identifiers of the vouchers
-      behind each total. Ledger names in it are shortened under `mask_parties`.
+    - A summary by ledger, month or voucher type sends the totals and counts,
+      and the voucher numbers, dates, types and Tally identifiers of up to five
+      of the vouchers behind each total. Ledger names in it are shortened under
+      `mask_parties`.
     - A summary by group sends group names as the book has them under every
       setting; the ledgers listed under a group total, and the ledger named when
       a group total cannot be given, are shortened under `mask_parties`.
-    - A voucher's reference date (the `reference_date` field) is a date, the same
-      under every setting.
+    - A voucher's reference date (the `reference_date` field) is a date, the
+      same under every setting.
     - The list of bill-wise ledgers waiting for your approval sends each
-      ledger's name (shortened under `mask_parties`), the dates and amounts of
-      its rows, its totals and row count, and a 64-character fingerprint (a
-      short code made from that ledger's rows in the batch). The approved-party
-      list in the build result is shortened the same way.
+      ledger's name (shortened under `mask_parties`), the date, voucher type,
+      side and amount of each of its rows with its transaction label, its totals
+      and row count, and a 64-character fingerprint (a short code made from that
+      ledger's rows, the batch and the company). The approved-party list in the
+      build result is shortened the same way.
     - The note on how long a voucher read took holds counts and seconds, and no
-      book data. Cash Flow and the trial balance also send a one-line summary
-      with the company name, the period and row counts.
+      book data. Cash Flow, like the trial balance and the two statements, also
+      sends a short summary in words naming the company and the period; the
+      trial balance's also counts its rows.
   - Either setting also leaves out the text of an error Tally returned for a
     line. Any other value stops the extension from starting.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
@@ -233,12 +239,14 @@ until you accept the new version (section 4). A server started by hand with
   dates, narrations, amounts and ledgers, and for each saved batch: each ledger
   it names with the identifier (GUID) Tally gave it, the ledgers named as
   Cash-in-Hand for a bank cash answer (with the voucher label), and the
-  bill-wise ledgers you approved to receive entries On Account (with a
-  64-character fingerprint, a short code made from that party's rows so a later
-  change can be noticed). These records hold ledger names and fingerprints, and
-  no new amounts, PAN, bank account numbers or contact details. It also holds
-  the proof-of-post files that hold what Tally read back, and a short note when
-  an approval you gave was dropped without being used.
+  bill-wise ledgers you approved to receive entries On Account (with the
+  64-character fingerprint your approval matched when the batch was built, a
+  short code made from that party's rows and the batch; it is kept as a record
+  and is not checked again when the batch is posted). These records hold ledger
+  names and fingerprints, and no new amounts, PAN, bank account numbers or
+  contact details. It also holds the proof-of-post files that hold what Tally
+  read back, and a short note when an approval you gave was dropped without
+  being used.
 - **Bank-statement proposals** (`bank-statements/`): every row of a statement
   you asked it to read, with date, amount, bank reference and narration.
 - **Lock files** with no content, a lock folder (`native-dispatch-leases/`,
@@ -320,9 +328,10 @@ batch of up to ten vouchers lists each on one line (type, date, amount, ledger
 and up to 40 characters of its narration, with no reference) and marks the
 approved ledgers On Account on its totals lines. A batch of more than ten
 vouchers, or whose lines cannot be shown safely or do not fit, shows its totals
-only, with a line saying why, and still asks for your approval. An approval also
-lapses when Tally's port is busy before anything is sent, and you are asked
-again.
+only, with a line saying why, and still asks for your approval, unless a ledger
+or company name cannot be shown safely or the totals do not fit, when it
+refuses. An approval also lapses when Tally's port is busy before anything is
+sent, and you are asked again.
 
 The window covers only ComplyEaze Bridge's own tools. Another Tally connector in
 the same Claude Desktop that can change entries can do so without it.

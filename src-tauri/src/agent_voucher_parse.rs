@@ -639,10 +639,9 @@ fn parse_voucher_rows(
                         // REFERENCE names. Like EFFECTIVEDATE above, an empty or absent element is
                         // not observed and the key is omitted, never invented as ""; a present value
                         // must be a date, as DATE must, or the read is refused. The shapes handled
-                        // here (a populated `YYYYMMDD` element, an empty one) are DERIVED from what
-                        // private books returned to a request that named every method; no capture
-                        // under this request records them yet, and the request here does not name
-                        // the field until one does.
+                        // here (a populated `YYYYMMDD` element, an empty one) are DERIVED from
+                        // observations that are not committed; no capture under this request records
+                        // them yet, and the request here does not name the field until one does.
                         if let Some(reference_date) = row
                             .get("REFERENCEDATE")
                             .map(|value| value.trim())

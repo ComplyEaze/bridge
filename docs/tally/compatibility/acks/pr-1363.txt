@@ -1,0 +1,7 @@
+src-tauri/src/agent_import_verification.rs
+src-tauri/src/agent_register.rs
+src-tauri/src/agent_register_tests.rs
+src-tauri/src/agent_voucher_parse.rs
+src-tauri/src/agent_voucher_parse_tests.rs
+src-tauri/src/agent_voucher_scalars.rs
+reviewer: lamemustafa

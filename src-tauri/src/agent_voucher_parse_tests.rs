@@ -1167,8 +1167,8 @@ fn captured_utf16le(bytes: &[u8]) -> String {
 /// `reference_date` (#1257), checked on derived shapes: the captured three-voucher fixture was taken before
 /// the request named REFERENCEDATE, so these injected elements are not evidence of what Tally returns under
 /// this request. They pin the parse of two derived shapes (a populated `YYYYMMDD` element, and an empty one,
-/// as private books returned them to a request that named every method) and the refusal of a value that is
-/// not a date.
+/// derived from observations that are not committed; no capture under this request records them yet) and the
+/// refusal of a value that is not a date.
 #[test]
 fn reference_date_is_optional_a_date_when_present_and_refused_otherwise() {
     let captured = captured_native_vouchers();

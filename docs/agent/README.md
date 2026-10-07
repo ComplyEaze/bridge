@@ -1264,8 +1264,9 @@ each other.
     measured: it is 16 MiB divided by an estimate of 1,400 bytes a ledger. The 16 MiB is a size chosen
     here (half the transport cap) and not verified as safe for the gateway; the 1,400 is the estimate
     the compliance ledger read uses, which that read measured at 1,104 bytes a ledger (a book of
-    1,989 ledgers) and 1,221 (a real book of about 9,500) on its own list without balances; that this
-    list has the same row shape is not established.
+    1,989 ledgers) and 1,221 (a real book of about 9,500) on its own list without balances; this list
+    read 1,175 bytes a ledger in the live runs of 6 and 7 October (51,698 bytes both times, for a book of 44 ledgers: a small book, so
+    the fixed part of the answer weighs in, and not a basis to raise the limit).
     The mark is an upper bound on ledgers (every other master raises it), so a smaller book may be
     refused, and the limit is about half of what the transport's own rule admits for the same list;
     it will not be raised without a measurement of bytes a ledger on this list. Then use the ledger, month or

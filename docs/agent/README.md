@@ -741,7 +741,7 @@ posted and nothing is inferred. It is a register of the books, not a GST return:
 it does not decide input tax credit eligibility or blocked credit, matches
 nothing against GSTR-2B or any portal, checks no GSTIN (`party_gstin` is returned
 only when the voucher carries one), returns `reference_date` only when the voucher
-carries one (as Tally sent it, `YYYYMMDD`; measured on one synthetic book, not on a sale), does not
+carries one (`YYYYMMDD`; measured on one synthetic book, on one Purchase), does not
 classify an item invoice's purchase as taxable, and never sums tax across heads
 or vouchers.
 

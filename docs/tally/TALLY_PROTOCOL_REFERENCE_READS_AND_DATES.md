@@ -679,7 +679,7 @@ on every voucher:
   day read's row (a reference date five days before its voucher date).
 - **One variable.** With the word removed, the data requests are byte-equal to the reads without it; with the
   `REFERENCEDATE` elements and the company counter block (`CMPINFO`) removed, the data responses are byte-equal to
-  the reads without it. The word adds 50 bytes a voucher (about 0.24% of the year's response).
+  the reads without it. The word adds 50 characters a voucher (100 bytes on the wire as UTF-16), about 0.24% of the year's response.
 - **Not shown.** A reference date on another voucher type, a voucher with a `REFERENCE` and no reference date,
   another release, another book. `reference_date` is returned as Tally sent it (`YYYYMMDD`); a value that is not
   a date refuses the read (`voucher_reference_date_invalid`).

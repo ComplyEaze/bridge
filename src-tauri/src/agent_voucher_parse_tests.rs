@@ -1216,6 +1216,12 @@ fn reference_date_is_optional_a_date_when_present_and_refused_otherwise() {
             "{bad}"
         );
     }
+    // The change feed reads the same rows: a value that is not a date refuses it, as it refuses the window read.
+    let malformed = with_injected_voucher_element("<REFERENCEDATE>15-Apr-2026</REFERENCEDATE>");
+    assert_eq!(
+        parse_agent_changed_rows(&malformed, CAPTURED_VOUCHER_COMPANY_GUID),
+        Err("voucher_reference_date_invalid".to_string())
+    );
     // A repeated element is the scalar rule's refusal, as for every other scalar.
     let twice = with_injected_voucher_element(
         "<REFERENCEDATE>20260415</REFERENCEDATE><REFERENCEDATE>20260416</REFERENCEDATE>",

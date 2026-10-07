@@ -496,8 +496,9 @@ fn the_live_capture_classes_a_renamed_type_and_its_child_from_the_request_sent()
             None,
         )
         .unwrap();
-    // The capture predates the word REFERENCEDATE in the field list: the request is the captured one
-    // once that word is removed.
+    // The capture predates the word REFERENCEDATE in the field list: the request carries the word and is
+    // the captured one once that word is removed.
+    assert!(request.contains("PARTYGSTIN,REFERENCEDATE</FETCH>"));
     assert_eq!(
         sha256_hex(request.replacen(",REFERENCEDATE", "", 1).as_bytes()),
         "913a6a68694dd09c2955dbc0e694e40072435b69fe7788e180f1df1bafe39279"

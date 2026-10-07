@@ -714,23 +714,44 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 #[path = "server_tests.rs"]
 mod tests;
 
-/// The body with every `,REFERENCEDATE` (UTF-8 or UTF-16LE) removed.
+/// The body with the FIRST `,REFERENCEDATE` (UTF-8 or UTF-16LE) removed: a request that carries the word twice,
+/// or that carries it elsewhere than the field list of the one voucher read, does not equal the recorded one.
 fn without_reference_date_word(body: &[u8]) -> Vec<u8> {
     let utf16: Vec<u8> = ",REFERENCEDATE"
         .encode_utf16()
         .flat_map(|unit| unit.to_le_bytes())
         .collect();
-    let mut out = Vec::with_capacity(body.len());
-    let mut at = 0;
-    while at < body.len() {
-        if body[at..].starts_with(&utf16) {
-            at += utf16.len();
-        } else if body[at..].starts_with(b",REFERENCEDATE") {
-            at += b",REFERENCEDATE".len();
-        } else {
-            out.push(body[at]);
-            at += 1;
+    for word in [utf16.as_slice(), b",REFERENCEDATE".as_slice()] {
+        if let Some(at) = body.windows(word.len()).position(|window| window == word) {
+            let mut out = body[..at].to_vec();
+            out.extend_from_slice(&body[at + word.len()..]);
+            return out;
         }
     }
-    out
+    body.to_vec()
+}
+
+#[cfg(test)]
+mod reference_date_word_tests {
+    use super::without_reference_date_word;
+
+    #[test]
+    fn only_the_first_word_is_removed_in_either_encoding() {
+        assert_eq!(
+            without_reference_date_word(b"A,REFERENCEDATE</FETCH>"),
+            b"A</FETCH>"
+        );
+        assert_eq!(
+            without_reference_date_word(b"A,REFERENCEDATE,REFERENCEDATE"),
+            b"A,REFERENCEDATE"
+        );
+        let wide = |text: &str| -> Vec<u8> {
+            text.encode_utf16().flat_map(|unit| unit.to_le_bytes()).collect()
+        };
+        assert_eq!(
+            without_reference_date_word(&wide("A,REFERENCEDATE</FETCH>")),
+            wide("A</FETCH>")
+        );
+        assert_eq!(without_reference_date_word(b"no word"), b"no word");
+    }
 }

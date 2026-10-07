@@ -21,11 +21,11 @@ A live `vouchers` read of the synthetic book `BRIDGE SHAPE LAB` with `REFERENCED
 
 - **The element comes back on every voucher.** 134 of 134 data rows of the year read, and the one row of the day read, carry `REFERENCEDATE` with `TYPE="Date"`.
 - **Two shapes.** Empty: `<REFERENCEDATE TYPE="Date"></REFERENCEDATE>` on 132 rows (66 vouchers). Populated: `<REFERENCEDATE TYPE="Date">YYYYMMDD</REFERENCEDATE>` on two rows (one voucher, a Purchase whose reference date is its own voucher date and which carries a `REFERENCE`) and on the day read's voucher (reference date five days before the voucher date).
-- **One variable.** The data requests are byte-equal to the same reads without the word once the word is removed, and the data responses are byte-equal to the same reads without the word once the `REFERENCEDATE` elements and the company counter block (`CMPINFO`) are removed. The word adds 50 bytes a voucher.
+- **One variable.** The data requests are byte-equal to the same reads without the word once the word is removed, and the data responses are byte-equal to the same reads without the word once the `REFERENCEDATE` elements and the company counter block (`CMPINFO`) are removed. The word adds 50 characters a voucher (100 bytes on the wire as UTF-16).
 - **Not shown.** A reference date on any other voucher type, a voucher with a reference and no reference date, another Tally release, or a book other than this one.
 
 ## Screening
 
 - Every name in the kept rows is a synthetic lab name (two ledgers: a supplier and a purchase ledger).
 - The day read's own response is not committed: its voucher was keyed for this capture, and the year rows already carry both shapes.
-- The company name appears in the request and in the response header.
+- The company name appears in the request only.

@@ -693,7 +693,7 @@ async fn the_four_outcomes_of_a_cash_flow_read_the_same_under_every_redaction_an
         let text = plain["content"][0]["text"].as_str().expect("a text copy");
         let parsed: Value = serde_json::from_str(text).expect("the text copy is JSON");
         assert_eq!(
-            parsed["state"],
+            parsed["result"]["state"],
             plain["structuredContent"]["result"]["state"]
         );
         for redaction in [Redaction::MaskParties, Redaction::DropNarration] {

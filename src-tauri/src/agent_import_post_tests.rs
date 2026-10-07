@@ -2083,6 +2083,21 @@ fn a_bank_preview_is_refused_at_each_cap_rather_than_truncated() {
     );
 }
 
+/// An assistant's post adds the line that says when the post happens, so its
+/// text holds one entry fewer: six entries of a bank voucher fit 24 lines and
+/// seven do not.
+#[test]
+fn an_assistants_bank_preview_fits_one_entry_fewer() {
+    let (_, endpoint) = batch();
+    let six = agent_review_preview(&payment_with(5, |i| format!("Party {i}")), &endpoint)
+        .expect("six entries fit");
+    assert_eq!(six.lines().count(), 24, "{six}");
+    assert_eq!(
+        agent_review_preview(&payment_with(6, |i| format!("Party {i}")), &endpoint).unwrap_err(),
+        "import_review_too_large"
+    );
+}
+
 /// Grow a preview one character at a time with `build(pad)`: it fits up to some
 /// size and is refused beyond it, never the other way round. The largest preview
 /// that fit, and the refusal that followed it (`None` if none did by `max_pad`).

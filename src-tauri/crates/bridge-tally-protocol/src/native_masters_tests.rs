@@ -1617,3 +1617,82 @@ fn a_cost_centre_category_over_the_name_bound_is_refused() {
         Err(NativeMastersError::RowExceedsBound)
     );
 }
+
+// ---- the same collections on a book whose Cost Centres setting reads Yes (captured 7 Oct 2026 by another lane, scrubbed) ----
+
+/// The parity book's synthetic company GUID, as scrubbed in the fixtures.
+const PARITY_COMPANY: &str = "7c0de000-0000-4000-8000-0000000000a1";
+
+fn parity(bytes: &[u8]) -> String {
+    utf16le(bytes)
+}
+
+#[test]
+fn a_book_with_the_setting_at_yes_reads_its_three_centres_one_under_another() {
+    let rows = parse_native_masters(
+        NativeMasterKind::CostCentres,
+        &parity(
+            &include_bytes!(
+                "../tests/fixtures/masters_cost_centres_parity_flag_yes_live.utf16le.xml"
+            )[..],
+        ),
+        PARITY_COMPANY,
+    )
+    .unwrap()
+    .rows;
+    assert_eq!(
+        rows.iter().map(|row| row.name.as_str()).collect::<Vec<_>>(),
+        ["Parity CC A", "Parity CC A1", "Parity CC B"]
+    );
+    // The two top-level centres carry the reserved root marker; the child names its parent centre.
+    assert!(is_tally_reserved_root(rows[0].parent.as_deref().unwrap()));
+    assert_eq!(rows[1].parent.as_deref(), Some("Parity CC A"));
+    assert!(!is_tally_reserved_root(rows[1].parent.as_deref().unwrap()));
+    assert!(is_tally_reserved_root(rows[2].parent.as_deref().unwrap()));
+    // The default category is a category like any other: kept, not dropped.
+    for row in &rows {
+        assert_eq!(
+            row.detail,
+            NativeMasterDetail::CostCentre {
+                category: Some("Primary Cost Category".to_string())
+            }
+        );
+    }
+    assert_eq!((rows[0].master_id, rows[0].alter_id), (206, 211));
+    assert_eq!((rows[1].master_id, rows[1].alter_id), (208, 213));
+}
+
+#[test]
+fn the_parity_book_cost_category_is_the_predefined_one_with_its_flags() {
+    let rows = parse_native_masters(
+        NativeMasterKind::CostCategories,
+        &parity(
+            &include_bytes!(
+                "../tests/fixtures/masters_cost_categories_parity_flag_yes_live.utf16le.xml"
+            )[..],
+        ),
+        PARITY_COMPANY,
+    )
+    .unwrap()
+    .rows;
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].name, "Primary Cost Category");
+    assert_eq!(rows[0].parent, None);
+    assert_eq!(
+        rows[0].detail,
+        NativeMasterDetail::CostCategory {
+            allocates_revenue: true,
+            allocates_non_revenue: true,
+            affects_stock: false,
+        }
+    );
+}
+
+#[test]
+fn the_flag_yes_answers_are_company_bound_like_the_others() {
+    let centres = parity(
+        &include_bytes!("../tests/fixtures/masters_cost_centres_parity_flag_yes_live.utf16le.xml")
+            [..],
+    );
+    assert!(parse_native_masters(NativeMasterKind::CostCentres, &centres, COMPANY).is_err());
+}

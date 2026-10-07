@@ -340,8 +340,9 @@ carries `name`, `guid`, `master_id`, `alter_id` and `parent`; units add
 cost categories `allocates_revenue`, `allocates_non_revenue` and `affects_stock`.
 Cost centres and categories are returned whether or not the company's Cost
 Centres setting is on: a book whose setting read No still returned its two
-centres and two categories (one synthetic book), so a No setting is not "no
-centres", and an empty cost-centre list (one synthetic book with none defined
+centres and two categories (one synthetic book), and a book whose setting read Yes
+returned its three centres, one under another, with the same shape (a second synthetic
+book), so a No setting is not "no centres", and an empty cost-centre list (one synthetic book with none defined
 answered one) does not say whether the feature is off or none is defined; this
 call does not return the setting. An empty cost-category list is refused
 (`masters_cost_categories_empty`): the predefined Primary Cost Category always

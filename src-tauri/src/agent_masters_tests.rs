@@ -562,6 +562,93 @@ async fn cost_categories_read_end_to_end_with_their_allocation_flags() {
 }
 
 #[tokio::test]
+async fn a_category_that_affects_stock_is_returned_as_such() {
+    // The captured answer holds only categories that do not affect stock; the one flag of the last
+    // row is changed in the captured bytes, so the output is read from the wire and not defaulted.
+    let captured = capture("cost_categories");
+    let flag = "<AFFECTSSTOCK TYPE=\"Logical\">No</AFFECTSSTOCK>";
+    let at = captured.rfind(flag).expect("a flag");
+    let changed = format!(
+        "{}<AFFECTSSTOCK TYPE=\"Logical\">Yes</AFFECTSSTOCK>{}",
+        &captured[..at],
+        &captured[at + flag.len()..]
+    );
+    let one = OneServer::spawn(first_page_plans(changed, 14));
+    let response = one.call(args("cost_categories", 0, 500, None)).await;
+    let rows = result(&response)["masters"].as_array().unwrap().clone();
+    let stock_flags = rows
+        .iter()
+        .map(|row| {
+            (
+                row["name"].as_str().unwrap().to_string(),
+                row["affects_stock"].clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        stock_flags,
+        [
+            ("Business Line".to_string(), json!(false)),
+            ("Primary Cost Category".to_string(), json!(true)),
+        ]
+    );
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn cost_centre_and_category_names_and_categories_are_masked_under_mask_parties() {
+    // A customer can name a cost centre after itself, so the names and the category a centre carries
+    // are masked; the allocation flags of a category are not names and stay.
+    let mut plans = first_page_plans(capture("cost_centres"), 14);
+    plans.extend(first_page_plans(capture("cost_categories"), 14));
+    let one = OneServer::spawn_with(plans, Redaction::MaskParties);
+
+    let response = one.call(args("cost_centres", 0, 500, None)).await;
+    let page = result(&response);
+    let rows = page["masters"].as_array().unwrap();
+    let names = rows
+        .iter()
+        .map(|row| (row["name"].clone(), row["category"].clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        [
+            (json!(mask("Assembly")), json!(mask("Business Line"))),
+            (json!(mask("Trading")), json!(mask("Business Line"))),
+        ]
+    );
+    // A mask that kept the plain text would pass the above if `mask` did.
+    assert_ne!(mask("Business Line"), "Business Line");
+    for plain in ["Assembly", "Trading", "Business Line"] {
+        assert!(!response.to_string().contains(plain), "{plain}");
+    }
+    assert!(rows
+        .iter()
+        .all(|row| row["parent"] == json!("\u{fffd}#4; Primary")));
+
+    let response = one.call(args("cost_categories", 0, 500, None)).await;
+    let page = result(&response);
+    let names = page["masters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["name"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        [
+            json!(mask("Business Line")),
+            json!(mask("Primary Cost Category"))
+        ]
+    );
+    for plain in ["Business Line", "Primary Cost Category"] {
+        assert!(!response.to_string().contains(plain), "{plain}");
+    }
+    assert_eq!(page["masters"][0]["allocates_revenue"], json!(true));
+    assert_eq!(one.requests(), 2 * FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
 async fn voucher_types_have_no_size_check_before_the_read() {
     // A mark no godown, unit or stock group read would be admitted at.
     let one = OneServer::spawn(first_page_plans_at(

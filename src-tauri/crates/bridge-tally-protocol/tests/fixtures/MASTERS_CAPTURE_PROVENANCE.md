@@ -51,3 +51,11 @@ Voucher types, godowns, units and stock groups, each read as one native collecti
 | `masters_cost_categories_shape_lab_live.utf16le.xml` | 5782 | `e61714960d2c365c93805366c2021703eb885891be684b8c879d1721056c9b7b` | cost categories | 2 |
 | `masters_cost_centres_corpus_forex_empty_live.utf16le.xml` | 2996 | `9ec9b8fbbfc810101a9cfe8a4a8b1a82df383be0c678400cf3e5ab82d954909a` | cost centres | 0 |
 
+### Cost centres and categories on a book with the setting at Yes (captured 2026-10-07 by another lane)
+
+A third synthetic book, the parity lab, whose Cost Centres setting read Yes (the Company flag `ISCOSTCENTRESON`, equal to the owner's screen), captured through the same collection requests as the files above. The fixtures are **scrubbed copies**: the company GUID prefix is replaced with a synthetic one and the lab names `RB1 CC A`, `RB1 CC A1` and `RB1 CC B` with `Parity CC A`, `Parity CC A1` and `Parity CC B`; the structure and every other byte of the answers are as received (BOM-less UTF-16LE, `&#4;` kept in `PARENT`). The originals are 6,806 and 4,458 bytes.
+
+| file | bytes | sha256 | content |
+| --- | --- | --- | --- |
+| `masters_cost_centres_parity_flag_yes_live.utf16le.xml` | 6848 | `2a8fe692c63da913919ec5e8440a2da5571b2f7d5a371cb13d1288b6a0ca9186` | CostCentre, 3 rows: two at the top level, one under another centre, default category |
+| `masters_cost_categories_parity_flag_yes_live.utf16le.xml` | 4458 | `a07fd9d365134a5023e17b5aa5e7f3c762a27d9dd807ae12ff433edaf2863376` | CostCategory, 1 row, the predefined Primary Cost Category (Yes, Yes, No) |

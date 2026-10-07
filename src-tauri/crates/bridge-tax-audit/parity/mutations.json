@@ -9814,5 +9814,77 @@
   "file": "src/loans_interest.rs",
   "from": "                    cited.contains(v.guid.as_str())\n",
   "to": "                    (cited.contains(v.guid.as_str()) || true)\n"
+ },
+ {
+  "id": "L1259-23",
+  "by": "reviewer-opus",
+  "what": "loans_interest: LOAN-1 reads the published TDS ledger names without the empty name, as LOAN-4 does",
+  "file": "src/loans_interest.rs",
+  "from": "        .map(|f| lines_of(f))\n        .unwrap_or_default();\n    let tds_read_loan4",
+  "to": "        .map(|f| lines_of(f).into_iter().filter(|x| !x.is_empty()).collect())\n        .unwrap_or_default();\n    let tds_read_loan4"
+ },
+ {
+  "id": "L1259-24",
+  "by": "reviewer-opus",
+  "what": "loans_interest: LOAN-1 reads an empty published TDS ledger figure as one empty name, not as no ledger",
+  "file": "src/loans_interest.rs",
+  "from": "        .filter(|f| matches!(&f.value, Value::Text(t) if !t.is_empty()))\n",
+  "to": ""
+ },
+ {
+  "id": "L1259-25",
+  "by": "reviewer-opus",
+  "what": "loans_interest: LOAN-4 keeps the empty name among the TDS ledgers it reads",
+  "file": "src/loans_interest.rs",
+  "from": "tds_read.iter().filter(|x| !x.is_empty()).cloned().collect();",
+  "to": "tds_read.iter().cloned().collect();"
+ },
+ {
+  "id": "L1259-26",
+  "by": "reviewer-opus",
+  "what": "loans_interest: charge_shaped leaves out the ledgers on nil lines (the reference reads them)",
+  "file": "src/loans_interest.rs",
+  "from": "            let counter: Vec<&str> = others_than(v, loan_ledger)\n",
+  "to": "            let counter: Vec<&str> = posted_others_than(v, loan_ledger)\n"
+ },
+ {
+  "id": "L1259-27",
+  "by": "reviewer-opus",
+  "what": "loans_interest: tds_in_principal is published only where the principal vouchers' TDS does not net to nil",
+  "file": "src/loans_interest.rs",
+  "from": "        if !principal_tds.is_empty() {\n",
+  "to": "        if principal_tds.iter().map(|&(_, x)| x).sum::<i128>() != 0 {\n"
+ },
+ {
+  "id": "L1259-28",
+  "by": "reviewer-opus",
+  "what": "loans_interest: tds_in_principal sums only the TDS deducted, leaving out a TDS debit on a taken or repaid voucher",
+  "file": "src/loans_interest.rs",
+  "from": "paise(principal_tds.iter().map(|&(_, x)| x).sum())?,",
+  "to": "paise(principal_tds.iter().map(|&(_, x)| x).filter(|x| *x > 0).sum())?,"
+ },
+ {
+  "id": "L1259-29",
+  "by": "reviewer-opus",
+  "what": "loans_interest: the TDS-journal test reads the ledgers on nil lines (the reference's reads those on lines with an amount)",
+  "file": "src/loans_interest.rs",
+  "from": "            && others\n                .iter()\n                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))\n",
+  "to": "            && others_than(v, loan_ledger)\n                .iter()\n                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))\n"
+ },
+ {
+  "id": "L1259-30",
+  "by": "reviewer-opus",
+  "what": "loans_interest: LOAN-1 goes no further to the tie once it has said the TDS in principal differs from its cited vouchers'",
+  "file": "src/loans_interest.rs",
+  "from": "the lines on the TDS ledgers of the vouchers it cites on this loan are {derived}p\"\n                ));\n",
+  "to": "the lines on the TDS ledgers of the vouchers it cites on this loan are {derived}p\"\n                ));\n                continue;\n"
+ },
+ {
+  "id": "L1259-31",
+  "by": "reviewer-opus",
+  "what": "loans_interest: LOAN-1's re-derivation takes a voucher whose lines on the loan net to an amount, not one with a line with an amount on it",
+  "file": "src/loans_interest.rs",
+  "from": "                            .any(|l| l.ledger == **name && l.amount_paise != 0)",
+  "to": "                            .filter(|l| l.ledger == **name)\n                            .map(|l| i128::from(l.amount_paise))\n                            .sum::<i128>()\n                            != 0"
  }
 ]

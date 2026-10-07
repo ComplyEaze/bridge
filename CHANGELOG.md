@@ -339,9 +339,9 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - Search and summaries were checked on one synthetic book of 67 vouchers; large
   books, masking and foreign-currency vouchers are not checked, and a group
   summary is refused above a provisional limit that was not measured (#1230).
-- A voucher read on a large book still covers one day of vouchers per call, and
-  a slow call can take a minute or more; what a read cost is stated after it,
-  not before (#485, #595, #703, #1239).
+- On a large book a voucher read is practical a day at a time: one day took
+  about 170 seconds on the largest book measured, and a month is read day by day.
+  What a read cost is stated after it, not before (#485, #595, #703, #1239).
 - The either-spelling ledger lookup was checked live on one book and one ledger;
   a second check on a book where a ledger's spelling differs from its own name is
   pending (#1085).
@@ -351,9 +351,9 @@ counter Tally keeps that moves when vouchers or ledgers change.
   a party-scoped request is not built (#945, #1356). The slice L captures of
   #1257 (a duty-head change or delete moving the master change counter; an item
   purchase on the class-entry shape) have not been run.
-- Cost centres, the company's enabled features and bank-reconciliation fields
-  are not read (`trial_balance` and `cash_flow` do return the company's
-  currency) **[#1231: rewrite when the slice's merge is known]**.
+- Cost centres, whether the company has cost centres or GST switched on, and
+  bank-reconciliation fields are not read (`trial_balance` and `cash_flow` do
+  return the company's currency, and `stock_summary` the inventory settings) **[#1231: rewrite when the slice's merge is known]**.
   Tally's Funds Flow, Ratio Analysis, Negative Stock and Negative Ledgers
   reports are not read (#1358).
 - GST Sales and Purchase posting are not in this build (#628).

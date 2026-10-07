@@ -755,7 +755,7 @@ impl Server {
             if report.iter().any(|value| value["match_state"] != "exact") {
                 let report = in_batch_order(
                     requested_names.iter().zip(report).collect(),
-                    &payload,
+                    &payload.vouchers,
                     |(name, _)| name.as_str(),
                 )
                 .into_iter()
@@ -774,7 +774,7 @@ impl Server {
             }
             let twins = in_batch_order(
                 folded_twins(&requested_names, ledger_masters.catalog().parents()),
-                &payload,
+                &payload.vouchers,
                 |twins| twins.requested.as_str(),
             );
             if !twins.is_empty() {
@@ -1602,7 +1602,8 @@ impl Server {
             };
             let mut proof = proof;
             if let Some(masters) = &masters_after_post {
-                proof["masters_after_post"] = masters.clone();
+                proof["masters_after_post"] =
+                    served_masters_verdict(masters.clone(), &line.vouchers);
             }
             // Whether a person's recorded review still covers this doubt and
             // this voucher (#239). Beside the verdict, never instead of it.
@@ -3462,22 +3463,35 @@ fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
 
 /// `rows` in the order the batch first names each row's ledger. A list of the
 /// batch's ledgers goes out in this order and never by name, with or without
-/// masking. A ledger the batch does not name goes last, in its incoming order;
-/// no caller passes one.
+/// masking. A ledger the batch does not name goes last, in its incoming order:
+/// the lists built from the batch hold none, and a recorded verdict names the
+/// ledgers the batch was bound to.
 fn in_batch_order<T>(
     mut rows: Vec<T>,
-    payload: &ImportPayload,
+    vouchers: &[ImportVoucher],
     ledger: impl for<'a> Fn(&'a T) -> &'a str,
 ) -> Vec<T> {
     rows.sort_by_cached_key(|row| {
-        payload
-            .vouchers
+        vouchers
             .iter()
             .flat_map(|voucher| &voucher.entries)
             .position(|entry| entry.ledger == ledger(row))
             .unwrap_or(usize::MAX)
     });
     rows
+}
+
+/// A masters verdict as an answer carries it: the ledgers it names in the order
+/// the batch names them (`in_batch_order`), not the order they were recorded
+/// in. The recorded verdict is left as it was saved: a recorded review is bound
+/// to its bytes.
+fn served_masters_verdict(mut verdict: Value, vouchers: &[ImportVoucher]) -> Value {
+    if let Some(ledgers) = verdict.get_mut("ledgers").and_then(Value::as_array_mut) {
+        *ledgers = in_batch_order(std::mem::take(ledgers), vouchers, |ledger| {
+            ledger.as_str().unwrap_or_default()
+        });
+    }
+    verdict
 }
 
 /// The ledgers a batch names, each once, in name order. A list of them sent to

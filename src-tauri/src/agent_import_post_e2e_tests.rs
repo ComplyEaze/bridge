@@ -3847,6 +3847,36 @@ async fn a_doubted_post_stays_doubted_when_reconciled_later() {
     assert_eq!(masters_check_of(&server, BATCH), doubt);
 }
 
+/// A recorded verdict's ledgers are answered in the order the batch names them,
+/// never in the order they were recorded (which is by name). The captured
+/// batch names its two ledgers in name order too, so this record is written in
+/// the opposite order to tell the two apart; the record itself is left as it
+/// was saved.
+#[tokio::test]
+async fn a_recorded_verdict_lists_its_ledgers_in_the_order_the_batch_names_them() {
+    let recorded = serde_json::to_vec(&json!({"state":"posted_under_changed_masters",
+        "trigger":"masters_moved","ledgers":["Cash","Bridge Nested Debtor WR4"]}))
+    .unwrap();
+    let (response, _, _, server, _directory) =
+        reconcile_with_masters_check(Some(&recorded), Vec::new()).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["masters_after_post"]["ledgers"],
+        json!(["Bridge Nested Debtor WR4", "Cash"]),
+        "{response}"
+    );
+    assert_eq!(
+        result["masters_after_post"]["state"], "posted_under_changed_masters",
+        "{response}"
+    );
+    // The record's own bytes, not a reading of them.
+    let record = server
+        .imports_dir()
+        .unwrap()
+        .join(format!("{BATCH}.masters_check.json"));
+    assert_eq!(fs::read(record).unwrap(), recorded);
+}
+
 /// A check the post could not finish (a crash, a lost read) is finished by the
 /// next readback that finds the voucher, against the ledgers bound at build.
 #[tokio::test]

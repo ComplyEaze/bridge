@@ -125,8 +125,12 @@ These changes are in source and not yet in a published build.
   same ledgers are found and refused as before.
   Where a list is cut (`ledgers_changed` names eight; a small response cap
   leaves rows of `refused_ledgers` out), which ledgers are named, and how many
-  `refused_ledgers_omitted` counts, can differ from before. Other lists are
-  unchanged (#1234).
+  `refused_ledgers_omitted` counts, can differ from before. The ledgers a
+  `post_import` or `verify_import` answer names in `masters_after_post.ledgers`
+  come in the same order, where the batch first names each, in the answer and
+  in the proof saved from it (the desktop screen names the first eight of
+  them); the recorded verdict, and the review dialog that reads it, keep the
+  order they were recorded in. Other lists are unchanged (#1234).
 
 ## [0.4.2] - 2026-10-03
 

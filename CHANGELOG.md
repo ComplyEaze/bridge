@@ -274,7 +274,8 @@ counter Tally keeps that moves when vouchers or ledgers change.
   post (#815, #1228, #1229).
 - `build_import_xml` refuses a bank statement built onto a Cash-in-Hand ledger
   (`statement_bank_ledger_not_a_bank`), and warns, without refusing, about a
-  suspense ledger outside Suspense A/c. No live run; the read-only check of the
+  suspense ledger that is outside Suspense A/c, whose group is not established,
+  or that is not in the book. No live run; the read-only check of the
   bank ledger in Tally against the statement is not in this build (#1211, #1214).
 - An HDFC statement that 0.4.2 refused with `unparseable_date` at the last row of
   a page is read with the statement-period line skipped, so its dates are no
@@ -284,17 +285,19 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - When Tally rejects a post entirely, the post's summary now says so and no
   longer suggests posting again. Not measured: a live post that Tally rejects
   whole (#1108, #1213).
-- A busy Tally port gets three answers. Busy before `post_import` sends anything:
+- A busy Tally port gets four answers. Busy before `post_import` sends anything:
   the refusal tells the assistant to call `post_import` again with the same
   batch after 5 seconds, that you will be asked to approve again, and not to
   rebuild it. Busy after the send: it tells the assistant to use
-  `verify_import` with the original batch and never to post again. The second
-  pass of an approved post has no time left: it refuses at once as
-  `tally_endpoint_busy` with nothing sent (#869, #893, #1219, #1244).
+  `verify_import` with the original batch and never to post again. Whether the
+  post was sent could not be observed: the refusal says to use `verify_import`
+  with the original batch. The second pass of an approved post has no time left:
+  it refuses at once as `tally_endpoint_busy` with nothing sent (#869, #893,
+  #1219, #1244).
 - The approval dialog for a batch of up to ten vouchers lists each voucher on
   one line (type, date, amount, ledger, narration cut at 40 characters); a larger
-  batch, or one with an unsafe narration or reference, shows the totals with a
-  line saying why. A narration that reads like a line of the dialog itself is not
+  batch, one with an unsafe narration or reference, or one whose lines do not
+  fit the dialog shows the totals with a line saying why. A narration that reads like a line of the dialog itself is not
   shown. A single-voucher dialog shows the narration without its outer spaces,
   as posted. The per-voucher lines were seen on macOS only (#1055, #1063,
   #1223, #1226, #1278, #1283).
@@ -318,7 +321,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   described, six easily confused pairs end with "use X instead", and the two log
   tools say when to use each and that reading changes nothing but its own
   receipt line. The `ledger_masters` description is about 4 percent shorter than
-  in 0.4.2 (6,717 to 6,451 characters) without dropping a limit or safety
+  in 0.4.2 (6,714 to 6,448 characters in the source) without dropping a limit or safety
   phrase, and the `vouchers` description says a bill allocation carries its bill
   date and credit period when Tally sends them. No claim is made that assistants
   choose better (#945, #1155, #1157, #1161, #1164, #1166, #1176, #1180, #1191,
@@ -326,16 +329,19 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - The extension's listing text (a long description, keywords and links) is
   added to the manifest; it says the extension is untested outside Claude Desktop
   and that ComplyEaze Bridge is not affiliated with Tally Solutions (#1375).
-- ComplyEaze Bridge is named in full in the desktop app's screens and messages
-  (#962, #1163, #1165, #1168, #1170, #1179, #1190).
+- ComplyEaze Bridge is named in full in the text of the desktop app's screens
+  and messages that these changes reached. The app's product name and window
+  title in its configuration still read "Bridge", and some error strings in
+  its source still begin with it (#962, #1163, #1165, #1168, #1170, #1179, #1190).
 
 **Known limits**
 
 - Search and summaries were checked on one synthetic book of 67 vouchers; large
   books, masking and foreign-currency vouchers are not checked, and a group
   summary is refused above a provisional limit that was not measured (#1230).
-- A voucher read on a large book still takes one day per call; what a read cost
-  is stated after it, not before (#485, #595, #703, #1239).
+- A voucher read on a large book still covers one day of vouchers per call, and
+  a slow call can take a minute or more; what a read cost is stated after it,
+  not before (#485, #595, #703, #1239).
 - The either-spelling ledger lookup was checked live on one book and one ledger;
   a second check on a book where a ledger's spelling differs from its own name is
   pending (#1085).
@@ -345,8 +351,9 @@ counter Tally keeps that moves when vouchers or ledgers change.
   a party-scoped request is not built (#945, #1356). The slice L captures of
   #1257 (a duty-head change or delete moving the master change counter; an item
   purchase on the class-entry shape) have not been run.
-- Cost centres, the company's currency and features, and bank-reconciliation
-  fields are not read **[#1231: rewrite when the slice's merge is known]**.
+- Cost centres, the company's enabled features and bank-reconciliation fields
+  are not read (`trial_balance` and `cash_flow` do return the company's
+  currency) **[#1231: rewrite when the slice's merge is known]**.
   Tally's Funds Flow, Ratio Analysis, Negative Stock and Negative Ledgers
   reports are not read (#1358).
 - GST Sales and Purchase posting are not in this build (#628).

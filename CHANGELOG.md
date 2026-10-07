@@ -36,6 +36,22 @@ These changes are in source and not yet in a published build.
   trail reads carries for it, so a party detail that finds no bill or no unallocated
   row for such a ledger says `report_spelling: not_established`; that the first name
   list is the primary language (#1085).
+- `cash_flow` reads Tally's own Cash Flow for whole months (the month-wise
+  movement of the cash and bank ledgers, not a cash flow statement under AS 3). The
+  months are returned only after their net total has been compared with the
+  trial balance's cash and bank ledgers and found equal; the split into months is
+  Tally's own and is not checked, and Tally's debit and credit columns are not
+  returned. A ledger under Bank OD A/c or Bank OCC A/c with movement refuses the
+  result: Tally was seen counting one such ledger, which the check does not yet
+  count, and the refusal is covered by tests and has not been seen against Tally.
+  The tool was run against Tally on two synthetic books: the net total tied on
+  five windows (three with only debits, two with a credit amount, one of them
+  with a positive closing as well) and a quiet window was answered as nothing to
+  compare. Tally's own answers were captured on four synthetic books in all, one
+  of them a year of empty months on a large book. A Bank OD credit or a Bank OCC ledger, a contra, a month with entries that
+  cancel, a window ending in February, a window crossing a financial year,
+  optional or post-dated vouchers, a several-currency book and a large book with
+  cash activity are not measured.
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
   `amount`), and can add a window up by ledger, month, voucher type, group or

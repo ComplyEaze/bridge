@@ -87,6 +87,7 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 The ordinary default tools, in name order:
 
 - `balance_sheet`
+- `cash_flow`
 - `egress_log`
 - `ledger_masters`
 - `ledger_movement`
@@ -109,7 +110,7 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `local_data_report` (also
+0.4.2. `cash_flow` is in source and not yet in a published build. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -396,6 +397,90 @@ are masked like a party name, because a job-work godown or a supplier-named
 stock group can carry a party's name; Tally's reserved root as a parent is a
 fixed marker and is left as it is. Voucher-type, unit and account-group names
 are not masked: they are configuration labels, not counterparties.
+
+### Cash Flow
+
+Use `cash_flow` with `company_guid`, `from` and `to` for Tally's own Cash Flow: the
+month-wise movement of the cash and bank ledgers. It is not a cash flow
+statement under AS 3. The window must be whole months: `from` the 1st of a month,
+`to` the last day of a month, at most twelve months, so that each row Tally prints
+(a month name, with no year) can be placed in its year. Otherwise the call is
+refused before any trial balance or report request, after the status and company reads (`cash_flow_window_not_month_start`,
+`cash_flow_window_not_month_end`, `cash_flow_window_too_many_months`; a window starting
+before the book is `trial_balance_before_books`; a reversed window is `invalid_date_range`).
+Education mode and a book with several currency masters are refused, as for the statements.
+
+The months are returned only once the **net total** of the whole window has been
+compared with the trial balance read for the same window and found equal: the
+months' closing amounts added up, against the debit and credit totals of every
+ledger under Cash-in-Hand or Bank Accounts (a ledger under a group a user made inside
+one is counted by the group tree and was not measured). Both sides must carry an amount.
+The top-level `state` is `observed` when the months are returned and
+`not_established` otherwise, with `reason`:
+
+- `cash_flow_differs_from_trial_balance`: the two figures differ, or only one side
+  carries an amount (an empty amount is not a zero: that side shows as `null`).
+  `months` is `null`; `net_total` carries both figures for investigation only (`use` says so),
+  and a count of ledgers with movement whose group could not be resolved, which is
+  where to look. Neither figure is the cash movement.
+- `cash_flow_money_group_unmeasured`: a ledger under Bank OD A/c or Bank OCC A/c
+  has movement in the window. Tally's Cash Flow was seen counting one such ledger
+  (debit only, one book), which the tie does not count, so the refusal stands in
+  place of a difference; it is covered by tests and has not been seen against Tally,
+  and a Bank OD credit and a Bank OCC ledger were not measured. `months` is `null`.
+- `cash_flow_nothing_to_compare`: nothing could be tied. Either neither the cash and
+  bank ledgers of the trial balance nor Tally's Cash Flow carry an amount for the
+  window (an empty amount is not a zero), or both sides net to zero, which would be
+  equal under any sign convention and any meaning of the columns. `months` is
+  `null`. Months that net to zero over no cash or bank ledger at all are
+  `cash_flow_differs_from_trial_balance`, not a tie.
+
+`unmeasured_in_this_answer` lists, in the result itself, what this answer holds that
+was never compared with Tally's own Cash Flow screen: `credit_amount_present` (a non-zero
+credit column), `positive_closing` (a closing on the credit side) and
+`window_runs_from_march_into_april` (a window across a financial year of the usual
+April-to-March kind). The first two were seen tied to the trial balance in live runs on one
+synthetic book (a credit in two windows, a positive closing in one of them) and are still named; the third was never run. The list is empty only for
+debit-only months in one year, and when it is not empty the lead says to treat each month's
+figure as unverified and compare it with Tally's own Cash Flow. A bank ledger placed under
+another group, a liability one for example, is not counted as cash or bank: if Tally
+counts it the net total differs and the result is `not_established`.
+
+`checks` says per field what was `checked`, `differs` (compared, and the figures
+disagree), `not_checked` or `withheld`: the net total is checked; the split into months is Tally's own and is not checked (a total
+can tie while one month is wrong); Tally's debit and credit columns are read but
+not returned: on the two books with credits each column differed from the debit and credit
+totals of the ledgers Tally counts as cash and bank (on one of them including a Bank OD A/c
+ledger) by one common amount in size (the ledgers' columns larger in both) while the net tied, and what that amount is has not been established. A month
+Tally printed with no amounts is returned with an empty `closing`, which is not zero and does not
+say the month had no entries (whether entries that cancel print an empty closing is not measured).
+A negative amount is a debit: cash and bank grew.
+
+An unknown report name, a reported failure, an empty answer and rows for other
+months than the window holds are each refused, classified by the structure of the
+answer: on licensed 7.1 an unknown name is answered in band (`STATUS` 0 with a
+`LINEERROR`) and is refused as `cash_flow_tally_reported_failure`; only a bare
+`RESPONSE` (an earlier build) is `cash_flow_report_unknown`; the others are
+`cash_flow_empty_envelope` and `cash_flow_months_unexpected`. A change between the
+two paired Cash Flow reads is `native_cash_flow_changed`.
+
+The refusals above reach the caller as an `isError` result whose `error.code` is
+`cash_flow_read_failed` and whose `error.cause` is the code named (the window codes
+are the `error.code` itself).
+
+The tool was run against Tally on two synthetic books on licensed TallyPrime 7.1 (2026-10-07,
+one call at a time through a recording relay): on five windows the net total tied to the trial
+balance and the months were returned (three windows with debits only; two with a credit amount,
+one of them with a positive closing as well), and a quiet window with no cash or bank amount was
+answered as `cash_flow_nothing_to_compare`. An independent recomputation from the raw bytes
+agreed with the tool on all six. Tally's own answers were captured on four synthetic books in all: on
+every captured month with an amount the closing is the debit plus the credit, and a year of empty
+months on a large book was answered at once. Not measured: a ledger under Bank OD A/c or Bank OCC
+A/c in the tool's own run (Tally was seen counting a Bank OD ledger, so the refusal above stands in
+place of a difference; it is covered by tests only), what Tally's debit and credit columns each
+include (each differed from the totals of the ledgers Tally counts as cash and bank by one common amount in size (the ledgers' columns larger in both) while the net tied; on one book that set includes a Bank OD A/c ledger), a contra, a window
+ending in February, a window crossing a financial year, optional or post-dated vouchers, a book with
+several currencies, and a large book with cash activity.
 
 ### Stock Summary
 

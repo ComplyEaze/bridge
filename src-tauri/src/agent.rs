@@ -39,6 +39,8 @@ use agent_protocol::serve_stdio;
 #[path = "agent_company.rs"]
 mod company;
 use company::*;
+#[path = "agent_cash_flow.rs"]
+mod cash_flow;
 #[path = "agent_changes.rs"]
 mod changes;
 #[path = "agent_headline.rs"]
@@ -782,6 +784,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
             .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
         {
             return Some(statement.code());
+        }
+        if let Some(cash_flow) =
+            cause.downcast_ref::<bridge_tally_protocol::native_cash_flow::NativeCashFlowError>()
+        {
+            return Some(cash_flow.code());
+        }
+        if let Some(check) =
+            cause.downcast_ref::<crate::reports::cash_flow::CashFlowCheckError>()
+        {
+            return Some(check.code());
         }
         if let Some(outstandings) =
             cause.downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
@@ -2085,6 +2097,7 @@ impl Server {
                 self.import_enabled()?;
                 self.build_import_xml(args).await
             }
+            "cash_flow" => self.cash_flow(args).await,
             "changed_since" => self.changed_since(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
             "ledger_masters" => self.ledger_masters(args).await,

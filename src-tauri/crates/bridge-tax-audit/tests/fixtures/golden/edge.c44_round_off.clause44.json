@@ -72,7 +72,7 @@
     },
     {
       "id": "clause44.money_category_forced_lines_count",
-      "value": 18,
+      "value": 19,
       "unit": "count",
       "definition_sha256_16": "b86f5a98255490a6",
       "definition_text": "Population expenditure lines whose column was FORCED by a client-configured money-category classification (interest or discount to a bank/NBFC, or bank charges/fees) rather than derived from the voucher's own GSTIN/tax-line signals -- CL44-3 excludes every voucher named here from its own GSTIN-precedence re-derivation (module docstring).",
@@ -126,12 +126,17 @@
           "kind": "voucher",
           "id": "m2",
           "label": "Journal J-11 on 2025-10-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "o1",
+          "label": "Journal J-13 on 2025-10-07"
         }
       ]
     },
     {
       "id": "clause44.money_category_forced_lines_paise",
-      "value": 1031323,
+      "value": 1102044,
       "unit": "paise",
       "definition_sha256_16": "816493fcd894ece8",
       "definition_text": "Sum of the lines above; already included in total_expenditure_paise via its own forced bucket, not a separate addition.",
@@ -240,7 +245,7 @@
     },
     {
       "id": "clause44.no_supplier_non_supply_expense_count",
-      "value": 5,
+      "value": 7,
       "unit": "count",
       "definition_sha256_16": "31bf63648e7134d9",
       "definition_text": "Expense lines outside the four GST-registration columns, reason 'non_supply_expense'.",
@@ -264,12 +269,17 @@
           "kind": "voucher",
           "id": "n1",
           "label": "Journal J-12 on 2025-10-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "o1",
+          "label": "Journal J-13 on 2025-10-07"
         }
       ]
     },
     {
       "id": "clause44.no_supplier_non_supply_expense_paise",
-      "value": 263906,
+      "value": 339546,
       "unit": "paise",
       "definition_sha256_16": "3123c969094dd783",
       "definition_text": "Sum of expenditure outside the four GST-registration columns, reason 'non_supply_expense'.",
@@ -363,7 +373,7 @@
     },
     {
       "id": "clause44.registered_other_than_composition_count",
-      "value": 15,
+      "value": 16,
       "unit": "count",
       "definition_sha256_16": "93ef4dd569fb0737",
       "definition_text": "Expense lines classified 'registered_other_than_composition'.",
@@ -417,12 +427,17 @@
           "kind": "voucher",
           "id": "m2",
           "label": "Journal J-11 on 2025-10-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "o1",
+          "label": "Journal J-13 on 2025-10-07"
         }
       ]
     },
     {
       "id": "clause44.registered_other_than_composition_paise",
-      "value": 914543,
+      "value": 985264,
       "unit": "paise",
       "definition_sha256_16": "39a002038f56f019",
       "definition_text": "Sum of expenditure, category 'registered_other_than_composition'.",
@@ -430,7 +445,7 @@
     },
     {
       "id": "clause44.total_expenditure_paise",
-      "value": 2879315,
+      "value": 3025676,
       "unit": "paise",
       "definition_sha256_16": "073b6e286df50c91",
       "definition_text": "Sum of every bucket and no-supplier/judgement-reason figure above (books-POPULATION only); tied in check_invariants (CL44-1), TOGETHER WITH population_excluded_expense_paise below, to the financial_statements test's own TB-based expenditure definition (purchases + direct_expenses + indirect_expenses), independent of this walk.",
@@ -735,6 +750,11 @@
           "kind": "voucher",
           "id": "n1",
           "label": "Journal J-12 on 2025-10-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "o1",
+          "label": "Journal J-13 on 2025-10-07"
         }
       ],
       "title_sha256_16": "6ca5bdb4e1a6a5cb",

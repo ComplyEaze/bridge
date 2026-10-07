@@ -54,7 +54,7 @@ the Trial Balance through `financial_statements`, and re-derives each cited vouc
   expenditure line, else "non supply". A debit and a credit round-off on a journal with no party and on one whose
   party is an expense or an income ledger; beside bank charges, bank interest, a partner's remuneration, a mixed
   ledger, a depreciation line and a no-supplier line; round-off first and then bank charges and bank interest (it
-  follows the charges); a line read by the party after a forced line (a debit one, and a credit one); a capital
+  follows the charges); a salary (no supplier) and then bank charges (it follows the salary); a line read by the party after a forced line (a debit one, and a credit one); a capital
   invoice whose other lines are not expenditure; a registered, a composition and an unregistered supplier; two
   round-off lines on one voucher; round-off beside only round-off ledgers with a role of their own; and a
   round-off ledger that has its own category, depreciation role or no-supplier role, which is placed by that role.
@@ -122,24 +122,24 @@ existing eight books are otherwise unchanged apart from their comments.
 
 | File | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
-| `c44_blank_gstin.json` | 5,924 | `1ee7cb0d1280d78a699493925490adcf002e80ef17335347085096af7087dd8f` | `edge-books/c44_blank_gstin.json` |
+| `c44_blank_gstin.json` | 5,925 | `cb413c8b90107161bd597fdccc59272110e509f20a95baa74a680de2f7295c02` | `edge-books/c44_blank_gstin.json` |
 | `c44_core.json` | 14,308 | `0c6c1e1faf8d551a8e750a2728ae207bf3ddde785c55241d4e6647ba018735fc` | `edge-books/c44_core.json` |
 | `c44_excluded.json` | 5,382 | `828dff0fb7c163ec87f763557de367e51450fdbc84880abdbf1fe35460c977e6` | `edge-books/c44_excluded.json` |
 | `c44_money.json` | 10,702 | `03d4224d78349ae78077f77ba0a95355d6cc66de7e8c923d6a025dc0f4113c3f` | `edge-books/c44_money.json` |
 | `c44_placement.json` | 10,727 | `dd0ab2738a07007e4491bcb509b0b8c8dc6e0bf08bb86910deeeeed09f27e769` | `edge-books/c44_placement.json` |
 | `c44_quiet.json` | 3,186 | `0e729600b171fe27c69cf5d4f24ed5ab65c9c91d8568283683e39bce3b8c7231` | `edge-books/c44_quiet.json` |
-| `c44_round_off.json` | 17,654 | `d67c89aa238783faf640a5838bb4c76b38d48c01857ef4e9f77f6504b7a6a6c0` | `edge-books/c44_round_off.json` |
+| `c44_round_off.json` | 18,031 | `77752c3dc552c9b314295da87d5c8df9cfeccea8ec8db83a1fec939751af6f38` | `edge-books/c44_round_off.json` |
 | `c44_tie_100.json` | 3,447 | `166d559570f62b4ad93b1111c816c6644ce5d027012286c353ae2e61b5b7b150` | `edge-books/c44_tie_100.json` |
 | `c44_tie_101.json` | 3,479 | `e5fa7f79b918db0a0efecb8fe54580aca94209f55a1bbdf5dfd15261182c6f29` | `edge-books/c44_tie_101.json` |
 | `c44_tie_minus_100.json` | 3,536 | `1f5af983d4e50a8226a3fbb18da08695f31ed0f42754199ceb6148d12c322d8e` | `edge-books/c44_tie_minus_100.json` |
 | `c44_traps.json` | 5,486 | `342ce37a62466ff3d04670bad7e68fabf99dee8197ac339d38d7322cd094b7f0` | `edge-books/c44_traps.json` |
-| `edge.c44_blank_gstin.clause44.json` | 19,063 | `5378c3626d9824fc3d5146ff2ec7f465f1abb989cc4f0bf6661bccb15654f87e` | `golden/edge.c44_blank_gstin.clause44.json` |
+| `edge.c44_blank_gstin.clause44.json` | 19,063 | `507a2742cfaa8dba28ef1f19c2d32bd8074056da2cd9e3eb2fce39b7da5c79f2` | `golden/edge.c44_blank_gstin.clause44.json` |
 | `edge.c44_core.clause44.json` | 22,736 | `9ad1e74c6ff446d943e6dccbeb515457bd130761a60baf54440ae73ade1e7fbb` | `golden/edge.c44_core.clause44.json` |
 | `edge.c44_excluded.clause44.json` | 18,396 | `5f2e1a1836e70969fa86f60d7b8fe2937cb58234d12c79e3c7e53341dafe7d06` | `golden/edge.c44_excluded.clause44.json` |
 | `edge.c44_money.clause44.json` | 25,426 | `1bafad264a2d82c492f4e5185533fbe71d3fb3676da282d8b6375ba02107dab3` | `golden/edge.c44_money.clause44.json` |
 | `edge.c44_placement.clause44.json` | 27,124 | `27af85e629036b12fd1b0afafbf17b43e3d4efb5a69fa7d89aa3585ad617977a` | `golden/edge.c44_placement.clause44.json` |
 | `edge.c44_quiet.clause44.json` | 17,315 | `87a1cbd814c9201c2d4ee7e034070e64429173462ff0e1bc49715d68a119b926` | `golden/edge.c44_quiet.clause44.json` |
-| `edge.c44_round_off.clause44.json` | 31,086 | `9dce1e461573c8551b3fd35a058172d10d890da92274bf53bc63336b82d88ca2` | `golden/edge.c44_round_off.clause44.json` |
+| `edge.c44_round_off.clause44.json` | 31,566 | `310041b4e5e4fc5dee5a3ee6ba0b49f710cb1838b097c30e4345493cf49be4c6` | `golden/edge.c44_round_off.clause44.json` |
 | `edge.c44_tie_100.clause44.json` | 17,579 | `2eb14e77dbe1a5b160a6139cf0cdf3d2fa6be3768337a751bb4d2899f62bb2f5` | `golden/edge.c44_tie_100.clause44.json` |
 | `edge.c44_tie_101.clause44.json` | 18,210 | `dabc778b524459b24ae8323616a8b912ddcb35413ea9901d1f644fd79a0475b2` | `golden/edge.c44_tie_101.clause44.json` |
 | `edge.c44_tie_minus_100.clause44.json` | 17,579 | `6d20eea41a81050c1c50be3635021870201e6011b851cd86344621c35169f711` | `golden/edge.c44_tie_minus_100.clause44.json` |

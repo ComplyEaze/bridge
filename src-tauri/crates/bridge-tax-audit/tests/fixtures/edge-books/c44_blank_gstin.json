@@ -122,22 +122,22 @@
    "ledger": "Cash",
    "opening": 0,
    "debit": 0,
-   "credit": 67747,
-   "closing": -67747
+   "credit": 126044,
+   "closing": -126044
   },
   {
    "ledger": "Input CGST",
    "opening": 0,
-   "debit": 22964,
+   "debit": 67096,
    "credit": 0,
-   "closing": 22964
+   "closing": 67096
   },
   {
    "ledger": "Input SGST",
    "opening": 0,
-   "debit": 101315,
+   "debit": 9747,
    "credit": 0,
-   "closing": 101315
+   "closing": 9747
   },
   {
    "ledger": "Sales",
@@ -149,30 +149,30 @@
   {
    "ledger": "Office Expenses",
    "opening": 0,
-   "debit": 704353,
+   "debit": 789351,
    "credit": 0,
-   "closing": 704353
+   "closing": 789351
   },
   {
    "ledger": "Alpha Traders",
    "opening": 0,
    "debit": 0,
-   "credit": 393294,
-   "closing": -393294
+   "credit": 456596,
+   "closing": -456596
   },
   {
    "ledger": "Beta Composition Co",
    "opening": 0,
    "debit": 0,
-   "credit": 92641,
-   "closing": -92641
+   "credit": 129654,
+   "closing": -129654
   },
   {
    "ledger": "Gamma Works",
    "opening": 0,
    "debit": 0,
-   "credit": 274950,
-   "closing": -274950
+   "credit": 153900,
+   "closing": -153900
   }
  ],
  "vouchers": [
@@ -184,11 +184,11 @@
    "lines": [
     [
      "Office Expenses",
-     72374
+     118615
     ],
     [
      "Alpha Traders",
-     -72374
+     -118615
     ]
    ],
    "number": "P-1",
@@ -202,19 +202,19 @@
    "lines": [
     [
      "Office Expenses",
-     100221
+     82641
     ],
     [
      "Input CGST",
-     22964
+     67096
     ],
     [
      "Input SGST",
-     101315
+     9747
     ],
     [
      "Alpha Traders",
-     -224500
+     -159484
     ]
    ],
    "number": "P-2",
@@ -228,11 +228,11 @@
    "lines": [
     [
      "Office Expenses",
-     92641
+     129654
     ],
     [
      "Beta Composition Co",
-     -92641
+     -129654
     ]
    ],
    "number": "P-3",
@@ -246,11 +246,11 @@
    "lines": [
     [
      "Office Expenses",
-     115296
+     67320
     ],
     [
      "Gamma Works",
-     -115296
+     -67320
     ]
    ],
    "number": "P-4",
@@ -264,11 +264,11 @@
    "lines": [
     [
      "Office Expenses",
-     67747
+     126044
     ],
     [
      "Cash",
-     -67747
+     -126044
     ]
    ],
    "number": "P-5",
@@ -282,11 +282,11 @@
    "lines": [
     [
      "Office Expenses",
-     159654
+     86580
     ],
     [
      "Gamma Works",
-     -159654
+     -86580
     ]
    ],
    "number": "P-6",
@@ -300,11 +300,11 @@
    "lines": [
     [
      "Office Expenses",
-     96420
+     178497
     ],
     [
      "Alpha Traders",
-     -96420
+     -178497
     ]
    ],
    "number": "P-7",

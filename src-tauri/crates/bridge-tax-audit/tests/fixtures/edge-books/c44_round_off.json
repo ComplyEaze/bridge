@@ -1,5 +1,5 @@
 {
- "comment": "clause44: a plain round-off line (a round-off ledger with no role of its own) is shown exactly where the line it rounds is shown: the voucher's first expenditure line that is read by the party, else its first other expenditure line, else non-supply. On a journal with no party or one whose party is an expense or income ledger it takes that reason, a debit or a credit; beside bank charges or bank interest (forced) it is forced with them and counted as forced; beside a partner's remuneration, a mixed ledger, a depreciation line or a no-supplier line it takes that reason; round-off first, then bank charges, then bank interest follows the charges; a line read by the party wins over an earlier forced one, a credit one too; on a capital invoice whose only other lines are not expenditure (a zero purchase line is no row) it is non-supply; two round-off lines both follow; beside an own-role round-off ledger it follows that line; and a round-off ledger given its own category, depreciation or no-supplier role is placed by that role whatever it rounds. Every GSTIN is invented (fourteenth character Y).",
+ "comment": "clause44: a plain round-off line (a round-off ledger with no role of its own) is shown exactly where the line it rounds is shown: the voucher's first expenditure line that is read by the party, else its first other expenditure line, else non-supply. On a journal with no party or one whose party is an expense or income ledger it takes that reason, a debit or a credit; beside bank charges or bank interest (forced) it is forced with them and counted as forced; beside a partner's remuneration, a mixed ledger, a depreciation line or a no-supplier line it takes that reason; round-off first, then bank charges, then bank interest follows the charges; a salary (no supplier) and then bank charges: it follows the salary; a line read by the party wins over an earlier forced one, a credit one too; on a capital invoice whose only other lines are not expenditure (a zero purchase line is no row) it is non-supply; two round-off lines both follow; beside an own-role round-off ledger it follows that line; and a round-off ledger given its own category, depreciation or no-supplier role is placed by that role whatever it rounds. Every GSTIN is invented (fourteenth character Y).",
  "groups": {
   "Capital Account": null,
   "Current Assets": null,
@@ -276,9 +276,9 @@
   {
    "ledger": "Bank Fees",
    "opening": 0,
-   "debit": 402208,
+   "debit": 472929,
    "credit": 0,
-   "closing": 402208
+   "closing": 472929
   },
   {
    "ledger": "Bank Interest",
@@ -304,9 +304,9 @@
   {
    "ledger": "Staff Salary",
    "opening": 0,
-   "debit": 86678,
+   "debit": 142052,
    "credit": 0,
-   "closing": 86678
+   "closing": 142052
   },
   {
    "ledger": "Mixed Charges",
@@ -332,9 +332,9 @@
   {
    "ledger": "Round Off",
    "opening": 0,
-   "debit": 822403,
+   "debit": 842669,
    "credit": 0,
-   "closing": 822403
+   "closing": 842669
   },
   {
    "ledger": "Round Off Fees",
@@ -382,8 +382,8 @@
    "ledger": "Provision",
    "opening": 0,
    "debit": 0,
-   "credit": 1198444,
-   "closing": -1198444
+   "credit": 1344805,
+   "closing": -1344805
   },
   {
    "ledger": "Scrap Sales",
@@ -1067,6 +1067,31 @@
     ]
    ],
    "number": "J-12"
+  },
+  {
+   "guid": "o1",
+   "date": "2025-10-07",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Staff Salary",
+     55374
+    ],
+    [
+     "Bank Fees",
+     70721
+    ],
+    [
+     "Round Off",
+     20266
+    ],
+    [
+     "Provision",
+     -146361
+    ]
+   ],
+   "number": "J-13"
   }
  ],
  "clause44": {

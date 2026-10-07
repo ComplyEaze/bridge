@@ -251,6 +251,34 @@ fn a_closing_without_its_value_a_repeated_column_and_unknown_elements_are_refuse
 }
 
 #[test]
+fn a_blank_item_name_a_repeated_value_and_content_after_the_envelope_are_refused() {
+    let blank = mutate(
+        "<DSPDISPNAME>Cleaning Kit A</DSPDISPNAME>",
+        "<DSPDISPNAME>  </DSPDISPNAME>",
+    );
+    assert_eq!(
+        parse_native_negative_stock(&blank),
+        invalid_response("negative_stock_item_name_missing")
+    );
+    let twice = mutate(
+        "<DSPCLAMTA>2500.00</DSPCLAMTA>",
+        "<DSPCLAMTA>2500.00</DSPCLAMTA><DSPCLAMTA>1.00</DSPCLAMTA>",
+    );
+    assert_eq!(
+        parse_native_negative_stock(&twice),
+        invalid_response("negative_stock_closing_shape")
+    );
+    let after = mutate(
+        "</ENVELOPE>",
+        "</ENVELOPE><DSPACCNAME><DSPDISPNAME>X</DSPDISPNAME></DSPACCNAME>",
+    );
+    assert_eq!(
+        parse_native_negative_stock(&after),
+        invalid_response("negative_stock_trailing_content")
+    );
+}
+
+#[test]
 fn text_a_wrapper_and_a_cut_response_are_refused() {
     assert_eq!(
         parse_native_negative_stock(&mutate("<DSPACCNAME>", "stray<DSPACCNAME>")),

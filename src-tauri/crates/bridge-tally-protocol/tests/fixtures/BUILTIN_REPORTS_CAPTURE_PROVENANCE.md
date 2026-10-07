@@ -30,7 +30,7 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 | `builtin_unknown_report_request.utf16le.xml` | 798 | `232ba9c3a753133eb24912a803d63d79ad1fd22aa6b45cd54717a1e1a73ca7ae` | request, a report name Tally does not have |
 | `builtin_funds_flow_fy_request.utf16le.xml` | 764 | `e4aab2996d71aafdbb7df82ca8fb99dce8440f53d007cab61766d6c8d272c883` | request, Funds Flow, 2025-04-01 to 2026-03-31 |
 | `builtin_funds_flow_probe_b_fy_live.utf16le.xml` | 6196 | `fd328be1820b65d9e9e3a501b88a7bce823f16c387a531bc8486bf5dd829ad4d` | Funds Flow, 12 month rows (not read by any parser) |
-| `builtin_negative_stock_shape_lab_fy_live.utf16le.xml` | 2392 | `de7e67b5d1ef8d86a85179f1814333e91cba7bd07938d02bc3b0bdb22b4f7031` | Negative Stock, 5 items (not read by any parser) |
+| `builtin_negative_stock_shape_lab_fy_live.utf16le.xml` | 2392 | `de7e67b5d1ef8d86a85179f1814333e91cba7bd07938d02bc3b0bdb22b4f7031` | Negative Stock, 5 items (read by `native_negative_stock`) |
 | `builtin_negative_stock_shape_lab_fy_request.utf16le.xml` | 760 | `f054cc20c12679f65c6daaf29abb00a03ce665252bc60758fe95741fe99e5ecc` | request, Negative Stock, 2025-04-01 to 2026-03-31, on the stock company |
 | `builtin_ratio_analysis_fy_request.utf16le.xml` | 772 | `c47d3a745d75821e39d918867c05a226cd19de062bd31fdb550ec9a096df3103` | request, Ratio Analysis, 2025-04-01 to 2026-03-31 |
 | `builtin_ratio_analysis_probe_b_fy_live.utf16le.xml` | 3636 | `bd2b6621da370413ea602929e4e8bf760a243fc55cedb911c11739134a3dd635` | Ratio Analysis, 23 name and value pairs (not read by any parser) |

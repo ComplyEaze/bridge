@@ -291,6 +291,20 @@ pub(super) struct OnAccountApproved {
     pub(super) party_digest: String,
 }
 
+/// The order a party list is sent in: by ledger name, as the lists are built,
+/// unless party names are masked. The order of masked names would still be the
+/// alphabetical order of the real ones, so a masked list goes by digest.
+pub(super) fn in_listing_order<T>(
+    mut parties: Vec<T>,
+    masked: bool,
+    digest: impl for<'a> Fn(&'a T) -> &'a str,
+) -> Vec<T> {
+    if masked {
+        parties.sort_by(|left, right| digest(left).cmp(digest(right)));
+    }
+    parties
+}
+
 /// The approved parties as a build result lists them: each ledger name marked
 /// as a party name, so the list follows the masking setting as the refusal's
 /// does. The saved record keeps the real name.

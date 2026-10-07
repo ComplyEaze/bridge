@@ -914,16 +914,19 @@ impl Server {
                 bill_wise::bill_wise_parties(&payload.vouchers, &observed_flags);
             let verdict = bill_wise::judge_approvals(&approvals, &parties, &bill_wise_context)
                 .map_err(approval_invalid)?;
+            let names_masked = self.settings.redaction == super::Redaction::MaskParties;
             if !verdict.unapproved.is_empty() {
+                let unapproved =
+                    bill_wise::in_listing_order(verdict.unapproved, names_masked, |party| &party.1);
                 let (refused, omitted) = bill_wise::refused_parties_json(
-                    &verdict.unapproved,
+                    &unapproved,
                     refusal_diagnostic_budget(self.settings.max_bytes),
                 );
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                         "state":"refused", "reason":"bill_wise_party_unapproved",
                         "refused_parties":refused,
-                        "refused_party_count":verdict.unapproved.len(),
+                        "refused_party_count":unapproved.len(),
                         "refused_parties_omitted":omitted,
                         "bill_wise_response_sha256":[catalogue_evidence.response_sha256.clone()],
                         "next_step":BILL_WISE_UNAPPROVED_NEXT_STEP
@@ -1169,10 +1172,13 @@ impl Server {
                     // marked as a party name, with the digest the approval
                     // was tied to, and the catalogue response the flags came
                     // from (#1234).
-                    "on_account_approved": line
-                        .on_account_approved
-                        .as_deref()
-                        .map(bill_wise::approved_json),
+                    "on_account_approved": line.on_account_approved.as_ref().map(|approved| {
+                        bill_wise::approved_json(&bill_wise::in_listing_order(
+                            approved.clone(),
+                            names_masked,
+                            |party| &party.party_digest,
+                        ))
+                    }),
                     "bill_wise_response_sha256": [catalogue_evidence.response_sha256.clone()],
                     // The fifth element of §9.13's identity tuple. It is
                     // recorded on the batch and compared on dispatch, but a

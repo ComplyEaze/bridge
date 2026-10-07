@@ -333,6 +333,94 @@ async fn every_approved_party_is_listed_under_its_masked_name() {
     }
 }
 
+/// With party names masked, both party lists the assistant receives are in
+/// digest order: the refusal's and the build result's. The digests change with
+/// the endpoint, so the run is repeated until they fall in the opposite order
+/// to the names (a coin toss each time), where name order would show. On that
+/// same run, with no masking, the refusal's list is in name order as before.
+#[tokio::test]
+async fn masked_party_lists_are_in_digest_order_where_it_differs_from_name_order() {
+    let both = || journal_plans(&[PARTY, SALES]);
+    for _ in 0..64 {
+        let refusal = || both()[..REFUSAL_REQUESTS].to_vec();
+        let simulator = SequenceSimulator::spawn([refusal(), refusal(), both()].concat()).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let mut server = server(directory.path(), simulator.address().port(), 200_000);
+        server.settings.redaction = crate::agent::Redaction::MaskParties;
+        let refused = answered(&server.call_tool("build_import_xml", build_args(None)).await);
+        let parties = refused["result"]["refused_parties"]
+            .as_array()
+            .expect("the refusal lists its parties")
+            .clone();
+        assert_eq!(parties.len(), 2, "{refused}");
+        // PARTY sorts before SALES by name; its masked form begins "Br".
+        let digest_of = |starts: &str| {
+            parties
+                .iter()
+                .find(|party| party["ledger"].as_str().unwrap().starts_with(starts))
+                .map(|party| party["party_digest"].as_str().unwrap().to_string())
+                .expect("each party is listed under its masked name")
+        };
+        let (first_by_name, second_by_name) = (digest_of("Br"), digest_of("WR"));
+        if first_by_name < second_by_name {
+            simulator.cancel();
+            continue;
+        }
+        let digests = |list: &Value| -> Vec<String> {
+            list.as_array()
+                .unwrap()
+                .iter()
+                .map(|party| party["party_digest"].as_str().unwrap().to_string())
+                .collect()
+        };
+        let by_digest = vec![second_by_name, first_by_name];
+        assert_eq!(digests(&refused["result"]["refused_parties"]), by_digest);
+        server.settings.redaction = crate::agent::Redaction::None;
+        let unmasked = answered(&server.call_tool("build_import_xml", build_args(None)).await);
+        assert_eq!(
+            unmasked["result"]["refused_parties"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|party| party["ledger"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            [PARTY, SALES],
+            "{unmasked}"
+        );
+        server.settings.redaction = crate::agent::Redaction::MaskParties;
+        // The approvals are given in name order, so the result's order is its
+        // own and not the argument's.
+        let approvals: Vec<Value> = by_digest
+            .iter()
+            .rev()
+            .map(|digest| json!({"party_digest": digest}))
+            .collect();
+        let built = answered(
+            &server
+                .call_tool("build_import_xml", build_args(Some(json!(approvals))))
+                .await,
+        );
+        assert_eq!(
+            digests(&built["result"]["on_account_approved"]),
+            by_digest,
+            "{built}"
+        );
+        // The saved record keeps its own order, by name.
+        let saved = server.import_ledger().unwrap().pop().unwrap();
+        assert_eq!(
+            saved
+                .on_account_approved
+                .unwrap()
+                .iter()
+                .map(|approved| approved.ledger.as_str())
+                .collect::<Vec<_>>(),
+            [PARTY, SALES]
+        );
+        return;
+    }
+    panic!("no run in 64 put the two digests in the opposite order to the names");
+}
+
 #[tokio::test]
 async fn approving_one_of_two_parties_refuses_the_other() {
     let both = || journal_plans(&[PARTY, SALES])[..REFUSAL_REQUESTS].to_vec();

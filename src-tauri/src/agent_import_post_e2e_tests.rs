@@ -3285,6 +3285,43 @@ async fn a_ledger_replaced_under_its_name_since_the_build_is_refused_before_appr
     }
 }
 
+/// The changed ledgers go out in the order the batch names them and never by
+/// name: under `mask_parties` the order of masked names would still be the
+/// alphabetical order of the real ones. The saved Journal names `WR2 Sales`
+/// before `Cash`.
+#[tokio::test]
+async fn the_changed_ledgers_of_a_refused_post_are_listed_in_the_order_the_batch_names_them() {
+    for redaction in [
+        crate::agent::Redaction::None,
+        crate::agent::Redaction::MaskParties,
+    ] {
+        let replaced = |name: &str| BoundLedger {
+            name: name.into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000ff".into(),
+        };
+        let (result, ..) = refused_by_build_binding_under(
+            Some(vec![replaced("Cash"), replaced("WR2 Sales")]),
+            false,
+            redaction,
+        )
+        .await;
+        let sent = |name: &str| match redaction {
+            crate::agent::Redaction::MaskParties => crate::agent::mask(name),
+            _ => name.to_string(),
+        };
+        assert_eq!(
+            result["error"]["code"], "import_masters_changed_since_build",
+            "{result}"
+        );
+        assert_eq!(
+            result["error"]["ledgers_changed"],
+            json!([sent("WR2 Sales"), sent("Cash")]),
+            "{result}"
+        );
+        assert_eq!(result["error"]["ledgers_changed_total"], 2, "{result}");
+    }
+}
+
 /// #1234: when a ledger was replaced under its old name AND a named ledger is
 /// bill-wise now, the post reports the replacement (which names the ledger and
 /// says to confirm the intended one), not the flag, so a rebuild is not

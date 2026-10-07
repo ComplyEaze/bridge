@@ -115,6 +115,19 @@ These changes are in source and not yet in a published build.
   found and counted as before and none is chosen for you; when more than 25 are
   found, the ones left off the list are the ledgers holding only some of the
   words before those holding all of them (#1076).
+- Five lists of a batch's ledgers in refusals now come in the batch's own
+  order, not in name order. `masters` of `masters_not_exact`, `ledger_twins`
+  and `ledgers_changed` list a ledger where the batch first names it;
+  `refused_ledgers` of `cash_bank_ledger_not_established` lists a ledger where
+  one of its entries is first refused, and `refused_ledgers` of the cash-answer
+  refusals (in `build_import_xml` and `post_import`) where an answer first
+  names it. Under `mask_parties` a list in name order still showed the
+  alphabetical order of the real names; the order is now the same whether or
+  not party names are masked. The same ledgers are found and refused as before.
+  Where a list is cut (`ledgers_changed` names eight; a small response cap
+  leaves rows of `refused_ledgers` out), which ledgers are named, and how many
+  `refused_ledgers_omitted` counts, can differ from before. Other lists are
+  unchanged (#1234).
 
 ## [0.4.2] - 2026-10-03
 

@@ -331,9 +331,11 @@ what it reaches.
 
 The crate's `tests/edge_books.rs` reads `related_parties` (absent meaning `{}`), runs the test on the
 book with it and compares the whole dump with the golden, as it does for the other edge books (parity
-spec section 7); a port written from this pack does the same. The side of the harness that runs
-the reference, `parity/edge_golden.py`, is kept by the reference's maintainers, together with its runner
-for this test; a porter does not write one. The goldens are regenerated only by the reference's maintainers.
+spec section 7); a port written from this pack does the same. The side of the harness that runs the
+reference is the crate's own `parity/edge_golden.py`, which already runs this test (`HASHES.md` gives
+the command), so a porter does not write one. Running it needs the reference, which is private: a porter
+compares with the goldens in this pack and cannot regenerate them. When the reference's behaviour
+changes, its maintainers regenerate them and say so in `HASHES.md`.
 
 ## 13. Registering the test in the crate
 

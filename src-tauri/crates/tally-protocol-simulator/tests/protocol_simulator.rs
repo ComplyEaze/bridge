@@ -125,14 +125,13 @@ fn element_values(xml: &str, element_name: &[u8]) -> Result<Vec<String>, String>
     let mut values = Vec::new();
     loop {
         match reader.read_event().map_err(|error| error.to_string())? {
-            Event::Start(element) if element.name().as_ref() == element_name => {
+            Event::Start(element) if element.name().as_ref().as_bytes() == element_name => {
                 values.push(
                     reader
                         .read_text(element.name())
                         .map_err(|error| error.to_string())?
-                        .decode()
-                        .map_err(|error| error.to_string())?
-                        .into_owned(),
+                        .as_ref()
+                        .to_owned(),
                 );
             }
             Event::Eof => break,
@@ -147,12 +146,12 @@ fn assert_well_formed(xml: &str) -> Result<(), String> {
     let mut open = Vec::<Vec<u8>>::new();
     loop {
         match reader.read_event().map_err(|error| error.to_string())? {
-            Event::Start(element) => open.push(element.name().as_ref().to_vec()),
+            Event::Start(element) => open.push(element.name().as_ref().as_bytes().to_vec()),
             Event::End(element) => {
                 let expected = open
                     .pop()
                     .ok_or_else(|| "unexpected closing element".to_owned())?;
-                if expected != element.name().as_ref() {
+                if expected != element.name().as_ref().as_bytes() {
                     return Err("mismatched closing element".to_owned());
                 }
             }

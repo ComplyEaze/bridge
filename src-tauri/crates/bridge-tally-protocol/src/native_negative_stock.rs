@@ -46,7 +46,8 @@ pub fn render_native_negative_stock_request(
 /// printed it (an empty one is not zero). Being listed does not make it negative
 /// by itself: four of the five captured items have a positive quantity (and a
 /// credit value), so the quantity is kept for the caller's own check and is not
-/// serialized, and no serialized form of an item says "negative".
+/// serialized (`NativeQuantityRead` has no `Serialize`), and no serialized form of an item says
+/// "negative".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NativeListedStockItem {
     pub name: String,
@@ -161,7 +162,7 @@ pub fn parse_native_negative_stock(
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if !root_seen {
                     match name.as_slice() {
                         b"ENVELOPE" => root_seen = true,
@@ -198,7 +199,7 @@ pub fn parse_native_negative_stock(
                 }
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if !root_seen {
                     return Err(if name.as_slice() == b"ENVELOPE" {
                         NativeNegativeStockError::EmptyEnvelope
@@ -212,7 +213,7 @@ pub fn parse_native_negative_stock(
                 return Err(invalid("negative_stock_unexpected_empty_element"));
             }
             Event::End(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if name.as_slice() == b"ENVELOPE" && wrapper_depth == 0 && !envelope_closed {
                     envelope_closed = true;
                 } else if is_wrapper(&name) && wrapper_depth > 0 {
@@ -222,7 +223,7 @@ pub fn parse_native_negative_stock(
                 }
             }
             Event::Text(text) => {
-                if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                if !text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("negative_stock_stray_text"));
                 }
             }
@@ -255,22 +256,22 @@ fn read_item_name(
     reader: &mut Reader<&[u8]>,
     block: &BytesStart<'_>,
 ) -> Result<String, NativeNegativeStockError> {
-    let block = block.name().as_ref().to_vec();
+    let block = block.name().as_ref().as_bytes().to_vec();
     let mut name: Option<String> = None;
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"DSPDISPNAME")
+                if element.name().as_ref().eq_ignore_ascii_case("DSPDISPNAME")
                     && name.is_none() =>
             {
                 name = Some(text(reader, element.name())?);
             }
-            Event::End(element) if element.name().as_ref() == block.as_slice() => {
+            Event::End(element) if element.name().as_ref().as_bytes() == block.as_slice() => {
                 return name
                     .filter(|text| !text.trim().is_empty())
                     .ok_or(invalid("negative_stock_item_name_missing"));
             }
-            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {}
+            Event::Text(text) if text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) => {}
             _ => return Err(invalid("negative_stock_name_shape")),
         }
     }
@@ -282,19 +283,19 @@ fn read_item_row(
     block: &BytesStart<'_>,
     name: String,
 ) -> Result<NativeListedStockItem, NativeNegativeStockError> {
-    let block = block.name().as_ref().to_vec();
+    let block = block.name().as_ref().as_bytes().to_vec();
     let mut item: Option<NativeListedStockItem> = None;
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"DSPSTKCL") && item.is_none() =>
+                if element.name().as_ref().eq_ignore_ascii_case("DSPSTKCL") && item.is_none() =>
             {
                 item = Some(read_closing(reader, &element, name.clone())?);
             }
-            Event::End(element) if element.name().as_ref() == block.as_slice() => {
+            Event::End(element) if element.name().as_ref().as_bytes() == block.as_slice() => {
                 return item.ok_or(invalid("negative_stock_closing_missing"));
             }
-            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {}
+            Event::Text(text) if text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) => {}
             _ => return Err(invalid("negative_stock_row_shape")),
         }
     }
@@ -308,14 +309,14 @@ fn read_closing(
     block: &BytesStart<'_>,
     name: String,
 ) -> Result<NativeListedStockItem, NativeNegativeStockError> {
-    let block = block.name().as_ref().to_vec();
+    let block = block.name().as_ref().as_bytes().to_vec();
     let (mut quantity_text, mut rate, mut value): (Option<String>, Option<String>, Option<String>) =
         (None, None, None);
     let mut quantity_seen = false;
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element) => {
-                let key = element.name().as_ref().to_ascii_uppercase();
+                let key = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 let text = text(reader, element.name())?;
                 match key.as_slice() {
                     b"DSPCLQTY" if !quantity_seen => {
@@ -328,7 +329,7 @@ fn read_closing(
                 }
             }
             Event::Empty(element) => {
-                let key = element.name().as_ref().to_ascii_uppercase();
+                let key = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 match key.as_slice() {
                     b"DSPCLQTY" if !quantity_seen => quantity_seen = true,
                     b"DSPCLRATE" if rate.is_none() => rate = Some(String::new()),
@@ -336,7 +337,7 @@ fn read_closing(
                     _ => return Err(invalid("negative_stock_closing_shape")),
                 }
             }
-            Event::End(element) if element.name().as_ref() == block.as_slice() => {
+            Event::End(element) if element.name().as_ref().as_bytes() == block.as_slice() => {
                 let (Some(rate), true) = (rate, quantity_seen) else {
                     return Err(invalid("negative_stock_column_missing"));
                 };
@@ -354,7 +355,7 @@ fn read_closing(
                     value: amount(&value)?,
                 });
             }
-            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {}
+            Event::Text(text) if text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) => {}
             _ => return Err(invalid("negative_stock_closing_shape")),
         }
     }

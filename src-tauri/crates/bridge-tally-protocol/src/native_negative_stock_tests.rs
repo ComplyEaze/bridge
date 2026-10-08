@@ -12,8 +12,12 @@ const LIVE: &[u8] =
     include_bytes!("../tests/fixtures/builtin_negative_stock_shape_lab_fy_live.utf16le.xml");
 const REQUEST: &[u8] =
     include_bytes!("../tests/fixtures/builtin_negative_stock_shape_lab_fy_request.utf16le.xml");
+/// A stand-in: the Negative Ledgers answer of another book, which is an empty envelope. No empty
+/// Negative Stock answer is captured.
 const EMPTY_ENVELOPE: &[u8] =
     include_bytes!("../tests/fixtures/builtin_negative_ledgers_probe_b_fy_empty_live.utf16le.xml");
+/// Tally's refusal of an unknown report name on 7.1: a failure signal, not a bare `RESPONSE`. The
+/// bare `RESPONSE` read as `UnknownReport` below is a typed string; no capture of it is committed.
 const UNKNOWN_REPORT: &[u8] =
     include_bytes!("../tests/fixtures/builtin_unknown_report_refusal_live.utf16le.xml");
 
@@ -103,7 +107,9 @@ fn a_negative_quantity_keeps_its_sign_and_empty_rate_and_value_stay_empty_not_ze
 
 #[test]
 fn a_value_that_is_a_credit_is_a_positive_amount_as_tally_sent_it() {
-    // Four of the five captured items have a positive quantity and a positive (credit) value (§12a.13).
+    // Four of the five captured items have a positive quantity; this pins only that a value is kept as
+    // the positive amount Tally sent. That a positive value is a credit comes from §12a.13, measured on
+    // another company.
     let parsed = parse_native_negative_stock(&live()).unwrap();
     assert_eq!(parsed.items[3].value, present("5000.00"));
 }
@@ -408,6 +414,42 @@ fn the_remaining_shape_refusals_each_return_their_own_code() {
             parse_native_negative_stock(&xml),
             invalid_response(code),
             "{code}"
+        );
+    }
+}
+
+#[test]
+fn a_listed_item_serializes_its_name_rate_and_value_and_never_its_quantity() {
+    // The quantity is kept for the caller's own check; the serialized form says nothing about sign.
+    let value = serde_json::to_value(parse_native_negative_stock(&live()).unwrap()).unwrap();
+    let items = value["items"].as_array().unwrap();
+    assert_eq!(items.len(), 5);
+    for item in items {
+        let mut keys: Vec<&str> = item
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["name", "rate", "value"]);
+    }
+}
+
+#[test]
+fn an_end_tag_that_does_not_match_its_start_is_refused_as_malformed_at_every_level() {
+    // One cut per reader: the envelope, an item name block, a row and a row's closing block.
+    let cases = [
+        mutate("</ENVELOPE>", "</DSPSTKINFO></ENVELOPE>"),
+        mutate("</DSPSTKINFO>", "</DSPACCNAME>"),
+        mutate("</DSPDISPNAME></DSPACCNAME>", "</DSPDISPNAME></DSPSTKINFO>"),
+        mutate("</DSPSTKCL>", "</DSPACCNAME>"),
+    ];
+    for xml in cases {
+        assert_eq!(
+            parse_native_negative_stock(&xml),
+            invalid_response("negative_stock_xml_malformed"),
+            "{xml}"
         );
     }
 }

@@ -30,8 +30,8 @@ requests it comes from, except where it names an issue.
   setting is on, every tool answers `terms_not_accepted` and names the
   setting; nothing is read from Tally. What we saw: a package built from this
   change on one Mac (only its version set to 0.5.1), installed over 0.4.2 and
-  over 0.5.0, was started by Claude Desktop each time, and with the setting off its
-  tools gave that answer. Not tried: the published 0.5.1 file, an update on Windows, and a
+  over 0.5.0, was started by Claude Desktop (in one run only after Claude Desktop was
+  quit and reopened), and with the setting off its tools gave that answer. Not tried: the published 0.5.1 file, an update on Windows, and a
   release older than 0.4.2 (#1413).
 - **If 0.5.0 already starts for you:** the other changes below are the reason
   to update, if any.
@@ -73,7 +73,7 @@ requests it comes from, except where it names an issue.
   `terms_not_accepted`, naming the setting. The setting no longer shows
   "(required)" beside its title, and its description now begins "Tick to use
   ComplyEaze Bridge: it refuses every tool call until you accept the Terms of
-  Use." This was seen on one Mac with a package built from this change; it has
+  Use." This was seen on one Mac with a package built from the Terms-setting change (#1436); it has
   not yet been checked on Windows (#1413).
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
   the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
@@ -85,8 +85,8 @@ requests it comes from, except where it names an issue.
   date. A record holding a date that is not `YYYYMMDD` refuses the whole journal
   (`import_ledger_invalid`): building, posting, verifying and reconciling every batch, and the
   desktop journal screen, stop until the record is put right, and the local data report shows the
-  journal as not read. No release has written such a date, so only a record edited by hand can hold
-  one, and the stored bytes do not change (#1307).
+  journal as not read. The current code writes only that form, so only a record edited by hand is
+  expected to hold such a date, and the stored bytes do not change (#1307).
 - A program built from this repository no longer reads `BRIDGE_PDFIUM_LIBRARY` to load the PDF
   library from another place; it loads it from the folder that holds its own program. Only its
   tests read that setting (#1422).
@@ -95,7 +95,7 @@ requests it comes from, except where it names an issue.
 
 - Windows is untried for this build, and so is the published 0.5.1 file. The
   Terms start-up behaviour above was seen on one Mac with a package built from
-  this change, over 0.4.2 and over 0.5.0 (#1413).
+  the Terms-setting change (#1436), over 0.4.2 and over 0.5.0 (#1413).
 - The library that reads Tally's replies was updated (#1198). Its output for
   the saved replies in our test record is unchanged; it was not run against
   a new capture from TallyPrime or on Windows. The bank-statement narration change was not run through a Tally import (#1430).

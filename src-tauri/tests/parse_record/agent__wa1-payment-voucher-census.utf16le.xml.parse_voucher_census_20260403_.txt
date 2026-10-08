@@ -1,0 +1,10 @@
+# fixture: agent/wa1-payment-voucher-census.utf16le.xml
+# parser: parse_voucher_census(20260403)
+# source: captured
+Ok([
+    CensusRow {
+        day: 2026-04-03,
+        alter_id: 1676,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000064e",
+    },
+])

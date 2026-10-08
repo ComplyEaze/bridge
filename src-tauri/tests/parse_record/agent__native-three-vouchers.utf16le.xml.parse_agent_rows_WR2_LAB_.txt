@@ -1,0 +1,102 @@
+# fixture: agent/native-three-vouchers.utf16le.xml
+# parser: parse_agent_rows(WR2_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(1),
+        "amounts": Array [
+            Object {
+                "amount": String("-101.01"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-101.01"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("नमस\u{94d}त\u{947} ट\u{94d}र\u{947}डर\u{94d}स"),
+            },
+            Object {
+                "amount": String("101.01"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("WR2 Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260801"),
+        "guid": String("61c6de69-1748-461c-ad3f-162cb949df9f-00000001"),
+        "is_invoice": Bool(false),
+        "master_id": String("1"),
+        "narration": String("WR2-N3-DEV-01A01A2F"),
+        "optional": Bool(false),
+        "party": String("नमस\u{94d}त\u{947} ट\u{94d}र\u{947}डर\u{94d}स"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2),
+        "amounts": Array [
+            Object {
+                "amount": String("-102.02"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-102.02"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Café Naïve Traders"),
+            },
+            Object {
+                "amount": String("102.02"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("WR2 Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260801"),
+        "guid": String("61c6de69-1748-461c-ad3f-162cb949df9f-00000002"),
+        "is_invoice": Bool(false),
+        "master_id": String("2"),
+        "narration": String("WR2-N3-NFC-01A01A2F"),
+        "optional": Bool(false),
+        "party": String("Café Naïve Traders"),
+        "voucher_number": String("2"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(3),
+        "amounts": Array [
+            Object {
+                "amount": String("-103.03"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("WR2 XML Café Naïve Ledger 01A01A2F"),
+            },
+            Object {
+                "amount": String("103.03"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("WR2 Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260801"),
+        "guid": String("61c6de69-1748-461c-ad3f-162cb949df9f-00000003"),
+        "is_invoice": Bool(false),
+        "master_id": String("3"),
+        "narration": String("WR2-N6-VCH-01A01A2F"),
+        "optional": Bool(false),
+        "party": String("WR2 XML Café Naïve Ledger 01A01A2F"),
+        "voucher_number": String("3"),
+        "voucher_type": String("Sales"),
+    },
+])

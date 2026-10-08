@@ -328,6 +328,13 @@ class SBI(Bank):
         return bool(self.date_pattern.match(cell.strip()))
 
     def party(self, row):
+        # A name field that was found but printed empty (or blank, or only
+        # hyphens) is UNNAMED, never an empty party: an empty party matches no
+        # mapping row and leaves the line's narration naming no one. Applied
+        # once, here, so no branch below can return an empty party.
+        return self._printed_party(row) or "UNNAMED"
+
+    def _printed_party(self, row):
         narr, ref = row["narr_spaced"], row["ref_spaced"]
         if "ATM WDL" in narr:
             return "ATM CASH WITHDRAWAL"
@@ -360,7 +367,7 @@ class SBI(Bank):
             parts = found.group(1).split("/")
             if len(parts) >= 2:
                 inner = re.match(r"^[A-Za-z]+-\s*[Xx]+\d+-\s*(.*)$", parts[1])
-                return _squash((inner.group(1) if inner else parts[1]).rstrip("-")) or "UNNAMED"
+                return _squash((inner.group(1) if inner else parts[1]).rstrip("-"))
         return "UNRESOLVED"
 
     def reference(self, row):

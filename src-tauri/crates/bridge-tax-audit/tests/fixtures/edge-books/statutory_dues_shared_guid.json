@@ -1,0 +1,362 @@
+{
+ "comment": "statutory_dues_43b, vouchers that share a GUID on natures other than employees' contributions (#1243): on output GST with an opening liability, a payment whose GUID a later charge shares (the payment is cited as paying the opening liability, the charge is not), two blank-GUID payments and a blank-GUID charge with no number, two payments with one GUID, number, type and day (one ref, both counted), a blank-GUID voucher whose line on the ledger is nil (not cited), a blank-GUID voucher on two natures (cited on each), a GUID differing from another only in case, and a third voucher on a shared GUID that touches no mapped ledger (cited nowhere); on reverse-charge GST, an opening liability, two blank-GUID charges and a charge that also carries a nil line on the nature's second ledger, with no payment (no payment cited: a nil line is no payment); on TDS payable, figures only.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Output GST Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-sg-l01"
+  },
+  {
+   "name": "RCM GST Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-sg-l02"
+  },
+  {
+   "name": "RCM IGST Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-sg-l06"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-sg-l03"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-sg-l04"
+  },
+  {
+   "name": "Trade Debtors",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-sg-l05"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Output GST Payable",
+   "opening": -50000,
+   "debit": 36000,
+   "credit": 8400,
+   "closing": -22400
+  },
+  {
+   "ledger": "RCM GST Payable",
+   "opening": -3000,
+   "debit": 0,
+   "credit": 2100,
+   "closing": -5100
+  },
+  {
+   "ledger": "RCM IGST Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 50,
+   "credit": 50,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "edge-sg-a",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "number": "P1",
+   "lines": [
+    [
+     "Output GST Payable",
+     20000
+    ],
+    [
+     "Bank",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sg-a",
+   "date": "2025-07-05",
+   "base_type": "Journal",
+   "number": "J1",
+   "lines": [
+    [
+     "Output GST Payable",
+     -7000
+    ],
+    [
+     "Trade Debtors",
+     7000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-01",
+   "base_type": "Payment",
+   "number": "B1",
+   "lines": [
+    [
+     "Output GST Payable",
+     5000
+    ],
+    [
+     "Bank",
+     -5000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-02",
+   "base_type": "Payment",
+   "number": "B2",
+   "lines": [
+    [
+     "Output GST Payable",
+     6000
+    ],
+    [
+     "Bank",
+     -6000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-03",
+   "base_type": "Journal",
+   "number": "",
+   "lines": [
+    [
+     "Output GST Payable",
+     -1000
+    ],
+    [
+     "Trade Debtors",
+     1000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sg-twin",
+   "date": "2025-09-01",
+   "base_type": "Payment",
+   "number": "TW",
+   "lines": [
+    [
+     "Output GST Payable",
+     1500
+    ],
+    [
+     "Bank",
+     -1500
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sg-twin",
+   "date": "2025-09-01",
+   "base_type": "Payment",
+   "number": "TW",
+   "lines": [
+    [
+     "Output GST Payable",
+     2500
+    ],
+    [
+     "Bank",
+     -2500
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-12-01",
+   "base_type": "Journal",
+   "number": "Z0",
+   "lines": [
+    [
+     "Output GST Payable",
+     0
+    ],
+    [
+     "Trade Debtors",
+     10
+    ],
+    [
+     "Bank",
+     -10
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-12-05",
+   "base_type": "Journal",
+   "number": "MIX",
+   "lines": [
+    [
+     "Output GST Payable",
+     -400
+    ],
+    [
+     "TDS Payable",
+     -50
+    ],
+    [
+     "Trade Debtors",
+     450
+    ]
+   ]
+  },
+  {
+   "guid": "EDGE-SG-A",
+   "date": "2025-12-10",
+   "base_type": "Payment",
+   "number": "P9",
+   "lines": [
+    [
+     "Output GST Payable",
+     1000
+    ],
+    [
+     "Bank",
+     -1000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sg-a",
+   "date": "2025-12-12",
+   "base_type": "Journal",
+   "number": "X-OTHER",
+   "lines": [
+    [
+     "Trade Debtors",
+     70
+    ],
+    [
+     "Bank",
+     -70
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-01-10",
+   "base_type": "Journal",
+   "number": "R1",
+   "lines": [
+    [
+     "RCM GST Payable",
+     -700
+    ],
+    [
+     "Trade Debtors",
+     700
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-01-11",
+   "base_type": "Journal",
+   "number": "R2",
+   "lines": [
+    [
+     "RCM GST Payable",
+     -800
+    ],
+    [
+     "Trade Debtors",
+     800
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sg-rn",
+   "date": "2026-01-12",
+   "base_type": "Journal",
+   "number": "R3",
+   "lines": [
+    [
+     "RCM GST Payable",
+     -600
+    ],
+    [
+     "RCM IGST Payable",
+     0
+    ],
+    [
+     "Trade Debtors",
+     600
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-02-07",
+   "base_type": "Payment",
+   "number": "T1",
+   "lines": [
+    [
+     "TDS Payable",
+     50
+    ],
+    [
+     "Bank",
+     -50
+    ]
+   ]
+  }
+ ],
+ "cash": [],
+ "bank": [
+  "Bank"
+ ],
+ "statutory_dues": {
+  "nature_by_ledger": {
+   "Output GST Payable": "gst_payable",
+   "RCM GST Payable": "gst_payable_rcm",
+   "RCM IGST Payable": "gst_payable_rcm",
+   "TDS Payable": "tds_payable"
+  }
+ },
+ "tests": [
+  "statutory_dues_43b"
+ ]
+}

@@ -173,10 +173,10 @@ impl AlterIdSpan {
     }
 }
 
-/// A window date that reaches this layer as text from a read or a stored
-/// record, not from a tool argument (whose date [`normalized_date`] parses):
-/// parsed once, by the caller, and carried as a [`TallyDate`] into every
-/// request rendered from it (#861).
+/// A window date that reaches this layer as text read from the book, not from a
+/// tool argument (whose date [`normalized_date`] parses): parsed once, by its one
+/// caller, the bill trail's window start (`agent_bill_trail.rs`), and carried as
+/// a [`TallyDate`] into every request rendered from it (#861).
 pub(super) fn parse_window_date(value: &str) -> Result<TallyDate, ToolFailure> {
     TallyDate::parse(value).map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
 }
@@ -2453,7 +2453,7 @@ pub(super) fn parse_voucher_census(
                 let (Event::Start(event) | Event::Empty(event)) = event else {
                     unreachable!("matched as Start or Empty above")
                 };
-                let name = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let name = event.name().as_ref().to_ascii_uppercase();
                 if name == "VOUCHER" && scope.collection() {
                     if empty {
                         return Err(invalid());
@@ -2491,7 +2491,7 @@ pub(super) fn parse_voucher_census(
                 }
             }
             Ok(Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 scope.end(&end)?;
                 if end == "VOUCHER" && scope.collection() {
                     let row = current.take().ok_or_else(invalid)?;

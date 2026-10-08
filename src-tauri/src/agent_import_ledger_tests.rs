@@ -12,8 +12,8 @@ fn batch() -> ImportLedgerLine {
         company_guid: GUID.into(),
         company: None,
         txn_ids: vec!["txn-001".into()],
-        date_from: "20260901".into(),
-        date_to: "20260901".into(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "a".repeat(64),
         built_at: now(),
         status: "built".into(),
@@ -22,7 +22,7 @@ fn batch() -> ImportLedgerLine {
             value: Some(10),
             master_value: Some(10),
         },
-        vouchers: vec![payload().vouchers.remove(0)],
+        vouchers: vec![admitted_payload().vouchers.remove(0)],
     }
 }
 
@@ -676,4 +676,45 @@ fn a_guid_bound_by_another_batch_is_recorded_as_a_refusal() {
         recorded,
         ledger::PostSpanVerdict::Refused("span_identity_reused".into())
     );
+}
+
+/// A stored date that is not `YYYYMMDD` refuses the whole journal, as any
+/// other malformed record does, for the import tools and the local data
+/// report alike. No release has written one: every build stored the
+/// normalised date (#1307).
+#[test]
+fn a_stored_date_that_is_not_yyyymmdd_refuses_the_journal() {
+    let mut line = batch();
+    line.company = Some(ImportCompanyTuple {
+        name: "Synthetic Accounts".into(),
+        guid: GUID.into(),
+        company_number: "1".into(),
+        books_from: stored_date("20260401"),
+    });
+    let stored = serde_json::to_value(&line).unwrap();
+    let text = format!("{stored}\n");
+    assert_eq!(ledger::parse_snapshots(&text).unwrap().len(), 1);
+    assert!(ledger::settlement(text.as_bytes()).is_ok());
+    for pointer in [
+        "/date_from",
+        "/date_to",
+        "/vouchers/0/date",
+        "/company/books_from",
+    ] {
+        for date in ["2026-09-01", "20260931", ""] {
+            let mut edited = stored.clone();
+            *edited.pointer_mut(pointer).unwrap() = json!(date);
+            let text = format!("{edited}\n");
+            assert_eq!(
+                ledger::parse_snapshots(&text).err(),
+                Some("import_ledger_invalid".to_string()),
+                "{pointer} {date:?}"
+            );
+            assert_eq!(
+                ledger::settlement(text.as_bytes()).err(),
+                Some("import_ledger_invalid".to_string()),
+                "{pointer} {date:?}"
+            );
+        }
+    }
 }

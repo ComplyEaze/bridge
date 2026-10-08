@@ -122,6 +122,17 @@ def _related_parties_cl23(c):
     return related_parties_cl23, related_parties_cl23.run(c.eng, c.rules, related_parties_config(c.cfg))
 
 
+def _specified_persons_40a2b(c):
+    from types import SimpleNamespace
+    from tae.audit_tests import related_parties_cl23, specified_persons_40a2b
+    from tae.config import related_parties_config
+    rp = related_parties_config(c.cfg)
+    cl23 = related_parties_cl23.run(c.eng, c.rules, rp)
+    mod = SimpleNamespace(TEST_ID=specified_persons_40a2b.TEST_ID, check_invariants=lambda e, res:
+                          specified_persons_40a2b.check_invariants(e, c.rules, rp, cl23, res))
+    return mod, specified_persons_40a2b.run(c.eng, c.rules, rp, cl23)
+
+
 def _trial_balance(c):
     from tae.audit_tests import trial_balance
     return trial_balance, trial_balance.run(c.eng, c.rules)
@@ -465,6 +476,10 @@ def _stock(c):
     return module, stock.run(c.eng, {"version": c.rules.version}, items, opening, closing,
                              read_format.company_isintegrated(c.cfg, c.path.parent))
 
+def _questionnaire_cl13(c):
+    from tae.audit_tests import questionnaire_cl13
+    return questionnaire_cl13, questionnaire_cl13.run(c.eng, c.rules, _stock(c)[1])
+
 def _party_monthly(c):
     from tae.audit_tests import party_monthly
     # As tae/pack.py calls it: the cash and bank ledgers, and the module's own top-parties cut.
@@ -495,8 +510,10 @@ RUNNERS = {
     "loans_interest": _loans_interest,
     "partners_40b_194t": _partners_40b_194t,
     "party_monthly": _party_monthly,
+    "questionnaire_cl13": _questionnaire_cl13,
     "read_scope": _read_scope,
     "related_parties_cl23": _related_parties_cl23,
+    "specified_persons_40a2b": _specified_persons_40a2b,
     "stale_balances_41_1": _stale_balances_41_1,
     "statutory_dues_43b": _statutory_dues_43b,
     "stock": _stock,

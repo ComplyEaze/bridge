@@ -42,6 +42,14 @@ branch the real book does not reach. This bends the two-book bar; the owner may 
   interest ledger (its interest counted, and asked for as all disallowed) and one without (its own title, no
   s.40(b) question); the firm total withheld.
 
+## Re-pin at the reworded gross-reading limit (2026-10-06)
+
+At `5658c8ce70d57981df63c5e65172308bf166ef94` (the reference's main; the wording changed at its `5db144ff`) the
+limit for a partner with a negative net credit reads "under the gross reading they lower nothing", without the dated
+attribution it carried. `edge.partners_tds_mixed.partners_40b_194t.json` is regenerated there: that one limit string
+and its hash move. The other five partners goldens of this file regenerate byte-identical there. The book is
+unchanged.
+
 ## Re-pin at the off-capital rule (Lane E3, 2026-09-28, last)
 
 At `c0b7e2103279589df984a3bb9dc77faa3e348b5c` (the reference's main) a voucher on a partner's interest or remuneration ledger that touches another partner's
@@ -124,6 +132,6 @@ that commit with no client data, under Python 3.13, with ENGINE the archive:
 | `edge.partners_not_applicable.partners_40b_194t.json` | 1,049 | `d03a931902fd87eb43fcf832cc2bb5297e03da9e34d7dfb0b3a4c51c57677e73` | `golden/edge.partners_not_applicable.partners_40b_194t.json` |
 | `synthetic.partners_40b_194t.json` | 1,605 | `671f8ecaa00a79a50499fa1853abfe156c08c48ded2496210c330fb956fae1c5` | `golden/synthetic.partners_40b_194t.json` |
 | `partners_tds_mixed.json` | 7,336 | `6a5722722fea285506982aaaebd8afc9fa70defb77e26faf3ed6ab0de9baf9e8` | `edge-books/partners_tds_mixed.json` |
-| `edge.partners_tds_mixed.partners_40b_194t.json` | 51,729 | `57c6f2f0d10fd7a49bb7507e3d2ce661998b7b87b25004de6457e0ee6828f963` | `golden/edge.partners_tds_mixed.partners_40b_194t.json` |
+| `edge.partners_tds_mixed.partners_40b_194t.json` | 51,713 | `acd2cbf61c7aaa56fe665726993dc5de6fc1e5ac59d09151744bfb3f01ac38ad` | `golden/edge.partners_tds_mixed.partners_40b_194t.json` |
 | `partners_deed_no_interest.json` | 3,935 | `38e10d442f3fb66572909c4dab815b39d648b878a263cde8edcb95ddb4128a92` | `edge-books/partners_deed_no_interest.json` |
 | `edge.partners_deed_no_interest.partners_40b_194t.json` | 21,981 | `57a3f63896ee617b024356bd710fc68d312e056f3783788eec912fb8170f9968` | `golden/edge.partners_deed_no_interest.partners_40b_194t.json` |

@@ -1,0 +1,221 @@
+{
+ "comment": "Matches sharing GUIDs, and no stock result. Two regular journals share qc-dup-a: they count once, the label is the later one's (JV-A2), and POP-5 reports the GUID. A regular journal (JV-B1) and a later cancelled one (JV-B2) share qc-dup-b: the regular one counts, and because its GUID is also an excluded voucher's, POP-4 reports the citation twice (once on the figure, once on the finding). A journal (JV-C1) and a later regular payment (PV-C2) share qc-dup-c: the journal still counts, and POP-5 reports the GUID. The count is 3; the module check walks voucher by voucher, finds 4 and fires.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-qc_shared_guid-b-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-qc_shared_guid-b-001"
+  },
+  {
+   "name": "Expenses Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-qc_shared_guid-b-002"
+  },
+  {
+   "name": "Freight Inward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-qc_shared_guid-b-003"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-qc_shared_guid-b-004"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-qc_shared_guid-b-005"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-qc_shared_guid-b-006"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 30000,
+   "closing": 49970000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Expenses Payable",
+   "opening": 0,
+   "debit": 30000,
+   "credit": 110000,
+   "closing": -80000
+  },
+  {
+   "ledger": "Freight Inward",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 0,
+   "closing": 50000
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 60000,
+   "credit": 0,
+   "closing": 60000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "qc-dup-a",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-A1",
+   "lines": [
+    [
+     "Office Rent",
+     10000
+    ],
+    [
+     "Expenses Payable",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-dup-a",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-A2",
+   "lines": [
+    [
+     "Freight Inward",
+     20000
+    ],
+    [
+     "Expenses Payable",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-dup-b",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-B1",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-dup-b",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-B2",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-dup-c",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-C1",
+   "lines": [
+    [
+     "Freight Inward",
+     30000
+    ],
+    [
+     "Expenses Payable",
+     -30000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-dup-c",
+   "date": "2026-03-31",
+   "base_type": "Payment",
+   "number": "PV-C2",
+   "lines": [
+    [
+     "Expenses Payable",
+     30000
+    ],
+    [
+     "Bank A",
+     -30000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "questionnaire_cl13"
+ ]
+}

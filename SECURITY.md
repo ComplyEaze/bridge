@@ -5,7 +5,7 @@
 | Version | Security status |
 | --- | --- |
 | `master` | Development branch; a fix, if made, lands here first |
-| <!-- managed:latest-preview -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:latest-preview -->, the latest published release | Receives security fixes, as a new release, if we make one |
+| <!-- managed:latest-preview -->[`mcp-v0.5.0`](https://github.com/ComplyEaze/bridge/releases/latest) (8 October 2026)<!-- /managed:latest-preview -->, the latest published release | Receives security fixes, as a new release, if we make one |
 | Earlier releases | Not supported; install the latest release |
 
 ComplyEaze Bridge is published as extension archives (`.mcpb`) on GitHub

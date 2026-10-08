@@ -1,0 +1,4 @@
+# fixture: ../tally-protocol-simulator/fixtures/malformed_export_metadata.xml
+# parser: parse_ledgers_with_evidence
+# source: synthetic: not evidence of what Tally sends
+Err(Tally company context RECORDCOUNT was not a non-negative integer)

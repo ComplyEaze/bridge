@@ -860,9 +860,7 @@ fn scan_exact_grammar(
                 }
             }
             Event::Text(text) => {
-                let decoded = text
-                    .decode()
-                    .map_err(|_| IndiaTaxObservationError::MalformedXml)?;
+                let decoded = &*text;
                 if decoded.len() > limits.max_field_bytes {
                     return Err(IndiaTaxObservationError::ResourceLimitExceeded);
                 }
@@ -908,8 +906,7 @@ fn scan_exact_grammar(
     Ok(fragments)
 }
 
-fn event_name(bytes: &[u8]) -> Result<String, IndiaTaxObservationError> {
-    let name = std::str::from_utf8(bytes).map_err(|_| IndiaTaxObservationError::MalformedXml)?;
+fn event_name(name: &str) -> Result<String, IndiaTaxObservationError> {
     if !name.bytes().all(|byte| byte.is_ascii_uppercase()) {
         return Err(IndiaTaxObservationError::WrongGrammar);
     }
@@ -1008,8 +1005,7 @@ fn validate_attributes(
         if count > max_attributes {
             return Err(IndiaTaxObservationError::ResourceLimitExceeded);
         }
-        let key = std::str::from_utf8(attribute.key.as_ref())
-            .map_err(|_| IndiaTaxObservationError::MalformedXml)?;
+        let key = attribute.key.as_ref();
         let folded = key.to_ascii_uppercase();
         if key != folded || !seen.insert(folded.clone()) {
             return Err(IndiaTaxObservationError::DuplicateField);

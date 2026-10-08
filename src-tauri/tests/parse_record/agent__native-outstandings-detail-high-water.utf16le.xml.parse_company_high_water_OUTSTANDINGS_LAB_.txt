@@ -1,0 +1,7 @@
+# fixture: agent/native-outstandings-detail-high-water.utf16le.xml
+# parser: parse_company_high_water(OUTSTANDINGS_LAB)
+# source: captured
+Ok(Object {
+    "altmstid": Number(222),
+    "altvchid": Number(20),
+})

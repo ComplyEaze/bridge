@@ -242,21 +242,59 @@ pub fn extract_pages(engine: &PdfEngine, pdf: &[u8], password: &str) -> Result<V
                 "a page carries more characters than the accepted limit",
             ));
         }
-        let glyphs = chars.iter().map(|character| {
-            let bounds = character.loose_bounds().ok()?;
-            Some(Glyph {
+        let mut glyphs = Vec::new();
+        for character in chars.iter() {
+            if !is_drawn(&character) {
+                // an invisible character breaks a word, as PDFium's own spaces do
+                glyphs.push(None);
+                continue;
+            }
+            glyphs.push(character.loose_bounds().ok().map(|bounds| Glyph {
                 character: printed_character(character.unicode_char()),
                 left: f64::from(bounds.left().value) - origin_left,
                 right: f64::from(bounds.right().value) - origin_left,
                 top: origin_top - f64::from(bounds.top().value),
                 bottom: origin_top - f64::from(bounds.bottom().value),
                 size: f64::from(character.scaled_font_size().value),
-            })
-        });
+            }));
+        }
         out.push(assemble_words(glyphs));
     }
     require_readable_text(&out)?;
     Ok(out)
+}
+
+/// Is this character drawn on the page? A scanner app lays its OCR text over
+/// the scanned image in text render mode 3 (invisible), so a reader that takes
+/// every character reads the OCR as the bank's own text. A character that
+/// PDFium reports as invisible (mode 3, or 7, which only adds to the clip) is
+/// not drawn; every other character is, including one whose render mode PDFium
+/// cannot answer, so that a character read today is only ever dropped on
+/// positive evidence that it is invisible.
+///
+/// PDFium's own generated characters (the spaces and line breaks it inserts)
+/// have no text object, so asking them for a render mode is an error, which
+/// reads here as drawn, as before. Seen in one local run on the synthetic
+/// fixtures (Courier, `Tj` only), and not asserted by a committed test: every
+/// generated character answered with an error and every other character with
+/// its mode. Real statements may use text operators and fonts
+/// the fixtures do not (`TJ` kerning, composite fonts, Type 3): whether any
+/// character there has no render mode is not measured.
+///
+/// A scan whose only text is an invisible layer then has no words and is
+/// refused as `no_readable_text`. A mixed document (some pages scans with such
+/// a layer, some text) is not refused here: the scanned pages read as empty.
+/// Rows missing from them are caught by the closing-balance control, and for
+/// SBI and HDFC by the printed totals, under a refusal that does not say why;
+/// they pass silently only when the missing rows net to zero on a bank that
+/// prints no totals (Union Bank). A refusal of its own for such a page would be
+/// the loud form; it is not added because no real file shows how often a
+/// genuine statement carries a page of invisible text only.
+fn is_drawn(character: &PdfPageTextChar<'_>) -> bool {
+    !matches!(
+        character.render_mode(),
+        Ok(PdfPageTextRenderMode::Invisible | PdfPageTextRenderMode::InvisibleClipping)
+    )
 }
 
 /// Refuse a document whose words carry no numeric character at all: a scan, a
@@ -270,9 +308,11 @@ pub fn extract_pages(engine: &PdfEngine, pdf: &[u8], password: &str) -> Result<V
 /// what the account check's `\d` reads) is the test because every statement that
 /// gets past `parse::require_account_match` has one (its account-number line), so
 /// this renames a refusal that was certain; it cannot refuse a statement that is
-/// read today. Residual: a scan whose text layer carries a digit (an OCR layer, or a
-/// stamp that prints a date) is not caught here and is still refused or read as
-/// before, by the balance chain and the account check.
+/// read today. Residual: a scan whose text layer carries a digit and is not
+/// invisible (an OCR layer drawn in an ordinary render mode under the image, or
+/// in white, tiny or off-page text, or a stamp that prints a date) is not caught
+/// here and is still refused or read as before, by the balance chain and the
+/// account check.
 fn require_readable_text(pages: &[Page]) -> Result<(), Refusal> {
     let has_figures = pages
         .iter()

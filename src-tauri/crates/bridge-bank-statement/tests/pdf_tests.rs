@@ -389,3 +389,35 @@ fn a_logo_and_a_watermark_do_not_change_the_words_that_are_read() {
     assert_eq!(with_images.len(), 1);
     assert_eq!(words(&with_images), words(&plain));
 }
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn a_scan_with_an_invisible_ocr_layer_has_no_readable_text() {
+    // every character of the layer is in text render mode 3, so none is read
+    refuses(
+        extract_pages(
+            pdfium(),
+            &pdf("scan-with-hidden-ocr-text.pdf"),
+            "synthetic-user-4321",
+        ),
+        "no_readable_text",
+    );
+}
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn an_invisible_line_in_a_text_page_is_not_read() {
+    let words =
+        |pages: &[Page]| -> Vec<String> { pages[0].iter().map(|word| word.text.clone()).collect() };
+    let hidden = extract_pages(
+        pdfium(),
+        &pdf("hdfc-with-hidden-line.pdf"),
+        "synthetic-user-4321",
+    )
+    .unwrap();
+    let plain = extract_pages(pdfium(), &pdf("hdfc-synthetic.pdf"), "synthetic-user-4321").unwrap();
+    assert_eq!(words(&hidden), words(&plain));
+    for hidden_word in ["TRACKING", "CLIPPED"] {
+        assert!(!words(&hidden).iter().any(|word| word.contains(hidden_word)));
+    }
+}

@@ -1,0 +1,137 @@
+//! Count what a PDF's text layer holds, by kind, and print nothing else: no
+//! word, no value, no name, no account number. Safe to paste to the people who
+//! work on this crate (not into a public issue: counts are still a fingerprint).
+//!
+//! It answers, for a statement the owner holds: how many characters PDFium
+//! reports, how many are PDFium's own generated spaces, and how many of the rest
+//! have each text render mode (in particular `Invisible`, which a scanner app's
+//! OCR layer uses); how many words and how many numeric characters
+//! `extract_pages` sees; and which refusal, if any, `extract_pages` gives.
+//!
+//! The password file's permission check (no group or other access) exists on
+//! Unix only; on Windows the file is read without one. This is an example run
+//! by hand on the owner's own machine, not a shipped tool.
+//!
+//! PDFium can be bound once per process, so there are two runs: without
+//! `--extract` it counts characters; with `--extract` it reports what
+//! `extract_pages` reads or refuses.
+//!
+//! ```text
+//! cargo run --example text_layer_counts -- \
+//!     --pdfium /path/to/libpdfium.dylib --pdf statement.pdf [--password-file statement.password] [--extract]
+//! ```
+
+use bridge_bank_statement::pdf::{engine, extract_pages};
+use pdfium_render::prelude::*;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::process::ExitCode;
+
+fn read_password(path: &PathBuf) -> Result<String, String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(path)
+            .map_err(|_| "password file unreadable")?
+            .permissions()
+            .mode();
+        if mode & 0o077 != 0 {
+            return Err("password file must not be readable by group or others (chmod 600)".into());
+        }
+    }
+    let text = std::fs::read_to_string(path).map_err(|_| "password file unreadable")?;
+    Ok(text.trim_end_matches(['\r', '\n']).to_string())
+}
+
+fn main() -> ExitCode {
+    match run() {
+        Ok(report) => {
+            println!("{report}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("text_layer_counts: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn run() -> Result<String, String> {
+    let mut named: BTreeMap<String, String> = BTreeMap::new();
+    let mut args = std::env::args().skip(1).enumerate();
+    while let Some((position, key)) = args.next() {
+        let Some(name) = key
+            .strip_prefix("--")
+            .filter(|name| ["pdfium", "pdf", "password-file", "extract"].contains(name))
+        else {
+            return Err(format!(
+                "argument {} is not an option of this tool",
+                position + 1
+            ));
+        };
+        if name == "extract" {
+            named.insert(name.to_string(), String::new());
+            continue;
+        }
+        let (_, value) = args
+            .next()
+            .ok_or_else(|| format!("argument {} needs a value", position + 1))?;
+        named.insert(name.to_string(), value);
+    }
+    let library = PathBuf::from(named.get("pdfium").ok_or("--pdfium is required")?);
+    let pdf = PathBuf::from(named.get("pdf").ok_or("--pdf is required")?);
+    let password = match named.get("password-file") {
+        Some(path) => read_password(&PathBuf::from(path))?,
+        None => String::new(),
+    };
+    let bytes = std::fs::read(&pdf).map_err(|_| "statement unreadable")?;
+
+    if named.contains_key("extract") {
+        return Ok(
+            match engine(&library).and_then(|engine| extract_pages(engine, &bytes, &password)) {
+                Ok(read) => {
+                    let words: usize = read.iter().map(Vec::len).sum();
+                    let numeric: usize = read
+                        .iter()
+                        .flatten()
+                        .map(|word| word.text.chars().filter(|c| c.is_numeric()).count())
+                        .sum();
+                    format!("extract_pages: read, words {words}, numeric characters {numeric}")
+                }
+                Err(refusal) => format!("extract_pages: refused, {}", refusal.category),
+            },
+        );
+    }
+
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    let pdfium = Pdfium::new(
+        Pdfium::bind_to_library(&library).map_err(|_| "the PDFium library could not be loaded")?,
+    );
+    let document = pdfium
+        .load_pdf_from_byte_slice(&bytes, Some(&password))
+        .map_err(|_| "the PDF could not be opened (password, or not a PDF)")?;
+    let mut pages = 0;
+    for page in document.pages().iter() {
+        pages += 1;
+        let Ok(text) = page.text() else {
+            *counts.entry("page text unreadable".into()).or_default() += 1;
+            continue;
+        };
+        for character in text.chars().iter() {
+            let kind = match character.is_generated() {
+                Ok(true) => "generated by PDFium".to_string(),
+                Ok(false) => match character.render_mode() {
+                    Ok(mode) => format!("text, render mode {mode:?}"),
+                    Err(_) => "text, render mode unreadable".to_string(),
+                },
+                Err(_) => "is_generated unreadable".to_string(),
+            };
+            *counts.entry(kind).or_default() += 1;
+        }
+    }
+    let mut out = format!("pages {pages}\n");
+    for (kind, count) in &counts {
+        out.push_str(&format!("characters, {kind}: {count}\n"));
+    }
+    Ok(out)
+}

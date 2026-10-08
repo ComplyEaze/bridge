@@ -18,6 +18,11 @@ pub enum AuditError {
     /// The engagement or rules configuration is missing a key or has the wrong type.
     #[error("config: {0}")]
     Config(String),
+    /// A value in a client table that a test refuses when it reads the table, as the reference's
+    /// `ConfigValueRefused(table, name)` does: `table` is the dotted table, `name` the key (a
+    /// ledger, as bound) of the first offending entry.
+    #[error("config: {table}.{name:?} is not an accepted value")]
+    ConfigValueRefused { table: &'static str, name: String },
     /// Two different ledgers in the same Book normalise to the same non-blank Tally GUID (a
     /// corrupt read); see `ledger_ids::check_no_duplicate_ledger_guids`.
     #[error("duplicate ledger GUID: {0}")]

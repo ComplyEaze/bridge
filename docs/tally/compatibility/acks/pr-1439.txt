@@ -1,0 +1,4 @@
+src-tauri/crates/bridge-bank-statement/src/bank.rs
+src-tauri/crates/bridge-bank-statement/src/proposals.rs
+src-tauri/src/agent_bank_statement.rs
+reviewer: lamemustafa

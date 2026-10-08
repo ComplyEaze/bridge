@@ -1,0 +1,276 @@
+{
+ "comment": "statutory_dues_43b, vouchers that share a GUID on employees' contributions (#1243). PF: an opening lot paid by two blank-GUID payments, one by its due date and one after; one GUID on May's deduction and on its late payment; one GUID, number, type and day on July's two deductions (one ref, both counted), paid on time; a blank-GUID payment with no number left as an unmatched advance. ESI: one GUID on a payment of the opening lot and on a later deduction; an opening remainder still unpaid; May's deduction in the PF voucher (its payment, sharing that GUID, has no ESI line and is not cited on ESI); two blank-GUID March deductions with identical refs, due after the year end. Every figure and finding of the walk cites each voucher of its nature.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "PF Employee Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-sge-l01"
+  },
+  {
+   "name": "ESI Employee Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-sge-l02"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-sge-l03"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sge-l04"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "PF Employee Payable",
+   "opening": -1000,
+   "debit": 1825,
+   "credit": 750,
+   "closing": 75
+  },
+  {
+   "ledger": "ESI Employee Payable",
+   "opening": -800,
+   "debit": 300,
+   "credit": 490,
+   "closing": -990
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "",
+   "date": "2025-04-10",
+   "base_type": "Payment",
+   "number": "PF-P1",
+   "lines": [
+    [
+     "PF Employee Payable",
+     600
+    ],
+    [
+     "Bank",
+     -600
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-04-20",
+   "base_type": "Payment",
+   "number": "PF-P2",
+   "lines": [
+    [
+     "PF Employee Payable",
+     400
+    ],
+    [
+     "Bank",
+     -400
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sge-may",
+   "date": "2025-05-31",
+   "base_type": "Journal",
+   "number": "J-MAY",
+   "lines": [
+    [
+     "PF Employee Payable",
+     -500
+    ],
+    [
+     "ESI Employee Payable",
+     -90
+    ],
+    [
+     "Wages",
+     590
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sge-may",
+   "date": "2025-06-20",
+   "base_type": "Payment",
+   "number": "P-MAY",
+   "lines": [
+    [
+     "PF Employee Payable",
+     500
+    ],
+    [
+     "Bank",
+     -500
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sge-twin",
+   "date": "2025-07-31",
+   "base_type": "Journal",
+   "number": "J-JUL",
+   "lines": [
+    [
+     "PF Employee Payable",
+     -100
+    ],
+    [
+     "Wages",
+     100
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sge-twin",
+   "date": "2025-07-31",
+   "base_type": "Journal",
+   "number": "J-JUL",
+   "lines": [
+    [
+     "PF Employee Payable",
+     -150
+    ],
+    [
+     "Wages",
+     150
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sge-jul",
+   "date": "2025-08-10",
+   "base_type": "Payment",
+   "number": "P-JUL",
+   "lines": [
+    [
+     "PF Employee Payable",
+     250
+    ],
+    [
+     "Bank",
+     -250
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-09-05",
+   "base_type": "Payment",
+   "number": "",
+   "lines": [
+    [
+     "PF Employee Payable",
+     75
+    ],
+    [
+     "Bank",
+     -75
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sge-esi",
+   "date": "2025-04-12",
+   "base_type": "Payment",
+   "number": "ESI-P1",
+   "lines": [
+    [
+     "ESI Employee Payable",
+     300
+    ],
+    [
+     "Bank",
+     -300
+    ]
+   ]
+  },
+  {
+   "guid": "edge-sge-esi",
+   "date": "2025-10-31",
+   "base_type": "Journal",
+   "number": "ESI-J1",
+   "lines": [
+    [
+     "ESI Employee Payable",
+     -200
+    ],
+    [
+     "Wages",
+     200
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "ESI-J2",
+   "lines": [
+    [
+     "ESI Employee Payable",
+     -120
+    ],
+    [
+     "Wages",
+     120
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "ESI-J2",
+   "lines": [
+    [
+     "ESI Employee Payable",
+     -80
+    ],
+    [
+     "Wages",
+     80
+    ]
+   ]
+  }
+ ],
+ "cash": [],
+ "bank": [
+  "Bank"
+ ],
+ "statutory_dues": {
+  "nature_by_ledger": {
+   "PF Employee Payable": "pf_employee",
+   "ESI Employee Payable": "esi_employee"
+  },
+  "salary_expense_ledgers": [
+   "Wages"
+  ]
+ },
+ "tests": [
+  "statutory_dues_43b"
+ ]
+}

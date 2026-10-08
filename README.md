@@ -122,11 +122,9 @@ whose ledger now points to a different master.
   written whether the call succeeds or is refused.
 - **You accept the Terms of Use first.** The extension asks you to accept the
   ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings, and every
-  tool refuses with `terms_not_accepted` until you do. (After an update from
-  0.4.2, on the one Mac we tried with a build of 0.5.0 made by our checks, Claude
-  Desktop did not start the extension before the box was ticked and before any
-  quit, and a request
-  failed with a 400 error that did not mention the Terms.)
+  tool refuses with `terms_not_accepted` until you do. (In 0.5.0, after an
+  update from 0.4.2, Claude Desktop may not start the extension, with an error
+  that does not mention the Terms; #1413.)
 - **Open source** under Apache-2.0.
 
 ## What has been run against a real TallyPrime
@@ -582,4 +580,4 @@ Attribution notices are provided in [NOTICE](./NOTICE).
 The ComplyEaze logo and icon files are not licensed under Apache-2.0; see
 [NOTICE](./NOTICE) and [TRADEMARKS.md](./TRADEMARKS.md).
 The historical `v0.1.0` release remains under the MIT license shipped with
-that tag; current development source is version `0.5.0` under Apache-2.0.
+that tag; current development source is version `0.5.1` under Apache-2.0.

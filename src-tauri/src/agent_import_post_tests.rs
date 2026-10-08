@@ -3078,6 +3078,23 @@ fn a_batch_is_admitted_only_under_the_batch_limit() {
     );
 }
 
+/// The batch text's dates are the batch's earliest and latest, whatever order
+/// its vouchers are in: here the earliest is the last voucher.
+#[test]
+fn the_batch_dates_are_the_earliest_and_latest_whatever_the_voucher_order() {
+    let (mut line, endpoint) = batch_of_every_type();
+    line.vouchers.rotate_left(1);
+    assert_eq!(line.vouchers.last().unwrap().date.as_str(), "20260901");
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        preview
+            .lines()
+            .filter(|text| text.starts_with("Dates: "))
+            .collect::<Vec<_>>(),
+        ["Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them"]
+    );
+}
+
 /// The batch approval text: every ledger's totals and entry count, the types,
 /// the money Receipts and Payments move, and a line for Contras and Journals.
 #[test]

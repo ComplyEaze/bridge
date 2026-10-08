@@ -11674,10 +11674,10 @@
  {
   "id": "NR-06",
   "by": "author",
-  "what": "narration_payees: a channel word alone lets the later forms be tried",
+  "what": "narration_payees: UPI is not a channel word",
   "file": "src/narration_payees.rs",
-  "from": "    if CHANNEL_WORDS.contains(&name.as_str()) {\n        return Some(Reading::NoPayee);",
-  "to": "    if CHANNEL_WORDS.contains(&name.as_str()) {\n        return None;"
+  "from": "const CHANNEL_WORDS: [&str; 4] = [\"UPI\", \"IMPS\", \"NEFT\", \"RTGS\"];",
+  "to": "const CHANNEL_WORDS: [&str; 3] = [\"IMPS\", \"NEFT\", \"RTGS\"];"
  },
  {
   "id": "NR-07",

@@ -1,8 +1,9 @@
 # Security and privacy
 
 This page answers, in one place, what a CA or a firm's IT person asks before
-installing ComplyEaze Bridge next to client books. It describes the source that
-becomes release 0.5.0, read at commit `eb6983ffe` (no 0.5.0 tag exists yet). Two
+installing ComplyEaze Bridge next to client books. It describes the source of
+release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
+page was not read again at it). Two
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), and the note on how long a
@@ -13,7 +14,8 @@ commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again,
 and neither were the sentences in the other sections that describe 0.4.0 or
 0.4.1 only as history. Earlier releases differ: 0.4.0 to 0.4.2 ask you to
 accept Terms version 2026-10, not 2026-10.1. It was not tested on a running
-system (see the README's list of what has been run). Unless a line says
+system, except where a sentence says it was seen once (see the README's list
+of what has been run). Unless a line says
 otherwise, each answer rests on reading that source. Anything not measured on a
 running system is marked **Not measured**.
 
@@ -49,9 +51,12 @@ to 50 vouchers of one saved batch after one approval; the published extension
 neither offers nor sets it, so it applies only if someone sets it by hand.
 
 Every tool refuses until the Terms of Use (version 2026-10.1 in 0.5.0) are
-accepted in the extension settings. After installing 0.5.0 that setting is off
-until you accept the new version (section 4). A server started by hand with
-`BRIDGE_TERMS_ACCEPTED` set to `true` or `1` is not asked.
+accepted in the extension settings. Seen once, on one Mac, with a build of 0.5.0
+made by our checks (not the published file) installed over 0.4.2: the new setting
+had no value, and before it was ticked, and before any quit, Claude Desktop did
+not start the extension and a request failed with a 400 error that did not
+mention the Terms (section 4). A server started by hand with `BRIDGE_TERMS_ACCEPTED` set
+to `true` or `1` is not asked.
 
 ## 2. Does anything leave my computer?
 
@@ -240,7 +245,9 @@ until you accept the new version (section 4). A server started by hand with
   holds no row values.
 - **A terms record** (`terms-acceptance.jsonl`): the extension asks you to
   accept the ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings,
-  and every tool refuses with `terms_not_accepted` until you do. When the server
+  and every tool refuses with `terms_not_accepted` until you do (section 1 says
+  what was seen once after an update: the extension was not started and a
+  request failed with a 400 error). When the server
   starts with the setting on, it appends a line with the terms version, the
   time, and that the acceptance came through the setting (once per version; two
   servers starting together can each add a line). If that line cannot be

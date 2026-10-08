@@ -268,6 +268,21 @@ fn each_fingerprinted_field_changed_alone_changes_the_fingerprint() {
     assert_eq!(voucher_fingerprint(&alter), original);
 }
 
+/// A recorded review is bound to these exact digests: a change to how the read
+/// holds a field, such as its dates (#1425), must not change the bytes hashed,
+/// or every review on file would read as stale.
+#[test]
+fn the_fingerprint_of_a_read_voucher_is_unchanged() {
+    assert_eq!(
+        voucher_fingerprint(&row(2, "Paid")),
+        "bd42a82bc3c2cf8bdc5e238f72be946b8831d854e469e768d5c00eb05ecaba4e"
+    );
+    let mut dated = row_json(2, "Paid");
+    *dated.pointer_mut("/effective_date").unwrap() = json!("20260907");
+    let dated: ReadVoucher = serde_json::from_value(dated).unwrap();
+    assert_eq!(voucher_fingerprint(&dated), "6e3f9e74fdce028e34f79fb3c586e9cc619e7a836024d77b4d3b20bf7d32a8bf");
+}
+
 /// A posted line, as `post_import` saves one: its marker is what
 /// `admit_review` finds the voucher by.
 fn posted_line() -> ImportLedgerLine {

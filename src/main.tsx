@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import ReactDOM from "react-dom/client";
-import { Building2, Cable, Check, Cloud, FileText, FolderOpen, KeyRound, Play, Search, Settings2, ShieldCheck } from "lucide-react";
+import { Building2, Cable, Check, Cloud, FileText, FolderOpen, KeyRound, Search, Settings2, ShieldCheck } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   applyProbeCompanySelectionTransition,
@@ -29,7 +29,6 @@ import {
   operatorSelectedOutstandingsAsOf,
   refreshAutomaticOutstandingsAsOf,
 } from "./outstandings-as-of";
-import { GstScreen } from "./GstScreen";
 import { MirrorProofScreen } from "./MirrorProofScreen";
 import { ErrorBoundary, ReloadGuardContext } from "./ErrorBoundary";
 import { ClientSwitcher, type ClientSwitcherClient } from "./ClientSwitcher";
@@ -96,32 +95,10 @@ type TallyWriteFixtureEnrollmentResponse = TallyWriteFixtureEnrollmentStatus & {
   review_cleanup_warning?: "review_cache_cleanup_failed_after_fixture_enrollment";
 };
 
-export type GstReturnDraft = {
-  company: string;
-  financial_year: string;
-  gstr1: {
-    b2b_invoice_count: number;
-    b2c_invoice_count: number;
-    credit_debit_note_count: number;
-    hsn_summary_count: number;
-  };
-  gstr3b: {
-    outward_taxable_value: string;
-    integrated_tax: string;
-    central_tax: string;
-    state_tax: string;
-    cess: string;
-  };
-  missing_fields: string[];
-};
-
-type View = "dashboard" | "clients" | "outstandings" | "trial_balance" | "ledger_entries" | "companies" | "settings" | "journal" | "source_draft" | "gst";
+type View = "dashboard" | "clients" | "outstandings" | "trial_balance" | "ledger_entries" | "companies" | "settings" | "journal" | "source_draft";
 
 const TABLE_PREVIEW_LIMIT = 100;
 const MIRROR_PAGE_LIMIT = 25;
-// These workflows remain implemented but unavailable until their end-to-end
-// workflow evidence is complete.
-const NON_TALLY_SECTIONS_ENABLED = false;
 
 const VIEW_TITLES: Record<View, string> = {
   dashboard: "Tally evidence dashboard",
@@ -133,7 +110,6 @@ const VIEW_TITLES: Record<View, string> = {
   settings: "Settings",
   journal: "Review Journal",
   source_draft: "Prepare file",
-  gst: "GST return readiness",
 };
 
 const TRANSPORT_LABELS: Record<string, string> = {
@@ -214,9 +190,6 @@ function App() {
   const [snapshotStartOutcomeUnknown, setSnapshotStartOutcomeUnknown] = React.useState(false);
   const [snapshotOutcomeUnknownRunId, setSnapshotOutcomeUnknownRunId] = React.useState<string | null>(null);
   const [dashboardError, setDashboardError] = React.useState<OperatorError | null>(null);
-  const [gstCompany, setGstCompany] = React.useState("");
-  const [gstFinancialYear, setGstFinancialYear] = React.useState(currentFinancialYear.label);
-  const [draft, setDraft] = React.useState<GstReturnDraft | null>(null);
   const [view, setView] = React.useState<View>("outstandings");
   const [evidenceDrawerOpen, setEvidenceDrawerOpen] = React.useState(false);
   const [evidenceDrawerRestorePending, setEvidenceDrawerRestorePending] = React.useState(false);
@@ -225,7 +198,6 @@ function App() {
   const [outstandingsAsOfSelection, setOutstandingsAsOfSelection] = React.useState(
     () => automaticOutstandingsAsOf(),
   );
-  const [busy, setBusy] = React.useState(false);
   const [tallyAction, setTallyAction] = React.useState<TallyAction | null>(null);
   const snapshotTransitionPending = tallyAction === "start" || tallyAction === "resume";
   const [journalActionBusy, setJournalActionBusy] = React.useState(false);
@@ -488,7 +460,6 @@ function App() {
     setOpenCompanyNames([]);
     setUntrustedDiscoveredCompanies([]);
     setUntrustedDiscoveryError(null);
-    setDraft(null);
     setCompanyError(null);
     setFixtureStatus(null);
     setFixtureStatusError(null);
@@ -1106,42 +1077,6 @@ function App() {
     }
   }
 
-  async function prepareDraft() {
-    if (!NON_TALLY_SECTIONS_ENABLED) {
-      setDashboardError("GST availability is unavailable until end-to-end workflow evidence is complete.");
-      return;
-    }
-    const company = gstCompany.trim();
-    const financialYear = gstFinancialYear.trim();
-    if (!company || !/^\d{4}-\d{4}$/.test(financialYear)) {
-      setDashboardError("Enter a company and a financial year in YYYY-YYYY format.");
-      return;
-    }
-
-    const resultsVersion = tallyResultsVersion.current;
-    setBusy(true);
-    setDashboardError(null);
-    try {
-      const result = await invoke<GstReturnDraft>("prepare_gst_return_draft", {
-        request: {
-          company,
-          financial_year: financialYear,
-        },
-      });
-      if (resultsVersion === tallyResultsVersion.current) {
-        setDraft(result);
-      }
-    } catch (error) {
-      if (resultsVersion === tallyResultsVersion.current) {
-        setDraft(null);
-        setDashboardError(toOperatorError(error));
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const gstDraftComplete = draft !== null && draft.missing_fields.length === 0;
   const selectedCompanyRecord = companies.find((company) => tallyCompanyKey(company) === selectedCompany);
   const selectedCompanyLive = !!selectedCompanyRecord && liveCompanyKeys.includes(tallyCompanyKey(selectedCompanyRecord));
   const currentProbeCompanyList = currentProbeCompanies(companies, liveCompanyKeys);
@@ -1497,40 +1432,6 @@ function App() {
         {view === "dashboard" && (
           <ErrorBoundary key="dashboard" label="Tally evidence dashboard">
           <>
-            {NON_TALLY_SECTIONS_ENABLED ? (
-              <section className="toolbar">
-                <label>
-                  GST company
-                  <input
-                    value={gstCompany}
-                    onChange={(event) => {
-                      setGstCompany(event.target.value);
-                      setDraft(null);
-                      tallyResultsVersion.current += 1;
-                    }}
-                  />
-                </label>
-                <label>
-                  Financial year
-                  <input
-                    value={gstFinancialYear}
-                    placeholder="YYYY-YYYY"
-                    onChange={(event) => {
-                      setGstFinancialYear(event.target.value);
-                      setDraft(null);
-                      tallyResultsVersion.current += 1;
-                    }}
-                  />
-                </label>
-                <button onClick={prepareDraft} disabled={busy}>
-                  <Play size={18} />
-                  Check GST Availability
-                </button>
-              </section>
-            ) : (
-              <p className="future-sections-note" role="status">GST availability is unavailable until end-to-end workflow evidence is complete.</p>
-            )}
-
             {dashboardError && <TallyErrorNotice message={dashboardError} />}
 
             <section className="grid">
@@ -1541,16 +1442,6 @@ function App() {
                   <div><dt>Compatibility</dt><dd>{status ? (status.compatible ? "Recognized Tally status; data capabilities not verified" : status.reachable ? "Endpoint responded but Tally compatibility was not recognized" : "Unavailable") : "Not checked"}</dd></div>
                   <div><dt>Status heuristic claim</dt><dd>{status?.product ?? "Unknown"}</dd></div>
                   <div><dt>Responder text</dt><dd>{status?.server_text || formatConnectionError(status?.error) || "Waiting for endpoint check"}</dd></div>
-                </dl>
-              </article>
-
-              <article className="panel">
-                <h2>GST preparation</h2>
-                <dl>
-                  <div><dt>Status</dt><dd>{NON_TALLY_SECTIONS_ENABLED && gstDraftComplete ? "Calculated" : "Unavailable pending evidence"}</dd></div>
-                  <div><dt>Company</dt><dd>{NON_TALLY_SECTIONS_ENABLED && draft ? draft.company : "Not available"}</dd></div>
-                  <div><dt>GSTR-1 B2B</dt><dd>{gstDraftComplete ? draft.gstr1.b2b_invoice_count : "Not available"}</dd></div>
-                  <div><dt>GSTR-3B taxable</dt><dd>{gstDraftComplete ? draft.gstr3b.outward_taxable_value : "Not available"}</dd></div>
                 </dl>
               </article>
 
@@ -1927,12 +1818,6 @@ function App() {
             {dashboardError && <TallyErrorNotice message={dashboardError} />}
             {companyError && <TallyErrorNotice message={companyError} />}
           </>
-          </ErrorBoundary>
-        )}
-
-        {view === "gst" && (
-          <ErrorBoundary key="gst" label="GST return readiness">
-          <GstScreen draft={draft} />
           </ErrorBoundary>
         )}
 

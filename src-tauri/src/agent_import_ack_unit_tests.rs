@@ -268,6 +268,38 @@ fn each_fingerprinted_field_changed_alone_changes_the_fingerprint() {
     assert_eq!(voucher_fingerprint(&alter), original);
 }
 
+/// The read's dates are parsed where it is admitted: a row whose date is
+/// absent or not a Tally date, or whose effective date is not one, is no
+/// `ReadVoucher` (#1425).
+#[test]
+fn a_read_voucher_holds_only_valid_dates() {
+    for (pointer, value) in [
+        ("/date", Value::Null),
+        ("/date", json!("2026-09-07")),
+        ("/date", json!("20260931")),
+        ("/effective_date", json!("")),
+        ("/effective_date", json!("20260931")),
+    ] {
+        let mut bad = row_json(2, "Paid");
+        *bad.pointer_mut(pointer).unwrap() = value.clone();
+        assert!(
+            serde_json::from_value::<ReadVoucher>(bad).is_err(),
+            "{pointer} {value}"
+        );
+    }
+    let mut absent = row_json(2, "Paid");
+    absent.as_object_mut().unwrap().remove("date");
+    assert!(serde_json::from_value::<ReadVoucher>(absent).is_err());
+    let mut no_effective = row_json(2, "Paid");
+    no_effective
+        .as_object_mut()
+        .unwrap()
+        .remove("effective_date");
+    let read: ReadVoucher = serde_json::from_value(no_effective).unwrap();
+    assert_eq!(read.date.as_str(), "20260907");
+    assert_eq!(read.effective_date, None);
+}
+
 /// A recorded review is bound to these exact digests: a change to how the read
 /// holds a field, such as its dates (#1425), must not change the bytes hashed,
 /// or every review on file would read as stale.
@@ -280,7 +312,10 @@ fn the_fingerprint_of_a_read_voucher_is_unchanged() {
     let mut dated = row_json(2, "Paid");
     *dated.pointer_mut("/effective_date").unwrap() = json!("20260907");
     let dated: ReadVoucher = serde_json::from_value(dated).unwrap();
-    assert_eq!(voucher_fingerprint(&dated), "6e3f9e74fdce028e34f79fb3c586e9cc619e7a836024d77b4d3b20bf7d32a8bf");
+    assert_eq!(
+        voucher_fingerprint(&dated),
+        "6e3f9e74fdce028e34f79fb3c586e9cc619e7a836024d77b4d3b20bf7d32a8bf"
+    );
 }
 
 /// A posted line, as `post_import` saves one: its marker is what

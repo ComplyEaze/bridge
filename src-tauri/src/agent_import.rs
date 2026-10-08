@@ -499,7 +499,9 @@ struct ReadVoucher {
     remote_id: Option<String>,
     guid: Option<String>,
     alter_id: Option<u64>,
-    date: Option<String>,
+    /// Parsed where the read is admitted: a row without a valid date never
+    /// becomes a `ReadVoucher` (#1425).
+    date: TallyDate,
     voucher_type: Option<String>,
     narration: Option<String>,
     voucher_number: Option<String>,
@@ -508,14 +510,14 @@ struct ReadVoucher {
     optional: Option<bool>,
     /// Absent when the response carried no `EFFECTIVEDATE` (or an empty one).
     #[serde(default)]
-    effective_date: Option<String>,
+    effective_date: Option<TallyDate>,
     #[serde(rename = "amounts")]
     entries: Vec<ReadEntry>,
 }
 
 impl super::WindowRow for ReadVoucher {
     fn window_date(&self) -> Option<&str> {
-        self.date.as_deref()
+        Some(self.date.as_str())
     }
     fn window_alter_id(&self) -> Option<u64> {
         self.alter_id

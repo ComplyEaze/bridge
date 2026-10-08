@@ -11,7 +11,7 @@ masters read, in sections 1 and 2 (#1398), and the note on how long a
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
-(except the sentences on who opens a bank statement PDF, what PDFium is known
+(except the sentences on who opens a bank statement PDF, what PDFium is inferred
 to read, and what is built from this repository, which were read at the tag
 `mcp-v0.5.0` and again at commit `a3c1bb9d` in the pull request that changed
 them, #1416),
@@ -320,13 +320,12 @@ build time), used only to read the bank statement PDF you name. **Not
 measured:** which files PDFium opens, and when, or whether it opens any network
 connection. What the source does show: ComplyEaze Bridge, not PDFium, opens the
 statement file. It reads the file itself, refusing one larger than 32 MiB, and hands
-PDFium the bytes; it reads the password file itself as well. PDFium does read
-the computer's installed font data: when a statement uses one of the 14
-standard PDF fonts without embedding it, PDFium substitutes a font installed on
-the computer, as the crate's own note records from its synthetic test
-statements. The lock file that pins the PDFium release records that its
-JavaScript engine (V8) and XFA forms are disabled in those builds; that is the
-lock file's own note, and the build settings behind it were not read.
+PDFium the bytes; it reads the password file itself as well. PDFium probably
+also reads fonts installed on the computer. That is inferred, not observed: on
+the crate's synthetic test statements, which use a standard PDF font without
+embedding it, the word boxes come out shifted vertically by a constant, and the
+crate's note explains this as PDFium substituting an installed font. Which font
+file it opened was not observed.
 
 ## 6. Has it been independently reviewed?
 

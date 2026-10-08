@@ -1,4 +1,7 @@
-//! Every composite here is read from a committed capture, never typed.
+//! Every composite read as a value here is one a committed capture holds,
+//! except the typed shapes in `the_shapes_admitted_without_a_capture_are_pinned`.
+//! A refusal is tested on a captured composite with one feature changed, or,
+//! for the zero amounts, the signed zero and the negative rate, on a typed one.
 use super::*;
 use crate::native_outstandings::{parse_company_currency_name, parse_currency_master_list};
 use std::collections::BTreeMap;
@@ -439,8 +442,6 @@ fn every_shape_no_capture_shows_is_refused_under_its_own_name() {
         change("8600.00", "08600.00"),
         Err(CompositeRefusal::LeadingZero)
     );
-    // a lone zero before the point is fine
-    assert!(parse("$ 0.50 @ I\u{20b9} 86/$  = I\u{20b9} 43.00").is_ok());
     assert_eq!(change("= -I", "= I"), Err(CompositeRefusal::SignsDisagree));
     assert_eq!(
         change(" 86/", " /"),
@@ -504,6 +505,9 @@ fn the_shapes_admitted_without_a_capture_are_pinned() {
         };
         assert_eq!(valued.rate().as_str(), rate);
     }
+    // a foreign amount below one, with its lone zero before the point (the
+    // smallest captured amount other than zero is 40.00)
+    assert!(parse("$ 0.50 @ I\u{20b9} 86/$  = I\u{20b9} 43.00").is_ok());
     // a rate below one (every captured rate is 84 or more)
     assert!(parse("$ 100.00 @ I\u{20b9} 0.5/$  = I\u{20b9} 50.00").is_ok());
     // a book whose base is not the rupee: the book's own base is accepted

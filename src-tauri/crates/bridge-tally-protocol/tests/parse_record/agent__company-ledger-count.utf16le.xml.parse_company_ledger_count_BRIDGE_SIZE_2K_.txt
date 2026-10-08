@@ -1,0 +1,8 @@
+# fixture: tests/fixtures/agent/company-ledger-count.utf16le.xml
+# parser: parse_company_ledger_count(BRIDGE SIZE 2K)
+# source: captured
+Ok(Some(
+    CompanyLedgerCount(
+        4339,
+    ),
+))

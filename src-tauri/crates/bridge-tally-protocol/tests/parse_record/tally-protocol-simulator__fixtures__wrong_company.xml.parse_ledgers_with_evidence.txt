@@ -1,0 +1,35 @@
+# fixture: ../tally-protocol-simulator/fixtures/wrong_company.xml
+# parser: parse_ledgers_with_evidence
+# source: synthetic: not evidence of what Tally sends
+Ok(ParsedExport {
+    records: [],
+    evidence: ExportEvidence {
+        company_context: Some(
+            CompanyContextEvidence {
+                name: Some(
+                    "BRIDGE SYNTHETIC OTHER BOOK",
+                ),
+                guid: Some(
+                    "00000000-0000-4000-8000-000000000002",
+                ),
+                query_identity_set_sha256: None,
+                requested_from_yyyymmdd: None,
+                requested_to_yyyymmdd: None,
+            },
+        ),
+        schema: Some(
+            "bridge.tally.ledgers/1",
+        ),
+        object_type: Some(
+            "LEDGER",
+        ),
+        observed_record_count: None,
+        source_record_count: Some(
+            0,
+        ),
+        identified_record_count: 0,
+        duplicate_identities: [],
+        company_guid_prefix_match_count: 0,
+        company_guid_prefix_mismatch_count: 0,
+    },
+})

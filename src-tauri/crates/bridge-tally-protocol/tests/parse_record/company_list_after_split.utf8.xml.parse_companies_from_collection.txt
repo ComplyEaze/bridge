@@ -1,0 +1,125 @@
+# fixture: tests/fixtures/company_list_after_split.utf8.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "Aarav Trading Company Demo",
+        guid: Some(
+            "bb8ad19e-6aef-4239-a917-87fec0c6215e",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "Bridge Ageing Lab",
+        guid: Some(
+            "eebb9a9f-1679-4468-9e8f-814c729674cb",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "Bridge Billwise Lab",
+        guid: Some(
+            "75f7566d-7a4f-431a-9642-e93a9d06d57d",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS AGEING",
+        guid: Some(
+            "2f65b86f-edf4-471c-99ed-da0de7163836",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS DENSE",
+        guid: Some(
+            "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS FOREX",
+        guid: Some(
+            "b14e9b2d-8a63-4779-804d-25d59eb787eb",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS GST",
+        guid: Some(
+            "46faa869-1208-4119-8961-f28db4df3b8e",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS ONACCOUNT",
+        guid: Some(
+            "9b4c70d1-2785-486a-8560-63d3a405c312",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS OPENING",
+        guid: Some(
+            "915d42f8-42ae-4b03-8291-55f596e3a2ea",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS PAYABLES",
+        guid: Some(
+            "b87c24c8-e5fa-43c5-be1f-486202e88bd3",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS SETTLED",
+        guid: Some(
+            "74d7e825-396a-4667-90b2-83f593f06a36",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "BRIDGE PROBE B SANDBOX",
+        guid: Some(
+            "ec4454ae-5c4c-4bfa-b3b0-68182a749689",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "BRIDGE PROBE B SANDBOX - (from 1-Apr-26)",
+        guid: Some(
+            "ec4454ae-5c4c-4bfa-b3b0-68182a749689",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "Bridge Validation Lab",
+        guid: Some(
+            "c6afd306-00e1-4f51-802a-babe44daddd3",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "WR2 Unicode Lab",
+        guid: Some(
+            "61c6de69-1748-461c-ad3f-162cb949df9f",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+])

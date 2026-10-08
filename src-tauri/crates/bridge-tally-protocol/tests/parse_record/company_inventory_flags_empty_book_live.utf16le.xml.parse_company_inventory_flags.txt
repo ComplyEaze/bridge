@@ -1,0 +1,13 @@
+# fixture: tests/fixtures/company_inventory_flags_empty_book_live.utf16le.xml
+# parser: parse_company_inventory_flags
+# source: captured
+Ok(NativeCompanyInventory {
+    flags: NativeInventoryFlags {
+        integrated: Yes,
+        inventory_on: Yes,
+        batchwise: Yes,
+    },
+    item_count: Reported(
+        0,
+    ),
+})

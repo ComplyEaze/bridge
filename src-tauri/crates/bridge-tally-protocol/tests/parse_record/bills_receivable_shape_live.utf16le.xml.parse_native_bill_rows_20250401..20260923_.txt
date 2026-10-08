@@ -1,0 +1,21 @@
+# fixture: tests/fixtures/bills_receivable_shape_live.utf16le.xml
+# parser: parse_native_bill_rows(20250401..20260923)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "Chem Supplier 1",
+        reference: "ADV-C5",
+        bill_date: TallyDate(
+            "20250607",
+        ),
+        due_date: TallyDate(
+            "20250607",
+        ),
+        closing_balance: ExactDecimal(
+            "-5000.00",
+        ),
+        tally_overdue_days: Some(
+            473,
+        ),
+    },
+])

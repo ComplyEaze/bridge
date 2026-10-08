@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/note-days/shape_lab_company_list_response.utf16le.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "BRIDGE SHAPE LAB",
+        guid: Some(
+            "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+        ),
+        company_number: Some(
+            "100021",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+])

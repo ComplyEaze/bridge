@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/agent/register-e2e/native-register-e2e-book-extent.utf16le.xml
+# parser: parse_company_book_extent_v2(REGISTER LAB)
+# source: captured
+Ok(CompanyBookExtentFields {
+    company_name: "BRIDGE GST RECON LAB",
+    company_guid: "ae1490be-52c5-4544-9ffc-4b7da85f9797",
+    books_from: TallyDate(
+        "20250401",
+    ),
+    last_voucher_date: TallyDate(
+        "20250927",
+    ),
+    voucher_alter_id_high_water: Some(
+        59,
+    ),
+    master_alter_id_high_water: Some(
+        288,
+    ),
+})

@@ -1,22 +1,25 @@
-// Proves the test-only native-approval seam (bridge#583) is absent from every
-// shipped executable, and present where it must be, so that its absence means
-// something.
+// Proves the test-only native-approval seam (bridge#583) and the test-only
+// PDFium library override are absent from every shipped executable, and
+// present where they must be, so that their absence means something.
 //
 // The seam lives in src-tauri/src/tally/approved_import.rs under bare
 // `#[cfg(test)]` and carries SEAM_MARKER, which it uses at runtime so the
-// optimiser keeps it. A binary holding the marker was compiled with the seam.
+// optimiser keeps it. The override is pdfium_library() in
+// src-tauri/src/agent_bank_statement.rs, whose bare `#[cfg(test)]` lookup
+// reads the variable PDFIUM_OVERRIDE_MARKER names. A binary holding either
+// marker was compiled with that test-only code.
 //
 //   node scripts/check-no-test-seam.mjs <file-or-directory>...
-//       Fails if any regular file at or under the paths holds the marker.
+//       Fails if any regular file at or under the paths holds a marker.
 //   node scripts/check-no-test-seam.mjs --expect-present <file>
-//       Fails unless the file holds the marker (a positive control).
+//       Fails unless the file holds every marker (a positive control).
 //   node scripts/check-no-test-seam.mjs --tauri-bundle-hook
 //       Tauri's beforeBundleCommand: scans the bridge and bridge_mcp
 //       executables `tauri build` just produced.
 //   node scripts/check-no-test-seam.mjs --test-harness [--release]
 //       Builds (or reuses) the bridge lib unit-test executable and requires
-//       the marker in it: proof the scan can see the seam when it is compiled
-//       in, in that profile.
+//       every marker in it: proof the scan can see the test-only code when it
+//       is compiled in, in that profile.
 //
 // Only uncompressed executables prove anything. A .dmg, .msi, .zip, .mcpb or
 // installer compresses its contents, so a clean scan of one would pass
@@ -29,6 +32,8 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const SEAM_MARKER = "bridge-test-approval-seam-5f1c9e7a";
+export const PDFIUM_OVERRIDE_MARKER = "BRIDGE_PDFIUM_LIBRARY";
+export const TEST_ONLY_MARKERS = [SEAM_MARKER, PDFIUM_OVERRIDE_MARKER];
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const COMPRESSED = /\.(dmg|msi|zip|mcpb|gz|tgz|xz|bz2|7z|pkg|appimage|deb|rpm)$|-setup\.exe$/i;
@@ -44,8 +49,14 @@ const CONTAINER_SIGNATURES = [
 ];
 const SHIPPED_BINARIES = ["bridge", "bridge_mcp"];
 
+/** The markers `path` holds, in TEST_ONLY_MARKERS order. */
+export function markersIn(path) {
+  const bytes = readFileSync(path);
+  return TEST_ONLY_MARKERS.filter((marker) => bytes.includes(Buffer.from(marker, "utf8")));
+}
+
 export function holdsMarker(path) {
-  return readFileSync(path).includes(Buffer.from(SEAM_MARKER, "utf8"));
+  return markersIn(path).length > 0;
 }
 
 /** Every regular file at or under `path`. */
@@ -117,7 +128,7 @@ export function assertNoTestSeam(paths) {
   const marked = markedFiles(paths);
   if (marked.length > 0) {
     throw new Error(
-      `test-only approval seam compiled into: ${marked.join(", ")} (bridge#583); ` +
+      `test-only code compiled into: ${marked.map((path) => `${path} (${markersIn(path).join(", ")})`).join(", ")}; ` +
         "a shipped binary was built with cfg(test)",
     );
   }
@@ -200,9 +211,13 @@ function main(argumentsList) {
     const [file] = argumentsList.slice(1);
     // The same scan the negative check runs, so the control proves that code.
     if (!file || markedFiles([file]).length !== 1) {
-      throw new Error(`${file ?? "(no file)"} does not hold the seam marker: the scan cannot see the seam`);
+      throw new Error(`${file ?? "(no file)"} holds no marker: the scan cannot see the test-only code`);
     }
-    console.log(`seam marker present in ${basename(file)}, as a positive control requires`);
+    const missing = TEST_ONLY_MARKERS.filter((marker) => !markersIn(file).includes(marker));
+    if (missing.length > 0) {
+      throw new Error(`${file} does not hold ${missing.join(", ")}: the scan cannot see that test-only code`);
+    }
+    console.log(`every marker present in ${basename(file)}, as a positive control requires`);
     return;
   }
   if (argumentsList[0] === "--test-harness") {
@@ -213,7 +228,7 @@ function main(argumentsList) {
   }
   const paths = argumentsList[0] === "--tauri-bundle-hook" ? tauriBuildExecutables() : argumentsList;
   assertNoTestSeam(paths);
-  console.log(`no test-only approval seam in ${paths.length} path(s): ${paths.map((path) => basename(path)).join(", ")}`);
+  console.log(`no test-only code in ${paths.length} path(s): ${paths.map((path) => basename(path)).join(", ")}`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -315,9 +315,12 @@ fn read_statement(path: &LocalDiskPath) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-/// Where the bundled PDFium library is: beside this executable, unless
-/// `BRIDGE_PDFIUM_LIBRARY` names an absolute path to it.
+/// Where the bundled PDFium library is: beside this executable. This crate's
+/// own unit tests may name another by an absolute path in
+/// `BRIDGE_PDFIUM_LIBRARY`; any other build has no such lookup, which
+/// `scripts/check-no-test-seam.mjs` proves on every shipped executable.
 fn pdfium_library() -> Result<PathBuf, String> {
+    #[cfg(test)]
     if let Some(path) = env::var_os("BRIDGE_PDFIUM_LIBRARY") {
         let path = PathBuf::from(path);
         return if path.is_absolute() {

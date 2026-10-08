@@ -6,7 +6,9 @@ import { join } from "node:path";
 import test from "node:test";
 import { deflateRawSync, gzipSync } from "node:zlib";
 import {
+  PDFIUM_OVERRIDE_MARKER,
   SEAM_MARKER,
+  TEST_ONLY_MARKERS,
   assertNoTestSeam,
   holdsMarker,
   markedFiles,
@@ -17,10 +19,12 @@ function scratch() {
   return mkdtempSync(join(tmpdir(), "bridge-seam-scan-"));
 }
 
+/** A fake executable holding every marker (`true`), none (`false`) or the ones listed. */
 function binary(path, withMarker) {
+  const markers = withMarker === true ? TEST_ONLY_MARKERS : withMarker || [];
   const bytes = Buffer.concat([
     Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00, 0xff]),
-    Buffer.from(withMarker ? `..${SEAM_MARKER}..` : "..no seam here..", "utf8"),
+    Buffer.from(markers.length > 0 ? markers.map((marker) => `..${marker}..`).join("") : "..no seam here..", "utf8"),
     Buffer.from([0x00, 0x01]),
   ]);
   writeFileSync(path, bytes);
@@ -35,11 +39,27 @@ test("the marker is the one the Rust seam carries", () => {
   assert.ok(source.includes(`const SEAM_MARKER: &str = "${SEAM_MARKER}";`));
 });
 
+test("the PDFium marker is the variable the Rust override reads, under bare cfg(test)", () => {
+  const source = readFileSync(new URL("../src-tauri/src/agent_bank_statement.rs", import.meta.url), "utf8");
+  const lookup = `env::var_os("${PDFIUM_OVERRIDE_MARKER}")`;
+  assert.equal(source.split(lookup).length - 1, 1, "one lookup of the override");
+  assert.ok(source.includes(`    #[cfg(test)]\n    if let Some(path) = ${lookup} {`));
+});
+
+test("each marker alone marks a binary, and the refusal names it", () => {
+  const directory = scratch();
+  for (const marker of TEST_ONLY_MARKERS) {
+    const file = binary(join(directory, marker), [marker]);
+    assert.equal(holdsMarker(file), true, marker);
+    assert.throws(() => assertNoTestSeam([file]), (error) => error.message.includes(`(${marker})`), marker);
+  }
+});
+
 test("a binary holding the marker is found, and one without it is not", () => {
   const directory = scratch();
   assert.equal(holdsMarker(binary(join(directory, "marked"), true)), true);
   assert.equal(holdsMarker(binary(join(directory, "clean"), false)), false);
-  assert.throws(() => assertNoTestSeam([join(directory, "marked")]), /approval seam compiled into/);
+  assert.throws(() => assertNoTestSeam([join(directory, "marked")]), /test-only code compiled into/);
   assert.doesNotThrow(() => assertNoTestSeam([join(directory, "clean")]));
 });
 
@@ -181,4 +201,8 @@ test("the command line fails on a marked binary and on a control that sees nothi
   assert.equal(run(clean, marked), 1);
   assert.equal(run("--expect-present", marked), 0);
   assert.equal(run("--expect-present", clean), 1);
+  // A control that sees only some of the test-only code proves nothing about the rest.
+  for (const marker of TEST_ONLY_MARKERS) {
+    assert.equal(run("--expect-present", binary(join(directory, `only-${marker}`), [marker])), 1, marker);
+  }
 });

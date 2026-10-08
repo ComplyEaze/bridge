@@ -117,7 +117,7 @@ to `true` or `1` is not asked.
     and the name as the statement prints it. A cash line the tool recognises, and
     a line it labels itself as bank charges, a card fee or an EMI, get no name; a
     line sent to suspense already carried the name. Vouchers already in Tally
-    keep their narration until you post or import an amendment of their batch.
+    keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
   - **What the new reads in 0.5.0 send, under each setting.** Under `none`

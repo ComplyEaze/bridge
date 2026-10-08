@@ -586,6 +586,29 @@ def test_account_identity_comes_from_the_statement(m):
 # numeric parsing                                                              #
 # --------------------------------------------------------------------------- #
 
+def test_an_sbi_name_field_that_prints_empty_is_unnamed_not_an_empty_party(m):
+    """The UPI, NEFT, RTGS and transfer shapes returned an empty party when the
+    name field was empty, blank or only hyphens (IMPS already returned UNNAMED).
+    An empty party matches no mapping row, so the suspense line named no one."""
+    sbi = m.SBI()
+    for narr, ref in (
+        ("TO TRANSFER-UPI/DR/5//ZZBK", ""),
+        ("TO TRANSFER-UPI/DR/5/ /ZZBK", ""),
+        ("TO TRANSFER-UPI/DR/5/-/ZZBK", ""),
+        ("TO TRANSFER-UPI/DR/5/", ""),
+        ("TO TRANSFER-NEFT*ZZBK0001*ZZ1**", ""),
+        ("NEFT*ZZBK0001*ZZ1*-", ""),
+        ("RTGS UTR NO: ZZBKR1234- ", ""),
+        ("TO TRANSFER-PAYMENT", "TRANSFER TO 123  / 456"),
+        ("TO TRANSFER-PAYMENT", "CT0 TRANSFER FROM 123   /"),
+    ):
+        row = {"narr": narr, "narr_spaced": narr, "ref": ref, "ref_spaced": ref}
+        assert sbi.party(row) == "UNNAMED", (narr, ref)
+    named = {"narr": "TO TRANSFER-UPI/DR/5/ACME EXPORTS/ZZBK", "ref": ""}
+    named["narr_spaced"], named["ref_spaced"] = named["narr"], ""
+    assert sbi.party(named) == "ACME EXPORTS"
+
+
 def test_hyphenated_counterparties_survive_every_narration_shape(m):
     """Every HDFC narration field is hyphen-delimited, so a counterparty called
     ACME-INDUSTRIES occupies two fields. Cutting at the first hyphen either

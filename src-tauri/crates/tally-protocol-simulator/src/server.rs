@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     io::{self, Read, Write},
     net::{Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
     sync::{
@@ -23,6 +24,28 @@ const MAX_REQUEST_BYTES: usize = 128 * 1024;
 /// A divided agent read replayed end to end (bridge#520) is about ninety legs:
 /// six per paired read, plus the identity and ledger legs around them.
 pub const MAX_SEQUENCE_REQUESTS: usize = 128;
+
+/// The payload of the `TimedOut` error returned when no request reached a plan
+/// within the accept deadline: `plan` is its zero-based place in a sequence of
+/// `plans`. A test failing here names the scripted request its client never
+/// sent (#1248), not only that one is missing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NoRequestForPlan {
+    pub plan: usize,
+    pub plans: usize,
+}
+
+impl fmt::Display for NoRequestForPlan {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "simulator received no request for plan {} of {} (zero-based)",
+            self.plan, self.plans
+        )
+    }
+}
+
+impl std::error::Error for NoRequestForPlan {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObservedRequest {
@@ -130,7 +153,15 @@ impl SequenceSimulator {
         // As in `Simulator::spawn`: no wait for the worker to start (#1248).
         let worker = thread::Builder::new()
             .name("tally-protocol-sequence-simulator".to_owned())
-            .spawn(move || serve_sequence(listener, plans, worker_cancelled, worker_received))?;
+            .spawn(move || {
+                serve_sequence(
+                    listener,
+                    plans,
+                    worker_cancelled,
+                    worker_received,
+                    ACCEPT_DEADLINE,
+                )
+            })?;
         Ok(Self {
             address,
             cancelled,
@@ -206,7 +237,15 @@ fn serve_once(
     plan: ScenarioPlan,
     cancelled: Arc<AtomicBool>,
 ) -> io::Result<ObservedRequest> {
-    serve_request(&listener, plan, &cancelled, &AtomicUsize::new(0))
+    let unanswered = NoRequestForPlan { plan: 0, plans: 1 };
+    serve_request(
+        &listener,
+        plan,
+        &cancelled,
+        &AtomicUsize::new(0),
+        unanswered,
+        ACCEPT_DEADLINE,
+    )
 }
 
 fn serve_sequence(
@@ -214,13 +253,26 @@ fn serve_sequence(
     plans: Vec<ScenarioPlan>,
     cancelled: Arc<AtomicBool>,
     received: Arc<AtomicUsize>,
+    accept_deadline: Duration,
 ) -> io::Result<Vec<ObservedRequest>> {
-    let mut observed = Vec::with_capacity(plans.len());
-    for plan in plans {
+    let plans_len = plans.len();
+    let mut observed = Vec::with_capacity(plans_len);
+    for (index, plan) in plans.into_iter().enumerate() {
         if cancelled.load(Ordering::Acquire) {
             break;
         }
-        observed.push(serve_request(&listener, plan, &cancelled, &received)?);
+        let unanswered = NoRequestForPlan {
+            plan: index,
+            plans: plans_len,
+        };
+        observed.push(serve_request(
+            &listener,
+            plan,
+            &cancelled,
+            &received,
+            unanswered,
+            accept_deadline,
+        )?);
     }
     Ok(observed)
 }
@@ -230,17 +282,16 @@ fn serve_request(
     plan: ScenarioPlan,
     cancelled: &AtomicBool,
     received: &AtomicUsize,
+    unanswered: NoRequestForPlan,
+    accept_deadline: Duration,
 ) -> io::Result<ObservedRequest> {
     let started = Instant::now();
     let (mut stream, request) = loop {
         let (mut stream, _) = match listener.accept() {
             Ok(accepted) => accepted,
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                if started.elapsed() >= ACCEPT_DEADLINE {
-                    return Err(io::Error::new(
-                        io::ErrorKind::TimedOut,
-                        "simulator received no request",
-                    ));
+                if started.elapsed() >= accept_deadline {
+                    return Err(io::Error::new(io::ErrorKind::TimedOut, unanswered));
                 }
                 thread::sleep(Duration::from_millis(2));
                 continue;

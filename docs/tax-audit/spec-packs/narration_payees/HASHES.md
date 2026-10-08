@@ -1,8 +1,9 @@
 # Hashes and provenance: the `narration_payees` spec pack
 
-Each book here is invented, with synthetic ledger names, payee names taken from the Greek alphabet
-and from trees, and made-up bank-style tokens: no book is a Tally read of any real assessee, no
-narration is a line of any bank statement, and no figure or name comes from either.
+Each book here is invented, with synthetic ledger names, payee names taken from the Greek alphabet,
+from trees or built from the reader's own words, and made-up bank-style tokens: no book is a Tally
+read of any real assessee, no narration is a line of any bank statement, and no figure or name comes
+from either.
 
 ## What these files establish, and what they do not
 
@@ -34,11 +35,15 @@ narration is a line of any bank statement, and no figure or name comes from eith
 
 ## Which rules the goldens pin
 
-Each rule below was changed alone, in a copy of the reference test or of its narration reader held
-in memory (the reference itself was not edited), and every book was run again; the books named are
-those whose `narration_payees` golden then changed. The unchanged copies reproduced every golden
-first. No `tds_payees` golden changed under any row. A port that gets one of these rules wrong fails
-at least one golden. 212 rules are listed.
+Each rule below was changed alone, in a copy of the reference test or of its narration reader held in
+memory (the reference itself was not edited), and every book was run again; the books named are those
+whose `narration_payees` golden then changed. The unchanged copies reproduced every golden first. No
+`tds_payees` golden changed under any row. A port that gets one of these rules wrong fails at least one
+golden. 226 rules are listed. The 26 rows marked † (the cheque prefix, the two refused cheque
+beginnings, a channel word in a name's place, and two older rows whose books this change moved) were
+measured at commit `2b329354` on the books as they are now; every other row was measured at commit
+`ee17d80f`, before `np_forms` and `np_unread` changed (README sections 3.1 and 3.2), and was not run
+again.
 
 ### Reading a name out of a narration
 
@@ -47,13 +52,13 @@ at least one golden. 212 rules are listed.
 | narration not upper-cased | `np_forms`, `np_handles`, `np_text`, `np_unread` |
 | whitespace runs not collapsed | `np_forms`, `np_text` |
 | only ASCII whitespace collapsed | `np_text` |
-| first UPI layout found anywhere in the narration, not only at its start | `np_forms`, `np_text`, `np_unread` |
+| first UPI layout found anywhere in the narration, not only at its start † | `np_text`, `np_unread` |
 | IMPS found anywhere in the narration | `np_unread` |
 | NEFT found anywhere in the narration | `np_unread` |
 | second UPI layout found anywhere in the narration | `np_unread` |
 | cheque found anywhere in the narration | `np_text`, `np_unread` |
 | only the letters a to z upper-cased | `np_text` |
-| UPI and IMPS name: a space before the closing hyphen kept | `np_forms` |
+| UPI and IMPS name: a space before the closing hyphen kept † | `np_forms`, `np_unread` |
 | NEFT name: a space before the closing hyphen kept | `np_forms` |
 | UPI name: an underscore allowed | `np_unread` |
 | UPI name: digits not allowed | `np_forms` |
@@ -90,6 +95,15 @@ at least one golden. 212 rules are listed.
 | NEFT: the code skipped | `np_unread` |
 | NEFT name: no closing hyphen needed | `np_unread` |
 | NEFT and RTGS reported as one channel | `np_forms` |
+| first UPI layout and IMPS: a channel word read as a name † | `np_unread` |
+| NEFT and RTGS: a channel word read as a name † | `np_unread` |
+| channel words: UPI not one † | `np_unread` |
+| channel words: IMPS not one † | `np_unread` |
+| channel words: NEFT not one † | `np_unread` |
+| channel words: RTGS not one † | `np_unread` |
+| first UPI layout and IMPS: a name that begins with a channel word refused † | `np_forms` |
+| NEFT and RTGS: a name that begins with a channel word refused † | `np_forms` |
+| first UPI layout and IMPS: the channel word compared before the space before the hyphen is removed † | `np_unread` |
 | second UPI layout: no space allowed after TO TRANSFER- | `np_forms` |
 | second UPI layout: a space allowed before the hyphen | `np_unread` |
 | second UPI layout: CR read too | `np_unread` |
@@ -110,10 +124,13 @@ at least one golden. 212 rules are listed.
 | second UPI layout: a letter of any script is enough | `np_text` |
 | second UPI layout: a name with a character outside ASCII not read | `np_text` |
 | second UPI layout: every character must be a letter | `np_forms`, `np_text` |
-| cheque: the WITHDRAWAL BY prefix kept as part of the name | `np_forms`, `np_unread` |
-| cheque: only the full spelling WITHDRAWAL | `np_forms` |
-| cheque: the prefix needs no space after BY | `np_forms` |
-| cheque: the prefix must be followed by a name (no falling back) | `np_forms` |
+| second UPI layout: a channel word refused as the name too † | `np_forms` |
+| cheque: the WITHDRAWAL BY prefix kept as part of the name † | `np_forms`, `np_unread` |
+| cheque: only the full spelling WITHDRAWAL † | `np_forms` |
+| cheque: the prefix must be followed by a space † | `np_unread` |
+| cheque: the prefix may be followed by a letter † | `np_forms` |
+| cheque: a full stop after the prefix taken as part of a word † | `np_unread` |
+| cheque: read again from the start when nothing readable follows the prefix † | `np_unread` |
 | cheque name: digits allowed | `np_unread` |
 | cheque name: an ampersand allowed | `np_unread` |
 | cheque name: an apostrophe allowed | `np_unread` |
@@ -126,12 +143,14 @@ at least one golden. 212 rules are listed.
 | cheque: the hyphen not needed | `np_unread` |
 | cheque: CHQ PAID must end a word | `np_forms` |
 | cheque: CHQ and any word | `np_unread` |
-| cheque: a name starting with SELF read | `np_unread` |
-| cheque: a name starting with CASH PAID TO read | `np_unread` |
-| cheque: only the exact names SELF and CASH PAID TO refused | `np_unread` |
-| cheque: SELF refused as a whole word only | `np_unread` |
-| cheque: CASH PAID refused without TO | `np_forms` |
-| cheque: SELF refused anywhere in the name | `np_forms` |
+| cheque: a name starting with SELF read † | `np_unread` |
+| cheque: a name starting with CASH PAID TO read † | `np_unread` |
+| cheque: only the exact names SELF and CASH PAID TO refused † | `np_unread` |
+| cheque: SELF and CASH PAID TO refused by their first characters, not as words † | `np_forms` |
+| cheque: CASH PAID refused without TO † | `np_forms` |
+| cheque: SELF refused anywhere in the name † | `np_forms` |
+| cheque: a full stop after SELF or CASH PAID TO taken as part of a word † | `np_unread` |
+| cheque: a channel word refused as the name too † | `np_forms` |
 | cheque channel named CHEQUE | `np_forms` |
 
 ### Reading a UPI handle
@@ -311,7 +330,7 @@ in a cut payment's name when a cut handle is completed.
 
 ## How the goldens were produced
 
-At the reference engine (a private repository), commit `ee17d80f`, under Python 3.13, with the
+At the reference engine (a private repository), commit `2b329354`, under Python 3.13, with the
 crate's `parity/edge_golden.py`, which is in this repository under its Apache-2.0 licence and has no
 runner for this test. The goldens were made with that file extended by the runner README section 16
 gives as text; the extended file is held by the reference's maintainers and is not part of this
@@ -326,7 +345,10 @@ every book also names `tds_payees`. Run from `src-tauri/crates/bridge-tax-audit`
         BOOK.json OUTDIR
 
 Each run writes `OUTDIR/edge.<book>.tds_payees.json` and `OUTDIR/edge.<book>.narration_payees.json`.
-Running every book a second time, into a new directory, reproduced every golden byte for byte. As a
+Running every book a second time, into a new directory, reproduced every golden byte for byte. The pack
+was first made at commit `ee17d80f`. Commit `2b329354` changed the narration reader (README sections
+3.1 and 3.2), and `np_forms` and `np_unread` were rebuilt for it; at `2b329354` the other 35 goldens are
+byte-identical to those first made. As a
 control, the extended file reproduced the crate's committed `edge.tds_payees_goods_and_cash.tds_payees.json`
 and `edge.cc_shared_guid.counter_cheques_40a3.json` byte for byte.
 
@@ -347,7 +369,7 @@ byte-identical both times, and the same extended file reproduced the crate's com
 | `np_else_single.json` | 3,334 | `7f478c33d09089d054036ece23c2f8399dd06dd621509fd9785dc90c36b8ff2b` | `books/np_else_single.json` |
 | `np_elsewhere.json` | 10,061 | `e982da7454037ac9d01def4416c358ba37104e2ebf6a33c6500918de28e7f930` | `books/np_elsewhere.json` |
 | `np_empty.json` | 1,890 | `24bda688017fc655b0c6bb08634f782023f2a8cef25d95b2e1ff01d265c9b71d` | `books/np_empty.json` |
-| `np_forms.json` | 13,426 | `dc89980cd5d344a8b1696effcdb8cb12dfff4a9dea140a915ef535b7d2d3d33b` | `books/np_forms.json` |
+| `np_forms.json` | 14,738 | `7383987cfe5cad2323c50ad670d7a9d7d8fb7b71ea13c9abf695bad82ddd417f` | `books/np_forms.json` |
 | `np_handles.json` | 14,592 | `3e5f06e621ec6da32da26e6618c0b338729a81c63aecb9cfe0908d8da399480d` | `books/np_handles.json` |
 | `np_names.json` | 4,224 | `314657c4f0d8fc67745f1c87ccc53e2e5cee72a0d62bab9d61d425cf8e5e7339` | `books/np_names.json` |
 | `np_outside.json` | 6,097 | `62ee16b431d9e3cc9601b50007d8cbae361e1e916d774a8a7c1421f9a530c815` | `books/np_outside.json` |
@@ -357,7 +379,7 @@ byte-identical both times, and the same extended file reproduced the crate's com
 | `np_shared_guid.json` | 7,865 | `1054b54261cb8285fdb1aa69a79afe44078ae2b1cd8a91e0e30da00789f614e1` | `books/np_shared_guid.json` |
 | `np_single.json` | 4,190 | `9f3e0290c19d31fea979348e2264df6b5d72c3c8b8dda8bf90f81475bc83c189` | `books/np_single.json` |
 | `np_text.json` | 11,905 | `51aafced4b7f66c6c3329caa36d215702d534df6d6ddbc8288dab3521bb91653` | `books/np_text.json` |
-| `np_unread.json` | 15,939 | `8cb9f8ae93c562c2cd870887b5a1819ef43eead224db5c9010bbb8c9c18c140a` | `books/np_unread.json` |
+| `np_unread.json` | 17,781 | `d5abfdf691c70b40de67f33460e605b61f1bfd3ca75add2d0f3f133183336577` | `books/np_unread.json` |
 | `edge.np_added.narration_payees.json` | 17,492 | `06c065fc9c84fe4553117d708bfe5e0d2701bc5265b275c5ef62be85b4544e2a` | `goldens/edge.np_added.narration_payees.json` |
 | `edge.np_added.tds_payees.json` | 23,458 | `c9f268881dc9ccd667f1d7428fca26634ec2879d6069c9d98b26719f827bdb0b` | `goldens/edge.np_added.tds_payees.json` |
 | `edge.np_aggregate.narration_payees.json` | 16,499 | `609c3ada203169cec24b8619b79ec21f90e8d34af4d303ca6614005de65e0463` | `goldens/edge.np_aggregate.narration_payees.json` |
@@ -372,7 +394,7 @@ byte-identical both times, and the same extended file reproduced the crate's com
 | `edge.np_elsewhere.tds_payees.json` | 16,342 | `10e473aaafd51d2074c50a3d20dbb11e4e657120c59278ca6655b147665ef65f` | `goldens/edge.np_elsewhere.tds_payees.json` |
 | `edge.np_empty.narration_payees.json` | 5,861 | `58cb45bbb2afd1ccd63b9b94efc81dd009301cacb7f067dd641e5619b083a1b5` | `goldens/edge.np_empty.narration_payees.json` |
 | `edge.np_empty.tds_payees.json` | 16,223 | `6e25a43a42bfa24d128ea99fc1984f21bc196fe499de69e6f4a6c935aeab3517` | `goldens/edge.np_empty.tds_payees.json` |
-| `edge.np_forms.narration_payees.json` | 50,233 | `97b95af16c506581efadc91c2233e0a24af7f4f51b9a474c73235dd85c76c8d8` | `goldens/edge.np_forms.narration_payees.json` |
+| `edge.np_forms.narration_payees.json` | 56,666 | `dcd5451e6254837a49cc0043bdb47b57af7d77dd54d1c5bce3fd363efe56be85` | `goldens/edge.np_forms.narration_payees.json` |
 | `edge.np_forms.tds_payees.json` | 16,223 | `6e25a43a42bfa24d128ea99fc1984f21bc196fe499de69e6f4a6c935aeab3517` | `goldens/edge.np_forms.tds_payees.json` |
 | `edge.np_handles.narration_payees.json` | 81,889 | `9a354cad474091d979eae7556f632a1bc7719f40da6a6a74cdd19405d2dcbbbe` | `goldens/edge.np_handles.narration_payees.json` |
 | `edge.np_handles.tds_payees.json` | 16,223 | `6e25a43a42bfa24d128ea99fc1984f21bc196fe499de69e6f4a6c935aeab3517` | `goldens/edge.np_handles.tds_payees.json` |
@@ -392,6 +414,6 @@ byte-identical both times, and the same extended file reproduced the crate's com
 | `edge.np_single.tds_payees.json` | 16,223 | `6e25a43a42bfa24d128ea99fc1984f21bc196fe499de69e6f4a6c935aeab3517` | `goldens/edge.np_single.tds_payees.json` |
 | `edge.np_text.narration_payees.json` | 34,529 | `8d8e495fee0e27c45fd8fea63e5b76eeb1cccd3cffa0f329e7616c2e78d0f63b` | `goldens/edge.np_text.narration_payees.json` |
 | `edge.np_text.tds_payees.json` | 16,223 | `6e25a43a42bfa24d128ea99fc1984f21bc196fe499de69e6f4a6c935aeab3517` | `goldens/edge.np_text.tds_payees.json` |
-| `edge.np_unread.narration_payees.json` | 21,495 | `b1532f6150aa5e24fc7c1bb4c4a6fb1e4fc74902ba4a4a007bcd889b2df1e888` | `goldens/edge.np_unread.narration_payees.json` |
+| `edge.np_unread.narration_payees.json` | 23,176 | `2b6d79a211bd70be8a38f562656027da425470bced6042c7d88b00ef09859afd` | `goldens/edge.np_unread.narration_payees.json` |
 | `edge.np_unread.tds_payees.json` | 16,223 | `6e25a43a42bfa24d128ea99fc1984f21bc196fe499de69e6f4a6c935aeab3517` | `goldens/edge.np_unread.tds_payees.json` |
 | `synthetic.narration_payees.json` | 6,417 | `a3cb127263b6c64e381d0a7e576f6976a98a598e85063d40b02d597739350ef6` | `goldens/synthetic.narration_payees.json` |

@@ -464,7 +464,7 @@ fn a_batch_mixing_the_two_rendered_shapes_is_refused() {
     mixed.vouchers[0].voucher_type = VoucherType::Journal;
     mixed.vouchers[1].voucher_type = VoucherType::Payment;
     assert_eq!(
-        validate_payload(&mixed),
+        payload_verdict(&mixed),
         Err("voucher_type_shapes_mixed".to_string())
     );
     // Within a family, mixing stays allowed in both directions.
@@ -1255,7 +1255,7 @@ async fn a_bank_voucher_carrying_a_reference_is_refused_before_any_read() {
     journal.voucher_type = VoucherType::Journal;
     journal.reference = Some("JV-REF".into());
     assert_eq!(
-        validate_payload(&ImportPayload {
+        payload_verdict(&ImportPayload {
             company_guid: GUID.into(),
             vouchers: vec![journal],
             amends_batch_id: None,
@@ -1328,7 +1328,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
         VoucherType::Receipt,
         VoucherType::Contra,
     ] {
-        let mut voucher = payload().vouchers.remove(0);
+        let mut voucher = admitted_payload().vouchers.remove(0);
         voucher.voucher_type = voucher_type.clone();
         voucher.voucher_number = None;
         let line = ImportLedgerLine {
@@ -1342,8 +1342,8 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
             company_guid: GUID.into(),
             company: None,
             txn_ids: vec![voucher.bridge_txn_id.clone()],
-            date_from: "20260901".into(),
-            date_to: "20260901".into(),
+            date_from: stored_date("20260901"),
+            date_to: stored_date("20260901"),
             sha256: "hash".into(),
             built_at: now(),
             status: "built".into(),
@@ -1372,7 +1372,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
             guid: Some("guid-bank".into()),
             master_id: Some("41".into()),
             alter_id: Some(63),
-            date: Some(normalized_date(&voucher.date).unwrap().as_str().to_string()),
+            date: Some(voucher.date.as_str().to_owned()),
             voucher_type: Some(voucher_type.as_str().into()),
             narration: Some(format!("[BRIDGE:{}]", voucher.bridge_txn_id)),
             // Tally's own number, which Bridge never sent and must not compare.

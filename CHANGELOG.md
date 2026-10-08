@@ -12,6 +12,8 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+- The import journal (`agent-import-ledger.jsonl`) is now read with each of its dates as a checked date: a record holding a date that is not `YYYYMMDD` refuses the whole journal (`import_ledger_invalid`), which stops building, posting, verifying and reconciling every batch and the desktop journal screen, and the local data report shows the journal as not read, until the record is put right. No release has written such a date, so only a record edited by hand can hold one, and the stored bytes do not change (#1307).
+
 ## [0.5.0] - 2026-10-08
 
 ### In plain words: ComplyEaze Bridge 0.5.0, since 0.4.2 (3 Oct 2026)

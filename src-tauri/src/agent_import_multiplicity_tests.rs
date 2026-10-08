@@ -1,7 +1,7 @@
 use super::*;
 
 fn identical_batch() -> (ImportLedgerLine, Vec<ReadVoucher>) {
-    let first = payload().vouchers.remove(0);
+    let first = admitted_payload().vouchers.remove(0);
     let mut second = first.clone();
     second.bridge_txn_id = "txn-identical".into();
     let vouchers = vec![first, second];
@@ -13,7 +13,7 @@ fn identical_batch() -> (ImportLedgerLine, Vec<ReadVoucher>) {
             guid: Some(format!("guid-{index}")),
             master_id: Some(index.to_string()),
             alter_id: Some(11 + index as u64),
-            date: Some(normalized_date(&voucher.date).unwrap().as_str().to_string()),
+            date: Some(voucher.date.as_str().to_owned()),
             voucher_type: Some(voucher.voucher_type.as_str().into()),
             narration: Some(format!("[BRIDGE:{}]", voucher.bridge_txn_id)),
             voucher_number: None,
@@ -45,8 +45,8 @@ fn identical_batch() -> (ImportLedgerLine, Vec<ReadVoucher>) {
         company_guid: GUID.into(),
         company: None,
         txn_ids: vouchers.iter().map(|v| v.bridge_txn_id.clone()).collect(),
-        date_from: "20260901".into(),
-        date_to: "20260901".into(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".into(),
         built_at: now(),
         status: "built".into(),

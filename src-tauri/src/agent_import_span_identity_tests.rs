@@ -58,7 +58,7 @@ fn sent() -> Vec<ImportVoucher> {
     use VoucherType::{Contra, Payment, Receipt};
     let v = |n: usize, voucher_type, narration: &str, entries| ImportVoucher {
         bridge_txn_id: format!("span-{n:02}"),
-        date: "2026-07-10".into(),
+        date: bridge_tally_core::TallyDate::parse("20260710").unwrap(),
         voucher_type,
         narration: Some(narration.into()),
         reference: None,
@@ -627,7 +627,7 @@ fn sent_journals() -> Vec<ImportVoucher> {
     use EntrySide::{Cr, Dr};
     let v = |n: usize, narration: &str, entries| ImportVoucher {
         bridge_txn_id: format!("journal-{n:02}"),
-        date: "2026-07-11".into(),
+        date: bridge_tally_core::TallyDate::parse("20260711").unwrap(),
         voucher_type: VoucherType::Journal,
         narration: Some(narration.into()),
         reference: None,

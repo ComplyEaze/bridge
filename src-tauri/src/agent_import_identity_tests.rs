@@ -148,7 +148,7 @@ fn namespaced_journal_roundtrips_derived_attribution_and_rejects_unknown_scheme(
 
 #[test]
 fn renderer_uses_one_derived_identity_for_remote_id_and_marker() {
-    let mut input = payload();
+    let mut input = admitted_payload();
     input.vouchers[0].voucher_number = Some("CLIENT-42".into());
     let mut renderings = Vec::new();
     for batch_id in ["batch-one", "batch-two"] {

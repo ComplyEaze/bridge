@@ -466,6 +466,10 @@
       "reason": "binds a native post's vouchers to the Tally vouchers its own POST created; a change there can attribute a posted voucher to the wrong Tally object, which is a false posted_verified"
     },
     {
+      "path": "src-tauri/src/agent_import_stop.rs",
+      "reason": "decides when a person's release lifts the stop a sent Sales invoice puts on its company, and what it records about the invoice; a defect there lets a second invoice post behind an unverified one, or drops a possibly posted invoice from the number control"
+    },
+    {
       "path": "src-tauri/src/agent_import_verification.rs"
     },
     {

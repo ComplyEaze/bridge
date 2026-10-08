@@ -1,0 +1,10 @@
+docs/adr/0004-tally-write-safety.md
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_import.rs
+src-tauri/src/agent_import_ack.rs
+src-tauri/src/agent_import_ledger.rs
+src-tauri/src/agent_import_post.rs
+src-tauri/src/agent_import_stop.rs
+src-tauri/src/tally/approved_import.rs
+reviewer: lamemustafa

@@ -489,6 +489,11 @@ pub(crate) enum UnderLockRefusal {
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
+    /// Another invoice of this company was sent and is not verified posted, as
+    /// an approval dialog stood open (ADR 0004, slice 4): nothing was recorded
+    /// or sent.
+    #[error("invoice_company_stopped")]
+    CompanyStopped,
 }
 
 impl UnderLockRefusal {
@@ -501,6 +506,7 @@ impl UnderLockRefusal {
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
+            Self::CompanyStopped => "invoice_company_stopped",
         }
     }
 }

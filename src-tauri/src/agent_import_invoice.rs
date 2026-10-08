@@ -1256,6 +1256,16 @@ impl super::super::Server {
             .map(|entry| entry.ledger.clone())
             .ok_or_else(|| refused(refuse("invoice_party_missing")))?;
 
+        // A sent invoice of this company that is not verified posted stops
+        // every further invoice until a person releases it (ADR 0004, slice
+        // 4). Asked first, from the journal alone, so a stopped company costs
+        // Tally no request; the post asks again under its lock.
+        if let Some(batch_id) = self
+            .import_invoice_stop(identity.company_guid())
+            .map_err(|_| failed("invoice_stop_unreadable"))?
+        {
+            return Err(refused(refuse_value("invoice_company_stopped", &batch_id)));
+        }
         // 0. Refuse large books: the whole ledger compliance listing is read
         // three times for one invoice (build, before the dialog, after it).
         let (mark, mark_evidence) = self

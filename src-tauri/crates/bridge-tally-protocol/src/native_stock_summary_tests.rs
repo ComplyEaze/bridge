@@ -2362,8 +2362,9 @@ fn no_quantity_of_the_eleven_item_capture_agrees_because_its_report_lists_only_g
 #[test]
 fn an_item_inside_a_group_of_its_own_name_gets_no_quantity_from_the_groups_line() {
     // A line that carries an item's name, unit, quantity and amount is not the item's when
-    // the item's own parent is a stock group: the report lists only what sits directly
-    // under the root, so that line is a group's. An edit of the captured row's PARENT.
+    // the item's own parent is a stock group: in the captures the report listed only what
+    // sits directly under the root, so that line is read as a group's. An edit of the
+    // captured row's PARENT.
     let in_a_group = replaced(
         &sale_items(),
         "<PARENT TYPE=\"String\">&#4; Primary</PARENT>",

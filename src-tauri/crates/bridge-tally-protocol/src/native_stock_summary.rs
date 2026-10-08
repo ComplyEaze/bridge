@@ -189,8 +189,9 @@ impl NativeQuantityRead {
 /// Whether a closing quantity is returned, and why not when it is not. A
 /// quantity leaves Bridge only where Tally's own plain Stock Summary shows the
 /// same item by name with the same quantity and the same amount (`Agreed`); the
-/// report is the only second source, and it has a line only for what sits
-/// directly under the root (§12a.13).
+/// report is the only second source, and in the captures it had a line only for
+/// what sits directly under the root (§12a.13; no capture yet holds a group and
+/// an item under the root side by side).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NativeQuantityAgreement {
     /// The rows as parsed: nothing has compared them with the report yet.
@@ -204,9 +205,10 @@ pub enum NativeQuantityAgreement {
     /// with a space in it).
     Unread,
     /// The item's own `PARENT` is not the root (a stock group; any other text
-    /// gets this state too, which only withholds), so it cannot have a line of
-    /// its own in a report that lists only what sits directly under the root. A
-    /// line that carries its name belongs to something else (a group of that name).
+    /// gets this state too, which only withholds), so it is taken to have no line
+    /// of its own: in the captures the report listed only what sits directly
+    /// under the root. A line that carries its name is read as something else's
+    /// (a group of that name).
     InsideStockGroup,
     /// The item sits directly under the root and no line of the report carries its
     /// name: it has nothing to show, or the report shows it under another name (an
@@ -1273,18 +1275,20 @@ pub fn gate_stock_summary(
 /// Whether an item's closing quantity may be returned: only where exactly one
 /// line of Tally's plain Stock Summary carries the item's name and agrees with
 /// the item on the unit, the quantity and the amount (two empty amounts agree).
-/// The report lists only what sits directly under the root: an item inside a
-/// stock group, one with nothing to show, or one the report names differently
-/// has no line of its own, so such an item's quantity is not returned.
+/// In the captures the report listed only what sits directly under the root, so
+/// an item inside a stock group is taken to have no line of its own; one with
+/// nothing to show, or one the report names differently, has none either, and
+/// such an item's quantity is not returned.
 fn agreement_of(item: &NativeStockItem, lines: &[NativeReportLine]) -> NativeQuantityAgreement {
     let own = match &item.closing.quantity {
         NativeQuantityRead::Empty => return NativeQuantityAgreement::NoneSent,
         NativeQuantityRead::Unread => return NativeQuantityAgreement::Unread,
         NativeQuantityRead::Read(quantity) => quantity,
     };
-    // The plain report lists only what sits directly under the root. An item inside a
-    // stock group has no line of its own, whatever a line of the same name shows: that
-    // line is the group's (§12a.13). A parent that was not sent proves neither.
+    // In the captures the plain report listed only what sits directly under the root, so
+    // an item inside a stock group is taken to have no line of its own, whatever a line of
+    // the same name shows: that line is read as the group's (§12a.13). A parent that was
+    // not sent proves neither.
     match item.parent.as_deref() {
         Some(parent) if !crate::is_tally_reserved_root(parent) => {
             return NativeQuantityAgreement::InsideStockGroup

@@ -654,6 +654,11 @@ fn a_proof_name_parses_only_its_own_shape() {
         text.to_uppercase(),
         text.replacen('.', "/", 1),
         format!("{}.{}", &text[..19], "0".repeat(63)),
+        // A letter in place of a digit, at each end of the date and of the time.
+        format!("a{}", &text[1..]),
+        format!("{}a{}", &text[..7], &text[8..]),
+        format!("{}a{}", &text[..9], &text[10..]),
+        format!("{}a{}", &text[..17], &text[18..]),
     ] {
         assert!(ledger::ProofName::try_from(bad.clone()).is_err(), "{bad}");
     }

@@ -17,7 +17,9 @@ pub(super) const MAX_BATCH_POST_VOUCHERS: usize = 50;
 /// its JSON, written `<UTC stamp>.<sha256>`, so a person listing the folder
 /// sees the pairs in the order they were saved. Constructed only from a
 /// proof's own bytes or parsed whole, so a journal record or a file name
-/// can never carry a path (#911).
+/// can never carry a path (#911). The digest is the JSON's, and only the
+/// JSON is read back and checked against it; nothing in ComplyEaze Bridge
+/// reads the `.md` back.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub(super) struct ProofName {

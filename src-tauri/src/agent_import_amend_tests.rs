@@ -1095,6 +1095,12 @@ fn the_build_whose_record_equals_the_book_admits_even_when_not_first() {
     assert_eq!(refused[0]["reason"], "voucher_never_verified");
 }
 
+// Unix only: the stage takes a fresh name on each write, so the only failure a
+// test can cause before the rename is a folder that refuses new files. On
+// Windows that needs an access-control change, and this crate builds
+// windows-sys without its security API. On every platform,
+// a_record_written_once_is_whole_alone_and_never_replaced shows that the write
+// never replaces a record already there.
 #[cfg(unix)]
 #[test]
 fn a_failed_baseline_write_leaves_the_previous_file_whole() {

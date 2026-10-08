@@ -1571,8 +1571,10 @@ that turns that on.
    (`<batch>.proof.<time saved>.<SHA-256>.json` and `.md`) beside every earlier
    one, and appends the verification status, which names that pair current, to
    the local import ledger. No file is replaced: the journal decides which pair
-   is current. Every pair is kept until you delete it; nothing in ComplyEaze
-   Bridge deletes one. A batch last verified by an earlier build keeps its
+   is current. The SHA-256 in the name is the JSON's, and only the JSON is read
+   back and checked against it; the `.md` is a copy for people to read, and
+   ComplyEaze Bridge never reads it back. Every pair is kept until you delete
+   it; nothing in ComplyEaze Bridge deletes one. A batch last verified by an earlier build keeps its
    single `<batch>.proof.json`, which no longer changes. It compares the
    date, voucher type and entries; it does **not** compare `EFFECTIVEDATE` or
    `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see

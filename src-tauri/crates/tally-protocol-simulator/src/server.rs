@@ -3,7 +3,7 @@ use std::{
     net::{Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        mpsc, Arc,
+        Arc,
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -75,16 +75,11 @@ impl Simulator {
         debug_assert!(address.ip().is_loopback());
         let cancelled = Arc::new(AtomicBool::new(false));
         let worker_cancelled = Arc::clone(&cancelled);
-        let (ready_tx, ready_rx) = mpsc::channel();
+        // No wait for the worker to start: the listener is already bound, so a
+        // connection made before the worker runs waits in the backlog (#1248).
         let worker = thread::Builder::new()
             .name("tally-protocol-simulator".to_owned())
-            .spawn(move || {
-                let _ = ready_tx.send(());
-                serve_once(listener, plan, worker_cancelled)
-            })?;
-        ready_rx
-            .recv_timeout(Duration::from_secs(1))
-            .map_err(|_| io::Error::other("simulator worker did not become ready"))?;
+            .spawn(move || serve_once(listener, plan, worker_cancelled))?;
         Ok(Self {
             address,
             cancelled,
@@ -132,16 +127,10 @@ impl SequenceSimulator {
         let worker_cancelled = Arc::clone(&cancelled);
         let received = Arc::new(AtomicUsize::new(0));
         let worker_received = Arc::clone(&received);
-        let (ready_tx, ready_rx) = mpsc::channel();
+        // As in `Simulator::spawn`: no wait for the worker to start (#1248).
         let worker = thread::Builder::new()
             .name("tally-protocol-sequence-simulator".to_owned())
-            .spawn(move || {
-                let _ = ready_tx.send(());
-                serve_sequence(listener, plans, worker_cancelled, worker_received)
-            })?;
-        ready_rx
-            .recv_timeout(Duration::from_secs(1))
-            .map_err(|_| io::Error::other("simulator sequence worker did not become ready"))?;
+            .spawn(move || serve_sequence(listener, plans, worker_cancelled, worker_received))?;
         Ok(Self {
             address,
             cancelled,

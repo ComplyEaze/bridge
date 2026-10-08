@@ -315,11 +315,17 @@ request is predicted over a budget well below the cap.
 - **A mark that is loose as a density prior.** On the inventory-heavy book the mark was ten times the
   voucher count. It is still a correct upper bound; it only makes the whole-book shortcut rarer.
 - **The empty-window corroboration reuses the first read's marks.** Its widened read (±1 day) opens
-  on the marks the window's own read observed. Only when that widened read is itself divided is it
-  bracketed, and then a change anywhere in the company between the two reads refuses it. An undivided
-  widened read is not bracketed; there, a voucher in the window refuses the read as
-  `window_contradicted`, and otherwise the empty result is corroborated or reported partial by the
-  existing empty-window control, exactly as before the bound.
+  on the marks the window's own read observed. On a book large enough to be counted it is a census of
+  its own and no read of the widened window's vouchers (#1240): the census carries each voucher's day,
+  which is all the control needs. A census sent in several requests is bracketed, and then a change
+  anywhere in the company since the marks the first read opened on refuses it; one sent in a single
+  request is not. A book that fits one request is read whole, uncounted, as before. Either way a voucher in the
+  window refuses the read as `window_contradicted`, and otherwise the empty result is corroborated or
+  reported partial by the existing empty-window control. **Confidence: PARTIAL**: the request counts are
+  from scripted doubles through the tool call, not from a live Tally; for a neighbour-empty widened window
+  the census replaces one paired window read and so saves six requests, and with vouchers on the
+  neighbouring days it saves every part those days would have taken. The saving is counted in requests;
+  the bytes of a census and of the parts it replaces were not compared.
 - **AlterID 0.** Every span starts above an exclusive lower bound of 0, so a voucher with AlterID 0
   could not be read by a divided day. None has been observed; a census row carrying AlterID 0 is
   refused rather than planned around.

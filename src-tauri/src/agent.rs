@@ -2569,16 +2569,18 @@ fn window_honoured(rows: &[Value], from: &str, to: &str) -> bool {
     })
 }
 
-fn corroborate_empty_voucher_window(
-    widened_rows: &[Value],
-    from: &str,
-    to: &str,
+/// What the widened read found, as the two facts the corroboration needs: any
+/// voucher on a day inside the window, and any voucher at all in the widened
+/// window. The rows of a data read and the days of a census both give them.
+fn corroborate_empty_by_days(
+    any_in_window: bool,
+    any_in_widened: bool,
     company_high_water: Option<u64>,
 ) -> Result<(bool, Option<&'static str>), String> {
-    if widened_rows.iter().any(|row| row_in_window(row, from, to)) {
+    if any_in_window {
         return Err("window_contradicted".to_string());
     }
-    if !widened_rows.is_empty() {
+    if any_in_widened {
         // Boundary-day rows only prove that this wider read returned *some*
         // data. They provide no independent cardinality for the nonempty
         // response, so they cannot promote the original empty window.

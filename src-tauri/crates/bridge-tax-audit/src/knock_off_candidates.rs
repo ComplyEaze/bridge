@@ -350,12 +350,13 @@ fn named<'a>(
     out
 }
 
-/// What a T2 voucher adds to a total: the larger side of its money lines once for a Contra or a
-/// voucher whose every nonzero line is money, else each money line's absolute value.
+/// What a T2 voucher adds to a total: the larger side of its money lines once for a Contra (by
+/// its base type, as the reference reads it) or a voucher whose every nonzero line is money, else
+/// each money line's absolute value.
 fn money_amount(v: &Voucher, money: &BTreeSet<&str>) -> i128 {
     let lines = || v.lines.iter().filter(|l| l.amount_paise != 0);
     let money_lines = || lines().filter(|l| money.contains(l.ledger.as_str()));
-    if v.vtype == CONTRA || lines().all(|l| money.contains(l.ledger.as_str())) {
+    if v.base_type == CONTRA || lines().all(|l| money.contains(l.ledger.as_str())) {
         let debit: i128 = money_lines()
             .filter(|l| l.amount_paise > 0)
             .map(|l| i128::from(l.amount_paise))

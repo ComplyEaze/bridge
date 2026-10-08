@@ -261,6 +261,14 @@
       "reason": "Tests pinning the masters requests to their captured bytes and the parser's refusals, company binding and size arithmetic; a weakened test lets a masters defect ship unseen."
     },
     {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_negative_stock.rs",
+      "reason": "Negative Stock read: renders the report request and parses the answer closed, item by item; a defect reads an empty or refused answer as 'no negative stock' or shows one item's quantity or value as another's."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_negative_stock_tests.rs",
+      "reason": "Tests pinning the Negative Stock request to its captured bytes, the parse of the live capture, and the parser's refusals on mutated copies of it; a weakened test lets an empty answer or a malformed row pass unseen."
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_outstandings/compute.rs"
     },
     {

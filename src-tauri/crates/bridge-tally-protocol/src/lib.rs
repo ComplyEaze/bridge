@@ -45,6 +45,7 @@ pub mod ledger_census;
 pub mod native_cash_flow;
 mod native_ledger_collection;
 pub mod native_masters;
+pub mod native_negative_stock;
 pub mod native_outstandings;
 pub mod native_statement_reports;
 pub mod native_stock_summary;

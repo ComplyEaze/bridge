@@ -1700,8 +1700,8 @@
   "by": "author (Lane C)",
   "what": "row id hashed without its prefix",
   "file": "src/tds_payees.rs",
-  "from": "let h = hash8(&format!(\"{prefix}:{}\", stable_ledger_tag(book, entity)?));",
-  "to": "let h = hash8(&stable_ledger_tag(book, entity)?);"
+  "from": "    Ok(hash8(&format!(\n        \"{prefix}:{}\",\n        stable_ledger_tag(book, entity)?\n    )))",
+  "to": "    Ok(hash8(&stable_ledger_tag(book, entity)?))"
  },
  {
   "id": "C1-32",
@@ -11630,5 +11630,429 @@
   "file": "src/loans_interest.rs",
   "from": "                            .any(|l| l.ledger == **name && l.amount_paise != 0)",
   "to": "                            .filter(|l| l.ledger == **name)\n                            .map(|l| i128::from(l.amount_paise))\n                            .sum::<i128>()\n                            != 0"
+ },
+ {
+  "id": "NR-01",
+  "by": "author",
+  "what": "narration_payees: only the letters a to z upper-cased",
+  "file": "src/narration_payees.rs",
+  "from": "let text = py_split(&py_upper(narration)).join(\" \");",
+  "to": "let text = py_split(&narration.to_ascii_uppercase()).join(\" \");"
+ },
+ {
+  "id": "NR-02",
+  "by": "author",
+  "what": "narration_payees: Rust's whitespace in place of Python's",
+  "file": "src/narration_payees.rs",
+  "from": "let text = py_split(&py_upper(narration)).join(\" \");",
+  "to": "let text = py_upper(narration).split_whitespace().collect::<Vec<_>>().join(\" \");"
+ },
+ {
+  "id": "NR-03",
+  "by": "author",
+  "what": "narration_payees: a name of forms 1 to 3 keeps the space before its hyphen",
+  "file": "src/narration_payees.rs",
+  "from": "    if name.ends_with(' ') {\n        name.pop();\n    }\n    Some((name, end + 1))",
+  "to": "    Some((name, end + 1))"
+ },
+ {
+  "id": "NR-04",
+  "by": "author",
+  "what": "narration_payees: a name of forms 1 to 3 may hold an underscore",
+  "file": "src/narration_payees.rs",
+  "from": "matches!(x, ' ' | '.' | '&' | '\\'')",
+  "to": "matches!(x, ' ' | '.' | '&' | '\\'' | '_')"
+ },
+ {
+  "id": "NR-05",
+  "by": "author",
+  "what": "narration_payees: a channel word alone is a name",
+  "file": "src/narration_payees.rs",
+  "from": "    if CHANNEL_WORDS.contains(&name.as_str()) {\n        return Some(Reading::NoPayee);",
+  "to": "    if false {\n        return Some(Reading::NoPayee);"
+ },
+ {
+  "id": "NR-06",
+  "by": "author",
+  "what": "narration_payees: a channel word alone lets the later forms be tried",
+  "file": "src/narration_payees.rs",
+  "from": "    if CHANNEL_WORDS.contains(&name.as_str()) {\n        return Some(Reading::NoPayee);",
+  "to": "    if CHANNEL_WORDS.contains(&name.as_str()) {\n        return None;"
+ },
+ {
+  "id": "NR-07",
+  "by": "author",
+  "what": "narration_payees: the IMPS reference takes ASCII digits only",
+  "file": "src/narration_payees.rs",
+  "from": "let i = run1(c, lit(c, 0, \"IMPS-\")?, py_is_decimal)?;",
+  "to": "let i = run1(c, lit(c, 0, \"IMPS-\")?, |x| x.is_ascii_digit())?;"
+ },
+ {
+  "id": "NR-08",
+  "by": "author",
+  "what": "narration_payees: RTGS reported as NEFT",
+  "file": "src/narration_payees.rs",
+  "from": "None => (lit(c, 0, \"RTGS\")?, Channel::Rtgs),",
+  "to": "None => (lit(c, 0, \"RTGS\")?, Channel::Neft),"
+ },
+ {
+  "id": "NR-09",
+  "by": "author",
+  "what": "narration_payees: NEFT and RTGS need the space before DR",
+  "file": "src/narration_payees.rs",
+  "from": "let i = lit(c, opt(c, i, ' '), \"DR-\")?;",
+  "to": "let i = lit(c, i, \" DR-\")?;"
+ },
+ {
+  "id": "NR-10",
+  "by": "author",
+  "what": "narration_payees: the NEFT code takes any decimal digit",
+  "file": "src/narration_payees.rs",
+  "from": "let i = run1(c, i, |x| az(x) || x.is_ascii_digit())?;",
+  "to": "let i = run1(c, i, |x| az(x) || py_is_decimal(x))?;"
+ },
+ {
+  "id": "NR-11",
+  "by": "author",
+  "what": "narration_payees: the second layout's reference takes ASCII digits only",
+  "file": "src/narration_payees.rs",
+  "from": "|x| x == ' ' || py_is_decimal(x)",
+  "to": "|x| x == ' ' || x.is_ascii_digit()"
+ },
+ {
+  "id": "NR-12",
+  "by": "author",
+  "what": "narration_payees: the second layout's placeholders are payees",
+  "file": "src/narration_payees.rs",
+  "from": "    if PLACEHOLDERS.contains(&name.as_str()) {",
+  "to": "    if false {"
+ },
+ {
+  "id": "NR-13",
+  "by": "author",
+  "what": "narration_payees: the second layout's name needs a letter of any script",
+  "file": "src/narration_payees.rs",
+  "from": "    if !name.chars().any(az) {",
+  "to": "    if !name.chars().any(char::is_alphabetic) {"
+ },
+ {
+  "id": "NR-14",
+  "by": "author",
+  "what": "narration_payees: the second layout's handle is never cut",
+  "file": "src/narration_payees.rs",
+  "from": "        None => Handle::Cut(field),",
+  "to": "        None => Handle::Whole(field),"
+ },
+ {
+  "id": "NR-15",
+  "by": "author",
+  "what": "narration_payees: the second layout's handle is cut at the last @",
+  "file": "src/narration_payees.rs",
+  "from": "    let handle = match field.split_once('@') {",
+  "to": "    let handle = match field.rsplit_once('@') {"
+ },
+ {
+  "id": "NR-16",
+  "by": "author",
+  "what": "narration_payees: the first layout's handle suffix takes ASCII digits only",
+  "file": "src/narration_payees.rs",
+  "from": "        end = run1(c, end + 1, py_is_decimal)?;",
+  "to": "        end = run1(c, end + 1, |x| x.is_ascii_digit())?;"
+ },
+ {
+  "id": "NR-17",
+  "by": "author",
+  "what": "narration_payees: the first layout's handle may hold a space",
+  "file": "src/narration_payees.rs",
+  "from": "matches!(x, '.' | '_')\n",
+  "to": "matches!(x, '.' | '_' | ' ')\n"
+ },
+ {
+  "id": "NR-18",
+  "by": "author",
+  "what": "narration_payees: the cheque prefix is kept in the name",
+  "file": "src/narration_payees.rs",
+  "from": "    let i = cheque_prefix(c).unwrap_or(0);",
+  "to": "    let i = 0;"
+ },
+ {
+  "id": "NR-19",
+  "by": "author",
+  "what": "narration_payees: the cheque prefix may be followed by a letter",
+  "file": "src/narration_payees.rs",
+  "from": "    if c.get(i).is_some_and(|&x| az(x)) {\n        return None;\n    }",
+  "to": "    if false {\n        return None;\n    }"
+ },
+ {
+  "id": "NR-20",
+  "by": "author",
+  "what": "narration_payees: only the exact names SELF and CASH PAID TO are refused",
+  "file": "src/narration_payees.rs",
+  "from": ".is_some_and(|rest| !rest.starts_with(az))",
+  "to": ".is_some_and(str::is_empty)"
+ },
+ {
+  "id": "NR-21",
+  "by": "author",
+  "what": "narration_payees: a cheque name may hold digits",
+  "file": "src/narration_payees.rs",
+  "from": ".take_while(|&&x| az(x) || matches!(x, ' ' | '.'))",
+  "to": ".take_while(|&&x| az(x) || x.is_ascii_digit() || matches!(x, ' ' | '.'))"
+ },
+ {
+  "id": "NR-22",
+  "by": "author",
+  "what": "narration_payees: a cheque needs no space allowed after its hyphen",
+  "file": "src/narration_payees.rs",
+  "from": "lit(c, opt(c, j, ' '), \"CHQ PAID\")",
+  "to": "lit(c, j, \"CHQ PAID\")"
+ },
+ {
+  "id": "NR-23",
+  "by": "author",
+  "what": "narration_payees: a payment's amount is its net on the ledgers read",
+  "file": "src/narration_payees.rs",
+  "from": ".filter(|l| l.amount_paise > 0 && self.read.contains(&l.ledger))",
+  "to": ".filter(|l| self.read.contains(&l.ledger))"
+ },
+ {
+  "id": "NR-24",
+  "by": "author",
+  "what": "narration_payees: a bank debit counts as a bank leg",
+  "file": "src/narration_payees.rs",
+  "from": ".any(|l| l.amount_paise < 0 && self.bank.contains(&l.ledger))",
+  "to": ".any(|l| l.amount_paise != 0 && self.bank.contains(&l.ledger))"
+ },
+ {
+  "id": "NR-25",
+  "by": "author",
+  "what": "narration_payees: a placeholder left out of the unread total",
+  "file": "src/narration_payees.rs",
+  "from": "            reading if amount != 0 => {",
+  "to": "            reading if amount != 0 && reading != Reading::Placeholder => {"
+ },
+ {
+  "id": "NR-26",
+  "by": "author",
+  "what": "narration_payees: a cut handle joins without an agreeing name",
+  "file": "src/narration_payees.rs",
+  "from": ".any(|n| names_agree(n, &p.printed.name)) =>",
+  "to": ".any(|_| true) =>"
+ },
+ {
+  "id": "NR-27",
+  "by": "author",
+  "what": "narration_payees: a cut handle joins the first of several whole ones",
+  "file": "src/narration_payees.rs",
+  "from": "                [only]\n",
+  "to": "                [only, ..]\n"
+ },
+ {
+  "id": "NR-28",
+  "by": "author",
+  "what": "narration_payees: a payee keyed by its largest handle",
+  "file": "src/narration_payees.rs",
+  "from": ".filter_map(|p| p.joins_by.as_ref()).min()",
+  "to": ".filter_map(|p| p.joins_by.as_ref()).max()"
+ },
+ {
+  "id": "NR-29",
+  "by": "author",
+  "what": "narration_payees: a payee keyed without the upi: prefix",
+  "file": "src/narration_payees.rs",
+  "from": "Some(h) => format!(\"upi:{h}\"),",
+  "to": "Some(h) => h.clone(),"
+ },
+ {
+  "id": "NR-30",
+  "by": "author",
+  "what": "narration_payees: added ledgers: any nature mapped",
+  "file": "src/narration_payees.rs",
+  "from": ".filter(|l| nature_by_ledger.get(&l.ledger).map(String::as_str) == Some(\"194C\"))",
+  "to": ".filter(|l| nature_by_ledger.contains_key(&l.ledger))"
+ },
+ {
+  "id": "NR-31",
+  "by": "author",
+  "what": "narration_payees: added ledgers: a credit line adds its ledger too",
+  "file": "src/narration_payees.rs",
+  "from": "        .filter(|l| l.amount_paise > 0)\n        .filter(|l| nature_by_ledger",
+  "to": "        .filter(|l| nature_by_ledger"
+ },
+ {
+  "id": "NR-32",
+  "by": "author",
+  "what": "narration_payees: added ledgers: looked for under another nature's finding",
+  "file": "src/narration_payees.rs",
+  "from": "\"{}/194C_{}\",",
+  "to": "\"{}/194J_{}\","
+ },
+ {
+  "id": "NR-33",
+  "by": "author",
+  "what": "narration_payees: added count: a listed ledger counted again",
+  "file": "src/narration_payees.rs",
+  "from": "count(TEST_ID, added.difference(listed).count())?",
+  "to": "count(TEST_ID, added.len())?"
+ },
+ {
+  "id": "NR-34",
+  "by": "author",
+  "what": "narration_payees: over: the single-sum limit reached, not passed",
+  "file": "src/narration_payees.rs",
+  "from": "row.max > limits.single_sum_paise",
+  "to": "row.max >= limits.single_sum_paise"
+ },
+ {
+  "id": "NR-35",
+  "by": "author",
+  "what": "narration_payees: over: the aggregate limit reached, not passed",
+  "file": "src/narration_payees.rs",
+  "from": "row.total > limits.aggregate_paise",
+  "to": "row.total >= limits.aggregate_paise"
+ },
+ {
+  "id": "NR-36",
+  "by": "author",
+  "what": "narration_payees: same day: one payment is enough",
+  "file": "src/narration_payees.rs",
+  "from": "if ps.len() < 2 || sum <= limits.single_sum_paise {",
+  "to": "if sum <= limits.single_sum_paise {"
+ },
+ {
+  "id": "NR-37",
+  "by": "author",
+  "what": "narration_payees: same day: the limit reached, not passed",
+  "file": "src/narration_payees.rs",
+  "from": "if ps.len() < 2 || sum <= limits.single_sum_paise {",
+  "to": "if ps.len() < 2 || sum < limits.single_sum_paise {"
+ },
+ {
+  "id": "NR-38",
+  "by": "author",
+  "what": "narration_payees: elsewhere: a Contra counted",
+  "file": "src/narration_payees.rs",
+  "from": "        if v.base_type == \"Contra\" {",
+  "to": "        if false {"
+ },
+ {
+  "id": "NR-39",
+  "by": "author",
+  "what": "narration_payees: elsewhere: a bank ledger given counted",
+  "file": "src/narration_payees.rs",
+  "from": "                || self.bank.contains(&l.ledger)\n",
+  "to": "\n"
+ },
+ {
+  "id": "NR-40",
+  "by": "author",
+  "what": "narration_payees: elsewhere: a ledger with no master left out",
+  "file": "src/narration_payees.rs",
+  "from": ".is_some_and(|m| NOT_OTHER_GROUPS.iter().any(|g| m.under(g)));",
+  "to": ".is_none_or(|m| NOT_OTHER_GROUPS.iter().any(|g| m.under(g)));"
+ },
+ {
+  "id": "NR-41",
+  "by": "author",
+  "what": "narration_payees: elsewhere: a payee over a limit can cross again",
+  "file": "src/narration_payees.rs",
+  "from": "let crossing = !over(row)",
+  "to": "let crossing = true"
+ },
+ {
+  "id": "NR-42",
+  "by": "author",
+  "what": "narration_payees: elsewhere: all the other debits together tested against the single-sum limit",
+  "file": "src/narration_payees.rs",
+  "from": "|| largest > limits.single_sum_paise",
+  "to": "|| sum > limits.single_sum_paise"
+ },
+ {
+  "id": "NR-43",
+  "by": "author",
+  "what": "narration_payees: cut handles: a payment outside the rows counted",
+  "file": "src/narration_payees.rs",
+  "from": ".filter(|i| w.payments[*i].cut_unjoined.is_some() && in_row.contains(i))",
+  "to": ".filter(|i| w.payments[*i].cut_unjoined.is_some())"
+ },
+ {
+  "id": "NR-44",
+  "by": "author",
+  "what": "narration_payees: cut handles: a group of one listed",
+  "file": "src/narration_payees.rs",
+  "from": "        if payees.len() < 2 {",
+  "to": "        if payees.is_empty() {"
+ },
+ {
+  "id": "NR-45",
+  "by": "author",
+  "what": "narration_payees: cut handles: the group tag hashes upi: and the handle",
+  "file": "src/narration_payees.rs",
+  "from": "&format!(\"possible_same_{}\", hash8(cut)),",
+  "to": "&format!(\"possible_same_{}\", hash8(&format!(\"upi:{cut}\"))),"
+ },
+ {
+  "id": "NR-46",
+  "by": "author",
+  "what": "narration_payees: a citation's label replaces an empty number by the GUID",
+  "file": "src/narration_payees.rs",
+  "from": "        &format!(\"{} {} on {}\", v.vtype, v.number, iso(&v.date)),",
+  "to": "        &crate::support::voucher_label(v),"
+ },
+ {
+  "id": "NR-47",
+  "by": "author",
+  "what": "narration_payees: one citation per GUID, whatever the label",
+  "file": "src/narration_payees.rs",
+  "from": ".filter(|r| seen.insert((r.id.clone(), r.label.clone())))",
+  "to": ".filter(|r| seen.insert((r.id.clone(), String::new())))"
+ },
+ {
+  "id": "NR-48",
+  "by": "author",
+  "what": "narration_payees: check: a cited GUID resolves to its first population voucher",
+  "file": "src/narration_payees.rs",
+  "from": "        .enumerate()\n        .map(|(at, v)| (v.guid.as_str(), at))",
+  "to": "        .enumerate()\n        .rev()\n        .map(|(at, v)| (v.guid.as_str(), at))"
+ },
+ {
+  "id": "NR-49",
+  "by": "author",
+  "what": "narration_payees: check: no NP-3",
+  "file": "src/narration_payees.rs",
+  "from": "                if *earlier != tag {",
+  "to": "                if false {"
+ },
+ {
+  "id": "NR-50",
+  "by": "author",
+  "what": "narration_payees: check: NP-6 does not link by a shared name",
+  "file": "src/narration_payees.rs",
+  "from": "    if a.name == b.name {\n        return true;",
+  "to": "    if false {\n        return true;"
+ },
+ {
+  "id": "NR-51",
+  "by": "author",
+  "what": "narration_payees: check: a cited voucher with no bank leg reported, not stopped on",
+  "file": "src/narration_payees.rs",
+  "from": "Some(at) if !w.outgoing.contains(&at) => {",
+  "to": "Some(at) if false && !w.outgoing.contains(&at) => {"
+ },
+ {
+  "id": "NR-52",
+  "by": "author",
+  "what": "narration_payees: bind keeps no narration payee ledgers",
+  "file": "src/binding.rs",
+  "from": "        narration_payee_ledgers,\n        bank_reconciliation_ledger,",
+  "to": "        narration_payee_ledgers: Vec::new(),\n        bank_reconciliation_ledger,"
+ },
+ {
+  "id": "NR-53",
+  "by": "author",
+  "what": "narration_payees: narration_payees_on reads nothing added",
+  "file": "src/lib.rs",
+  "from": "narration_payees::run(book, rules, &bank, &listed, &added)?;",
+  "to": "narration_payees::run(book, rules, &bank, &listed, &BTreeSet::new())?;"
  }
 ]

@@ -315,7 +315,10 @@ fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
         ),
         "{description}"
     );
-    assert!(!description.contains("Required"), "{description}");
+    assert!(
+        !description.to_ascii_lowercase().contains("required"),
+        "{description}"
+    );
     assert!(description.contains("https://bridge.complyeaze.com/terms"));
     assert!(description.contains("https://bridge.complyeaze.com/privacy"));
     assert_eq!(

@@ -22,36 +22,42 @@ requests it comes from, except where it names an issue.
 **Should I upgrade?**
 
 - **If you updated from 0.4.2 to 0.5.0 and Claude Desktop did not start
-  ComplyEaze Bridge: yes.** 0.5.0 marked the Terms of Use setting as required,
-  and Claude Desktop does not start an extension while a required setting has
-  no value. 0.5.1 no longer marks it required. After installing 0.5.1, tick
-  the Terms setting in the extension's settings, then quit and reopen Claude
-  Desktop. Until the setting is ticked every tool answers `terms_not_accepted`
-  and names the setting; nothing is read from Tally. What we saw: a package
-  our checks built for this fix, installed over 0.4.2 on one Mac, was started
-  by Claude Desktop and its tools gave that answer. Not tried: the published
-  0.5.1 file, an update on Windows, and a release older than 0.4.2 (#1413).
-- **If 0.5.0 already starts for you:** nothing here is urgent. The other
-  changes below are small.
-- **If you use the bank-statement tool and post to mapped ledgers:** a voucher built from a statement
-  now ends its narration with the statement's party (see "What you can do now" below). Vouchers
-  already imported keep their narration, but amending a batch built before this change rewrites the
+  ComplyEaze Bridge: yes.** 0.5.0 marked the Terms of Use setting as required.
+  On one Mac, after an update from 0.4.2, 0.5.0 was not started and Claude
+  Desktop showed "Unable to connect to extension server". 0.5.1 no longer marks
+  the setting required. After installing 0.5.1, turn on the Terms setting in
+  the extension's settings, then quit and reopen Claude Desktop. Until the
+  setting is on, every tool answers `terms_not_accepted` and names the
+  setting; nothing is read from Tally. What we saw: a package built from this
+  change on one Mac (only its version set to 0.5.1), installed over 0.4.2 and
+  over 0.5.0, was started by Claude Desktop each time, and with the setting off its
+  tools gave that answer. Not tried: the published 0.5.1 file, an update on Windows, and a
+  release older than 0.4.2 (#1413).
+- **If 0.5.0 already starts for you:** the other changes below are the reason
+  to update, if any.
+- **If you use the bank-statement tool and build vouchers for mapped ledgers:**
+  such a voucher now carries the statement's party at the end of its narration
+  text (see "What you can do now" below). Vouchers already imported keep their
+  narration, but amending a batch built before this change rewrites the
   narrations of that batch's vouchers in the book (#1430).
 - **If you use ComplyEaze Bridge on Windows, treat it as untried:** no one on our
   side has installed the Windows package of this build in Claude Desktop.
 - **How:** ComplyEaze Bridge does not update itself. Follow the
   [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
   (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
-  Desktop, Settings, Extensions, install the new file; (3) keep ComplyEaze
-  Bridge's data folder; (4) check that the extension shows 0.5.1, tick the
-  Terms setting if it shows no value, and check that "Allow voucher posting" is
-  as you want it; (5) quit Claude Desktop completely and reopen it.
+  Desktop, Settings, Extensions, install the new file (on one Mac a new
+  install opened no settings window: open Settings, Extensions, ComplyEaze
+  Bridge yourself); (3) keep ComplyEaze Bridge's data folder; (4) check that
+  the extension shows 0.5.1, turn on the Terms setting if it is not on, and
+  check that "Allow voucher posting" is as you want it; (5) quit Claude
+  Desktop completely and reopen it.
 
 **What you can do now**
 
 - No new tool.
-- A voucher built from a bank statement and posted to a mapped ledger now ends its narration with
-  `| Statement party: <name>`, the counterparty the statement printed (#1430). A line sent to suspense and a
+- A voucher built from a bank statement for a mapped ledger now carries `| Statement party: <name>`, the
+  counterparty the statement printed, at the end of its narration text (#1430). A file you import by hand adds
+  ComplyEaze Bridge's `[BRIDGE:...]` tag after it. A line sent to suspense and a
   cash line are written as before. A party that contains `|`, that carries the reserved marker, or that makes the narration longer than 2,000
   characters now refuses the statement run (`party_not_admissible`); `skip` that party or map it to the suspense
   ledger. A label the parser gives a line by its wording (bank charges, a card fee, an instalment) is not written as a party. Vouchers already imported keep their narration,
@@ -60,35 +66,38 @@ requests it comes from, except where it names an issue.
 
 **Safer or fixed**
 
-- **An update now starts ComplyEaze Bridge before the Terms are ticked, and
+- **An update now starts ComplyEaze Bridge before the Terms are turned on, and
   its tools say why they refuse.** The Terms of Use setting is no longer
   marked required and still starts off. Claude Desktop now starts ComplyEaze
-  Bridge, and until you tick the setting every tool answers
+  Bridge, and until you turn the setting on every tool answers
   `terms_not_accepted`, naming the setting. The setting no longer shows
   "(required)" beside its title, and its description now begins "Tick to use
   ComplyEaze Bridge: it refuses every tool call until you accept the Terms of
-  Use." This was seen on one Mac with a test package; it has not yet been
-  checked on Windows (#1413).
+  Use." This was seen on one Mac with a package built from this change; it has
+  not yet been checked on Windows (#1413).
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
   the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
   text already said; the schema said 500 even when the row limit was lower or higher (#1148).
 - A State Bank of India statement line whose UPI, NEFT, RTGS or transfer text prints an empty name
-  field now names its party as `UNNAMED`, as the IMPS reader already did. Before, the party was empty, no mapping
-  row could match it, and the suspense line's narration named no one (#1429).
+  field now names its party as `UNNAMED`, as the IMPS reader already did. Before, the party was empty and
+  the suspense line's narration named no one. `UNNAMED` cannot be mapped to a ledger, so the line still goes to the suspense ledger (#1429).
 - The import journal (`agent-import-ledger.jsonl`) is now read with each of its dates as a checked
   date. A record holding a date that is not `YYYYMMDD` refuses the whole journal
   (`import_ledger_invalid`): building, posting, verifying and reconciling every batch, and the
   desktop journal screen, stop until the record is put right, and the local data report shows the
   journal as not read. No release has written such a date, so only a record edited by hand can hold
   one, and the stored bytes do not change (#1307).
+- A program built from this repository no longer reads `BRIDGE_PDFIUM_LIBRARY` to load the PDF
+  library from another place; it loads it from the folder that holds its own program. Only its
+  tests read that setting (#1422).
 
 **Known limits**
 
 - Windows is untried for this build, and so is the published 0.5.1 file. The
-  Terms start-up behaviour above was seen on one Mac with a package our checks
-  built, over 0.4.2 (#1413).
+  Terms start-up behaviour above was seen on one Mac with a package built from
+  this change, over 0.4.2 and over 0.5.0 (#1413).
 - The library that reads Tally's replies was updated (#1198). Its output for
-  the 53 saved replies in our test record is unchanged; it was not run against
+  the saved replies in our test record is unchanged; it was not run against
   a new capture from TallyPrime or on Windows. The bank-statement narration change was not run through a Tally import (#1430).
 
 ## [0.5.0] - 2026-10-08

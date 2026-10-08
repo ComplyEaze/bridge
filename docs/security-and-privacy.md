@@ -8,7 +8,7 @@ changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
 `ledger_movement` read took, in section 2 (#1366), and where the released
-program loads the PDF library from, in section 5 (#PRNUM). It was written from a reading
+program loads the PDF library from, in section 5 (#1422). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again

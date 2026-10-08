@@ -7,3 +7,4 @@ c351d6c62a09ce5173355f3998ef12746f01aba253ea8bdc42664b1b9766fb00  r08-voucher-ty
 aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985  r09-number-new-invoice.xml  (1682 bytes, collection id: Bridge Invoice Number)
 90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6  r10-number-control-k0.xml  (1682 bytes, collection id: Bridge Invoice Number)
 40f91b3fdb131279b413910c60f86a3b56989d8646def9bbe6b1fbdc97b6a68b  r11-company-state.xml  (938 bytes, collection id: Bridge Invoice Company)
+28a47c26a29fa799856c112b71e19076946d4c0f85a6dcc65f5cdafe0e1e1bd0  r13-ledger-catalogue-v2.xml  (2106 bytes, collection id: List of Ledgers)

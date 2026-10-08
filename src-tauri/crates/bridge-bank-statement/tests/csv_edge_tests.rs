@@ -204,6 +204,8 @@ fn an_amount_outside_the_declared_grouping_is_refused() {
         (&OLDEST_FIRST, "-5.00"),
         (&indian, "1,234,567.50"),
         (&plain, "1,000.00"),
+        (&plain, "1.234"),
+        (&indian, "1.234"),
     ] {
         let refusal = refuses(amount(layout, cell), "malformed_amount");
         assert_eq!(refusal.row, Some(1), "{cell}");
@@ -342,7 +344,8 @@ fn a_leading_zero_is_refused_so_one_value_has_one_spelling() {
         (&indian, "0,100.00"),
         (&indian, "01,234.00"),
     ] {
-        refuses(amount(layout, cell), "malformed_amount");
+        let refusal = refuses(amount(layout, cell), "malformed_amount");
+        assert_eq!(refusal.row, Some(1), "{cell}");
     }
     // zero itself, and a fraction below one, are fine
     assert_eq!(amount(&plain, "0").unwrap()[0].get(CREDIT), "0.00");
@@ -370,4 +373,32 @@ fn whitespace_around_a_date_or_an_amount_cell_is_trimmed() {
         read_rows(&file(&[padded_date]), &OLDEST_FIRST).unwrap()[0].get(DATE),
         "2026-08-01"
     );
+}
+
+#[test]
+fn which_amount_cells_a_row_fills_is_left_to_the_later_stages() {
+    // both filled: read here, refused by the running-balance proof
+    let both = "01-08-2026,A,\"5.00\",\"5.00\",\"10,000.00\"";
+    let rows = read_rows(&file(&[both]), &OLDEST_FIRST).unwrap();
+    assert_eq!((rows[0].get(DEBIT), rows[0].get(CREDIT)), ("5.00", "5.00"));
+    let opening = ExactDecimal::parse("10000.00".to_string()).unwrap();
+    let refusal = refuses(reconcile(&rows, &opening, &opening), "two_sided_row");
+    assert_eq!(refusal.row, Some(1));
+    // neither filled: read here, and the proof accepts a row that moves nothing
+    let neither = "01-08-2026,A,,,\"10,000.00\"";
+    let rows = read_rows(&file(&[neither]), &OLDEST_FIRST).unwrap();
+    assert_eq!((rows[0].get(DEBIT), rows[0].get(CREDIT)), ("", ""));
+    reconcile(&rows, &opening, &opening).unwrap();
+}
+
+#[test]
+fn a_narration_is_kept_as_written_after_trimming() {
+    for narration in ["=1+2", "+91 PAYEE", "-PAYEE", "@PAYEE", "A\u{1b}B"] {
+        let line = format!("01-08-2026,{narration},,\"5.00\",\"1.00\"");
+        let rows = read_rows(&file(&[&line]), &OLDEST_FIRST).unwrap();
+        assert_eq!(rows[0].get(NARRATION), narration);
+    }
+    let spanning = "01-08-2026,\"A\nB\",,\"5.00\",\"1.00\"";
+    let rows = read_rows(&file(&[spanning]), &OLDEST_FIRST).unwrap();
+    assert_eq!(rows[0].get(NARRATION), "A\nB");
 }

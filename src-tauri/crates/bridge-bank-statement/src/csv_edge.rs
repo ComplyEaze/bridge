@@ -1,23 +1,33 @@
 //! A bank's own CSV export, read at the edge into the statement `Row`.
 //!
-//! Nothing downstream re-checks what this reads: a file either matches a
-//! shipped [`CsvLayout`] exactly and becomes rows whose dates are `YYYY-MM-DD`
-//! and whose amounts are plain two-place decimals, or it is refused with the
-//! row it failed at. The running-balance chain sees amounts and not dates, so
-//! the checks the PDF path gets from geometry are made here by shape: an exact
-//! header, one date format with two-digit day and month, one declared thousands
-//! grouping, and dates in the declared order.
+//! Nothing downstream re-checks the shapes this reads: a file either matches a
+//! [`CsvLayout`] exactly and becomes rows whose dates are `YYYY-MM-DD` and whose
+//! amounts are plain two-place decimals, or it is refused with the row it failed
+//! at. Which amount cells a row fills is left to the later stages, as on the PDF
+//! path: `reconcile` refuses a row with both filled (`two_sided_row`) and the
+//! proposals refuse one with neither inside the run's date window
+//! (`row_without_amount`). Whether a date
+//! falls inside the statement's period is not checked here, and no range of
+//! plausible dates is applied. The running-balance chain sees amounts and not
+//! dates, so the checks the PDF path gets from geometry are made here by shape:
+//! an exact header, one date format with two-digit day and month, one declared
+//! thousands grouping, and dates in the declared order.
 //!
-//! A layout is shipped data, never supplied by a caller. This module ships
-//! none yet (`LAYOUTS` is empty): a layout's header and column order come from a
-//! real export, and no export was read to write this engine.
+//! A layout is meant to be shipped data, not supplied by a caller, but the type
+//! does not enforce that yet: its fields are public so the tests can build the
+//! invented layout they read, which is why `layout_invalid` exists. This module
+//! ships none (`LAYOUTS` is empty): a layout's header and column order come from
+//! a real export, and no export was read to write this engine. Narrowing
+//! [`read_rows`] to the shipped list waits for the first real layout.
 //!
 //! Row numbers in a refusal count the file's data records from 1, in file order
 //! (a blank line is skipped by the reader and a quoted narration spanning lines
 //! is one record), including for a newest-first layout, whose rows are returned
 //! oldest first: a refusal from a later stage numbers them in that order, so
-//! the two numberings differ for such a layout. Date and amount cells are
-//! trimmed of surrounding whitespace before they are read.
+//! the two numberings differ for such a layout. Date, amount and narration
+//! cells are trimmed of surrounding whitespace before they are read; a
+//! narration is otherwise kept as written, including a leading `=`, `+`, `-` or
+//! `@`, a line break inside quotes, and any other control character.
 
 use crate::bank::{BALANCE, CREDIT, DATE, DEBIT, NARRATION};
 use crate::date::{parse_day_month_year_hyphenated, parse_day_month_year_slashed, Date};

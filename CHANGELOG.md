@@ -12,12 +12,44 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-### In plain words: the next build, since 0.5.0
+## [0.5.1] - 2026-10-08
 
-These changes are in source and not yet in a published build.
+### In plain words: ComplyEaze Bridge 0.5.1, since 0.5.0 (8 Oct 2026)
 
-**Changed**
+These changes are in ComplyEaze Bridge 0.5.1. Each line names the pull
+requests it comes from, except where it names an issue.
 
+**Should I upgrade?**
+
+- **If you updated from 0.4.2 to 0.5.0 and Claude Desktop did not start
+  ComplyEaze Bridge: yes.** 0.5.0 marked the Terms of Use setting as required,
+  and Claude Desktop does not start an extension while a required setting has
+  no value. 0.5.1 no longer marks it required. After installing 0.5.1, tick
+  the Terms setting in the extension's settings, then quit and reopen Claude
+  Desktop. Until the setting is ticked every tool answers `terms_not_accepted`
+  and names the setting; nothing is read from Tally. What we saw: a package
+  our checks built for this fix, installed over 0.4.2 on one Mac, was started
+  by Claude Desktop and its tools gave that answer. Not tried: the published
+  0.5.1 file, an update on Windows, and a release older than 0.4.2 (#1413).
+- **If 0.5.0 already starts for you:** nothing here is urgent. The other
+  changes below are small.
+- **If you use the bank-statement tool and post to mapped ledgers:** a voucher built from a statement
+  now ends its narration with the statement's party (see "What you can do now" below). Vouchers
+  already imported keep their narration, but amending a batch built before this change rewrites the
+  narrations of that batch's vouchers in the book (#1430).
+- **If you use ComplyEaze Bridge on Windows, treat it as untried:** no one on our
+  side has installed the Windows package of this build in Claude Desktop.
+- **How:** ComplyEaze Bridge does not update itself. Follow the
+  [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
+  (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
+  Desktop, Settings, Extensions, install the new file; (3) keep ComplyEaze
+  Bridge's data folder; (4) check that the extension shows 0.5.1, tick the
+  Terms setting if it shows no value, and check that "Allow voucher posting" is
+  as you want it; (5) quit Claude Desktop completely and reopen it.
+
+**What you can do now**
+
+- No new tool.
 - A voucher built from a bank statement and posted to a mapped ledger now ends its narration with
   `| Statement party: <name>`, the counterparty the statement printed (#1430). A line sent to suspense and a
   cash line are written as before. A party that contains `|`, that carries the reserved marker, or that makes the narration longer than 2,000
@@ -26,35 +58,36 @@ These changes are in source and not yet in a published build.
   but amending a batch built before this change rewrites the narrations of that batch's vouchers in the book.
   The name is part of the narration, so `mask_parties` does not shorten it and `drop_narration` removes it.
 
-**Fixed**
+**Safer or fixed**
 
-- **An update now starts ComplyEaze Bridge before the Terms are ticked, and its
-  tools say why they refuse.** 0.5.0 marked the Terms of Use setting as
-  required. Claude Desktop does not start an extension while a required setting
-  has no value, and an update from 0.4.2 leaves the new Terms setting with none.
-  On one Mac, 0.5.0 installed over 0.4.2 was not started even when switched on: Claude
-  Desktop showed "Unable to connect to extension server" and the assistant said
-  the connector was not available, with nothing naming the Terms. The setting is
-  no longer marked required and still starts off. Claude Desktop now starts
-  ComplyEaze Bridge, and until you tick the setting every tool answers
-  `terms_not_accepted`, naming the setting; nothing is read from Tally. The
-  setting no longer shows "(required)" beside its title. This was seen on one
-  Mac with a test package; it has not yet been checked on Windows (#1413).
+- **An update now starts ComplyEaze Bridge before the Terms are ticked, and
+  its tools say why they refuse.** The Terms of Use setting is no longer
+  marked required and still starts off. Claude Desktop now starts ComplyEaze
+  Bridge, and until you tick the setting every tool answers
+  `terms_not_accepted`, naming the setting. The setting no longer shows
+  "(required)" beside its title. This was seen on one Mac with a test package;
+  it has not yet been checked on Windows (#1413).
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
   the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
   text already said; the schema said 500 even when the row limit was lower or higher (#1148).
 - A State Bank of India statement line whose UPI, NEFT, RTGS or transfer text prints an empty name
   field now names its party as `UNNAMED`, as the IMPS reader already did. Before, the party was empty, no mapping
   row could match it, and the suspense line's narration named no one (#1429).
-
-**Changed**
-
 - The import journal (`agent-import-ledger.jsonl`) is now read with each of its dates as a checked
   date. A record holding a date that is not `YYYYMMDD` refuses the whole journal
   (`import_ledger_invalid`): building, posting, verifying and reconciling every batch, and the
   desktop journal screen, stop until the record is put right, and the local data report shows the
   journal as not read. No release has written such a date, so only a record edited by hand can hold
   one, and the stored bytes do not change (#1307).
+
+**Known limits**
+
+- Windows is untried for this build, and so is the published 0.5.1 file. The
+  Terms start-up behaviour above was seen on one Mac with a package our checks
+  built, over 0.4.2 (#1413).
+- The library that reads Tally's replies was updated (#1198). Its output for
+  the 53 saved replies in our test record is unchanged; it was not run against
+  a new capture from TallyPrime or on Windows. The bank-statement narration change was not run through a Tally import (#1430).
 
 ## [0.5.0] - 2026-10-08
 

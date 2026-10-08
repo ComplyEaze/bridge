@@ -16,9 +16,9 @@ use sha2::{Digest, Sha256};
 // Full workspace runs can briefly starve the simulator thread while native jobs link or scan
 // several test binaries in parallel. Keep the synthetic peer patient enough that scheduler
 // delay is not misclassified as a Tally transport failure, while polling keeps cancellation
-// responsive when a client disconnects before completing its request.
-const ACCEPT_DEADLINE: Duration = Duration::from_secs(30);
-const REQUEST_READ_DEADLINE: Duration = Duration::from_secs(30);
+// responsive when a client disconnects before completing its request. One deadline per plan,
+// from the start of its accept: the request must have arrived whole by then.
+const PLAN_DEADLINE: Duration = Duration::from_secs(30);
 const REQUEST_READ_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const MAX_REQUEST_BYTES: usize = 128 * 1024;
 /// A divided agent read replayed end to end (bridge#520) is about ninety legs:
@@ -46,6 +46,69 @@ impl fmt::Display for NoRequestForPlan {
 }
 
 impl std::error::Error for NoRequestForPlan {}
+
+/// The payload of the error returned when a request reached a plan but could
+/// not be read as one whole request (#1148): `plan` is its zero-based place in
+/// a sequence of `plans`, as for [`NoRequestForPlan`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RefusedRequest {
+    pub plan: usize,
+    pub plans: usize,
+    pub fault: RequestFault,
+}
+
+/// Why a request that arrived was refused. Byte counts in `received` and
+/// `expected` cover the whole request, head and body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RequestFault {
+    /// The deadline passed before the request was whole. `expected` is `None`
+    /// while the head had not ended.
+    Incomplete {
+        received: usize,
+        expected: Option<usize>,
+    },
+    /// The client ended its stream before the request was whole.
+    EndedEarly {
+        received: usize,
+        expected: Option<usize>,
+    },
+    /// A request other than `GET` declared no `Content-Length`. A `GET` without
+    /// one has no body (RFC 9112 §6.3).
+    MissingContentLength,
+    /// A `Content-Length` value that is not one or more ASCII digits.
+    UnparseableContentLength,
+    /// More than one `Content-Length`, even with the same value.
+    RepeatedContentLength,
+    /// The declared length does not fit in `usize`, or the head plus it does not.
+    LengthOverflow,
+    /// Body bytes arrived beyond the declared length.
+    PastDeclaredLength { declared: usize, received: usize },
+    /// The request is larger than the simulator accepts: `bytes` is its
+    /// declared size, or what arrived before its head ended.
+    TooLarge { bytes: usize },
+}
+
+impl RequestFault {
+    fn error_kind(self) -> io::ErrorKind {
+        match self {
+            Self::Incomplete { .. } => io::ErrorKind::TimedOut,
+            Self::EndedEarly { .. } => io::ErrorKind::UnexpectedEof,
+            _ => io::ErrorKind::InvalidData,
+        }
+    }
+}
+
+impl fmt::Display for RefusedRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "simulator refused the request for plan {} of {} (zero-based): {:?}",
+            self.plan, self.plans, self.fault
+        )
+    }
+}
+
+impl std::error::Error for RefusedRequest {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObservedRequest {
@@ -159,7 +222,7 @@ impl SequenceSimulator {
                     plans,
                     worker_cancelled,
                     worker_received,
-                    ACCEPT_DEADLINE,
+                    PLAN_DEADLINE,
                 )
             })?;
         Ok(Self {
@@ -244,7 +307,7 @@ fn serve_once(
         &cancelled,
         &AtomicUsize::new(0),
         unanswered,
-        ACCEPT_DEADLINE,
+        PLAN_DEADLINE,
     )
 }
 
@@ -253,7 +316,7 @@ fn serve_sequence(
     plans: Vec<ScenarioPlan>,
     cancelled: Arc<AtomicBool>,
     received: Arc<AtomicUsize>,
-    accept_deadline: Duration,
+    deadline: Duration,
 ) -> io::Result<Vec<ObservedRequest>> {
     let plans_len = plans.len();
     let mut observed = Vec::with_capacity(plans_len);
@@ -266,12 +329,7 @@ fn serve_sequence(
             plans: plans_len,
         };
         observed.push(serve_request(
-            &listener,
-            plan,
-            &cancelled,
-            &received,
-            unanswered,
-            accept_deadline,
+            &listener, plan, &cancelled, &received, unanswered, deadline,
         )?);
     }
     Ok(observed)
@@ -283,14 +341,14 @@ fn serve_request(
     cancelled: &AtomicBool,
     received: &AtomicUsize,
     unanswered: NoRequestForPlan,
-    accept_deadline: Duration,
+    deadline: Duration,
 ) -> io::Result<ObservedRequest> {
     let started = Instant::now();
     let (mut stream, request) = loop {
         let (mut stream, _) = match listener.accept() {
             Ok(accepted) => accepted,
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                if started.elapsed() >= accept_deadline {
+                if started.elapsed() >= deadline {
                     return Err(io::Error::new(io::ErrorKind::TimedOut, unanswered));
                 }
                 thread::sleep(Duration::from_millis(2));
@@ -321,9 +379,9 @@ fn serve_request(
             }
             Err(error) => return Err(error),
         }
-        let remaining_read_deadline = REQUEST_READ_DEADLINE
+        let remaining_read_deadline = deadline
             .checked_sub(started.elapsed())
-            .filter(|deadline| !deadline.is_zero())
+            .filter(|remaining| !remaining.is_zero())
             .ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::TimedOut,
@@ -331,28 +389,30 @@ fn serve_request(
                 )
             })?;
         match read_request(&mut stream, cancelled, remaining_read_deadline) {
-            Ok(request) if request.is_empty() && !cancelled.load(Ordering::Acquire) => continue,
-            Ok(request) => break (stream, request),
+            Ok(ReadOutcome::Nothing) if !cancelled.load(Ordering::Acquire) => continue,
+            Ok(ReadOutcome::Nothing) => break (stream, Vec::new()),
+            Ok(ReadOutcome::Cancelled(partial)) => break (stream, partial),
+            Ok(ReadOutcome::Whole(request)) => {
+                received.fetch_add(1, Ordering::AcqRel);
+                break (stream, request);
+            }
             Err(_) if cancelled.load(Ordering::Acquire) => break (stream, Vec::new()),
-            Err(error)
-                if error.kind() == io::ErrorKind::TimedOut
-                    && !cancelled.load(Ordering::Acquire) =>
-            {
-                continue;
+            // A request arrived, so this is not "no request" (#1148).
+            Err(ReadError::Refused(fault)) => {
+                let NoRequestForPlan { plan, plans } = unanswered;
+                return Err(io::Error::new(
+                    fault.error_kind(),
+                    RefusedRequest { plan, plans, fault },
+                ));
             }
             // A client that gave up before its request was read (its deadline
             // fired while this responder was still busy with an earlier one)
             // resets the connection. It sent nothing this plan could answer, so
             // wait for the next request rather than ending the whole sequence.
-            Err(error) if client_stopped_reading(&error) && !cancelled.load(Ordering::Acquire) => {
-                continue;
-            }
-            Err(error) => return Err(error),
+            Err(ReadError::Io(error)) if client_stopped_reading(&error) => continue,
+            Err(ReadError::Io(error)) => return Err(error),
         }
     };
-    if !request.is_empty() {
-        received.fetch_add(1, Ordering::AcqRel);
-    }
     let (method, path) = request_line(&request);
     let request_body = request_body(&request);
     let mut observed = ObservedRequest {
@@ -515,30 +575,81 @@ fn client_stopped_reading(error: &io::Error) -> bool {
     )
 }
 
+/// What a read gave when it was not refused.
+#[derive(Debug)]
+enum ReadOutcome {
+    /// One whole request: its head and exactly the body that head declares.
+    Whole(Vec<u8>),
+    /// The client closed, or the deadline passed, before a byte arrived.
+    Nothing,
+    /// The test cancelled the simulator first; what had arrived is kept.
+    Cancelled(Vec<u8>),
+}
+
+#[derive(Debug)]
+enum ReadError {
+    Refused(RequestFault),
+    Io(io::Error),
+}
+
+/// The declared frame of a request whose head has ended: `head` counts the
+/// head with its terminator, and `total` adds the declared body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Frame {
+    head: usize,
+    total: usize,
+}
+
 fn read_request(
     stream: &mut TcpStream,
     cancelled: &AtomicBool,
     deadline: Duration,
-) -> io::Result<Vec<u8>> {
+) -> Result<ReadOutcome, ReadError> {
     let mut request = Vec::new();
     let mut buffer = [0_u8; 4096];
+    let mut frame = None;
     let started = Instant::now();
     loop {
-        match stream.read(&mut buffer) {
-            Ok(0) => break,
+        // Once the head has ended, ask only for the bytes it still declares, so
+        // no byte past the declared length is read.
+        let wanted = frame.map_or(buffer.len(), |frame: Frame| {
+            (frame.total - request.len()).min(buffer.len())
+        });
+        match stream.read(&mut buffer[..wanted]) {
+            Ok(0) if request.is_empty() => return Ok(ReadOutcome::Nothing),
+            Ok(0) => {
+                return Err(ReadError::Refused(RequestFault::EndedEarly {
+                    received: request.len(),
+                    expected: frame.map(|frame| frame.total),
+                }));
+            }
             Ok(read) => {
-                if request.len().saturating_add(read) > MAX_REQUEST_BYTES {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "synthetic request exceeded simulator limit",
-                    ));
-                }
                 request.extend_from_slice(&buffer[..read]);
-                if started.elapsed() >= deadline {
-                    return Err(incomplete_request_timeout(&request));
+                if frame.is_none() {
+                    frame = parse_head(&request).map_err(ReadError::Refused)?;
                 }
-                if request_complete(&request) {
-                    break;
+                match frame {
+                    Some(frame) if request.len() > frame.total => {
+                        return Err(ReadError::Refused(RequestFault::PastDeclaredLength {
+                            declared: frame.total - frame.head,
+                            received: request.len() - frame.head,
+                        }));
+                    }
+                    // Whole before the deadline is looked at: a request whose
+                    // last byte arrives late is still whole.
+                    Some(frame) if request.len() == frame.total => {
+                        return Ok(ReadOutcome::Whole(request));
+                    }
+                    Some(_) => {}
+                    None if request.len() > MAX_REQUEST_BYTES => {
+                        return Err(ReadError::Refused(RequestFault::TooLarge {
+                            bytes: request.len(),
+                        }));
+                    }
+                    None => {}
+                }
+                if started.elapsed() >= deadline {
+                    return Err(incomplete(&request, frame));
                 }
             }
             Err(error)
@@ -548,47 +659,73 @@ fn read_request(
                 ) =>
             {
                 if cancelled.load(Ordering::Acquire) {
-                    return Ok(request);
+                    return Ok(ReadOutcome::Cancelled(request));
                 }
                 if started.elapsed() < deadline {
                     continue;
                 }
-                return Err(incomplete_request_timeout(&request));
+                if request.is_empty() {
+                    return Ok(ReadOutcome::Nothing);
+                }
+                return Err(incomplete(&request, frame));
             }
-            Err(error) => return Err(error),
+            Err(error) => return Err(ReadError::Io(error)),
         }
     }
-    Ok(request)
 }
 
-fn incomplete_request_timeout(request: &[u8]) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::TimedOut,
-        format!(
-            "synthetic request body was incomplete (received {}, expected {:?})",
-            request.len(),
-            expected_request_bytes(request)
-        ),
-    )
+fn incomplete(request: &[u8], frame: Option<Frame>) -> ReadError {
+    ReadError::Refused(RequestFault::Incomplete {
+        received: request.len(),
+        expected: frame.map(|frame| frame.total),
+    })
 }
 
-fn request_complete(request: &[u8]) -> bool {
-    expected_request_bytes(request).is_some_and(|expected| request.len() >= expected)
+/// The request's frame once its head has ended, or `None` before then. The
+/// length is parsed here, once, and fails closed.
+fn parse_head(request: &[u8]) -> Result<Option<Frame>, RequestFault> {
+    let Some(terminator) = find_bytes(request, b"\r\n\r\n") else {
+        return Ok(None);
+    };
+    let head = terminator + 4;
+    let text = String::from_utf8_lossy(&request[..terminator]);
+    let mut lines = text.lines();
+    let method = lines
+        .next()
+        .and_then(|line| line.split_whitespace().next())
+        .unwrap_or_default();
+    let mut declared = None;
+    for line in lines {
+        let Some((name, value)) = line.split_once(':') else {
+            continue;
+        };
+        if !name.eq_ignore_ascii_case("content-length") {
+            continue;
+        }
+        if declared.is_some() {
+            return Err(RequestFault::RepeatedContentLength);
+        }
+        declared = Some(parse_content_length(value.trim())?);
+    }
+    let body = match declared {
+        Some(body) => body,
+        None if method == "GET" => 0,
+        None => return Err(RequestFault::MissingContentLength),
+    };
+    let total = head.checked_add(body).ok_or(RequestFault::LengthOverflow)?;
+    if total > MAX_REQUEST_BYTES {
+        return Err(RequestFault::TooLarge { bytes: total });
+    }
+    Ok(Some(Frame { head, total }))
 }
 
-fn expected_request_bytes(request: &[u8]) -> Option<usize> {
-    let header_end = find_bytes(request, b"\r\n\r\n")?;
-    let headers = String::from_utf8_lossy(&request[..header_end]);
-    let content_length = headers
-        .lines()
-        .find_map(|line| {
-            let (name, value) = line.split_once(':')?;
-            name.eq_ignore_ascii_case("content-length")
-                .then(|| value.trim().parse::<usize>().ok())
-                .flatten()
-        })
-        .unwrap_or(0);
-    Some(header_end + 4 + content_length)
+fn parse_content_length(value: &str) -> Result<usize, RequestFault> {
+    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(RequestFault::UnparseableContentLength);
+    }
+    value
+        .parse::<usize>()
+        .map_err(|_| RequestFault::LengthOverflow)
 }
 
 fn request_line(request: &[u8]) -> (String, String) {

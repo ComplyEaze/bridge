@@ -665,14 +665,16 @@ mod tests {
 
     #[test]
     fn a_block_must_keep_its_lines_adjacent_and_in_order() {
-        // A line between two lines of a block, and a comment-only line there, split it.
-        let split = edited(
+        // A comment-only line between two lines of a block splits it.
+        let note = edited(
             "rate_after_deduction_bp = 150",
-            "rate_after_deduction_bp = 150\n# a note\nrate_x = 1",
+            "rate_after_deduction_bp = 150\n# a note\n",
         );
-        let split = split.replace("rate_x = 1\n", "");
-        assert_ne!(split, VENDORED);
-        assert!(!vendored_blocks_in_source(VENDORED, &split));
+        assert_ne!(note, VENDORED);
+        assert!(!vendored_blocks_in_source(VENDORED, &note));
+        // So does a line of its own, in the same place.
+        let line = edited("month_conventions", "rate_x = 1\nmonth_conventions");
+        assert!(!vendored_blocks_in_source(VENDORED, &line));
         let swapped = edited(
             "rate_before_deduction_bp = 100   # 1% per month or part, deductible date -> deducted date\nrate_after_deduction_bp = 150    # 1.5% per month or part, deducted date -> paid date",
             "rate_after_deduction_bp = 150\nrate_before_deduction_bp = 100",

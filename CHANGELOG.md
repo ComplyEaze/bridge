@@ -12,9 +12,23 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-## [0.5.1] - 2026-10-08
+### In plain words: the next build, since 0.5.1
 
-### In plain words: ComplyEaze Bridge 0.5.1, since 0.5.0 (8 Oct 2026)
+These changes are in source and not yet in a published build.
+
+**Changed**
+
+- The hand-import script `scripts/bank_statement_import.py` (not part of the downloaded package, #1430) now writes the same
+  `| Statement party: <name>` segment under the same rules as the app, and
+  refuses a run whose narration holds a control character or the reserved marker, or runs past 2,000 characters, as
+  `narration_not_admissible`, as the app does (`party_not_admissible` when the party's own segment is what breaks
+  the rule). Importing its file again for a statement already imported is expected to rewrite those vouchers'
+  narrations in the book: their keys do not depend on the narration the script writes. A same-key re-import has been measured over
+  the gateway, not through Tally's own Import menu, which is how this script's file is imported.
+
+## [0.5.1] - 2026-10-09
+
+### In plain words: ComplyEaze Bridge 0.5.1, since 0.5.0 (9 Oct 2026)
 
 These changes are in ComplyEaze Bridge 0.5.1. Each line names the pull
 requests it comes from, except where it names an issue.
@@ -28,11 +42,19 @@ requests it comes from, except where it names an issue.
   the setting required. After installing 0.5.1, turn on the Terms setting in
   the extension's settings, then quit and reopen Claude Desktop. Until the
   setting is on, every tool answers `terms_not_accepted` and names the
-  setting; nothing is read from Tally. What we saw: a package built from this
-  change on one Mac (only its version set to 0.5.1), installed over 0.4.2 and
-  over 0.5.0, was started by Claude Desktop (in one run only after Claude Desktop was
-  quit and reopened), and with the setting off its tools gave that answer. Not tried: the published 0.5.1 file, an update on Windows, and a
-  release older than 0.4.2 (#1413).
+  setting; nothing is read from Tally. What we saw: a package built from the
+  Terms-setting change (#1436) on one Mac (only its version set to 0.5.1),
+  installed over 0.4.2 and over 0.5.0, was started by Claude Desktop (in one run
+  only after Claude Desktop was quit and reopened), and with the setting off its
+  tools gave that answer. On one Windows 10 computer with Claude Desktop 2.26454.2
+  from the Microsoft Store, the published 0.5.0 file over 0.4.2 was not started
+  either (no ComplyEaze Bridge tool in the chat and no error), and the build our
+  checks made for this release (commit d744d25a, not the published file) was
+  started after a fresh install, after an
+  update from 0.4.2 and after an update from 0.5.0 (as the update leaves it, and
+  with the Terms ticked); with the Terms off every tool gave that answer, and with
+  them on the Tally check ran. Not tried: the published 0.5.1 file, and a release
+  older than 0.4.2 (#1413).
 - **If 0.5.0 already starts for you:** the other changes below are the reason
   to update, if any.
 - **If you use the bank-statement tool and build vouchers for mapped ledgers:**
@@ -40,8 +62,8 @@ requests it comes from, except where it names an issue.
   text (see "What you can do now" below). Vouchers already imported keep their
   narration, but amending a batch built before this change rewrites the
   narrations of that batch's vouchers in the book (#1430).
-- **If you use ComplyEaze Bridge on Windows, treat it as untried:** no one on our
-  side has installed the Windows package of this build in Claude Desktop.
+- **After updating, if the assistant does not find ComplyEaze Bridge, check that it is switched on in Settings, Extensions.** An update keeps the extension's switch as it was: on one Windows computer, an extension switched off before the update was still off after it, and the assistant showed no ComplyEaze Bridge tools and no error. Switching it on was enough there (#1413).
+- **If you use ComplyEaze Bridge on Windows:** the build of this release made by our checks was tried on one Windows 10 computer, with TallyPrime 7.1 (Silver) and a company made for the test; see "Known limits" below for what was and was not tried.
 - **How:** ComplyEaze Bridge does not update itself. Follow the
   [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
   (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
@@ -58,7 +80,7 @@ requests it comes from, except where it names an issue.
 - A voucher built from a bank statement for a mapped ledger now carries `| Statement party: <name>`, the
   counterparty the statement printed, at the end of its narration text (#1430). A file you import by hand adds
   ComplyEaze Bridge's `[BRIDGE:...]` tag after it. A line sent to suspense and a
-  cash line are written as before. A party that contains `|`, that carries the reserved marker, or that makes the narration longer than 2,000
+  cash line are written as before. A party that contains `|` or a control character, that carries the reserved marker, or that makes the narration longer than 2,000
   characters now refuses the statement run (`party_not_admissible`); `skip` that party or map it to the suspense
   ledger. A label the parser gives a line by its wording (bank charges, a card fee, an instalment) is not written as a party. Vouchers already imported keep their narration,
   but amending a batch built before this change rewrites the narrations of that batch's vouchers in the book.
@@ -72,11 +94,11 @@ requests it comes from, except where it names an issue.
   Bridge, and until you turn the setting on every tool answers
   `terms_not_accepted`, naming the setting. That the app starts and the tools
   answer was seen on one Mac with a package built from the Terms-setting change
-  (#1436); it has not yet been checked on Windows (#1413). The setting no
-  longer shows "(required)" beside its title, and its description now begins
-  "Tick to use ComplyEaze Bridge: it refuses every tool call until you accept
-  the Terms of Use." A test checks that wording; it has not been seen in Claude
-  Desktop yet.
+  (#1436), and on one Windows computer with the build of this release (#1413).
+  The setting no longer shows "(required)" beside its title, and its description
+  now begins "Tick to use ComplyEaze Bridge: it refuses every tool call until you
+  accept the Terms of Use." A test checks that wording, and it was seen in
+  Claude Desktop on that Windows computer.
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
   the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
   text already said; the schema said 500 even when the row limit was lower or higher (#1148).
@@ -89,18 +111,26 @@ requests it comes from, except where it names an issue.
   desktop journal screen, stop until the record is put right, and the local data report shows the
   journal as not read. The current code writes only that form, so only a record edited by hand is
   expected to hold such a date, and the stored bytes do not change (#1307).
-- A program built from this repository no longer reads `BRIDGE_PDFIUM_LIBRARY` to load the PDF
-  library from another place; it loads it from the folder that holds its own program. Only its
-  tests read that setting (#1422).
+- The PDF library is loaded from the folder that holds the program (#1422).
 
 **Known limits**
 
-- Windows is untried for this build, and so is the published 0.5.1 file. The
-  Terms start-up behaviour above was seen on one Mac with a package built from
-  the Terms-setting change (#1436), over 0.4.2 and over 0.5.0 (#1413).
+- Windows was tried on one computer (Windows 10, Claude Desktop 2.26454.2 from
+  the Microsoft Store, TallyPrime 7.1 Silver, a company made for the test), with
+  the build our checks made for this release at commit d744d25a. The published
+  0.5.1 file was not tried, and nothing was tried on other Windows versions or
+  other Tally editions (#1413).
+- On that computer, a bank-statement import file built for six vouchers was
+  imported by hand into Tally and read back: the verification found all six, and
+  a voucher posted to a mapped ledger showed its narration with
+  `| Statement party: <name>` before the `[BRIDGE:...]` tag. An unchanged
+  re-import of the same file was matched to the six vouchers already there and
+  added none. A changed re-import was not tried (#1430).
+- On one Windows computer where Claude Desktop was installed from the Microsoft Store, the folder shown for a built import file did not exist: the file was under the user's AppData\Local\Packages\Claude_<id>\LocalCache\Local\Bridge\agent\imports folder. If Tally's Import screen does not find the file at the path shown, look there. Seen with 0.5.0 as well (#1459).
 - The library that reads Tally's replies was updated (#1198). Its output for
-  the saved replies in our test record is unchanged; it was not run against
-  a new capture from TallyPrime or on Windows. The bank-statement narration change was not run through a Tally import (#1430).
+  the saved replies in our test record is unchanged. The Windows runs above used
+  it for a company list, the read-back of six vouchers and an August trial
+  balance on a small company; it was not run against a large book.
 
 ## [0.5.0] - 2026-10-08
 

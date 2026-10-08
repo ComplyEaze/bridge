@@ -170,9 +170,11 @@ PASSING = {KILLED, TIMEOUT}  # a test-run timeout is a hang the suite would not 
 CRASHED = "<crashed>"  # the test name recorded when a test binary dies without naming a failure
 
 # Crate-relative files that never change what a test does: no crate source names them (a unit
-# test holds that), and a change to the list is judged entry by entry (see the docstring).
+# test holds that), and a change to the list is judged entry by entry (see the docstring). The
+# local parity example is built by `cargo test` and run by no test; a change that stops it
+# compiling fails the pull request's own test and clippy runs.
 INERT = ("parity/mutations.py", "parity/mutation-results.json", "parity/test_mutations.py",
-         "parity/mutations.json")
+         "parity/mutations.json", "examples/local_parity.rs")
 # The machine-readable line a failed report ends with, which the nightly puts in its issue.
 FAILING_MARK = "mutation-nightly-failing:"
 # The header ci.yml writes before each open issue's body in the --nightly-issues file.

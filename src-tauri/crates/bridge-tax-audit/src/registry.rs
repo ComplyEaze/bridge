@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Every ported test, one entry each, sorted by test id: how to run it on a book, and the
 //! least number of figures a parity comparison of it must see. Porting a test adds one entry
-//! here and one runner in `parity/python_golden.py`'s `RUNNERS`; `examples/local_parity.rs`,
+//! here and one runner in `parity/python_golden.py`'s `RUNNERS`; `examples/local_parity`,
 //! `compare::default_min_figures` and the registry-wide CI parity (`tests/registry.rs`) read
 //! this table instead of listing tests themselves.
 
@@ -138,6 +138,12 @@ pub const PORTED: &[PortedTest] = &[
                 &c.traces.ais,
             )
         },
+    },
+    PortedTest {
+        id: "knock_off_candidates",
+        // The seven fixed figures, on every book.
+        min_figures: 7,
+        run_on: |e, b, r, _| crate::knock_off_candidates_on(e, b, r),
     },
     PortedTest {
         id: "ledger_scrutiny",

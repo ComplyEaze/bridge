@@ -45,14 +45,17 @@ Read from the engagement's book, as the crate's `src/book.rs` holds it:
   GUID. The chain decides whether a ledger is a party or a bank or cash ledger (README section 3.1);
   the GUID only gives the tag in two figure ids (README section 4.7). Every ledger master whose name
   yields a token also counts when the test looks for names two masters share (README section 3.3).
-- **Vouchers**: GUID, date, voucher type name, number, narration, status and lines; each line is a
-  ledger name and an integer amount in paise, debit positive, credit negative.
+- **Vouchers**: GUID, date, voucher type name, base voucher type, number, narration, status and
+  lines; each line is a ledger name and an integer amount in paise, debit positive, credit negative.
+  The base type is read once: to tell a Contra when a voucher's money is counted (README section 4.1;
+  `knock_off_candidates.py`, `money_of`: `v.base_type == "Contra"`, line 218 at reference commit
+  `742f67fc`). Nothing else in the test reads it, and the evidence label uses the type name (README section 4.2).
 - **The books population**: vouchers whose status is regular (`Book::population`). Optional,
   cancelled and post-dated vouchers are never read (`ko_status`). The test always forms the
   population, so a book with any voucher of unknown status refuses (README section 10).
 
-Not read: the Trial Balance, the group masters themselves (only each ledger's chain), the base
-voucher type, the party field, the reference, inventory, and the edge book's `cash` and `bank` lists.
+Not read: the Trial Balance, the group masters themselves (only each ledger's chain), the party
+field, the reference, inventory, and the edge book's `cash` and `bank` lists.
 Bank and cash ledgers are found by group, never by those lists (`ko_groups`: `OD Account` is a bank
 ledger though `bank` names only `Bank A`).
 
@@ -272,8 +275,8 @@ two more come for each name found plainly.
 
 Consequences the goldens show: a T1 voucher adds every positive party line, even for a party whose
 lines net to zero (`ko_t1`'s t08 adds the ₹2,000 debit line of `Alpha Traders`, whose two lines net to
-`₹0`); a voucher whose every non-nil line is on a bank or cash ledger, or any Contra, moves one amount
-between money ledgers and counts the larger side of its money lines once (`ko_t2`'s b04 adds its
+`₹0`); a voucher whose every non-nil line is on a bank or cash ledger, or whose base type is Contra,
+moves one amount between money ledgers and counts the larger side of its money lines once (`ko_t2`'s b04 adds its
 amount once); every other voucher sums the absolute value of each of its bank and cash lines; a voucher that is both a T2 and a T2 embedded row is in both totals (`ko_nested`'s n16); a T2
 row naming two parties counts once in `t2_row_count` and once in each name's figures, so
 `t2_named_pair_count` exceeds `t2_row_count` (`ko_t2`: 14 and 13).

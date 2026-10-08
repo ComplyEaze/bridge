@@ -8820,8 +8820,8 @@
   "by": "author",
   "what": "bind drops the bound party identity table",
   "file": "src/binding.rs",
-  "from": "        party_identity,\n        ..engagement.clone()",
-  "to": "        ..engagement.clone()"
+  "from": "        party_identity,\n        party_groups,\n        party_identity_not_a_table,\n        ..engagement.clone()",
+  "to": "        party_groups,\n        party_identity_not_a_table,\n        ..engagement.clone()"
  },
  {
   "id": "EG-52",
@@ -12046,5 +12046,309 @@
   "file": "src/lib.rs",
   "from": "questionnaire_cl13::run(book, rules, &bound.period, Some(&stock_result))?",
   "to": "questionnaire_cl13::run(book, rules, &bound.period, None)?"
+ },
+ {
+  "id": "R1446-01",
+  "by": "author",
+  "what": "rules: the text before a trailing comment keeps the whitespace in front of the comment",
+  "file": "src/rules.rs",
+  "from": "            None if c == '#' => return line[..at].trim_end(),",
+  "to": "            None if c == '#' => return &line[..at],"
+ },
+ {
+  "id": "R1446-02",
+  "by": "author",
+  "what": "rules: a # inside a literal ('...') string starts a comment",
+  "file": "src/rules.rs",
+  "from": "            None if c == '\"' || c == '\\'' => quote = Some(c),",
+  "to": "            None if c == '\"' => quote = Some(c),"
+ },
+ {
+  "id": "R1446-03",
+  "by": "author",
+  "what": "rules: a backslash escapes the next character in a literal string too",
+  "file": "src/rules.rs",
+  "from": "                } else if c == '\\\\' && q == '\"' {",
+  "to": "                } else if c == '\\\\' {"
+ },
+ {
+  "id": "R1446-04",
+  "by": "author",
+  "what": "rules: one vendored block found in the live source is enough",
+  "file": "src/rules.rs",
+  "from": "        .all(|block| {",
+  "to": "        .any(|block| {"
+ },
+ {
+  "id": "R1446-05",
+  "by": "author",
+  "what": "rules: a block's lines may sit apart and in any order in the live source",
+  "file": "src/rules.rs",
+  "from": "            live.windows(want.len()).any(|w| w == want.as_slice())",
+  "to": "            want.iter().all(|l| live.contains(l))"
+ },
+ {
+  "id": "R1446-06",
+  "by": "author",
+  "what": "rules: an escaped quote in a string keeps the next character escaped",
+  "file": "src/rules.rs",
+  "from": "                    escaped = false;",
+  "to": "                    escaped = true;"
+ },
+ {
+  "id": "R1446-07",
+  "by": "author",
+  "what": "rules: a comment-only line of the live source between a block's lines is skipped",
+  "file": "src/rules.rs",
+  "from": "    let live: Vec<&str> = source.lines().map(without_comment).collect();",
+  "to": "    let live: Vec<&str> = source\n        .lines()\n        .filter(|l| !l.trim_start().starts_with('#'))\n        .map(without_comment)\n        .collect();"
+ },
+ {
+  "id": "KO-01",
+  "by": "author",
+  "what": "knock_off_candidates: a mark after a letter a to z is kept",
+  "file": "src/knock_off_candidates.rs",
+  "from": ".is_some_and(|p| !p.is_ascii_lowercase())",
+  "to": ".is_some()"
+ },
+ {
+  "id": "KO-02",
+  "by": "author",
+  "what": "knock_off_candidates: a mark that would start a token is kept",
+  "file": "src/knock_off_candidates.rs",
+  "from": ".is_some_and(|p| !p.is_ascii_lowercase())",
+  "to": ".is_none_or(|p| !p.is_ascii_lowercase())"
+ },
+ {
+  "id": "KO-03",
+  "by": "author",
+  "what": "knock_off_candidates: the zero-width joiner, non-joiner and soft hyphen end a token",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        if DROPPED.contains(&c) {\n            continue;\n        }\n",
+  "to": ""
+ },
+ {
+  "id": "KO-04",
+  "by": "author",
+  "what": "knock_off_candidates: the text is not cut at a late code point before normalising",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        if in_table(&LATE, c) {\n            flush(&mut piece, &mut out);",
+  "to": "        if false {\n            flush(&mut piece, &mut out);"
+ },
+ {
+  "id": "KO-05",
+  "by": "author",
+  "what": "knock_off_candidates: the text is not decomposed",
+  "file": "src/knock_off_candidates.rs",
+  "from": "let nfd: String = piece.nfd().collect();",
+  "to": "let nfd: String = piece.clone();"
+ },
+ {
+  "id": "KO-06",
+  "by": "author",
+  "what": "knock_off_candidates: the text is decomposed with NFKD, not NFD",
+  "file": "src/knock_off_candidates.rs",
+  "from": "let nfd: String = piece.nfd().collect();",
+  "to": "let nfd: String = piece.nfkd().collect();"
+ },
+ {
+  "id": "KO-07",
+  "by": "author",
+  "what": "knock_off_candidates: a mark is never a token character",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        } else if in_table(&MARK, c) {",
+  "to": "        } else if false {"
+ },
+ {
+  "id": "KO-08",
+  "by": "author",
+  "what": "knock_off_candidates: letters and numbers are taken by Rust's is_alphanumeric, not Python's categories",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        } else if in_table(&LETTER_OR_NUMBER, c) {",
+  "to": "        } else if c.is_alphanumeric() {"
+ },
+ {
+  "id": "KO-09",
+  "by": "author",
+  "what": "knock_off_candidates: `|` does not cut a part",
+  "file": "src/knock_off_candidates.rs",
+  "from": "const SEPARATORS: [char; 9] = ['-', '/', ',', ';', '|', ':', '(', ')', '\\\\'];",
+  "to": "const SEPARATORS: [char; 8] = ['-', '/', ',', ';', ':', '(', ')', '\\\\'];"
+ },
+ {
+  "id": "KO-10",
+  "by": "author",
+  "what": "knock_off_candidates: `neft` is name-like",
+  "file": "src/knock_off_candidates.rs",
+  "from": "    \"neft\",\n",
+  "to": "    \"neftx\",\n"
+ },
+ {
+  "id": "KO-11",
+  "by": "author",
+  "what": "knock_off_candidates: a one-letter word is name-like",
+  "file": "src/knock_off_candidates.rs",
+  "from": "token.chars().count() >= 2",
+  "to": "token.chars().count() >= 1"
+ },
+ {
+  "id": "KO-12",
+  "by": "author",
+  "what": "knock_off_candidates: a word with a digit is name-like",
+  "file": "src/knock_off_candidates.rs",
+  "from": "token.chars().all(|c| c.is_ascii_lowercase())",
+  "to": "token.chars().all(|c| c.is_ascii_alphanumeric())"
+ },
+ {
+  "id": "KO-13",
+  "by": "author",
+  "what": "knock_off_candidates: the word beside a name may sit in another part",
+  "file": "src/knock_off_candidates.rs",
+  "from": "n.tokens[t].1 == n.tokens[anchor].1 && name_like(words[t])",
+  "to": "name_like(words[t])"
+ },
+ {
+  "id": "KO-14",
+  "by": "author",
+  "what": "knock_off_candidates: a word in a disjoint kept span still makes a name inside",
+  "file": "src/knock_off_candidates.rs",
+  "from": "if !holding.is_empty() && !holding.iter()",
+  "to": "if false && !holding.iter()"
+ },
+ {
+  "id": "KO-15",
+  "by": "author",
+  "what": "knock_off_candidates: only the word before a name is looked at",
+  "file": "src/knock_off_candidates.rs",
+  "from": "beside(s.checked_sub(1), s) || beside(Some(e + 1), e)",
+  "to": "beside(s.checked_sub(1), s)"
+ },
+ {
+  "id": "KO-16",
+  "by": "author",
+  "what": "knock_off_candidates: the word before a name is compared with the part of its last token",
+  "file": "src/knock_off_candidates.rs",
+  "from": "beside(s.checked_sub(1), s) || beside(Some(e + 1), e)",
+  "to": "beside(s.checked_sub(1), e) || beside(Some(e + 1), e)"
+ },
+ {
+  "id": "KO-17",
+  "by": "author",
+  "what": "knock_off_candidates: a span inside a longer found span is kept",
+  "file": "src/knock_off_candidates.rs",
+  "from": ".any(|&(fs, fe, _)| fs <= s && e <= fe && (fs, fe) != (s, e))",
+  "to": ".any(|&(fs, fe, _)| false && fs <= s && e <= fe && (fs, fe) != (s, e))"
+ },
+ {
+  "id": "KO-18",
+  "by": "author",
+  "what": "knock_off_candidates: a name two masters share is bound to a party",
+  "file": "src/knock_off_candidates.rs",
+  "from": "let owner = (masters[&key] == 1).then_some(*name);",
+  "to": "let owner = Some(*name);"
+ },
+ {
+  "id": "KO-19",
+  "by": "author",
+  "what": "knock_off_candidates: a shared name is dropped from the index",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        index.insert(key, owner);\n",
+  "to": "        if owner.is_some() {\n            index.insert(key, owner);\n        }\n"
+ },
+ {
+  "id": "KO-20",
+  "by": "author",
+  "what": "knock_off_candidates: a ledger on the voucher is still reported",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        if on_voucher.contains(name) {\n            continue;\n        }\n",
+  "to": ""
+ },
+ {
+  "id": "KO-21",
+  "by": "author",
+  "what": "knock_off_candidates: an inside occurrence of a name also plain on the voucher is recorded",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        if !out.plain.contains(name) {",
+  "to": "        if true {"
+ },
+ {
+  "id": "KO-22",
+  "by": "author",
+  "what": "knock_off_candidates: an inside part runs only to the end of the part of the name's first token",
+  "file": "src/knock_off_candidates.rs",
+  "from": "n.between(n.tokens[s].1, n.tokens[e].1)",
+  "to": "n.between(n.tokens[s].1, n.tokens[s].1)"
+ },
+ {
+  "id": "KO-23",
+  "by": "author",
+  "what": "knock_off_candidates: only a Contra counts its money once",
+  "file": "src/knock_off_candidates.rs",
+  "from": "if v.vtype == CONTRA || lines().all(|l| money.contains(l.ledger.as_str())) {",
+  "to": "if v.vtype == CONTRA {"
+ },
+ {
+  "id": "KO-24",
+  "by": "author",
+  "what": "knock_off_candidates: every voucher sums its money lines' absolute values",
+  "file": "src/knock_off_candidates.rs",
+  "from": "if v.vtype == CONTRA || lines().all(|l| money.contains(l.ledger.as_str())) {",
+  "to": "if false {"
+ },
+ {
+  "id": "KO-25",
+  "by": "author",
+  "what": "knock_off_candidates: a narration of exactly 80 characters is cut",
+  "file": "src/knock_off_candidates.rs",
+  "from": "collapsed.chars().count() > SHOWN_CHARS",
+  "to": "collapsed.chars().count() >= SHOWN_CHARS"
+ },
+ {
+  "id": "KO-26",
+  "by": "author",
+  "what": "knock_off_candidates: the engagement's party groups are ignored",
+  "file": "src/knock_off_candidates.rs",
+  "from": "PARTY_GROUPS.iter().any(|g| l.under(g)) || party_groups.iter().any(|g| l.under(g))",
+  "to": "PARTY_GROUPS.iter().any(|g| l.under(g))"
+ },
+ {
+  "id": "KO-27",
+  "by": "author",
+  "what": "knock_off_candidates: a bank or cash line does not block T1",
+  "file": "src/knock_off_candidates.rs",
+  "from": "if parties.len() >= 2 && !has_money {",
+  "to": "if parties.len() >= 2 {"
+ },
+ {
+  "id": "KO-28",
+  "by": "author",
+  "what": "knock_off_candidates: a zero line puts its ledger on the voucher",
+  "file": "src/knock_off_candidates.rs",
+  "from": "            .filter(|l| l.amount_paise != 0)\n            .map(|l| l.ledger.as_str())\n",
+  "to": "            .map(|l| l.ledger.as_str())\n"
+ },
+ {
+  "id": "KO-29",
+  "by": "author",
+  "what": "knock_off_candidates: T1's total adds every party line, credits included",
+  "file": "src/knock_off_candidates.rs",
+  "from": ".filter(|l| l.amount_paise > 0 && party.contains(l.ledger.as_str()))",
+  "to": ".filter(|l| party.contains(l.ledger.as_str()))"
+ },
+ {
+  "id": "KO-30",
+  "by": "author",
+  "what": "knock_off_candidates: knock_off_candidates_on runs on a [party_identity] that is not a table",
+  "file": "src/lib.rs",
+  "from": "    if bound.party_identity_not_a_table {",
+  "to": "    if false {"
+ },
+ {
+  "id": "KO-31",
+  "by": "author",
+  "what": "knock_off_candidates: bind keeps no party groups for knock_off_candidates",
+  "file": "src/binding.rs",
+  "from": "        party_groups = bound;\n",
+  "to": "        let _ = bound;\n"
  }
 ]

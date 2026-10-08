@@ -1,4 +1,6 @@
 package.json
 src-tauri/Cargo.lock
 src-tauri/Cargo.toml
+src-tauri/src/agent_bank_statement.rs
+src-tauri/src/agent_catalog.rs
 reviewer: lamemustafa

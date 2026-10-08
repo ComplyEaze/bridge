@@ -9,4 +9,33 @@ Ok(Lines {
     ),
     present: 3,
     empty: 0,
+    lines: [
+        NativeReportLine {
+            name: "Finished Kits",
+            quantity: Empty,
+            amount: Some(
+                ExactDecimal(
+                    "18750.00",
+                ),
+            ),
+        },
+        NativeReportLine {
+            name: "Packaging",
+            quantity: Empty,
+            amount: Some(
+                ExactDecimal(
+                    "14500.00",
+                ),
+            ),
+        },
+        NativeReportLine {
+            name: "Raw Chemicals",
+            quantity: Empty,
+            amount: Some(
+                ExactDecimal(
+                    "-30249.99",
+                ),
+            ),
+        },
+    ],
 })

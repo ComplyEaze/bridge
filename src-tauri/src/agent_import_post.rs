@@ -586,7 +586,7 @@ impl Server {
         let mut preexisting_txn_ids: Option<Vec<String>> = None;
         // Set when the batch that met that refusal holds an invoice: the
         // unsettled batch of this machine with its figures, if there is one.
-        let mut preexisting_invoice: Option<Option<String>> = None;
+        let mut preexisting_invoice: Option<Result<Option<String>, String>> = None;
         let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
@@ -743,18 +743,7 @@ impl Server {
             require_absent_verification_result(&before.payload["result"], line.vouchers.len())
                 .inspect_err(|_| {
                     preexisting_txn_ids = Some(present_txn_ids(&before.payload["result"]));
-                    preexisting_invoice = line
-                        .vouchers
-                        .iter()
-                        .any(|voucher| voucher.voucher_type.is_invoice())
-                        .then(|| {
-                            self.lock_import_admission_shared()
-                                .and_then(|_lock| {
-                                    self.import_unsettled_invoice_twin_while_admitted(&line)
-                                })
-                                .ok()
-                                .flatten()
-                        });
+                    preexisting_invoice = self.import_unsettled_invoice_twin_for_refusal(&line);
                 })?;
             let payload = ImportPayload {
                 company_guid: line.company_guid.clone(),
@@ -1060,13 +1049,7 @@ impl Server {
             // Read inside the endpoint's dispatch lease, so no other post of
             // this machine to this endpoint can be sent between this read and
             // the queued recheck that uses it.
-            let invoice_identity = {
-                let _lock = self.lock_import_admission_shared()?;
-                InvoiceIdentity::beside(
-                    self.import_unsettled_invoice_twin_while_admitted(&line)?
-                        .as_deref(),
-                )
-            };
+            let invoice_identity = self.import_invoice_identity(&line)?;
             let posted = self
                 .runtime
                 .post_approved_import(
@@ -1967,7 +1950,7 @@ const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in e
 
 /// The same refusal for an invoice, which is recognised by its number and not
 /// by its figures (ADR 0004). It names no amount, ledger or narration.
-const PREEXISTING_INVOICE_NEXT_STEP: &str = "Nothing was sent. A voucher already in the book looks like this invoice: it has this invoice's number under this voucher type, or it has no number and the same date, ledgers, amounts and sides. Open that voucher in Tally. If it is this invoice, the invoice is in the book: do not build it again. If it is another invoice, tell the user the number is in use and ask which invoice number to use; never choose a number yourself. If error.unsettled_batch_id is present, an earlier batch from this computer with the same date, ledgers, amounts and sides was sent to Tally and has not been confirmed, so a voucher with those figures may be that batch's invoice whatever its number: run verify_import on that batch and look at the voucher in Tally before building this invoice again.";
+const PREEXISTING_INVOICE_NEXT_STEP: &str = "Nothing was sent. A voucher already in the book looks like this invoice, in one or more of three ways. Open it in Tally first and confirm it is a regular voucher (not optional, post-dated or cancelled): if you cannot find it, do not enter the invoice by hand, ask the user. (1) It has this invoice's number under this voucher type. If it is this invoice, the invoice is in the book: do not build it again. If it is another invoice, tell the user the number is in use and ask which invoice number to use; never choose a number yourself. (2) It has no number and the same date, ledgers, amounts and sides. If it is this invoice, it is in the book: do not build it again. If it is another sale, a new number does not get past this check: tell the user and enter the invoice in Tally by hand. (3) error.unsettled_batch_id is present: an earlier batch from this computer with the same date, ledgers, amounts and sides was sent to Tally and has not been confirmed, so a voucher with those figures may be that batch's invoice whatever its number. If the voucher is that batch's invoice, it is in the book: do not build it again. If that batch's answer was received, verify_import on it can confirm it and end this refusal; that is not permission to build this invoice again if it is already in the book. If you have found the voucher and it is not that batch's invoice, or the user says this is another sale, ComplyEaze Bridge cannot post it while that batch is unconfirmed: enter it in Tally by hand. If error.unsettled_batch_unread is present instead, and no voucher in the book is this invoice by case (1) or (2), the check could not read the journal or the invoice, and its value says why: if it is import_admission_busy, another action of ComplyEaze Bridge holds the journal, so build the invoice again once; for any other value tell the user, and do not assume a batch exists. Apart from the new number the user chooses in case (1), never change a number, date, ledger, amount or side to get past this check.";
 
 /// Name the rows of the batch that are already in the book, with the way on.
 /// `invoice` is set for a batch that holds an invoice, to the unsettled batch
@@ -1975,7 +1958,7 @@ const PREEXISTING_INVOICE_NEXT_STEP: &str = "Nothing was sent. A voucher already
 fn name_preexisting_rows(
     payload: &mut Value,
     txn_ids: &[String],
-    invoice: Option<&Option<String>>,
+    invoice: Option<&Result<Option<String>, String>>,
 ) {
     if txn_ids.is_empty() {
         return;
@@ -1986,8 +1969,12 @@ fn name_preexisting_rows(
         Some(_) => PREEXISTING_INVOICE_NEXT_STEP,
         None => PREEXISTING_ROWS_NEXT_STEP,
     });
-    if let Some(Some(batch_id)) = invoice {
-        error["unsettled_batch_id"] = json!(batch_id);
+    match invoice {
+        Some(Ok(Some(batch_id))) => error["unsettled_batch_id"] = json!(batch_id),
+        // The journal could not be read to say whether a batch is unconfirmed:
+        // the refusal says so, never that there is none.
+        Some(Err(code)) => error["unsettled_batch_unread"] = json!(code),
+        Some(Ok(None)) | None => {}
     }
     // Set only at the check before the dialog, where nothing was sent, so the
     // generic "never rebuild it to retry" of an unobserved attempt would

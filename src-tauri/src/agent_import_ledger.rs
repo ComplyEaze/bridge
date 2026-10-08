@@ -531,76 +531,110 @@ pub(super) fn rows_already_posted(
 }
 
 /// An invoice's date, filed type and entries, as two saved invoices are
-/// compared; `None` for every other voucher.
-fn invoice_figures(voucher: &ImportVoucher) -> Option<(String, String, Vec<String>)> {
+/// compared.
+enum InvoiceFigures {
+    /// Not an invoice: the guard reads nothing of it.
+    NotInvoice,
+    /// An invoice whose amount or date cannot be read. The guard never takes
+    /// this for "no figures": on a saved batch it counts as a match.
+    Unreadable,
+    Of((String, String, Vec<String>)),
+}
+
+fn invoice_figures(voucher: &ImportVoucher) -> InvoiceFigures {
     if !voucher.voucher_type.is_invoice() {
-        return None;
+        return InvoiceFigures::NotInvoice;
     }
     let mut canonical = voucher.clone();
     for entry in &mut canonical.entries {
-        entry.amount = super::verification::canonical_verification_amount(&entry.amount).ok()?;
+        match super::verification::canonical_verification_amount(&entry.amount) {
+            Ok(amount) => entry.amount = amount,
+            Err(_) => return InvoiceFigures::Unreadable,
+        }
     }
-    Some((
-        normalized_date(&voucher.date).ok()?.as_str().to_string(),
-        voucher.filed_type_name().to_string(),
-        super::verification::expected_entry_fingerprint(&canonical),
-    ))
+    match normalized_date(&voucher.date) {
+        Ok(date) => InvoiceFigures::Of((
+            date.as_str().to_string(),
+            voucher.filed_type_name().to_string(),
+            super::verification::expected_entry_fingerprint(&canonical),
+        )),
+        Err(_) => InvoiceFigures::Unreadable,
+    }
 }
 
 /// The id of another batch of the same company that Bridge sent to Tally (a
-/// dispatch intent), that no readback has found posted, and that holds an
+/// dispatch intent), whose latest status is not a verified post, and that holds an
 /// invoice with the date, filed type and entries of `batch`'s invoice; the
 /// first in id order. A post whose answer was lost never binds, and such a
 /// batch may be this invoice under the number it was first given, so while it
 /// stands the invoice is matched by its figures as well as its number
 /// (`InvoiceIdentity::ByNumberOrFigures`). A batch that was only built, or one
-/// a readback found posted, does not count: two invoices with the same figures
-/// are otherwise two documents. A batch with no invoice reads nothing here.
+/// whose latest status is `posted_verified`, does not count: two invoices with
+/// the same figures are otherwise two documents. A batch with no invoice reads
+/// nothing here. It fails closed: an invoice of the batch itself that cannot be
+/// read is an error, and one of a saved batch that cannot be read counts as a
+/// twin.
 pub(super) fn unsettled_invoice_twin(
     reader: impl BufRead,
     batch: &ImportLedgerLine,
 ) -> Result<Option<String>, String> {
-    let wanted = batch
-        .vouchers
-        .iter()
-        .filter_map(invoice_figures)
-        .collect::<Vec<_>>();
+    let mut wanted = Vec::new();
+    for figures in batch.vouchers.iter().map(invoice_figures) {
+        match figures {
+            InvoiceFigures::NotInvoice => {}
+            InvoiceFigures::Unreadable => return Err("import_invoice_figures_unreadable".into()),
+            InvoiceFigures::Of(figures) => wanted.push(figures),
+        }
+    }
     if wanted.is_empty() {
         return Ok(None);
     }
     let mut holds_a_twin = BTreeSet::new();
     let mut sent = BTreeSet::new();
-    let mut found_posted = BTreeSet::new();
+    // A batch is settled when its LATEST status is `posted_verified`, as
+    // `settlement` takes it: a dispatch intent after a hand import's
+    // verification makes it unverified again.
+    let mut verified = BTreeSet::new();
     scan_records(reader, |record, _| match record {
         Record::Batch(other) if other.batch_id != batch.batch_id => {
             let twin = other.company_guid.eq_ignore_ascii_case(&batch.company_guid)
                 && other
                     .vouchers
                     .iter()
-                    .filter_map(invoice_figures)
-                    .any(|figures| wanted.contains(&figures));
+                    .map(invoice_figures)
+                    .any(|figures| match figures {
+                        InvoiceFigures::NotInvoice => false,
+                        InvoiceFigures::Unreadable => true,
+                        InvoiceFigures::Of(figures) => wanted.contains(&figures),
+                    });
             if twin {
                 holds_a_twin.insert(other.batch_id.clone());
             } else {
                 holds_a_twin.remove(&other.batch_id);
             }
             if other.status == "posted_verified" {
-                found_posted.insert(other.batch_id.clone());
+                verified.insert(other.batch_id.clone());
+            } else {
+                verified.remove(&other.batch_id);
             }
         }
         Record::Status(update) => {
             if matches!(update.record_type, StatusKind::DispatchIntent) {
                 sent.insert(update.batch_id.clone());
             }
-            if update.status == "posted_verified" {
-                found_posted.insert(update.batch_id.clone());
+            if update.sets_status() {
+                if update.status == "posted_verified" {
+                    verified.insert(update.batch_id.clone());
+                } else {
+                    verified.remove(&update.batch_id);
+                }
             }
         }
         Record::Batch(_) => {}
     })?;
     Ok(holds_a_twin
         .intersection(&sent)
-        .find(|id| !found_posted.contains(*id))
+        .find(|id| !verified.contains(*id))
         .cloned())
 }
 

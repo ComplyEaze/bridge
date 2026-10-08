@@ -856,3 +856,43 @@ fn an_invoice_sent_and_not_found_posted_is_the_unsettled_twin_of_its_figures() {
         Ok(None)
     );
 }
+
+/// A batch is settled by its LATEST status, as `settlement` takes it: one a
+/// readback found posted and that was sent again afterwards is unsettled
+/// again, so the guard comes back on.
+#[test]
+fn a_batch_sent_again_after_it_was_found_posted_is_unsettled_again() {
+    let first = invoice_batch("first", 'a', ("INV/1", "Sales Manual"), SALE);
+    let second = invoice_batch("second", 'b', ("INV/2", "Sales Manual"), SALE);
+    let journal = [record(&first), found(&first), sent(&first), record(&second)].concat();
+    assert_eq!(
+        unsettled_invoice_twin(Cursor::new(journal), &second),
+        Ok(Some("first".to_string()))
+    );
+}
+
+/// The guard fails closed. A saved batch whose invoice cannot be read counts
+/// as a twin once sent; an invoice of the batch itself that cannot be read is
+/// an error, never "no figures, nothing to match".
+#[test]
+fn an_invoice_that_cannot_be_read_never_switches_the_guard_off() {
+    let unreadable = invoice_batch(
+        "unreadable",
+        'a',
+        ("INV/1", "Sales Manual"),
+        &[
+            ("Customer", "not-a-number", "Dr"),
+            ("Sales", "118.00", "Cr"),
+        ],
+    );
+    let second = invoice_batch("second", 'b', ("INV/2", "Sales Manual"), SALE);
+    let journal = [record(&unreadable), sent(&unreadable), record(&second)].concat();
+    assert_eq!(
+        unsettled_invoice_twin(Cursor::new(journal), &second),
+        Ok(Some("unreadable".to_string()))
+    );
+    assert_eq!(
+        unsettled_invoice_twin(Cursor::new(Vec::new()), &unreadable),
+        Err("import_invoice_figures_unreadable".to_string())
+    );
+}

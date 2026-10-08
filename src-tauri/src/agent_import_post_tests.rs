@@ -4565,7 +4565,7 @@ fn an_invoice_met_in_the_book_gets_its_own_next_step_and_names_the_unsettled_bat
     );
     assert!(bank["result"]["error"].get("unsettled_batch_id").is_none());
     let mut invoice = refused();
-    name_preexisting_rows(&mut invoice, &["t1".into()], Some(&None));
+    name_preexisting_rows(&mut invoice, &["t1".into()], Some(&Ok(None)));
     assert_eq!(
         invoice["result"]["error"]["next_step"],
         PREEXISTING_INVOICE_NEXT_STEP
@@ -4577,7 +4577,7 @@ fn an_invoice_met_in_the_book_gets_its_own_next_step_and_names_the_unsettled_bat
     name_preexisting_rows(
         &mut beside_a_twin,
         &["t1".into()],
-        Some(&Some("bridge-earlier".to_string())),
+        Some(&Ok(Some("bridge-earlier".to_string()))),
     );
     assert_eq!(
         beside_a_twin["result"]["error"]["unsettled_batch_id"],
@@ -4587,6 +4587,62 @@ fn an_invoice_met_in_the_book_gets_its_own_next_step_and_names_the_unsettled_bat
         beside_a_twin["result"]["error"]["next_step"],
         PREEXISTING_INVOICE_NEXT_STEP
     );
+    // A journal that could not be read says so, and names no batch.
+    let mut unread = refused();
+    name_preexisting_rows(
+        &mut unread,
+        &["t1".into()],
+        Some(&Err("import_admission_busy".to_string())),
+    );
+    assert_eq!(
+        unread["result"]["error"]["unsettled_batch_unread"],
+        "import_admission_busy"
+    );
+    assert!(unread["result"]["error"]
+        .get("unsettled_batch_id")
+        .is_none());
+    // The invoice text never leaves a person at a dead end or offers to nudge
+    // a figure: where a new number cannot help it says to enter the invoice by
+    // hand, and it forbids changing the number, date, ledger, amount or side.
+    // Case (2), a match by figures alone: a new number cannot help.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "a new number does not get past this check: tell the user and enter the invoice in Tally by hand"
+    ));
+    // Case (3), an unconfirmed earlier batch: hand entry, and how it ends.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP
+        .contains("cannot post it while that batch is unconfirmed: enter it in Tally by hand"));
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("verify_import on it can confirm it"));
+    // A busy journal is a retry, not a reason to enter anything by hand.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "if it is import_admission_busy, another action of ComplyEaze Bridge holds the journal, so build the invoice again once"
+    ));
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("do not assume a batch exists"));
+    // A match that cannot be found is never a reason to enter the invoice by hand.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "confirm it is a regular voucher (not optional, post-dated or cancelled): if you cannot find it, do not enter the invoice by hand, ask the user"
+    ));
+    // The clauses that stop a duplicate: opening the voucher first, never
+    // choosing a number, the end of a refusal not being permission to build
+    // again, and the unread journal not being read as "no batch".
+    for phrase in [
+        "Open it in Tally first and confirm it is a regular voucher",
+        "never choose a number yourself",
+        "that is not permission to build this invoice again if it is already in the book",
+        "If you have found the voucher and it is not that batch's invoice",
+        "and no voucher in the book is this invoice by case (1) or (2)",
+    ] {
+        assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(phrase), "{phrase}");
+    }
+    assert_eq!(
+        PREEXISTING_INVOICE_NEXT_STEP
+            .matches("do not build it again")
+            .count(),
+        3
+    );
+    // The ban on moving a figure leaves out only the number the user chooses.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "Apart from the new number the user chooses in case (1), never change a number, date, ledger, amount or side to get past this check"
+    ));
     // The invoice text speaks of a number and never of a statement row.
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("this invoice's number"));
     assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("statement"));

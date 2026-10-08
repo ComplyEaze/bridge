@@ -159,7 +159,8 @@ pub(super) enum InvoiceIdentity {
 
 impl InvoiceIdentity {
     /// The identity to use beside `unsettled_twin`, the batch of this machine
-    /// with the invoice's figures that was sent and not found posted.
+    /// with the invoice's figures that was sent and whose latest status is not
+    /// a verified post.
     pub(super) fn beside(unsettled_twin: Option<&str>) -> Self {
         match unsettled_twin {
             Some(_) => Self::ByNumberOrFigures,

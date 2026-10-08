@@ -346,3 +346,116 @@ fn the_identity_beside_an_unsettled_batch_is_the_stricter_one() {
         InvoiceIdentity::ByNumberOrFigures
     );
 }
+
+/// The wiring the post, the check before it and every later verification share
+/// (`import_invoice_identity`): a batch with no invoice never takes the
+/// journal's lock or reads the journal, so a Payment, Receipt, Contra or
+/// Journal post and its readback cannot be refused as busy by this change; an
+/// invoice batch is by number alone until this machine holds a sent, unsettled
+/// batch with its figures, and then by number or figures.
+#[test]
+fn the_identity_is_read_from_the_journal_only_for_an_invoice_batch() {
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server = Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let bank = payment_batch("Rent", "500.00");
+    let mut earlier = invoice_batch("INV/1");
+    earlier.batch_id = "bridge-00000000-0000-4000-8000-00000000000b".into();
+    let invoice = invoice_batch("INV/2");
+    server.append_import_ledger(&earlier).expect("saved batch");
+    // The exclusive lock held by another writer.
+    let held = server.lock_import_admission().expect("admission lock");
+    assert_eq!(
+        server.import_invoice_identity(&bank),
+        Ok(InvoiceIdentity::ByNumber)
+    );
+    assert_eq!(
+        server.import_invoice_identity(&invoice),
+        Err("import_admission_busy".to_string())
+    );
+    // The refusal's own read: nothing for a bank batch, the busy lock for an
+    // invoice batch (not read as "no unsettled batch").
+    assert_eq!(
+        server.import_unsettled_invoice_twin_for_refusal(&bank),
+        None
+    );
+    assert_eq!(
+        server.import_unsettled_invoice_twin_for_refusal(&invoice),
+        Some(Err("import_admission_busy".to_string()))
+    );
+    server
+        .append_import_record_while_admitted(&ledger::StatusRecord::dispatch(&earlier))
+        .expect("dispatch intent");
+    drop(held);
+    assert_eq!(
+        server.import_invoice_identity(&bank),
+        Ok(InvoiceIdentity::ByNumber)
+    );
+    assert_eq!(
+        server.import_invoice_identity(&invoice),
+        Ok(InvoiceIdentity::ByNumberOrFigures)
+    );
+    assert_eq!(
+        server.import_unsettled_invoice_twin_for_refusal(&invoice),
+        Some(Ok(Some(earlier.batch_id.clone())))
+    );
+}
+
+/// The verification of a saved invoice batch (the check before the dialog and
+/// every later verification) reads the identity from the journal: a keyed
+/// voucher with the invoice's figures and another number leaves the invoice
+/// absent until this machine holds a sent, unsettled batch with those figures,
+/// and then it does not.
+#[test]
+fn a_verification_beside_an_unsettled_batch_matches_the_invoice_by_its_figures() {
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server = Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let mut earlier = invoice_batch("TG/25-26/011");
+    earlier.batch_id = "bridge-00000000-0000-4000-8000-00000000000b".into();
+    let invoice = invoice_batch("TG/25-26/002");
+    let keyed = || {
+        ImportReadSource::admit(vec![row(
+            KEYED,
+            "Sales Manual",
+            Some("TG/25-26/011"),
+            INVOICE,
+        )])
+        .unwrap()
+    };
+    server.append_import_ledger(&earlier).expect("saved batch");
+    let verdict = |server: &Server| {
+        server
+            .verify_batch_by_journal_identity(&invoice, &keyed(), Attribution::Tag)
+            .unwrap()
+    };
+    assert!(absent(&verdict(&server)));
+    let held = server.lock_import_admission().expect("admission lock");
+    server
+        .append_import_record_while_admitted(&ledger::StatusRecord::dispatch(&earlier))
+        .expect("dispatch intent");
+    drop(held);
+    assert!(!absent(&verdict(&server)));
+}

@@ -1560,14 +1560,7 @@ impl Server {
             };
             // An invoice is recognised by its number, and by its figures as
             // well while this machine holds an unsettled batch with them.
-            let invoice_identity = {
-                let _lock = self.lock_import_admission_shared()?;
-                InvoiceIdentity::beside(
-                    self.import_unsettled_invoice_twin_while_admitted(&line)?
-                        .as_deref(),
-                )
-            };
-            let mut result = verify_batch_as(&line, &observed, attribution, invoice_identity)?;
+            let mut result = self.verify_batch_by_journal_identity(&line, &observed, attribution)?;
             // The standard readback sees a voucher's date, type, number, entries
             // and narration. An invoice's party, GST header, reference and bill
             // allocation are read back separately; "posted_verified" is kept
@@ -2371,8 +2364,50 @@ impl Server {
         }
     }
 
-    /// The batch, sent and not found posted, that holds an invoice with the
-    /// figures of `line`'s invoice (`ledger::unsettled_invoice_twin`).
+    /// How an invoice batch's vouchers are recognised in the book: by number,
+    /// and by figures as well while this machine holds an unsettled batch with
+    /// them. A batch with no invoice takes the journal's lock and reads it not
+    /// at all, so Payment, Receipt, Contra and Journal posts and their
+    /// readbacks behave as they did before the number joined the identity.
+    fn import_invoice_identity(&self, line: &ImportLedgerLine) -> Result<InvoiceIdentity, String> {
+        if !holds_an_invoice(line) {
+            return Ok(InvoiceIdentity::ByNumber);
+        }
+        let _lock = self.lock_import_admission_shared()?;
+        Ok(InvoiceIdentity::beside(
+            self.import_unsettled_invoice_twin_while_admitted(line)?
+                .as_deref(),
+        ))
+    }
+
+    /// A batch's verdict over the rows read, with the invoice identity the
+    /// journal calls for (`import_invoice_identity`).
+    fn verify_batch_by_journal_identity(
+        &self,
+        line: &ImportLedgerLine,
+        observed: &ImportReadSource,
+        attribution: Attribution<'_>,
+    ) -> Result<Value, String> {
+        let identity = self.import_invoice_identity(line)?;
+        verify_batch_as(line, observed, attribution, identity)
+    }
+
+    /// What a refusal for rows already in the book says of the journal: `None`
+    /// for a batch with no invoice (which neither locks nor reads it), else the
+    /// unsettled twin, or why it could not be read.
+    pub(super) fn import_unsettled_invoice_twin_for_refusal(
+        &self,
+        line: &ImportLedgerLine,
+    ) -> Option<Result<Option<String>, String>> {
+        holds_an_invoice(line).then(|| {
+            self.lock_import_admission_shared()
+                .and_then(|_lock| self.import_unsettled_invoice_twin_while_admitted(line))
+        })
+    }
+
+    /// The batch, sent and whose latest status is not a verified post, that
+    /// holds an invoice with the figures of `line`'s invoice
+    /// (`ledger::unsettled_invoice_twin`).
     pub(super) fn import_unsettled_invoice_twin_while_admitted(
         &self,
         line: &ImportLedgerLine,
@@ -2457,6 +2492,14 @@ impl Server {
 }
 
 const AMENDMENT_WARNING: &str = "This file amends an earlier batch. Each voucher carries that batch's REMOTEID, so importing it alters the vouchers already in the book in place instead of creating new ones: Tally should report them as altered, not created. ComplyEaze Bridge compared those vouchers with what it built only as the book stood during this build, and only these fields: the date, a bank voucher's effective date when Tally returned one, the voucher type, the voucher number when the batch set one, each entry's ledger, amount and side, and the narration. It did not compare a voucher's reference, its bill-wise or cost-centre allocations, or which ledger Tally records as its party, because the verification read does not fetch them; instead it refused any voucher whose ALTERID has moved since ComplyEaze Bridge first verified it, which catches an edit to those fields made after that verification, provided a Tally edit advances the voucher's ALTERID (measured over the gateway; not yet for an edit made in Tally's own screens). An edit made before that first verification is not caught, so verify right after every import. An in-place alteration replaces a voucher's entries rather than merging them (measured over the gateway), and this file's entries carry no allocations, so allocations made in Tally, including those ComplyEaze Bridge advises adding after an import, are expected to be lost; that loss, and what happens to a reference, were not measured directly. An edit made in Tally between this build and the import is overwritten without warning. Import promptly, and build the amendment again if anyone may have changed these vouchers. Import and verify each amendment before building the next one for the same voucher: two amendments built from the same state overwrite each other, and the later import wins. In-place alteration with changed content was measured over the XML gateway on licensed TallyPrime 7.1 Silver for Journal, Payment, Receipt and Contra; an import through Tally's own Import menu was not measured.";
+
+/// Whether a batch holds an invoice: the one gate for every read of the journal's
+/// unsettled batches, so a bank batch never takes its lock for the number rule.
+fn holds_an_invoice(line: &ImportLedgerLine) -> bool {
+    line.vouchers
+        .iter()
+        .any(|voucher| voucher.voucher_type.is_invoice())
+}
 
 /// Why no file was written for a row another batch already sent (#876), and what
 /// to do instead. It never offers a hand import of this row: that is the second

@@ -258,7 +258,7 @@ impl Bank {
 
     pub fn party(self, row: &Row) -> String {
         match self {
-            Self::Sbi => sbi_party(row),
+            Self::Sbi => named_or_unnamed(sbi_party(row)),
             Self::Hdfc => hdfc_party(row),
             Self::Ubi => ubi_party(row),
         }
@@ -365,6 +365,18 @@ fn rstrip_hyphens(text: &str) -> &str {
     text.trim_end_matches('-')
 }
 
+/// A name field that was found but printed empty (or blank, or only hyphens)
+/// is `UNNAMED`, never an empty party: an empty party matches no mapping row
+/// and would leave the line's narration with no one named. Applied once, at
+/// the exit of the SBI reader, so no branch can return an empty party.
+fn named_or_unnamed(party: String) -> String {
+    if party.is_empty() {
+        UNNAMED.to_string()
+    } else {
+        party
+    }
+}
+
 fn sbi_party(row: &Row) -> String {
     pattern!(TRANSFER_TO, r"^TRANSFER TO \d+\s+(.+?)\s*/\s*\d+$");
     pattern!(
@@ -421,12 +433,7 @@ fn sbi_party(row: &Row) -> String {
             let inner = MASKED
                 .captures(parts[1])
                 .map_or(parts[1], |inner| inner.get(1).map_or("", |m| m.as_str()));
-            let name = squash(rstrip_hyphens(inner));
-            return if name.is_empty() {
-                UNNAMED.to_string()
-            } else {
-                name
-            };
+            return squash(rstrip_hyphens(inner));
         }
     }
     UNRESOLVED.to_string()

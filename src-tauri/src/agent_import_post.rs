@@ -2871,11 +2871,9 @@ fn batch_review_text(
             }
         }
     }
-    let dates = line.vouchers.iter().map(|voucher| voucher.date.as_str());
-    let (first, last) = (
-        dates.clone().min().unwrap_or_default(),
-        dates.max().unwrap_or_default(),
-    );
+    let (first, last) = date_window(line.vouchers.iter().map(|voucher| &voucher.date))
+        .ok_or("voucher_count_invalid")?;
+    let (first, last) = (first.as_str(), last.as_str());
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let marks = OnAccountMarks::of(line);
     let head = vec![

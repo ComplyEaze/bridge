@@ -173,10 +173,10 @@ impl AlterIdSpan {
     }
 }
 
-/// A window date that reaches this layer as text from a read or a stored
-/// record, not from a tool argument (whose date [`normalized_date`] parses):
-/// parsed once, by the caller, and carried as a [`TallyDate`] into every
-/// request rendered from it (#861).
+/// A window date that reaches this layer as text read from the book, not from a
+/// tool argument (whose date [`normalized_date`] parses): parsed once, by its one
+/// caller, the bill trail's window start (`agent_bill_trail.rs`), and carried as
+/// a [`TallyDate`] into every request rendered from it (#861).
 pub(super) fn parse_window_date(value: &str) -> Result<TallyDate, ToolFailure> {
     TallyDate::parse(value).map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
 }

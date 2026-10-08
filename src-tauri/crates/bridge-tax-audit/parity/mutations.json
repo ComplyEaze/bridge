@@ -11902,5 +11902,53 @@
   "file": "src/statutory_dues_43b.rs",
   "from": "    for (vk, v) in voucher_keys(pop)? {",
   "to": "    let own: Vec<&Voucher> = pop\n        .iter()\n        .copied()\n        .filter(|v| v.lines.iter().any(|l| ledgers.contains(l.ledger.as_str())))\n        .collect();\n    for (vk, v) in voucher_keys(&own)? {"
+ },
+ {
+  "id": "R1446-01",
+  "by": "author",
+  "what": "rules: the text before a trailing comment keeps the whitespace in front of the comment",
+  "file": "src/rules.rs",
+  "from": "            None if c == '#' => return line[..at].trim_end(),",
+  "to": "            None if c == '#' => return &line[..at],"
+ },
+ {
+  "id": "R1446-02",
+  "by": "author",
+  "what": "rules: a # inside a literal ('...') string starts a comment",
+  "file": "src/rules.rs",
+  "from": "            None if c == '\"' || c == '\\'' => quote = Some(c),",
+  "to": "            None if c == '\"' => quote = Some(c),"
+ },
+ {
+  "id": "R1446-03",
+  "by": "author",
+  "what": "rules: a backslash escapes the next character in a literal string too",
+  "file": "src/rules.rs",
+  "from": "                } else if c == '\\\\' && q == '\"' {",
+  "to": "                } else if c == '\\\\' {"
+ },
+ {
+  "id": "R1446-04",
+  "by": "author",
+  "what": "rules: one vendored block found in the live source is enough",
+  "file": "src/rules.rs",
+  "from": "        .all(|block| {",
+  "to": "        .any(|block| {"
+ },
+ {
+  "id": "R1446-05",
+  "by": "author",
+  "what": "rules: a block's lines may sit apart and in any order in the live source",
+  "file": "src/rules.rs",
+  "from": "            live.windows(want.len()).any(|w| w == want.as_slice())",
+  "to": "            want.iter().all(|l| live.contains(l))"
+ },
+ {
+  "id": "R1446-06",
+  "by": "author",
+  "what": "rules: an escaped quote in a string keeps the next character escaped",
+  "file": "src/rules.rs",
+  "from": "                    escaped = false;",
+  "to": "                    escaped = true;"
  }
 ]

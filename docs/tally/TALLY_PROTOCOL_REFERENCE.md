@@ -225,6 +225,9 @@ base revision.
 <a id="915-an-import-fills-its-own-alterid-span-in-request-order"></a>
 
 [9.15 An import fills its own AlterID span in request order](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#915-an-import-fills-its-own-alterid-span-in-request-order)
+<a id="916-a-sales-invoice-what-was-measured-what-bridge-posts-what-is-not-established"></a>
+
+[9.16 A Sales invoice: what was measured, what Bridge posts, what is not established](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#916-a-sales-invoice-what-was-measured-what-bridge-posts-what-is-not-established)
 <a id="12-a-modal-error-dialog-in-tallys-ui-blocks-the-gateway-until-a-human-clicks-ok--p0-operationally"></a>
 
 [1.2 A modal error dialog in Tally's UI blocks the gateway until a human clicks OK — **P0 operationally**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#12-a-modal-error-dialog-in-tallys-ui-blocks-the-gateway-until-a-human-clicks-ok--p0-operationally)

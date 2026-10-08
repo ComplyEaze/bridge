@@ -55,9 +55,9 @@ fn the_published_rules_name_every_qualified_type_and_claim_no_other() {
 
 #[test]
 fn a_voucher_type_outside_the_qualified_list_is_refused() {
-    // Every declared type is qualified today, so the gate is exercised against
-    // a narrowed list. It is what refuses a type added ahead of its evidence,
-    // and it runs before the first live request of a build.
+    // The gate exercised against a narrowed list, one type at a time. It is
+    // what refuses a type added ahead of its evidence (Sales today), and it
+    // runs before the first live request of a build.
     let vouchers = payload().vouchers;
     assert_eq!(
         refuse_unqualified_types(&vouchers, LIVE_QUALIFIED_VOUCHER_TYPES),
@@ -67,6 +67,7 @@ fn a_voucher_type_outside_the_qualified_list_is_refused() {
         VoucherType::Payment,
         VoucherType::Receipt,
         VoucherType::Contra,
+        VoucherType::Sales,
     ] {
         let qualified = LIVE_QUALIFIED_VOUCHER_TYPES
             .iter()
@@ -266,4 +267,75 @@ fn journal_renderer_preserves_create_remote_identity_with_optional_number() {
         assert_eq!(vouchers, 1);
         assert_eq!(numbers, number.into_iter().collect::<Vec<_>>());
     }
+}
+
+/// Sales is declared and not qualified: one rehearsal posted two invoices built
+/// here and read them back, and what it left owed comes first (section 9.16).
+/// The one list refuses it on every surface: the
+/// build before its first request and with nothing written, the schema, and
+/// (in the post tests) a saved batch at post.
+#[tokio::test]
+async fn a_sales_voucher_is_refused_before_any_request_and_nothing_is_written() {
+    assert!(!LIVE_QUALIFIED_VOUCHER_TYPES.contains(&VoucherType::Sales));
+    let directory = tempfile::tempdir().unwrap();
+    // Port 9 answers nothing: a build that sent a request would fail on the
+    // connection, with evidence of the attempt, instead of this refusal.
+    let server = Server::new(super::super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().into(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: true,
+        batch_post_enabled: false,
+    });
+    let invoice = |number: &str| {
+        json!({"company_guid": GUID, "vouchers": [{
+            "bridge_txn_id": "inv-001", "date": "2026-03-10", "voucher_type": "Sales",
+            "narration": "Invoice 278", "voucher_number": number,
+            "invoice": {"voucher_type_name": "Sales", "place_of_supply": "Rajasthan"},
+            "entries": [
+                {"ledger": "Customer A", "amount": "11200.00", "side": "Dr"},
+                {"ledger": "Sales", "amount": "10000.00", "side": "Cr"},
+                {"ledger": "Output CGST", "amount": "600.00", "side": "Cr"},
+                {"ledger": "Output SGST", "amount": "600.00", "side": "Cr"}
+            ]
+        }]})
+    };
+    // A well-formed invoice, and one with a defect of its own: both are refused
+    // as an unqualified type, not for the defect a later check would find.
+    for number in ["278", "INV 0042"] {
+        let failure = server
+            .build_import_xml(&invoice(number))
+            .await
+            .err()
+            .unwrap();
+        assert_eq!(failure.code, "import_voucher_type_unqualified", "{number}");
+        assert!(failure.evidence.is_none(), "no request reached Tally");
+    }
+    assert!(!directory.path().join("imports").exists(), "no import file");
+    assert!(
+        !directory.path().join("agent-import-ledger.jsonl").exists(),
+        "no journal line"
+    );
+    // The schema does not offer the type.
+    let offered = &voucher_input_schema()["properties"]["vouchers"]["items"]["properties"];
+    assert_eq!(
+        offered["voucher_type"]["enum"],
+        json!(["Journal", "Payment", "Receipt", "Contra"])
+    );
+    assert!(
+        offered.get("invoice").is_none(),
+        "no invoice object is described"
+    );
+    // The refusal says what to do, and does not advise booking it another way.
+    let next =
+        crate::agent::refusal_remediation("import_voucher_type_unqualified").expect("a next step");
+    assert!(next.contains("writes no file"), "{next}");
+    assert!(next.contains("is not posted"), "{next}");
+    assert!(next.contains("Do not rebuild it as a Journal"), "{next}");
 }

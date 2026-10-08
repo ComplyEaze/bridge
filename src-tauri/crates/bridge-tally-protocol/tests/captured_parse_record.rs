@@ -2214,12 +2214,45 @@ const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
      (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md: kept as evidence for §12a.16)";
+const SALES_REHEARSAL: &str = "answers of the GST Sales rehearsal (7 Oct 2026), which no parser of \
+     this crate reads: the app crate's invoice code parses them (src/agent_import_invoice_wire.rs), \
+     and its tests (src/agent_import_invoice_wire_tests.rs, src/agent_import_invoice_admission_tests.rs) \
+     pin what each parse returns; sales-rehearsal/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
+    // The GST Sales rehearsal answers.
+    (
+        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml",
+        SALES_REHEARSAL,
+    ),
+    (
+        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-known.utf16le.xml",
+        SALES_REHEARSAL,
+    ),
+    (
+        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-shared.utf16le.xml",
+        SALES_REHEARSAL,
+    ),
+    (
+        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-keyed-registered.utf16le.xml",
+        SALES_REHEARSAL,
+    ),
+    (
+        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-registered.utf16le.xml",
+        SALES_REHEARSAL,
+    ),
+    (
+        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-unregistered.utf16le.xml",
+        SALES_REHEARSAL,
+    ),
+    (
+        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-voucher-types.utf16le.xml",
+        SALES_REHEARSAL,
+    ),
     // Import request bodies named without `request`.
     ("tests/fixtures/agent/d3-batch-import.xml", IMPORT_REQUEST),
     ("tests/fixtures/agent/l1-reentry-import.xml", IMPORT_REQUEST),

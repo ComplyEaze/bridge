@@ -1373,6 +1373,7 @@ fn a_journal_recording_a_cash_in_hand_ledger_is_refused_by_the_queue() {
             None,
             &single_currency,
             &ledger_binding,
+            InvoiceIdentity::ByNumber,
         )
     };
     let error = recheck(&catalogue).expect_err("a recorded cash ledger without a bank voucher");
@@ -1453,6 +1454,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
             None,
             &single_currency,
             &ledger_binding,
+            InvoiceIdentity::ByNumber,
         )
     };
     // Control: the captured catalogue holds no twin of any named ledger.
@@ -1551,6 +1553,7 @@ fn a_named_ledger_switched_to_bill_wise_since_the_build_is_refused_by_the_queue(
             None,
             &single_currency,
             &ledger_binding,
+            InvoiceIdentity::ByNumber,
         )
     };
     // Control: nothing bill-wise at the build and nothing now.
@@ -1638,6 +1641,7 @@ fn a_record_without_cash_in_hand_ledgers_is_refused_by_the_queue() {
         None,
         "",
         &ledger_binding,
+        InvoiceIdentity::ByNumber,
     )
     .expect_err("a record without the field must be refused");
     assert_eq!(
@@ -1695,6 +1699,7 @@ fn a_record_without_bill_wise_approvals_is_refused_by_the_queue() {
         None,
         "",
         &ledger_binding,
+        InvoiceIdentity::ByNumber,
     )
     .expect_err("a record without the field must be refused");
     assert_eq!(
@@ -1782,6 +1787,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         None,
         &single_currency,
         &ledger_binding,
+        InvoiceIdentity::ByNumber,
     )
     .expect_err("captured attributed Journal must block the queued native attempt");
     assert!(matches!(
@@ -1806,6 +1812,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         None,
         &single_currency,
         &ledger_binding,
+        InvoiceIdentity::ByNumber,
     )
     .expect("paired captured source establishes absence of the new candidate");
 
@@ -1830,6 +1837,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         None,
         &single_currency,
         &ledger_binding,
+        InvoiceIdentity::ByNumber,
     )
     .expect_err("a folded twin added since approval must refuse the queued post");
     assert!(matches!(
@@ -1864,6 +1872,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
             groups,
             &single_currency,
             &ledger_binding,
+            InvoiceIdentity::ByNumber,
         )
     };
     recheck(&payment, Some(&groups)).expect("the captured masters classify this Payment");
@@ -2487,6 +2496,12 @@ fn record_key_paths(value: &Value, at: &str, into: &mut std::collections::BTreeS
 /// mark's `kind`. A new variant of one of the record's enums is not seen
 /// either; an older release is expected to fail to parse it and so refuse the
 /// whole journal.
+///
+/// The `invoice` record of a Sales voucher did not rename the binding: it is
+/// written on a Sales voucher only, and a release that does not know the
+/// record does not know the Sales type either, so it fails to parse the line
+/// and refuses the whole journal (releases up to 0.4.2 also find no binding
+/// they read).
 #[test]
 fn a_saved_batch_holds_exactly_these_records() {
     fn every_field_is_named(line: &ImportLedgerLine) {
@@ -2529,8 +2544,25 @@ fn a_saved_batch_holds_exactly_these_records() {
                 narration: _,
                 reference: _,
                 voucher_number: _,
+                invoice,
                 entries,
             } = voucher;
+            // One pattern names every field of the record and of what it holds.
+            if let Some(super::super::invoice::InvoiceDetail {
+                voucher_type_name: _,
+                place_of_supply: _,
+                round_off_ledger: _,
+                observed:
+                    Some(super::super::invoice::InvoiceObserved {
+                        voucher_type_guid: _,
+                        party_gstin: _,
+                        party_state: _,
+                        party_registration_type: _,
+                        party_bill_wise: _,
+                        company_state: _,
+                    }),
+            }) = invoice
+            {}
             for entry in entries {
                 let ImportEntry {
                     ledger: _,
@@ -2564,6 +2596,15 @@ fn a_saved_batch_holds_exactly_these_records() {
         serde_json::from_value(json!([{"ledger":"Expense","party_digest":"a".repeat(64)}]))
             .unwrap();
     line.vouchers[0].voucher_number = Some("7".into());
+    // Every key an invoice record can write, on a voucher of any type: only
+    // the keys are pinned here.
+    line.vouchers[0].invoice = serde_json::from_value(json!({
+        "voucher_type_name":"Sales", "place_of_supply":"Rajasthan", "round_off_ledger":"Round Off",
+        "observed":{"voucher_type_guid":"g", "party_gstin":"08ZZZZZ0000Z1ZQ",
+            "party_state":"Rajasthan", "party_registration_type":"Regular",
+            "party_bill_wise":true, "company_state":"Rajasthan"}
+    }))
+    .unwrap();
     every_field_is_named(&line);
     let written = serde_json::to_value(&line).unwrap();
     let mut paths = std::collections::BTreeSet::new();
@@ -2607,6 +2648,17 @@ fn a_saved_batch_holds_exactly_these_records() {
             "vouchers[].entries[].amount",
             "vouchers[].entries[].ledger",
             "vouchers[].entries[].side",
+            "vouchers[].invoice",
+            "vouchers[].invoice.observed",
+            "vouchers[].invoice.observed.company_state",
+            "vouchers[].invoice.observed.party_bill_wise",
+            "vouchers[].invoice.observed.party_gstin",
+            "vouchers[].invoice.observed.party_registration_type",
+            "vouchers[].invoice.observed.party_state",
+            "vouchers[].invoice.observed.voucher_type_guid",
+            "vouchers[].invoice.place_of_supply",
+            "vouchers[].invoice.round_off_ledger",
+            "vouchers[].invoice.voucher_type_name",
             "vouchers[].narration",
             "vouchers[].reference",
             "vouchers[].voucher_number",
@@ -3619,12 +3671,12 @@ fn only_present_rows_are_named_and_a_clean_result_names_none() {
     assert!(present_txn_ids(&json!({})).is_empty());
 
     let mut payload = json!({"result":{"error":{"code":"import_preexisting_identity"}}});
-    name_preexisting_rows(&mut payload, &[]);
+    name_preexisting_rows(&mut payload, &[], None);
     assert!(payload["result"]["error"].get("next_step").is_none());
     // An unobserved attempt's generic message would say never to rebuild it.
     payload["result"]["error"]["message"] =
         json!("The saved batch requires reconciliation. never rebuild it to retry.");
-    name_preexisting_rows(&mut payload, &["t2".into(), "t3".into()]);
+    name_preexisting_rows(&mut payload, &["t2".into(), "t3".into()], None);
     assert!(payload["result"]["error"]["message"]
         .as_str()
         .unwrap()
@@ -3662,6 +3714,343 @@ fn a_text_refusal_says_to_build_again_only_when_no_attempt_was_recorded() {
         json!(
             "No posting attempt was recorded. Review the error before requesting approval again."
         )
+    );
+}
+
+/// An invoice to a bill-wise customer is written with a New Ref, so the queue's
+/// bill-wise recheck must not ask for an On Account approval of the customer,
+/// must still refuse every other leg that has become bill-wise, and must refuse
+/// when the customer itself is no longer bill-wise (Tally would drop the New Ref
+/// silently). Without the exemption every invoice to a bill-wise customer was
+/// refused in the queue, after the approval was spent.
+#[test]
+fn the_queued_bill_wise_recheck_exempts_an_invoices_new_ref_party_and_nobody_else() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    ));
+    let raw_catalogue = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    ));
+    let single_currency = captured_currencies(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-00000000-0000-4000-8000-0000000000a1",
+        "identity_scheme":"batch_v1", "company_guid":company_guid,
+        "txn_ids":["INV_1"],
+        "date_from":"20260907", "date_to":"20260907", "sha256":"0000000000000000000000000000000000000000000000000000000000000000",
+        "built_at":"2026-10-06T10:00:00.000Z", "status":"built", "cash_in_hand_ledgers":[], "on_account_approved":[],
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+        "vouchers":[{"bridge_txn_id":"INV_1","date":"20260907","voucher_type":"Sales",
+            "narration":null, "reference":null, "voucher_number":"278",
+            "invoice":{"voucher_type_name":"Sales","place_of_supply":"Rajasthan","observed":{
+                "voucher_type_guid":"g-type","party_gstin":null,"party_state":"Rajasthan",
+                "party_registration_type":"Unregistered/Consumer","party_bill_wise":true,"company_state":"Rajasthan"}},
+            "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"1120.00","side":"Dr"},
+                {"ledger":"Cash","amount":"1120.00","side":"Cr"}]}]
+    }))
+    .unwrap();
+    let recheck = |bill_wise: &[&str], line: &ImportLedgerLine| {
+        let catalogue =
+            crate::agent::agent_import::tests::with_bill_wise_flags(&raw_catalogue, bill_wise);
+        let binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+            &catalogue,
+            "WR2 Unicode Lab",
+            company_guid,
+        )
+        .unwrap()
+        .bind_selected(requested_ledger_names(&ImportPayload {
+            company_guid: company_guid.into(),
+            vouchers: line.vouchers.clone(),
+            amends_batch_id: None,
+        }))
+        .unwrap();
+        recheck_import_admission(
+            line,
+            company_guid,
+            "WR2 Unicode Lab",
+            &captured,
+            &captured,
+            &catalogue,
+            None,
+            &single_currency,
+            &binding,
+            InvoiceIdentity::ByNumber,
+        )
+    };
+    let changed = |result: anyhow::Result<()>| {
+        matches!(
+            result
+                .unwrap_err()
+                .downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BillWiseChanged)
+        )
+    };
+    // The customer is bill-wise, as built: admitted with no On Account approval.
+    recheck(&["Bridge Nested Debtor WR4"], &line)
+        .expect("a New Ref party needs no On Account approval");
+    // The customer is no longer bill-wise: the New Ref would be dropped unseen.
+    assert!(changed(recheck(&[], &line)));
+    // Another leg has become bill-wise: still judged, still refused.
+    assert!(changed(recheck(
+        &["Bridge Nested Debtor WR4", "Cash"],
+        &line
+    )));
+    // An ordinary Journal to a bill-wise ledger is refused as before: no exemption.
+    let mut journal = line.clone();
+    journal.vouchers[0].voucher_type = VoucherType::Journal;
+    journal.vouchers[0].invoice = None;
+    journal.vouchers[0].voucher_number = None;
+    assert!(changed(recheck(&["Bridge Nested Debtor WR4"], &journal)));
+}
+
+fn invoice_batch(entries: serde_json::Value) -> (ImportLedgerLine, TallyEndpointConfig) {
+    let (mut line, endpoint) = batch();
+    line.vouchers = serde_json::from_value(json!([{
+        "bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Sales",
+        "narration":"Synthetic test only","reference":null,"voucher_number":"278",
+        "invoice":{"voucher_type_name":"Sales Acc","place_of_supply":"Rajasthan","round_off_ledger":"Round Off",
+            "observed":{"voucher_type_guid":"g-type","party_gstin":null,"party_state":"Rajasthan",
+                "party_registration_type":"Unregistered/Consumer","party_bill_wise":true,"company_state":"Rajasthan"}},
+        "entries":entries
+    }]))
+    .unwrap();
+    line.sha256 = sha256_hex(
+        render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id).as_bytes(),
+    );
+    (line, endpoint)
+}
+
+/// An invoice of up to three sales legs (a customer, the sales ledgers and the
+/// two tax heads: the most the window holds, since the line under the entries is
+/// not printed when no ledger is marked) is shown whole, inside the caps, with
+/// every ledger and amount on a line of its own; it is never cut.
+#[test]
+fn an_invoice_of_three_sales_legs_is_shown_whole_inside_the_dialogs_caps() {
+    let (line, endpoint) = invoice_batch(json!([
+        {"ledger":"Walk-in Customers","amount":"1050.00","side":"Dr"},
+        {"ledger":"Sales - Consulting Services (SAC 998311)","amount":"500.00","side":"Cr"},
+        {"ledger":"Sales - Training Services (SAC 999293)","amount":"300.00","side":"Cr"},
+        {"ledger":"Sales - Other Services (SAC 999799)","amount":"200.00","side":"Cr"},
+        {"ledger":"Output CGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"},
+        {"ledger":"Output SGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"}
+    ]));
+    let preview = review_preview_for(&line, &endpoint, PostScope::Vouchers)
+        .expect("a six-leg invoice fits the dialog");
+    assert!(preview.lines().count() <= 24, "{preview}");
+    assert!(preview.chars().count() <= 1_600, "{preview}");
+    assert!(
+        preview.lines().all(|l| l.chars().count() <= 100),
+        "{preview}"
+    );
+    for needed in [
+        "Dr 1050.00  \"Walk-in Customers\"",
+        "Cr 500.00  \"Sales - Consulting Services (SAC 998311)\"",
+        "Cr 300.00  \"Sales - Training Services (SAC 999293)\"",
+        "Cr 200.00  \"Sales - Other Services (SAC 999799)\"",
+        "Cr 25.00  \"Output CGST @ 2.5% (Rajasthan)\"",
+        "Cr 25.00  \"Output SGST @ 2.5% (Rajasthan)\"",
+        "Checked: customer, Sales Accounts ledgers, CGST and state tax by head. Ledger rates not read.",
+    ] {
+        assert!(preview.contains(needed), "lacks {needed:?}:\n{preview}");
+    }
+    // Longer names than any of these are refused as too large, never cut.
+    let long = "L".repeat(90);
+    let (line, endpoint) = invoice_batch(json!([
+        {"ledger":"Walk-in Customers","amount":"1050.00","side":"Dr"},
+        {"ledger":format!("Sales {long} one"),"amount":"500.00","side":"Cr"},
+        {"ledger":format!("Sales {long} two"),"amount":"300.00","side":"Cr"},
+        {"ledger":format!("Sales {long} three"),"amount":"200.00","side":"Cr"},
+        {"ledger":format!("Output CGST {long}"),"amount":"25.00","side":"Cr"},
+        {"ledger":format!("Output SGST {long}"),"amount":"25.00","side":"Cr"}
+    ]));
+    assert_eq!(
+        review_preview_for(&line, &endpoint, PostScope::Vouchers).unwrap_err(),
+        "import_review_too_large"
+    );
+}
+
+/// The approval a person gives to a GST invoice shows what they are agreeing to,
+/// inside the dialog's caps, with a round off (five legs, one sales leg),
+/// and a saved invoice is not posted while Sales is not a qualified type.
+#[test]
+fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualified() {
+    let (line, endpoint) = invoice_batch(json!([
+        {"ledger":"Customer A","amount":"11200.40","side":"Dr"},
+        {"ledger":"Sales","amount":"10000.00","side":"Cr"},
+        {"ledger":"Output CGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Output SGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Round Off","amount":"0.40","side":"Cr"}
+    ]));
+    let preview = review_preview_for(&line, &endpoint, PostScope::Vouchers)
+        .expect("a five-leg invoice fits the dialog");
+    for needed in [
+        "Create ONE Sales invoice",
+        "Voucher type: \"Sales Acc\"",
+        "Number: \"278\"",
+        "Customer: \"Customer A\"",
+        "Unregistered, no GSTIN  Place of supply: Rajasthan",
+        "Bill allocation: New Ref \"278\"\n",
+        "Dr 11200.40  \"Customer A\"",
+        "Cr 0.40  \"Round Off\"",
+    ] {
+        assert!(
+            preview.contains(needed),
+            "the dialog lacks {needed:?}:\n{preview}"
+        );
+    }
+    assert!(
+        preview.lines().count() <= 24 && preview.lines().all(|l| l.chars().count() <= 100),
+        "{preview}"
+    );
+    // The whole text, line by line: the voucher's own text is last, under its
+    // heading and after the agent's timing line; the cue stands once, above the
+    // entries, on a line of the dialog's own that carries none of the voucher's
+    // text; no ledger is recorded as approved On Account, so no line is marked
+    // and there is no line under the entries.
+    let text = |entries: [&str; 5], under_the_entries: &str| {
+        [
+            "Create ONE Sales invoice in \"Synthetic Accounts\"",
+            "Company GUID: 00000000-0000-4000-8000-000000000002",
+            "Company number: 100001  Books from: 20260401",
+            "Tally: http://127.0.0.1:9001  (the voucher's own text: last two lines)",
+            "Voucher type: \"Sales Acc\"  Date: 20260901  Number: \"278\"",
+            "Customer: \"Customer A\"",
+            "Unregistered, no GSTIN  Place of supply: Rajasthan",
+            "Bill allocation: New Ref \"278\"",
+        ]
+        .into_iter()
+        .chain(entries)
+        // The line under the entries is the On Account legend; with none it is
+        // not printed.
+        .chain(Some(under_the_entries).filter(|under| !under.is_empty()))
+        .chain([
+            // Totals are printed as the other dialogs print them, without
+            // trailing zeros.
+            "Total debit: 11200.4  Total credit: 11200.4",
+            "Checked: customer, Sales Accounts ledgers, CGST and state tax by head. Ledger rates not read.",
+            "Batch: bridge-00000000-0000-4000-8000-000000000001",
+            "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
+            "Do not post a file already imported manually. Pause other edits/imports in this company.",
+            "After a timeout, reconcile this batch; do not rebuild or resend it.",
+        ])
+        .map(str::to_string)
+        .chain(agent_post_timing_lines())
+        .chain([
+            VOUCHER_TEXT_HEADING.to_string(),
+            "Reference: \"278\"".to_string(),
+            "Narration: \"Synthetic test only\"".to_string(),
+        ])
+        .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        preview.lines().collect::<Vec<_>>(),
+        text(
+            [
+                "Dr 11200.40  \"Customer A\"",
+                "Cr 10000.00  \"Sales\"",
+                "Cr 600.00  \"Output CGST\"",
+                "Cr 600.00  \"Output SGST\"",
+                "Cr 0.40  \"Round Off\"",
+            ],
+            ""
+        )
+    );
+    assert_eq!(preview.lines().count(), 23, "{preview}");
+    // A leg the batch records as approved On Account is marked on its own line
+    // and on no other, and the legend takes the blank line's place: the dialog
+    // still fits with a round off.
+    let mut approved = line.clone();
+    approved.on_account_approved =
+        serde_json::from_value(json!([{"ledger":"Sales","party_digest":"a".repeat(64)}])).unwrap();
+    let marked = review_preview_for(&approved, &endpoint, PostScope::Vouchers)
+        .expect("a marked five-leg invoice fits the dialog");
+    assert_eq!(
+        marked.lines().collect::<Vec<_>>(),
+        text(
+            [
+                "Dr 11200.40  \"Customer A\"",
+                "Cr 10000.00  On Account  \"Sales\"",
+                "Cr 600.00  \"Output CGST\"",
+                "Cr 600.00  \"Output SGST\"",
+                "Cr 0.40  \"Round Off\"",
+            ],
+            ON_ACCOUNT_LEGEND
+        )
+    );
+    // A record that approves the customer On Account is not one a build
+    // writes (the customer's entry carries a New Ref or the customer is not
+    // bill-wise): refused, never shown as both.
+    let mut crafted = line.clone();
+    crafted.on_account_approved =
+        serde_json::from_value(json!([{"ledger":"Customer A","party_digest":"b".repeat(64)}]))
+            .unwrap();
+    assert_eq!(
+        review_preview_for(&crafted, &endpoint, PostScope::Vouchers).unwrap_err(),
+        "import_invoice_not_observed"
+    );
+    // A number outside the invoice alphabet never reaches a line above the
+    // entries, a narration with a line break is refused, and a text over the
+    // dialog's caps is refused, never cut.
+    let with = |change: &dyn Fn(&mut ImportVoucher)| {
+        let mut other = line.clone();
+        change(&mut other.vouchers[0]);
+        review_preview_for(&other, &endpoint, PostScope::Vouchers).unwrap_err()
+    };
+    assert_eq!(
+        with(&|voucher| voucher.voucher_number = Some("27 8".into())),
+        "import_review_layout_text"
+    );
+    assert_eq!(
+        with(&|voucher| voucher.narration = Some("first\nTotal debit: 1".into())),
+        "import_review_layout_text"
+    );
+    assert_eq!(
+        with(&|voucher| voucher.narration = Some("n".repeat(90))),
+        "import_review_too_large"
+    );
+    assert_eq!(
+        with(&|voucher| voucher.narration = Some("many words ".repeat(60))),
+        "import_review_too_large"
+    );
+    // Not postable, however the batch came to be saved, until Sales is qualified.
+    assert_eq!(
+        admit_saved_voucher(&line, &endpoint, PostScope::Vouchers, 1).unwrap_err(),
+        "import_voucher_type_unqualified"
+    );
+    // A registered customer that is not bill-wise says so, and a long customer name still fits.
+    let (mut other, endpoint) = invoice_batch(json!([
+        {"ledger":"A very long customer ledger name that goes on and on, Private Limited, Unit 2","amount":"11200.00","side":"Dr"},
+        {"ledger":"Sales","amount":"10000.00","side":"Cr"},
+        {"ledger":"Output CGST","amount":"600.00","side":"Cr"},
+        {"ledger":"Output SGST","amount":"600.00","side":"Cr"}
+    ]));
+    if let Some(detail) = other.vouchers[0].invoice.as_mut() {
+        detail.round_off_ledger = None;
+        if let Some(seen) = detail.observed.as_mut() {
+            seen.party_gstin = Some("08ZZZZZ0000Z1ZQ".into());
+            seen.party_registration_type = "Regular".into();
+            seen.party_bill_wise = false;
+        }
+    }
+    let preview = review_preview_for(&other, &endpoint, PostScope::Vouchers).unwrap();
+    assert!(
+        preview.contains("Regular, GSTIN ") && preview.contains("none (customer not bill-wise)"),
+        "{preview}"
+    );
+    assert!(
+        preview.lines().all(|l| l.chars().count() <= 100),
+        "{preview}"
     );
 }
 
@@ -4212,4 +4601,182 @@ fn a_batch_that_marks_nothing_is_shown_whole() {
         ]
         .join("\n")
     );
+}
+
+/// The invoice's own next step where a bank batch gets the statement one, and
+/// the unsettled batch named when there is one.
+#[test]
+fn an_invoice_met_in_the_book_gets_its_own_next_step_and_names_the_unsettled_batch() {
+    let refused = || json!({"result":{"error":{"code":"import_preexisting_identity"}}});
+    let mut bank = refused();
+    name_preexisting_rows(&mut bank, &["t1".into()], None);
+    assert_eq!(
+        bank["result"]["error"]["next_step"],
+        PREEXISTING_ROWS_NEXT_STEP
+    );
+    assert!(bank["result"]["error"].get("unsettled_batch_id").is_none());
+    let mut invoice = refused();
+    name_preexisting_rows(&mut invoice, &["t1".into()], Some(&Ok(None)));
+    assert_eq!(
+        invoice["result"]["error"]["next_step"],
+        PREEXISTING_INVOICE_NEXT_STEP
+    );
+    assert!(invoice["result"]["error"]
+        .get("unsettled_batch_id")
+        .is_none());
+    let mut beside_a_twin = refused();
+    name_preexisting_rows(
+        &mut beside_a_twin,
+        &["t1".into()],
+        Some(&Ok(Some("bridge-earlier".to_string()))),
+    );
+    assert_eq!(
+        beside_a_twin["result"]["error"]["unsettled_batch_id"],
+        "bridge-earlier"
+    );
+    assert_eq!(
+        beside_a_twin["result"]["error"]["next_step"],
+        PREEXISTING_INVOICE_NEXT_STEP
+    );
+    // A journal that could not be read says so, and names no batch.
+    let mut unread = refused();
+    name_preexisting_rows(
+        &mut unread,
+        &["t1".into()],
+        Some(&Err("import_admission_busy".to_string())),
+    );
+    assert_eq!(
+        unread["result"]["error"]["unsettled_batch_unread"],
+        "import_admission_busy"
+    );
+    assert!(unread["result"]["error"]
+        .get("unsettled_batch_id")
+        .is_none());
+    // The invoice text never leaves a person at a dead end or offers to nudge
+    // a figure: where a new number cannot help it says to enter the invoice by
+    // hand, and it forbids changing the number, date, ledger, amount or side.
+    // Case (2), a match by figures alone: a new number cannot help.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "a new number does not get past this check: tell the user and enter the invoice in Tally by hand"
+    ));
+    // Case (3), an unconfirmed earlier batch: hand entry, and how it ends.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP
+        .contains("cannot post it while that batch is unconfirmed: enter it in Tally by hand"));
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("verify_import on it can confirm it"));
+    // A busy journal is a retry, not a reason to enter anything by hand.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "if it is import_admission_busy, another action of ComplyEaze Bridge holds the journal, so build the invoice again once"
+    ));
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("do not assume a batch exists"));
+    // A match that cannot be found is never a reason to enter the invoice by hand.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "confirm it is a regular voucher (not optional, post-dated or cancelled): if you cannot find it, do not enter the invoice by hand, ask the user"
+    ));
+    // The clauses that stop a duplicate: opening the voucher first, never
+    // choosing a number, the end of a refusal not being permission to build
+    // again, and the unread journal not being read as "no batch".
+    for phrase in [
+        "Open it in Tally first and confirm it is a regular voucher",
+        "never choose a number yourself",
+        "that is not permission to build this invoice again if it is already in the book",
+        "If you have found the voucher and it is not that batch's invoice",
+        "and no voucher in the book is this invoice by case (1) or (2)",
+    ] {
+        assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(phrase), "{phrase}");
+    }
+    assert_eq!(
+        PREEXISTING_INVOICE_NEXT_STEP
+            .matches("do not build it again")
+            .count(),
+        3
+    );
+    // The ban on moving a figure leaves out only the number the user chooses.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "Apart from the new number the user chooses in case (1), never change a number, date, ledger, amount or side to get past this check"
+    ));
+    // The invoice text speaks of a number and never of a statement row.
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("this invoice's number"));
+    assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("statement"));
+}
+
+/// The queue's own check recognises an invoice as the check before the dialog
+/// does: a voucher with its figures and another number passes, the same number
+/// is refused, and beside an unsettled batch of this machine the figures are
+/// enough to refuse. Wiring only: the captured Journal's type is named as the
+/// invoice's filed type so that one captured row can stand for a voucher of
+/// that type; no evidence of what Tally stores for an invoice.
+#[test]
+fn the_queue_recognises_an_invoice_by_its_number_and_by_its_figures_beside_an_unsettled_batch() {
+    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    // One Journal, number 2: 12.61 from the debtor to Cash, 7 Sep 2026.
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    ));
+    let catalogue = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    ));
+    let catalogue = crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue, &[]);
+    let single_currency = captured_currencies(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let ledger_binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap()
+    .bind_selected(vec![
+        "Bridge Nested Debtor WR4".to_string(),
+        "Cash".to_string(),
+    ])
+    .unwrap();
+    let refused_as_in_the_book = |number: &str, identity: InvoiceIdentity| {
+        let line: ImportLedgerLine = serde_json::from_value(json!({
+            "batch_id":"bridge-00000000-0000-4000-8000-000000000691",
+            "identity_scheme":"batch_v1", "company_guid":company_guid,
+            "txn_ids":["inv-1"],
+            "date_from":"20260907", "date_to":"20260907", "sha256":"",
+            "built_at":"2026-10-07T00:00:00Z", "status":"built",
+            "cash_in_hand_ledgers":[], "on_account_approved":[],
+            "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":219},
+            "vouchers":[{"bridge_txn_id":"inv-1","date":"20260907","voucher_type":"Sales",
+                "narration":null,"reference":null,"voucher_number":number,
+                "invoice":{"voucher_type_name":"Journal","place_of_supply":"Rajasthan"},
+                "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"12.61","side":"Dr"},
+                    {"ledger":"Cash","amount":"12.61","side":"Cr"}]}]
+        }))
+        .unwrap();
+        recheck_import_admission(
+            &line,
+            company_guid,
+            "WR2 Unicode Lab",
+            &captured,
+            &captured,
+            &catalogue,
+            None,
+            &single_currency,
+            &ledger_binding,
+            identity,
+        )
+        .err()
+        .is_some_and(|error| {
+            error.downcast_ref::<ApprovedImportAdmissionError>()
+                == Some(&ApprovedImportAdmissionError::PreexistingIdentity)
+        })
+    };
+    assert!(!refused_as_in_the_book("INV/9", InvoiceIdentity::ByNumber));
+    assert!(refused_as_in_the_book("2", InvoiceIdentity::ByNumber));
+    assert!(refused_as_in_the_book(
+        "INV/9",
+        InvoiceIdentity::ByNumberOrFigures
+    ));
 }

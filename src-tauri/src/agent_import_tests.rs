@@ -2873,8 +2873,15 @@ fn refusal_reason_states_the_current_voucher_limit() {
         "{unmarked}"
     );
     // An unlisted code keeps its own name in the warning and a neutral reason.
-    let (warnings, _) =
-        build_import_guidance(true, Some("import_something_new"), 1, false, false, false);
+    let (warnings, _) = build_import_guidance(
+        true,
+        Some("import_something_new"),
+        1,
+        false,
+        false,
+        false,
+        false,
+    );
     assert!(warnings[0]
         .as_str()
         .unwrap()
@@ -2901,6 +2908,9 @@ mod source_tests;
 #[path = "agent_import_index_tests.rs"]
 mod index_tests;
 
+#[path = "agent_import_number_identity_tests.rs"]
+mod number_identity_tests;
+
 fn test_duplicates(observed: &[ReadVoucher]) -> Result<Vec<Value>, String> {
     let identities = observed
         .iter()
@@ -2908,7 +2918,7 @@ fn test_duplicates(observed: &[ReadVoucher]) -> Result<Vec<Value>, String> {
         .collect::<Result<Vec<_>, _>>()?;
     let fingerprints = observed
         .iter()
-        .map(|voucher| sha256_json(&observed_fingerprint(voucher)))
+        .map(|voucher| sha256_json(&observed_fingerprint(voucher, None)))
         .collect::<Vec<_>>();
     Ok(duplicates(observed, &identities, &fingerprints))
 }
@@ -2966,6 +2976,9 @@ mod preflight_tests;
 
 #[path = "agent_import_mode_tests.rs"]
 mod mode_tests;
+
+#[path = "agent_import_invoice_admission_tests.rs"]
+mod invoice_admission_tests;
 
 #[test]
 fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_periods() {

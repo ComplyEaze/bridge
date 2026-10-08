@@ -778,3 +778,205 @@ fn an_unreadable_candidate_amount_fails_closed() {
     );
     assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
 }
+
+/// One Sales invoice dated 1 Sep 2026 under `number`, over `entries`.
+fn invoice_batch(
+    id: &str,
+    sha: char,
+    (number, filed): (&str, &str),
+    entries: &[(&str, &str, &str)],
+) -> ImportLedgerLine {
+    let mut line = row_batch(id, "synthetic-guid", id, sha, entries);
+    line.vouchers[0] = serde_json::from_value(json!({
+        "bridge_txn_id":id, "date":"20260901", "voucher_type":"Sales", "voucher_number":number,
+        "invoice":{"voucher_type_name":filed, "place_of_supply":"Rajasthan"},
+        "entries":entries.iter().map(|(ledger, amount, side)|
+            json!({"ledger":ledger,"amount":amount,"side":side})).collect::<Vec<_>>()
+    }))
+    .unwrap();
+    line
+}
+
+const SALE: &[(&str, &str, &str)] = &[("Customer", "118", "Dr"), ("Sales", "118.00", "Cr")];
+
+/// What the journal offers as the control for a build's number read: a
+/// verified invoice of the company (its number and date), preferring one of the
+/// build's financial year and then the newest; else whether one was ever sent.
+#[test]
+fn the_number_control_is_a_verified_invoice_of_the_company() {
+    let control = |journal: Vec<Vec<u8>>| {
+        invoice_number_control(
+            Cursor::new(journal.concat()),
+            "synthetic-guid",
+            ("20260401", "20270331"),
+        )
+        .unwrap()
+    };
+    let first = invoice_batch("first", 'a', ("INV/1", "Sales Manual"), SALE);
+    assert_eq!(control(vec![]), NumberControl::NeverSent);
+    // Only built.
+    assert_eq!(control(vec![record(&first)]), NumberControl::NeverSent);
+    // Sent, never verified.
+    assert_eq!(
+        control(vec![record(&first), sent(&first)]),
+        NumberControl::NoneVerified
+    );
+    let known = NumberControl::Known {
+        number: "INV/1".to_string(),
+        date: "20260901".to_string(),
+    };
+    assert_eq!(
+        control(vec![record(&first), sent(&first), found(&first)]),
+        known
+    );
+    // A later verification that no longer finds it demotes it.
+    let demoted = record(
+        &serde_json::from_value::<StatusRecord>(json!({
+            "record_type":"verification_status","batch_id":"first",
+            "batch_sha256":first.sha256,"status":"verification_incomplete"
+        }))
+        .unwrap(),
+    );
+    assert_eq!(
+        control(vec![record(&first), sent(&first), found(&first), demoted]),
+        NumberControl::NoneVerified
+    );
+    // Another company's verified invoice is not this company's control.
+    let mut elsewhere = invoice_batch("elsewhere", 'b', ("INV/9", "Sales Manual"), SALE);
+    elsewhere.company_guid = "other-guid".to_string();
+    assert_eq!(
+        control(vec![
+            record(&elsewhere),
+            sent(&elsewhere),
+            found(&elsewhere)
+        ]),
+        NumberControl::NeverSent
+    );
+    // In the build's year before a newer one outside it; the newest inside it.
+    let dated = |id: &str, sha: char, number: &str, date: &str| {
+        let mut line = invoice_batch(id, sha, (number, "Sales Manual"), SALE);
+        line.vouchers[0].date = date.to_string();
+        line
+    };
+    let last_year = dated("last-year", 'c', "INV/2", "20260310");
+    let next_year = dated("next-year", 'd', "INV/3", "20270410");
+    let later = dated("later", 'e', "INV/4", "20261015");
+    let journal = |batches: &[&ImportLedgerLine]| {
+        batches
+            .iter()
+            .flat_map(|batch| [record(batch), sent(batch), found(batch)])
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        control(journal(&[&later, &first, &next_year, &last_year])),
+        NumberControl::Known {
+            number: "INV/4".to_string(),
+            date: "20261015".to_string()
+        }
+    );
+    assert_eq!(
+        control(journal(&[&next_year, &last_year])),
+        NumberControl::Known {
+            number: "INV/3".to_string(),
+            date: "20270410".to_string()
+        }
+    );
+}
+
+/// An invoice has an unsettled twin while another batch of the company holds an
+/// invoice with its date, filed type and entries (whatever its number), was
+/// sent, and no readback found it posted. A twin only built, one found posted,
+/// other figures, another filed type, another company, a Journal with the same
+/// entries and the batch itself are not; and a batch with no invoice asks
+/// nothing of the journal.
+#[test]
+fn an_invoice_sent_and_not_found_posted_is_the_unsettled_twin_of_its_figures() {
+    let twin = |journal: Vec<Vec<u8>>, candidate: &ImportLedgerLine| {
+        unsettled_invoice_twin(Cursor::new(journal.concat()), candidate).unwrap()
+    };
+    let first = invoice_batch("first", 'a', ("INV/1", "Sales Manual"), SALE);
+    let second = invoice_batch(
+        "second",
+        'b',
+        ("INV/2", "Sales Manual"),
+        &[("Customer", "118.00", "Dr"), ("Sales", "118", "Cr")],
+    );
+    assert_eq!(
+        twin(vec![record(&first), sent(&first), record(&second)], &second),
+        Some("first".to_string())
+    );
+    // Only built; found posted; the batch itself.
+    assert_eq!(twin(vec![record(&first), record(&second)], &second), None);
+    assert_eq!(
+        twin(
+            vec![record(&first), sent(&first), found(&first), record(&second)],
+            &second
+        ),
+        None
+    );
+    assert_eq!(twin(vec![record(&second), sent(&second)], &second), None);
+    // Other figures, another filed type, another company, a Journal.
+    let dearer = invoice_batch(
+        "dearer",
+        'c',
+        ("INV/1", "Sales Manual"),
+        &[("Customer", "119", "Dr"), ("Sales", "119", "Cr")],
+    );
+    let other_type = invoice_batch("other-type", 'd', ("INV/1", "Sales Export"), SALE);
+    let mut elsewhere = invoice_batch("elsewhere", 'e', ("INV/1", "Sales Manual"), SALE);
+    elsewhere.company_guid = "another-guid".into();
+    let journal = row_batch("journal", "synthetic-guid", "journal", 'f', SALE);
+    for other in [&dearer, &other_type, &elsewhere, &journal] {
+        assert_eq!(
+            twin(vec![record(other), sent(other), record(&second)], &second),
+            None,
+            "{}",
+            other.batch_id
+        );
+    }
+    // A batch with no invoice reads nothing: a journal that is not one is not met.
+    assert_eq!(
+        unsettled_invoice_twin(Cursor::new(b"not json\n".to_vec()), &journal),
+        Ok(None)
+    );
+}
+
+/// A batch is settled by its LATEST status, as `settlement` takes it: one a
+/// readback found posted and that was sent again afterwards is unsettled
+/// again, so the guard comes back on.
+#[test]
+fn a_batch_sent_again_after_it_was_found_posted_is_unsettled_again() {
+    let first = invoice_batch("first", 'a', ("INV/1", "Sales Manual"), SALE);
+    let second = invoice_batch("second", 'b', ("INV/2", "Sales Manual"), SALE);
+    let journal = [record(&first), found(&first), sent(&first), record(&second)].concat();
+    assert_eq!(
+        unsettled_invoice_twin(Cursor::new(journal), &second),
+        Ok(Some("first".to_string()))
+    );
+}
+
+/// The guard fails closed. A saved batch whose invoice cannot be read counts
+/// as a twin once sent; an invoice of the batch itself that cannot be read is
+/// an error, never "no figures, nothing to match".
+#[test]
+fn an_invoice_that_cannot_be_read_never_switches_the_guard_off() {
+    let unreadable = invoice_batch(
+        "unreadable",
+        'a',
+        ("INV/1", "Sales Manual"),
+        &[
+            ("Customer", "not-a-number", "Dr"),
+            ("Sales", "118.00", "Cr"),
+        ],
+    );
+    let second = invoice_batch("second", 'b', ("INV/2", "Sales Manual"), SALE);
+    let journal = [record(&unreadable), sent(&unreadable), record(&second)].concat();
+    assert_eq!(
+        unsettled_invoice_twin(Cursor::new(journal), &second),
+        Ok(Some("unreadable".to_string()))
+    );
+    assert_eq!(
+        unsettled_invoice_twin(Cursor::new(Vec::new()), &unreadable),
+        Err("import_invoice_figures_unreadable".to_string())
+    );
+}

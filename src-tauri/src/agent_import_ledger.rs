@@ -530,6 +530,205 @@ pub(super) fn rows_already_posted(
     )
 }
 
+/// An invoice's date, filed type and entries, as two saved invoices are
+/// compared.
+enum InvoiceFigures {
+    /// Not an invoice: the guard reads nothing of it.
+    NotInvoice,
+    /// An invoice whose amount or date cannot be read. The guard never takes
+    /// this for "no figures": on a saved batch it counts as a match.
+    Unreadable,
+    Of((String, String, Vec<String>)),
+}
+
+fn invoice_figures(voucher: &ImportVoucher) -> InvoiceFigures {
+    if !voucher.voucher_type.is_invoice() {
+        return InvoiceFigures::NotInvoice;
+    }
+    let mut canonical = voucher.clone();
+    for entry in &mut canonical.entries {
+        match super::verification::canonical_verification_amount(&entry.amount) {
+            Ok(amount) => entry.amount = amount,
+            Err(_) => return InvoiceFigures::Unreadable,
+        }
+    }
+    match normalized_date(&voucher.date) {
+        Ok(date) => InvoiceFigures::Of((
+            date.as_str().to_string(),
+            voucher.filed_type_name().to_string(),
+            super::verification::expected_entry_fingerprint(&canonical),
+        )),
+        Err(_) => InvoiceFigures::Unreadable,
+    }
+}
+
+/// The id of another batch of the same company that Bridge sent to Tally (a
+/// dispatch intent), whose latest status is not a verified post, and that holds an
+/// invoice with the date, filed type and entries of `batch`'s invoice; the
+/// first in id order. A post whose answer was lost never binds, and such a
+/// batch may be this invoice under the number it was first given, so while it
+/// stands the invoice is matched by its figures as well as its number
+/// (`InvoiceIdentity::ByNumberOrFigures`). A batch that was only built, or one
+/// whose latest status is `posted_verified`, does not count: two invoices with
+/// the same figures are otherwise two documents. A batch with no invoice reads
+/// nothing here. It fails closed: an invoice of the batch itself that cannot be
+/// read is an error, and one of a saved batch that cannot be read counts as a
+/// twin.
+pub(super) fn unsettled_invoice_twin(
+    reader: impl BufRead,
+    batch: &ImportLedgerLine,
+) -> Result<Option<String>, String> {
+    let mut wanted = Vec::new();
+    for figures in batch.vouchers.iter().map(invoice_figures) {
+        match figures {
+            InvoiceFigures::NotInvoice => {}
+            InvoiceFigures::Unreadable => return Err("import_invoice_figures_unreadable".into()),
+            InvoiceFigures::Of(figures) => wanted.push(figures),
+        }
+    }
+    if wanted.is_empty() {
+        return Ok(None);
+    }
+    let mut holds_a_twin = BTreeSet::new();
+    let mut sent = BTreeSet::new();
+    // A batch is settled when its LATEST status is `posted_verified`, as
+    // `settlement` takes it: a dispatch intent after a hand import's
+    // verification makes it unverified again.
+    let mut verified = BTreeSet::new();
+    scan_records(reader, |record, _| match record {
+        Record::Batch(other) if other.batch_id != batch.batch_id => {
+            let twin = other.company_guid.eq_ignore_ascii_case(&batch.company_guid)
+                && other
+                    .vouchers
+                    .iter()
+                    .map(invoice_figures)
+                    .any(|figures| match figures {
+                        InvoiceFigures::NotInvoice => false,
+                        InvoiceFigures::Unreadable => true,
+                        InvoiceFigures::Of(figures) => wanted.contains(&figures),
+                    });
+            if twin {
+                holds_a_twin.insert(other.batch_id.clone());
+            } else {
+                holds_a_twin.remove(&other.batch_id);
+            }
+            if other.status == "posted_verified" {
+                verified.insert(other.batch_id.clone());
+            } else {
+                verified.remove(&other.batch_id);
+            }
+        }
+        Record::Status(update) => {
+            if matches!(update.record_type, StatusKind::DispatchIntent) {
+                sent.insert(update.batch_id.clone());
+            }
+            if update.sets_status() {
+                if update.status == "posted_verified" {
+                    verified.insert(update.batch_id.clone());
+                } else {
+                    verified.remove(&update.batch_id);
+                }
+            }
+        }
+        Record::Batch(_) => {}
+    })?;
+    Ok(holds_a_twin
+        .intersection(&sent)
+        .find(|id| !verified.contains(*id))
+        .cloned())
+}
+
+/// What stands as the control for a build's "this invoice number is not in
+/// use" read, from the journal of one company: a known invoice to read for
+/// alongside it, or why there is none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum NumberControl {
+    /// The newest invoice of a batch whose LATEST status is `posted_verified`,
+    /// preferring one dated inside `year`: its number and its date.
+    Known { number: String, date: String },
+    /// No batch of this company holding an invoice was ever sent to Tally.
+    NeverSent,
+    /// One was sent and none is verified posted now (an answer lost, a post
+    /// declined, or a later verification that no longer finds it).
+    NoneVerified,
+}
+
+/// The control the journal offers for an invoice number read of this
+/// company (`NumberControl`). A batch is verified while its latest status is
+/// `posted_verified`, as `settlement` takes it; a dispatch intent makes it
+/// sent. An invoice whose number or date cannot be read is not a control.
+pub(super) fn invoice_number_control(
+    reader: impl BufRead,
+    company_guid: &str,
+    (from, to): (&str, &str),
+) -> Result<NumberControl, String> {
+    // batch id -> (journal order, the batch's invoices as (date, number))
+    let mut invoices: BTreeMap<String, (usize, Vec<(String, String)>)> = BTreeMap::new();
+    let mut sent = BTreeSet::new();
+    let mut verified = BTreeSet::new();
+    let mut order = 0usize;
+    scan_records(reader, |record, _| match record {
+        Record::Batch(batch) => {
+            order += 1;
+            let held: Vec<(String, String)> =
+                if batch.company_guid.eq_ignore_ascii_case(company_guid) {
+                    batch
+                        .vouchers
+                        .iter()
+                        .filter(|voucher| voucher.voucher_type.is_invoice())
+                        .filter_map(|voucher| {
+                            let date = normalized_date(&voucher.date).ok()?.as_str().to_string();
+                            Some((date, voucher.voucher_number.clone()?))
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+            if held.is_empty() {
+                invoices.remove(&batch.batch_id);
+            } else {
+                invoices.insert(batch.batch_id.clone(), (order, held));
+            }
+            if batch.status == "posted_verified" {
+                verified.insert(batch.batch_id.clone());
+            } else {
+                verified.remove(&batch.batch_id);
+            }
+        }
+        Record::Status(update) => {
+            if matches!(update.record_type, StatusKind::DispatchIntent) {
+                sent.insert(update.batch_id.clone());
+            }
+            if update.sets_status() {
+                if update.status == "posted_verified" {
+                    verified.insert(update.batch_id.clone());
+                } else {
+                    verified.remove(&update.batch_id);
+                }
+            }
+        }
+    })?;
+    let known = invoices
+        .iter()
+        .filter(|(id, _)| verified.contains(*id))
+        .flat_map(|(_, (order, held))| held.iter().map(move |invoice| (*order, invoice)))
+        .max_by_key(|(order, (date, _))| {
+            (
+                date.as_str() >= from && date.as_str() <= to,
+                date.clone(),
+                *order,
+            )
+        });
+    Ok(match known {
+        Some((_, (date, number))) => NumberControl::Known {
+            number: number.clone(),
+            date: date.clone(),
+        },
+        None if invoices.keys().any(|id| sent.contains(id)) => NumberControl::NoneVerified,
+        None => NumberControl::NeverSent,
+    })
+}
+
 /// The same check for vouchers not yet in a batch (a build), where no batch id
 /// of their own exists to skip.
 pub(super) fn vouchers_already_posted(

@@ -325,6 +325,14 @@ def main() -> int:
         integrated = typed(spec, "is_integrated", lambda x: isinstance(x, bool), "true, false or null")
         return module, stock.run(eng, {"version": rules.version}, items, opening, closing, integrated)
 
+    def questionnaire_cl13_run():
+        from tae.audit_tests import questionnaire_cl13
+        has = ("stock_opening" in spec, "stock_closing" in spec)
+        if has[0] != has[1]:
+            raise SystemExit(f"{spec_path.name}: stock_opening and stock_closing go together")
+        stock_result = stock_run()[1] if has[0] else None
+        return questionnaire_cl13, questionnaire_cl13.run(eng, rules, stock_result)
+
     def clause21a_candidates_run():
         # As tae/pack.py: the client's [clause21a].extra_terms through the reference's own reader, from a config
         # built out of the spec's key, and the partners' interest and remuneration ledgers, each kept when truthy;
@@ -425,6 +433,7 @@ def main() -> int:
             eng, rules, cash, bank,
             top_n=typed(spec, "top_n", lambda x: integer(x) and x >= 0, "a non-negative integer",
                         absent=party_monthly.PARTY_TOP_N, nullable=False))),
+        "questionnaire_cl13": questionnaire_cl13_run,
         "read_scope": lambda: (read_scope, read_scope.run(eng, rules)),
         "related_parties_cl23": lambda: (related_parties_cl23, related_parties_cl23.run(
             eng, rules, related_parties_config({"related_parties": spec.get("related_parties", {})}))),

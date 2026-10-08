@@ -31,10 +31,10 @@ use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
     cash_book_integrity, cash_payments_40a3, clause21a_candidates, counter_cheques_40a3,
     creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register, ledger_scrutiny,
-    loans_interest, partners_40b_194t, party_identity, party_monthly, read_scope,
-    related_parties_cl23, specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock,
-    stock_read, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
-    RelatedPartiesConfig, Tds26asConfig, TdsConfig,
+    loans_interest, partners_40b_194t, party_identity, party_monthly, questionnaire_cl13,
+    read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
+    statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as, trial_balance,
+    twentysixas_receipts, PartnersConfig, RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -1064,6 +1064,23 @@ fn check(name: &str) {
                     party_monthly::check_invariants(&book, &period(&s), &r, &cash, &bank).unwrap();
                 (r, c)
             }
+            "questionnaire_cl13" => {
+                // The stock port's result on a book carrying both Stock Summaries, none on a book
+                // carrying neither; one alone is refused, as `parity/edge_golden.py` refuses it.
+                let has = (
+                    s.get("stock_opening").is_some(),
+                    s.get("stock_closing").is_some(),
+                );
+                let stock_result = match has {
+                    (true, true) => Some(stock::run(&book, &rules, &stock_inputs(&s)).unwrap()),
+                    (false, false) => None,
+                    _ => panic!("{name}: stock_opening and stock_closing go together"),
+                };
+                let r = questionnaire_cl13::run(&book, &rules, &period(&s), stock_result.as_ref())
+                    .unwrap();
+                let c = questionnaire_cl13::check_invariants(&book, &period(&s), &r).unwrap();
+                (r, c)
+            }
             "stock" => {
                 let inputs = stock_inputs(&s);
                 let r = stock::run(&book, &rules, &inputs).unwrap();
@@ -1103,7 +1120,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 26] = [
+const EDGE_TESTS: [&str; 27] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1120,6 +1137,7 @@ const EDGE_TESTS: [&str; 26] = [
     "loans_interest",
     "partners_40b_194t",
     "party_monthly",
+    "questionnaire_cl13",
     "read_scope",
     "related_parties_cl23",
     "specified_persons_40a2b",

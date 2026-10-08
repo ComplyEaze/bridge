@@ -11902,5 +11902,149 @@
   "file": "src/statutory_dues_43b.rs",
   "from": "    for (vk, v) in voucher_keys(pop)? {",
   "to": "    let own: Vec<&Voucher> = pop\n        .iter()\n        .copied()\n        .filter(|v| v.lines.iter().any(|l| ledgers.contains(l.ledger.as_str())))\n        .collect();\n    for (vk, v) in voucher_keys(&own)? {"
+ },
+ {
+  "id": "QC-01",
+  "by": "author",
+  "what": "questionnaire_cl13: the count takes any population voucher dated up to the period's last day, not only on it",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "    v.date == *last_day\n        && v.base_type == JOURNAL",
+  "to": "    v.date <= *last_day\n        && v.base_type == JOURNAL"
+ },
+ {
+  "id": "QC-02",
+  "by": "author",
+  "what": "questionnaire_cl13: the base type is compared without its case",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        && v.base_type == JOURNAL\n",
+  "to": "        && v.base_type.eq_ignore_ascii_case(JOURNAL)\n"
+ },
+ {
+  "id": "QC-03",
+  "by": "author",
+  "what": "questionnaire_cl13: the voucher type name is read instead of the base type",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        && v.base_type == JOURNAL\n",
+  "to": "        && v.vtype == JOURNAL\n"
+ },
+ {
+  "id": "QC-04",
+  "by": "author",
+  "what": "questionnaire_cl13: a counted journal needs every line on an expense ledger, not one",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        && v.lines.iter().any(|l| expense.contains(l.ledger.as_str()))\n}",
+  "to": "        && v.lines.iter().all(|l| expense.contains(l.ledger.as_str()))\n}"
+ },
+ {
+  "id": "QC-05",
+  "by": "author",
+  "what": "questionnaire_cl13: an expense group counts only as the primary group, the last in the chain",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        .filter(|l| EXPENSE_GROUPS.iter().any(|g| l.under(g)))",
+  "to": "        .filter(|l| EXPENSE_GROUPS.iter().any(|g| l.chain.last().is_some_and(|p| p == g)))"
+ },
+ {
+  "id": "QC-06",
+  "by": "author",
+  "what": "questionnaire_cl13: the first of two counted vouchers sharing a GUID gives the label, not the later",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "            counted.insert(v.guid.as_str(), v);",
+  "to": "            counted.entry(v.guid.as_str()).or_insert(v);"
+ },
+ {
+  "id": "QC-07",
+  "by": "author",
+  "what": "questionnaire_cl13: the count is taken over every voucher, not the books population",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "    let population = book.population()?;",
+  "to": "    let population: Vec<&Voucher> = book.vouchers.iter().collect();"
+ },
+ {
+  "id": "QC-08",
+  "by": "author",
+  "what": "questionnaire_cl13: the stock pointer is attached with no stock result",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "            Pointer::StockFigure if stock_supplied => {",
+  "to": "            Pointer::StockFigure if true => {"
+ },
+ {
+  "id": "QC-09",
+  "by": "author",
+  "what": "questionnaire_cl13: any stock result attaches the pointer, whether or not it carries the figure",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "stock.is_some_and(|s| s.figures.iter().any(|f| f.id == STOCK_FIGURE))",
+  "to": "stock.is_some()"
+ },
+ {
+  "id": "QC-10",
+  "by": "author",
+  "what": "questionnaire_cl13: the method-of-accounting finding cites no voucher",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "                evidence.clone_from(&refs);\n",
+  "to": ""
+ },
+ {
+  "id": "QC-11",
+  "by": "author",
+  "what": "questionnaire_cl13: the method-of-accounting finding drops its count fact",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "                facts.push((COUNT.to_string(), count_id.clone()));\n",
+  "to": "                let _ = &count_id;\n"
+ },
+ {
+  "id": "QC-12",
+  "by": "author",
+  "what": "questionnaire_cl13: the answer definition writes the key bare, not as repr() writes it",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        py_repr_str(key)\n",
+  "to": "        key\n"
+ },
+ {
+  "id": "QC-13",
+  "by": "author",
+  "what": "questionnaire_cl13: QCL-1 is silent on a result without the count",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        return Ok(vec![format!(\"QCL-1: {id} missing from the result\")]);",
+  "to": "        return Ok(Vec::new());"
+ },
+ {
+  "id": "QC-14",
+  "by": "author",
+  "what": "questionnaire_cl13: QCL-1 never fires",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "    if figure.value == walked {",
+  "to": "    if true {"
+ },
+ {
+  "id": "QC-15",
+  "by": "author",
+  "what": "questionnaire_cl13: QCL-1's walk takes every voucher, not the regular ones",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        .filter(|v| v.status == VoucherStatus::Regular)\n",
+  "to": ""
+ },
+ {
+  "id": "QC-16",
+  "by": "author",
+  "what": "questionnaire_cl13: QCL-1's walk counts from the period's last day onward",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        .filter(|v| v.date == period.to && v.base_type == \"Journal\")",
+  "to": "        .filter(|v| v.date >= period.to && v.base_type == \"Journal\")"
+ },
+ {
+  "id": "QC-17",
+  "by": "author",
+  "what": "questionnaire_cl13: QCL-1's walk finds Indirect Expenses ledgers only",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "                .any(|g| g == \"Direct Expenses\" || g == \"Indirect Expenses\")",
+  "to": "                .any(|g| g == \"Indirect Expenses\")"
+ },
+ {
+  "id": "QC-18",
+  "by": "author",
+  "what": "questionnaire_cl13: questionnaire_cl13_on passes no stock result",
+  "file": "src/lib.rs",
+  "from": "questionnaire_cl13::run(book, rules, &bound.period, Some(&stock_result))?",
+  "to": "questionnaire_cl13::run(book, rules, &bound.period, None)?"
  }
 ]

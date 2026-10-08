@@ -1,8 +1,7 @@
 //! The ICICI Bank layout: columns, one visual line per amount, the newest row first.
 //!
 //! There is no Python reference for this profile. Its geometry and shapes were
-//! measured on two real statements (a current account of 232 rows and a cash
-//! credit account of 36); every line here is synthetic, laid out at the measured
+//! measured on two real statements, held privately; every line here is synthetic, laid out at the measured
 //! column positions.
 
 mod common;
@@ -333,9 +332,8 @@ fn a_narration_that_says_page_n_of_m_is_not_a_footer() {
 
 #[test]
 fn a_later_page_must_start_with_a_row() {
-    // the two statements measured started all 7 of their later pages with a row; anything
-    // else is not read into the row above it, so a banner, a note or a row split across
-    // the break refuses the statement
+    // every later page starts with a row; anything else is not read into the row above
+    // it, so a banner, a note or a row split across the break refuses the statement
     for stray in [
         // the continuation of a narration, at the page top
         (149.5, "INDUSTRIES-EAST"),

@@ -47,20 +47,18 @@ shapes measured on two real statements (no value from either).
   the x positions are invented, since the profile reads rows as text.
 - `icici-synthetic.pdf` — two pages, empty user password and an owner password nobody is given, as a
   downloaded ICICI statement opens: 14 rows, newest first, in the ICICI Bank layout. It stands for what
-  two real statements (a current account and a cash credit account) showed, measured by a layout probe
+  two real statements, held privately, showed, measured by a layout probe
   through PDFium: the transaction date at x 15-65 and the value date at 87-137, narrations from x 149.5
   wrapping at 359.5, withdrawals ending at 543, deposits at 662 and the balance (a glued `Cr`/`Dr`) at 787,
   the column header on page 1 only, a masked account number (`123XXXXXXXX456`) printed three times above
   the table, amounts on their own line 6 and 11 points below the date (0, about 6 and about 11.5 on the real files), a `<date> <time> <word> Page N of M`
   footer and a disclaimer line on every page, and no opening or closing balance or totals. Every word,
   amount, account digit and reference is invented, including each narration's wording; the shapes are
-  the observed ones (a UPI row whose VPA is broken at the wrap edge and one cut before its bank word, a
+  the ones the rules cover (a UPI row whose VPA is broken at the wrap edge and one cut before its bank word, a
   NEFT name holding a hyphen, an RTGS name wrapped at a space, an IMPS row, charges, a loan recovery, a
   cash deposit, a cheque number in the cheque column). **Limits:** Courier is wider than the bank's font, so
   two narrations run past the 50 characters the bank allows, to exercise the wrap rule; nothing here was
-  captured from a real file; the balance crosses from `Cr` to `Dr` on one row, which the cash credit account
-  did not show (its balances were all `Dr`, the current account's all `Cr`); the real files are the owner's
-  and are not in this repository.
+  captured from a real file; the balance crosses from `Cr` to `Dr` on one row, to exercise the signed-balance rule; the real statements are held privately and are not in this repository.
 - `scan-image-only.pdf` — two pages, user password `synthetic-user-4321`; each
   page is one 8x8 grey image scaled to the page and no text object. `pdftotext -bbox`
   reports no words (measured 2026-10-07).

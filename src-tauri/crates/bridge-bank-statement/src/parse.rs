@@ -270,10 +270,9 @@ fn page_sequence_unproven(index: usize, count: usize) -> Refusal {
     )
 }
 
-/// A table whose column header is printed once starts every later page with a row: that
-/// is what the two statements measured did on all of their 7 later pages, so a later page
-/// opening with anything else is a banner, a note or a row split across the break, and
-/// none of them is read into the row above it.
+/// A table whose column header is printed once starts every later page with a row, so a
+/// later page opening with anything else is a banner, a note or a row split across the
+/// break, and none of them is read into the row above it.
 fn require_later_pages_start_with_a_row(pages: &[Page], bank: Bank) -> Result<(), Refusal> {
     let mut header_seen = false;
     for (index, page) in pages.iter().enumerate() {

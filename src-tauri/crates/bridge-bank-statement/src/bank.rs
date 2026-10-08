@@ -11,8 +11,8 @@
 //! rows): see [`Layout::SingleLine`] and `ubi_party`.
 //!
 //! `Icici` (ICICI Bank) has no Python reference either. Its rules come from two
-//! real statements read through PDFium (a current account of 232 rows and a
-//! cash credit account of 36), described by shape and geometry only: see
+//! real statements read through PDFium (held privately), described by shape and
+//! geometry only: see
 //! [`Bank::icici_rows`] for what is peculiar to it (newest row first, a
 //! `Cr`/`Dr` marker glued to the balance, no printed totals, and a column header
 //! on the first page only).
@@ -165,7 +165,7 @@ impl Bank {
             (Self::Sbi, "narr") => Some(220.0),
             (Self::Sbi, "ref") => Some(299.0),
             (Self::Hdfc, "narr") => Some(240.0),
-            // the right edge of the narration cell: 42 words end at 359.5 and none past 360
+            // the right edge of the narration cell: narration words end at 359.5, none past 360
             (Self::Icici, "narr") => Some(360.0),
             _ => None,
         }
@@ -810,7 +810,7 @@ impl Bank {
     /// ICICI's rows as the replay needs them: oldest first, each balance a signed number.
     ///
     /// The statement prints its newest row first, each balance followed by a glued `Cr`
-    /// or `Dr` marker (a `Dr` balance is overdrawn, as on a cash credit account), and no
+    /// or `Dr` marker (a `Dr` balance is overdrawn), and no
     /// opening balance, closing balance or totals. A statement whose dates run the other
     /// way is refused, not reversed twice: the replay would break on it anyway, and a
     /// loud refusal that names the cause is kinder than a chain failure. Numbers in any
@@ -881,11 +881,11 @@ impl Bank {
 ///   it: a VPA that ends the text may have lost its handle to the cut;
 /// * `NEFT-<UTR>-<name>` and `RTGS-<UTR>-<name>` name everything after the UTR (a name can
 ///   hold hyphens), without trailing hyphens, unless a line was broken at the cell edge
-///   somewhere in the narration (the de-wrapped and the space-joined readings then differ,
-///   which on the two statements measured was 4 of 66 such rows);
+///   somewhere in the narration (the de-wrapped and the space-joined readings then differ);
 /// * `BY CASH` is a cash deposit; `Loan Recovery For<digits>` is named as printed, loan
-///   number included, so that two loans are two parties; the three charge wordings seen
-///   on several rows are `BANK CHARGES`.
+///   number included, so that two loans are two parties; the three charge wordings
+///   (`CHARGES FOR :IMPS/`, `Charges for PORD Customer Payment`, `SMS Charges for`) are
+///   `BANK CHARGES`.
 ///
 /// Not named, so they reach suspense: `IMPS` (no counterparty field is settled), `MBK` (the
 /// last field may be the payer's own remark), `EBANK`, `BY <name>`, interest, disbursement

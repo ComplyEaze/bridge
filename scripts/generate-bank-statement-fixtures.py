@@ -414,7 +414,7 @@ UBI_PAGE_2 = (
 # below the date line, the newest row comes first, the column header is printed
 # on page 1 only, and every page ends with a `<date> <time> <word> Page N of M`
 # footer and a disclaimer line. Every word, number and amount below is invented;
-# the real narrations are at most about 50 characters (the bank cuts them), the
+# the bank cuts a narration at about 50 characters, and the
 # fixture's two wrapped ones are longer, because Courier is wider than the
 # bank's font.
 

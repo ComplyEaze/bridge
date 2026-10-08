@@ -19,7 +19,7 @@ These changes are in source and not yet in a published build.
 **Added**
 
 - `parse_bank_statement` reads ICICI Bank statements (`bank: "icici"`; Part of #1457). The layout was measured on two
-  downloaded statements (a current account and a cash credit account) and the profile follows what was seen there:
+  real downloaded statements (held privately) and the profile follows what was seen there:
   the statement prints neither an opening nor a closing balance nor totals, so both balances come from you, and
   every page must print `Page N of M` and every page after the first must start with a row. It prints the account
   number masked (first and last three digits clear), so `account_label` must carry the whole number; only those six

@@ -282,9 +282,9 @@ request is predicted over a budget well below the cap.
    `voucher_window_replay_unwitnessed`. The import-verification read is not replayed at all when it
    was divided, every part was admitted against a census naming each voucher's GUID, and the marks
    read after its last part equal the marks it opened on (#1241): each part is already a paired
-   read that matched the census voucher for voucher, and any create, alter, cancel, re-date or
-   delete between the opening and the closing marks moves a mark (§11c.5), so the replay could only
-   observe a later state. A window read whole, or divided with no census, is still replayed.
+   read that matched the census voucher for voucher, and each create, alter, cancel, re-date and
+   delete moved a mark every time it was measured (§11c.5; §11c.4 lists what was not tested), so the
+   replay could only observe a later state. A window read whole, or divided with no census, is still replayed.
 9. **A caller that must send the undivided request itself decides on what was measured.** The
    pre-post check inside the import dispatch lease sends the whole verification window as one
    request. Before approval it is admitted on the `verify_import` read of the same window that runs

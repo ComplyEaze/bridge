@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { deflateRawSync, gzipSync } from "node:zlib";
 import {
   PDFIUM_OVERRIDE_MARKER,
@@ -195,9 +196,9 @@ test("a bundle hook that finds no executable fails rather than passing", () => {
 
 test("the command line fails on a marked binary and on a control that sees nothing", () => {
   const directory = scratch();
-  const script = new URL("./check-no-test-seam.mjs", import.meta.url);
+  const script = fileURLToPath(new URL("./check-no-test-seam.mjs", import.meta.url));
   const run = (...argumentsList) =>
-    spawnSync(process.execPath, [script.pathname, ...argumentsList], { encoding: "utf8" }).status;
+    spawnSync(process.execPath, [script, ...argumentsList], { encoding: "utf8" }).status;
   const marked = binary(join(directory, "marked"), true);
   const clean = binary(join(directory, "clean"), false);
   assert.equal(run(clean), 0);

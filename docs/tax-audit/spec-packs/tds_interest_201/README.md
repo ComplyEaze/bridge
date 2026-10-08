@@ -93,12 +93,13 @@ configuration, and uses their results as they stand.
 3. **Partner rows**, after all payee rows. The caller walks the findings of `partners_40b_194t` in
    the order raised (README section 2.4) and takes those whose id begins
    `partners_40b_194t/s194t/` and that have a fact named `tds_expected`. The rest of the id is the
-   partner's tag, used as the row id. The section is `194T`; there is one rate, the rules'
-   `[s194t].rate_bp`, or 1000 when the rules have no `[s194t]` table (`ti_rules_default`); the
+   partner's tag, used as the row id. The section is `194T`; there is one row per tranche, with the
+   rate tag `single_rate` and one rate, the rules' `[s194t].rate_bp`, or 1000 when the rules have no
+   `[s194t]` table (`ti_rules_default`); the
    tranches are the tag's entry in the partner tranche table; the flag of step 1 is never set on a
    partner's row (`ti_placeholder`).
 
-| Section | Rows per tranche, in this order | Rate, from `[tds_rates]` |
+| Section | Rows per tranche, in this order | Rate, from `[tds_rates]` unless the line says otherwise |
 | --- | --- | --- |
 | `194C` | `lower_rate`, then `higher_rate` | `s194c_individual_huf_bp`, then `s194c_other_bp` |
 | `194I` | `lower_rate`, then `higher_rate` | `s194i_plant_machinery_bp`, then `s194i_land_building_bp` |
@@ -106,10 +107,11 @@ configuration, and uses their results as they stand.
 | `194J`, category `technical` | `single_rate` | `s194j_technical_bp` |
 | `194J`, category `royalty` or `28va` | `lower_rate`, then `higher_rate` | `s194j_technical_bp`, then `s194j_professional_bp` |
 | `194H` | `single_rate` | `s194h_bp` |
+| `194T` (a partner's row) | `single_rate` | not from `[tds_rates]`: `[s194t].rate_bp`, or 1000 (step 3) |
 
 The s.194J category is the second underscore-separated part of the row id
-(`194J_professional_<tag>`). `ti_sections` has every line of the table but the first, which
-`ti_194c` and `ti_rounding` have.
+(`194J_professional_<tag>`). `ti_sections` has every payee line of the table but the first, which
+`ti_194c` and `ti_rounding` have; `ti_partners` has the `194T` line.
 
 Each row carries:
 
@@ -150,9 +152,12 @@ credits (`ti_quiet`'s q17: a voucher crediting two payees leaves its TDS out of 
 has no tranche). `ti_base` has one payee for each adjustment. For a partner they are the credits
 `partners_40b_194t` builds its s.194T base from: each voucher's credit to the partner's capital,
 taken as interest or as remuneration according to which of the partner's two ledgers the voucher
-debits, plus any TDS on the same voucher (on a ledger classified as TDS payable) when that capital
-is the only ledger the voucher credits (`ti_partners`' p04); a voucher's credit can be negative. A voucher is one credit even when it shares
-its GUID with another voucher (`ti_shared_guid`).
+has a non-zero line on, plus the TDS on the same voucher (its lines on ledgers classified as TDS payable) when
+this holds: take the side of the voucher the TDS is on (credited with a deduction, debited with its
+reversal) and leave the TDS-payable ledgers out; every ledger left on that side is one of that
+partner's capital ledgers (also when none is left). `ti_partners`' p04 credits the capital and the TDS ledger, so its TDS is
+added back. Otherwise the TDS is not added. A voucher's credit can be negative. A voucher is one credit even when it shares its GUID with another
+voucher (`ti_shared_guid`).
 
 **The rule**, the same for every section (the crate's `tds_tranches::crossing_tranches` already
 implements it):
@@ -264,7 +269,8 @@ sections 2.3, 2.4 and 14).
 ### 2.7 Rules keys and fixed values
 
 Read by the test: `[s201_1a]` and `[s206c_7]` (README section 2.1). Read by the caller:
-`[due_dates].audit_report`, `[tds_rates]` (the seven rates of README section 2.2's table),
+`[due_dates].audit_report`, `[tds_rates]` (the seven keys of it that README section 2.2's table names; the
+vendored table holds two more, `s194t_bp` and `s194a_bp`, and the caller reads neither),
 `[s194t].rate_bp`, and through the two tranche tables the limits of README section 2.3.
 
 Without `[tds_rates]` the caller refuses, on every book, also one with no row. Without `[s194t]`
@@ -488,7 +494,8 @@ The check reads only the published figures. For every tag that has an `interest_
 in ascending order of tag, it reads that row's `tax`, `section`, `deductible_date`, `deducted_date`,
 `paid_date`, `interest_min`, `interest_max` and `interest_if_not_deducted` figures, and the `as_of`
 and three rate figures, and recomputes them with its own copies of the months and interest rules of
-README section 3.2. For a row whose deducted date is `not supplied` the recomputed minimum is 0, the
+README section 3.2. A `deducted_date_<tag>` or `paid_date_<tag>` figure that is absent, or has no
+value, is read as `not supplied`. For a row whose deducted date is `not supplied` the recomputed minimum is 0, the
 recomputed still-not-deducted amount is the interest on the tax at `rate_before_deduction_bp` for
 the months from the deductible date to the as-of date, and the recomputed maximum is the largest of
 the sums of README section 3.2. The reference's check does not try every day for that: it tries the
@@ -502,7 +509,9 @@ the own-date figures, the months figures, the group figures or the totals.
 Its six messages, exactly, each beginning `TDSI-1: <tag>: `:
 
 - `missing a figure needed for independent recomputation`, when the row's tax, section, deductible
-  date, minimum or maximum figure is absent; the row is then not checked further;
+  date, minimum or maximum figure is absent or has no value (the check takes its tags from the
+  minimum figures, so the minimum can have no value but cannot be absent); the row is then not
+  checked further;
 - `negative bound (min=<minimum>, max=<maximum>)`;
 - `min <minimum> > max <maximum>`;
 - `published interest_min <minimum> != independently recomputed <value>`;
@@ -625,7 +634,12 @@ And these cannot be told apart by any book:
   end in the same tranche;
 - the caller's filter on evidence of kind `voucher`: the two input tests cite vouchers only on
   these findings;
-- passing by a payee that is only possibly over: it has no tranche either way.
+- passing by a payee that is only possibly over: it has no tranche either way;
+- where the s.194T rate is read from: `[s194t].rate_bp` (which the caller reads), `[tds_rates].s194t_bp`
+  (which it does not) and the value used without an `[s194t]` table are all 1000 in the vendored
+  rules, and a book can drop a rules table but cannot change a value;
+- where the s.194J technical rate is read from: `[tds_rates].s194j_technical_bp` (which the caller
+  reads) and `[s194j].technical_services_rate_bp` (which it does not) are both 200.
 
 Every rule in the first table of HASHES.md changed at least one golden when it alone was changed at
 `10717095`. Its other three tables are as measured at `ee17d80f`; HASHES.md says what was not run

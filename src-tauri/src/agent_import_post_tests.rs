@@ -3831,8 +3831,57 @@ fn invoice_batch(entries: serde_json::Value) -> (ImportLedgerLine, TallyEndpoint
     (line, endpoint)
 }
 
+/// An invoice of up to three sales legs (a customer, the sales ledgers and the
+/// two tax heads: the most the window holds, since the line under the entries is
+/// not printed when no ledger is marked) is shown whole, inside the caps, with
+/// every ledger and amount on a line of its own; it is never cut.
+#[test]
+fn an_invoice_of_three_sales_legs_is_shown_whole_inside_the_dialogs_caps() {
+    let (line, endpoint) = invoice_batch(json!([
+        {"ledger":"Walk-in Customers","amount":"1050.00","side":"Dr"},
+        {"ledger":"Sales - Consulting Services (SAC 998311)","amount":"500.00","side":"Cr"},
+        {"ledger":"Sales - Training Services (SAC 999293)","amount":"300.00","side":"Cr"},
+        {"ledger":"Sales - Other Services (SAC 999799)","amount":"200.00","side":"Cr"},
+        {"ledger":"Output CGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"},
+        {"ledger":"Output SGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"}
+    ]));
+    let preview = review_preview_for(&line, &endpoint, PostScope::Vouchers)
+        .expect("a six-leg invoice fits the dialog");
+    assert!(preview.lines().count() <= 24, "{preview}");
+    assert!(preview.chars().count() <= 1_600, "{preview}");
+    assert!(
+        preview.lines().all(|l| l.chars().count() <= 100),
+        "{preview}"
+    );
+    for needed in [
+        "Dr 1050.00  \"Walk-in Customers\"",
+        "Cr 500.00  \"Sales - Consulting Services (SAC 998311)\"",
+        "Cr 300.00  \"Sales - Training Services (SAC 999293)\"",
+        "Cr 200.00  \"Sales - Other Services (SAC 999799)\"",
+        "Cr 25.00  \"Output CGST @ 2.5% (Rajasthan)\"",
+        "Cr 25.00  \"Output SGST @ 2.5% (Rajasthan)\"",
+        "Checked: customer, Sales Accounts ledgers, CGST and state tax by head. Ledger rates not read.",
+    ] {
+        assert!(preview.contains(needed), "lacks {needed:?}:\n{preview}");
+    }
+    // Longer names than any of these are refused as too large, never cut.
+    let long = "L".repeat(90);
+    let (line, endpoint) = invoice_batch(json!([
+        {"ledger":"Walk-in Customers","amount":"1050.00","side":"Dr"},
+        {"ledger":format!("Sales {long} one"),"amount":"500.00","side":"Cr"},
+        {"ledger":format!("Sales {long} two"),"amount":"300.00","side":"Cr"},
+        {"ledger":format!("Sales {long} three"),"amount":"200.00","side":"Cr"},
+        {"ledger":format!("Output CGST {long}"),"amount":"25.00","side":"Cr"},
+        {"ledger":format!("Output SGST {long}"),"amount":"25.00","side":"Cr"}
+    ]));
+    assert_eq!(
+        review_preview_for(&line, &endpoint, PostScope::Vouchers).unwrap_err(),
+        "import_review_too_large"
+    );
+}
+
 /// The approval a person gives to a GST invoice shows what they are agreeing to,
-/// inside the dialog's caps, with a round off (the most legs an invoice has),
+/// inside the dialog's caps, with a round off (five legs, one sales leg),
 /// and a saved invoice is not posted while Sales is not a qualified type.
 #[test]
 fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualified() {
@@ -3868,7 +3917,7 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
     // heading and after the agent's timing line; the cue stands once, above the
     // entries, on a line of the dialog's own that carries none of the voucher's
     // text; no ledger is recorded as approved On Account, so no line is marked
-    // and the line under the entries is blank.
+    // and there is no line under the entries.
     let text = |entries: [&str; 5], under_the_entries: &str| {
         [
             "Create ONE Sales invoice in \"Synthetic Accounts\"",
@@ -3882,12 +3931,14 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
         ]
         .into_iter()
         .chain(entries)
+        // The line under the entries is the On Account legend; with none it is
+        // not printed.
+        .chain(Some(under_the_entries).filter(|under| !under.is_empty()))
         .chain([
-            under_the_entries,
             // Totals are printed as the other dialogs print them, without
             // trailing zeros.
             "Total debit: 11200.4  Total credit: 11200.4",
-            "Checked in Tally: Sundry Debtors customer, Sales Accounts ledger, CGST and state tax by head.",
+            "Checked: customer, Sales Accounts ledgers, CGST and state tax by head. Ledger rates not read.",
             "Batch: bridge-00000000-0000-4000-8000-000000000001",
             "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
             "Do not post a file already imported manually. Pause other edits/imports in this company.",
@@ -3915,7 +3966,7 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
             ""
         )
     );
-    assert_eq!(preview.lines().count(), 24, "{preview}");
+    assert_eq!(preview.lines().count(), 23, "{preview}");
     // A leg the batch records as approved On Account is marked on its own line
     // and on no other, and the legend takes the blank line's place: the dialog
     // still fits with a round off.

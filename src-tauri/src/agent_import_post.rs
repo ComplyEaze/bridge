@@ -2571,9 +2571,7 @@ fn classification_review_line(voucher_type: &VoucherType) -> Option<&'static str
             Some("Checked in Tally: every Dr ledger is bank/cash; every Cr ledger holds no money.")
         }
         VoucherType::Contra => Some("Checked in Tally: every ledger is bank/cash."),
-        VoucherType::Sales => Some(
-            "Checked in Tally: Sundry Debtors customer, Sales Accounts ledger, CGST and state tax by head.",
-        ),
+        VoucherType::Sales => Some(INVOICE_CHECKED_LINE),
     }
 }
 
@@ -2733,6 +2731,11 @@ fn review_text(
     marks.seal(line, preview)
 }
 
+/// What the invoice window says was checked: the ledgers' own GST rates are
+/// not read, only that the tax amounts are a slab rate's half of the taxable value.
+const INVOICE_CHECKED_LINE: &str =
+    "Checked: customer, Sales Accounts ledgers, CGST and state tax by head. Ledger rates not read.";
+
 /// The approval text of one Sales invoice: what a person must see to say yes to
 /// a GST document. The party with its GSTIN and registration, the place of
 /// supply, the invoice number (which is also the reference), the bill
@@ -2819,8 +2822,16 @@ fn invoice_review_preview(
         })
         .collect::<Vec<_>>()
         .join("\n");
+    // The line under the entries is the legend of the ledgers approved On Account;
+    // with none it is not printed, which keeps a bill of several sales legs inside
+    // the window.
     let legend = marks.legend(voucher.entries.iter().map(|entry| entry.ledger.as_str()));
-    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}  {VOUCHER_TEXT_CUE}\nVoucher type: {}  Date: {}  Number: {}\nCustomer: {}\n{registration}  Place of supply: {}\nBill allocation: {allocation}\n{}\n{legend}\nTotal debit: {debit}  Total credit: {credit}\nChecked in Tally: Sundry Debtors customer, Sales Accounts ledger, CGST and state tax by head.\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    let under = if legend.is_empty() {
+        String::new()
+    } else {
+        format!("{legend}\n")
+    };
+    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}  {VOUCHER_TEXT_CUE}\nVoucher type: {}  Date: {}  Number: {}\nCustomer: {}\n{registration}  Place of supply: {}\nBill allocation: {allocation}\n{}\n{under}Total debit: {debit}  Total credit: {credit}\n{INVOICE_CHECKED_LINE}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         quoted(&company.name), company.guid, company.company_number, company.books_from,
         quoted(&detail.voucher_type_name), voucher.date, quoted(number),
         quoted(party), detail.place_of_supply, entries, line.batch_id);

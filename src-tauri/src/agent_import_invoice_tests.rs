@@ -201,7 +201,7 @@ fn roles_come_from_groups_and_duty_heads_never_from_names() {
         roles,
         InvoiceRoles {
             party: 0,
-            sales: 1,
+            sales: vec![1],
             cgst: 2,
             state_tax: 3,
             round_off: None
@@ -1343,9 +1343,12 @@ fn each_leg_must_sit_on_its_own_side_and_each_role_be_filled_once() {
         codes(classify_sales_invoice(&v, &facts, RAJ))
     };
     assert!(with("Customer B", &["Sundry Debtors"]).contains(&"invoice_more_than_one_party"));
+    // A second Sales Accounts ledger is a second sales leg: here it breaks the
+    // slab arithmetic (10,001.00 taxed 600.00 a head), where a bill that splits
+    // its taxable value between two ledgers is admitted (below).
     assert_eq!(
         with("Sales B", &["Sales Accounts"]),
-        vec!["invoice_needs_exactly_one_sales_ledger"]
+        vec!["invoice_tax_matches_no_slab_rate"]
     );
     let mut facts = good_facts();
     facts.get_mut("Customer A").unwrap().reserved_groups = vec!["Sales Accounts".into()];
@@ -1549,4 +1552,94 @@ fn a_saved_invoice_of_an_unqualified_type_is_not_read_back_and_not_called_verifi
         assert!(invoice_readback_due(&mut result, &saved, qualified).is_none());
         assert_eq!(result, unmatched);
     }
+}
+
+/// Several sales legs on one tax pair: the taxable value is their sum, the
+/// slab and the party total are checked on the sum, every leg is a credit to
+/// a Sales Accounts ledger, and the window's leg cap is held before any read.
+#[test]
+fn several_sales_legs_share_one_pair_of_tax_heads() {
+    let facts = || {
+        let mut facts = good_facts();
+        facts.extend(facts_for(&[
+            ("Sales B", &["Sales Accounts"], DutyHead::NotTax),
+            ("Sales C", &["Sales Accounts"], DutyHead::NotTax),
+        ]));
+        facts
+    };
+    // 10,000.00 as 6,000.00 + 4,000.00: the same tax, the same party total.
+    let split = |amounts: &[&str]| {
+        let mut v = voucher();
+        v.entries.truncate(1);
+        for (name, amount) in ["Sales", "Sales B", "Sales C"].iter().zip(amounts) {
+            v.entries.push(entry(name, amount, EntrySide::Cr));
+        }
+        v.entries
+            .push(entry("Output CGST", "600.00", EntrySide::Cr));
+        v.entries
+            .push(entry("Output SGST", "600.00", EntrySide::Cr));
+        v
+    };
+    let two = split(&["6000.00", "4000.00"]);
+    let roles = classify_sales_invoice(&two, &facts(), RAJ).expect("two sales legs");
+    assert_eq!(roles.sales, vec![1, 2]);
+    assert!(validate_invoice_voucher(&two).is_ok());
+    let three = split(&["5000.00", "3000.00", "2000.00"]);
+    assert_eq!(
+        classify_sales_invoice(&three, &facts(), RAJ)
+            .expect("three sales legs")
+            .sales,
+        vec![1, 2, 3]
+    );
+    assert!(validate_invoice_voucher(&three).is_ok());
+    // The sum is what the slab and the party total are checked on.
+    let mut short = split(&["6000.00", "3999.00"]);
+    assert_eq!(
+        codes(classify_sales_invoice(&short, &facts(), RAJ)),
+        vec!["invoice_tax_matches_no_slab_rate"]
+    );
+    short.entries[2].amount = "3999.97".into();
+    short.entries[0].amount = "11199.97".into();
+    assert!(classify_sales_invoice(&short, &facts(), RAJ).is_ok());
+    short.entries[0].amount = "11200.00".into();
+    assert_eq!(
+        codes(classify_sales_invoice(&short, &facts(), RAJ)),
+        vec!["invoice_party_amount_does_not_close"]
+    );
+    // A sales leg that is a debit is still refused (a discount is netted by the
+    // caller, never sent), and a ledger that is no Sales Accounts ledger is no sales leg.
+    let mut discount = split(&["6000.00", "4000.00"]);
+    discount.entries[2].side = EntrySide::Dr;
+    assert!(codes(classify_sales_invoice(&discount, &facts(), RAJ))
+        .contains(&"invoice_sales_must_be_credit"));
+    // No Sales Accounts ledger at all is refused under its own code.
+    let mut none = voucher();
+    none.entries.remove(1);
+    assert!(codes(classify_sales_invoice(&none, &good_facts(), RAJ))
+        .contains(&"invoice_needs_a_sales_ledger"));
+    // The window's cap on legs: a fourth sales leg, or a round off beside three,
+    // is refused before any read.
+    let mut four = split(&["4000.00", "3000.00", "2000.00"]);
+    four.entries
+        .push(entry("Sales D", "1000.00", EntrySide::Cr));
+    assert_eq!(
+        validate_invoice_voucher(&four),
+        Err("invoice_too_many_entries".to_string())
+    );
+    let mut with_round_off = three.clone();
+    with_round_off.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
+    with_round_off
+        .entries
+        .push(entry("Round Off", "0.10", EntrySide::Cr));
+    assert_eq!(
+        validate_invoice_voucher(&with_round_off),
+        Err("invoice_too_many_entries".to_string())
+    );
+    // Two sales legs and a round off are within the cap.
+    let mut two_and_round = two.clone();
+    two_and_round.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
+    two_and_round
+        .entries
+        .push(entry("Round Off", "0.10", EntrySide::Cr));
+    assert!(validate_invoice_voucher(&two_and_round).is_ok());
 }

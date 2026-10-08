@@ -137,7 +137,7 @@ fn normalize(value: &str) -> String {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct InvoiceRoles {
     pub(super) party: usize,
-    pub(super) sales: usize,
+    pub(super) sales: Vec<usize>,
     pub(super) cgst: usize,
     pub(super) state_tax: usize,
     pub(super) round_off: Option<usize>,
@@ -361,6 +361,12 @@ fn ledger_count_refusal(ledgers: Option<u64>, mark: u64) -> Option<InvoiceRefusa
     }
 }
 
+/// The most legs an invoice may carry: the customer, up to three Sales Accounts
+/// ledgers, the two tax heads (or two sales ledgers, the heads and a round off).
+/// What the approval window can show, with its blank line dropped when nothing
+/// stands under the entries.
+const MAX_INVOICE_ENTRIES: usize = 6;
+
 /// The GST slab rates an invoice's tax may be, in percent.
 const SLAB_RATES: &[i128] = &[5, 12, 18, 28, 40];
 
@@ -500,9 +506,14 @@ pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), St
         .filter(|entry| Some(entry.ledger.as_str()) != round_off);
     let debits = counted.clone().filter(|e| e.side == EntrySide::Dr).count();
     let credits = counted.filter(|e| e.side == EntrySide::Cr).count();
-    // One party debit; the sales leg and one tax leg per head are credits.
+    // One party debit; the sales legs and one tax leg per head are credits.
     if debits != 1 || credits < 3 {
         return Err("invoice_entry_shape_invalid".to_string());
+    }
+    // The approval window holds this many legs and no more (24 lines, 1,600
+    // characters); an invoice that would not fit is refused here, before any read.
+    if voucher.entries.len() > MAX_INVOICE_ENTRIES {
+        return Err("invoice_too_many_entries".to_string());
     }
     Ok(())
 }
@@ -586,11 +597,9 @@ pub(super) fn classify_sales_invoice(
             None
         }
     };
-    let sales_index = one(
-        &sales,
-        "invoice_needs_exactly_one_sales_ledger",
-        &mut refusals,
-    );
+    if sales.is_empty() {
+        refusals.push(refuse_value("invoice_needs_a_sales_ledger", "0 found"));
+    }
     let cgst_index = one(
         &cgst,
         "invoice_needs_exactly_one_cgst_ledger",
@@ -673,17 +682,18 @@ pub(super) fn classify_sales_invoice(
     }
     let (party, sales, cgst, state_tax) = (
         party.expect("checked"),
-        sales_index.expect("checked"),
+        sales,
         cgst_index.expect("checked"),
         state_index.expect("checked"),
     );
     let amount = |index: usize| paise(&voucher.entries[index].amount);
-    let (Some(party_amount), Some(taxable), Some(cgst_amount), Some(state_amount)) = (
-        amount(party),
-        amount(sales),
-        amount(cgst),
-        amount(state_tax),
-    ) else {
+    // The taxable value is the sum of the sales legs, all at the one tax pair's rate.
+    let taxable = sales.iter().try_fold(0_i128, |sum, index| {
+        amount(*index).and_then(|leg| sum.checked_add(leg))
+    });
+    let (Some(party_amount), Some(taxable), Some(cgst_amount), Some(state_amount)) =
+        (amount(party), taxable, amount(cgst), amount(state_tax))
+    else {
         return Err(vec![refuse("invoice_amount_invalid")]);
     };
     let Some(legs) = TaxLegs::new(cgst_amount, state_amount) else {

@@ -72,9 +72,9 @@ real pipeline a separate step does it first, for every list under `ledgers_by_na
 matches no ledger master is refused with a binding error naming the location, and a ledger renamed
 since the table was written is rewritten to its current name by identity. In the crate that step is
 `src/binding.rs`, which binds only the locations the ported tests read, in the order the reference
-binds its name locations; the port adds this location there. `rp_unknown_ledger` shows what the test
-itself does with a name that has no master (it contributes 0 and the result-level check reports each
-citation), which the real pipeline never reaches because it refuses the name earlier.
+binds its name locations; this location is bound at `src/binding.rs:881-924`. `rp_unknown_ledger`
+shows what the test itself does with a name that has no master (it contributes 0 and the result-level
+check reports each citation), which the real pipeline never reaches because it refuses the name earlier.
 
 The position in the reference's list of ledger-name locations (42 in all, in the order it binds them): the
 location `related_parties.<person>.ledgers_by_nature.<nature>` (a list) is number 25. It follows the three
@@ -318,24 +318,25 @@ what it reaches.
 
 ## 12. Running the books
 
-The crate's `tests/edge_books.rs` does not read `related_parties` yet. A port adds that: read
-`related_parties` (absent meaning `{}`), run the test on the book with it, and compare the whole dump
-with the golden as the other edge books do (parity spec section 7). The side of the harness that runs
-the reference, `parity/edge_golden.py`, is kept by the reference's maintainers, together with its runner
-for this test; a porter does not write one. The goldens are regenerated only by the reference's maintainers.
+The crate's `tests/edge_books.rs` reads `related_parties` (absent meaning `{}`, `tests/edge_books.rs:419-428`),
+runs the test on the book with it (`:646-650`), and compares the whole dump with the golden as the other edge
+books do (parity spec section 7). The side of the harness that runs the reference, `parity/edge_golden.py`, is
+kept by the reference's maintainers, together with its runner for this test in its `runners` table. The goldens
+are regenerated only by the reference's maintainers.
 
 ## 13. Registering the test in the crate
 
-A new registry entry needs, besides the books, a golden for the synthetic read and the two harness lines. All of
-them are described here so that a port does not have to write a golden by hand.
+The test is in the crate's registry. Besides the books, its entry has a golden for the synthetic read and a
+runner in each of the harness's two scripts, described here as they are.
 
 - **The synthetic golden.** `goldens/synthetic.related_parties_cl23.json` is the test on the crate's synthetic
   read (`tests/fixtures/synthetic-engagement.toml`). That engagement has no related-person table, so the dump is
-  the unconfirmed one: one figure (`applicable` = "no") and the `not_confirmed` finding. It goes to
-  `tests/fixtures/golden/synthetic.related_parties_cl23.json`. The registry's `min_figures` for this test is 1.
-- **The harness lines** (the reference's maintainers keep and regenerate the harness; these are the lines a port
-  adds so its own harness can name the test). In `parity/python_golden.py`, a runner and its `RUNNERS` entry
-  (the `RUNNERS` list is kept sorted by test id):
+  the unconfirmed one: one figure (`applicable` = "no") and the `not_confirmed` finding. The crate holds it,
+  byte for byte, as `tests/fixtures/golden/synthetic.related_parties_cl23.json`. The registry's `min_figures` for
+  this test is 1.
+- **The harness runners** (the reference's maintainers keep the harness, run it against the reference and
+  regenerate the goldens). In `parity/python_golden.py`, the runner and its `RUNNERS` entry (the `RUNNERS` list
+  is kept sorted by test id):
 
       def _related_parties_cl23(c):
           from tae.audit_tests import related_parties_cl23
@@ -351,5 +352,5 @@ them are described here so that a port does not have to write a golden by hand.
           eng, rules, related_parties_config({"related_parties": spec.get("related_parties", {})}))),
 
   Both runners import the module from the reference's audit tests and the reader from its configuration module,
-  and are run against the reference by the reference's maintainers; a port only needs them to keep the two
-  sides' test lists in step (the crate has tests that compare the Rust registry with the harness's list).
+  and are run against the reference by the reference's maintainers. In the crate, `tests/registry.rs` checks that
+  the `RUNNERS` list of `parity/python_golden.py` names exactly the tests of the Rust registry.

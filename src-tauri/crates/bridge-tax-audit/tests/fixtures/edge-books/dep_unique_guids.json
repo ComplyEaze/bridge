@@ -1,0 +1,250 @@
+{
+ "comment": "depreciation, the guard for #1243: every voucher has a GUID of its own. A depreciation journal crediting two asset ledgers (book depreciation) and a sale of one of them (a deletion); a purchase on credit paid to the supplier in cash the same day (flagged by the same-day payment); a cash purchase put to use for fewer than 180 days (flagged by its own cash line, half rate); a purchase by bank (not flagged). One row id per flagged addition, none suffixed. This golden is the same before and after the reference's change.",
+ "groups": {
+  "Fixed Assets": null,
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Capital Account": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-dep_unique_guids-000"
+  },
+  {
+   "name": "Machine A",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_unique_guids-001"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-dep_unique_guids-002"
+  },
+  {
+   "name": "Machine B",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_unique_guids-003"
+  },
+  {
+   "name": "Machine C",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_unique_guids-004"
+  },
+  {
+   "name": "Supplier P",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-dep_unique_guids-005"
+  },
+  {
+   "name": "Depreciation",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-dep_unique_guids-006"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-dep_unique_guids-007"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 3104219,
+   "debit": 0,
+   "credit": 2700056,
+   "closing": 404163
+  },
+  {
+   "ledger": "Machine A",
+   "opening": 2750613,
+   "debit": 812309,
+   "credit": 444558,
+   "closing": 3118364
+  },
+  {
+   "ledger": "Edge Bank",
+   "opening": 1260433,
+   "debit": 264517,
+   "credit": 812309,
+   "closing": 712641
+  },
+  {
+   "ledger": "Machine B",
+   "opening": 0,
+   "debit": 1500037,
+   "credit": 0,
+   "closing": 1500037
+  },
+  {
+   "ledger": "Machine C",
+   "opening": 88213,
+   "debit": 1200019,
+   "credit": 35022,
+   "closing": 1253210
+  },
+  {
+   "ledger": "Supplier P",
+   "opening": 0,
+   "debit": 1500037,
+   "credit": 1500037,
+   "closing": 0
+  },
+  {
+   "ledger": "Depreciation",
+   "opening": 0,
+   "debit": 215063,
+   "credit": 0,
+   "closing": 215063
+  },
+  {
+   "ledger": "Capital",
+   "opening": -7203478,
+   "debit": 0,
+   "credit": 0,
+   "closing": -7203478
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "dep-g-1",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "J1",
+   "lines": [
+    [
+     "Depreciation",
+     215063
+    ],
+    [
+     "Machine A",
+     -180041
+    ],
+    [
+     "Machine C",
+     -35022
+    ]
+   ]
+  },
+  {
+   "guid": "dep-g-2",
+   "date": "2025-08-14",
+   "base_type": "Receipt",
+   "number": "R1",
+   "lines": [
+    [
+     "Edge Bank",
+     264517
+    ],
+    [
+     "Machine A",
+     -264517
+    ]
+   ]
+  },
+  {
+   "guid": "dep-g-3",
+   "date": "2025-06-18",
+   "base_type": "Purchase",
+   "number": "P1",
+   "lines": [
+    [
+     "Machine B",
+     1500037
+    ],
+    [
+     "Supplier P",
+     -1500037
+    ]
+   ]
+  },
+  {
+   "guid": "dep-g-4",
+   "date": "2025-06-18",
+   "base_type": "Payment",
+   "number": "Y1",
+   "lines": [
+    [
+     "Supplier P",
+     1500037
+    ],
+    [
+     "Cash",
+     -1500037
+    ]
+   ]
+  },
+  {
+   "guid": "dep-g-5",
+   "date": "2025-11-12",
+   "base_type": "Payment",
+   "number": "Y2",
+   "lines": [
+    [
+     "Machine C",
+     1200019
+    ],
+    [
+     "Cash",
+     -1200019
+    ]
+   ]
+  },
+  {
+   "guid": "dep-g-6",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "number": "Y3",
+   "lines": [
+    [
+     "Machine A",
+     812309
+    ],
+    [
+     "Edge Bank",
+     -812309
+    ]
+   ]
+  }
+ ],
+ "depreciation": {
+  "block_by_ledger": {
+   "Machine A": "plant_machinery_15",
+   "Machine B": "plant_machinery_15",
+   "Machine C": "plant_machinery_15"
+  },
+  "opening_wdv_paise": {
+   "plant_machinery_15": 4317265
+  },
+  "dep_expense_ledgers": [
+   "Depreciation"
+  ]
+ },
+ "tests": [
+  "depreciation"
+ ]
+}

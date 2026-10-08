@@ -18,6 +18,17 @@ These changes are in source and not yet in a published build.
 
 **Fixed**
 
+- **An update now starts ComplyEaze Bridge before the Terms are ticked, and its
+  tools say why they refuse.** 0.5.0 marked the Terms of Use setting as
+  required. Claude Desktop does not start an extension while a required setting
+  has no value, and an update from 0.4.2 leaves the new Terms setting with none.
+  So 0.5.0 installed over 0.4.2 was not started even when switched on: Claude
+  Desktop showed "Unable to connect to extension server" and the assistant said
+  the connector was not available, with nothing naming the Terms. The setting is
+  no longer marked required and still starts off. Claude Desktop now starts
+  ComplyEaze Bridge, and until you tick the setting every tool answers
+  `terms_not_accepted`, naming the setting; nothing is read from Tally. The
+  setting no longer shows "(required)" beside its title (#1413).
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
   the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
   text already said; the schema said 500 even when the row limit was lower or higher (#1148).

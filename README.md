@@ -122,11 +122,12 @@ whose ledger now points to a different master.
   written whether the call succeeds or is refused.
 - **You accept the Terms of Use first.** The extension asks you to accept the
   ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings, and every
-  tool refuses with `terms_not_accepted` until you do. (After an update from
-  0.4.2, on the one Mac we tried with a build of 0.5.0 made by our checks, Claude
-  Desktop did not start the extension before the box was ticked and before any
-  quit, and a request
-  failed with a 400 error that did not mention the Terms.)
+  tool refuses with `terms_not_accepted` until you do. (In 0.5.0, after an
+  update from 0.4.2, Claude Desktop did not start the extension before the box
+  was ticked, so that answer was never shown: on one Mac a request failed with a
+  400 error that did not mention the Terms. From 0.5.1 the setting is not marked
+  required, so Claude Desktop starts the extension and the answer is shown;
+  #1413.)
 - **Open source** under Apache-2.0.
 
 ## What has been run against a real TallyPrime

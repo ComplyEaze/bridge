@@ -65,10 +65,15 @@ actually on.
    HTTP setting.
 4. Read the Terms of Use linked in the extension settings, then turn on **I
    accept the ComplyEaze Bridge Terms of Use**. Until you do, Bridge does
-   not read from Tally. (On one Mac, with the package our checks built for 0.5.0
-   installed over 0.4.2, Claude Desktop did not start Bridge before the box was
-   ticked and before any quit, and a request to a Bridge tool failed with a 400 error that did not
-   mention the Terms.)
+   not read from Tally, and from release 0.5.1 every Bridge tool answers that
+   the Terms of Use are not accepted and names this setting. (In 0.5.0 the
+   setting was marked required, and Claude Desktop does not start an extension
+   while a required setting has no value. On one Mac, with the package our
+   checks built for 0.5.0 installed over 0.4.2, Claude Desktop did not start
+   Bridge before the box was ticked and before any quit, and a request to a
+   Bridge tool failed with a 400 error that did not mention the Terms. 0.5.1 no
+   longer marks the setting required, so Claude Desktop starts Bridge and Bridge
+   gives the answer itself; bridge#1413.)
 5. Save the extension settings, then quit Claude Desktop completely and reopen
    it. (On that Mac Claude Desktop
    started Bridge as soon as the settings were saved and a new chat got an answer
@@ -113,9 +118,13 @@ port, Response redaction and the posting setting as they were (a posting
 setting that was on stayed on), the old Terms setting gone and no value for the
 new one (version 2026-10.1). This was not tried with the published file or on
 Windows. So after updating, tick the Terms setting, check the posting setting, then
-quit and reopen Claude Desktop; on that Mac, before the tick, Claude Desktop did
-not start Bridge and a request to one of its tools failed with a 400 error that
-did not mention the Terms. Installing over a release older than 0.4.2 was not
+quit and reopen Claude Desktop. With 0.5.0 on that Mac, before the tick, Claude
+Desktop did not start Bridge, and a request to one of its tools failed with a 400
+error that did not mention the Terms; the published 0.5.0, installed over 0.4.2
+and switched on while the new setting had no value, was not started either, and Claude Desktop
+showed "Unable to connect to extension server" (bridge#1413). From 0.5.1 Claude
+Desktop starts Bridge before the tick, and every tool answers that the Terms of
+Use are not accepted until you tick it. Installing over a release older than 0.4.2 was not
 tried: remove such a release first. If Settings,
 Extensions then lists two ComplyEaze Bridge entries (as happened when 0.4.2 was
 installed beside an older release), remove the older entry before you use
@@ -147,8 +156,9 @@ Private MCPB downloads do not update automatically. To upgrade, keep the data
 folder, install the newer release from the Extensions screen in Claude Desktop's
 settings, then confirm its version. On one Mac the package our checks built for 0.5.0
 (not the published file) replaced 0.4.2 and kept its Tally port, Response redaction and posting setting
-(see above): there, tick the new Terms setting and check the posting setting,
-then quit and reopen Claude Desktop. Installing over a release older than 0.4.2
+(see above): there, tick the new Terms setting (until you do, Bridge's tools
+answer that the Terms of Use are not accepted, from 0.5.1; 0.5.0 was not started
+at all) and check the posting setting, then quit and reopen Claude Desktop. Installing over a release older than 0.4.2
 was not tried: remove it first. If
 Settings, Extensions lists two ComplyEaze Bridge entries instead (as happened
 when 0.4.2 was installed beside an older release), remove

@@ -6,6 +6,12 @@ protocol crate's record (`crates/bridge-tally-protocol/tests/parse_record/`) cov
 parsers and leaves these fixtures to this one. They are not captures: the fixtures stay in the
 protocol crate's `tests/fixtures/`, with their provenance and byte-integrity checks.
 
+**Both records together.** The protocol crate's
+`every_fixture_left_to_the_app_crate_is_in_its_record` reads each file's `# fixture:` header. It
+fails, naming the fixture, when a fixture it leaves here has no record, or when a record here
+names a fixture it does not leave here. A hashed record has no header, so that test refuses it
+until its form names the fixture; none is hashed today.
+
 **What a file holds.** Each file is named `<fixture path>.<parser>`, with `/` written as `__`.
 - A header names the fixture, the parser with its fixed arguments, and whether the fixture is
   `captured` or `synthetic` (authored or derived, not evidence of what Tally sends).

@@ -58,15 +58,14 @@ neither offers nor sets it, so it applies only if someone sets it by hand.
 Every tool refuses until the Terms of Use (version 2026-10.1 since 0.5.0) are
 accepted in the extension settings. In 0.5.0 the setting was marked required, and
 Claude Desktop does not start an extension while a required setting has no value.
-Seen on one Mac, with 0.5.0 installed over 0.4.2: the new setting had no value.
-With a build of 0.5.0 made by our checks, before it was ticked and before any
-quit, Claude Desktop did not start the extension and a request failed with a 400
-error that did not mention the Terms; with the published file, switched on while the
-setting had no value, the extension was not started either (section 4). From 0.5.1
-the setting is not marked required: Claude Desktop starts the extension with the
-setting off, and every tool call answers `terms_not_accepted`, naming the setting
-(bridge#1413). That was seen on one Mac with a test package; it has not yet been
-checked on Windows. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to `true`
+Seen on one Mac with 0.5.0 installed over 0.4.2, where the new setting had no
+value: a build made by our checks was not started before the tick or any quit,
+and a request failed with a 400 error; the published file, switched on, was not
+started either ("Unable to connect to extension server"). Neither error mentioned
+the Terms (section 4). From 0.5.1 the setting is not marked required, so Claude
+Desktop starts the extension and every tool answers `terms_not_accepted`, naming
+the setting (bridge#1413). That was seen on one Mac with a test package; it has
+not yet been checked on Windows. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to `true`
 or `1` is not asked.
 
 ## 2. Does anything leave my computer?
@@ -257,8 +256,7 @@ or `1` is not asked.
 - **A terms record** (`terms-acceptance.jsonl`): the extension asks you to
   accept the ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings,
   and every tool refuses with `terms_not_accepted` until you do (section 1 says
-  what 0.5.0 did after an update, when the extension was not started at all, and
-  what changed in 0.5.1). When the server
+  what 0.5.0 did after an update and what changes in 0.5.1). When the server
   starts with the setting on, it appends a line with the terms version, the
   time, and that the acceptance came through the setting (once per version; two
   servers starting together can each add a line). If that line cannot be

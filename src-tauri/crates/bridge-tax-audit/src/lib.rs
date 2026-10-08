@@ -19,7 +19,7 @@
 //! **Parity evidence.** `tests/parity.rs`, `tests/parity_40a3.rs` and `tests/parity_depreciation.rs`
 //! each compare this crate's dump over a committed synthetic read with the reference engine's dump
 //! over the same bytes, and prove the comparison can fail. That is parity on invented data only.
-//! The evidence that the slice reads real Tally books is `examples/local_parity.rs`, run on the
+//! The evidence that the slice reads real Tally books is the local parity example (`examples/local_parity`), run on the
 //! machine that holds client reads and never committed; each change to this crate should record
 //! that run's result.
 //!

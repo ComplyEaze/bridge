@@ -11950,5 +11950,13 @@
   "file": "src/rules.rs",
   "from": "                    escaped = false;",
   "to": "                    escaped = true;"
+ },
+ {
+  "id": "R1446-07",
+  "by": "author",
+  "what": "rules: a comment-only line of the live source between a block's lines is skipped",
+  "file": "src/rules.rs",
+  "from": "    let live: Vec<&str> = source.lines().map(without_comment).collect();",
+  "to": "    let live: Vec<&str> = source\n        .lines()\n        .filter(|l| !l.trim_start().starts_with('#'))\n        .map(without_comment)\n        .collect();"
  }
 ]

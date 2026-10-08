@@ -8,9 +8,9 @@ fn types_xml(extra: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO><COMPANY>0</COMPANY><VOUCHERTYPE>0</VOUCHERTYPE></CMPINFO></DESC><DATA><COLLECTION ISMODIFY=\"No\">\
 <VOUCHERTYPE NAME=\"Sales\" RESERVEDNAME=\"Sales\"><GUID>5a1e5-01</GUID><PARENT>Sales</PARENT><NUMBERINGMETHOD>Automatic (Manual Override)</NUMBERINGMETHOD>\
-<VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>\
+<VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD><PREVENTDUPLICATES>Yes</PREVENTDUPLICATES></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>\
 <VOUCHERTYPE NAME=\"Sales Acc\" RESERVEDNAME=\"\"><GUID>acc0-02</GUID><PARENT>Sales</PARENT><NUMBERINGMETHOD>None</NUMBERINGMETHOD>\
-<VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>\
+<VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD><PREVENTDUPLICATES>Yes</PREVENTDUPLICATES></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>\
 <VOUCHERTYPE NAME=\"Attendance\" RESERVEDNAME=\"Attendance\"><GUID>a77e-03</GUID><PARENT>Attendance</PARENT>\
 <VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Automatic</NUMBERINGMETHOD></VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>\
 <VOUCHERTYPE NAME=\"Sales Auto\" RESERVEDNAME=\"\"><GUID>a070-04</GUID><PARENT>Sales</PARENT>\
@@ -36,7 +36,7 @@ fn the_cmpinfo_counter_is_not_a_row_and_each_type_is_read_with_its_series() {
             guid: "acc0-02".into(),
             reserved_name: String::new(),
             parent: "Sales".into(),
-            series: vec![("Default".into(), "Manual".into())],
+            series: vec![("Default".into(), "Manual".into(), Some("Yes".into()))],
         }
     );
 }
@@ -66,6 +66,19 @@ fn a_named_type_resolves_by_its_parent_chain_and_its_series_not_by_its_name() {
         Err("invoice_voucher_type_several_series")
     );
     assert_eq!(resolve("Decoy"), Err("invoice_voucher_type_wrong_class"));
+    // A Manual series that lets a number repeat, or that does not say, is refused.
+    for (guard, name) in [
+        ("<PREVENTDUPLICATES>No</PREVENTDUPLICATES>", "Dup No"),
+        ("", "Dup Unsaid"),
+    ] {
+        let row = format!("<VOUCHERTYPE NAME=\"{name}\" RESERVEDNAME=\"\"><GUID>d0-0c</GUID><PARENT>Sales</PARENT><VOUCHERNUMBERSERIES.LIST><NAME>Default</NAME><NUMBERINGMETHOD>Manual</NUMBERINGMETHOD>{guard}</VOUCHERNUMBERSERIES.LIST></VOUCHERTYPE>");
+        let types = parse_voucher_types(&types_xml(&row)).unwrap();
+        assert_eq!(
+            resolve_voucher_type(&types, name, "Sales"),
+            Err("invoice_voucher_type_duplicates_allowed"),
+            "{name}"
+        );
+    }
     assert_eq!(
         resolve("Attendance"),
         Err("invoice_voucher_type_wrong_class")
@@ -335,7 +348,11 @@ fn the_captured_voucher_types_resolve_the_manual_type_and_refuse_the_automatic_o
     );
     assert_eq!(
         manual.series,
-        [("Default".to_string(), "Manual".to_string())]
+        [(
+            "Default".to_string(),
+            "Manual".to_string(),
+            Some("Yes".to_string())
+        )]
     );
     assert_eq!(
         resolve_voucher_type(&types, "Sales", "Sales"),

@@ -215,8 +215,9 @@ pub(super) struct VoucherTypeRow {
     /// Tally's reserved name: set on a predefined type, empty on a user's.
     pub(super) reserved_name: String,
     pub(super) parent: String,
-    /// Each number series of the type, with its numbering method.
-    pub(super) series: Vec<(String, String)>,
+    /// Each number series of the type, with its numbering method and its
+    /// "prevent duplicates" flag (`None` when the answer gave none).
+    pub(super) series: Vec<(String, String, Option<String>)>,
 }
 
 /// What a named voucher type resolves to for an invoice.
@@ -256,13 +257,25 @@ pub(super) fn parse_voucher_types(xml: &str) -> Result<Vec<VoucherTypeRow>, &'st
             .all("VOUCHERNUMBERSERIES.LIST/NUMBERINGMETHOD")
             .collect::<Vec<_>>();
         let names = row.all("VOUCHERNUMBERSERIES.LIST/NAME").collect::<Vec<_>>();
+        // The flag is aligned to its series only when every series has one;
+        // none at all reads as unknown, and some but not all is unreadable.
+        let guards = row
+            .all("VOUCHERNUMBERSERIES.LIST/PREVENTDUPLICATES")
+            .map(|flag| Some(flag.to_string()))
+            .collect::<Vec<_>>();
+        let guards = match guards.len() {
+            0 => vec![None; names.len()],
+            n if n == names.len() => guards,
+            _ => return Err("invoice_voucher_type_series_unreadable"),
+        };
         if methods.len() != names.len() {
             return Err("invoice_voucher_type_series_unreadable");
         }
         let series = names
             .into_iter()
             .zip(methods)
-            .map(|(name, method)| (name.to_string(), method.to_string()))
+            .zip(guards)
+            .map(|((name, method), guard)| (name.to_string(), method.to_string(), guard))
             .collect();
         types.push(VoucherTypeRow {
             name,
@@ -325,8 +338,14 @@ pub(super) fn resolve_voucher_type(
     // type reads Automatic (Manual Override) on top and Manual in its series;
     // the type keyed for the rehearsal reads None on top and Manual in its
     // series).
+    // Its "prevent duplicates" flag is Tally's own refusal of a second
+    // voucher of the type with a number already used (§9.8), the guard the
+    // number read's control relies on for a company's first invoice.
     match target.series.as_slice() {
-        [(_, method)] if method == "Manual" => {}
+        [(_, method, Some(guard))] if method == "Manual" && guard == "Yes" => {}
+        [(_, method, _)] if method == "Manual" => {
+            return Err("invoice_voucher_type_duplicates_allowed")
+        }
         [] => return Err("invoice_voucher_type_series_missing"),
         [_] => return Err("invoice_voucher_type_numbering_not_manual"),
         _ => return Err("invoice_voucher_type_several_series"),

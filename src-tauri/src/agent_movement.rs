@@ -277,7 +277,14 @@ impl Server {
                 parse_movement_rows(voucher_rows, range.from_yyyymmdd(), range.to_yyyymmdd())?;
             if page.observed_rows == 0 {
                 let (corroboration, partial, reason) = self
-                    .corroborate_empty_voucher_read(identity, company.as_str(), &from, &to, marks)
+                    .corroborate_empty_voucher_read(
+                        identity,
+                        company.as_str(),
+                        &from,
+                        &to,
+                        None,
+                        marks,
+                    )
                     .await?;
                 evidence = combine_evidence(evidence.clone(), corroboration);
                 if partial {

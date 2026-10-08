@@ -1,0 +1,302 @@
+# fixture: tests/fixtures/native/ledger_snapshot_master_fields_lab.utf8.xml
+# parser: parse_native_ledger_snapshot
+# source: captured
+Ok([
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB CREDITOR ALPHA",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB CREDITOR BETA",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB CREDITOR DEBIT BALANCE",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1250.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "-1250.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "-1250.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB CREDITOR DELTA",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB CREDITOR EPSILON",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB CREDITOR GAMMA",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB CREDITOR ZETA",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB DEBTOR ALPHA",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB DEBTOR BETA",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB DEBTOR CREDIT BALANCE",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "1250.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "1250.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "1250.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB DEBTOR DELTA",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB DEBTOR EPSILON",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB DEBTOR GAMMA",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB DEBTOR ZETA",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BRIDGE MFLAB PARTIAL ALTER PROBE",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Cash",
+        parent: Some(
+            "Cash-in-Hand",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Profit & Loss A/c",
+        parent: Some(
+            "�#4; Primary",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+])

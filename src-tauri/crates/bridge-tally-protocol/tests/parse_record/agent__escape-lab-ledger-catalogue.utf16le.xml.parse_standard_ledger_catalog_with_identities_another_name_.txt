@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/agent/escape-lab-ledger-catalogue.utf16le.xml
+# parser: parse_standard_ledger_catalog_with_identities(another name)
+# source: captured
+Err(CompanyIdentityMismatch)

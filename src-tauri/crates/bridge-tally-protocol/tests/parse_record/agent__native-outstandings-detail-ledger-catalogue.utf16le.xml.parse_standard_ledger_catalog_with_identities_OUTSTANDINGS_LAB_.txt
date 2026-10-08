@@ -1,0 +1,160 @@
+# fixture: tests/fixtures/agent/native-outstandings-detail-ledger-catalogue.utf16le.xml
+# parser: parse_standard_ledger_catalog_with_identities(OUTSTANDINGS LAB)
+# source: captured
+Ok(StandardLedgerCatalog {
+    entries: [
+        StandardLedgerCatalogEntry {
+            name: "Cash",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-0000001f",
+            parent: Some(
+                "Cash-in-Hand",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL Bank",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000db",
+            parent: Some(
+                "Bank Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL Misc Income",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000dc",
+            parent: Some(
+                "Indirect Incomes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P01 Named Bills Debtor",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000ce",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P02 On Account Debtor",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000cf",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P03 Not Billwise Debtor",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000d0",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P04 Advance Debtor",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000d1",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P05 Credit Note Debtor",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000d2",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P06 Debit Note Creditor",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000d3",
+            parent: Some(
+                "Sundry Creditors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P07 Referenced Opening Debtor",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000d4",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P08 Unreferenced Opening Debtor",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000d5",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P09 Reuse Debtor A",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000d6",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P10 Reuse Debtor B",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000d7",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL P11 Journal Debtor",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000d8",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL Purchases",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000da",
+            parent: Some(
+                "Purchase Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "OL Sales",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-000000d9",
+            parent: Some(
+                "Sales Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Profit & Loss A/c",
+            stored_name: None,
+            guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7-0000001e",
+            parent: Some(
+                "�#4; Primary",
+            ),
+            parent_unsupported: false,
+        },
+    ],
+})

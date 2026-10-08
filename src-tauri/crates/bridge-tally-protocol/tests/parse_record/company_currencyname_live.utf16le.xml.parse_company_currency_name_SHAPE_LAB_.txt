@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/company_currencyname_live.utf16le.xml
+# parser: parse_company_currency_name(SHAPE LAB)
+# source: captured
+Ok("₹")

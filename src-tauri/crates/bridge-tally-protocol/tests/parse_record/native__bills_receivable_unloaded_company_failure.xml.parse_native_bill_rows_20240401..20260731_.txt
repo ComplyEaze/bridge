@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/native/bills_receivable_unloaded_company_failure.xml
+# parser: parse_native_bill_rows(20240401..20260731)
+# source: captured
+Err(InvalidResponse("bills_unexpected_element"))

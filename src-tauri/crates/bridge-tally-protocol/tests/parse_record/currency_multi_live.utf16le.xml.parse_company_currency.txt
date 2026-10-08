@@ -1,0 +1,14 @@
+# fixture: tests/fixtures/currency_multi_live.utf16le.xml
+# parser: parse_company_currency
+# source: captured
+Ok(CompanyCurrency {
+    symbol: "$",
+    mailing_name: "USD",
+    currency_count: 2,
+    decimal_places: 2,
+    is_inr: false,
+    names: [
+        "$",
+        "I₹",
+    ],
+})

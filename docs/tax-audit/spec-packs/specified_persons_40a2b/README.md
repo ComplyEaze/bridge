@@ -353,11 +353,11 @@ the comment lists their relationships (`Person L01` also has a governed interest
 
 ## 10. Running the books
 
-The crate's `tests/edge_books.rs` reads `entity_type` already but not `related_parties`, and runs
-neither test yet. A port adds that: read `related_parties` (absent meaning `{}`); run the
-related-party test on the book; run this test with the same table, the rules for the book's entity
-type and that result; run the module check with the same three inputs and this test's result; and
-compare each whole dump with its golden as the other edge books do (parity spec section 7). The side
+The crate's `tests/edge_books.rs` reads `entity_type` and `related_parties`, and runs the
+related-party test, but does not run this test yet. A port adds that: run this test with the same
+`related_parties` table, the rules for the book's entity type and the related-party result; run the
+module check with the same three inputs and this test's result; and compare each whole dump with
+its golden as the other edge books do (parity spec section 7). The side
 of the harness that runs the reference, `parity/edge_golden.py`, is kept by the reference's
 maintainers, together with its runners for both tests; a porter does not write one. The goldens are
 regenerated only by the reference's maintainers.

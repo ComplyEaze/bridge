@@ -1,0 +1,11 @@
+# fixture: stock-lab-day/stock_lab_taxed_day_company_marks_response.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE STOCK LAB",
+        guid: "1edb9b05-8d35-4c0c-9959-dce655730463",
+        vouchers: 3,
+        masters: 241,
+    },
+])

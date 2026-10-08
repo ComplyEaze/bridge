@@ -56,7 +56,7 @@ pub(super) fn required_attribute(
         let attribute = attribute.map_err(|_| {
             NativeTrialBalanceError::InvalidResponse("trial_balance_attribute_malformed")
         })?;
-        if !attribute.key.as_ref().eq_ignore_ascii_case(key) {
+        if !attribute.key.as_ref().as_bytes().eq_ignore_ascii_case(key) {
             continue;
         }
         if found.is_some() {
@@ -89,31 +89,23 @@ pub(super) fn read_element_text(
             .map_err(|_| NativeTrialBalanceError::InvalidResponse("trial_balance_xml_malformed"))?
         {
             Event::Text(text) => {
-                let decoded = text.decode().map_err(|_| {
-                    NativeTrialBalanceError::InvalidResponse("trial_balance_xml_invalid_encoding")
-                })?;
-                let unescaped = quick_xml::escape::unescape(&decoded).map_err(|_| {
+                let unescaped = quick_xml::escape::unescape(&text).map_err(|_| {
                     NativeTrialBalanceError::InvalidResponse("trial_balance_xml_invalid_escape")
                 })?;
                 value.push_str(&unescaped);
             }
-            Event::GeneralRef(reference) => {
-                let decoded = reference.decode().map_err(|_| {
-                    NativeTrialBalanceError::InvalidResponse("trial_balance_xml_invalid_encoding")
-                })?;
-                match decoded.as_ref() {
-                    "amp" => value.push('&'),
-                    "lt" => value.push('<'),
-                    "gt" => value.push('>'),
-                    "quot" => value.push('"'),
-                    "apos" => value.push('\''),
-                    _ => {
-                        return Err(NativeTrialBalanceError::InvalidResponse(
-                            "trial_balance_scalar_general_reference_invalid",
-                        ))
-                    }
+            Event::GeneralRef(reference) => match &*reference {
+                "amp" => value.push('&'),
+                "lt" => value.push('<'),
+                "gt" => value.push('>'),
+                "quot" => value.push('"'),
+                "apos" => value.push('\''),
+                _ => {
+                    return Err(NativeTrialBalanceError::InvalidResponse(
+                        "trial_balance_scalar_general_reference_invalid",
+                    ))
                 }
-            }
+            },
             Event::End(end) if end.name() == name => return Ok(value),
             Event::Start(_) | Event::Empty(_) | Event::CData(_) | Event::Comment(_) => {
                 return Err(NativeTrialBalanceError::InvalidResponse(

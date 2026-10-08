@@ -1,0 +1,23 @@
+# fixture: note-days/cancelled_purchase_day_voucher_window_response.utf16le.xml
+# parser: parse_agent_rows(SHAPE_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(41),
+        "amounts": Array [],
+        "cancelled": Bool(true),
+        "date": String("20250703"),
+        "guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000029"),
+        "is_invoice": Bool(true),
+        "master_id": String("41"),
+        "narration": String("SHAPELAB-C2B cancelled, no financial legs"),
+        "optional": Bool(false),
+        "party": String(""),
+        "post_dated": Bool(false),
+        "voucher_class": String("Purchase"),
+        "voucher_number": String("9"),
+        "voucher_type": String("Purchase"),
+        "voucher_type_guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000002e"),
+        "voucher_type_reserved_name": String("Purchase"),
+    },
+])

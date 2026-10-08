@@ -1,0 +1,161 @@
+{
+ "comment": "partners_40b_194t, #1243: an interest voucher and a remuneration voucher that share one GUID each also credit a ledger this test does not read (Sundry Payable on the interest voucher, Other Payable on the remuneration voucher). Only the interest voucher is an interest voucher crediting an unread ledger: the not-computed finding names Sundry Payable alone, though both vouchers are named among those crediting a ledger not read.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Capital Account": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-partners_shared_guid_unread-000"
+  },
+  {
+   "name": "Interest P",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_shared_guid_unread-001"
+  },
+  {
+   "name": "Other Payable",
+   "chain": [
+    "Current Liabilities"
+   ],
+   "guid": "edge-partners_shared_guid_unread-002"
+  },
+  {
+   "name": "P Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-partners_shared_guid_unread-003"
+  },
+  {
+   "name": "Remuneration P",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_shared_guid_unread-004"
+  },
+  {
+   "name": "Sundry Payable",
+   "chain": [
+    "Current Liabilities"
+   ],
+   "guid": "edge-partners_shared_guid_unread-005"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 40000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 40000000
+  },
+  {
+   "ledger": "Interest P",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Other Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "P Capital",
+   "opening": -40000000,
+   "debit": 0,
+   "credit": 900000,
+   "closing": -40900000
+  },
+  {
+   "ledger": "Remuneration P",
+   "opening": 0,
+   "debit": 600000,
+   "credit": 0,
+   "closing": 600000
+  },
+  {
+   "ledger": "Sundry Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "mix-u",
+   "date": "2025-09-15",
+   "base_type": "Journal",
+   "number": "M1",
+   "lines": [
+    [
+     "Interest P",
+     500000
+    ],
+    [
+     "P Capital",
+     -400000
+    ],
+    [
+     "Sundry Payable",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "mix-u",
+   "date": "2025-10-15",
+   "base_type": "Journal",
+   "number": "M2",
+   "lines": [
+    [
+     "Remuneration P",
+     600000
+    ],
+    [
+     "P Capital",
+     -500000
+    ],
+    [
+     "Other Payable",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "partners_40b_194t"
+ ],
+ "entity_type": "firm",
+ "partners": {
+  "pp": {
+   "capital_ledgers": [
+    "P Capital"
+   ],
+   "interest_ledger": "Interest P",
+   "remuneration_ledger": "Remuneration P"
+  }
+ },
+ "deed": {
+  "interest_rate_bp": 1200
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

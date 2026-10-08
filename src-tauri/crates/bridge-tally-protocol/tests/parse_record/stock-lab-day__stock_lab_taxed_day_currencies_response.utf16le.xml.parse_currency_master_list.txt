@@ -1,0 +1,13 @@
+# fixture: tests/fixtures/stock-lab-day/stock_lab_taxed_day_currencies_response.utf16le.xml
+# parser: parse_currency_master_list
+# source: captured
+Ok(CurrencyMasters {
+    masters: [
+        CurrencyMaster {
+            name: "₹",
+            original_name: None,
+            mailing_name: "INR",
+            decimal_places: 2,
+        },
+    ],
+})

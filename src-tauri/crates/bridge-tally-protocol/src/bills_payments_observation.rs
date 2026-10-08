@@ -950,9 +950,7 @@ fn scan_exact_grammar(
                 }
             }
             Event::Text(text) => {
-                let decoded = text
-                    .decode()
-                    .map_err(|_| BillsObservationError::MalformedXml)?;
+                let decoded = &*text;
                 if decoded.len() > limits.max_field_bytes {
                     return Err(BillsObservationError::ResourceLimitExceeded);
                 }
@@ -978,8 +976,7 @@ fn scan_exact_grammar(
     Ok(fragments)
 }
 
-fn event_name(bytes: &[u8]) -> Result<String, BillsObservationError> {
-    let name = std::str::from_utf8(bytes).map_err(|_| BillsObservationError::MalformedXml)?;
+fn event_name(name: &str) -> Result<String, BillsObservationError> {
     if !name.bytes().all(|byte| byte.is_ascii_uppercase()) {
         return Err(BillsObservationError::WrongGrammar);
     }
@@ -1044,8 +1041,7 @@ fn validate_attributes(
         if count > limits.max_attributes {
             return Err(BillsObservationError::ResourceLimitExceeded);
         }
-        let key = std::str::from_utf8(attribute.key.as_ref())
-            .map_err(|_| BillsObservationError::MalformedXml)?;
+        let key = attribute.key.as_ref();
         if key != key.to_ascii_uppercase() || !seen.insert(key.to_string()) {
             return Err(BillsObservationError::DuplicateField);
         }

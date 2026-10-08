@@ -10,7 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::book::{Book, Voucher};
+use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::rules::Rules;
@@ -62,8 +62,9 @@ fn texts(value: &toml::Value, key: &str, field: &str) -> Result<Vec<String>> {
 
 /// The `[related_parties]` table, typed. A field that is present with the wrong type is refused,
 /// naming the person key and the field; an absent field keeps its default, and an empty person
-/// is a person. The reference leaves both uncovered (spec pack §2.2); this is a deliberate,
-/// stated divergence on input no golden covers.
+/// is a person. A relationship that is not text the reference refuses too (spec pack §10); a
+/// person or ledger list of the wrong shape no golden covers (§2.2), and refusing it is this
+/// port's own stated choice.
 pub fn related_persons(cfg: &RelatedPartiesConfig) -> Result<BTreeMap<String, RelatedPerson>> {
     let mut persons = BTreeMap::new();
     for (key, value) in &cfg.persons {
@@ -106,7 +107,8 @@ pub fn related_persons(cfg: &RelatedPartiesConfig) -> Result<BTreeMap<String, Re
 /// Each person's tag: the first 8 hex digits of the SHA-1 of the key's UTF-8 bytes as written
 /// (no trimming, case folding or normalisation). Two keys sharing a tag would share every figure
 /// id, so the table is refused, naming both keys, rather than one person being dropped or merged.
-/// The reference stops on the duplicate figure id instead (spec pack §10); this refuses this test
+/// The reference refuses it too, naming the tag and every key sharing it (spec pack §10); the
+/// form is the port's own. This one names the first two keys in key order and refuses this test
 /// alone, as the crate's other config refusals do.
 pub fn person_tags(persons: &BTreeMap<String, RelatedPerson>) -> Result<BTreeMap<String, String>> {
     let mut by_tag: BTreeMap<String, &String> = BTreeMap::new();
@@ -211,10 +213,17 @@ confirmation only, never inferred from a ledger or party name."
                 continue;
             }
             let (amount, entries) = walk(&population, &set)?;
+            // Each entry's voucher by its own GUID and label, distinct and sorted: two vouchers
+            // with the same GUID and label are one citation (both are counted).
+            let refs: BTreeSet<(&str, String)> = entries
+                .values()
+                .map(|(_, v)| (v.guid.as_str(), support::voucher_label(v)))
+                .collect();
             let mut evidence = ledger_refs(&set);
-            evidence.extend(entries.values().map(|(_, v)| {
-                EvidenceRef::with_label("voucher", &v.guid, &support::voucher_label(v))
-            }));
+            evidence.extend(
+                refs.iter()
+                    .map(|(guid, label)| EvidenceRef::with_label("voucher", guid, label)),
+            );
             let id = r.fig(
                 &format!("amount_{nature}_{tag}"),
                 Value::Int(amount),
@@ -355,16 +364,17 @@ the amount paid to this related person in each nature shown above."
     Ok(r)
 }
 
-/// A ledger set's entries, by voucher GUID: each voucher's net on the set, and the voucher.
-type Entries<'a> = BTreeMap<&'a str, (i64, &'a Voucher)>;
+/// A ledger set's entries, by the voucher's key in the population: its net on the set, and it.
+type Entries<'a> = BTreeMap<VoucherKey, (i64, &'a Voucher)>;
 
-/// The population walk of one ledger set (spec pack §4): each voucher's net on the set, in book
-/// order; a voucher netting to zero is no entry; a later voucher sharing a GUID replaces the
-/// earlier one's entry, unless it nets to zero. The amount is the sum of the entries' nets.
+/// The population walk of one ledger set (spec pack §4): each voucher's net on the set; a voucher
+/// netting to zero is no entry; every other voucher is its own entry, keyed by
+/// [`voucher_keys`], so vouchers sharing a GUID are each counted. The amount is the sum of the
+/// entries' nets.
 fn walk<'a>(population: &[&'a Voucher], set: &BTreeSet<&str>) -> Result<(i64, Entries<'a>)> {
     let overflow = || support::overflow(TEST_ID);
     let mut entries: Entries = BTreeMap::new();
-    for v in population {
+    for (key, v) in voucher_keys(population)? {
         let mut net = 0i64;
         for line in &v.lines {
             if set.contains(line.ledger.as_str()) {
@@ -372,7 +382,7 @@ fn walk<'a>(population: &[&'a Voucher], set: &BTreeSet<&str>) -> Result<(i64, En
             }
         }
         if net != 0 {
-            entries.insert(v.guid.as_str(), (net, v));
+            entries.insert(key, (net, v));
         }
     }
     let amount = entries

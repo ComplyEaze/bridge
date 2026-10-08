@@ -2852,6 +2852,9 @@ fn attach_build_egress_failure(response: &mut Value) -> bool {
 }
 
 #[cfg(test)]
+#[path = "agent_parse_record_tests.rs"]
+mod parse_record_tests;
+#[cfg(test)]
 #[path = "agent_tests.rs"]
 mod tests;
 

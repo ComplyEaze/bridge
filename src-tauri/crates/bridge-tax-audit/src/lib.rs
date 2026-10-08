@@ -60,6 +60,7 @@ pub mod read_scope;
 pub mod registry;
 pub mod related_parties_cl23;
 pub mod rules;
+pub mod specified_persons_40a2b;
 pub mod stale_balances_41_1;
 pub mod statutory_dues_43b;
 pub mod stock;
@@ -1915,6 +1916,26 @@ pub fn related_parties_cl23_on(
     let (bound, _report) = engagement.bind(book)?;
     let result = related_parties_cl23::run(book, rules, &bound.related_parties)?;
     let module_check = related_parties_cl23::check_invariants(book, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `specified_persons_40a2b` on an already-built book: `related_parties_cl23` first, on the
+/// same bound table, then this test on its result, with its module check (SPD-1). Refuses without
+/// `[client].entity_type`.
+pub fn specified_persons_40a2b_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let entity_type = engagement.entity_type.as_deref().ok_or_else(|| {
+        AuditError::Config("specified_persons_40a2b needs [client].entity_type".to_string())
+    })?;
+    let (bound, _report) = engagement.bind(book)?;
+    let table = &bound.related_parties;
+    let related = related_parties_cl23::run(book, rules, table)?;
+    let result = specified_persons_40a2b::run(rules, entity_type, table, &related)?;
+    let module_check =
+        specified_persons_40a2b::check_invariants(rules, entity_type, table, &related, &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 

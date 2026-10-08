@@ -1,0 +1,6 @@
+# fixture: tests/fixtures/masters_cost_centres_corpus_forex_empty_live.utf16le.xml
+# parser: parse_native_masters(CostCentres, FOREX)
+# source: captured
+Ok(NativeMasters {
+    rows: [],
+})

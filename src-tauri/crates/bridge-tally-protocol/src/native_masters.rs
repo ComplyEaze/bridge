@@ -497,10 +497,7 @@ pub fn parse_native_masters(
 /// return, line feed) may sit between elements. `str::trim` is not that set: it
 /// also drops U+00A0 and other Unicode spaces, which are text.
 pub(crate) fn refuse_stray_text(text: &BytesText<'_>) -> Result<(), NativeMastersError> {
-    let decoded = text
-        .decode()
-        .map_err(|_| NativeMastersError::Malformed("masters_xml_invalid_encoding"))?;
-    if decoded.trim_matches([' ', '\t', '\r', '\n']).is_empty() {
+    if text.trim_matches([' ', '\t', '\r', '\n']).is_empty() {
         Ok(())
     } else {
         Err(NativeMastersError::Malformed("masters_unexpected_text"))
@@ -558,7 +555,15 @@ fn parse_row(
                     }
                 }
             }
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(kind.element()) => break,
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(kind.element()) =>
+            {
+                break
+            }
             Event::Text(text) => refuse_stray_text(&text)?,
             Event::CData(_) | Event::GeneralRef(_) => {
                 return Err(NativeMastersError::Malformed("masters_unexpected_text"))
@@ -726,10 +731,7 @@ pub(crate) fn read_text(
     let raw = reader
         .read_text(name)
         .map_err(|_| NativeMastersError::Malformed("masters_xml_malformed"))?;
-    let decoded = raw
-        .decode()
-        .map_err(|_| NativeMastersError::Malformed("masters_xml_invalid_encoding"))?;
-    if let Some((_, nested)) = decoded.split_once('<') {
+    if let Some((_, nested)) = raw.split_once('<') {
         // Tally's own failure elements keep their meaning inside a scalar: the
         // first nested tag's name is compared exactly, so `<ERRORS>` is not one.
         let tag = nested
@@ -744,7 +746,7 @@ pub(crate) fn read_text(
             },
         );
     }
-    quick_xml::escape::unescape(&decoded)
+    quick_xml::escape::unescape(&raw)
         .map(std::borrow::Cow::into_owned)
         .map_err(|_| NativeMastersError::Malformed("masters_xml_invalid_escape"))
 }
@@ -761,7 +763,7 @@ fn require_collection_type(
     for attribute in element.attributes() {
         let attribute =
             attribute.map_err(|_| NativeMastersError::Malformed("masters_attribute_malformed"))?;
-        if attribute.key.as_ref().eq_ignore_ascii_case(b"MSTDEPTYPE") {
+        if attribute.key.as_ref().eq_ignore_ascii_case("MSTDEPTYPE") {
             let value = attribute
                 .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                 .map_err(|_| NativeMastersError::Malformed("masters_attribute_malformed"))?;
@@ -782,7 +784,7 @@ pub(crate) fn name_attribute(element: &BytesStart<'_>) -> Result<String, NativeM
     for attribute in element.attributes() {
         let attribute =
             attribute.map_err(|_| NativeMastersError::Malformed("masters_attribute_malformed"))?;
-        let key = attribute.key.as_ref();
+        let key = attribute.key.as_ref().as_bytes();
         let is_name = key.eq_ignore_ascii_case(b"NAME");
         if !is_name && !key.eq_ignore_ascii_case(b"RESERVEDNAME") {
             continue;
@@ -860,7 +862,7 @@ fn numbering_method(text: &str) -> Result<NativeNumberingMethod, NativeMastersEr
 }
 
 pub(crate) fn upper(name: QName<'_>) -> Vec<u8> {
-    name.as_ref().to_ascii_uppercase()
+    name.as_ref().as_bytes().to_ascii_uppercase()
 }
 
 pub(crate) fn refuse_error_element(name: &[u8]) -> Result<(), NativeMastersError> {

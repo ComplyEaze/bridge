@@ -1,0 +1,31 @@
+# fixture: tests/fixtures/masters_cost_centres_shape_lab_flag_no_live.utf16le.xml
+# parser: parse_native_masters(CostCentres, SHAPE LAB)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Assembly",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000109",
+            master_id: 265,
+            alter_id: 267,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: CostCentre {
+                category: "Business Line",
+            },
+        },
+        NativeMasterRow {
+            name: "Trading",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000d9",
+            master_id: 217,
+            alter_id: 218,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: CostCentre {
+                category: "Business Line",
+            },
+        },
+    ],
+})

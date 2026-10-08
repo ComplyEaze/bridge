@@ -1,0 +1,6 @@
+# fixture: tests/fixtures/masters_stock_groups_reads_lab_live.utf16le.xml
+# parser: parse_native_masters(StockGroups)
+# source: captured
+Ok(NativeMasters {
+    rows: [],
+})

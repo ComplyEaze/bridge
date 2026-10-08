@@ -1,0 +1,382 @@
+# fixture: tests/fixtures/stock_items_shape_lab_fy_live.utf16le.xml
+# parser: parse_native_stock_items
+# source: captured
+Ok(NativeStockItems {
+    rows: [
+        NativeStockItem {
+            name: "Carton Box Small",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000110",
+            parent: Some(
+                "Packaging",
+            ),
+            base_unit: Some(
+                "Box",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "100",
+                        ),
+                        unit: "Box",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "2500.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "100",
+                        ),
+                        unit: "Box",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "2500.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Caustic Soda Flakes",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010c",
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            base_unit: Some(
+                "Kgs",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "200.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "9000.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "400.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "-1000.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Cleaning Kit A",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000112",
+            parent: Some(
+                "Finished Kits",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "25",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "18750.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "12",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "18750.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Cleaning Kit B",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000113",
+            parent: Some(
+                "Finished Kits",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Empty,
+                value: Some(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Empty,
+                value: None,
+            },
+        },
+        NativeStockItem {
+            name: "Descaler Concentrate",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000114",
+            parent: Some(
+                "Finished Kits",
+            ),
+            base_unit: Some(
+                "Kgs",
+            ),
+            opening: NativeStockPosition {
+                quantity: Empty,
+                value: Some(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Empty,
+                value: None,
+            },
+        },
+        NativeStockItem {
+            name: "HDPE Drum 50L",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010f",
+            parent: Some(
+                "Packaging",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "40",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "12000.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "40",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "12000.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Hydrochloric Acid 33pc",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010d",
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            base_unit: Some(
+                "Kgs",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "150.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "4500.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "816.667",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "-15500.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Label Roll",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000111",
+            parent: Some(
+                "Packaging",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Empty,
+                value: Some(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Empty,
+                value: None,
+            },
+        },
+        NativeStockItem {
+            name: "Soda Ash Light",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010e",
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            base_unit: Some(
+                "Kgs",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "300.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "7500.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "1300.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "-18749.99",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Sulphuric Acid 98pc",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000dc",
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            base_unit: Some(
+                "Kgs",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "100.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "5000.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "100.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                value: Some(
+                    ExactDecimal(
+                        "5000.00",
+                    ),
+                ),
+            },
+        },
+        NativeStockItem {
+            name: "Zero Stock Item",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000115",
+            parent: Some(
+                "Raw Chemicals",
+            ),
+            base_unit: Some(
+                "Kgs",
+            ),
+            opening: NativeStockPosition {
+                quantity: Empty,
+                value: Some(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "-50.000",
+                        ),
+                        unit: "Kgs",
+                    },
+                ),
+                value: None,
+            },
+        },
+    ],
+})

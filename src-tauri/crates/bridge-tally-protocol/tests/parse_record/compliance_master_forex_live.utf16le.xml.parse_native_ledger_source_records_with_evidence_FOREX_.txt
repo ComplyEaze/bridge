@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/compliance_master_forex_live.utf16le.xml
+# parser: parse_native_ledger_source_records_with_evidence(FOREX)
+# source: captured
+Err(native ledger row carried a foreign-currency opening balance)

@@ -50,6 +50,7 @@ pub mod financial_statements;
 pub mod findings;
 pub mod high_value_register;
 pub mod invariants;
+pub mod knock_off_candidates;
 pub mod ledger_ids;
 pub mod ledger_scrutiny;
 pub mod loans_interest;
@@ -74,6 +75,7 @@ pub mod tds_tranches;
 mod text_tables;
 pub mod trial_balance;
 pub mod twentysixas_receipts;
+mod unicode_tables;
 pub mod xml;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -142,6 +144,12 @@ pub struct Engagement {
     /// ledger and group names to the Book; its values are typed when that test runs
     /// ([`party_identity::PartyConfig::from_toml`]).
     pub party_identity: Option<toml::Value>,
+    /// `knock_off_candidates`-only: `[party_identity].party_groups` as bound, empty when absent.
+    /// [`binding::bind`] refuses a value that is not a list of names (`BIND-ID-MALFORMED`).
+    pub party_groups: Vec<String>,
+    /// `[party_identity]` is present but is not a table: `knock_off_candidates` refuses when it
+    /// runs, as the reference's read of `party_groups` raises there.
+    pub party_identity_not_a_table: bool,
     /// `depreciation`-only: `None` when the client config carries no `[depreciation]` table at
     /// all (an engagement that never runs that test); `Some` once the table is present, at which
     /// point `block_by_ledger`, `opening_wdv_paise` and `dep_expense_ledgers` are REQUIRED within
@@ -959,6 +967,8 @@ not YYYY-MM-DD"
                 .get("s194n_withdrawal_narration_terms")
                 .cloned(),
             party_identity: cfg.get("party_identity").cloned(),
+            party_groups: Vec::new(),
+            party_identity_not_a_table: false,
             loan_ledgers_configured: cfg
                 .get("loans")
                 .and_then(toml::Value::as_table)
@@ -1457,6 +1467,24 @@ pub fn questionnaire_cl13_on(
     let result = questionnaire_cl13::run(book, rules, &bound.period, Some(&stock_result))?;
     let module_check = questionnaire_cl13::check_invariants(book, &bound.period, &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `knock_off_candidates` on a book and return its canonical parity dump. The test has no
+/// module check. Its only setting is the bound `[party_identity].party_groups`; the table's other
+/// keys are never read, as the reference's pack never reads them for this test.
+pub fn knock_off_candidates_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    if bound.party_identity_not_a_table {
+        return Err(AuditError::Config(
+            "[party_identity] is not a table".to_string(),
+        ));
+    }
+    let result = knock_off_candidates::run(book, rules, &bound.party_groups)?;
+    canonical::canonical_test_result(book, &result, None)
 }
 
 /// Run `cash_book_integrity` on a book and return its canonical parity dump, with the module's

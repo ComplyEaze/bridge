@@ -819,8 +819,8 @@ fn the_stock_lab_day_request_files_are_exactly_the_requests_the_call_sent() {
 /// The recorded purchase read with the window's census and window answers spliced out for
 /// Tally's own empty collection (a committed capture of an empty collection, not a capture of an
 /// empty-window call), followed by the empty-window corroboration the register then makes: a
-/// census of the wider window (paired; no window read, #1240) and the company's voucher mark.
-const EMPTY_WINDOW_TAIL: &str = "ensnseemsmse";
+/// wider window read (its census and window, each paired) and the company's voucher mark.
+const EMPTY_WINDOW_TAIL: &str = "ensnseewswseemsmse";
 
 /// The company-marks response with the voucher mark set to zero: a book with no vouchers.
 fn marks_with_voucher_mark_zero() -> String {
@@ -878,7 +878,7 @@ async fn empty_window_register(corroborating_marks: Option<String>) -> Value {
 async fn an_empty_window_its_wider_read_cannot_corroborate_is_partial_in_a_register() {
     // No voucher in the window, none in the wider window, and the company's voucher mark is not
     // zero: nothing corroborates the emptiness, so the register says `partial` with the reason
-    // `vouchers` gives the same window (agent.rs `corroborate_empty_by_days`), not
+    // `vouchers` gives the same window (agent.rs `corroborate_empty_voucher_window`), not
     // `complete`. This is the empty-window half of #1031, read end to end.
     let response = empty_window_register(None).await;
     assert_eq!(response["isError"], false, "{response}");

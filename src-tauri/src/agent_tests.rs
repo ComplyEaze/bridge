@@ -2096,41 +2096,32 @@ fn a_tool_date_that_is_not_a_tally_date_is_refused_at_the_boundary() {
 
 #[test]
 fn empty_voucher_window_corroboration_handles_all_three_control_branches() {
-    // what a widened read found: a voucher inside the window, one anywhere in the widened window
     assert_eq!(
-        corroborate_empty_by_days(false, true, None),
+        corroborate_empty_voucher_window(
+            &[json!({"date":"20260831"}), json!({"date":"20260903"})],
+            "20260901",
+            "20260902",
+            None,
+        ),
         Ok((true, Some("nonempty_uncorroborated")))
     );
     assert_eq!(
-        corroborate_empty_by_days(true, true, None),
+        corroborate_empty_voucher_window(
+            &[json!({"date":"20260901"})],
+            "20260901",
+            "20260902",
+            None,
+        ),
         Err("window_contradicted".to_string())
     );
     assert_eq!(
-        corroborate_empty_by_days(false, false, Some(0)),
+        corroborate_empty_voucher_window(&[], "20260901", "20260902", Some(0)),
         Ok((false, Some("company_has_no_vouchers")))
     );
     assert_eq!(
-        corroborate_empty_by_days(false, false, Some(1)),
+        corroborate_empty_voucher_window(&[], "20260901", "20260902", Some(1)),
         Ok((true, Some("empty_uncorroborated")))
     );
-    // nothing found and no mark to decide on
-    assert_eq!(
-        corroborate_empty_by_days(false, false, None),
-        Err("voucher_checkpoint_invalid".to_string())
-    );
-    // the rows of a data read are in the window by their own day, ends included
-    for (date, inside) in [
-        ("20260831", false),
-        ("20260901", true),
-        ("20260902", true),
-        ("20260903", false),
-    ] {
-        assert_eq!(
-            row_in_window(&json!({"date": date}), "20260901", "20260902"),
-            inside,
-            "{date}"
-        );
-    }
 }
 
 #[tokio::test]

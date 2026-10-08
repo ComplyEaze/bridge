@@ -444,6 +444,11 @@ def _bank_reconciliation(c):
         bank_charge_narration_terms=bank_charge_narration_terms(c.cfg))
 
 
+def _knock_off_candidates(c):
+    from tae.audit_tests import knock_off_candidates
+    return knock_off_candidates, knock_off_candidates.run(
+        c.eng, c.rules, tuple(c.cfg.get("party_identity", {}).get("party_groups", ())))
+
 def _high_value_register(c):
     """As tae/pack.py calls it, on every engagement: the bank statement and the AIS rows are both
     optional here, as there (none and no rows without their flags). The counterparty types are the
@@ -515,6 +520,7 @@ RUNNERS = {
     "entity_269st_gap": _entity_269st_gap,
     "financial_statements": _financial_statements,
     "high_value_register": _high_value_register,
+    "knock_off_candidates": _knock_off_candidates,
     "ledger_scrutiny": _ledger_scrutiny,
     "loans_interest": _loans_interest,
     "partners_40b_194t": _partners_40b_194t,

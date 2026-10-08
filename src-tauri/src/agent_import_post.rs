@@ -1130,6 +1130,18 @@ impl Server {
                                 UnderLockRefusal::TxnAlreadyPosted,
                             ));
                         }
+                        // An invoice waits for a sent invoice of this company that is
+                        // not verified posted (ADR 0004, slice 4). Asked again here,
+                        // under the lock, because the approval dialog may have stood
+                        // open while another batch went out.
+                        if self
+                            .stopped_company_while_admitted(&line)
+                            .map_err(BeforeDispatchError::Other)?
+                        {
+                            return Err(BeforeDispatchError::Refused(
+                                UnderLockRefusal::CompanyStopped,
+                            ));
+                        }
                         // Before the approval is spent: a refusal here withdraws it,
                         // and the next call asks the person again.
                         let pre_post_voucher_mark =
@@ -1524,6 +1536,18 @@ impl Server {
                     });
                     name_blocking_batch(&mut outcome.payload, blocking.as_deref());
                 }
+                // The same for a stopped company, from the pre-dialog recheck
+                // and the lock alike: name the batch the person must decide about.
+                if outcome.payload["result"]["error"]["code"] == "invoice_company_stopped" {
+                    let blocking = snapshot.as_ref().and_then(|current| {
+                        self.import_invoice_stop(&current.batch.company_guid)
+                            .ok()
+                            .flatten()
+                    });
+                    if let Some(id) = blocking {
+                        outcome.payload["result"]["error"]["blocking_batch_id"] = json!(id);
+                    }
+                }
                 if let Some(located) = post_location {
                     outcome.payload["result"]["post_location"] = located;
                 }
@@ -1684,6 +1708,8 @@ const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could no
 /// What a caller does when another batch already sent, or was found to have
 /// posted, a row of this one (#876). Tally's counters for a rejected send are
 /// not proof that the row is absent now, so Bridge never lifts the block itself.
+const STOPPED_NEXT_STEP: &str = "Nothing was sent and the approval is withdrawn. blocking_batch_id names the earlier invoice batch (when it is absent, call verify_import on the company's recent invoice batches). Call verify_import on it: if it reads posted and verified, post this invoice again. If it does not, ask the user to check that invoice in Tally; once they have, call acknowledge_post_review with that batch_id and doubt invoice_stop, which asks them in a dialog you cannot answer. Never rebuild an invoice to get past this.";
+
 const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. If Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot post this row again: ask the user to enter the voucher in Tally. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it.";
 
 /// What a caller is told when `post_import` refuses a saved batch's own text
@@ -1715,6 +1741,10 @@ fn reconciliation_failure_payload(
     if code == "import_txn_already_posted" {
         payload["result"]["error"]["message"] = json!("Nothing was sent: another batch of this company already sent, or was found to have posted, a row of this batch.");
         payload["result"]["error"]["next_step"] = json!(TXN_ALREADY_POSTED_NEXT_STEP);
+    }
+    if code == "invoice_company_stopped" {
+        payload["result"]["error"]["message"] = json!("Nothing was sent: an earlier invoice of this company was sent to Tally and is not verified posted, so no further invoice is posted until a person decides about it.");
+        payload["result"]["error"]["next_step"] = json!(STOPPED_NEXT_STEP);
     }
     // The saved text itself is refused, and a saved batch cannot be changed,
     // so asking for approval again always fails the same way: it has to be

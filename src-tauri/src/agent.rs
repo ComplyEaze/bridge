@@ -1329,13 +1329,28 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              tell the user the number check does not work on this book; do not post this \
              invoice through ComplyEaze Bridge.",
         ),
+        "invoice_company_stopped" => Some(
+            "An earlier invoice of this company was sent to Tally and is not verified posted, so \
+             ComplyEaze Bridge builds and posts no further invoice for this company until a \
+             person decides about it. The detail names its batch. Run verify_import on that \
+             batch: if it reads posted and verified, the stop lifts by itself. If it does not, \
+             tell the user to check that invoice in Tally, then call acknowledge_post_review \
+             with that batch_id and doubt invoice_stop: a native dialog asks the user, and \
+             nothing but their answer releases the stop.",
+        ),
+        "invoice_stop_unreadable" => Some(
+            "ComplyEaze Bridge could not read its own import journal to see whether an earlier \
+             invoice of this company stops this one, so the build is refused. Tell the user and \
+             stop.",
+        ),
         "invoice_number_control_unavailable" => Some(
             "An earlier invoice of this company was sent to Tally and none is verified posted \
              now, so ComplyEaze Bridge has no known invoice to check its number read against, \
              and refuses the build. Run verify_import on the earlier invoice batch: if it reads \
              as posted and verified, build this invoice again. If Tally never took that invoice \
-             (it declined the post, or it was deleted), this refusal will not clear: tell the \
-             user, and the invoice is entered by hand in Tally.",
+             (it declined the post, or it was deleted), the user can release it with \
+             acknowledge_post_review (that batch_id, doubt invoice_stop) after checking Tally; \
+             until then this refusal stands.",
         ),
         "invoice_number_control_unreadable" => Some(
             "ComplyEaze Bridge could not read its own import journal, or the earlier invoice it \

@@ -985,6 +985,11 @@ impl Server {
         &self,
         args: &Value,
     ) -> Result<ToolOutcome, ToolFailure> {
+        // The release of a Sales stop is its own act with its own record, and
+        // never one of the doubts below: this review "unblocks nothing".
+        if args.get("doubt").and_then(Value::as_str) == Some("invoice_stop") {
+            return self.release_invoice_stop(args).await;
+        }
         let batch_id = required_string(args, "batch_id")?;
         let imports = self.imports_dir()?;
         let ledger::BatchSnapshot {

@@ -381,3 +381,88 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
         assert_eq!(sent(lab.simulator), requests, "{code}");
     }
 }
+
+/// What one admission does for a company whose journal holds an invoice batch
+/// (sent, then `then` appended after it): its refusal code, and how many
+/// requests it sent.
+async fn admission_after_a_sent_invoice(then: Option<&str>) -> (Option<String>, usize) {
+    let party = "Counter Sales - Unregistered";
+    let lab = lab(admission_plans(false));
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-00000000-0000-4000-8000-000000000001","identity_scheme":"batch_v1",
+        "company_guid":LAB_GUID,"endpoint_origin":"http://127.0.0.1:9000",
+        "company":null,"txn_ids":["t0"],"date_from":"20260801","date_to":"20260801",
+        "sha256":"a".repeat(64),"built_at":"2026-08-01T00:00:00Z","status":"built",
+        "on_account_approved":[],
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":7},
+        "vouchers":[{"bridge_txn_id":"t0","date":"20260801","voucher_type":"Sales",
+            "voucher_number":"TG/25-26/899","narration":null,"reference":null,
+            "invoice":{"voucher_type_name":"Sales Manual","place_of_supply":"Rajasthan"},
+            "entries":[{"ledger":party,"amount":"118.00","side":"Dr"},
+                {"ledger":"Sales - Goods","amount":"118.00","side":"Cr"}]}]
+    }))
+    .unwrap();
+    lab.server.append_import_ledger(&line).unwrap();
+    {
+        let _lock = lab.server.lock_import_admission().unwrap();
+        lab.server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_native(
+                &line,
+                "c".repeat(64),
+                uuid::Uuid::new_v4(),
+            ))
+            .unwrap();
+        if let Some(status) = then {
+            lab.server
+                .append_import_record_while_admitted(
+                    &serde_json::from_value::<ledger::StatusRecord>(json!({
+                        "record_type":"verification_status","batch_id":line.batch_id,
+                        "batch_sha256":line.sha256,"status":status
+                    }))
+                    .unwrap(),
+                )
+                .unwrap();
+        }
+    }
+    let mut voucher = invoice_to(party, "Sales Manual", false);
+    let outcome = lab
+        .server
+        .admit_sales_invoice(
+            &lab.identity,
+            &lab.company,
+            &mut voucher,
+            &catalogue(&[(party, false)]),
+        )
+        .await;
+    let stopped = match outcome {
+        Err(invoice::InvoiceAdmission::Refused(refusals)) => refusals
+            .into_iter()
+            .find(|refusal| refusal.code == "invoice_company_stopped")
+            .map(|refusal| match refusal.detail {
+                invoice::RefusalDetail::Value(batch_id) => batch_id,
+                _ => String::new(),
+            }),
+        _ => None,
+    };
+    (stopped, sent(lab.simulator))
+}
+
+/// A company with an invoice sent and not verified posted is refused before
+/// any read of Tally, naming the batch; once that batch reads verified, the
+/// admission goes on to every read as before.
+#[tokio::test]
+async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
+    let batch_id = "bridge-00000000-0000-4000-8000-000000000001".to_string();
+    assert_eq!(
+        admission_after_a_sent_invoice(None).await,
+        (Some(batch_id.clone()), 0)
+    );
+    assert_eq!(
+        admission_after_a_sent_invoice(Some("verification_incomplete")).await,
+        (Some(batch_id), 0)
+    );
+    assert_eq!(
+        admission_after_a_sent_invoice(Some("posted_verified")).await,
+        (None, 64)
+    );
+}

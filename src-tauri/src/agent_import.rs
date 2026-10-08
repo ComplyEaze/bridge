@@ -64,6 +64,8 @@ mod persistence;
 mod post;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
+#[path = "agent_import_stop.rs"]
+mod stop;
 pub(super) use approval::PostApprovals;
 #[path = "agent_import_verification.rs"]
 mod verification;
@@ -957,6 +959,16 @@ impl Server {
             // Admit the journal before publication; labels in older batches do not
             // collide with this build's independently generated wire identities.
             self.import_snapshot_while_admitted(None)?;
+            // The admission above read the stop before this lock; a post may
+            // have gone out since. No file is written for a stopped company.
+            if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice())
+                && self
+                    .import_invoice_stop_while_admitted(&payload.company_guid)?
+                    .is_some()
+            {
+                return Err(ToolFailure::from("invoice_company_stopped".to_string())
+                    .with_prior_evidence(accumulated.clone()));
+            }
             let lineage = match payload.amends_batch_id {
                 Some(_) => Some(self.amendment_lineage_while_admitted(&payload)?),
                 None => None,
@@ -2418,6 +2430,53 @@ impl Server {
             Some(reader) => ledger::invoice_number_control(reader, company_guid, year),
             None => Ok(ledger::NumberControl::NeverSent),
         }
+    }
+
+    /// The batch of this company that stops every further Sales post
+    /// (`ledger::invoice_stop`), read under the shared admission lock and
+    /// released at once.
+    pub(super) fn import_invoice_stop(&self, company_guid: &str) -> Result<Option<String>, String> {
+        let _lock = self.lock_import_admission_shared()?;
+        self.import_invoice_stop_while_admitted(company_guid)
+    }
+
+    /// Whether `line` is an invoice that a stop of its company holds back. A
+    /// batch with no invoice is never judged by it: a stopped company stops no
+    /// Journal, Payment, Receipt or Contra.
+    pub(super) fn stopped_company_while_admitted(
+        &self,
+        line: &ImportLedgerLine,
+    ) -> Result<bool, String> {
+        if !holds_an_invoice(line) {
+            return Ok(false);
+        }
+        Ok(self
+            .import_invoice_stop_while_admitted(&line.company_guid)?
+            .is_some())
+    }
+
+    /// Every batch that stops this company, in id order.
+    pub(super) fn import_invoice_stops_while_admitted(
+        &self,
+        company_guid: &str,
+    ) -> Result<Vec<String>, String> {
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::invoice_stops(reader, company_guid),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// [`Self::import_invoice_stop`] for a caller that already holds an
+    /// admission lock: the build before it writes a file, and a post before it
+    /// records its dispatch intent.
+    pub(super) fn import_invoice_stop_while_admitted(
+        &self,
+        company_guid: &str,
+    ) -> Result<Option<String>, String> {
+        Ok(self
+            .import_invoice_stops_while_admitted(company_guid)?
+            .into_iter()
+            .next())
     }
 
     /// The batch, sent and whose latest status is not a verified post, that

@@ -66,8 +66,8 @@ actually on.
 4. Read the Terms of Use linked in the extension settings, then turn on **I
    accept the ComplyEaze Bridge Terms of Use**. Until you do, Bridge does
    not read from Tally, and from release 0.5.1 every Bridge tool answers that
-   the Terms of Use are not accepted and names this setting (seen on one Mac
-   with a test package, and on one Windows computer with the build our checks made for this release). (In 0.5.0, after an update
+   the Terms of Use are not accepted and names this setting (the tools the assistant called
+   gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). (In 0.5.0, after an update
    from 0.4.2, Claude Desktop may not start Bridge: on a Mac with an error that
    does not mention the Terms, on one Windows computer with no error; bridge#1413.)
 5. Save the extension settings, then quit Claude Desktop completely and reopen
@@ -117,7 +117,7 @@ port and Response redaction were kept and the Terms setting was dropped the same
 way (bridge#1413). On one Windows computer, the published 0.5.0 file over 0.4.2 was not started either: the chat showed no Bridge tool and no error. So after updating, tick the Terms setting, check the posting setting, then
 quit and reopen Claude Desktop. Before the box is ticked, Claude Desktop may not
 start 0.5.0 at all; from 0.5.1 it starts Bridge, and every Bridge tool answers
-that the Terms of Use are not accepted (seen on one Mac with a test package, and on one Windows computer with the build our checks made for this release; bridge#1413). Installing over a release older than 0.4.2 was not
+that the Terms of Use are not accepted (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release; bridge#1413). Installing over a release older than 0.4.2 was not
 tried: remove such a release first. If Settings,
 Extensions then lists two ComplyEaze Bridge entries (as happened when 0.4.2 was
 installed beside an older release), remove the older entry before you use

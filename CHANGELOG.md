@@ -45,15 +45,15 @@ requests it comes from, except where it names an issue.
   setting; nothing is read from Tally. What we saw: a package built from the
   Terms-setting change (#1436) on one Mac (only its version set to 0.5.1),
   installed over 0.4.2 and over 0.5.0, was started by Claude Desktop (in one run
-  only after Claude Desktop was quit and reopened), and with the setting off its
-  tools gave that answer. On one Windows 10 computer with Claude Desktop 2.26454.2
+  only after Claude Desktop was quit and reopened), and with the setting off the
+  tools the assistant called gave that answer. On one Windows 10 computer with Claude Desktop 2.26454.2
   from the Microsoft Store, the published 0.5.0 file over 0.4.2 was not started
   (no ComplyEaze Bridge tool in the chat and no error), and the build our
   checks made for this release (commit d744d25a, not the published file) was
   started after a fresh install, after an
   update from 0.4.2 and after an update from 0.5.0 that was switched on (as the
-  update leaves it, and with the Terms ticked); with the Terms off every tool gave
-  that answer, and with them on the Tally check ran. Not tried: the published 0.5.1 file, and a release
+  update leaves it, and with the Terms ticked); with the Terms off the tools the
+  assistant called gave that answer, and with them on the Tally check ran. Not tried: the published 0.5.1 file, and a release
   older than 0.4.2 (#1413).
 - **If 0.5.0 already starts for you:** the other changes below are the reason
   to update, if any.
@@ -92,8 +92,8 @@ requests it comes from, except where it names an issue.
   its tools say why they refuse.** The Terms of Use setting is no longer
   marked required and still starts off. Claude Desktop now starts ComplyEaze
   Bridge, and until you turn the setting on every tool answers
-  `terms_not_accepted`, naming the setting. That the app starts and the tools
-  answer was seen on one Mac with a package built from the Terms-setting change
+  `terms_not_accepted`, naming the setting. That the app starts and the tools the
+  assistant called answered was seen on one Mac with a package built from the Terms-setting change
   (#1436), and on one Windows computer with the build of this release (#1413).
   The setting no longer shows "(required)" beside its title, and its description
   now begins "Tick to use ComplyEaze Bridge: it refuses every tool call until you

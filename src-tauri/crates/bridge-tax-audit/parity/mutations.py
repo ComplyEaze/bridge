@@ -10,6 +10,7 @@ every mutation an author or a reviewer has written for this crate, with who wrot
     python3 parity/mutations.py M08 B12                 # by id
     python3 parity/mutations.py --changed-since origin/master --jobs 3
     python3 parity/mutations.py --changed-since origin/master --verify   # no build: the merge check
+    python3 parity/mutations.py --check-anchors        # no build: exit 2 on an anchor not exactly once at HEAD
     python3 parity/mutations.py --full --shard 2/8 --results shard.json  # nightly, one shard
     python3 parity/mutations.py --merge shard*.json --results all.json --report report.md
 
@@ -538,6 +539,17 @@ def list_problems(mutations: list[dict], tracked: set[str]) -> list[str]:
     return out
 
 
+def load_refusal(mutations: list[dict], tracked: set[str]) -> str | None:
+    """Why the list cannot be judged at all (exit 2), or None: an id used more than once, or an
+    entry `list_problems` refuses."""
+    order = [m["id"] for m in mutations]
+    repeated = sorted({i for i in order if order.count(i) > 1})
+    if repeated:
+        return f"refusing: mutation ids used more than once: {repeated}"
+    malformed = list_problems(mutations, tracked)
+    return "refusing: mutation entries the runner cannot judge:\n  " + "\n  ".join(malformed) if malformed else None
+
+
 def tracked_files(repo: Path = REPO, crate: str = CRATE) -> set[str]:
     """Crate-relative paths of the files HEAD tracks under the crate, as git spells them."""
     out = subprocess.run(["git", "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", crate], cwd=repo,
@@ -550,12 +562,14 @@ def dirty(porcelain: str) -> list[str]:
     return [line for line in porcelain.splitlines() if line.strip() and not line.endswith(RESULTS_REL)]
 
 
-def apply_check(mutations: list[dict], crate: Path = ROOT) -> list[str]:
-    """Every mutation's `from` text appears exactly once in its file."""
+def apply_check(mutations: list[dict], crate: Path = ROOT, files: dict[str, bytes] | None = None) -> list[str]:
+    """Every mutation's `from` text appears exactly once in its file: in the working tree, or in
+    `files` ({crate-relative path: bytes}) when given."""
     bad = []
     for m in mutations:
         path = crate / m["file"]
-        n = path.read_bytes().count(m["from"].encode("utf-8")) if path.is_file() else 0
+        data = (path.read_bytes() if path.is_file() else None) if files is None else files.get(m["file"])
+        n = data.count(m["from"].encode("utf-8")) if data is not None else 0
         if n != 1:
             bad.append(f"{m['id']}: `from` found {n} times in {m['file']}")
     return bad
@@ -854,6 +868,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--workdir", type=Path, default=WORKERS, help="where the worker copies live")
     ap.add_argument("--merge", type=Path, nargs="+", metavar="FILE", help="merge shard results; run nothing")
     ap.add_argument("--report", type=Path, metavar="MD", help="with --merge: write a Markdown report")
+    ap.add_argument("--check-anchors", action="store_true",
+                    help="build nothing: exit 2 when an anchor is not exactly once in HEAD's committed bytes")
     args = ap.parse_args(argv)
     _MADE_A_VERDICT.clear()
     try:
@@ -873,17 +889,43 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
 
+def check_anchors(args: argparse.Namespace) -> int:
+    """`--check-anchors`: the list, the tracked paths and the files all read from HEAD's committed
+    bytes, never the working tree, so the answer is about the head that will be run. Exit 2 when an
+    anchor is not exactly once (as for a list the runner cannot judge), else 0. No build, no copy."""
+    others = [name for name, value in (("ids", args.ids), ("--verify", args.verify), ("--list", args.list),
+                                       ("--merge", args.merge), ("--changed-since", args.changed_since),
+                                       ("--results", args.results), ("--nightly-issues", args.nightly_issues),
+                                       ("--report", args.report), ("--full", args.full), ("--shard", args.shard))
+              if value not in (None, False, [])]
+    if others:
+        print(f"refusing: --check-anchors takes no other mode or option: {others}", file=sys.stderr)
+        return 2
+    head = git("rev-parse", "HEAD").strip()
+    files = {p[len(CRATE) + 1:]: data for p, data in committed_files(head, REPO, (CRATE,)).items()}
+    mutations = json.loads(files[LIST.relative_to(ROOT).as_posix()].decode("utf-8"))
+    refusal = load_refusal(mutations, set(files))
+    if refusal:
+        print(refusal, file=sys.stderr)
+        return 2
+    stale = apply_check(mutations, ROOT, files)
+    for line in stale[:REPORT_ROWS]:
+        print(f"STALE {line}")
+    if len(stale) > REPORT_ROWS:
+        print(f"... and {len(stale) - REPORT_ROWS} more")
+    print(f"{len(stale)} of {len(mutations)} anchors are not exactly once in HEAD's bytes ({head})")
+    return 2 if stale else 0
+
+
 def run(args: argparse.Namespace) -> int:
+    if args.check_anchors:  # before the working-tree list is read
+        return check_anchors(args)
 
     mutations = json.loads(LIST.read_text(encoding="utf-8"))
     order = [m["id"] for m in mutations]
-    repeated = sorted({i for i in order if order.count(i) > 1})
-    if repeated:
-        print(f"refusing: mutation ids used more than once: {repeated}", file=sys.stderr)
-        return 2
-    malformed = list_problems(mutations, tracked_files(REPO, CRATE))
-    if malformed:
-        print("refusing: mutation entries the runner cannot judge:\n  " + "\n  ".join(malformed), file=sys.stderr)
+    refusal = load_refusal(mutations, tracked_files(REPO, CRATE))
+    if refusal:
+        print(refusal, file=sys.stderr)
         return 2
     unknown = sorted(set(args.ids) - set(order))
     if unknown:

@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 use bridge_tally_primitives::TallyDate;
 use bridge_tally_protocol::native_cash_flow::{parse_native_cash_flow, WholeMonthWindow};
 use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
+use bridge_tally_protocol::native_negative_stock::parse_native_negative_stock;
 use bridge_tally_protocol::native_outstandings::{
     parse_company_currency, parse_company_currency_name,
     parse_compliance_ledger_snapshot_for_company, parse_currency_master_list,
@@ -1094,6 +1095,13 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_cash_flow(20250401..20260331)",
         parse: |_, text| cash_flow(text, "20250401", "20260331"),
+    },
+    // Built-in Negative Stock report: src/native_negative_stock_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_negative_stock_shape_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_stock",
+        parse: |_, text| typed(parse_native_negative_stock(text)),
     },
     // Native masters: src/native_masters_tests.rs (SHAPE LAB and READS LAB);
     // src/agent_voucher_type_class_tests.rs for READS LAB's voucher types, read by production
@@ -2463,10 +2471,6 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     // Built-in reports no parser reads.
     (
         "tests/fixtures/builtin_funds_flow_probe_b_fy_live.utf16le.xml",
-        NOT_READ_REPORT,
-    ),
-    (
-        "tests/fixtures/builtin_negative_stock_shape_lab_fy_live.utf16le.xml",
         NOT_READ_REPORT,
     ),
     (

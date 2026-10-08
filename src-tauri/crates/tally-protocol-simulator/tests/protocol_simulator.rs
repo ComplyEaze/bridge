@@ -240,11 +240,11 @@ fn dropping_a_simulator_whose_worker_failed_fails_the_test() {
     // called `finish()` could not tell a failed double from a quiet one.
     let (simulator, refused) = failed_simulator();
 
-    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(simulator)))
+    let payload = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(simulator)))
         .expect_err("dropping a failed simulator fails the test");
 
     assert_eq!(
-        panic.downcast_ref::<String>(),
+        payload.downcast_ref::<String>(),
         Some(&format!("simulator worker failed: {refused}"))
     );
 }
@@ -254,14 +254,14 @@ fn a_failed_simulator_dropped_while_a_test_panics_leaves_that_panic_alone() {
     // A second panic while unwinding would abort the whole test binary.
     let (simulator, _) = failed_simulator();
 
-    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+    let payload = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
         let _held = simulator;
         panic!("the test's own failure");
     }))
     .expect_err("the test's own panic propagates");
 
     assert_eq!(
-        panic.downcast_ref::<&str>(),
+        payload.downcast_ref::<&str>(),
         Some(&"the test's own failure")
     );
 }

@@ -239,16 +239,27 @@ class BundleSmokeTests(unittest.TestCase):
         template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
         manifest = json.loads(template.read_text(encoding="utf-8"))
         self.assertEqual(smoke.resolve_environment(manifest)["BRIDGE_TERMS_ACCEPTED"], "false")
-        for field, value in (("default", True), ("required", False), ("type", "string")):
+        for field, value in (("default", True), ("default", None), ("type", "string")):
             broken = json.loads(template.read_text(encoding="utf-8"))
             broken["user_config"]["accept_terms_2026_10_1"][field] = value
-            with self.subTest(field=field), self.assertRaisesRegex(
-                    smoke.SmokeError, "terms_setting_must_be_required_and_off"):
+            with self.subTest(field=field, value=value), self.assertRaisesRegex(
+                    smoke.SmokeError, "^terms_setting_must_be_boolean_and_off$"):
                 smoke.resolve_environment(broken)
         broken = json.loads(template.read_text(encoding="utf-8"))
         del broken["user_config"]["accept_terms_2026_10_1"]
-        with self.assertRaisesRegex(smoke.SmokeError, "terms_setting_must_be_required_and_off"):
+        with self.assertRaisesRegex(smoke.SmokeError, "^terms_setting_must_be_boolean_and_off$"):
             smoke.resolve_environment(broken)
+        # bridge#1413: a required setting with no stored value stops Claude Desktop from starting
+        # the server, so no setting may be required, the Terms setting included.
+        for name in ("accept_terms_2026_10_1", "port"):
+            broken = json.loads(template.read_text(encoding="utf-8"))
+            broken["user_config"][name]["required"] = True
+            with self.subTest(required=name), self.assertRaisesRegex(
+                    smoke.SmokeError, "^required_setting_blocks_launch$"):
+                smoke.resolve_environment(broken)
+        unrequired = json.loads(template.read_text(encoding="utf-8"))
+        unrequired["user_config"]["accept_terms_2026_10_1"]["required"] = False
+        self.assertEqual(smoke.resolve_environment(unrequired)["BRIDGE_TERMS_ACCEPTED"], "false")
         for mapping in ("true", "${user_config.enable_writes}"):
             broken = json.loads(template.read_text(encoding="utf-8"))
             broken["server"]["mcp_config"]["env"]["BRIDGE_TERMS_ACCEPTED"] = mapping

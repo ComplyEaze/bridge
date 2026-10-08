@@ -65,10 +65,11 @@ actually on.
    HTTP setting.
 4. Read the Terms of Use linked in the extension settings, then turn on **I
    accept the ComplyEaze Bridge Terms of Use**. Until you do, Bridge does
-   not read from Tally. (On one Mac, with the package our checks built for 0.5.0
-   installed over 0.4.2, Claude Desktop did not start Bridge before the box was
-   ticked and before any quit, and a request to a Bridge tool failed with a 400 error that did not
-   mention the Terms.)
+   not read from Tally, and from release 0.5.1 every Bridge tool answers that
+   the Terms of Use are not accepted and names this setting (seen on one Mac
+   with a test package; not yet checked on Windows). (In 0.5.0, after an update
+   from 0.4.2, Claude Desktop may not start Bridge, with an error that does not
+   mention the Terms; bridge#1413.)
 5. Save the extension settings, then quit Claude Desktop completely and reopen
    it. (On that Mac Claude Desktop
    started Bridge as soon as the settings were saved and a new chat got an answer
@@ -111,11 +112,13 @@ on Windows). The package our checks built for release 0.5.0, installed on one Ma
 over 0.4.2, replaced it as an update: one extension at version 0.5.0, the Tally
 port, Response redaction and the posting setting as they were (a posting
 setting that was on stayed on), the old Terms setting gone and no value for the
-new one (version 2026-10.1). This was not tried with the published file or on
-Windows. So after updating, tick the Terms setting, check the posting setting, then
-quit and reopen Claude Desktop; on that Mac, before the tick, Claude Desktop did
-not start Bridge and a request to one of its tools failed with a 400 error that
-did not mention the Terms. Installing over a release older than 0.4.2 was not
+new one (version 2026-10.1). With the published 0.5.0 file, on one Mac, the Tally
+port and Response redaction were kept and the Terms setting was dropped the same
+way (bridge#1413); not tried on Windows. So after updating, tick the Terms setting, check the posting setting, then
+quit and reopen Claude Desktop. Before the box is ticked, Claude Desktop may not
+start 0.5.0 at all; from 0.5.1 it starts Bridge, and every Bridge tool answers
+that the Terms of Use are not accepted (seen on one Mac with a test package; not
+yet checked on Windows; bridge#1413). Installing over a release older than 0.4.2 was not
 tried: remove such a release first. If Settings,
 Extensions then lists two ComplyEaze Bridge entries (as happened when 0.4.2 was
 installed beside an older release), remove the older entry before you use

@@ -1,0 +1,275 @@
+{
+ "comment": "high_value_register, journal-transfer row ids that would repeat (#1243): four blank-GUID journals between two party ledgers, read out of date order with two on one day, beside a fifth under the threshold; one GUID on two journals on one day; a journal with a GUID of its own whose two lines are on one party ledger, the credit line read first, and another with the debit line read first; and a journal with a GUID of its own whose ids stay as they were; and one GUID on a journal over the threshold and one under it (the one over keeps its id). A repeated id takes its place among the rows sharing it, in date and ledger order, then reading order, as a suffix.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Capital Account": null,
+  "Fixed Assets": null,
+  "Loans & Advances (Asset)": "Current Assets",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_journal_suffix-000"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_journal_suffix-001"
+  },
+  {
+   "name": "Party Q",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_journal_suffix-002"
+  },
+  {
+   "name": "Party R",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_journal_suffix-003"
+  },
+  {
+   "name": "Party S",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-hvr_journal_suffix-004"
+  },
+  {
+   "name": "Party T",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-hvr_journal_suffix-005"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "",
+   "date": "2025-06-06",
+   "base_type": "Journal",
+   "number": "J1",
+   "lines": [
+    [
+     "Party Q",
+     30000000
+    ],
+    [
+     "Party R",
+     -30000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "number": "J2",
+   "lines": [
+    [
+     "Party Q",
+     40000000
+    ],
+    [
+     "Party R",
+     -40000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-07",
+   "base_type": "Journal",
+   "number": "J3",
+   "lines": [
+    [
+     "Party Q",
+     50000000
+    ],
+    [
+     "Party R",
+     -50000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-07",
+   "base_type": "Journal",
+   "number": "J4",
+   "lines": [
+    [
+     "Party Q",
+     60000000
+    ],
+    [
+     "Party R",
+     -60000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "number": "J5",
+   "lines": [
+    [
+     "Party Q",
+     10000000
+    ],
+    [
+     "Party R",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-j",
+   "date": "2025-06-08",
+   "base_type": "Journal",
+   "number": "J6",
+   "lines": [
+    [
+     "Party S",
+     30000000
+    ],
+    [
+     "Party T",
+     -30000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-j",
+   "date": "2025-06-08",
+   "base_type": "Journal",
+   "number": "J7",
+   "lines": [
+    [
+     "Party S",
+     35000000
+    ],
+    [
+     "Party T",
+     -35000000
+    ]
+   ]
+  },
+  {
+   "guid": "one-ledger",
+   "date": "2025-06-09",
+   "base_type": "Journal",
+   "number": "J8",
+   "lines": [
+    [
+     "Party Q",
+     -30000000
+    ],
+    [
+     "Party Q",
+     30000000
+    ]
+   ]
+  },
+  {
+   "guid": "own-j",
+   "date": "2025-06-09",
+   "base_type": "Journal",
+   "number": "J9",
+   "lines": [
+    [
+     "Party S",
+     30000000
+    ],
+    [
+     "Party T",
+     -30000000
+    ]
+   ]
+  },
+  {
+   "guid": "pair-j",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "J10",
+   "lines": [
+    [
+     "Party S",
+     30000000
+    ],
+    [
+     "Party T",
+     -30000000
+    ]
+   ]
+  },
+  {
+   "guid": "pair-j",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "J11",
+   "lines": [
+    [
+     "Party S",
+     10000000
+    ],
+    [
+     "Party T",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "one-ledger-dr",
+   "date": "2025-06-11",
+   "base_type": "Journal",
+   "number": "J12",
+   "lines": [
+    [
+     "Party Q",
+     30000000
+    ],
+    [
+     "Party Q",
+     -30000000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "high_value_register"
+ ]
+}

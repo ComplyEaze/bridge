@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Every ported test, one entry each, sorted by test id: how to run it on a book, and the
 //! least number of figures a parity comparison of it must see. Porting a test adds one entry
-//! here and one runner in `parity/python_golden.py`'s `RUNNERS`; `examples/local_parity.rs`,
+//! here and one runner in `parity/python_golden.py`'s `RUNNERS`; `examples/local_parity`,
 //! `compare::default_min_figures` and the registry-wide CI parity (`tests/registry.rs`) read
 //! this table instead of listing tests themselves.
 
@@ -171,6 +171,12 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::party_monthly_on(e, b, r),
     },
     PortedTest {
+        id: "questionnaire_cl13",
+        // The accrual-journal count and the four answer figures, on every book.
+        min_figures: 5,
+        run_on: |e, b, r, _| crate::questionnaire_cl13_on(e, b, r),
+    },
+    PortedTest {
         id: "read_scope",
         min_figures: 1,
         run_on: |_, b, r, _| crate::read_scope_on(b, r),
@@ -180,6 +186,12 @@ pub const PORTED: &[PortedTest] = &[
         // `applicable` alone when no person is confirmed, as on the synthetic read.
         min_figures: 1,
         run_on: |e, b, r, _| crate::related_parties_cl23_on(e, b, r),
+    },
+    PortedTest {
+        id: "specified_persons_40a2b",
+        // `applicable` alone when no person is confirmed, as on the synthetic read.
+        min_figures: 1,
+        run_on: |e, b, r, _| crate::specified_persons_40a2b_on(e, b, r),
     },
     PortedTest {
         id: "stale_balances_41_1",

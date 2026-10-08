@@ -23,7 +23,7 @@ impl AgentReadRequest {
         loop {
             match reader.read_event().map_err(|_| AgentReadRequestError)? {
                 Event::Start(event) => {
-                    let name = event.name().as_ref().to_vec();
+                    let name = event.name().as_ref().as_bytes().to_vec();
                     if path.is_empty() {
                         roots += 1;
                         if name != b"ENVELOPE" || roots != 1 {
@@ -39,7 +39,6 @@ impl AgentReadRequest {
                         let value = reader
                             .read_text(event.name())
                             .map_err(|_| AgentReadRequestError)?;
-                        let value = value.decode().map_err(|_| AgentReadRequestError)?;
                         let target = if name == b"TALLYREQUEST" {
                             &mut operation
                         } else {
@@ -53,28 +52,24 @@ impl AgentReadRequest {
                     }
                 }
                 Event::End(event) => {
-                    if path.pop().as_deref() != Some(event.name().as_ref()) {
+                    if path.pop().as_deref() != Some(event.name().as_ref().as_bytes()) {
                         return Err(AgentReadRequestError);
                     }
                 }
                 Event::Empty(event) => {
                     let name = event.name();
+                    let name = name.as_ref().as_bytes();
                     if path.is_empty()
-                        || (path == [b"ENVELOPE".to_vec()] && name.as_ref() == b"HEADER")
+                        || (path == [b"ENVELOPE".to_vec()] && name == b"HEADER")
                         || (path == [b"ENVELOPE".to_vec(), b"HEADER".to_vec()]
-                            && matches!(name.as_ref(), b"TALLYREQUEST" | b"TYPE"))
+                            && matches!(name, b"TALLYREQUEST" | b"TYPE"))
                     {
                         return Err(AgentReadRequestError);
                     }
                 }
                 Event::DocType(_) => return Err(AgentReadRequestError),
                 Event::Text(text) if path.is_empty() => {
-                    if !text
-                        .decode()
-                        .map_err(|_| AgentReadRequestError)?
-                        .trim()
-                        .is_empty()
-                    {
+                    if !text.trim().is_empty() {
                         return Err(AgentReadRequestError);
                     }
                 }
@@ -144,14 +139,14 @@ impl AgentReadRequest {
             match reader.read_event() {
                 Ok(Event::Start(event))
                     if matches!(
-                        event.name().as_ref().to_ascii_uppercase().as_slice(),
-                        b"SVFROMDATE" | b"SVTODATE"
+                        event.name().as_ref().to_ascii_uppercase().as_str(),
+                        "SVFROMDATE" | "SVTODATE"
                     ) =>
                 {
                     let accepted = reader
                         .read_text(event.name())
                         .ok()
-                        .and_then(|text| text.decode().ok().map(|text| text.trim().to_string()))
+                        .map(|text| text.trim().to_string())
                         .and_then(|text| bridge_tally_core::TallyDate::parse(text).ok())
                         .is_some_and(|date| profile.accepts_boundary(&date));
                     if !accepted {
@@ -160,8 +155,8 @@ impl AgentReadRequest {
                 }
                 Ok(Event::Empty(event))
                     if matches!(
-                        event.name().as_ref().to_ascii_uppercase().as_slice(),
-                        b"SVFROMDATE" | b"SVTODATE"
+                        event.name().as_ref().to_ascii_uppercase().as_str(),
+                        "SVFROMDATE" | "SVTODATE"
                     ) =>
                 {
                     return false;

@@ -1,0 +1,29 @@
+# fixture: agent/d3-batch-company-high-water.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE AMEND LAB",
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536",
+        vouchers: 1469,
+        masters: 222,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS DENSE",
+        guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+        vouchers: 29900,
+        masters: 328,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS FOREX",
+        guid: "b14e9b2d-8a63-4779-804d-25d59eb787eb",
+        vouchers: 18,
+        masters: 216,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE READS LAB",
+        guid: "de2e15f2-6d42-4715-b6e7-b7a95a68abe8",
+        vouchers: 3,
+        masters: 242,
+    },
+])

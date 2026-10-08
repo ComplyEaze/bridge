@@ -1455,7 +1455,7 @@ fn the_register_labels_its_window_by_the_one_rule_vouchers_uses() {
         ("complete", None)
     );
     // An empty window it could not confirm: partial, with the corroboration's own reason (the
-    // two codes `corroborate_empty_voucher_window` gives for it).
+    // two codes `corroborate_empty_by_days` gives for it).
     for reason in ["nonempty_uncorroborated", "empty_uncorroborated"] {
         assert_eq!(
             register_window_label(true, Some((true, Some(reason)))),

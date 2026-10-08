@@ -751,13 +751,13 @@
       ],
       "title_sha256_16": "1bf0ea7c56ab393c",
       "title_text": "Payments/credits to a partner over the s.194T threshold, with TDS seen on its vouchers: which credits it covers, and its deposit, are the CA's to determine",
-      "limits_sha256_16": "bce2f38d796f9c19",
+      "limits_sha256_16": "1d19587048f534ca",
       "limits_text": [
         "Books only: TAN registration, challans filed and any Form 26A route are not visible from vouchers.",
         "1 interest or remuneration voucher(s) also credit a ledger this test does not read (Journal c2 on 2025-09-30): the partner may be credited net of it, so this base may be understated.",
         "1 interest or remuneration voucher(s) carry TDS but also credit another party (Journal c2 on 2025-09-30): their TDS is not added back, so the interest or remuneration counted may be understated by it.",
         "2 voucher(s) touching this partner are not read exactly (Journal c2 on 2025-09-30, Journal c3 on 2026-01-15): this base may be wrong in either direction.",
-        "1 voucher(s) carry a negative net credit of interest and remuneration to this partner (Journal c3 on 2026-01-15): under the gross reading (owner, 25-Sep) they lower nothing, so this base (₹39,000) exceeds the interest and remuneration credited net of them (₹34,000).",
+        "1 voucher(s) carry a negative net credit of interest and remuneration to this partner (Journal c3 on 2026-01-15): under the gross reading they lower nothing, so this base (₹39,000) exceeds the interest and remuneration credited net of them (₹34,000).",
         "TDS of ₹200 (net) is seen on 1 voucher(s) touching this partner: Journal c2 on 2025-09-30."
       ],
       "ask_client_sha256_16": "bc25a006eb146deb",

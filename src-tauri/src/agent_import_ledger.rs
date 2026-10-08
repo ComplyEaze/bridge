@@ -489,7 +489,7 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
 /// vouchers compare equal whatever order their ledgers were listed in and
 /// whichever ledgers they name. `None` when an amount cannot be read, which a
 /// caller treats as a match.
-type RowShape = (String, Vec<(String, bool)>);
+type RowShape = (bridge_tally_core::TallyDate, Vec<(String, bool)>);
 
 fn row_shape(voucher: &ImportVoucher) -> Option<RowShape> {
     let mut entries = voucher

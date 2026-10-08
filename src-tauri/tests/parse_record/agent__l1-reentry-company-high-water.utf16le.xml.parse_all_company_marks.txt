@@ -1,0 +1,65 @@
+# fixture: agent/l1-reentry-company-high-water.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE ALL DELETED",
+        guid: "df256ef9-7000-48b4-b3bf-a9ec5364f8ed",
+        vouchers: 6,
+        masters: 212,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE AMEND LAB",
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536",
+        vouchers: 1790,
+        masters: 234,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS DENSE",
+        guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+        vouchers: 29900,
+        masters: 328,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS FOREX",
+        guid: "b14e9b2d-8a63-4779-804d-25d59eb787eb",
+        vouchers: 19,
+        masters: 216,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CURRENCY LAB",
+        guid: "75dade07-c3cb-4118-a01b-89043a5d5220",
+        vouchers: 0,
+        masters: 210,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE ESCAPE & LAB",
+        guid: "21463ec7-c236-44fb-a06d-20f0ad8a6df3",
+        vouchers: 0,
+        masters: 207,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE PROBE B SANDBOX",
+        guid: "ec4454ae-5c4c-4bfa-b3b0-68182a749689",
+        vouchers: 2800,
+        masters: 237,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE READS LAB",
+        guid: "de2e15f2-6d42-4715-b6e7-b7a95a68abe8",
+        vouchers: 3,
+        masters: 242,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE SHAPE LAB",
+        guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+        vouchers: 111,
+        masters: 289,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE SIZE 2K",
+        guid: "f8dab51e-a5d9-49d5-9232-54a16c8b95bb",
+        vouchers: 0,
+        masters: 207,
+    },
+])

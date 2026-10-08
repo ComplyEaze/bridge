@@ -1,0 +1,430 @@
+{
+ "comment": "book_keeping_quality: Contra row ids where two DIFFERENT voucher GUIDs have one hash (sha256 of 'cn-13938301' and of 'cn-26912320' both begin 3cd5b0157789), one GUID on two mismatching vouchers and the other on one, so a row takes a suffix because its hash is shared though its GUID is not (two more vouchers of those GUIDs claim no direction and are no rows); twelve blank-GUID Contras on scrambled days (suffixes _1 to _12 in (date, key) order, seven of them on one day); and a unique GUID whose key sorts between the two keys of a shared GUID, on their day.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Capital Account": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Fixed Assets": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "adv-4988a1-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "adv-4988a1-001"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 1230000,
+   "credit": 3910000,
+   "closing": -2680000
+  },
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 3910000,
+   "credit": 1230000,
+   "closing": 2680000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "cn-26912320",
+   "date": "2025-05-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -100000
+    ],
+    [
+     "Bank",
+     100000
+    ]
+   ],
+   "number": "K1",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "cn-13938301",
+   "date": "2025-05-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -200000
+    ],
+    [
+     "Bank",
+     200000
+    ]
+   ],
+   "number": "K2",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "cn-13938301",
+   "date": "2025-05-08",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -300000
+    ],
+    [
+     "Bank",
+     300000
+    ]
+   ],
+   "number": "K3",
+   "narration": "transfer"
+  },
+  {
+   "guid": "cn-26912320",
+   "date": "2025-05-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -400000
+    ],
+    [
+     "Bank",
+     400000
+    ]
+   ],
+   "number": "K4",
+   "narration": "transfer"
+  },
+  {
+   "guid": "cn-26912320",
+   "date": "2025-05-07",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     500000
+    ],
+    [
+     "Bank",
+     -500000
+    ]
+   ],
+   "number": "K5",
+   "narration": "Cash deposit"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -10000
+    ],
+    [
+     "Bank",
+     10000
+    ]
+   ],
+   "number": "B01",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-03",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -20000
+    ],
+    [
+     "Bank",
+     20000
+    ]
+   ],
+   "number": "B02",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -30000
+    ],
+    [
+     "Bank",
+     30000
+    ]
+   ],
+   "number": "B03",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-01",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -40000
+    ],
+    [
+     "Bank",
+     40000
+    ]
+   ],
+   "number": "B04",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -50000
+    ],
+    [
+     "Bank",
+     50000
+    ]
+   ],
+   "number": "B05",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-02",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -60000
+    ],
+    [
+     "Bank",
+     60000
+    ]
+   ],
+   "number": "B06",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -70000
+    ],
+    [
+     "Bank",
+     70000
+    ]
+   ],
+   "number": "B07",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -80000
+    ],
+    [
+     "Bank",
+     80000
+    ]
+   ],
+   "number": "B08",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-04",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -90000
+    ],
+    [
+     "Bank",
+     90000
+    ]
+   ],
+   "number": "B09",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -100000
+    ],
+    [
+     "Bank",
+     100000
+    ]
+   ],
+   "number": "B10",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -110000
+    ],
+    [
+     "Bank",
+     110000
+    ]
+   ],
+   "number": "B11",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-05",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -120000
+    ],
+    [
+     "Bank",
+     120000
+    ]
+   ],
+   "number": "B12",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "g",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -700000
+    ],
+    [
+     "Bank",
+     700000
+    ]
+   ],
+   "number": "G1",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "g\u000000000001x",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -710000
+    ],
+    [
+     "Bank",
+     710000
+    ]
+   ],
+   "number": "G2",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "g",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -720000
+    ],
+    [
+     "Bank",
+     720000
+    ]
+   ],
+   "number": "G3",
+   "narration": "Cash withdrawal from bank"
+  },
+  {
+   "guid": "solo",
+   "date": "2025-06-09",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     730000
+    ],
+    [
+     "Bank",
+     -730000
+    ]
+   ],
+   "number": "S1",
+   "narration": "withdrawal, shown as a deposit"
+  }
+ ],
+ "tests": [
+  "book_keeping_quality"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank"
+ ],
+ "book_keeping_quality": {
+  "payment_channel_debtors": [],
+  "tax_ledgers": {},
+  "gst_payment_ledgers": [],
+  "reissue_narration_terms": [],
+  "writeoff_discount_ledgers": []
+ }
+}

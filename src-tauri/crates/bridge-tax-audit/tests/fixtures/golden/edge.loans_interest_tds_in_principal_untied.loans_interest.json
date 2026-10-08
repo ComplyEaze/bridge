@@ -1,0 +1,311 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "loans_interest",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "933d0802253430c9",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout. A loan ledger's interest journals are vouchers whose only other ledger lines are its configured interest ledger or ledgers (the client's list of loans) and any ledger the client configures as TDS payable; every other voucher touching the loan ledger is a taken (credit) or repaid (debit) transaction, never classified by ledger name -- except one that both credits and debits the loan ledger, which is listed as the books hold it, not divided into entries.",
+  "figures": [
+    {
+      "id": "loans_interest.clause31_repaid_reportable_total",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "1ca28daf4d59e6dd",
+      "definition_text": "Sum of the repayments that Clause 31(c) reports: entries on a loan from a lender outside the form's reporting exemption, where the balance being repaid, with or without the interest credited and not yet paid, or the repayment itself reaches the s.269SS/269T limit.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.clause31_repaid_total_19f79fbc",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "baebbd8286149a08",
+      "definition_text": "Debits to loan ledger (tag 19f79fbc) other than its interest journals -- amount repaid in the year, before any Clause 31/s.269T lender-exemption or mode filter.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.clause31_row_amount_repaid_19f79fbc_2fab3f1c",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "1f1aaf9e6b3a0f5c",
+      "definition_text": "Loan repaid on voucher (tag 2fab3f1c) against loan ledger (tag 19f79fbc).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d01",
+          "label": "Payment d01 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "loans_interest.clause31_row_mode_code_repaid_19f79fbc_2fab3f1c",
+      "value": "",
+      "unit": "text",
+      "definition_sha256_16": "55e0f8e6dc02196b",
+      "definition_text": "Form 3CD utility Note 1 code for this repaid entry: derived from the mode and direction, not read off a specimen utility export -- confirm.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.clause31_row_mode_repaid_19f79fbc_2fab3f1c",
+      "value": "bank",
+      "unit": "text",
+      "definition_sha256_16": "e6e58d451b1c4370",
+      "definition_text": "Mode of this repaid transaction, read from its counter-line ledger group(s): cash/bank if any counter-line is under that group, else journal if the voucher's own type is Journal, else other.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.clause31_row_outstanding_after_repaid_19f79fbc_2fab3f1c",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "9c954645c70ddac3",
+      "definition_text": "Outstanding balance owed to the lender on loan ledger (tag 19f79fbc) immediately after this entry (prior balance 5000000p minus this entry's amount) -- the GN 55.8/57.2 running-balance walk.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.clause31_taken_reportable_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "50c18eb5ff17b6b3",
+      "definition_text": "Sum of the loans taken that Clause 31(a) reports: entries on a loan from a lender outside the form's reporting exemption, from where the running balance with that lender reaches the s.269SS/269T limit, or whose own amount does.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.clause31_taken_total_19f79fbc",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3a3bca2145992a3f",
+      "definition_text": "Credits to loan ledger (tag 19f79fbc) other than its interest journals -- amount taken/accepted in the year, before any Clause 31/s.269SS lender-exemption or mode filter.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.deductor_status",
+      "value": "deductor",
+      "unit": "text",
+      "definition_sha256_16": "a02e7d371de92a27",
+      "definition_text": "Whether the assessee must deduct TDS under s.194A for the year -- the same rule and figure as 'TDS on payments made': firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.interest_ledger_19f79fbc",
+      "value": "",
+      "unit": "text",
+      "definition_sha256_16": "c1d098bb37f4c667",
+      "definition_text": "The configured interest ledger name(s) for loan ledger (tag 19f79fbc), one per line, or '' if the loan is interest-free -- this test's own consistency checks read them back to check each voucher on this loan and its interest ledger(s) independently of the test's own bucketing.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.interest_total_19f79fbc",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "54eeae2e4cbfeab8",
+      "definition_text": "Interest paid/credited on loan ledger (tag 19f79fbc): sum of every voucher whose only other lines are its configured interest ledger(s) and any ledger in the client's statutory dues classified as TDS payable, counted before that TDS.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.lender_type_19f79fbc",
+      "value": "person",
+      "unit": "text",
+      "definition_sha256_16": "897fcac2e1917480",
+      "definition_text": "Lender type for loan ledger (tag 19f79fbc) from the client's list of loans, classified by the loan ledger this interest pairs with -- never by a word in the ledger name.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.loan_not_listed_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "0db09bdab34a2d4e",
+      "definition_text": "Ledgers under Loans (Liability), other than bank and cash ledgers, that moved in the year and are not in the client's list of loans (each has a notice).",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.loan_notice_chain_incomplete_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "e98a3afeb6df0500",
+      "definition_text": "Ledgers that moved in the year, are not in the client's list of loans and are not bank or cash ledgers, whose Tally group chain is incomplete: whether each is under Loans (Liability) cannot be told, so neither notice is raised for it.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.loan_pattern_not_listed_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "2bc6287eee8463fa",
+      "definition_text": "Ledgers under Current Liabilities, Sundry Creditors or Suspense A/c, not in the client's list of loans, with bank debits of one amount in 3 or more months narrated with ACH, NACH, ECS or EMI (each has a notice).",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.max_outstanding_paise_19f79fbc",
+      "value": 5000000,
+      "unit": "paise",
+      "definition_sha256_16": "415dc196d14924ff",
+      "definition_text": "Running maximum of the outstanding balance owed to the lender on loan ledger (tag 19f79fbc) during the year (opening balance, then after every taken/repaid entry in date order) -- the utility's MaxAmtOsAccPy column.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.s194a_tds_coverage_19f79fbc",
+      "value": "covered",
+      "unit": "text",
+      "definition_sha256_16": "83392b19cd122029",
+      "definition_text": "Whether the TDS on loan ledger (tag 19f79fbc) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.s194a_tds_covering_19f79fbc",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "6d29ee1fccdc5ebd",
+      "definition_text": "The TDS on loan ledger (tag 19f79fbc) that covers its interest: each deduction counts only against interest credited on or before its own date, up to the s.194A rate on that interest.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d01",
+          "label": "Payment d01 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "loans_interest.s194a_tds_expected_19f79fbc",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a3852fcf8d33a750",
+      "definition_text": "TDS at the s.194A rate (1000 basis points) on loan ledger (tag 19f79fbc)'s interest.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.s194a_tds_over_threshold_lender_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "460e4c4fc8e61e8a",
+      "definition_text": "Loan ledgers with a non-exempt lender whose interest this year exceeds the s.194A threshold, where the assessee is a deductor or its deductor status is not known, and the TDS seen does not cover the s.194A rate on it (each listed in clause 21(b)); a loan whose s.194A verdict is not computed is not counted.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.s269ss_269t_flag_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "caaf7427c636ca1f",
+      "definition_text": "Reportable taken/repaid rows in cash/journal/other mode at or over the s.269SS/269T limit (₹20,000).",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.tds_in_principal_19f79fbc",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "3a11ce965240c26a",
+      "definition_text": "Of the TDS deducted on loan ledger (tag 19f79fbc), the part on the vouchers counted in its taken or repaid totals (a repayment booked net of TDS, say), summed. It is inside the TDS figure beside it, and is shown so the loan's movement can be checked against the Trial Balance.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d01",
+          "label": "Payment d01 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "loans_interest.tds_on_loan_19f79fbc",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "25692be3926e7c79",
+      "definition_text": "TDS deducted on loan ledger (tag 19f79fbc): the lines on ledgers in the client's statutory dues classified as TDS payable, on every voucher that posts to the loan.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d01",
+          "label": "Payment d01 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "loans_interest.tds_payable_ledgers",
+      "value": "TDS Payable",
+      "unit": "text",
+      "definition_sha256_16": "82b3f68f0d51c1bc",
+      "definition_text": "The ledgers the client's statutory dues classify as TDS payable, less every loan's interest ledger and every shared one, one per line: the TDS lines this test reads. Its own consistency checks read them back.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "loans_interest/clause31/repaid_19f79fbc_2fab3f1c",
+      "clauses": [
+        "3CD-31(c)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "loans_interest.clause31_row_amount_repaid_19f79fbc_2fab3f1c"
+        },
+        {
+          "name": "mode",
+          "figure_id": "loans_interest.clause31_row_mode_repaid_19f79fbc_2fab3f1c"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan Dropped",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "d01",
+          "label": "Payment d01 on 2025-06-10"
+        }
+      ],
+      "title_sha256_16": "5c7e528f92b6c07a",
+      "title_text": "Loan repaid against Invented Dropped Lender (bank mode, code n/a)",
+      "limits_sha256_16": "c0ec8796e2fef130",
+      "limits_text": [
+        "Books only: confirm the lender's identity (name, address, PAN) for Form 3CD Clause 31, and whether this lender is excepted from s.269SS/269T beyond the lender types the rules already except (Government, a notified corporation, or another body notified under the Explanation).",
+        "The mode-and-direction code follows the Form 3CD utility's own Note 1 list (A/B cash payment/receipt, I/J journal entry debit/credit, K/L any other mode debit/credit); this pack's own mapping from mode and direction to that code is a derivation from the GN's text, not verified against a specimen utility export -- confirm."
+      ],
+      "ask_client_sha256_16": "8c22e5a927638b0c",
+      "ask_client_text": [
+        "Confirm lender identity (name, address, PAN) for Clause 31."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "POP-1",
+      "subject": "Loan Dropped",
+      "detail": "vouchers 1000000 vs TB movement 1500000 paise"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to -4500000 paise"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "opening_paise",
+      "detail": "TB opening_paise sums to -5000000 paise"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "loans_interest.check_invariants"
+  ],
+  "module_invariant_violations": [
+    {
+      "invariant": "loans_interest.check_invariants",
+      "subject": "loans_interest",
+      "detail": "LOAN-1: Loan Dropped (tag 19f79fbc) expected FY movement 1000000p (= -taken 0p + repaid 1000000p - interest 0p + TDS 0p) does not tie the TB movement 1500000p (opening -5000000p, closing -3500000p); difference -500000p -- a voucher on this loan ledger was likely dropped from or wrongly added to the population."
+    }
+  ]
+}

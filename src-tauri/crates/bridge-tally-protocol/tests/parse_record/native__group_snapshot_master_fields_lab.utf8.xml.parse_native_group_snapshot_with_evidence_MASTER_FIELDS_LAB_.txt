@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/native/group_snapshot_master_fields_lab.utf8.xml
+# parser: parse_native_group_snapshot_with_evidence(MASTER FIELDS LAB)
+# source: captured
+Err(InvalidResponse("group_response_company_guid_missing"))

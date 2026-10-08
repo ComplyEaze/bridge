@@ -1,0 +1,212 @@
+{
+ "comment": "loans_interest, bridge#1259 item 3, a firm: an interest journal beside a nil line is an interest journal, not a loan taken. Loan One's journal has a nil line on another configured loan (Loan One B); Loan Two's has a nil bank line.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_interest_journal-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_interest_journal-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_nil_line_interest_journal-002"
+  },
+  {
+   "name": "Loan One",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_line_interest_journal-003"
+  },
+  {
+   "name": "Loan One B",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_line_interest_journal-004"
+  },
+  {
+   "name": "Loan Two",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_line_interest_journal-005"
+  },
+  {
+   "name": "Interest One",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_nil_line_interest_journal-006"
+  },
+  {
+   "name": "Interest Two",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_nil_line_interest_journal-007"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Interest One",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Interest Two",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 0,
+   "closing": 2000000
+  },
+  {
+   "ledger": "Loan One",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 900000,
+   "closing": -5900000
+  },
+  {
+   "ledger": "Loan One B",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -5000000
+  },
+  {
+   "ledger": "Loan Two",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 1800000,
+   "closing": -6800000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 300000,
+   "closing": -300000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "n01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest One",
+     1000000
+    ],
+    [
+     "Loan One",
+     -900000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ],
+    [
+     "Loan One B",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "n02",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Two",
+     2000000
+    ],
+    [
+     "Loan Two",
+     -1800000
+    ],
+    [
+     "TDS Payable",
+     -200000
+    ],
+    [
+     "Bank A",
+     0
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan One": {
+   "lender": "Invented One Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest One"
+  },
+  "Loan One B": {
+   "lender": "Invented One B Lender",
+   "lender_type": "person"
+  },
+  "Loan Two": {
+   "lender": "Invented Two Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Two"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

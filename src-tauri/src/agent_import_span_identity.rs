@@ -327,10 +327,8 @@ pub(super) fn bind(
 /// amount that does not parse is a difference, never a match.
 fn content_differences(voucher: &ImportVoucher, row: &ReadVoucher) -> Vec<&'static str> {
     let mut fields = Vec::new();
-    let date = normalized_date(&voucher.date)
-        .ok()
-        .map(|date| date.as_str().to_string());
-    if date.is_none() || row.date != date {
+    let date = Some(voucher.date.as_str().to_owned());
+    if row.date != date {
         fields.push("date");
     }
     // The bank shapes write EFFECTIVEDATE equal to DATE; a Journal writes none.

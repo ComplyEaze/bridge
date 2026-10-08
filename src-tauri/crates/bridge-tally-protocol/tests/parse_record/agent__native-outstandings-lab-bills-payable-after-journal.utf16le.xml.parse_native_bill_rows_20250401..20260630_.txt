@@ -1,0 +1,53 @@
+# fixture: tests/fixtures/agent/native-outstandings-lab-bills-payable-after-journal.utf16le.xml
+# parser: parse_native_bill_rows(20250401..20260630)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "OL P06 Debit Note Creditor",
+        reference: "OL-BILL-401",
+        bill_date: TallyDate(
+            "20250422",
+        ),
+        due_date: TallyDate(
+            "20250522",
+        ),
+        closing_balance: ExactDecimal(
+            "9000.00",
+        ),
+        tally_overdue_days: Some(
+            404,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P04 Advance Debtor",
+        reference: "OL-ADV-001",
+        bill_date: TallyDate(
+            "20250515",
+        ),
+        due_date: TallyDate(
+            "20250515",
+        ),
+        closing_balance: ExactDecimal(
+            "6000.00",
+        ),
+        tally_overdue_days: Some(
+            411,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P05 Credit Note Debtor",
+        reference: "OL-CN-001",
+        bill_date: TallyDate(
+            "20250520",
+        ),
+        due_date: TallyDate(
+            "20250520",
+        ),
+        closing_balance: ExactDecimal(
+            "3000.00",
+        ),
+        tally_overdue_days: Some(
+            406,
+        ),
+    },
+])

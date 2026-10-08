@@ -19,7 +19,7 @@
 //! **Parity evidence.** `tests/parity.rs`, `tests/parity_40a3.rs` and `tests/parity_depreciation.rs`
 //! each compare this crate's dump over a committed synthetic read with the reference engine's dump
 //! over the same bytes, and prove the comparison can fail. That is parity on invented data only.
-//! The evidence that the slice reads real Tally books is `examples/local_parity.rs`, run on the
+//! The evidence that the slice reads real Tally books is the local parity example (`examples/local_parity`), run on the
 //! machine that holds client reads and never committed; each change to this crate should record
 //! that run's result.
 //!
@@ -56,11 +56,13 @@ pub mod loans_interest;
 pub mod partners_40b_194t;
 pub mod party_identity;
 pub mod party_monthly;
+pub mod questionnaire_cl13;
 pub mod read;
 pub mod read_scope;
 pub mod registry;
 pub mod related_parties_cl23;
 pub mod rules;
+pub mod specified_persons_40a2b;
 pub mod stale_balances_41_1;
 pub mod statutory_dues_43b;
 pub mod stock;
@@ -1440,6 +1442,23 @@ pub fn stock_on(
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
+/// Run `questionnaire_cl13` on a book and return its canonical parity dump, with the module's own
+/// QCL-1 check. As the reference's pack runs it, the `stock` port runs first on the same book and
+/// its result is passed in, so the closing-stock finding carries its pointer; a missing or
+/// malformed stock part refuses here, as [`stock_on`] does, and never becomes "no stock result".
+pub fn questionnaire_cl13_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let inputs = stock_read::stock_inputs(engagement.raw_cfg.get("stock"), book.stock.as_ref())?;
+    let stock_result = stock::run(book, rules, &inputs)?;
+    let result = questionnaire_cl13::run(book, rules, &bound.period, Some(&stock_result))?;
+    let module_check = questionnaire_cl13::check_invariants(book, &bound.period, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
 /// Run `cash_book_integrity` on a book and return its canonical parity dump, with the module's
 /// own CBI-1/CBI-2 check. Cash and bank are the engagement's cash and bank groups; the
 /// own-account narration terms are the optional `[roles]` key, as the reference's pack passes
@@ -1989,6 +2008,26 @@ pub fn related_parties_cl23_on(
     let (bound, _report) = engagement.bind(book)?;
     let result = related_parties_cl23::run(book, rules, &bound.related_parties)?;
     let module_check = related_parties_cl23::check_invariants(book, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `specified_persons_40a2b` on an already-built book: `related_parties_cl23` first, on the
+/// same bound table, then this test on its result, with its module check (SPD-1). Refuses without
+/// `[client].entity_type`.
+pub fn specified_persons_40a2b_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let entity_type = engagement.entity_type.as_deref().ok_or_else(|| {
+        AuditError::Config("specified_persons_40a2b needs [client].entity_type".to_string())
+    })?;
+    let (bound, _report) = engagement.bind(book)?;
+    let table = &bound.related_parties;
+    let related = related_parties_cl23::run(book, rules, table)?;
+    let result = specified_persons_40a2b::run(rules, entity_type, table, &related)?;
+    let module_check =
+        specified_persons_40a2b::check_invariants(rules, entity_type, table, &related, &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 

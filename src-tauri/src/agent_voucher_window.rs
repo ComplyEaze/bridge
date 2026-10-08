@@ -173,10 +173,10 @@ impl AlterIdSpan {
     }
 }
 
-/// A window date that reaches this layer as text from a read or a stored
-/// record, not from a tool argument (whose date [`normalized_date`] parses):
-/// parsed once, by the caller, and carried as a [`TallyDate`] into every
-/// request rendered from it (#861).
+/// A window date that reaches this layer as text read from the book, not from a
+/// tool argument (whose date [`normalized_date`] parses): parsed once, by its one
+/// caller, the bill trail's window start (`agent_bill_trail.rs`), and carried as
+/// a [`TallyDate`] into every request rendered from it (#861).
 pub(super) fn parse_window_date(value: &str) -> Result<TallyDate, ToolFailure> {
     TallyDate::parse(value).map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
 }
@@ -474,6 +474,21 @@ impl WindowCensus {
     /// outside the window is not a count of this window.
     fn within(&self, from: NaiveDate, to: NaiveDate) -> bool {
         self.days.keys().all(|day| *day >= from && *day <= to)
+    }
+
+    /// Whether any voucher was counted on a day in `[from, to]`.
+    pub(super) fn holds_a_voucher_between(
+        &self,
+        from: &TallyDate,
+        to: &TallyDate,
+    ) -> Result<bool, ToolFailure> {
+        let (from, to) = (day_of(from)?, day_of(to)?);
+        Ok(self.days.range(from..=to).next().is_some())
+    }
+
+    /// Whether the census counted no voucher at all.
+    pub(super) fn is_empty(&self) -> bool {
+        self.days.is_empty()
     }
 
     /// The day's counted AlterIDs inside `span`, or all of them.
@@ -1994,6 +2009,124 @@ impl Server {
     }
 }
 
+/// What a count-only read of a window established.
+pub(super) enum WindowCount {
+    /// The book holds no voucher, or fits one request, so its window is not
+    /// counted: a caller that needs the rows reads the window whole. `marks` are
+    /// the company marks this read took, or the ones it was given; `evidence` is
+    /// the read that took them, if it took any.
+    NotCounted {
+        marks: Option<CompanyMarks>,
+        evidence: Option<Evidence>,
+    },
+    /// Every voucher the window holds, counted per day, bracketed by the company
+    /// marks read before and after. No data part was sent.
+    Counted {
+        census: WindowCensus,
+        evidence: Evidence,
+    },
+}
+
+/// Count `window` with a census of its own and send no data part (#1240). A
+/// caller that needs only to know whether, and on which days, the window holds
+/// vouchers has what it needs from the census: its rows carry each voucher's
+/// day. Nothing is admitted against the count. A count taken in one request is
+/// one observation, as a window read whole is; a count divided into several
+/// spans is bracketed as a divided window read is: both company marks are read
+/// again after the last census request, and marks that moved refuse it
+/// ([`WINDOW_CHANGED_DURING_READ`]).
+pub(super) async fn count_window_only<R: WindowReader>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    (from, to): (&TallyDate, &TallyDate),
+    known_marks: Option<CompanyMarks>,
+    limits: WindowReadLimits,
+) -> Result<WindowCount, ToolFailure> {
+    reader.begin_window();
+    if reader.seals_its_reads() {
+        // A sealed record admits its data against a census; this reads none.
+        return Err(AUDIT_WINDOW_NEEDS_ITS_OWN_MARKS.to_string().into());
+    }
+    let days = (day_of(from)?, day_of(to)?);
+    if days.0 > days.1 {
+        return Err("invalid_date_range".to_string().into());
+    }
+    let mut preflight = None;
+    let mut opening = None;
+    let mut boundary = None;
+    let estimate = estimate_window_volume(
+        reader,
+        identity,
+        company,
+        (from, to),
+        days,
+        known_marks,
+        limits,
+        &mut preflight,
+        &mut opening,
+        &mut boundary,
+    )
+    .await
+    .map_err(|failure| with_prior(failure, &preflight, &None))?;
+    let census = match estimate {
+        Preflight::Whole { census: None, .. } => {
+            return Ok(WindowCount::NotCounted {
+                marks: opening,
+                evidence: preflight,
+            })
+        }
+        Preflight::Whole {
+            census: Some(census),
+            ..
+        }
+        | Preflight::Counted { census, .. } => census,
+    };
+    let mut closing = None;
+    if let Some(opened) = opening {
+        let spans = census_spans(opened.vouchers, limits.census_capacity())
+            .map_or(usize::MAX, Iterator::count);
+        if spans > 1 {
+            let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
+                .await
+                .map_err(|failure| with_prior_closed(failure, &preflight, &None, &closing))?;
+            if closed != opened {
+                return Err(with_prior_closed(
+                    WINDOW_CHANGED_DURING_READ.to_string().into(),
+                    &preflight,
+                    &None,
+                    &closing,
+                ));
+            }
+        }
+    }
+    let evidence = chronological(&preflight, &None, &closing)
+        .unwrap_or_else(|| super::agent_import::local_evidence("voucher_window_count_empty"));
+    Ok(WindowCount::Counted { census, evidence })
+}
+
+impl Server {
+    /// [`count_window_only`] through the agent's own paired read.
+    pub(super) async fn count_voucher_window(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &str,
+        window: (&TallyDate, &TallyDate),
+        known_marks: Option<CompanyMarks>,
+        limits: WindowReadLimits,
+    ) -> Result<WindowCount, ToolFailure> {
+        count_window_only(
+            &AgentReader(self),
+            identity,
+            company,
+            window,
+            known_marks,
+            limits,
+        )
+        .await
+    }
+}
+
 async fn read_marks<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
@@ -2453,7 +2586,7 @@ pub(super) fn parse_voucher_census(
                 let (Event::Start(event) | Event::Empty(event)) = event else {
                     unreachable!("matched as Start or Empty above")
                 };
-                let name = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let name = event.name().as_ref().to_ascii_uppercase();
                 if name == "VOUCHER" && scope.collection() {
                     if empty {
                         return Err(invalid());
@@ -2491,7 +2624,7 @@ pub(super) fn parse_voucher_census(
                 }
             }
             Ok(Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 scope.end(&end)?;
                 if end == "VOUCHER" && scope.collection() {
                     let row = current.take().ok_or_else(invalid)?;

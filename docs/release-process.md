@@ -566,7 +566,9 @@ payload-free smoke result, and source-provenance record is present. Preview tags
 must be `mcp-vX.Y.Z` (or the older `mcp-preview-X.Y.Z`, used by 0.2.0 and
 0.3.0); they cannot reuse a production `v*` tag. A
 build without publisher signing must never be described as signed, notarized,
-or ready for production use.
+or ready for production use. The workflow titles the release
+`ComplyEaze Bridge MCP <version>` itself, with the version taken from the tag
+(`mcp-v0.5.0` gives `0.5.0`), so the title needs no edit after publication.
 
 This workflow intentionally has no production-signed channel. A raw MCPB
 archive is not a notarization-and-stapling carrier for the enclosed macOS

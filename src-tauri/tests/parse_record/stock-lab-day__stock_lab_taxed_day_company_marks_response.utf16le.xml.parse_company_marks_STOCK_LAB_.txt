@@ -1,0 +1,7 @@
+# fixture: stock-lab-day/stock_lab_taxed_day_company_marks_response.utf16le.xml
+# parser: parse_company_marks(STOCK_LAB)
+# source: captured
+Ok((
+    3,
+    241,
+))

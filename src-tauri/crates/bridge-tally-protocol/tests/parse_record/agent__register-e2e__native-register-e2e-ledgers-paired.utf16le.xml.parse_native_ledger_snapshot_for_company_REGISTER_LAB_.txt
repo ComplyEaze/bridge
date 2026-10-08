@@ -1,0 +1,954 @@
+# fixture: tests/fixtures/agent/register-e2e/native-register-e2e-ledgers-paired.utf16le.xml
+# parser: parse_native_ledger_snapshot_for_company(REGISTER LAB)
+# source: captured
+Ok([
+    LedgerSnapshotEntry {
+        name: "Bank - HDFC Current",
+        parent: Some(
+            "Bank Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "37500.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Bank - SBI Current",
+        parent: Some(
+            "Bank Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "465300.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Bengaluru Distributors",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-510940.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Cash",
+        parent: Some(
+            "Cash-in-Hand",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "180.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Counter Sales - Unregistered",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-41300.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Freight Inward (M2)",
+        parent: Some(
+            "Indirect Expenses",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input Cess",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input Cess (M2)",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input CGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-45256.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input CGST 9% (M2)",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input IGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-118200.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input IGST 18% (M2)",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input SGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-44906.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input SGST 9% (M2)",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-450.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Input UT Tax",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Invalid Head Control (M2)",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Kutch Poly Industries",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "448800.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Meridian Office Supplies",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "65837.67",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Nandi Logistics",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "141600.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Output Cess (M2)",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Output CGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "32160.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Output CGST 9% (M2)",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Output IGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "110440.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Output IGST 18% (M2)",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Output SGST",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "32060.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Output SGST 9% (probe)",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Profit & Loss A/c",
+        parent: Some(
+            "�#4; Primary",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-156845.67",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Pune Hardware Supply",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-47200.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Purchase - Goods",
+        parent: Some(
+            "Purchase Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-1107845.67",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Purchase - Services",
+        parent: Some(
+            "Purchase Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-65000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Rathi Packaging",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "73800.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Reliance Retail",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-15600.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Sales - Goods",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "1017000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Shree Ram Traders",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-65500.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Sundar Steel Traders",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "310440.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Surat Traders",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-166700.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Suspense",
+        parent: Some(
+            "Suspense A/c",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-240000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "SYN Buyer Registered (M2)",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-34220.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "SYN Buyer Unregistered (M2)",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-5000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "SYN Supplier Inter (M2)",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "23600.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "SYN Supplier Intra (M2)",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "18690.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "TDS Payable (M2)",
+        parent: Some(
+            "Duties & Taxes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "10.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Thane Retail Stores",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-268300.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+])

@@ -1,0 +1,125 @@
+# fixture: tests/fixtures/agent/l1-reentry-company-extent.utf16le.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "BRIDGE ALL DELETED",
+        guid: Some(
+            "df256ef9-7000-48b4-b3bf-a9ec5364f8ed",
+        ),
+        company_number: Some(
+            "100026",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE AMEND LAB",
+        guid: Some(
+            "17a10910-773c-42c6-bd66-7bba9a392536",
+        ),
+        company_number: Some(
+            "100024",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS DENSE",
+        guid: Some(
+            "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+        ),
+        company_number: Some(
+            "100012",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS FOREX",
+        guid: Some(
+            "b14e9b2d-8a63-4779-804d-25d59eb787eb",
+        ),
+        company_number: Some(
+            "100011",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE CURRENCY LAB",
+        guid: Some(
+            "75dade07-c3cb-4118-a01b-89043a5d5220",
+        ),
+        company_number: Some(
+            "100025",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE ESCAPE & LAB",
+        guid: Some(
+            "21463ec7-c236-44fb-a06d-20f0ad8a6df3",
+        ),
+        company_number: Some(
+            "100002",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE PROBE B SANDBOX",
+        guid: Some(
+            "ec4454ae-5c4c-4bfa-b3b0-68182a749689",
+        ),
+        company_number: Some(
+            "100005",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE READS LAB",
+        guid: Some(
+            "de2e15f2-6d42-4715-b6e7-b7a95a68abe8",
+        ),
+        company_number: Some(
+            "100023",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE SHAPE LAB",
+        guid: Some(
+            "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+        ),
+        company_number: Some(
+            "100021",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE SIZE 2K",
+        guid: Some(
+            "f8dab51e-a5d9-49d5-9232-54a16c8b95bb",
+        ),
+        company_number: Some(
+            "100001",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+])

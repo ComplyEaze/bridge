@@ -1,0 +1,4 @@
+# fixture: agent/post-span-guid-absent.utf16le.xml
+# parser: parse_import_verification_rows(IMPORT_LAB)
+# source: captured
+Ok([])

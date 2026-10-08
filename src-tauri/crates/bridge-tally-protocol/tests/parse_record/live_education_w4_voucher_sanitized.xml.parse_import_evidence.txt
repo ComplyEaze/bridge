@@ -1,0 +1,28 @@
+# fixture: tests/fixtures/live_education_w4_voucher_sanitized.xml
+# parser: parse_import_evidence
+# source: synthetic: not evidence of what Tally sends
+Ok(ParsedImportEvidenceFields {
+    application_status: NotReported,
+    counters: TallyImportResult {
+        created: 1,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 0,
+        line_error_count: 0,
+        counter_presence: TallyImportCounterPresence {
+            created: true,
+            altered: true,
+            deleted: true,
+            ignored: true,
+            errors: true,
+            cancelled: true,
+            exceptions: true,
+        },
+    },
+    exceptions_were_reported: true,
+    response_sha256: "eeecd0886e14ca818c363a9eac8169aef250c11a8b85c0616a069d048183f760",
+    line_error_sha256: [],
+})

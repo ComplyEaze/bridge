@@ -74,7 +74,7 @@ fn book_row(line: &ImportLedgerLine) -> ReadVoucher {
         guid: Some(format!("{GUID}-00000005")),
         master_id: Some("5".into()),
         alter_id: Some(40),
-        date: Some(voucher.date.clone()),
+        date: Some(voucher.date.as_str().to_owned()),
         voucher_type: Some(voucher.voucher_type.as_str().into()),
         narration: Some(format!("[BRIDGE:{}]", line.attribution_tag(voucher))),
         voucher_number: Some("7".into()),
@@ -277,12 +277,12 @@ fn the_window_holds_where_a_voucher_is_and_where_the_amendment_moves_it() {
     let earlier = build(AMENDMENT, None, "12.50", "20260902").vouchers;
     assert_eq!(
         lineage.window(&earlier),
-        ("20260902".into(), "20260910".into())
+        Some((stored_date("20260902"), stored_date("20260910")))
     );
     let later = build(AMENDMENT, None, "12.50", "20260920").vouchers;
     assert_eq!(
         lineage.window(&later),
-        ("20260910".into(), "20260920".into())
+        Some((stored_date("20260910"), stored_date("20260920")))
     );
 }
 

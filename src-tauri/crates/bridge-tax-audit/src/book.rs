@@ -259,6 +259,66 @@ impl Book {
     }
 }
 
+/// A voucher's key in one population, which no other voucher of it shares (the reference's
+/// `model.voucher_keys`, #1243). A row that keeps a per-voucher amount, date or count keys it by
+/// this, never by [`Voucher::guid`]: a GUID can be blank or repeated, and two vouchers under one
+/// key are one voucher in the figure. A citation names a voucher by its GUID and label, never by
+/// this, so the key's text has no accessor, nor has its index: nothing reads either, and what
+/// nothing can read cannot be sorted by wrongly. Only [`voucher_keys`] makes one.
+///
+/// Keys made from two different populations must never be compared or mixed: equality here needs
+/// both fields (text and index), where the reference's needs the text only.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct VoucherKey {
+    /// The reference's key: the GUID where no other voucher of the population holds it, else the
+    /// GUID, a NUL and the voucher's place (from 1) among those holding it, zero-padded to eight
+    /// digits so the keys of one GUID sort in population order. Compared first, and unique, so keys
+    /// sort as the reference sorts its `str` keys (code points, as UTF-8 bytes do).
+    text: String,
+    /// The voucher's index in the population. Equality compares it too, and [`Debug`] shows it
+    /// alone, so a key can be told from another in a failure message without printing its text.
+    /// Keys of different GUIDs sort by text, not by this.
+    ///
+    /// [`Debug`]: std::fmt::Debug
+    index: usize,
+}
+
+impl std::fmt::Debug for VoucherKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "VoucherKey(#{})", self.index)
+    }
+}
+
+/// Each voucher of `pop` with its key, in `pop`'s order: its GUID where no other voucher of `pop`
+/// holds that GUID, so nothing that reads it moves; else the GUID, a NUL and its place among those
+/// sharing it, zero-padded to eight digits (the reference's `{place:08d}`). Refuses, as the
+/// reference raises, if two keys are still equal, which only a GUID holding a NUL can make (no
+/// read produces one).
+pub fn voucher_keys<'a>(pop: &[&'a Voucher]) -> Result<Vec<(VoucherKey, &'a Voucher)>> {
+    let mut count: BTreeMap<&str, usize> = BTreeMap::new();
+    for v in pop {
+        *count.entry(v.guid.as_str()).or_default() += 1;
+    }
+    let mut place: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut out = Vec::with_capacity(pop.len());
+    for (index, &v) in pop.iter().enumerate() {
+        let guid = v.guid.as_str();
+        let text = if count[guid] == 1 {
+            guid.to_string()
+        } else {
+            let n = place.entry(guid).or_default();
+            *n += 1;
+            format!("{guid}\0{n:08}")
+        };
+        out.push((VoucherKey { text, index }, v));
+    }
+    let distinct: BTreeSet<&str> = out.iter().map(|(k, _)| k.text.as_str()).collect();
+    if distinct.len() != out.len() {
+        return Err(AuditError::VoucherKeysNotUnique);
+    }
+    Ok(out)
+}
+
 /// Tally amount text to integer paise, as the reference engine's `model.paise` reads it:
 /// commas dropped, leading signs stripped (a `-` anywhere among them makes it negative), and
 /// the third decimal rounds half away from zero; further decimals are ignored. `None` for
@@ -1716,5 +1776,70 @@ mod tests {
         let e = fx_tb(&text).expect_err("unreadable");
         assert!(matches!(e, AuditError::Parse { .. }), "{e}");
         assert!(e.to_string().contains("not a plain decimal amount"), "{e}");
+    }
+
+    /// The reference's `voucher_keys`, case by case: a unique GUID is its own key; a blank or
+    /// repeated one takes its place among those sharing it, zero-padded to eight digits, so a
+    /// tenth sharer sorts after its second as the reference's keys do; keys sort by their text and
+    /// keep the population index; a GUID that would make two keys equal is
+    /// refused, and without it the same GUIDs are keyed.
+    #[test]
+    fn voucher_keys_are_the_guid_where_unique_else_its_place_among_those_sharing_it() {
+        let vouchers = |guids: &[&str]| -> Vec<Voucher> {
+            guids
+                .iter()
+                .map(|g| Voucher {
+                    guid: (*g).to_string(),
+                    ..Default::default()
+                })
+                .collect()
+        };
+        let mut guids = vec!["u", "", "d", "", "d"];
+        guids.extend(std::iter::repeat_n("t", 10));
+        let vs = vouchers(&guids);
+        let pop: Vec<&Voucher> = vs.iter().collect();
+        let keys = voucher_keys(&pop).unwrap();
+        let text: Vec<&str> = keys.iter().map(|(k, _)| k.text.as_str()).collect();
+        assert_eq!(
+            text[..5],
+            [
+                "u",
+                "\u{0}00000001",
+                "d\u{0}00000001",
+                "\u{0}00000002",
+                "d\u{0}00000002"
+            ]
+        );
+        assert_eq!(text[14], "t\u{0}00000010");
+        assert!(keys
+            .iter()
+            .enumerate()
+            .all(|(i, (k, v))| k.index == i && std::ptr::eq(*v, pop[i])));
+        // Eleven or more sharers: the tenth "t" sorts after the second, by text, as the reference's
+        // zero-padded str keys do, so one GUID's keys sort in population order.
+        assert!(keys[6].0 < keys[14].0 && keys[6].0.index < keys[14].0.index);
+        // The text is compared before the index: a key read later but smaller as text sorts first.
+        let vs = vouchers(&["b", "a", "b"]);
+        let pop: Vec<&Voucher> = vs.iter().collect();
+        let keys = voucher_keys(&pop).unwrap();
+        assert!(keys[1].0 < keys[0].0 && keys[1].0.index > keys[0].0.index);
+        assert!(keys[0].0 < keys[2].0 && keys[1].0 < keys[2].0);
+        // A key's Debug shows its index and never its text.
+        assert_eq!(format!("{:?}", keys[2].0), "VoucherKey(#2)");
+        let sharers: Vec<&str> = std::iter::repeat_n("s", 12).collect();
+        let vs = vouchers(&sharers);
+        let pop: Vec<&Voucher> = vs.iter().collect();
+        let keys = voucher_keys(&pop).unwrap();
+        assert!(keys.windows(2).all(|w| w[0].0 < w[1].0));
+        assert_eq!(keys[11].0.text, "s\u{0}00000012");
+        let vs = vouchers(&["a\u{0}00000001", "a", "a"]);
+        let pop: Vec<&Voucher> = vs.iter().collect();
+        assert!(matches!(
+            voucher_keys(&pop),
+            Err(AuditError::VoucherKeysNotUnique)
+        ));
+        let vs = vouchers(&["a\u{0}00000001", "a"]);
+        let pop: Vec<&Voucher> = vs.iter().collect();
+        assert_eq!(voucher_keys(&pop).unwrap().len(), 2);
     }
 }

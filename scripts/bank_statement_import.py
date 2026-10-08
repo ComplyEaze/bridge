@@ -328,9 +328,16 @@ class SBI(Bank):
         return bool(self.date_pattern.match(cell.strip()))
 
     def party(self, row):
+        # A name field that was found but printed empty (or blank, or only
+        # hyphens) is UNNAMED, never an empty party: an empty party matches no
+        # mapping row and leaves the line's narration naming no one. Applied
+        # once, here, so no branch below can return an empty party.
+        return self._printed_party(row) or "UNNAMED"
+
+    def _printed_party(self, row):
         narr, ref = row["narr_spaced"], row["ref_spaced"]
         if "ATM WDL" in narr:
-            return "ATM CASH WITHDRAWAL"
+            return CASH_WITHDRAWAL
         for pattern in (r"^TRANSFER TO \d+\s+(.+?)\s*/\s*\d+$",
                         r"^CT0\S*\s*\S*\s+TRANSFER FROM \d+\s+(.+?)\s*/$"):
             found = re.match(pattern, ref)
@@ -360,7 +367,7 @@ class SBI(Bank):
             parts = found.group(1).split("/")
             if len(parts) >= 2:
                 inner = re.match(r"^[A-Za-z]+-\s*[Xx]+\d+-\s*(.*)$", parts[1])
-                return _squash((inner.group(1) if inner else parts[1]).rstrip("-")) or "UNNAMED"
+                return _squash((inner.group(1) if inner else parts[1]).rstrip("-"))
         return "UNRESOLVED"
 
     def reference(self, row):
@@ -1109,6 +1116,61 @@ MAPPING_COLUMNS = ("party", "ledger", "treatment")
 # the hole by being forgotten here.
 PARSER_SENTINELS = frozenset({"UNRESOLVED", "UNNAMED"})
 
+# The labels `party()` returns for a line it recognises by its wording (a loan
+# instalment, a card fee, bank charges) rather than by a name the statement
+# printed. They can be mapped like a party, but none is a counterparty, so none
+# is written into a narration as the statement's party; nor is a cash
+# withdrawal, compared whitespace- and case-insensitively as the app does.
+PARSER_CATEGORIES = frozenset({"EMI", "DEBIT CARD FEE", "BANK CHARGES"})
+CASH_WITHDRAWAL = "ATM CASH WITHDRAWAL"
+
+# The segment that names the statement's party on a voucher posted to a mapped
+# ledger: ` | Statement party: <name>`, after the date, as the app writes it. It
+# says where the name came from, so it is not read as a Tally party ledger.
+STATEMENT_PARTY_LABEL = "Statement party:"
+
+# The app's limit on a narration's length.
+MAX_NARRATION_CHARS = 2000
+
+
+def _admissible_narration(text):
+    """The app's rule for a narration it builds: within the length limit, no
+    control character, and not the reserved `[BRIDGE:` marker in any ASCII
+    case."""
+    return (len(text) <= MAX_NARRATION_CHARS
+            and not any(ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F for c in text)
+            and not re.search(r"\[bridge:", text, re.ASCII | re.IGNORECASE))
+
+
+def _statement_payee(party, index):
+    """`party` when it is a counterparty that can be named in a narration,
+    `None` when it is not a counterparty, or a refusal when a `|` in it would
+    end the segment early. Checked before the narration, as in the app."""
+    if (not party or party in PARSER_SENTINELS or party in PARSER_CATEGORIES
+            or _key(party) == _key(CASH_WITHDRAWAL)):
+        return None
+    if "|" in party:
+        raise Refusal(
+            "party_not_admissible",
+            f"row {index}'s party contains the character | and cannot be written "
+            "into the narration: skip that party or map it to the suspense ledger",
+        )
+    return party
+
+
+def _statement_party_segment(payee, narration, index):
+    """The segment naming `payee`, refused when the narration with it would not
+    be one the app builds."""
+    segment = f" | {STATEMENT_PARTY_LABEL} {payee}"
+    if not _admissible_narration(narration + segment):
+        raise Refusal(
+            "party_not_admissible",
+            f"row {index}'s party makes the narration longer than "
+            f"{MAX_NARRATION_CHARS} characters or adds a character a narration "
+            "cannot carry: skip that party or map it to the suspense ledger",
+        )
+    return segment
+
 
 def load_mapping(path):
     """CSV: party,ledger,treatment
@@ -1337,12 +1399,22 @@ def build(rows, bank, company, bank_ledger, suspense, mapping, account_tail,
         # look instead of a wrong search.
         unidentified = _ledger_key(ledger) == _ledger_key(suspense)
         shown = party if unidentified else ledger
+        # a suspense line already names its party where the ledger would be
+        payee = None if unidentified else _statement_payee(party, index)
         narration = _squash(
             f"{mode} {reference} {'to' if outward else 'from'} {shown}"
             f" | {account_tail} | {date.strftime('%d-%b-%Y')}"
         )
         if unidentified:
             narration += f" | UNIDENTIFIED - reallocate from {ledger}"
+        if not _admissible_narration(narration):
+            raise Refusal(
+                "narration_not_admissible",
+                f"row {index}'s narration carries control characters, the reserved "
+                f"[BRIDGE: marker, or more than {MAX_NARRATION_CHARS} characters",
+            )
+        if payee:
+            narration += _statement_party_segment(payee, narration, index)
         remote_id = _remote_id(account, date, row, bank)
         if remote_id in seen:
             raise Refusal(

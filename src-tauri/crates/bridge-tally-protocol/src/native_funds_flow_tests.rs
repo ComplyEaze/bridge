@@ -117,6 +117,7 @@ fn each_shared_failure_keeps_its_own_variant() {
         parse_native_funds_flow(&response(EMPTY_ENVELOPE), &year()),
         Err(NativeFundsFlowError::EmptyEnvelope)
     );
+    // A typed string: no capture of a bare `RESPONSE` is committed (seen on another build).
     assert_eq!(
         parse_native_funds_flow("<RESPONSE>Unknown Request</RESPONSE>", &year()),
         Err(NativeFundsFlowError::UnknownReport)

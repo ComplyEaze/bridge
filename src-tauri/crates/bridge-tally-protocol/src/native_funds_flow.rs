@@ -38,7 +38,9 @@ pub fn render_native_funds_flow_request(company: &str, window: &WholeMonthWindow
 }
 
 /// One month's row, each column exactly as Tally printed it under its own
-/// name. An empty amount is not zero.
+/// name. An empty amount is not zero. On the one capture an empty `CL` appears
+/// in the five months where `Cr` equals `Dr` and in no other; it is still kept
+/// as empty, never read as zero.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NativeFundsFlowRow {
     pub month: CashFlowMonth,

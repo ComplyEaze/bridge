@@ -236,6 +236,12 @@ class Select(unittest.TestCase):
     def test_the_runner_and_its_results_are_inert(self):
         self.assertEqual(self.picked(list(mu.INERT)), set())
 
+    def test_the_local_parity_example_is_inert(self):
+        self.assertIn("examples/local_parity.rs", mu.INERT)
+        self.assertEqual(self.picked(["examples/local_parity.rs"]), set())
+        # Another example is not inert: it is not named, so its change selects everything.
+        self.assertNotEqual(self.picked(["examples/other.rs"]), set())
+
     def test_a_change_to_the_list_selects_only_the_entries_it_changes(self):
         changed = ["parity/mutations.json"]
         added = mutation("N1", "src/book.rs")

@@ -250,8 +250,10 @@ such as `2026-02-30`, is `invalid_date`; it gets the same date guidance in `reme
 
 Like `remediation`, `expected`, `cause`, `counts`, `size`, `endpoint`, `ledger`, `bill_row`,
 `partial_reason` (and `partial_reasons`), `reads`, `unsupported_parent_ledgers`, `candidates_listing`,
-`candidates_total`, `requested` and `window` are omitted when
-`BRIDGE_AGENT_MAX_BYTES` is below 4,096, so that the code always fits. Before a tool response is written, Bridge appends a
+`candidates_reason`, `candidates_total`, `candidates_total_is_lower_bound`, `candidates_truncated`,
+`candidates`, `requested` and `window` are omitted when
+`BRIDGE_AGENT_MAX_BYTES` is below 4,096, so that the code always fits. A refusal's list of
+candidate ledgers needs at least 16,384, so it can be absent above 4,096 too. Before a tool response is written, Bridge appends a
 `response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`. It holds
 hashes, counts and field paths, and one set of values: for a response that carries an error, its
 `error` keeps the code, the cause when it is a code, and a voucher window's timings (requested
@@ -1219,7 +1221,7 @@ each other.
   `ledger_movement` reports it), `credit`, `net` (debit plus credit) and
   `voucher_refs`: up to five vouchers by date, type, number and GUID, with
   `voucher_refs_complete` saying whether that is all of them. `vouchers` with the
-  same arguments without `summarise_by`, narrowed to the bucket, lists the rest: for a month bucket narrow `from` and `to`; for a ledger bucket pass that ledger when the call carries none; for a type bucket pass `voucher_class` (a superset when a class has child types) or the type's GUID (a type name that is also a class name is refused as `voucher_type_ambiguous` when the types with that name differ from that class's types or from the types reserving that name).
+  same arguments without `summarise_by`, narrowed to the bucket, lists the rest: for a month bucket narrow `from` and `to`; for a ledger bucket pass that ledger when the call carries none; for a type bucket pass `voucher_class` (a superset when a class has child types) or the type's GUID (a type name is refused as `voucher_type_ambiguous` when the types with that name differ from the class of that name, or from the types whose reserved name it is).
 - A debit is an entry with a negative amount and a credit one with a positive
   amount, the rule `ledger_movement` uses (the same function); `ISDEEMEDPOSITIVE`
   decides only a zero amount, which adds nothing to either side but still counts

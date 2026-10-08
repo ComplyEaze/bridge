@@ -3,12 +3,13 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Three
+page was not read again at it, except as said below). Four
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
-`ledger_movement` read took, in section 2 (#1366), and where a program built
-from this repository loads the PDF library from, in section 5 (#1422). It was written from a reading
+`ledger_movement` read took, in section 2 (#1366), where a program built
+from this repository loads the PDF library from, in section 5 (#1422), and the
+statement party written into a bank voucher's narration, in section 2 (#1430). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
@@ -111,6 +112,14 @@ to `true` or `1` is not asked.
   - `drop_narration` removes narrations, and a search of vouchers by a phrase of
     their narration is refused under it. Apart from the error text noted below,
     it removes nothing else.
+  - From the release that includes #1430, a voucher built from a bank statement
+    whose party is mapped to a ledger ends its narration with “Statement party:”
+    and the name as the statement prints it. A cash line the tool recognises, and
+    a line it labels itself as bank charges, a card fee or an EMI, get no name; a
+    line sent to suspense already carried the name. Vouchers already in Tally
+    keep their narration until an amendment of their batch is imported.
+    Whenever narrations are read, the name goes to your AI provider, unshortened
+    under `mask_parties`; `drop_narration` removes it with the narration.
   - **What the new reads in 0.5.0 send, under each setting.** Under `none`
     everything below is sent as read.
     - Cash Flow sends month names, each month's amounts and the net total, and

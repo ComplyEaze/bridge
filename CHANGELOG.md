@@ -16,6 +16,16 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
+**Changed**
+
+- A voucher built from a bank statement and posted to a mapped ledger now ends its narration with
+  `| Statement party: <name>`, the counterparty the statement printed (#1430). A line sent to suspense and a
+  cash line are written as before. A party that contains `|`, that carries the reserved marker, or that makes the narration longer than 2,000
+  characters now refuses the statement run (`party_not_admissible`); `skip` that party or map it to the suspense
+  ledger. A label the parser gives a line by its wording (bank charges, a card fee, an instalment) is not written as a party. Vouchers already imported keep their narration,
+  but amending a batch built before this change rewrites the narrations of that batch's vouchers in the book.
+  The name is part of the narration, so `mask_parties` does not shorten it and `drop_narration` removes it.
+
 **Fixed**
 
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out

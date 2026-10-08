@@ -3,7 +3,7 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it). Two
+page was not read again at it, except as said below). Two
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), and the note on how long a
@@ -323,10 +323,10 @@ statement file. It reads the file itself, refusing one larger than 32 MiB, and h
 PDFium the bytes; it reads the password file itself as well. PDFium does read
 the computer's installed font data: when a statement uses one of the 14
 standard PDF fonts without embedding it, PDFium substitutes a font installed on
-the computer, as measured on the project's synthetic test statements. The lock
-file that pins the PDFium release records that its JavaScript engine (V8) and
-XFA forms are disabled in those builds; that is the lock file's own note, and
-the build settings behind it were not read.
+the computer, as the crate's own note records from its synthetic test
+statements. The lock file that pins the PDFium release records that its
+JavaScript engine (V8) and XFA forms are disabled in those builds; that is the
+lock file's own note, and the build settings behind it were not read.
 
 ## 6. Has it been independently reviewed?
 

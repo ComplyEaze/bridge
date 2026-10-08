@@ -1319,6 +1319,29 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              invoice, tell the user the number is in use and ask which invoice number to \
              use. Do not pick another number yourself.",
         ),
+        // The control beside the number read (`NumberAbsence`): a read that
+        // matches nothing must never pass as a number not in use.
+        "invoice_number_control_missing" => Some(
+            "Before trusting that this invoice number is not in use, ComplyEaze Bridge read for an \
+             earlier invoice it posted in this company and verified, and Tally did not return \
+             it, so the read cannot be trusted here and the build is refused. Run verify_import \
+             on the batch that posted that invoice. If Tally still shows the invoice, stop and \
+             tell the user the number check does not work on this book; do not post this \
+             invoice through ComplyEaze Bridge.",
+        ),
+        "invoice_number_control_unavailable" => Some(
+            "An earlier invoice of this company was sent to Tally and none is verified posted \
+             now, so ComplyEaze Bridge has no known invoice to check its number read against, \
+             and refuses the build. Run verify_import on the earlier invoice batch: if it reads \
+             as posted and verified, build this invoice again. If Tally never took that invoice \
+             (it declined the post, or it was deleted), this refusal will not clear: tell the \
+             user, and the invoice is entered by hand in Tally.",
+        ),
+        "invoice_number_control_unreadable" => Some(
+            "ComplyEaze Bridge could not read its own import journal, or the earlier invoice it \
+             names, to check the number read, so the build is refused. Tell the user and \
+             stop.",
+        ),
         // The qualified list (`LIVE_QUALIFIED_VOUCHER_TYPES`) is what
         // `voucher_schema` offers. The text names no type, so it stays true as
         // the list grows.

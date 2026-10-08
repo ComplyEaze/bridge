@@ -2405,6 +2405,21 @@ impl Server {
         })
     }
 
+    /// What the journal offers as the control for an invoice number read of
+    /// this company (`ledger::invoice_number_control`), read under the shared
+    /// admission lock and released at once.
+    fn import_invoice_number_control(
+        &self,
+        company_guid: &str,
+        year: (&str, &str),
+    ) -> Result<ledger::NumberControl, String> {
+        let _lock = self.lock_import_admission_shared()?;
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::invoice_number_control(reader, company_guid, year),
+            None => Ok(ledger::NumberControl::NeverSent),
+        }
+    }
+
     /// The batch, sent and whose latest status is not a verified post, that
     /// holds an invoice with the figures of `line`'s invoice
     /// (`ledger::unsettled_invoice_twin`).

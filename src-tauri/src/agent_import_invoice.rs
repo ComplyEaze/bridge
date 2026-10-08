@@ -1178,6 +1178,36 @@ fn financial_year_window(date: &str) -> Option<(String, String)> {
     Some((format!("{start}0401"), format!("{}0331", start + 1)))
 }
 
+/// Why a build believes that no voucher carries its invoice number. The read
+/// answers "not in use" with no row, which a filter that matches nothing on
+/// another release also gives, so the answer stands only on one of these.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NumberAbsence {
+    /// The same read for an invoice the journal holds as verified posted
+    /// found it.
+    Controlled,
+    /// The book's voucher mark is 0: it holds no voucher at all.
+    EmptyBook,
+    /// No invoice of this company was ever sent: the first post stands on
+    /// the voucher type's own duplicate guard and its read-back.
+    FirstPost,
+}
+
+/// The basis for "not in use" when the journal names no verified invoice of
+/// the company to read beside it. Once an invoice was sent and none stands
+/// verified, a read that matches nothing could not be told from an unused
+/// number, so the build is refused until that post is verified.
+fn absence_without_control(
+    sent_before: bool,
+    voucher_mark: Option<u64>,
+) -> Result<NumberAbsence, InvoiceRefusal> {
+    match (voucher_mark, sent_before) {
+        (Some(0), _) => Ok(NumberAbsence::EmptyBook),
+        (_, false) => Ok(NumberAbsence::FirstPost),
+        (_, true) => Err(refuse("invoice_number_control_unavailable")),
+    }
+}
+
 fn duty_head_of(observation: &bridge_tally_protocol::GstDutyHeadObservation) -> DutyHead {
     use bridge_tally_protocol::{GstDutyHead, GstDutyHeadObservation};
     match observation {
@@ -1361,6 +1391,41 @@ impl super::super::Server {
                 &number,
             )));
         }
+        // 3c. "No voucher carries this number" is believed only beside a
+        // control: the same read for an invoice this company is known to hold
+        // must find it (a read that matches nothing on this Tally fails
+        // here), or the book holds no voucher at all, or this is the
+        // company's first invoice sent (whose read-back is then the check).
+        let control = self
+            .import_invoice_number_control(identity.company_guid(), (&year.0, &year.1))
+            .map_err(|_| failed("invoice_number_control_unreadable"))?;
+        let _absence = match control {
+            super::ledger::NumberControl::Known {
+                number: known,
+                date,
+            } => {
+                let window = financial_year_window(&date)
+                    .ok_or_else(|| failed("invoice_number_control_unreadable"))?;
+                let request =
+                    super::super::invoice_number_read(company_name, &known, (&window.0, &window.1))
+                        .ok_or_else(|| failed("invoice_number_control_unreadable"))?;
+                let (xml, read) = self.post_read(identity, request).await?;
+                evidence = super::super::combine_evidence(evidence, read);
+                if !wire::control_row_found(&xml, &known, &date).map_err(failed)? {
+                    return Err(refused(refuse_value(
+                        "invoice_number_control_missing",
+                        &known,
+                    )));
+                }
+                NumberAbsence::Controlled
+            }
+            super::ledger::NumberControl::NeverSent => {
+                absence_without_control(false, mark.value).map_err(refused)?
+            }
+            super::ledger::NumberControl::NoneVerified => {
+                absence_without_control(true, mark.value).map_err(refused)?
+            }
+        };
 
         // 4. The company's state.
         let (xml, read) = self

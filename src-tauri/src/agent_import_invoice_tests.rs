@@ -1654,3 +1654,26 @@ fn several_sales_legs_share_one_pair_of_tax_heads() {
         .push(entry("Round Off", "0.10", EntrySide::Cr));
     assert!(validate_invoice_voucher(&two_and_round).is_ok());
 }
+
+/// "Not in use" with no known invoice to read beside it: an empty book, or
+/// the company's first invoice sent; once one was sent and none stands
+/// verified, refused.
+#[test]
+fn without_a_control_only_an_empty_book_or_a_first_post_is_believed() {
+    assert_eq!(
+        absence_without_control(false, Some(0)).map_err(|r| r.code),
+        Ok(NumberAbsence::EmptyBook)
+    );
+    assert_eq!(
+        absence_without_control(true, Some(0)).map_err(|r| r.code),
+        Ok(NumberAbsence::EmptyBook)
+    );
+    assert_eq!(
+        absence_without_control(false, Some(40)).map_err(|r| r.code),
+        Ok(NumberAbsence::FirstPost)
+    );
+    assert_eq!(
+        absence_without_control(true, Some(40)).map_err(|refusal| refusal.code),
+        Err("invoice_number_control_unavailable")
+    );
+}

@@ -389,6 +389,24 @@ pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
     Ok(sales)
 }
 
+/// Whether the number read for a known invoice (the control) found it: a row
+/// carrying exactly that number and that date, read as Sales class. Any other
+/// row is not the control, and a row whose class cannot be read is an error,
+/// as for the read it controls.
+pub(super) fn control_row_found(xml: &str, number: &str, date: &str) -> Result<bool, &'static str> {
+    let mut found = false;
+    for row in rows(xml, "VOUCHER")? {
+        let class = match row.one(SALES_CLASS_TAG)? {
+            Some("Yes") => true,
+            Some("No") => false,
+            _ => return Err("invoice_number_class_unread"),
+        };
+        found |=
+            class && row.one("VOUCHERNUMBER")? == Some(number) && row.one("DATE")? == Some(date);
+    }
+    Ok(found)
+}
+
 /// What a posted invoice reads back as: the voucher-level fields and every
 /// ledger entry with its bill allocations. The fetch is the entry wildcard the
 /// agent's voucher reads use (it returns the legs of an invoice-view voucher

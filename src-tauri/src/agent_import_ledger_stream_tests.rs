@@ -799,6 +799,90 @@ fn invoice_batch(
 
 const SALE: &[(&str, &str, &str)] = &[("Customer", "118", "Dr"), ("Sales", "118.00", "Cr")];
 
+/// What the journal offers as the control for a build's number read: a
+/// verified invoice of the company (its number and date), preferring one of the
+/// build's financial year and then the newest; else whether one was ever sent.
+#[test]
+fn the_number_control_is_a_verified_invoice_of_the_company() {
+    let control = |journal: Vec<Vec<u8>>| {
+        invoice_number_control(
+            Cursor::new(journal.concat()),
+            "synthetic-guid",
+            ("20260401", "20270331"),
+        )
+        .unwrap()
+    };
+    let first = invoice_batch("first", 'a', ("INV/1", "Sales Manual"), SALE);
+    assert_eq!(control(vec![]), NumberControl::NeverSent);
+    // Only built.
+    assert_eq!(control(vec![record(&first)]), NumberControl::NeverSent);
+    // Sent, never verified.
+    assert_eq!(
+        control(vec![record(&first), sent(&first)]),
+        NumberControl::NoneVerified
+    );
+    let known = NumberControl::Known {
+        number: "INV/1".to_string(),
+        date: "20260901".to_string(),
+    };
+    assert_eq!(
+        control(vec![record(&first), sent(&first), found(&first)]),
+        known
+    );
+    // A later verification that no longer finds it demotes it.
+    let demoted = record(
+        &serde_json::from_value::<StatusRecord>(json!({
+            "record_type":"verification_status","batch_id":"first",
+            "batch_sha256":first.sha256,"status":"verification_incomplete"
+        }))
+        .unwrap(),
+    );
+    assert_eq!(
+        control(vec![record(&first), sent(&first), found(&first), demoted]),
+        NumberControl::NoneVerified
+    );
+    // Another company's verified invoice is not this company's control.
+    let mut elsewhere = invoice_batch("elsewhere", 'b', ("INV/9", "Sales Manual"), SALE);
+    elsewhere.company_guid = "other-guid".to_string();
+    assert_eq!(
+        control(vec![
+            record(&elsewhere),
+            sent(&elsewhere),
+            found(&elsewhere)
+        ]),
+        NumberControl::NeverSent
+    );
+    // In the build's year before a newer one outside it; the newest inside it.
+    let dated = |id: &str, sha: char, number: &str, date: &str| {
+        let mut line = invoice_batch(id, sha, (number, "Sales Manual"), SALE);
+        line.vouchers[0].date = date.to_string();
+        line
+    };
+    let last_year = dated("last-year", 'c', "INV/2", "20260310");
+    let next_year = dated("next-year", 'd', "INV/3", "20270410");
+    let later = dated("later", 'e', "INV/4", "20261015");
+    let journal = |batches: &[&ImportLedgerLine]| {
+        batches
+            .iter()
+            .flat_map(|batch| [record(batch), sent(batch), found(batch)])
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        control(journal(&[&later, &first, &next_year, &last_year])),
+        NumberControl::Known {
+            number: "INV/4".to_string(),
+            date: "20261015".to_string()
+        }
+    );
+    assert_eq!(
+        control(journal(&[&next_year, &last_year])),
+        NumberControl::Known {
+            number: "INV/3".to_string(),
+            date: "20270410".to_string()
+        }
+    );
+}
+
 /// An invoice has an unsettled twin while another batch of the company holds an
 /// invoice with its date, filed type and entries (whatever its number), was
 /// sent, and no readback found it posted. A twin only built, one found posted,

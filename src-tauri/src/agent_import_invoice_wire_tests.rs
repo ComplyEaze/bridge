@@ -367,6 +367,44 @@ fn the_captured_number_answers_count_only_sales_class_vouchers() {
     }
 }
 
+/// The control beside the number read, on Tally's own answers: it passes only
+/// on a row with the known number, its date and the Sales class. The shared
+/// answer holds a Sales voucher numbered 12 on 18 Sep 2025 and a Purchase
+/// voucher numbered 12 on 22 Jul 2025.
+#[test]
+fn the_control_row_is_the_known_invoice_with_its_date_and_class() {
+    let known = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-known.utf16le.xml"));
+    let absent = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml"));
+    let shared = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-shared.utf16le.xml"));
+    assert_eq!(
+        control_row_found(&known, "TG/25-26/001", "20260310"),
+        Ok(true)
+    );
+    // A read that returns no row is never a control.
+    assert_eq!(
+        control_row_found(&absent, "TG/25-26/001", "20260310"),
+        Ok(false)
+    );
+    assert_eq!(control_row_found(&shared, "12", "20250918"), Ok(true));
+    // The Purchase row has the number and its own date, and is not Sales.
+    assert_eq!(control_row_found(&shared, "12", "20250722"), Ok(false));
+    // The number on another date; another number.
+    assert_eq!(control_row_found(&shared, "12", "20250101"), Ok(false));
+    assert_eq!(
+        control_row_found(&shared, "TG/25-26/001", "20250918"),
+        Ok(false)
+    );
+    // An answer with no collection is an error, as for the read it controls.
+    assert_eq!(
+        control_row_found(
+            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA></DATA></ENVELOPE>",
+            "12",
+            "20250918"
+        ),
+        Err("invoice_read_collection_absent")
+    );
+}
+
 /// The read-back of the two invoices ComplyEaze Bridge posted and of one keyed
 /// by hand, as Tally answered: every field the comparison reads comes back on
 /// a posted invoice; a keyed one in this book carries no reference.

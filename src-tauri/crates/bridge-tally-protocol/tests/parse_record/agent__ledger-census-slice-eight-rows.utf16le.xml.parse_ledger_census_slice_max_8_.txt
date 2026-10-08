@@ -1,0 +1,13 @@
+# fixture: tests/fixtures/agent/ledger-census-slice-eight-rows.utf16le.xml
+# parser: parse_ledger_census_slice(max 8)
+# source: captured
+Ok([
+    "f8dab51e-a5d9-49d5-9232-54a16c8b95bb-000001f3",
+    "f8dab51e-a5d9-49d5-9232-54a16c8b95bb-000001f4",
+    "f8dab51e-a5d9-49d5-9232-54a16c8b95bb-000001f5",
+    "f8dab51e-a5d9-49d5-9232-54a16c8b95bb-000001f6",
+    "f8dab51e-a5d9-49d5-9232-54a16c8b95bb-000001f7",
+    "f8dab51e-a5d9-49d5-9232-54a16c8b95bb-000001f8",
+    "f8dab51e-a5d9-49d5-9232-54a16c8b95bb-000001f9",
+    "f8dab51e-a5d9-49d5-9232-54a16c8b95bb-000001fa",
+])

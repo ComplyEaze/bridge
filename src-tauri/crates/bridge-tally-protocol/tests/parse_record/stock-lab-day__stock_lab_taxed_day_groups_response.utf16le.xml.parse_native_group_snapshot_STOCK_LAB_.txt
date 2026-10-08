@@ -1,0 +1,257 @@
+# fixture: tests/fixtures/stock-lab-day/stock_lab_taxed_day_groups_response.utf16le.xml
+# parser: parse_native_group_snapshot(STOCK LAB)
+# source: captured
+Ok([
+    TallyNamedMaster {
+        name: "Bank Accounts",
+        parent: Returned(
+            "Current Assets",
+        ),
+        reserved_name: Some(
+            "Bank Accounts",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Bank OD A/c",
+        parent: Returned(
+            "Loans (Liability)",
+        ),
+        reserved_name: Some(
+            "Bank OD A/c",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Branch / Divisions",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Branch / Divisions",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Capital Account",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Capital Account",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Cash-in-Hand",
+        parent: Returned(
+            "Current Assets",
+        ),
+        reserved_name: Some(
+            "Cash-in-Hand",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Current Assets",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Current Assets",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Current Liabilities",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Current Liabilities",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Deposits (Asset)",
+        parent: Returned(
+            "Current Assets",
+        ),
+        reserved_name: Some(
+            "Deposits (Asset)",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Direct Expenses",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Direct Expenses",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Direct Incomes",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Direct Incomes",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Duties & Taxes",
+        parent: Returned(
+            "Current Liabilities",
+        ),
+        reserved_name: Some(
+            "Duties & Taxes",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Fixed Assets",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Fixed Assets",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Indirect Expenses",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Indirect Expenses",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Indirect Incomes",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Indirect Incomes",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Investments",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Investments",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Loans & Advances (Asset)",
+        parent: Returned(
+            "Current Assets",
+        ),
+        reserved_name: Some(
+            "Loans & Advances (Asset)",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Loans (Liability)",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Loans (Liability)",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Misc. Expenses (ASSET)",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Misc. Expenses (ASSET)",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Provisions",
+        parent: Returned(
+            "Current Liabilities",
+        ),
+        reserved_name: Some(
+            "Provisions",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Purchase Accounts",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Purchase Accounts",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Reserves & Surplus",
+        parent: Returned(
+            "Capital Account",
+        ),
+        reserved_name: Some(
+            "Reserves & Surplus",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Sales Accounts",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Sales Accounts",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Secured Loans",
+        parent: Returned(
+            "Loans (Liability)",
+        ),
+        reserved_name: Some(
+            "Secured Loans",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Stock-in-Hand",
+        parent: Returned(
+            "Current Assets",
+        ),
+        reserved_name: Some(
+            "Stock-in-Hand",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Sundry Creditors",
+        parent: Returned(
+            "Current Liabilities",
+        ),
+        reserved_name: Some(
+            "Sundry Creditors",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Sundry Debtors",
+        parent: Returned(
+            "Current Assets",
+        ),
+        reserved_name: Some(
+            "Sundry Debtors",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Suspense A/c",
+        parent: Returned(
+            "�#4; Primary",
+        ),
+        reserved_name: Some(
+            "Suspense A/c",
+        ),
+    },
+    TallyNamedMaster {
+        name: "Unsecured Loans",
+        parent: Returned(
+            "Loans (Liability)",
+        ),
+        reserved_name: Some(
+            "Unsecured Loans",
+        ),
+    },
+])

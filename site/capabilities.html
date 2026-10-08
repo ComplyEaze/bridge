@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>What it can do: ComplyEaze Bridge</title>
-<meta name="description" content="Every tool ComplyEaze Bridge 0.4.2 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the two only with posting on." />
+<meta name="description" content="Every tool ComplyEaze Bridge 0.5.0 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the two only with posting on." />
 <link rel="canonical" href="https://bridge.complyeaze.com/capabilities.html" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="ComplyEaze Bridge" />
 <meta property="og:locale" content="en_IN" />
 <meta property="og:title" content="What it can do: ComplyEaze Bridge" />
-<meta property="og:description" content="Every tool ComplyEaze Bridge 0.4.2 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the two only with posting on." />
+<meta property="og:description" content="Every tool ComplyEaze Bridge 0.5.0 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the two only with posting on." />
 <meta property="og:url" content="https://bridge.complyeaze.com/capabilities.html" />
 <link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
 <script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
@@ -57,13 +57,13 @@
   <section class="page-hero">
     <div class="page-hero__inner">
       <h1>What ComplyEaze&nbsp;Bridge can do</h1>
-      <p>The 22 tools release 0.4.2 offers in Claude Desktop with its default settings (posting off), taken from the tool list the published package itself reports, and the two that posting adds. The Releases page says which release is the latest.</p>
+      <p>The 23 tools release 0.5.0 offers in Claude Desktop with its default settings (posting off), counted by the release&rsquo;s own check of each published package (it reports 23, and 25 with posting on) and named from the source of that release, and the two that posting adds. The Releases page says which release is the latest.</p>
     </div>
   </section>
 
   <div class="page-body">
     <section class="page-section">
-      <h2>The 22 tools, as installed</h2>
+      <h2>The 23 tools, as installed</h2>
       <p class="caps-lead">None of them changes your TallyPrime books. Every call adds a receipt line to a log on this computer; the log is designed to hold no figures. Whatever the assistant reads, amounts included, goes to your AI provider.</p>
       <div class="caps-scroll">
         <table class="caps-table">
@@ -71,12 +71,13 @@
           <tbody>
           <tr><th scope="row"><code>balance_sheet</code></th><td>The Balance Sheet for a date range, by primary group, from TallyPrime&rsquo;s Trial Balance</td><td>Read-only</td><td>A book with stock items is expected to be refused.</td></tr>
           <tr><th scope="row"><code>build_import_xml</code></th><td>Checks a Journal, Payment, Receipt or Contra batch and writes an import file that you import in TallyPrime yourself</td><td>Writes a file on this computer</td><td>Writes an import file and a ledger record on this computer. Writes nothing to TallyPrime.</td></tr>
+          <tr><th scope="row"><code>cash_flow</code></th><td>Tally&rsquo;s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, not a cash flow statement under AS 3</td><td>Read-only</td><td>Returned only after its net total is compared with the trial balance and found equal; the split into months is Tally&rsquo;s own and is not checked; a ledger under Bank OD A/c or Bank OCC A/c with movement refuses the result (covered by tests, not seen against Tally).</td></tr>
           <tr><th scope="row"><code>egress_log</code></th><td>The receipts ComplyEaze&nbsp;Bridge keeps of its own tool calls, with no figures</td><td>Read-only</td><td></td></tr>
           <tr><th scope="row"><code>ledger_masters</code></th><td>Ledgers with their opening balances; optionally GSTIN, PAN and other party details</td><td>Read-only</td><td></td></tr>
           <tr><th scope="row"><code>ledger_movement</code></th><td>A ledger&rsquo;s opening, debits, credits and closing for a period</td><td>Read-only</td><td></td></tr>
           <tr><th scope="row"><code>list_companies</code></th><td>The companies loaded in TallyPrime</td><td>Read-only</td><td>Start here: the reads of a company&rsquo;s books need a company from it.</td></tr>
           <tr><th scope="row"><code>local_data_report</code></th><td>What ComplyEaze&nbsp;Bridge keeps on this computer</td><td>Read-only</td><td></td></tr>
-          <tr><th scope="row"><code>masters</code></th><td>Voucher types, godowns, units, stock groups or account groups</td><td>Read-only</td><td></td></tr>
+          <tr><th scope="row"><code>masters</code></th><td>Voucher types, godowns, units, stock groups, cost centres, cost categories or account groups</td><td>Read-only</td><td></td></tr>
           <tr><th scope="row"><code>outstandings</code></th><td>Receivables and payables with ageing, the top parties and the open bills</td><td>Read-only</td><td></td></tr>
           <tr><th scope="row"><code>parse_bank_statement</code></th><td>Reads a password-protected SBI, HDFC or Union Bank of India statement PDF and proposes Payment, Receipt and Contra vouchers</td><td>Writes a file on this computer</td><td>Writes a private proposals file on this computer.</td></tr>
           <tr><th scope="row"><code>profit_and_loss</code></th><td>The Profit and Loss for a date range, by primary group, from TallyPrime&rsquo;s Trial Balance</td><td>Read-only</td><td>A book with stock items is expected to be refused.</td></tr>
@@ -90,7 +91,7 @@
           <tr><th scope="row"><code>verify_import</code></th><td>Reads back a batch you imported by hand in TallyPrime</td><td>Writes a file on this computer</td><td>Creates or replaces proof files and status records on this computer. Writes nothing to TallyPrime.</td></tr>
           <tr><th scope="row"><code>voucher_presence</code></th><td>Which proposed vouchers are already in the book</td><td>Read-only</td><td></td></tr>
           <tr><th scope="row"><code>voucher_schema</code></th><td>The voucher-file format, without asking TallyPrime</td><td>Read-only</td><td></td></tr>
-          <tr><th scope="row"><code>vouchers</code></th><td>The vouchers in a period. Search by number, reference, narration or amount, and totals by ledger, month, voucher type, group or primary group, are in the next build and not in 0.4.2 (search and the first three summaries checked once, and the group and primary-group totals in a second run, on a synthetic book of 67 vouchers; not checked on a large book)</td><td>Read-only</td><td></td></tr>
+          <tr><th scope="row"><code>vouchers</code></th><td>The vouchers in a period. Search by number, reference, narration or amount, and totals by ledger, month, voucher type, group or primary group, are in release 0.5.0 and not in 0.4.2 (search and the first three summaries checked once, and the group and primary-group totals in a second run, on a synthetic book of 67 vouchers; not checked on a large book)</td><td>Read-only</td><td></td></tr>
           </tbody>
         </table>
       </div>

@@ -1,0 +1,464 @@
+{
+ "comment": "clause21a_candidates on its two rules beyond words, a firm with two partners: a large entry (over the rules' threshold, not equal to it, a debit and not a credit) on a repairs, maintenance, computer or office expenses ledger is a capital candidate, and on a rent ledger is not, though its narration names office expenses; a debit in a voucher that credits a Capital Account ledger is a personal candidate, except on a partner's interest or remuneration ledger, unless a word makes it one; a P&L credit in such a voucher, and a debit in a voucher that debits capital, are not; and one line that is both.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Admin Expenses": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_capital-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_capital-001"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c21a_capital-002"
+  },
+  {
+   "name": "Partner Capital - A",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-c21a_capital-003"
+  },
+  {
+   "name": "Partner Capital - B",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-c21a_capital-004"
+  },
+  {
+   "name": "Interest to Partners",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_capital-005"
+  },
+  {
+   "name": "Partner Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_capital-006"
+  },
+  {
+   "name": "Partner Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_capital-007"
+  },
+  {
+   "name": "Repairs and Maintenance",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_capital-008"
+  },
+  {
+   "name": "Computer Maintenance",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_capital-009"
+  },
+  {
+   "name": "Office Expenses",
+   "chain": [
+    "Admin Expenses",
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_capital-010"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_capital-011"
+  },
+  {
+   "name": "Travelling Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_capital-012"
+  },
+  {
+   "name": "Conveyance",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_capital-013"
+  },
+  {
+   "name": "Rates and Taxes",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_capital-014"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 6100000,
+   "credit": 25012300,
+   "closing": -18912300
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Partner Capital - A",
+   "opening": 0,
+   "debit": 60000,
+   "credit": 8450000,
+   "closing": -8390000
+  },
+  {
+   "ledger": "Partner Capital - B",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2800000,
+   "closing": -2800000
+  },
+  {
+   "ledger": "Interest to Partners",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 0,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Partner Remuneration",
+   "opening": 0,
+   "debit": 2500000,
+   "credit": 0,
+   "closing": 2500000
+  },
+  {
+   "ledger": "Partner Salary",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 0,
+   "closing": 300000
+  },
+  {
+   "ledger": "Repairs and Maintenance",
+   "opening": 0,
+   "debit": 10012300,
+   "credit": 6000000,
+   "closing": 4012300
+  },
+  {
+   "ledger": "Computer Maintenance",
+   "opening": 0,
+   "debit": 7000000,
+   "credit": 0,
+   "closing": 7000000
+  },
+  {
+   "ledger": "Office Expenses",
+   "opening": 0,
+   "debit": 6000000,
+   "credit": 0,
+   "closing": 6000000
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 9000000,
+   "credit": 0,
+   "closing": 9000000
+  },
+  {
+   "ledger": "Travelling Expenses",
+   "opening": 0,
+   "debit": 250000,
+   "credit": 0,
+   "closing": 250000
+  },
+  {
+   "ledger": "Conveyance",
+   "opening": 0,
+   "debit": 40000,
+   "credit": 0,
+   "closing": 40000
+  },
+  {
+   "ledger": "Rates and Taxes",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "edge-c21a_capital-v01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Shop",
+   "lines": [
+    [
+     "Repairs and Maintenance",
+     5012300
+    ],
+    [
+     "Bank",
+     -5012300
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v02",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Godown",
+   "lines": [
+    [
+     "Repairs and Maintenance",
+     5000000
+    ],
+    [
+     "Bank",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v03",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Year",
+   "lines": [
+    [
+     "Office Expenses",
+     6000000
+    ],
+    [
+     "Bank",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v04",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Office expenses for the year",
+   "lines": [
+    [
+     "Rent",
+     9000000
+    ],
+    [
+     "Bank",
+     -9000000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v05",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "narration": "Reversal",
+   "lines": [
+    [
+     "Bank",
+     6000000
+    ],
+    [
+     "Repairs and Maintenance",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v06",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "narration": "Interest for the year",
+   "lines": [
+    [
+     "Interest to Partners",
+     1200000
+    ],
+    [
+     "Partner Capital - A",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v07",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "narration": "Remuneration for the year",
+   "lines": [
+    [
+     "Partner Remuneration",
+     2400000
+    ],
+    [
+     "Partner Capital - B",
+     -2400000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v08",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "narration": "Salary",
+   "lines": [
+    [
+     "Partner Salary",
+     300000
+    ],
+    [
+     "Partner Capital - B",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v09",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "narration": "Tour",
+   "lines": [
+    [
+     "Travelling Expenses",
+     250000
+    ],
+    [
+     "Bank",
+     100000
+    ],
+    [
+     "Partner Capital - A",
+     -250000
+    ],
+    [
+     "Rates and Taxes",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v10",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Fares",
+   "lines": [
+    [
+     "Conveyance",
+     40000
+    ],
+    [
+     "Partner Capital - A",
+     60000
+    ],
+    [
+     "Cash",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v11",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "narration": "Personal expenses of a partner",
+   "lines": [
+    [
+     "Partner Remuneration",
+     100000
+    ],
+    [
+     "Partner Capital - B",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_capital-v12",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "narration": "Upgrade",
+   "lines": [
+    [
+     "Computer Maintenance",
+     7000000
+    ],
+    [
+     "Partner Capital - A",
+     -7000000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank"
+ ],
+ "entity_type": "firm",
+ "partners": {
+  "partner_a": {
+   "capital_ledgers": [
+    "Partner Capital - A"
+   ],
+   "interest_ledger": "Interest to Partners"
+  },
+  "partner_b": {
+   "capital_ledgers": [
+    "Partner Capital - B"
+   ],
+   "interest_ledger": "",
+   "remuneration_ledger": "Partner Remuneration"
+  }
+ },
+ "tests": [
+  "clause21a_candidates"
+ ]
+}

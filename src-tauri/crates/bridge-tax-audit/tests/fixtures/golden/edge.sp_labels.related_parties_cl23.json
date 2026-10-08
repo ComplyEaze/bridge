@@ -1,0 +1,1336 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "related_parties_cl23",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "ab3d3f4e061679c1",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). One entry = one voucher's net Dr+/Cr- line-sum on a person's nature ledger set.",
+  "figures": [
+    {
+      "id": "related_parties_cl23.amount_interest_74b1dab5",
+      "value": 450000,
+      "unit": "paise",
+      "definition_sha256_16": "7c6e63ce99b09958",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 74b1dab5)'s 'interest' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L01 Interest",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "j01",
+          "label": "Journal j01 on 2026-03-31"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_08409dd2",
+      "value": 1100000,
+      "unit": "paise",
+      "definition_sha256_16": "18a0780a5b68f543",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 08409dd2)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L11 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p11",
+          "label": "Payment p11 on 2025-06-21"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_0c05ee00",
+      "value": 500000,
+      "unit": "paise",
+      "definition_sha256_16": "2ac7b0beb49b5452",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 0c05ee00)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L05 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p05",
+          "label": "Payment p05 on 2025-09-15"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_0ceecd7a",
+      "value": 200000,
+      "unit": "paise",
+      "definition_sha256_16": "df5ff8690e0ea50f",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 0ceecd7a)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L02 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Payment p02 on 2025-06-12"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_0e74b791",
+      "value": 700000,
+      "unit": "paise",
+      "definition_sha256_16": "a9a8eaf15897b6bb",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 0e74b791)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L07 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p07",
+          "label": "Payment p07 on 2025-11-17"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_0e7808aa",
+      "value": 800000,
+      "unit": "paise",
+      "definition_sha256_16": "168e6a648fe04809",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 0e7808aa)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L08 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Payment p08 on 2025-12-18"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_3e0265a9",
+      "value": 300000,
+      "unit": "paise",
+      "definition_sha256_16": "3704fd150be89ed6",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 3e0265a9)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L03 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p03",
+          "label": "Payment p03 on 2025-07-13"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_4ece4da1",
+      "value": 1400000,
+      "unit": "paise",
+      "definition_sha256_16": "a128f0d7e2ea09da",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 4ece4da1)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L15 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p14",
+          "label": "Payment p14 on 2025-09-24"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_64909c92",
+      "value": 400000,
+      "unit": "paise",
+      "definition_sha256_16": "7bee6d7336e63d2b",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 64909c92)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L04 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Payment p04 on 2025-08-14"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_6e6fc64b",
+      "value": 1300000,
+      "unit": "paise",
+      "definition_sha256_16": "15ab2150e63409dc",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 6e6fc64b)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L13 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p13",
+          "label": "Payment p13 on 2025-08-23"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_74b1dab5",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "6c1b5a1f4da2975c",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 74b1dab5)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L01 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Payment p01 on 2025-05-11"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_7e3c8da1",
+      "value": 600000,
+      "unit": "paise",
+      "definition_sha256_16": "2149af8aa96a3886",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 7e3c8da1)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L06 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p06",
+          "label": "Payment p06 on 2025-10-16"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_8ed7bfad",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "34b9e57dbedd397c",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 8ed7bfad)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L10 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p10",
+          "label": "Payment p10 on 2025-05-20"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_c090c2ae",
+      "value": 1200000,
+      "unit": "paise",
+      "definition_sha256_16": "43daa58b8e169f46",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag c090c2ae)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L12 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p12",
+          "label": "Payment p12 on 2025-07-22"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_de5a482a",
+      "value": 900000,
+      "unit": "paise",
+      "definition_sha256_16": "f63f06191345ae55",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag de5a482a)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L09 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p09",
+          "label": "Payment p09 on 2025-04-19"
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_total_08409dd2",
+      "value": 1100000,
+      "unit": "paise",
+      "definition_sha256_16": "78d514cbb679613e",
+      "definition_text": "Sum of amount_<nature>_08409dd2 across every nature configured for person (tag 08409dd2).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_0c05ee00",
+      "value": 500000,
+      "unit": "paise",
+      "definition_sha256_16": "9b01e091baa323ed",
+      "definition_text": "Sum of amount_<nature>_0c05ee00 across every nature configured for person (tag 0c05ee00).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_0ceecd7a",
+      "value": 200000,
+      "unit": "paise",
+      "definition_sha256_16": "6ff7f17c646fd407",
+      "definition_text": "Sum of amount_<nature>_0ceecd7a across every nature configured for person (tag 0ceecd7a).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_0e74b791",
+      "value": 700000,
+      "unit": "paise",
+      "definition_sha256_16": "4837c5051a4332c8",
+      "definition_text": "Sum of amount_<nature>_0e74b791 across every nature configured for person (tag 0e74b791).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_0e7808aa",
+      "value": 800000,
+      "unit": "paise",
+      "definition_sha256_16": "6824cb21f8207988",
+      "definition_text": "Sum of amount_<nature>_0e7808aa across every nature configured for person (tag 0e7808aa).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_3e0265a9",
+      "value": 300000,
+      "unit": "paise",
+      "definition_sha256_16": "3ec7b04826c105d1",
+      "definition_text": "Sum of amount_<nature>_3e0265a9 across every nature configured for person (tag 3e0265a9).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_4ece4da1",
+      "value": 1400000,
+      "unit": "paise",
+      "definition_sha256_16": "fd870b3814c01e0f",
+      "definition_text": "Sum of amount_<nature>_4ece4da1 across every nature configured for person (tag 4ece4da1).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_64909c92",
+      "value": 400000,
+      "unit": "paise",
+      "definition_sha256_16": "af9329372010d4ee",
+      "definition_text": "Sum of amount_<nature>_64909c92 across every nature configured for person (tag 64909c92).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_6e6fc64b",
+      "value": 1300000,
+      "unit": "paise",
+      "definition_sha256_16": "5dbc769b00294283",
+      "definition_text": "Sum of amount_<nature>_6e6fc64b across every nature configured for person (tag 6e6fc64b).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_74b1dab5",
+      "value": 550000,
+      "unit": "paise",
+      "definition_sha256_16": "9079344fbd83413b",
+      "definition_text": "Sum of amount_<nature>_74b1dab5 across every nature configured for person (tag 74b1dab5).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_7e3c8da1",
+      "value": 600000,
+      "unit": "paise",
+      "definition_sha256_16": "78d77a6475ec3dfe",
+      "definition_text": "Sum of amount_<nature>_7e3c8da1 across every nature configured for person (tag 7e3c8da1).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_8ed7bfad",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "6adcfa26211eee43",
+      "definition_text": "Sum of amount_<nature>_8ed7bfad across every nature configured for person (tag 8ed7bfad).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_c090c2ae",
+      "value": 1200000,
+      "unit": "paise",
+      "definition_sha256_16": "5acffac8f2897fa9",
+      "definition_text": "Sum of amount_<nature>_c090c2ae across every nature configured for person (tag c090c2ae).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.amount_total_de5a482a",
+      "value": 900000,
+      "unit": "paise",
+      "definition_sha256_16": "b01bfd7136d3f6d5",
+      "definition_text": "Sum of amount_<nature>_de5a482a across every nature configured for person (tag de5a482a).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.applicable",
+      "value": "yes",
+      "unit": "text",
+      "definition_sha256_16": "9b27b7c2da441e41",
+      "definition_text": "Whether any related person has been confirmed by the client for this engagement. 'no' means none were confirmed -- never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.related_person_count",
+      "value": 14,
+      "unit": "count",
+      "definition_sha256_16": "8feb927f1116a35a",
+      "definition_text": "Related persons confirmed by the client for this engagement.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_08409dd2",
+      "value": "PARTNER İN THE FİRM",
+      "unit": "text",
+      "definition_sha256_16": "e72e1f7b1cfd4732",
+      "definition_text": "Relationship confirmed by the client for related person (tag 08409dd2) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_0c05ee00",
+      "value": "\u001fpartner\u001c",
+      "unit": "text",
+      "definition_sha256_16": "8a02df5ac2d6a07f",
+      "definition_text": "Relationship confirmed by the client for related person (tag 0c05ee00) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_0ceecd7a",
+      "value": "  partner  ",
+      "unit": "text",
+      "definition_sha256_16": "ad04ff5418b5be28",
+      "definition_text": "Relationship confirmed by the client for related person (tag 0ceecd7a) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_0e74b791",
+      "value": "working  partner",
+      "unit": "text",
+      "definition_sha256_16": "f18cd6b25185b04b",
+      "definition_text": "Relationship confirmed by the client for related person (tag 0e74b791) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_0e7808aa",
+      "value": "partner​",
+      "unit": "text",
+      "definition_sha256_16": "db51606b718979b8",
+      "definition_text": "Relationship confirmed by the client for related person (tag 0e7808aa) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_3e0265a9",
+      "value": "\tWorking Partner\n",
+      "unit": "text",
+      "definition_sha256_16": "c7907a8ce60a54c9",
+      "definition_text": "Relationship confirmed by the client for related person (tag 3e0265a9) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_4ece4da1",
+      "value": "partner's son",
+      "unit": "text",
+      "definition_sha256_16": "5d9ab9cce53fb952",
+      "definition_text": "Relationship confirmed by the client for related person (tag 4ece4da1) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_64909c92",
+      "value": " Partner in the firm　",
+      "unit": "text",
+      "definition_sha256_16": "0737f20e1f4fa5fc",
+      "definition_text": "Relationship confirmed by the client for related person (tag 64909c92) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_6e6fc64b",
+      "value": "ｐａｒｔｎｅｒ",
+      "unit": "text",
+      "definition_sha256_16": "b71841e28bf2e3d0",
+      "definition_text": "Relationship confirmed by the client for related person (tag 6e6fc64b) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_74b1dab5",
+      "value": "PARTNER",
+      "unit": "text",
+      "definition_sha256_16": "c8f346d66556c581",
+      "definition_text": "Relationship confirmed by the client for related person (tag 74b1dab5) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_7e3c8da1",
+      "value": "WORKING PARTNER",
+      "unit": "text",
+      "definition_sha256_16": "7993c93c50a0173f",
+      "definition_text": "Relationship confirmed by the client for related person (tag 7e3c8da1) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_8ed7bfad",
+      "value": "partners",
+      "unit": "text",
+      "definition_sha256_16": "5c499ab155dda194",
+      "definition_text": "Relationship confirmed by the client for related person (tag 8ed7bfad) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_c090c2ae",
+      "value": "",
+      "unit": "text",
+      "definition_sha256_16": "cae1da29c9f8721f",
+      "definition_text": "Relationship confirmed by the client for related person (tag c090c2ae) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_de5a482a",
+      "value": "sleeping partner",
+      "unit": "text",
+      "definition_sha256_16": "f3fb7a595b269895",
+      "definition_text": "Relationship confirmed by the client for related person (tag de5a482a) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/08409dd2",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_08409dd2"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_08409dd2"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "7135bf219d6fc50f",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 08409dd2) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/0c05ee00",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_0c05ee00"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_0c05ee00"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "d60aff4363131453",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 0c05ee00) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/0ceecd7a",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_0ceecd7a"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_0ceecd7a"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "2d5891fc14da7a93",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 0ceecd7a) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/0e74b791",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_0e74b791"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_0e74b791"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "7e47632c3e59d301",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 0e74b791) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/0e7808aa",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_0e7808aa"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_0e7808aa"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "fa783a5a20e3750d",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 0e7808aa) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/3e0265a9",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_3e0265a9"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_3e0265a9"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "c64e9d826f7e2a85",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 3e0265a9) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/4ece4da1",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_4ece4da1"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_4ece4da1"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "2eb2fd022f19e1fd",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 4ece4da1) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/64909c92",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_64909c92"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_64909c92"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "fdfa6dc7d3eab8ec",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 64909c92) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/6e6fc64b",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_6e6fc64b"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_6e6fc64b"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "1a3323339183ec11",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 6e6fc64b) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/74b1dab5",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "interest",
+          "figure_id": "related_parties_cl23.amount_interest_74b1dab5"
+        },
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_74b1dab5"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_74b1dab5"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "091999d333bbd775",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 74b1dab5) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/7e3c8da1",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_7e3c8da1"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_7e3c8da1"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "c52b3a36fdf1a3b2",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 7e3c8da1) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/8ed7bfad",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_8ed7bfad"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_8ed7bfad"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "9930dcf76361a30d",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag 8ed7bfad) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/c090c2ae",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_c090c2ae"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_c090c2ae"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "a2f4c94b4f7e413f",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag c090c2ae) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/40a2b_reasonableness/de5a482a",
+      "clauses": [
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_de5a482a"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_de5a482a"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "32fdb1470370f4fa",
+      "title_text": "s.40A(2)(b) reasonableness of the amount(s) paid to related person (tag de5a482a) is not assessed here",
+      "limits_sha256_16": "769547273746b56a",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the excess over fair market value / legitimate business need, which needs a comparable arm's-length rate or amount that the books do not carry; this test reports the amount actually moved, never a view on whether it is excessive."
+      ],
+      "ask_client_sha256_16": "e505fb96ae45e26f",
+      "ask_client_text": [
+        "Confirm the basis (market rate, comparable, or documented business need) for the amount paid to this related person in each nature shown above."
+      ]
+    },
+    {
+      "id": "related_parties_cl23/clause23/08409dd2",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_08409dd2"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_08409dd2"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "9410a01f2f2dd726",
+      "title_text": "Transactions with a related person (tag 08409dd2) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/0c05ee00",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_0c05ee00"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_0c05ee00"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "b114f99e28e41ce1",
+      "title_text": "Transactions with a related person (tag 0c05ee00) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/0ceecd7a",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_0ceecd7a"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_0ceecd7a"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "1a705286587aeec8",
+      "title_text": "Transactions with a related person (tag 0ceecd7a) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/0e74b791",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_0e74b791"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_0e74b791"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "88770c3615d200ce",
+      "title_text": "Transactions with a related person (tag 0e74b791) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/0e7808aa",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_0e7808aa"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_0e7808aa"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "abc816073632f146",
+      "title_text": "Transactions with a related person (tag 0e7808aa) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/3e0265a9",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_3e0265a9"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_3e0265a9"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "f6836119b20acf21",
+      "title_text": "Transactions with a related person (tag 3e0265a9) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/4ece4da1",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_4ece4da1"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_4ece4da1"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "c6c9c6b0fda193bf",
+      "title_text": "Transactions with a related person (tag 4ece4da1) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/64909c92",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_64909c92"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_64909c92"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "0aad05bb4db12168",
+      "title_text": "Transactions with a related person (tag 64909c92) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/6e6fc64b",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_6e6fc64b"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_6e6fc64b"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "6f3ff7edf2a5b863",
+      "title_text": "Transactions with a related person (tag 6e6fc64b) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/74b1dab5",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "interest",
+          "figure_id": "related_parties_cl23.amount_interest_74b1dab5"
+        },
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_74b1dab5"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_74b1dab5"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "4bb1d9b52da9f546",
+      "title_text": "Transactions with a related person (tag 74b1dab5) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/7e3c8da1",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_7e3c8da1"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_7e3c8da1"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "bbc09fb87f721567",
+      "title_text": "Transactions with a related person (tag 7e3c8da1) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/8ed7bfad",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_8ed7bfad"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_8ed7bfad"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "5cc15f8718a5929e",
+      "title_text": "Transactions with a related person (tag 8ed7bfad) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/c090c2ae",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_c090c2ae"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_c090c2ae"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "89bbab808700a842",
+      "title_text": "Transactions with a related person (tag c090c2ae) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "related_parties_cl23/clause23/de5a482a",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "salary",
+          "figure_id": "related_parties_cl23.amount_salary_de5a482a"
+        },
+        {
+          "name": "total",
+          "figure_id": "related_parties_cl23.amount_total_de5a482a"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "0b23017db2468a50",
+      "title_text": "Transactions with a related person (tag de5a482a) confirmed by the client, reportable under Clause 23",
+      "limits_sha256_16": "d0910a1413d4a72f",
+      "limits_text": [
+        "Figures are the ledger population's own movement on the ledger(s) confirmed against this person; a person transacting through a ledger not listed in the client's own confirmation would not appear here."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "related_parties_cl23.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

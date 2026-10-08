@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/company_extents_forex_live.utf16le.xml
+# parser: parse_company_book_extent_v2(FOREX)
+# source: captured
+Ok(CompanyBookExtentFields {
+    company_name: "BRIDGE CORPUS FOREX",
+    company_guid: "b14e9b2d-8a63-4779-804d-25d59eb787eb",
+    books_from: TallyDate(
+        "20250401",
+    ),
+    last_voucher_date: TallyDate(
+        "20260915",
+    ),
+    voucher_alter_id_high_water: Some(
+        18,
+    ),
+    master_alter_id_high_water: Some(
+        216,
+    ),
+})

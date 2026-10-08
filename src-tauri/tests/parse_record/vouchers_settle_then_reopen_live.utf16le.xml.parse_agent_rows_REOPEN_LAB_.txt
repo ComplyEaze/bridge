@@ -1,0 +1,784 @@
+# fixture: vouchers_settle_then_reopen_live.utf16le.xml
+# parser: parse_agent_rows(REOPEN_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(2767),
+        "amounts": Array [
+            Object {
+                "amount": String("-1000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1000.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-001"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 02"),
+            },
+            Object {
+                "amount": String("1000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260810"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000acf"),
+        "is_invoice": Bool(false),
+        "master_id": String("2767"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("8"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2770),
+        "amounts": Array [
+            Object {
+                "amount": String("-1500.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1500.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(45),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-002"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 03"),
+            },
+            Object {
+                "amount": String("1500.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260810"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ad2"),
+        "is_invoice": Bool(false),
+        "master_id": String("2770"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("10"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2773),
+        "amounts": Array [
+            Object {
+                "amount": String("-2000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-2000.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("months"),
+                            "value": Number(2),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-003"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 01"),
+            },
+            Object {
+                "amount": String("2000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260810"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ad5"),
+        "is_invoice": Bool(false),
+        "master_id": String("2773"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("12"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2776),
+        "amounts": Array [
+            Object {
+                "amount": String("-2500.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-2500.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("weeks"),
+                            "value": Number(3),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-004"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 02"),
+            },
+            Object {
+                "amount": String("2500.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260810"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ad8"),
+        "is_invoice": Bool(false),
+        "master_id": String("2776"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("14"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2779),
+        "amounts": Array [
+            Object {
+                "amount": String("-3000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-3000.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(60),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-005"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 03"),
+            },
+            Object {
+                "amount": String("3000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260810"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000adb"),
+        "is_invoice": Bool(false),
+        "master_id": String("2779"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("16"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2782),
+        "amounts": Array [
+            Object {
+                "amount": String("-1100.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1100.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-CTL-001"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 01"),
+            },
+            Object {
+                "amount": String("1100.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260810"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ade"),
+        "is_invoice": Bool(false),
+        "master_id": String("2782"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("18"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2784),
+        "amounts": Array [
+            Object {
+                "amount": String("-1300.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1300.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("months"),
+                            "value": Number(2),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-CTL-002"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 01"),
+            },
+            Object {
+                "amount": String("1300.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260810"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ae0"),
+        "is_invoice": Bool(false),
+        "master_id": String("2784"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("19"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2768),
+        "amounts": Array [
+            Object {
+                "amount": String("1000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1000.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-001"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Party 02"),
+            },
+            Object {
+                "amount": String("-1000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260812"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ad0"),
+        "is_invoice": Bool(false),
+        "master_id": String("2768"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("1"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(2771),
+        "amounts": Array [
+            Object {
+                "amount": String("1500.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1500.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(45),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-002"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Party 03"),
+            },
+            Object {
+                "amount": String("-1500.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260812"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ad3"),
+        "is_invoice": Bool(false),
+        "master_id": String("2771"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("2"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(2774),
+        "amounts": Array [
+            Object {
+                "amount": String("2000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("2000.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("months"),
+                            "value": Number(2),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-003"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Party 01"),
+            },
+            Object {
+                "amount": String("-2000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260812"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ad6"),
+        "is_invoice": Bool(false),
+        "master_id": String("2774"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("3"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(2777),
+        "amounts": Array [
+            Object {
+                "amount": String("2500.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("2500.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("weeks"),
+                            "value": Number(3),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-004"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Party 02"),
+            },
+            Object {
+                "amount": String("-2500.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260812"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ad9"),
+        "is_invoice": Bool(false),
+        "master_id": String("2777"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("4"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(2780),
+        "amounts": Array [
+            Object {
+                "amount": String("3000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("3000.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(60),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-005"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Party 03"),
+            },
+            Object {
+                "amount": String("-3000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260812"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000adc"),
+        "is_invoice": Bool(false),
+        "master_id": String("2780"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("5"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(2783),
+        "amounts": Array [
+            Object {
+                "amount": String("1100.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1100.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-CTL-001"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Party 01"),
+            },
+            Object {
+                "amount": String("-1100.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260812"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000adf"),
+        "is_invoice": Bool(false),
+        "master_id": String("2783"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("6"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(2785),
+        "amounts": Array [
+            Object {
+                "amount": String("1300.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1300.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("months"),
+                            "value": Number(2),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-CTL-002"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Party 01"),
+            },
+            Object {
+                "amount": String("-1300.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260812"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ae1"),
+        "is_invoice": Bool(false),
+        "master_id": String("2785"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("7"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(2769),
+        "amounts": Array [
+            Object {
+                "amount": String("-400.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-400.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-001"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 02"),
+            },
+            Object {
+                "amount": String("400.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260814"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ad1"),
+        "is_invoice": Bool(false),
+        "master_id": String("2769"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("9"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2772),
+        "amounts": Array [
+            Object {
+                "amount": String("-600.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-600.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(45),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-002"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 03"),
+            },
+            Object {
+                "amount": String("600.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260814"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ad4"),
+        "is_invoice": Bool(false),
+        "master_id": String("2772"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("11"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2775),
+        "amounts": Array [
+            Object {
+                "amount": String("-750.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-750.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("months"),
+                            "value": Number(2),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-003"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 01"),
+            },
+            Object {
+                "amount": String("750.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260814"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ad7"),
+        "is_invoice": Bool(false),
+        "master_id": String("2775"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("13"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2778),
+        "amounts": Array [
+            Object {
+                "amount": String("-900.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-900.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("weeks"),
+                            "value": Number(3),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-004"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 02"),
+            },
+            Object {
+                "amount": String("900.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260814"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000ada"),
+        "is_invoice": Bool(false),
+        "master_id": String("2778"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("15"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2781),
+        "amounts": Array [
+            Object {
+                "amount": String("-1200.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1200.00"),
+                        "bill_date": String("20260810"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(60),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("RO-INV-005"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("RO Party 03"),
+            },
+            Object {
+                "amount": String("1200.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("RO Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260814"),
+        "guid": String("ec4454ae-5c4c-4bfa-b3b0-68182a749689-00000add"),
+        "is_invoice": Bool(false),
+        "master_id": String("2781"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("17"),
+        "voucher_type": String("Sales"),
+    },
+])

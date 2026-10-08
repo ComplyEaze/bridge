@@ -1,0 +1,115 @@
+# fixture: tests/fixtures/builtin_cash_flow_corpus_dense_fy_empty_live.utf16le.xml
+# parser: parse_native_cash_flow(20250401..20260331)
+# source: captured
+Ok(NativeCashFlow {
+    rows: [
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 4,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 5,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 6,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 7,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 8,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 9,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 10,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 11,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 12,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 1,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 2,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 3,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+    ],
+})

@@ -1,0 +1,11 @@
+# fixture: agent/register-e2e/native-register-e2e-marks.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE GST RECON LAB",
+        guid: "ae1490be-52c5-4544-9ffc-4b7da85f9797",
+        vouchers: 59,
+        masters: 288,
+    },
+])

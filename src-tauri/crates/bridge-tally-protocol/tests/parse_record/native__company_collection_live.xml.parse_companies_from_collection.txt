@@ -1,0 +1,29 @@
+# fixture: tests/fixtures/native/company_collection_live.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "Aarav Trading Company Demo",
+        guid: Some(
+            "bb8ad19e-6aef-4239-a917-87fec0c6215e",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "Bridge Ageing Lab",
+        guid: Some(
+            "eebb9a9f-1679-4468-9e8f-814c729674cb",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+    TallyCompany {
+        name: "Bridge Billwise Lab",
+        guid: Some(
+            "75f7566d-7a4f-431a-9642-e93a9d06d57d",
+        ),
+        company_number: None,
+        books_from: None,
+    },
+])

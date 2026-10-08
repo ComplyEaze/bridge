@@ -311,7 +311,10 @@ impl From<NativeMastersError> for NativeStockError {
             | NativeMastersError::RowFieldInvalid(_)
             | NativeMastersError::DuplicateGuid
             | NativeMastersError::DuplicateName
-            | NativeMastersError::VoucherTypesEmpty => Self::Malformed("stock_response_malformed"),
+            | NativeMastersError::VoucherTypesEmpty
+            | NativeMastersError::CostCategoriesEmpty => {
+                Self::Malformed("stock_response_malformed")
+            }
         }
     }
 }
@@ -531,7 +534,15 @@ fn read_row_fields(
                     }
                 }
             }
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(row_element) => break,
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(row_element) =>
+            {
+                break
+            }
             Event::Text(text) => refuse_stray_text(&text)?,
             Event::CData(_) | Event::GeneralRef(_) => {
                 return Err(NativeStockError::Malformed("stock_unexpected_text"))

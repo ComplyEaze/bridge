@@ -1,0 +1,30 @@
+# fixture: tests/fixtures/live_education_w7_baddate_sanitized.xml
+# parser: parse_import_evidence
+# source: synthetic: not evidence of what Tally sends
+Ok(ParsedImportEvidenceFields {
+    application_status: NotReported,
+    counters: TallyImportResult {
+        created: 0,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 1,
+        line_error_count: 1,
+        counter_presence: TallyImportCounterPresence {
+            created: true,
+            altered: true,
+            deleted: true,
+            ignored: true,
+            errors: true,
+            cancelled: true,
+            exceptions: true,
+        },
+    },
+    exceptions_were_reported: true,
+    response_sha256: "c620db7381ee910b6c3c922b54dbe61708a1166506c39086ba4cb3f3ca3424af",
+    line_error_sha256: [
+        "2018a893479241227cf9be0807b0df0b77176e7fd6d25d768b9dbe4bb9c0de67",
+    ],
+})

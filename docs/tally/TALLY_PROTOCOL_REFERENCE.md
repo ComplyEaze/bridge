@@ -405,6 +405,9 @@ base revision.
 <a id="12a16-cash-flow-and-its-sibling-built-in-reports-by-name-on-licensed-71"></a>
 
 [12a.16 Cash Flow and its sibling built-in reports by name on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a16-cash-flow-and-its-sibling-built-in-reports-by-name-on-licensed-71)
+<a id="12a17-cost-centres-and-categories-are-returned-whatever-the-companys-setting-reads-an-imported-allocation-is-stored-although-it-reads-no"></a>
+
+[12a.17 Cost centres and categories are returned whatever the company's setting reads; an imported allocation is stored although it reads No](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a17-cost-centres-and-categories-are-returned-whatever-the-companys-setting-reads-an-imported-allocation-is-stored-although-it-reads-no)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

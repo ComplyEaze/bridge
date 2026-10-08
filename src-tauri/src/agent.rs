@@ -1363,6 +1363,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              the limits for an invoice, and nothing was written. Build once more; if the \
              refusal repeats, tell the user this invoice has to be entered in Tally itself.",
         ),
+        "import_invoice_figures_unreadable" => Some(
+            "An invoice of this batch has an amount or a date ComplyEaze Bridge cannot read, so \
+             it cannot tell whether that invoice is already in the book, and nothing was sent. \
+             Build the invoice again from its values; if the refusal repeats, tell the user this \
+             invoice has to be entered in Tally itself.",
+        ),
         // A date argument a caller can correct. `TallyDate` admits years 0001
         // to 9999, and the edge codes come from widening an empty window past
         // either end of that (#1268).
@@ -2915,6 +2921,9 @@ fn attach_build_egress_failure(response: &mut Value) -> bool {
     true
 }
 
+#[cfg(test)]
+#[path = "agent_parse_record_tests.rs"]
+mod parse_record_tests;
 #[cfg(test)]
 #[path = "agent_tests.rs"]
 mod tests;

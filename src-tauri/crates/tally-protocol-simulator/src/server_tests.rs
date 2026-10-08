@@ -73,3 +73,48 @@ fn read_request_enforces_deadline_while_a_peer_drip_feeds_bytes() {
         "the read outlived the drip feed, so the deadline did not end it"
     );
 }
+
+#[test]
+fn a_plan_that_no_request_reaches_is_named_by_its_place_in_the_sequence() {
+    // The first request is queued on the listener before serving starts, as a
+    // client's is when it connects before the worker runs (#1248). So only the
+    // second plan can wait out the deadline, and a stall can only lengthen that.
+    let listener = bind_loopback_listener().expect("bind loopback listener");
+    listener
+        .set_nonblocking(true)
+        .expect("set the listener non-blocking");
+    let address = listener.local_addr().expect("read listener address");
+    let mut client = TcpStream::connect(address).expect("connect before serving starts");
+    client
+        .write_all(b"GET /status HTTP/1.1\r\n\r\n")
+        .expect("queue the first request");
+    let status = || {
+        ScenarioPlan::new(crate::Fixture::ProductStatus(
+            crate::ProductStatus::TallyPrime,
+        ))
+    };
+    let received = Arc::new(AtomicUsize::new(0));
+
+    let error = serve_sequence(
+        listener,
+        vec![status(), status()],
+        Arc::new(AtomicBool::new(false)),
+        Arc::clone(&received),
+        Duration::from_secs(1),
+    )
+    .expect_err("no request reaches the second plan");
+
+    assert_eq!(
+        received.load(Ordering::Acquire),
+        1,
+        "the queued request is served"
+    );
+    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+    assert_eq!(
+        error
+            .get_ref()
+            .and_then(|inner| inner.downcast_ref::<NoRequestForPlan>()),
+        Some(&NoRequestForPlan { plan: 1, plans: 2 })
+    );
+    drop(client);
+}

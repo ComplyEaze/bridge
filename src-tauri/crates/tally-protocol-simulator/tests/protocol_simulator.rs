@@ -266,6 +266,41 @@ fn a_failed_simulator_dropped_while_a_test_panics_leaves_that_panic_alone() {
     );
 }
 
+#[test]
+fn dropping_a_simulator_whose_worker_panicked_fails_the_test() {
+    // The worker panics through an existing route, not a test seam: a header
+    // delay of `Duration::MAX` overflows `Instant::now() + delay` while it
+    // holds the response, and std panics on an `Instant` it cannot represent.
+    let simulator = Simulator::spawn(
+        ScenarioPlan::new(Fixture::ExportStatusOne)
+            .with_delivery(Delivery::SlowHeaders(Duration::MAX)),
+    )
+    .expect("spawn simulator");
+    let mut stream = TcpStream::connect(simulator.address()).expect("connect loopback simulator");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .expect("set read timeout");
+    stream
+        .write_all(
+            b"POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        )
+        .expect("write synthetic request");
+    // The connection closes as the worker unwinds, after its panic began.
+    let mut response = Vec::new();
+    stream
+        .read_to_end(&mut response)
+        .expect("the simulator closes the connection");
+    assert!(response.is_empty(), "a panicked worker sends nothing");
+
+    let payload = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(simulator)))
+        .expect_err("dropping a panicked simulator fails the test");
+
+    assert_eq!(
+        payload.downcast_ref::<&str>(),
+        Some(&"simulator worker panicked")
+    );
+}
+
 fn element_values(xml: &str, element_name: &[u8]) -> Result<Vec<String>, String> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);

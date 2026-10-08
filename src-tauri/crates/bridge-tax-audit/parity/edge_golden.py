@@ -77,7 +77,9 @@ closing_value?}}, default {}), `stock_opening` and `stock_closing` ({as_of, rows
 rate?}}}), each quantity a number, each value or rate integer paise, absent or null meaning None, and
 `is_integrated` (true, false, or absent/null for unknown); and for `party_monthly`: `cash`, `bank` (both also
 passed to the module invariant, as the reference's pack passes them) and `period` as above, and `top_n` (a non-negative integer, default the module's PARTY_TOP_N; Python would slice
-a negative one from the end, which the Rust `usize` cannot express, so both sides refuse it).
+a negative one from the end, which the Rust `usize` cannot express, so both sides refuse it); and for
+`narration_payees`: `narration_payee_ledgers` (a list of text, default []), `bank` (also passed to the
+module invariant) and the keys `tds_payees` reads, whose result gives the 194C ledgers it adds.
 """
 from __future__ import annotations
 
@@ -359,6 +361,16 @@ def main() -> int:
             client_state=tc.client_state(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg),
             deductor_activity=tc.deductor_activity(cfg), goods_carriage_ledgers=tc.tds_goods_carriage_ledgers(cfg))
 
+    def narration_payees_run():
+        from tae.audit_tests import narration_payees
+        configured = frozenset(typed(spec, "narration_payee_ledgers",
+                                     lambda x: isinstance(x, list) and all(isinstance(t, str) for t in x),
+                                     "a list of text", absent=[], nullable=False))
+        added = narration_payees.unnamed_194c_ledgers(book, tds_payees_run()[1], dict(spec.get("nature_by_ledger", {})))
+        module = SimpleNamespace(TEST_ID=narration_payees.TEST_ID, check_invariants=lambda e, res:
+                                 narration_payees.check_invariants(e, res, bank, configured | added))
+        return module, narration_payees.run(eng, rules, bank, configured, added_ledgers=added)
+
     def specified_persons_run():
         # As the pack's runner: related_parties_cl23 on the same table first, its result this test's input.
         rp = related_parties_config({"related_parties": spec.get("related_parties", {})})
@@ -400,6 +412,7 @@ def main() -> int:
         "high_value_register": high_value_register_run,
         "ledger_scrutiny": lambda: (ledger_scrutiny, ledger_scrutiny.run(eng, rules, cash)),
         "loans_interest": loans_interest_run,
+        "narration_payees": narration_payees_run,
         "partners_40b_194t": lambda: (partners_40b_194t, partners_40b_194t.run(
             eng, rules, {k: dict(v) for k, v in spec.get("partners", {}).items()}, spec.get("deed"),
             tds_ledgers=frozenset(spec.get("tds_payable_ledgers", [])))),

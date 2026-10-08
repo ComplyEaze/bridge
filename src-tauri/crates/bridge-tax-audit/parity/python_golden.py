@@ -312,6 +312,16 @@ def _loans_interest(c):
         turnover_is_placeholder=turnover_is_placeholder(c.cfg))
 
 
+def _narration_payees(c):
+    from tae.audit_tests import narration_payees
+    from tae.config import tds_config
+    configured = frozenset(c.cfg.get("roles", {}).get("narration_payee_ledgers", []))
+    added = narration_payees.unnamed_194c_ledgers(c.eng.book, _tds_payees(c)[1], tds_config(c.cfg)[0])
+    module = SimpleNamespace(TEST_ID=narration_payees.TEST_ID, check_invariants=lambda eng, result:
+                             narration_payees.check_invariants(eng, result, c.bank, configured | added))
+    return module, narration_payees.run(c.eng, c.rules, c.bank, configured, added_ledgers=added)
+
+
 def _partners_40b_194t(c):
     from tae.audit_tests import partners_40b_194t
     from tae.config import partners_config, tds_payable_ledgers
@@ -498,6 +508,7 @@ RUNNERS = {
     "high_value_register": _high_value_register,
     "ledger_scrutiny": _ledger_scrutiny,
     "loans_interest": _loans_interest,
+    "narration_payees": _narration_payees,
     "partners_40b_194t": _partners_40b_194t,
     "party_monthly": _party_monthly,
     "read_scope": _read_scope,

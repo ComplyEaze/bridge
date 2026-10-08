@@ -42,6 +42,11 @@ pub enum AuditError {
     /// the reference does), so a firm with none is not refused there.
     #[error("a voucher GUID holds a NUL character, so two vouchers would take one key")]
     VoucherKeysNotUnique,
+    /// A test's own invariant check cannot finish where the reference's stops with an internal
+    /// error after forming the message carried here (`narration_payees`' NP-2 on a cited GUID
+    /// whose last population voucher has no bank leg; its spec pack's README section 13).
+    #[error("module check stopped: {0}")]
+    ModuleCheck(String),
     #[error("{path}: {source}")]
     Io {
         path: String,

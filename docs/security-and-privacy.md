@@ -3,14 +3,18 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it). Two
+page was not read again at it, except as said below). Two
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), and the note on how long a
 `ledger_movement` read took, in section 2 (#1366). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
-commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again,
+commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
+(except the sentences on who opens a bank statement PDF, what PDFium is inferred
+to read, and what is built from this repository, which were read at the tag
+`mcp-v0.5.0` and again at commit `a3c1bb9d` in the pull request that changed
+them, #1416),
 and neither were the sentences in the other sections that describe 0.4.0 or
 0.4.1 only as history. Earlier releases differ: 0.4.0 to 0.4.2 ask you to
 accept Terms version 2026-10, not 2026-10.1. It was not tested on a running
@@ -313,13 +317,27 @@ not a code signature, no client checks it yet, and it does not show the code
 is safe. The package includes an unsigned
 third-party PDF library (PDFium, from a pinned release, checked by SHA-256 at
 build time), used only to read the bank statement PDF you name. **Not
-measured:** whether PDFium itself opens any network connection or file other
-than the named PDF.
+measured:** which files PDFium opens, and when, or whether it opens any network
+connection. What the source does show: ComplyEaze Bridge, not PDFium, opens the
+statement file. It reads the file itself, refusing one larger than 32 MiB, and hands
+PDFium the bytes; it reads the password file itself as well. PDFium probably
+also reads fonts installed on the computer. That is inferred, not observed: on
+the crate's synthetic test statements, which use a standard PDF font without
+embedding it, the word boxes come out shifted vertically by a constant, and the
+crate's note explains this as PDFium substituting an installed font. Which font
+file it opened was not observed.
 
 ## 6. Has it been independently reviewed?
 
 **No independent security audit has been done.** The project runs its own checks
-in CI, and everything is open source, but that is not an external review.
+in CI, but that is not an external review. This repository's source is public,
+under the Apache License 2.0, and the release workflow builds the program from
+it, with the Rust dependencies its lock file pins. The bundled PDFium is not
+built from this repository: it is a third-party build, downloaded from release
+`chromium/7881` of `bblanchon/pdfium-binaries` and shipped byte for byte as
+that release's archive holds it, and nothing here rebuilds it. It is under its own
+licences, not this repository's; the package reproduces its licence files in
+`THIRD_PARTY_LICENSES_PDFIUM.txt`.
 
 ## 7. Does it need administrator rights, or install anything else?
 

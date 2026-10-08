@@ -25,6 +25,10 @@ These changes are in source and not yet in a published build.
   ledger. A label the parser gives a line by its wording (bank charges, a card fee, an instalment) is not written as a party. Vouchers already imported keep their narration,
   but amending a batch built before this change rewrites the narrations of that batch's vouchers in the book.
   The name is part of the narration, so `mask_parties` does not shorten it and `drop_narration` removes it.
+  The hand-import script `scripts/bank_statement_import.py` now writes the same segment under the same rules, and
+  refuses a run whose narration holds a control character or the reserved marker, or runs past 2,000 characters, as
+  `narration_not_admissible`, as the app does. Importing its file again for a statement already imported rewrites
+  those vouchers' narrations in the book.
 
 **Fixed**
 

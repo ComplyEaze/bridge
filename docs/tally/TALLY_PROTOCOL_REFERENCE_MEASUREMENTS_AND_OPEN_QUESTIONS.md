@@ -324,10 +324,12 @@ request is predicted over a budget well below the cap.
   answers from the one observation; and a widened window whose data plan exceeded the read allowance was
   refused at planning, which no longer applies because no data part is sent (a census of several spans can
   still refuse mid-census when its count passes the allowance). A book that fits one request is read whole, uncounted, as before. Either way a voucher in the
-  window refuses the read as `window_contradicted`, and otherwise the empty result is corroborated or
+  window refuses the read as `window_contradicted` (a census of several requests whose marks moved refuses as
+  `voucher_window_changed_during_read` first), and otherwise the empty result is corroborated or
   reported partial by the existing empty-window control. **Confidence: PARTIAL**: the request counts are
   from scripted doubles through the tool call, not from a live Tally; for a neighbour-empty widened window
-  the census replaces one paired window read and so saves six requests, and with vouchers on the
+  a census of one request replaces one paired window read and so saves six requests (a census of
+  several requests adds a closing marks read, so a small widened window saves none), and with vouchers on the
   neighbouring days it saves every part those days would have taken. The saving is counted in requests;
   the bytes of a census and of the parts it replaces were not compared.
 - **AlterID 0.** Every span starts above an exclusive lower bound of 0, so a voucher with AlterID 0

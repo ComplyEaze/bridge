@@ -26,8 +26,9 @@ These changes are in source and not yet in a published build.
   requests is refused (`voucher_window_changed_during_read`) when the company's marks differ from the ones the
   first read opened on, as a divided read is; a count that took one request is not bracketed, where a widened
   window that used to be read in several parts was; and because no vouchers are read, a refusal that came from
-  reading them (a part that failed or was not admitted, a read plan over its allowance, a disagreement between
-  the count and the read) no longer happens. A book that fits one request is read as before. The request counts
+  reading them (a part that failed or was not admitted, a part Education cannot serve, a read plan that
+  could not be made or went over its allowance, a disagreement between the count and the read) no longer happens;
+  a count of several requests can still pass its own allowance. A book that fits one request is read as before. The request counts
   come from test doubles, not from a live Tally.
 - A voucher built from a bank statement and posted to a mapped ledger now ends its narration with
   `| Statement party: <name>`, the counterparty the statement printed (#1430). A line sent to suspense and a

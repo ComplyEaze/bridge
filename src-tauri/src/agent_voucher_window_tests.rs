@@ -3768,9 +3768,10 @@ async fn an_empty_widened_window_costs_a_census_and_the_mark() {
 
 /// #1240: under Education, an empty window on days Education serves (the 1st
 /// to the 31st) whose widened day either side it does not serve (the 30th) is
-/// refused at the corroboration's own census, before that census is sent: the
-/// census-only corroboration keeps the refusal the widened data read used to
-/// give, and cannot take a census Education answered empty for a corroboration.
+/// refused at the corroboration's own census, before that census is sent: on a
+/// counted book the widened read's own census gave the same refusal, and the
+/// census-only corroboration cannot take a census Education answered empty as
+/// a corroboration.
 #[tokio::test]
 async fn education_refuses_the_corroboration_census_of_a_widened_window_it_cannot_serve() {
     let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
@@ -3817,6 +3818,10 @@ async fn education_refuses_the_corroboration_census_of_a_widened_window_it_canno
     assert!(sent
         .iter()
         .all(|request| request.request_body_sha256 != request_sha(&widened)));
+    // 4 prelude legs, the marks read, the window's census and its read (six each),
+    // then the corroboration census's opening identity leg alone: the refusal is
+    // at the corroboration, not earlier.
+    assert_eq!(sent.len(), 4 + 3 * 6 + 1);
 }
 
 /// #985, #1029: one rule labels the window. A window the census counted is

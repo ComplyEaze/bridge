@@ -111,6 +111,12 @@ to `true` or `1` is not asked.
   - `drop_narration` removes narrations, and a search of vouchers by a phrase of
     their narration is refused under it. Apart from the error text noted below,
     it removes nothing else.
+  - A voucher built from a bank statement after the change that adds the label
+    “Statement party:” carries the counterparty's name, as the statement printed
+    it, at the end of its narration when its party is mapped to a ledger (a
+    party that is not mapped already has its name there). When narrations are
+    read, that name reaches the AI provider: `mask_parties` does not shorten a
+    name written inside a narration, and `drop_narration` removes it.
   - **What the new reads in 0.5.0 send, under each setting.** Under `none`
     everything below is sent as read.
     - Cash Flow sends month names, each month's amounts and the net total, and

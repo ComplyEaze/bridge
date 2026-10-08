@@ -51,6 +51,15 @@ pub const UNRESOLVED: &str = "UNRESOLVED";
 pub const UNNAMED: &str = "UNNAMED";
 pub const PARSER_SENTINELS: [&str; 2] = [UNRESOLVED, UNNAMED];
 
+/// The labels a parser returns for a line it recognises by its wording (a loan
+/// instalment, a card fee, bank charges) rather than by a name the statement
+/// printed. They can be mapped like a party, but they are not a counterparty.
+pub const PARSER_CATEGORIES: [&str; 4] = [EMI, DEBIT_CARD_FEE, BANK_CHARGES, CARD_ANNUAL_FEE];
+const EMI: &str = "EMI";
+const DEBIT_CARD_FEE: &str = "DEBIT CARD FEE";
+const BANK_CHARGES: &str = "BANK CHARGES";
+const CARD_ANNUAL_FEE: &str = "CARD ANNUAL FEE";
+
 /// The digit count of an ACH bank reference — **exactly** the observed length,
 /// not a minimum. A six-digit PIN code printed with a space made a reasoned
 /// lower bound misattribute `ACME-400 001` to `ACME`.
@@ -614,13 +623,13 @@ fn hdfc_party(row: &Row) -> String {
         return squash(&found[1]);
     }
     if narration.starts_with("EMI ") {
-        return "EMI".to_string();
+        return EMI.to_string();
     }
     if narration.starts_with("DEBIT CARD") {
-        return "DEBIT CARD FEE".to_string();
+        return DEBIT_CARD_FEE.to_string();
     }
     if narration.contains("INSTAALERTCHG") {
-        return "BANK CHARGES".to_string();
+        return BANK_CHARGES.to_string();
     }
     UNRESOLVED.to_string()
 }
@@ -687,7 +696,7 @@ fn ubi_party(row: &Row) -> String {
         return crate::cash::CASH_DEPOSIT.to_string();
     }
     if CARD_FEE.is_match(narration) {
-        return "CARD ANNUAL FEE".to_string();
+        return CARD_ANNUAL_FEE.to_string();
     }
     UNRESOLVED.to_string()
 }

@@ -165,7 +165,7 @@ async fn a_read_returns_three_settings_each_saying_what_it_rests_on_and_the_symb
         "not an ISO code",
         "are not returned",
         "Nothing this tool returns changes what another tool reads or refuses",
-        "zero-width characters in it are not refused",
+        "a bidirectional override or isolate, a zero-width or other invisible format character",
     ] {
         assert!(
             limitations
@@ -215,6 +215,8 @@ async fn a_blank_currency_symbol_is_not_reported() {
     let (response, _, _) = call(plans(blank), json!({"company_guid": GUID})).await;
     let result = result(&response);
     assert_eq!(result["base_currency"], json!({"state": "not_reported"}));
+    // a symbol Tally did not send is a gap in the symbol only, not in the settings
+    assert_eq!(result["state"], "observed");
     assert!(lead(&response).ends_with("Tally sent no currency symbol."));
 }
 

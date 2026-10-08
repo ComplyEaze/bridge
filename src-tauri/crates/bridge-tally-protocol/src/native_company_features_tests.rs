@@ -243,9 +243,26 @@ fn the_symbol_is_read_as_sent_and_a_missing_or_blank_one_is_not_reported() {
 }
 
 #[test]
-fn a_symbol_with_a_control_character_or_over_the_bound_refuses_the_read() {
+fn a_symbol_that_hides_text_or_is_over_the_bound_refuses_the_read() {
     let symbol = "<CURRENCYNAME TYPE=\"String\">\u{20b9}</CURRENCYNAME>";
-    for bad in ["A\u{7}B", "ABCDEFGHIJKLMNOPQ"] {
+    for bad in [
+        "A\u{7}B",
+        "ABCDEFGHIJKLMNOPQ",
+        // bidirectional override and isolate, zero-width space and joiner, a
+        // line separator and a tag character
+        "A\u{202e}B",
+        "A\u{2066}B",
+        "A\u{200b}B",
+        "A\u{200d}B",
+        "A\u{2028}B",
+        "A\u{e0041}B",
+        // a format character that is not default-ignorable (Arabic number
+        // sign), a default-ignorable one that is not a format character
+        // (combining grapheme joiner), and a paragraph separator
+        "A\u{600}B",
+        "A\u{34f}B",
+        "A\u{2029}B",
+    ] {
         let edited = mutate(
             symbol,
             &format!("<CURRENCYNAME TYPE=\"String\">{bad}</CURRENCYNAME>"),

@@ -85,7 +85,7 @@ impl Server {
                     "Nothing this tool returns changes what another tool reads or refuses: stock_summary reads its own inventory, integrated and batch-wise flags from its own request",
                     "Measured on three synthetic books of one TallyPrime 7.1 Silver; other releases are not measured",
                     "Tally's answer carries no identity beyond the row's own GUID, name, company number and books-from date, which are compared with the verified company's, and the mode and book-extent checks around the read",
-                    "The currency symbol is refused if it is over 16 characters or holds a control character; zero-width characters in it are not refused",
+                    "The currency symbol is refused if it is over 16 characters or holds a control character, a bidirectional override or isolate, a zero-width or other invisible format character, or a line or paragraph separator",
                 ],
             },
         });

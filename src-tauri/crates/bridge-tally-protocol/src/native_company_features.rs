@@ -109,7 +109,7 @@ pub enum NativeCompanyFeaturesError {
     CompanyMismatch(&'static str),
     /// A setting element that is empty or says anything but `Yes` or `No`.
     SettingInvalid(&'static str),
-    /// A currency symbol with a control character or over the bound.
+    /// A currency symbol over the bound or with a character that hides text.
     CurrencyInvalid,
     /// A GUID that could break the filter formula's string.
     GuidUnsupported,
@@ -237,12 +237,32 @@ fn setting(
     }
 }
 
+/// A character that draws nothing or can change how the text around it reads:
+/// a control character, a line or paragraph separator, or a format or
+/// default-ignorable character (bidirectional overrides and isolates,
+/// zero-width marks, tag characters). The set of invisible characters the
+/// headline's company name drops; here the symbol is refused instead, so it
+/// cannot reorder or hide the words around it.
+fn hides_text(character: char) -> bool {
+    use icu_properties::{
+        props::{DefaultIgnorableCodePoint, GeneralCategory},
+        CodePointMapData, CodePointSetData,
+    };
+    character.is_control()
+        || CodePointSetData::new::<DefaultIgnorableCodePoint>().contains(character)
+        || matches!(
+            CodePointMapData::<GeneralCategory>::new().get(character),
+            GeneralCategory::Format
+                | GeneralCategory::LineSeparator
+                | GeneralCategory::ParagraphSeparator
+        )
+}
+
 fn currency(text: Option<String>) -> Result<NativeCurrencySymbol, NativeCompanyFeaturesError> {
     match text.as_deref().map(str::trim) {
         None | Some("") => Ok(NativeCurrencySymbol::NotReported),
         Some(symbol)
-            if symbol.chars().count() > MAX_SYMBOL_CHARS
-                || symbol.chars().any(char::is_control) =>
+            if symbol.chars().count() > MAX_SYMBOL_CHARS || symbol.chars().any(hides_text) =>
         {
             Err(NativeCompanyFeaturesError::CurrencyInvalid)
         }

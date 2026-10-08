@@ -274,9 +274,10 @@ pub fn extract_pages(engine: &PdfEngine, pdf: &[u8], password: &str) -> Result<V
 ///
 /// PDFium's own generated characters (the spaces and line breaks it inserts)
 /// have no text object, so asking them for a render mode is an error, which
-/// reads here as drawn, as before. Measured on the synthetic fixtures (Courier,
-/// `Tj` only): every generated character answers with an error and every other
-/// character with its mode. Real statements may use text operators and fonts
+/// reads here as drawn, as before. Seen in one local run on the synthetic
+/// fixtures (Courier, `Tj` only), and not asserted by a committed test: every
+/// generated character answered with an error and every other character with
+/// its mode. Real statements may use text operators and fonts
 /// the fixtures do not (`TJ` kerning, composite fonts, Type 3): whether any
 /// character there has no render mode is not measured.
 ///

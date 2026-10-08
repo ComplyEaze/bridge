@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::BTreeMap;
 use std::fs::OpenOptions;
 
 fn line() -> ImportLedgerLine {
@@ -523,6 +524,57 @@ fn rollback_failure_retains_recovery_material_and_blocks_import_admission() {
         server.lock_import_admission_shared().err(),
         Some("proof_publication_recovery_required".into())
     );
+}
+
+/// Every file under `directory`, by name: its bytes and, on Unix, its inode,
+/// so a file replaced by one with the same bytes still reads as changed.
+fn files(directory: &Path) -> BTreeMap<String, (Vec<u8>, u64)> {
+    let mut found = BTreeMap::new();
+    for entry in fs::read_dir(directory).unwrap() {
+        let entry = entry.unwrap();
+        if !entry.file_type().unwrap().is_file() {
+            continue;
+        }
+        #[cfg(unix)]
+        let identity = std::os::unix::fs::MetadataExt::ino(&entry.metadata().unwrap());
+        #[cfg(not(unix))]
+        let identity = 0;
+        found.insert(
+            entry.file_name().into_string().unwrap(),
+            (fs::read(entry.path()).unwrap(), identity),
+        );
+    }
+    found
+}
+
+/// Every file of `before` is still there, the same file with the same bytes;
+/// a journal (`.jsonl`) may only have grown, its earlier bytes kept as they were.
+fn assert_kept(before: &BTreeMap<String, (Vec<u8>, u64)>, directory: &Path) {
+    let after = files(directory);
+    for (name, (bytes, identity)) in before {
+        let (now, now_identity) = after
+            .get(name)
+            .unwrap_or_else(|| panic!("{name} was removed"));
+        assert_eq!(now_identity, identity, "{name} was replaced");
+        if name.ends_with(".jsonl") {
+            assert!(now.starts_with(bytes), "{name} lost earlier bytes");
+        } else {
+            assert_eq!(now, bytes, "{name} was rewritten");
+        }
+    }
+}
+
+#[test]
+fn a_record_written_once_is_whole_alone_and_never_replaced() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("batch.masters_verdict.json");
+    assert_eq!(write_record_once(&path, b"first"), Ok(()));
+    let kept = files(directory.path());
+    assert_eq!(kept.len(), 1, "the stage is gone");
+    assert!(crate::local_files::file::open_local_file(&path, false).is_ok());
+    assert_eq!(write_record_once(&path, b"second"), Err(RecordOnce::Exists));
+    assert_kept(&kept, directory.path());
+    assert_eq!(files(directory.path()).len(), 1);
 }
 
 #[test]

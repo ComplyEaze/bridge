@@ -126,12 +126,25 @@ fn import_class(name: &str) -> &'static str {
         || name.ends_with(".masters_ack.json")
         || name.ends_with(".batch_step_doubt.json")
         || name.ends_with(".batch_step_ack.json")
+        || name.ends_with(".masters_verdict.json")
         || name.ends_with(".baseline.json")
+        || is_baseline_addition(name)
     {
         "review_records"
     } else {
         "other"
     }
+}
+
+/// `<batch>.baseline.<n>.json`, one addition to a build's baseline (#911).
+fn is_baseline_addition(name: &str) -> bool {
+    name.strip_suffix(".json")
+        .and_then(|stem| stem.rsplit_once('.'))
+        .is_some_and(|(stem, index)| {
+            stem.ends_with(".baseline")
+                && !index.is_empty()
+                && index.bytes().all(|byte| byte.is_ascii_digit())
+        })
 }
 
 type ClassOf = fn(&str) -> &'static str;

@@ -871,29 +871,85 @@ async fn an_amendment_of_a_voucher_altered_or_never_verified_writes_nothing() {
 #[test]
 fn a_verified_baseline_file_is_written_once_per_voucher() {
     let directory = tempfile::tempdir().unwrap();
-    let proof = |alter_id: u64| json!({"vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":alter_id}]});
-    record_verified_baseline(directory.path(), ORIGINAL, &proof(40)).unwrap();
-    let first = std::fs::read(directory.path().join(format!("{ORIGINAL}.baseline.json"))).unwrap();
+    let addition =
+        |index: usize| verified_baseline_addition_path(directory.path(), ORIGINAL, index);
+    let proof = |vouchers: &[(&str, u64)]| {
+        json!({"vouchers": vouchers
+            .iter()
+            .map(|(txn_id, alter_id)| json!({"bridge_txn_id":txn_id,"status":"posted_verified","alter_id":alter_id}))
+            .collect::<Vec<_>>()})
+    };
+    record_verified_baseline(directory.path(), ORIGINAL, &proof(&[("txn-001", 40)])).unwrap();
+    let first = std::fs::read(addition(1)).unwrap();
     // A later verification after an edit reports the voucher posted at a
-    // higher ALTERID; the file keeps the first.
-    record_verified_baseline(directory.path(), ORIGINAL, &proof(41)).unwrap();
-    assert_eq!(
-        std::fs::read(directory.path().join(format!("{ORIGINAL}.baseline.json"))).unwrap(),
-        first
-    );
-    assert_eq!(
-        read_verified_baseline(directory.path(), ORIGINAL)
-            .unwrap()
-            .vouchers["txn-001"],
-        40
-    );
-    // An unreadable file is never rewritten.
-    std::fs::write(
-        directory.path().join(format!("{ORIGINAL}.baseline.json")),
-        b"{",
+    // higher ALTERID; nothing is written and the first value stays.
+    record_verified_baseline(directory.path(), ORIGINAL, &proof(&[("txn-001", 41)])).unwrap();
+    assert!(!addition(2).exists());
+    // A voucher verified for the first time goes to a file of its own; the
+    // earlier file is not touched (#911).
+    record_verified_baseline(
+        directory.path(),
+        ORIGINAL,
+        &proof(&[("txn-001", 41), ("txn-002", 52)]),
     )
     .unwrap();
-    assert!(record_verified_baseline(directory.path(), ORIGINAL, &proof(42)).is_err());
+    assert_eq!(std::fs::read(addition(1)).unwrap(), first);
+    let second: amend::VerifiedBaseline =
+        serde_json::from_slice(&std::fs::read(addition(2)).unwrap()).unwrap();
+    assert_eq!(
+        second.vouchers,
+        BTreeMap::from([("txn-002".to_string(), 52)])
+    );
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([
+            ("txn-001".to_string(), 40),
+            ("txn-002".to_string(), 52)
+        ]))
+    );
+    // An unreadable file is never added to, and the baseline reads as none.
+    std::fs::write(addition(1), b"{").unwrap();
+    assert!(
+        record_verified_baseline(directory.path(), ORIGINAL, &proof(&[("txn-003", 60)])).is_err()
+    );
+    assert!(!addition(3).exists());
+    assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
+}
+
+#[test]
+fn an_older_builds_baseline_is_read_first_and_never_touched() {
+    let directory = tempfile::tempdir().unwrap();
+    let legacy = verified_baseline_path(directory.path(), ORIGINAL);
+    std::fs::write(&legacy, br#"{"vouchers":{"txn-001":40}}"#).unwrap();
+    // An older build's stage, left by a stop before its rename.
+    let stage = directory
+        .path()
+        .join(format!("{ORIGINAL}.baseline.json.next"));
+    std::fs::write(&stage, b"older stage").unwrap();
+    let proof = json!({"vouchers":[
+        {"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":41},
+        {"bridge_txn_id":"txn-002","status":"posted_verified","alter_id":52}
+    ]});
+    record_verified_baseline(directory.path(), ORIGINAL, &proof).unwrap();
+    assert_eq!(
+        std::fs::read(&legacy).unwrap(),
+        br#"{"vouchers":{"txn-001":40}}"#
+    );
+    assert_eq!(std::fs::read(&stage).unwrap(), b"older stage");
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([
+            ("txn-001".to_string(), 40),
+            ("txn-002".to_string(), 52)
+        ]))
+    );
+    // An addition that repeats a recorded voucher proves nothing about which
+    // value came first: no baseline.
+    std::fs::write(
+        verified_baseline_addition_path(directory.path(), ORIGINAL, 2),
+        br#"{"vouchers":{"txn-001":41}}"#,
+    )
+    .unwrap();
     assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
 }
 
@@ -905,7 +961,7 @@ fn a_verified_baseline_past_the_record_bound_is_no_baseline() {
     let proof =
         json!({"vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":40}]});
     record_verified_baseline(directory.path(), ORIGINAL, &proof).unwrap();
-    let path = verified_baseline_path(directory.path(), ORIGINAL);
+    let path = verified_baseline_addition_path(directory.path(), ORIGINAL, 1);
     let record = std::fs::read(&path).unwrap();
     std::fs::write(
         &path,
@@ -1039,22 +1095,26 @@ fn the_build_whose_record_equals_the_book_admits_even_when_not_first() {
     assert_eq!(refused[0]["reason"], "voucher_never_verified");
 }
 
+#[cfg(unix)]
 #[test]
 fn a_failed_baseline_write_leaves_the_previous_file_whole() {
+    use std::os::unix::fs::PermissionsExt;
     let directory = tempfile::tempdir().unwrap();
     let proof = |txn_id: &str, alter_id: u64| json!({"vouchers":[{"bridge_txn_id":txn_id,"status":"posted_verified","alter_id":alter_id}]});
     record_verified_baseline(directory.path(), ORIGINAL, &proof("txn-001", 40)).unwrap();
-    let path = directory.path().join(format!("{ORIGINAL}.baseline.json"));
+    let path = verified_baseline_addition_path(directory.path(), ORIGINAL, 1);
     let before = std::fs::read(&path).unwrap();
-    // The staged file cannot be written: the write fails before the rename.
-    std::fs::create_dir(
-        directory
-            .path()
-            .join(format!("{ORIGINAL}.baseline.json.next")),
-    )
-    .unwrap();
-    assert!(record_verified_baseline(directory.path(), ORIGINAL, &proof("txn-002", 52)).is_err());
+    // Nothing can be staged in the folder: the write fails before the link.
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o500)).unwrap();
+    let result = record_verified_baseline(directory.path(), ORIGINAL, &proof("txn-002", 52));
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(result.is_err());
     assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([("txn-001".to_string(), 40)]))
+    );
 }
 
 /// A rebuild of the captured batch with the first voucher's debtor leg moved to

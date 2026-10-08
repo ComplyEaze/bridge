@@ -306,9 +306,10 @@ or an owner decision to amend the requirement instead:
       refuses (`voucher_altered_since_verified`, or `voucher_never_verified` when no such build has
       a record). A voucher's `ALTERID` advances on every alteration (§9.3, measured over the
       gateway; an edit in Tally's own screens is not yet measured), so equality with any recorded
-      value means nothing has altered the voucher since that reading. The value is kept in a write-once
-      `<batch>.baseline.json` beside the proof, not in the journal, so an older binary still reads the
-      journal after a rollback. That catches an edit to any field made after the first verification,
+      value means nothing has altered the voucher since that reading. The values are kept beside the
+      proof, not in the journal: in `<batch>.baseline.json` as builds before #911 wrote it (rewritten
+      as it grew), and from #911 in one file per verification that adds a voucher,
+      `<batch>.baseline.<n>.json`, written once and never replaced. That catches an edit to any field made after the first verification,
       on the premise above. An edit made between the import and the first
       verification becomes part of the baseline and is not caught; every amendable batch was imported
       by hand, since a batch Bridge posted cannot be amended, so the build asks for a verify right

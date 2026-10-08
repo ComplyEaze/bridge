@@ -899,8 +899,14 @@ async fn a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_requ
                 &fs::read(imports.join(format!("{}.masters_check.json", line.batch_id))).unwrap(),
             )
             .unwrap();
+            // The masters verdict has a file of its own beside the pending
+            // mark (#911); the step verdict is kept in the check record.
+            let masters_verdict: Value = serde_json::from_slice(
+                &fs::read(imports.join(format!("{}.masters_verdict.json", line.batch_id))).unwrap(),
+            )
+            .unwrap();
             let verdict = if kind == "masters" {
-                &check
+                &masters_verdict
             } else {
                 &check["batch_step"]
             };
@@ -991,11 +997,8 @@ async fn an_unnamed_review_beside_a_doubt_without_its_file_is_refused_before_any
             fs::remove_dir_all(&step_doubt).unwrap();
         }
         assert_eq!(step_doubt.is_file(), !step_file_fails, "{code}");
-        // The check record holds both doubts, each marked when its file failed.
-        let check: Value = serde_json::from_slice(
-            &fs::read(imports.join(format!("{}.masters_check.json", line.batch_id))).unwrap(),
-        )
-        .unwrap();
+        // The records hold both doubts, each marked when its file failed.
+        let check = recorded_checks(&imports, &line.batch_id);
         assert_eq!(check["state"], "posted_under_changed_masters", "{check}");
         assert_eq!(check["doubt_record"], "unavailable", "{check}");
         assert_eq!(check["batch_step"]["state"], "unmatched", "{check}");
@@ -1053,12 +1056,9 @@ async fn two_doubts_without_their_files_are_refused_named_or_not() {
     fs::remove_dir_all(&step_doubt).unwrap();
     let masters_doubt = imports.join(format!("{}.masters_doubt.json", line.batch_id));
     assert!(masters_doubt.is_file(), "the masters doubt was written");
-    // The check record holds both doubts: the masters one unmarked, since its
-    // file was written, and the step one marked, since its file was not.
-    let check: Value = serde_json::from_slice(
-        &fs::read(imports.join(format!("{}.masters_check.json", line.batch_id))).unwrap(),
-    )
-    .unwrap();
+    // The records hold both doubts: the masters one unmarked, since its file
+    // was written, and the step one marked, since its file was not.
+    let check = recorded_checks(&imports, &line.batch_id);
     assert_eq!(check["state"], "posted_under_changed_masters", "{check}");
     assert_eq!(check["doubt_record"], Value::Null, "{check}");
     assert_eq!(check["batch_step"]["state"], "unmatched", "{check}");
@@ -2205,4 +2205,16 @@ async fn an_unreadable_record_beside_a_pending_check_answers_before_any_request(
     );
     assert!(approval.reviews().is_empty(), "no dialog");
     assert!(sent(simulator).is_empty(), "no request");
+}
+
+/// The masters verdict as its own file holds it, with the step verdict the
+/// check record keeps beside it (#911).
+fn recorded_checks(imports: &Path, batch_id: &str) -> Value {
+    let read = |name: &str| -> Value {
+        serde_json::from_slice(&fs::read(imports.join(format!("{batch_id}.{name}"))).unwrap())
+            .unwrap()
+    };
+    let mut verdict = read("masters_verdict.json");
+    verdict["batch_step"] = read("masters_check.json")["batch_step"].clone();
+    verdict
 }

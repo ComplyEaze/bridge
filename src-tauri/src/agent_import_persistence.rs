@@ -182,6 +182,49 @@ pub(super) fn publish_proofs(
     fs::remove_dir_all(&transaction).map_err(|_| "proof_publication_recovery_required".to_string())
 }
 
+/// Why a record could not be placed by [`write_record_once`].
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum RecordOnce {
+    /// The name already holds a record, which stays as it is.
+    Exists,
+    Failed,
+}
+
+/// Place `bytes` at `path` whole, only if nothing is there: staged under a
+/// name of its own, synced, then hard-linked, which fails when the name
+/// exists. The stage is then unlinked; if that fails, the new name is
+/// unlinked too (this call made it), because a record with a second link is
+/// refused by every reader (`open_local_file`) and would stick.
+pub(super) fn write_record_once(path: &Path, bytes: &[u8]) -> Result<(), RecordOnce> {
+    let staged = path.with_extension(format!("{}.next", Uuid::new_v4()));
+    write_private(&staged, bytes).map_err(|_| RecordOnce::Failed)?;
+    let linked = fs::hard_link(&staged, path);
+    let unstaged = fs::remove_file(&staged);
+    match linked {
+        Ok(()) if unstaged.is_ok() => {
+            // Make the new name durable; a record lost to a power failure
+            // reads as absent, never as someone else's.
+            sync_directory(path.parent().unwrap_or(path));
+            Ok(())
+        }
+        Ok(()) => {
+            let _ = fs::remove_file(path);
+            Err(RecordOnce::Failed)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Err(RecordOnce::Exists),
+        Err(_) => Err(RecordOnce::Failed),
+    }
+}
+
+fn sync_directory(directory: &Path) {
+    #[cfg(unix)]
+    {
+        let _ = fs::File::open(directory).and_then(|directory| directory.sync_all());
+    }
+    #[cfg(not(unix))]
+    let _ = directory;
+}
+
 #[cfg(test)]
 #[path = "agent_import_persistence_tests.rs"]
 mod tests;

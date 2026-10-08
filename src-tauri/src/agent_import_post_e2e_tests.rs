@@ -4059,11 +4059,24 @@ fn a_masters_verdict_never_clears_an_observed_doubt() {
         server.record_masters_verdict("batch-a", unchanged.clone()),
         doubt
     );
+    // A later doubt naming another ledger does not replace the first (#911).
+    assert_eq!(
+        server.record_masters_verdict(
+            "batch-a",
+            json!({"state":"posted_under_changed_masters","ledgers":["Bank"]})
+        ),
+        doubt
+    );
     assert_eq!(read_masters_check(&imports, "batch-a"), Some(doubt.clone()));
+    // Each verdict went to a file of its own; the pending mark is as written.
+    assert_eq!(
+        read_masters_record(&imports.join("batch-a.masters_check.json")),
+        Some(pending.clone())
+    );
 
-    // The check record cannot be written: a clear verdict stays pending, and
+    // The verdict record cannot be written: a clear verdict stays pending, and
     // an observed doubt is still kept by its own file.
-    block(imports.join("batch-b.masters_check.json"));
+    block(imports.join("batch-b.masters_verdict.json"));
     assert_eq!(server.record_masters_verdict("batch-b", unchanged), pending);
     assert_eq!(
         server.record_masters_verdict("batch-b", doubt.clone()),

@@ -1,6 +1,7 @@
 //! The Sales stop and its release (ADR 0004, slice 4), against a journal on
-//! disk and the tool call. Tally is not reachable in these tests (port 9): a
-//! release must not need it, and a read that cannot run is shown, never fatal.
+//! disk and the tool call. A release needs a Tally it can read: most tests
+//! answer the readback with the captured one (which holds none of these
+//! invoices), one reaches no Tally (port 9) and is refused.
 use super::*;
 use std::sync::Arc;
 
@@ -17,14 +18,14 @@ fn saved(server: &Server, voucher_type: &str) -> ImportLedgerLine {
         crate::tally::connection::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let id = format!("bridge-{}", Uuid::new_v4());
     let voucher = if voucher_type == "Sales" {
-        json!({"bridge_txn_id":"t1","date":"20260801","voucher_type":"Sales",
+        json!({"bridge_txn_id":"t1","date":"20260907","voucher_type":"Sales",
             "voucher_number":"BP/26-27/0010",
             "invoice":{"voucher_type_name":"Sales Manual","place_of_supply":"Rajasthan"},
             "narration":null,"reference":null,
             "entries":[{"ledger":"Customer","amount":"118.00","side":"Dr"},
                 {"ledger":"Sales","amount":"118.00","side":"Cr"}]})
     } else {
-        json!({"bridge_txn_id":"t1","date":"20260801","voucher_type":voucher_type,
+        json!({"bridge_txn_id":"t1","date":"20260907","voucher_type":voucher_type,
             "narration":null,"reference":null,"voucher_number":null,
             "entries":[{"ledger":"Cash","amount":"118.00","side":"Dr"},
                 {"ledger":"Bank","amount":"118.00","side":"Cr"}]})
@@ -33,7 +34,7 @@ fn saved(server: &Server, voucher_type: &str) -> ImportLedgerLine {
         "batch_id":id, "identity_scheme":"batch_v1", "company_guid":GUID,
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
-        "txn_ids":["t1"],"date_from":"20260801","date_to":"20260801",
+        "txn_ids":["t1"],"date_from":"20260907","date_to":"20260907",
         "sha256":"a".repeat(64),"built_at":"2026-08-01T00:00:00Z","status":"built",
         "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":7},
@@ -44,7 +45,8 @@ fn saved(server: &Server, voucher_type: &str) -> ImportLedgerLine {
     line
 }
 
-/// The batch as the post sent it: a dispatch intent on top of `saved`.
+/// The batch as the post sent it and Tally answered: a dispatch intent and a
+/// response on top of `saved`.
 fn dispatched(server: &Server, line: &ImportLedgerLine) {
     let _lock = server.lock_import_admission().unwrap();
     server
@@ -52,6 +54,16 @@ fn dispatched(server: &Server, line: &ImportLedgerLine) {
             line,
             "c".repeat(64),
             Uuid::new_v4(),
+        ))
+        .unwrap();
+    // Tally answered, and created nothing: the shape of a declined post.
+    server
+        .append_import_record_while_admitted(&ledger::StatusRecord::response(
+            line,
+            ledger::DispatchResponse {
+                request_sha256: "c".repeat(64),
+                ..super::super::tests::dispatch_response("success", 0, 0)
+            },
         ))
         .unwrap();
 }
@@ -87,13 +99,44 @@ fn result(response: &Value) -> &Value {
     &response["structuredContent"]["result"]
 }
 
-/// The one way past a stop is a person's click: it appends a release bound to
-/// the batch, shows what it is for, records that Tally could not be read, and
-/// survives a restart.
+/// A server whose Tally answers `cycles` readbacks with the captured book, in
+/// which none of these invoices is found.
+fn server_reading(directory: &std::path::Path, cycles: usize) -> (SequenceSimulator, Server) {
+    // One readback, and the closing profile probe its verification ends with.
+    let plans = (0..cycles)
+        .flat_map(|_| reconcile_readback().into_iter().chain(probe()))
+        .collect();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let server = server_at(simulator.address(), directory);
+    (simulator, server)
+}
+
+/// A book that cannot be read is refused, before any dialog: a release made
+/// blind would drop a possibly posted invoice from the number control.
 #[tokio::test]
-async fn a_release_needs_the_person_works_without_tally_and_survives_a_restart() {
+async fn a_release_is_refused_while_tally_cannot_be_read() {
     let directory = tempfile::tempdir().unwrap();
     let server = server_without_tally(directory.path());
+    let line = saved(&server, "Sales");
+    dispatched(&server, &line);
+    let approval = ScriptedApproval::approving();
+    let response = release(&server, args(&line), approval.clone()).await;
+    assert_eq!(
+        result(&response)["error"]["code"],
+        "ack_stop_tally_unreadable",
+        "{response}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog: {response}");
+    assert_eq!(stop(&server), Some(line.batch_id));
+}
+
+/// The one way past a stop is a person's click: it appends a release bound to
+/// the batch, shows what it is for and what was read, journals that nothing was
+/// found, and survives a restart.
+#[tokio::test]
+async fn a_release_needs_the_person_and_survives_a_restart() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_simulator, server) = server_reading(directory.path(), 2);
     let line = saved(&server, "Sales");
     dispatched(&server, &line);
     status(&server, &line, "verification_incomplete");
@@ -109,8 +152,8 @@ async fn a_release_needs_the_person_works_without_tally_and_survives_a_restart()
     );
     assert_eq!(stop(&server), Some(line.batch_id.clone()));
 
-    // Approved: the dialog says what is released, names the batch and says
-    // Tally could not be read; the release is journaled.
+    // Approved: the dialog says what is released, names the batch and what
+    // was read; the release is journaled.
     let approval = ScriptedApproval::approving();
     let response = release(&server, args(&line), approval.clone()).await;
     assert_eq!(result(&response)["state"], "stop_released", "{response}");
@@ -119,7 +162,7 @@ async fn a_release_needs_the_person_works_without_tally_and_survives_a_restart()
     let shown = &approval.reviews()[0];
     assert!(shown.contains("RELEASES THE INVOICE STOP"), "{shown}");
     assert!(shown.contains(&line.batch_id), "{shown}");
-    assert!(shown.contains("Tally could not be read"), "{shown}");
+    assert!(shown.contains("not found in Tally"), "{shown}");
     assert!(approval.previews().is_empty(), "not a post dialog");
     assert_eq!(stop(&server), None);
     // What the read found is journaled: nothing found, so the invoice is no
@@ -142,6 +185,21 @@ async fn a_release_needs_the_person_works_without_tally_and_survives_a_restart()
         "ack_stop_not_held",
         "{again}"
     );
+}
+
+/// Any voucher of the invoice present counts as found, however it reads; none
+/// present is not found.
+#[test]
+fn a_release_records_found_for_any_voucher_present() {
+    let counts = |verified, divergent, not_effective, not_found| {
+        json!({"counts":{"posted_verified":verified,"posted_divergent":divergent,
+            "posted_not_effective":not_effective,"not_found":not_found}})
+    };
+    assert!(super::super::super::stop::Seen::of(&counts(1, 0, 0, 0)).found());
+    assert!(super::super::super::stop::Seen::of(&counts(0, 1, 0, 0)).found());
+    assert!(super::super::super::stop::Seen::of(&counts(0, 0, 1, 0)).found());
+    assert!(!super::super::super::stop::Seen::of(&counts(0, 0, 0, 1)).found());
+    assert!(!super::super::super::stop::Seen::of(&json!({})).found());
 }
 
 /// What is not a stop cannot be released: a batch never sent, one holding no
@@ -193,7 +251,8 @@ async fn only_a_batch_that_stops_the_company_can_be_released() {
 #[tokio::test]
 async fn a_stop_that_changes_while_the_dialog_is_open_is_not_released() {
     let directory = tempfile::tempdir().unwrap();
-    let server = Arc::new(server_without_tally(directory.path()));
+    let (_simulator, server) = server_reading(directory.path(), 1);
+    let server = Arc::new(server);
     let line = saved(&server, "Sales");
     dispatched(&server, &line);
     let (other, other_line) = (Arc::clone(&server), line.clone());
@@ -276,4 +335,26 @@ fn the_build_asks_the_stop_under_its_lock_before_it_writes_a_file() {
         .find("let lineage = match payload.amends_batch_id")
         .expect("before the lineage and the written file");
     assert!(invoice_only < asked && asked < refused && refused < lineage);
+}
+
+/// A post refused for a stopped company names its reason and what to do, and
+/// is the refusal of a post that sent nothing.
+#[test]
+fn a_post_refused_for_a_stopped_company_says_what_to_do() {
+    let payload = super::super::reconciliation_failure_payload(
+        "bridge-00000000-0000-4000-8000-000000000001",
+        Some(false),
+        None,
+        "invoice_company_stopped",
+    );
+    let error = &payload["result"]["error"];
+    assert_eq!(error["code"], "invoice_company_stopped");
+    assert!(error["message"]
+        .as_str()
+        .unwrap()
+        .starts_with("Nothing was sent"));
+    assert!(error["next_step"]
+        .as_str()
+        .unwrap()
+        .contains("invoice_stop"));
 }

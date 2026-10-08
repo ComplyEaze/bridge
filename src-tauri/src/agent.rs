@@ -1333,10 +1333,17 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "An earlier invoice of this company was sent to Tally and is not verified posted, so \
              ComplyEaze Bridge builds and posts no further invoice for this company until a \
              person decides about it. The detail names its batch. Run verify_import on that \
-             batch: if it reads posted and verified, the stop lifts by itself. If it does not, \
-             tell the user to check that invoice in Tally, then call acknowledge_post_review \
-             with that batch_id and doubt invoice_stop: a native dialog asks the user, and \
-             nothing but their answer releases the stop.",
+             batch: if it reads posted and verified, the stop lifts by itself; a batch whose \
+             answer was lost or was not clean may never read so. If it does not, tell the \
+             user to check that invoice in Tally, then call acknowledge_post_review with that \
+             batch_id and doubt invoice_stop (available when posting is enabled): a native \
+             dialog asks the user, and nothing but their answer releases the stop.",
+        ),
+        "ack_stop_tally_unreadable" => Some(
+            "A release is recorded with what ComplyEaze Bridge can see of the invoice in \
+             Tally, so it needs a Tally it can read, and the read did not run. Nothing was \
+             recorded and no dialog was shown. Ask the user to open the company in Tally, and \
+             call again. A book that cannot be read cannot post an invoice either."
         ),
         "invoice_stop_unreadable" => Some(
             "ComplyEaze Bridge could not read its own import journal to see whether an earlier \

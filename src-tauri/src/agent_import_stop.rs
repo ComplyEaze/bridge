@@ -9,35 +9,48 @@
 //! bound to the batch and its sha256. A later `posted_verified` of that batch
 //! voids the release, so a divergence found after it stops the company again.
 //!
-//! It asks for no successful readback and no voucher row: a declined or deleted
-//! invoice reads back nothing, and a Tally that cannot be read is the very case
-//! a person has checked by hand. A fresh readback is tried so the dialog can
-//! say what ComplyEaze Bridge sees, and what it saw is recorded: an invoice it
-//! found stays the control for the next invoice number read, and one it did
+//! It needs no voucher row: a declined or deleted invoice reads back nothing,
+//! and that is a release. It does need the fresh readback to run, so the dialog
+//! can say what ComplyEaze Bridge sees, and what it saw is recorded: an invoice
+//! it found stays the control for the next invoice number read, and one it did
 //! not find no longer counts as sent.
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, VoucherCount};
 
 /// What the read made for the dialog saw of the batch's invoice.
-enum Seen {
-    /// At least one invoice of the batch was found in Tally and attributed to it.
+pub(super) enum Seen {
+    /// At least one voucher of the batch's invoice was found in Tally, however
+    /// it reads (verified, divergent, or cancelled or optional).
     Found,
     /// The read ran and found none.
     NotFound,
-    /// The read did not run, by its code.
-    Unreadable(String),
 }
 
 impl Seen {
-    fn found(&self) -> bool {
+    pub(super) fn of(result: &Value) -> Self {
+        let present = [
+            "posted_verified",
+            "posted_divergent",
+            "posted_not_effective",
+        ]
+        .iter()
+        .map(|state| counted(result, state))
+        .sum::<u64>();
+        if present > 0 {
+            Self::Found
+        } else {
+            Self::NotFound
+        }
+    }
+
+    pub(super) fn found(&self) -> bool {
         matches!(self, Self::Found)
     }
 
-    fn words(&self) -> String {
+    fn words(&self) -> &'static str {
         match self {
-            Self::Found => "found in Tally".into(),
-            Self::NotFound => "not found in Tally".into(),
-            Self::Unreadable(code) => format!("Tally could not be read ({code})"),
+            Self::Found => "found in Tally",
+            Self::NotFound => "not found in Tally",
         }
     }
 }
@@ -98,28 +111,22 @@ impl Server {
         }
         self.require_stop(&line)?;
 
-        // What Tally holds now, to show and to record. A failed read does not
-        // refuse the release: it is shown, and the person decides.
+        // What Tally holds now, to show and to record. The release needs the
+        // read to run: a book it cannot read could hold the invoice, and a
+        // release would then drop that invoice from the number control. A
+        // Tally that cannot be read posts nothing anyway, so the person
+        // releases once it can be.
         let mut rows = None;
-        let (seen, evidence) = match self.verify_for_review(args, &mut rows).await {
-            Ok(outcome) => {
-                let result = &outcome.payload["result"];
-                let seen =
-                    if counted(result, "posted_verified") + counted(result, "posted_divergent") > 0
-                    {
-                        Seen::Found
-                    } else {
-                        Seen::NotFound
-                    };
-                (seen, outcome.evidence)
+        let outcome = match self.verify_for_review(args, &mut rows).await {
+            Ok(outcome) => outcome,
+            Err(failure) => {
+                let mut refused = ToolFailure::from("ack_stop_tally_unreadable".to_string());
+                refused.evidence = failure.evidence;
+                return Err(refused);
             }
-            Err(failure) => (
-                Seen::Unreadable(failure.code.clone()),
-                super::super::evidence_from_runtime_read(
-                    crate::tally::runtime::RuntimeReadEvidence::empty(),
-                ),
-            ),
         };
+        let seen = Seen::of(&outcome.payload["result"]);
+        let evidence = outcome.evidence;
         // The read itself may have verified the batch: the stop is then gone,
         // and nothing is asked.
         let Some(held) = self.stop_held(&line)? else {

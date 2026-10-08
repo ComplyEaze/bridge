@@ -46,9 +46,13 @@ test("the PDFium marker is the variable the Rust override reads, under bare cfg(
   assert.ok(source.includes(`    #[cfg(test)]\n    if let Some(path) = ${lookup} {`));
 });
 
+// Named, not read from TEST_ONLY_MARKERS, so a marker dropped from that list fails here.
+const EXPECTED_MARKERS = [SEAM_MARKER, PDFIUM_OVERRIDE_MARKER];
+
 test("each marker alone marks a binary, and the refusal names it", () => {
+  assert.deepEqual(TEST_ONLY_MARKERS, EXPECTED_MARKERS);
   const directory = scratch();
-  for (const marker of TEST_ONLY_MARKERS) {
+  for (const marker of EXPECTED_MARKERS) {
     const file = binary(join(directory, marker), [marker]);
     assert.equal(holdsMarker(file), true, marker);
     assert.throws(() => assertNoTestSeam([file]), (error) => error.message.includes(`(${marker})`), marker);
@@ -202,7 +206,7 @@ test("the command line fails on a marked binary and on a control that sees nothi
   assert.equal(run("--expect-present", marked), 0);
   assert.equal(run("--expect-present", clean), 1);
   // A control that sees only some of the test-only code proves nothing about the rest.
-  for (const marker of TEST_ONLY_MARKERS) {
+  for (const marker of EXPECTED_MARKERS) {
     assert.equal(run("--expect-present", binary(join(directory, `only-${marker}`), [marker])), 1, marker);
   }
 });

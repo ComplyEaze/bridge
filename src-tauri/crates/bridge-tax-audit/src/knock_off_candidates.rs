@@ -756,6 +756,36 @@ mod tests {
         }
     }
 
+    /// The money amount tells a Contra by the voucher's base type, not its type name, as the
+    /// reference's `money_of` does: a Contra-based type under another name counts the larger side
+    /// of its money lines once, and a type named Contra on another base sums each money line. Each
+    /// voucher has one line outside bank and cash, so only the Contra test decides.
+    #[test]
+    fn a_contra_is_told_by_its_base_type_not_its_name() {
+        let money = BTreeSet::from(["Bank A", "Cash"]);
+        let voucher = |vtype: &str, base_type: &str| Voucher {
+            vtype: vtype.to_string(),
+            base_type: base_type.to_string(),
+            lines: [
+                ("Bank A", 10_000),
+                ("Cash", -9_000),
+                ("Bank Charges", -1_000),
+            ]
+            .into_iter()
+            .map(|(ledger, amount_paise)| LedgerLine {
+                ledger: ledger.to_string(),
+                amount_paise,
+            })
+            .collect(),
+            ..payment("c1", "")
+        };
+        assert_eq!(
+            money_amount(&voucher("Cash Deposit", "Contra"), &money),
+            10_000
+        );
+        assert_eq!(money_amount(&voucher("Contra", "Payment"), &money), 19_000);
+    }
+
     #[test]
     fn two_named_ledgers_sharing_a_tag_stop_the_test_with_the_repeated_figure_id() {
         let rules = Rules::vendored().unwrap();

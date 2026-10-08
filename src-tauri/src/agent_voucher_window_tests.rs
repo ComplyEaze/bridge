@@ -3766,6 +3766,59 @@ async fn an_empty_widened_window_costs_a_census_and_the_mark() {
     assert_eq!(sent.len(), 4 + 5 * 6);
 }
 
+/// #1240: under Education, an empty window on days Education serves (the 1st
+/// to the 31st) whose widened day either side it does not serve (the 30th) is
+/// refused at the corroboration's own census, before that census is sent: the
+/// census-only corroboration keeps the refusal the widened data read used to
+/// give, and cannot take a census Education answered empty for a corroboration.
+#[tokio::test]
+async fn education_refuses_the_corroboration_census_of_a_widened_window_it_cannot_serve() {
+    let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+    let mut plans = vec![
+        education_company_plan(),
+        status_plan(),
+        education_company_plan(),
+        status_plan(),
+    ];
+    plans.extend(education_paired(&mark(limits.census_capacity())));
+    // the window's census and its read, on days Education serves
+    plans.extend(education_paired(&xml_plan(empty_collection())));
+    plans.extend(education_paired(&xml_plan(empty_collection())));
+    // the corroboration's census of 30 April to 1 June: refused at the guard,
+    // so only its opening identity leg is spent
+    plans.push(education_company_plan());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let response = server_at(simulator.address(), directory.path())
+        .call_tool(
+            "vouchers",
+            json!({"company_guid": GUID, "from": "20260501", "to": "20260531"}),
+        )
+        .await;
+    simulator.cancel();
+    let sent: Vec<_> = simulator
+        .finish()
+        .unwrap()
+        .into_iter()
+        .filter(|request| !request.method.is_empty())
+        .collect();
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "window_part_boundary_unsupported_in_education",
+        "{response}"
+    );
+    let widened = render_agent_voucher_census(
+        &company(),
+        &tally_date("20260430"),
+        &tally_date("20260601"),
+        None,
+    )
+    .unwrap();
+    assert!(sent
+        .iter()
+        .all(|request| request.request_body_sha256 != request_sha(&widened)));
+}
+
 /// #985, #1029: one rule labels the window. A window the census counted is
 /// `complete`, and the `vouchers` tool counts every book that has held a
 /// voucher, including one whose mark alone shows it fits a request, so both

@@ -322,7 +322,8 @@ request is predicted over a budget well below the cap.
   request is not. Before #1240 a widened read that the book needed in several data parts was bracketed
   too, so a book counted in one census with a busy neighbouring day was refused on moved marks and now
   answers from the one observation; and a widened window whose data plan exceeded the read allowance was
-  refused at planning, which no longer applies because no data part is sent. A book that fits one request is read whole, uncounted, as before. Either way a voucher in the
+  refused at planning, which no longer applies because no data part is sent (a census of several spans can
+  still refuse mid-census when its count passes the allowance). A book that fits one request is read whole, uncounted, as before. Either way a voucher in the
   window refuses the read as `window_contradicted`, and otherwise the empty result is corroborated or
   reported partial by the existing empty-window control. **Confidence: PARTIAL**: the request counts are
   from scripted doubles through the tool call, not from a live Tally; for a neighbour-empty widened window

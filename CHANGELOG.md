@@ -19,14 +19,16 @@ These changes are in source and not yet in a published build.
 **Changed**
 
 - When `vouchers`, `voucher_presence`, `ledger_movement` or a register comes back empty for a window on a large
-  book, the second look at the day either side of the window now counts those days instead of reading their
-  vouchers, so it usually sends fewer requests (#1240; the same number where the count takes several requests and
-  the widened window is small). The verdicts do not change: an empty window with vouchers on a neighbouring day
-  is still `partial`, and a voucher inside the window still refuses the read. Two cases differ. A count that took
-  several requests is refused (`voucher_window_changed_during_read`) when the company's marks have moved since the
-  marks the first read opened on, as a divided read is. A count that took one request is not bracketed, where a
-  widened window that used to be read in several parts was. A book that fits one request is read as before. The
-  request counts come from test doubles, not from a live Tally.
+  book, the second look at the window widened by a day each side now counts it instead of reading its vouchers,
+  so it usually sends fewer requests (#1240; the same number where the count takes several requests and the
+  widened window is small). The labels do not change: an empty window with vouchers on a neighbouring day is
+  still `partial`, and a voucher inside the window still refuses the read. What differs: a count that took several
+  requests is refused (`voucher_window_changed_during_read`) when the company's marks differ from the ones the
+  first read opened on, as a divided read is; a count that took one request is not bracketed, where a widened
+  window that used to be read in several parts was; and because no vouchers are read, a refusal that came from
+  reading them (a part that failed or was not admitted, a read plan over its allowance, a disagreement between
+  the count and the read) no longer happens. A book that fits one request is read as before. The request counts
+  come from test doubles, not from a live Tally.
 - A voucher built from a bank statement and posted to a mapped ledger now ends its narration with
   `| Statement party: <name>`, the counterparty the statement printed (#1430). A line sent to suspense and a
   cash line are written as before. A party that contains `|`, that carries the reserved marker, or that makes the narration longer than 2,000

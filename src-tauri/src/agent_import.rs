@@ -14,7 +14,7 @@ use bridge_tally_core::master_binding::{
     self, twin_fold_keys, BindingBasis, BindingStatus, Candidates, EntityBinding, MasterCatalog,
     MasterClass, SourceEntity,
 };
-use bridge_tally_core::ExactDecimal;
+use bridge_tally_core::{ExactDecimal, TallyDate};
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
@@ -136,11 +136,13 @@ fn pre_import_mark_refusal(parse_error: &str) -> &'static str {
     }
 }
 
+/// A batch's vouchers. `D` is the voucher date: the tool's text as
+/// `parse_payload` reads it, and a `TallyDate` from `validate_payload` on.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ImportPayload {
+struct ImportPayload<D = TallyDate> {
     company_guid: String,
-    vouchers: Vec<ImportVoucher>,
+    vouchers: Vec<ImportVoucher<D>>,
     /// A batch this Bridge built whose vouchers this build corrects in place.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     amends_batch_id: Option<String>,
@@ -148,9 +150,9 @@ struct ImportPayload {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ImportVoucher {
+struct ImportVoucher<D = TallyDate> {
     bridge_txn_id: String,
-    date: String,
+    date: D,
     voucher_type: VoucherType,
     #[serde(default)]
     narration: Option<String>,
@@ -159,6 +161,49 @@ struct ImportVoucher {
     #[serde(default)]
     voucher_number: Option<String>,
     entries: Vec<ImportEntry>,
+}
+
+impl<D> ImportVoucher<D> {
+    /// This voucher, holding `date` as its date.
+    fn dated(self, date: TallyDate) -> ImportVoucher {
+        let ImportVoucher {
+            bridge_txn_id,
+            date: _,
+            voucher_type,
+            narration,
+            reference,
+            voucher_number,
+            entries,
+        } = self;
+        ImportVoucher {
+            bridge_txn_id,
+            date,
+            voucher_type,
+            narration,
+            reference,
+            voucher_number,
+            entries,
+        }
+    }
+}
+
+/// A voucher date as `validate_payload` receives it, and the `TallyDate` it
+/// stands for. A tool's date is the caller's text, parsed by `normalized_date`;
+/// a saved batch's date already is one.
+trait PayloadDate {
+    fn tally_date(&self) -> Result<TallyDate, String>;
+}
+
+impl PayloadDate for String {
+    fn tally_date(&self) -> Result<TallyDate, String> {
+        normalized_date(self)
+    }
+}
+
+impl PayloadDate for TallyDate {
+    fn tally_date(&self) -> Result<TallyDate, String> {
+        Ok(self.clone())
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -280,8 +325,8 @@ pub(super) struct ImportLedgerLine {
     #[serde(default)]
     company: Option<ImportCompanyTuple>,
     txn_ids: Vec<String>,
-    date_from: String,
-    date_to: String,
+    date_from: TallyDate,
+    date_to: TallyDate,
     sha256: String,
     built_at: String,
     status: String,
@@ -431,7 +476,7 @@ struct ImportCompanyTuple {
     name: String,
     guid: String,
     company_number: String,
-    books_from: String,
+    books_from: TallyDate,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -719,14 +764,12 @@ impl Server {
         let mut args = resolved.args.clone();
         let approvals = bill_wise::take_approvals(&mut args).map_err(approval_invalid)?;
         let args = &args;
-        let mut payload = parse_payload(args)?;
-        validate_payload(&payload)?;
+        let payload = validate_payload(parse_payload(args)?)?;
         // After the whole of `validate_payload`: in a batch with several
         // defects, the first one it finds is reported, not this one (#1055).
         refuse_rewritten_narration(&payload.vouchers)?;
         let (debit, credit) = totals(&payload.vouchers)?;
         refuse_unqualified_types(&payload.vouchers, LIVE_QUALIFIED_VOUCHER_TYPES)?;
-        normalize_payload_dates(&mut payload)?;
         // Refuse an amendment Bridge could never admit before reading Tally.
         // Admission is repeated under the exclusive lock before publication.
         if payload.amends_batch_id.is_some() {
@@ -998,21 +1041,10 @@ impl Server {
                 // The window must hold each voucher where it is now as well as
                 // where the amendment moves it, or both checks miss it.
                 Some(lineage) => lineage.window(&payload.vouchers),
-                None => (
-                    payload
-                        .vouchers
-                        .iter()
-                        .map(|voucher| voucher.date.clone())
-                        .min()
-                        .unwrap_or_default(),
-                    payload
-                        .vouchers
-                        .iter()
-                        .map(|voucher| voucher.date.clone())
-                        .max()
-                        .unwrap_or_default(),
-                ),
-            };
+                None => date_window(payload.vouchers.iter().map(|voucher| &voucher.date)),
+            }
+            // `validate_payload` refuses an empty batch the same way.
+            .ok_or_else(|| "voucher_count_invalid".to_string())?;
             // Exercise the exact future readback projection before publishing a file.
             // This observes today's source, not a bound on later Tally mutations.
             // The high-water mark was read just above, so the pre-flight bound
@@ -1043,7 +1075,7 @@ impl Server {
             if let Some(closing) = preflight_read.closing_evidence {
                 accumulated = combine_evidence(accumulated.clone(), closing);
             }
-            verification_window_identities(&preflight, &date_from, &date_to)?;
+            verification_window_identities(&preflight, date_from.as_str(), date_to.as_str())?;
             let amendment = match &lineage {
                 Some(lineage) => match lineage.compare_and_swap(
                     &payload.vouchers,
@@ -1413,7 +1445,7 @@ impl Server {
             if line.company.as_ref() != Some(&import_company_tuple(&company)?) {
                 return Err("company_identity_mismatch".to_string().into());
             }
-            let window = (line.date_from.as_str(), line.date_to.as_str());
+            let window = (&line.date_from, &line.date_to);
             let observed_read = self
                 .read_verification_window(
                     &identity,
@@ -1455,7 +1487,7 @@ impl Server {
             // response to hash. The evidence's own response digest already folds
             // every part that was read, which is the honest commitment here.
             let voucher_read_sha256 = observed_evidence.response_sha256.clone();
-            corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)?;
+            corroborate_verification_window(&observed, &corroboration, line.date_from.as_str(), line.date_to.as_str())?;
             let span = match pre_post_voucher_mark {
                 Some(pre_post_voucher_mark) => {
                     let (current, mark_evidence) =
@@ -1853,22 +1885,16 @@ impl Server {
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company: &str,
-        (from, to): (&str, &str),
+        (from, to): (&TallyDate, &TallyDate),
         source: super::WindowPlanSource,
     ) -> Result<VerificationWindowRead, ToolFailure> {
-        // The window comes from the stored batch, not a tool argument: it is
-        // parsed here, where it enters the window layer.
-        let (from, to) = (
-            super::parse_window_date(from)?,
-            super::parse_window_date(to)?,
-        );
         let shape = super::VoucherReadShape::ImportVerification;
         let read = self
             .read_voucher_window(
                 identity,
                 company,
-                &from,
-                &to,
+                from,
+                to,
                 shape,
                 source,
                 super::WindowReadLimits::for_shape(shape),
@@ -2430,7 +2456,7 @@ fn batch_guid_matches(stored: &str, supplied: &str) -> bool {
     stored.eq_ignore_ascii_case(supplied)
 }
 
-fn parse_payload(args: &Value) -> Result<ImportPayload, String> {
+fn parse_payload(args: &Value) -> Result<ImportPayload<String>, String> {
     serde_json::from_value(args.clone()).map_err(|_| "voucher_schema_invalid".to_string())
 }
 
@@ -2456,9 +2482,7 @@ fn import_company_tuple(
                 .books_from
                 .as_deref()
                 .ok_or_else(|| "company_identity_incomplete".to_string())?,
-        )?
-        .as_str()
-        .to_string(),
+        )?,
     })
 }
 
@@ -2700,7 +2724,7 @@ fn renders_bank_shape(vouchers: &[ImportVoucher]) -> bool {
 /// (§9.8 against §9.13). No file mixing the two has been imported — the
 /// reallocation Journals went in on their own — so the union is refused rather
 /// than assumed from holding both citations at once.
-fn refuse_mixed_shapes(vouchers: &[ImportVoucher]) -> Result<(), String> {
+fn refuse_mixed_shapes<D>(vouchers: &[ImportVoucher<D>]) -> Result<(), String> {
     let bank = vouchers
         .iter()
         .filter(|voucher| voucher.voucher_type.bank_shape().is_some())
@@ -2710,7 +2734,10 @@ fn refuse_mixed_shapes(vouchers: &[ImportVoucher]) -> Result<(), String> {
         .ok_or_else(|| "voucher_type_shapes_mixed".to_string())
 }
 
-fn validate_payload(payload: &ImportPayload) -> Result<(), String> {
+/// Every check a batch must pass before Tally is read, and its vouchers with
+/// their dates parsed. A date is parsed where it is checked, so a batch with
+/// several defects is refused for the same one whatever `D` is.
+fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportPayload, String> {
     refuse_mixed_shapes(&payload.vouchers)?;
     if payload.company_guid.trim().is_empty()
         || payload.vouchers.is_empty()
@@ -2720,11 +2747,12 @@ fn validate_payload(payload: &ImportPayload) -> Result<(), String> {
     }
     let mut txn_ids = BTreeSet::new();
     let mut ledger_names = BTreeSet::new();
+    let mut dates = Vec::with_capacity(payload.vouchers.len());
     for voucher in &payload.vouchers {
         if !valid_txn_id(&voucher.bridge_txn_id) || !txn_ids.insert(&voucher.bridge_txn_id) {
             return Err("bridge_txn_id_invalid_or_duplicate".to_string());
         }
-        normalized_date(&voucher.date)?;
+        dates.push(voucher.date.tally_date()?);
         if voucher.entries.len() < 2 {
             return Err("voucher_entries_too_few".to_string());
         }
@@ -2792,7 +2820,16 @@ fn validate_payload(payload: &ImportPayload) -> Result<(), String> {
             validate_bank_voucher_shape(voucher)?;
         }
     }
-    Ok(())
+    Ok(ImportPayload {
+        company_guid: payload.company_guid,
+        vouchers: payload
+            .vouchers
+            .into_iter()
+            .zip(dates)
+            .map(|(voucher, date)| voucher.dated(date))
+            .collect(),
+        amends_batch_id: payload.amends_batch_id,
+    })
 }
 
 /// Payment, Receipt and Contra take two or more entries with at least one on
@@ -2811,7 +2848,7 @@ fn validate_payload(payload: &ImportPayload) -> Result<(), String> {
 /// through Tally's Import menu.
 ///
 /// One ledger on both sides would net inside the voucher, so it is refused.
-fn validate_bank_voucher_shape(voucher: &ImportVoucher) -> Result<(), String> {
+fn validate_bank_voucher_shape<D>(voucher: &ImportVoucher<D>) -> Result<(), String> {
     let debits = voucher
         .entries
         .iter()
@@ -3160,13 +3197,17 @@ fn contains_reserved_marker(value: &str) -> bool {
         .unwrap_or_else(|_| value.to_ascii_uppercase().contains("[BRIDGE:"))
 }
 
-/// Dates cross the tool boundary in the human-friendly form but are persisted
-/// in the exact Tally form used in the generated XML and verification window.
-fn normalize_payload_dates(payload: &mut ImportPayload) -> Result<(), String> {
-    for voucher in &mut payload.vouchers {
-        voucher.date = normalized_date(&voucher.date)?.as_str().to_string();
-    }
-    Ok(())
+/// The first and last of `dates`, which bound the read window that holds every
+/// one of them; `None` when there are none.
+fn date_window<'a>(
+    dates: impl IntoIterator<Item = &'a TallyDate>,
+) -> Option<(TallyDate, TallyDate)> {
+    let mut dates = dates.into_iter();
+    let first = dates.next()?;
+    let (from, to) = dates.fold((first, first), |(from, to), date| {
+        (from.min(date), to.max(date))
+    });
+    Some((from.clone(), to.clone()))
 }
 
 fn validate_dates(payload: &ImportPayload, books_from: Option<&str>) -> Result<(), String> {
@@ -3174,8 +3215,8 @@ fn validate_dates(payload: &ImportPayload, books_from: Option<&str>) -> Result<(
         normalized_date(books_from.ok_or_else(|| "company_identity_incomplete".to_string())?)?;
     let today = super::tally_host_today();
     for voucher in &payload.vouchers {
-        let date = normalized_date(&voucher.date)?;
-        if date < from || date.as_str() > today.as_str() {
+        let date = &voucher.date;
+        if *date < from || date.as_str() > today.as_str() {
             return Err("voucher_date_outside_company_extent".to_string());
         }
     }
@@ -3200,9 +3241,7 @@ fn validate_import_dates_for_profile(
 ) -> Result<(), String> {
     let boundary_profile = boundary_profile_for(profile);
     for voucher in &payload.vouchers {
-        let date = bridge_tally_core::TallyDate::parse(voucher.date.clone())
-            .map_err(|_| "voucher_date_invalid".to_string())?;
-        if !boundary_profile.accepts_boundary(&date) {
+        if !boundary_profile.accepts_boundary(&voucher.date) {
             return Err("education_voucher_date_unsupported".to_string());
         }
     }
@@ -3277,7 +3316,7 @@ fn valid_2dp_amount(value: &str) -> bool {
             .is_ok_and(|amount| !amount.is_zero() && !amount.is_negative())
 }
 
-fn totals(vouchers: &[ImportVoucher]) -> Result<(ExactDecimal, ExactDecimal), String> {
+fn totals<D>(vouchers: &[ImportVoucher<D>]) -> Result<(ExactDecimal, ExactDecimal), String> {
     let mut debit = ExactDecimal::zero();
     let mut credit = ExactDecimal::zero();
     for entry in vouchers.iter().flat_map(|voucher| &voucher.entries) {
@@ -3789,9 +3828,7 @@ fn render_voucher_xml(
         let amount = match entry.side { EntrySide::Dr => format!("-{}", entry.amount), EntrySide::Cr => entry.amount.clone() };
         format!("<ALLLEDGERENTRIES.LIST><LEDGERNAME>{}</LEDGERNAME><ISDEEMEDPOSITIVE>{}</ISDEEMEDPOSITIVE><AMOUNT>{}</AMOUNT></ALLLEDGERENTRIES.LIST>", xml_escape(&entry.ledger), entry.side.tally_positive(), amount)
     }).collect::<String>();
-    let date = normalized_date(&voucher.date)
-        .map(|date| date.as_str().to_string())
-        .unwrap_or_default();
+    let date = voucher.date.as_str();
     // §9.13: the imported Payment/Receipt/Contra files carried EFFECTIVEDATE
     // beside DATE, and named the party on the side opposite the money. The
     // Journal shape qualified in §9.8 carries neither element, and is left

@@ -35,6 +35,15 @@ These changes are in source and not yet in a published build.
   field now names its party as `UNNAMED`, as the IMPS reader already did. Before, the party was empty, no mapping
   row could match it, and the suspense line's narration named no one (#1429).
 
+**Changed**
+
+- The import journal (`agent-import-ledger.jsonl`) is now read with each of its dates as a checked
+  date. A record holding a date that is not `YYYYMMDD` refuses the whole journal
+  (`import_ledger_invalid`): building, posting, verifying and reconciling every batch, and the
+  desktop journal screen, stop until the record is put right, and the local data report shows the
+  journal as not read. No release has written such a date, so only a record edited by hand can hold
+  one, and the stored bytes do not change (#1307).
+
 ## [0.5.0] - 2026-10-08
 
 ### In plain words: ComplyEaze Bridge 0.5.0, since 0.4.2 (3 Oct 2026)

@@ -94,7 +94,7 @@ fn legacy_record() -> Value {
         "txn_ids":["txn-001"], "date_from":"20260901", "date_to":"20260901",
         "sha256":"hash", "built_at":"2026-09-07T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water", "value":10, "master_value":10},
-        "vouchers":[payload().vouchers.remove(0)]
+        "vouchers":[admitted_payload().vouchers.remove(0)]
     })
 }
 
@@ -148,7 +148,7 @@ fn namespaced_journal_roundtrips_derived_attribution_and_rejects_unknown_scheme(
 
 #[test]
 fn renderer_uses_one_derived_identity_for_remote_id_and_marker() {
-    let mut input = payload();
+    let mut input = admitted_payload();
     input.vouchers[0].voucher_number = Some("CLIENT-42".into());
     let mut renderings = Vec::new();
     for batch_id in ["batch-one", "batch-two"] {

@@ -228,8 +228,8 @@ Three reports, one dump:
 In the reference, the invariant **code** for a book-level or result-level function is read from
 its own docstring's leading `CODE-n:` token — not hardcoded a second time in the serialiser, so a
 new invariant that follows the convention is picked up automatically. This crate has no docstring
-to read and writes each code by hand twice: where a violation is raised, and again in the list of
-codes evaluated (`src/invariants.rs:178` for the book, `:244` for the result). What keeps the crate
+to read and writes each code by hand: where a violation is raised, and again in the list of codes
+evaluated (`src/invariants.rs:178` for the book, `:244` for the result). What keeps the crate
 in step is this section's comparison of the evaluated code sets: an invariant added to the
 reference fails parity until the crate lists it.
 
@@ -279,9 +279,8 @@ the content is complete and correct.
    the registry (`min_figures` in `src/registry.rs`, explained in `src/compare.rs:15-67`): the
    fewest figures a run of that test that did its work publishes, set from the code, low enough
    that a quiet real book passes and high enough that an empty dump does not. The crate does not
-   anchor it to the synthetic fixture's own figure count: of the 27 registered tests, 26 have a
-   synthetic golden, and 17 of those 26 floors are below the golden's figure count and 9 equal it.
-   The reference's own comparison tool anchors a floor to its fixture for two tests only
+   anchor it to the synthetic fixture's own figure count: for most tests the floor is below that
+   count. The reference's own comparison tool anchors a floor to its fixture for two tests only
    (`cash_44ab` 7, `cash_payments_40a3` 28) and holds a floor of 1 for every other test. A real
    client's count is measured separately, in the local run of section 9 below that compares the two
    engines; it is never committed as a CI gate value, consistent with the rule that no client data
@@ -296,8 +295,8 @@ the content is complete and correct.
 11. **`*_invariants_evaluated` set equality and `*_invariant_violations` list equality** (§5), for
     all three reports.
 
-On both sides, any violation from steps 3–11 (on the reference's side, from those of the steps
-its tool makes) is collected and reported together (not fail-fast) so a single run shows every
+In both comparison tools, any violation from steps 3–11 (in the reference's tool, from those of
+the steps it makes) is collected and reported together (not fail-fast) so a single run shows every
 difference, not just the first one found; the process still exits non-zero if the list is
 non-empty. Steps 1–2 are the only ones that stop early, because a badly-typed or empty document
 cannot be diffed meaningfully at all.

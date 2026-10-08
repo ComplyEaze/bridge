@@ -72,7 +72,7 @@ real pipeline a separate step does it first, for every list under `ledgers_by_na
 matches no ledger master is refused with a binding error naming the location, and a ledger renamed
 since the table was written is rewritten to its current name by identity. In the crate that step is
 `src/binding.rs`, which binds only the locations the ported tests read, in the order the reference
-binds its name locations; this location is bound at `src/binding.rs:880-894`. `rp_unknown_ledger`
+binds its name locations; this location is bound at `src/binding.rs:881-924`. `rp_unknown_ledger`
 shows what the test itself does with a name that has no master (it contributes 0 and the result-level
 check reports each citation), which the real pipeline never reaches because it refuses the name earlier.
 
@@ -327,7 +327,7 @@ are regenerated only by the reference's maintainers.
 ## 13. Registering the test in the crate
 
 The test is in the crate's registry. Besides the books, its entry has a golden for the synthetic read and a
-runner on each side of the harness, described here as they are.
+runner in each of the harness's two scripts, described here as they are.
 
 - **The synthetic golden.** `goldens/synthetic.related_parties_cl23.json` is the test on the crate's synthetic
   read (`tests/fixtures/synthetic-engagement.toml`). That engagement has no related-person table, so the dump is

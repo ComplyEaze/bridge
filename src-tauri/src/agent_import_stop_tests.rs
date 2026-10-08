@@ -252,3 +252,28 @@ fn the_post_asks_the_stop_under_its_lock_before_it_spends_the_approval() {
         .expect("appends the intent");
     assert!(asked < refused && refused < spent && spent < intent);
 }
+
+/// The build asks the stop again under its admission lock, before it checks
+/// the rows already posted and writes a file, for an invoice batch only. No
+/// Sales build runs end to end before Sales is qualified, so this pins the
+/// call where it stands.
+#[test]
+fn the_build_asks_the_stop_under_its_lock_before_it_writes_a_file() {
+    let source = include_str!("agent_import.rs");
+    let build = &source[source
+        .find("let _admission_lock = self.lock_import_admission()?;\n            // Admit the journal before publication")
+        .expect("the build's exclusive admission lock")..];
+    let asked = build
+        .find(".import_invoice_stop_while_admitted(&payload.company_guid)")
+        .expect("the build asks the stop");
+    let invoice_only = build[..asked]
+        .rfind("voucher.voucher_type.is_invoice()")
+        .expect("and only for an invoice batch");
+    let refused = build
+        .find("\"invoice_company_stopped\"")
+        .expect("and refuses it by its own code");
+    let lineage = build
+        .find("let lineage = match payload.amends_batch_id")
+        .expect("before the lineage and the written file");
+    assert!(invoice_only < asked && asked < refused && refused < lineage);
+}

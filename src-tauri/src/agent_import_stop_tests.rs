@@ -392,3 +392,24 @@ async fn a_release_is_not_refused_for_a_failure_waiting_cannot_cure() {
         }
     );
 }
+
+/// The company the caller names is the batch's own: a wrong one is refused
+/// before any read or dialog, and is no way onto the path a failed read takes.
+#[tokio::test]
+async fn a_release_naming_another_company_is_refused_before_any_read() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_without_tally(directory.path());
+    let line = saved(&server, "Sales");
+    dispatched(&server, &line);
+    let mut wrong = args(&line);
+    wrong["company_guid"] = json!("00000000-0000-4000-8000-0000000000ff");
+    let approval = ScriptedApproval::approving();
+    let response = release(&server, wrong, approval.clone()).await;
+    assert_eq!(
+        result(&response)["error"]["code"],
+        "import_batch_company_mismatch",
+        "{response}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog: {response}");
+    assert_eq!(stop(&server), Some(line.batch_id));
+}

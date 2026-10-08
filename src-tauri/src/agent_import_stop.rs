@@ -67,8 +67,8 @@ impl Seen {
 
 /// Whether a failed read is one no wait cures, because it fails before any
 /// Tally read, or independently of what Tally holds: the batch was sent to
-/// another endpoint or company than the one now set, or the host setting is
-/// unusable. Refusing the release for these would leave the company stopped for
+/// another endpoint than the one now set, the company now open is not the one
+/// the batch recorded, or the host setting is unusable. Refusing the release for these would leave the company stopped for
 /// good. Every other failure (Tally not answering, the company not open, a
 /// cancelled or cut-short read) is cured by waiting or by opening Tally, so the
 /// release is refused and made once the read runs; a code not listed here
@@ -76,10 +76,7 @@ impl Seen {
 fn failure_waiting_cannot_cure(failure: &ToolFailure) -> bool {
     matches!(
         failure.code.as_str(),
-        "import_post_endpoint_mismatch"
-            | "company_identity_mismatch"
-            | "import_batch_company_mismatch"
-            | "host_setting_invalid"
+        "import_post_endpoint_mismatch" | "company_identity_mismatch" | "host_setting_invalid"
     )
 }
 
@@ -136,6 +133,15 @@ impl Server {
         // or it holds no invoice, so it stops nothing.
         if !dispatched || !holds_an_invoice(&line) {
             return Err("ack_stop_batch_not_sent".to_string().into());
+        }
+        // The company the caller names is the batch's own: a mismatch is the
+        // caller's to correct, never a way onto the path taken for a read that
+        // cannot be made.
+        if !line
+            .company_guid
+            .eq_ignore_ascii_case(required_string(args, "company_guid")?)
+        {
+            return Err("import_batch_company_mismatch".to_string().into());
         }
         self.require_stop(&line)?;
 

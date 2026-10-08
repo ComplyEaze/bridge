@@ -70,11 +70,13 @@ requests it comes from, except where it names an issue.
   its tools say why they refuse.** The Terms of Use setting is no longer
   marked required and still starts off. Claude Desktop now starts ComplyEaze
   Bridge, and until you turn the setting on every tool answers
-  `terms_not_accepted`, naming the setting. The setting no longer shows
-  "(required)" beside its title, and its description now begins "Tick to use
-  ComplyEaze Bridge: it refuses every tool call until you accept the Terms of
-  Use." This was seen on one Mac with a package built from the Terms-setting change (#1436); it has
-  not yet been checked on Windows (#1413).
+  `terms_not_accepted`, naming the setting. That the app starts and the tools
+  answer was seen on one Mac with a package built from the Terms-setting change
+  (#1436); it has not yet been checked on Windows (#1413). The setting no
+  longer shows "(required)" beside its title, and its description now begins
+  "Tick to use ComplyEaze Bridge: it refuses every tool call until you accept
+  the Terms of Use." A test checks that wording; it has not been seen in Claude
+  Desktop yet.
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
   the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
   text already said; the schema said 500 even when the row limit was lower or higher (#1148).

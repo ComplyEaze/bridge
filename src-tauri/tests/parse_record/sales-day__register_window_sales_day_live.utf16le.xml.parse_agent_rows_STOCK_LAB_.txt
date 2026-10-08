@@ -1,0 +1,36 @@
+# fixture: sales-day/register_window_sales_day_live.utf16le.xml
+# parser: parse_agent_rows(STOCK_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(2),
+        "amounts": Array [
+            Object {
+                "amount": String("-24.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Lab Customer One"),
+            },
+            Object {
+                "amount": String("24.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Lab Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250420"),
+        "guid": String("1edb9b05-8d35-4c0c-9959-dce655730463-00000002"),
+        "is_invoice": Bool(true),
+        "master_id": String("2"),
+        "narration": String("Lab sale 1 [LAB-SYN:lab-sal-0002]"),
+        "optional": Bool(false),
+        "party": String("Lab Customer One"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Sales"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Sales"),
+        "voucher_type_guid": String("1edb9b05-8d35-4c0c-9959-dce655730463-0000002c"),
+        "voucher_type_reserved_name": String("Sales"),
+    },
+])

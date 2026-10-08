@@ -117,7 +117,7 @@ reviewer: some-github-login
   request that only deletes old acknowledgements (a cleanup) passes.
 - An acknowledgement is append-only for its own pull request: an existing one is
   never modified. After merge it means nothing, and old files may be cleaned up.
-- The branch name is not the file name, so a lane branch is fine.
+- The branch name is not the file name, so any branch name is fine.
 - The number is known only once the pull request is open, so the first run of a
   pull request that touches a pinned path fails with `found 0` until
   `pr-<N>.txt` is pushed to its branch. That is expected, not a breakage: open
@@ -566,7 +566,9 @@ payload-free smoke result, and source-provenance record is present. Preview tags
 must be `mcp-vX.Y.Z` (or the older `mcp-preview-X.Y.Z`, used by 0.2.0 and
 0.3.0); they cannot reuse a production `v*` tag. A
 build without publisher signing must never be described as signed, notarized,
-or ready for production use.
+or ready for production use. The workflow titles the release
+`ComplyEaze Bridge MCP <version>` itself, with the version taken from the tag
+(`mcp-v0.5.0` gives `0.5.0`), so the title needs no edit after publication.
 
 This workflow intentionally has no production-signed channel. A raw MCPB
 archive is not a notarization-and-stapling carrier for the enclosed macOS
@@ -616,8 +618,7 @@ every note for them first, and for maintainers second.
 
 **Rhythm**
 
-- Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) at most every two
-  weeks, and only when both of
+- Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) only when both of
   these hold: at least one user-visible change has landed, and CI is green on
   both hosts. A master push may show the native, bundle and seam jobs skipped
   when the merge queue ran them on that same commit; its job summary names the

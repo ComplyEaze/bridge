@@ -1,0 +1,53 @@
+# fixture: tests/fixtures/bills_payable_shape_live.utf16le.xml
+# parser: parse_native_bill_rows(20250401..20260923)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "Chem Supplier 4",
+        reference: "MANUAL-1",
+        bill_date: TallyDate(
+            "20250401",
+        ),
+        due_date: TallyDate(
+            "20250401",
+        ),
+        closing_balance: ExactDecimal(
+            "22500.00",
+        ),
+        tally_overdue_days: Some(
+            540,
+        ),
+    },
+    NativeBillRow {
+        party: "Shape Buyer 1",
+        reference: "PUR-B4",
+        bill_date: TallyDate(
+            "20250421",
+        ),
+        due_date: TallyDate(
+            "20250421",
+        ),
+        closing_balance: ExactDecimal(
+            "11799.50",
+        ),
+        tally_overdue_days: Some(
+            520,
+        ),
+    },
+    NativeBillRow {
+        party: "Shape Buyer 3",
+        reference: "BILL-C7",
+        bill_date: TallyDate(
+            "20250614",
+        ),
+        due_date: TallyDate(
+            "20250614",
+        ),
+        closing_balance: ExactDecimal(
+            "5000.00",
+        ),
+        tally_overdue_days: Some(
+            466,
+        ),
+    },
+])

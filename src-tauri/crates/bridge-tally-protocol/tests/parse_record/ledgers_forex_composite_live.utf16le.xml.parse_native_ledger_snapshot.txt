@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/ledgers_forex_composite_live.utf16le.xml
+# parser: parse_native_ledger_snapshot
+# source: captured
+Err(ForeignCurrencyLedgerBalance { ledger_name: "FX USD Debtor 02" })

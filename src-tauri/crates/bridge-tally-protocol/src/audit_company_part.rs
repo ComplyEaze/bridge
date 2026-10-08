@@ -24,7 +24,7 @@ pub struct AuditCompanyPart {
     pub books_from_yyyymmdd: String,
     /// `None` when the company carries no `ISINTEGRATED`, or an empty one, as
     /// the Python loader reads both. The stock test then
-    /// reports integration as "unknown" (Lane B, 2026-09-21), which is visible,
+    /// reports integration as "unknown", which is visible,
     /// so absence is admitted; a repeated tag is not.
     pub is_integrated: Option<String>,
 }
@@ -108,7 +108,7 @@ pub fn admit_audit_company_part(
         match event {
             Event::Start(ref start) | Event::Empty(ref start) => {
                 let is_empty = matches!(event, Event::Empty(_));
-                let element = start.name().as_ref().to_vec();
+                let element = start.name().as_ref().as_bytes().to_vec();
                 if path.is_empty() {
                     roots += 1;
                     if roots > 1 {
@@ -142,7 +142,7 @@ pub fn admit_audit_company_part(
                     companies += 1;
                     for attribute in start.attributes() {
                         let attribute = attribute.map_err(|_| AuditCompanyPartError::Malformed)?;
-                        if attribute.key.as_ref() == b"NAME" {
+                        if attribute.key.as_ref() == "NAME" {
                             name.push(
                                 attribute
                                     .normalized_value(quick_xml::XmlVersion::Implicit1_0)
@@ -175,9 +175,7 @@ pub fn admit_audit_company_part(
                 }
             }
             Event::Text(text) => {
-                let decoded = text
-                    .decode()
-                    .map_err(|_| AuditCompanyPartError::Malformed)?;
+                let decoded = &*text;
                 if path.is_empty()
                     && !decoded
                         .trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}')
@@ -186,27 +184,25 @@ pub fn admit_audit_company_part(
                     return Err(AuditCompanyPartError::Malformed);
                 }
                 if let Some((_, value)) = current_text.as_mut() {
-                    value.push_str(&decoded);
+                    value.push_str(decoded);
                 }
                 if let Some(value) = status_text.as_mut() {
-                    value.push_str(&decoded);
+                    value.push_str(decoded);
                 }
             }
             // The consumer merges CDATA into element text (bridge-tax-audit
             // `xml.rs`), and so must admission, or a CDATA-wrapped GUID would
             // read as empty here and correct there.
             Event::CData(data) => {
-                let decoded = data
-                    .decode()
-                    .map_err(|_| AuditCompanyPartError::Malformed)?;
+                let decoded = &*data;
                 if path.is_empty() {
                     return Err(AuditCompanyPartError::Malformed);
                 }
                 if let Some((_, value)) = current_text.as_mut() {
-                    value.push_str(&decoded);
+                    value.push_str(decoded);
                 }
                 if let Some(value) = status_text.as_mut() {
-                    value.push_str(&decoded);
+                    value.push_str(decoded);
                 }
             }
             // Only a reference inside a field admission reads is resolved; the
@@ -218,14 +214,9 @@ pub fn admit_audit_company_part(
                     .map_err(|_| AuditCompanyPartError::Malformed)?
                 {
                     Some(character) => character.to_string(),
-                    None => {
-                        let entity = reference
-                            .decode()
-                            .map_err(|_| AuditCompanyPartError::Malformed)?;
-                        quick_xml::escape::resolve_predefined_entity(&entity)
-                            .ok_or(AuditCompanyPartError::Malformed)?
-                            .to_string()
-                    }
+                    None => quick_xml::escape::resolve_predefined_entity(&reference)
+                        .ok_or(AuditCompanyPartError::Malformed)?
+                        .to_string(),
                 };
                 if let Some((_, value)) = current_text.as_mut() {
                     value.push_str(&resolved);
@@ -235,7 +226,7 @@ pub fn admit_audit_company_part(
                 }
             }
             Event::End(end) => {
-                if path.last().map(Vec::as_slice) != Some(end.name().as_ref()) {
+                if path.last().map(Vec::as_slice) != Some(end.name().as_ref().as_bytes()) {
                     return Err(AuditCompanyPartError::Malformed);
                 }
                 if path.len() == COMPANY_PATH.len() + 1 {

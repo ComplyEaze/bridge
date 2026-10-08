@@ -298,15 +298,11 @@ fn element_paths(xml: &str) -> Vec<(String, String)> {
     loop {
         match reader.read_event().unwrap() {
             Event::Start(event) => {
-                path.push(String::from_utf8(event.name().as_ref().to_vec()).unwrap());
+                path.push(event.name().as_ref().to_owned());
                 for attribute in event.attributes() {
                     let attribute = attribute.unwrap();
                     out.push((
-                        format!(
-                            "{}/@{}",
-                            path.join("/"),
-                            String::from_utf8(attribute.key.as_ref().to_vec()).unwrap()
-                        ),
+                        format!("{}/@{}", path.join("/"), attribute.key.as_ref()),
                         attribute
                             .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                             .unwrap()
@@ -316,14 +312,12 @@ fn element_paths(xml: &str) -> Vec<(String, String)> {
                 out.push((path.join("/"), String::new()));
             }
             Event::Text(text) => {
-                let text = text.decode().unwrap();
                 if let Some(last) = out.last_mut() {
                     last.1.push_str(&text);
                 }
             }
             Event::GeneralRef(reference) => {
-                let name = reference.decode().unwrap();
-                let decoded = quick_xml::escape::resolve_predefined_entity(&name).unwrap();
+                let decoded = quick_xml::escape::resolve_predefined_entity(&reference).unwrap();
                 out.last_mut().unwrap().1.push_str(decoded);
             }
             Event::End(_) => {
@@ -503,7 +497,7 @@ fn audit_fetch_lists_carry_what_a_silent_default_would_hide() {
         assert!(vouchers.iter().any(|field| field == required), "{required}");
     }
     // An absent quantity, rate or amount on a goods line is read as none,
-    // and the stock movement is silently dropped (Lane B, 2026-09-21).
+    // and the stock movement is silently dropped.
     for prefix in [
         "ALLLEDGERENTRIES.INVENTORYALLOCATIONS",
         "ALLINVENTORYENTRIES",

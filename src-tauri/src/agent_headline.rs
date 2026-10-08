@@ -513,7 +513,7 @@ pub(super) enum CashFlowOutcome {
     /// The two differ.
     Differs,
     /// A Bank OD A/c or Bank OCC A/c ledger has movement in the period, and
-    /// whether Tally's Cash Flow counts it is not measured.
+    /// Tally's Cash Flow was seen counting one such ledger, which the check does not count.
     MoneyGroupUnmeasured,
     /// No amount on either side (no cash or bank ledger with an amount, and an
     /// empty Cash Flow): nothing was compared.
@@ -526,8 +526,8 @@ pub(super) struct CashFlowBasis {
     from: bridge_tally_core::TallyDate,
     to: bridge_tally_core::TallyDate,
     outcome: CashFlowOutcome,
-    /// The answer holds something not measured against Tally yet (a credit
-    /// amount, a positive closing, a window across March into April).
+    /// The answer holds something not yet compared with Tally's own Cash Flow
+    /// screen (a credit amount, a positive closing, a window across March into April).
     unmeasured_shape: bool,
 }
 
@@ -565,16 +565,16 @@ impl CashFlowBasis {
                 "{}: Tally's net cash and bank movement for the whole period equals the cash and bank ledgers of its trial balance. The split into months is Tally's own and has not been checked. Tally's debit and credit columns are not shown, and a negative amount is a debit (cash and bank growing).{} This is Tally's month-wise cash and bank movement, not a cash flow statement under AS 3.",
                 capitalised(&subject),
                 if self.unmeasured_shape {
-                    " This answer holds a credit amount, a positive closing or a window from March into April, a shape that has not been measured against Tally: the net total agrees, but treat each month's figure as unverified and compare it with Tally's own Cash Flow."
+                    " This answer holds a credit amount, a positive closing or a window from March into April, a shape of which a credit amount (two windows, one with a positive closing) tied to the trial balance in live runs on one synthetic book, a window from March into April was not run, and no month was compared with Tally's own Cash Flow screen: the net total agrees, but treat each month's figure as unverified and compare it with Tally's own Cash Flow."
                 } else {
-                    " No month with an outflow has been measured against Tally."
+                    " No month's figure has been checked against Tally's own Cash Flow screen."
                 }
             ),
             CashFlowOutcome::Differs => format!(
                 "Not established: the {subject}. Tally's net cash and bank figure for the period differs from the cash and bank ledgers of its trial balance, so the months are withheld. Do not give either figure as the cash movement: ask the user to open Cash Flow in Tally for the same period."
             ),
             CashFlowOutcome::MoneyGroupUnmeasured => format!(
-                "Not established: the {subject}. A ledger under Bank OD A/c or Bank OCC A/c has movement in the period, and whether Tally's Cash Flow counts such a ledger has not been measured, so the months are withheld. Tell the user that cash flow for this period has to be read in Tally."
+                "Not established: the {subject}. A ledger under Bank OD A/c or Bank OCC A/c has movement in the period, and Tally's Cash Flow was seen counting such a ledger, which this check does not count, so the months are withheld. Tell the user that cash flow for this period has to be read in Tally."
             ),
             CashFlowOutcome::NothingToCompare => format!(
                 "Not established: the {subject}. Nothing could be tied: either neither the trial balance's cash and bank ledgers (Cash-in-Hand and Bank Accounts) nor Tally's Cash Flow carry any amount for the period (an empty month is not a zero), or both add up to zero, which would agree under any reading of the columns. The months are withheld. Tell the user that cash flow for this period has to be read in Tally."

@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { deflateRawSync, gzipSync } from "node:zlib";
 import {
   SEAM_MARKER,
   assertNoTestSeam,
@@ -83,6 +84,60 @@ test("an archive that is the first file a scanned directory yields is refused to
   mkdirSync(directory);
   binary(join(directory, "a.zip"), false);
   assert.throws(() => markedFiles([directory]), { code: "compressed_artefact" });
+});
+
+// A compressed file is refused by what it starts with, not by what it is called (#839): the marker inside one is
+// compressed, so scanning its raw bytes would pass it. The first bytes of each family a bundler or an installer uses.
+const MARKED = Buffer.from(`..${SEAM_MARKER}..`, "utf8");
+const DEFLATED = deflateRawSync(MARKED);
+const SIGNATURES = {
+  gzip: gzipSync(MARKED),
+  zip: Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(26), DEFLATED]),
+  zstd: Buffer.concat([Buffer.from([0x28, 0xb5, 0x2f, 0xfd]), DEFLATED]),
+  xz: Buffer.concat([Buffer.from([0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00]), DEFLATED]),
+  bzip2: Buffer.concat([Buffer.from("BZh9", "latin1"), DEFLATED]),
+  sevenZip: Buffer.concat([Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]), DEFLATED]),
+};
+
+test("a compressed file is refused by its first bytes whatever it is called or where it sits", () => {
+  for (const [family, bytes] of Object.entries(SIGNATURES)) {
+    for (const name of ["payload", "payload.bin", "payload.zst"]) {
+      const directory = scratch();
+      const file = join(directory, name);
+      // A clean executable sorts before the payload and another after it, so a check of only the first or the last
+      // walked file would miss it (the same class as #1177).
+      binary(join(directory, "a-bridge"), false);
+      binary(join(directory, "zz-bridge"), false);
+      writeFileSync(file, bytes);
+      // The scan must be able to miss it for this test to measure anything: the marker is inside, and invisible.
+      assert.equal(holdsMarker(file), false, `${family} ${name}: the marker must not show in the raw bytes`);
+      assert.throws(() => markedFiles([file]), { code: "compressed_artefact" }, `${family} ${name} as an argument`);
+      assert.throws(() => markedFiles([directory]), { code: "compressed_artefact" }, `${family} ${name} in a directory`);
+      assert.throws(() => assertNoTestSeam([directory]), { code: "compressed_artefact" }, `${family} ${name} through the hook`);
+    }
+  }
+});
+
+test("a file that merely resembles a signature is reported or passed, never refused as compressed", () => {
+  const directory = scratch();
+  // An uncompressed file holding the marker is found, not refused.
+  const marked = binary(join(directory, "payload"), true);
+  assert.deepEqual(markedFiles([marked]), [marked]);
+  // Short files, a truncated signature and a signature that is not at the start are not containers.
+  const shapes = {
+    empty: Buffer.alloc(0),
+    oneByte: Buffer.from([0x1f]),
+    truncatedZip: Buffer.from([0x50, 0x4b, 0x03]),
+    twoLetters: Buffer.from("BZ", "latin1"),
+    // The read buffer is zero-filled: an xz signature ends in a zero byte, so five bytes must not be read as six.
+    truncatedXz: Buffer.from([0xfd, 0x37, 0x7a, 0x58, 0x5a]),
+    signatureAtOffsetOne: Buffer.concat([Buffer.from([0x00]), SIGNATURES.gzip]),
+  };
+  for (const [shape, bytes] of Object.entries(shapes)) {
+    const file = join(directory, `shape-${shape}`);
+    writeFileSync(file, bytes);
+    assert.doesNotThrow(() => markedFiles([file]), `${shape} is not a container`);
+  }
 });
 
 test("the bundle hook scans the executables of the profile tauri built", () => {

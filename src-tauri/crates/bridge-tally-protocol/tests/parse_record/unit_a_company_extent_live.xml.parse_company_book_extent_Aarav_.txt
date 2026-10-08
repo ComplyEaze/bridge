@@ -1,0 +1,15 @@
+# fixture: tests/fixtures/unit_a_company_extent_live.xml
+# parser: parse_company_book_extent(Aarav)
+# source: captured
+Ok(CompanyBookExtentFields {
+    company_name: "Aarav Trading Company Demo",
+    company_guid: "bb8ad19e-6aef-4239-a917-87fec0c6215e",
+    books_from: TallyDate(
+        "20240401",
+    ),
+    last_voucher_date: TallyDate(
+        "20260401",
+    ),
+    voucher_alter_id_high_water: None,
+    master_alter_id_high_water: None,
+})

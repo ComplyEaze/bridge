@@ -1,0 +1,69 @@
+# fixture: tests/fixtures/agent/native-ageing-payable.utf16le.xml
+# parser: parse_native_bill_rows(20260401..20260801)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "Ageing Customer B",
+        reference: "ADV-2",
+        bill_date: TallyDate(
+            "20260502",
+        ),
+        due_date: TallyDate(
+            "20260502",
+        ),
+        closing_balance: ExactDecimal(
+            "1000.00",
+        ),
+        tally_overdue_days: Some(
+            91,
+        ),
+    },
+    NativeBillRow {
+        party: "Ageing Customer B",
+        reference: "ADV-1",
+        bill_date: TallyDate(
+            "20260531",
+        ),
+        due_date: TallyDate(
+            "20260531",
+        ),
+        closing_balance: ExactDecimal(
+            "1500.00",
+        ),
+        tally_overdue_days: Some(
+            62,
+        ),
+    },
+    NativeBillRow {
+        party: "Ageing Customer A",
+        reference: "ZBR",
+        bill_date: TallyDate(
+            "20260601",
+        ),
+        due_date: TallyDate(
+            "20260601",
+        ),
+        closing_balance: ExactDecimal(
+            "1500.00",
+        ),
+        tally_overdue_days: Some(
+            61,
+        ),
+    },
+    NativeBillRow {
+        party: "Ageing Customer B",
+        reference: "MP-B",
+        bill_date: TallyDate(
+            "20260702",
+        ),
+        due_date: TallyDate(
+            "20260702",
+        ),
+        closing_balance: ExactDecimal(
+            "1000.00",
+        ),
+        tally_overdue_days: Some(
+            30,
+        ),
+    },
+])

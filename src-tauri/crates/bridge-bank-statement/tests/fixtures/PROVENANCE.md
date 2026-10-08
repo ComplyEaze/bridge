@@ -17,6 +17,10 @@ HDFC profiles were calibrated on, which is already public in
 | `sbi-owner-password-only.pdf` | 3,545 | `64bb53bf392ec9cc52aede9085390b29b7cac0ba7908d678ba933551414d14c0` |
 | `hdfc-rotated.pdf` | 2,921 | `655d670aa5513a6386d723611c61db19555196ea034e85e611846a8f6f904d21` |
 | `ubi-synthetic.pdf` | 3,413 | `6694b20b393c09b53cc7359226c69998adf90d9e731e1413fbfd310733d9098b` |
+| `scan-image-only.pdf` | 1,481 | `ac3f526b32c6e7883e7cd665503f88af96b4c4117e07400ff0c4b5c66382bb6a` |
+| `print-to-pdf-vector-glyphs.pdf` | 21,643 | `08a3722a9e27975eb8547e0d11973f760fab7a2993554ccf8392923f7e54ade9` |
+| `scan-with-visible-stamp.pdf` | 1,256 | `ae4bc131732ad8808db287097ddaf363bbc1add12ba510e51f2413a66cbf5008` |
+| `hdfc-logo-and-watermark.pdf` | 3,260 | `d82ea459eb763263af46482c5adea1250e08866ba63778d08680e59f054332c3` |
 
 - `hdfc-synthetic.pdf` — three pages, user password `synthetic-user-4321`. A
   12-digit UPI reference and an ACH reference broken mid-token at the 240pt
@@ -39,8 +43,26 @@ HDFC profiles were calibrated on, which is already public in
   also prints a masked account line and a CIF ID; only `Account Number` binds.
   The row *shapes* were described from one real statement without its values;
   the x positions are invented, since the profile reads rows as text.
+- `scan-image-only.pdf` — two pages, user password `synthetic-user-4321`; each
+  page is one 8x8 grey image scaled to the page and no text object. `pdftotext -bbox`
+  reports no words (measured 2026-10-07).
+- `print-to-pdf-vector-glyphs.pdf` — one page carrying the HDFC page 1 lines,
+  every character drawn as a filled rectangle, as a printer driver converts
+  glyphs to outlines; no text object. `pdftotext -bbox` reports no words (measured
+  2026-10-07). The rectangles are not letter shapes: the fixture stands for
+  "no extractable text", not for a legible scan.
+- `scan-with-visible-stamp.pdf` — the same image under one line of real text,
+  "SCANNED WITH A PHONE APP", which has no digit: the shape of a scanner app's
+  stamp on a scan. `pdftotext -bbox` reports 5 words (measured 2026-10-07).
+- `hdfc-logo-and-watermark.pdf` — the same lines as real text, with a 40pt
+  image as a logo and a light rotated rectangle as a watermark.
+  `pdftotext -bbox` reports 72 words, as for page 1 of `hdfc-synthetic.pdf`
+  (measured 2026-10-07).
 
-**Limits.** Encryption is RC4 128-bit (standard security handler revision 3);
+**Limits.** None of these four was made by a scanner or a printer driver: they
+are shaped like what those tools write, not captured from them.
+
+Encryption is RC4 128-bit (standard security handler revision 3);
 real statements commonly use AES, which is not exercised here. The text is the
 non-embedded base-14 Courier font; embedded and proportional fonts are not.
 

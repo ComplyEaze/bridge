@@ -1,0 +1,786 @@
+{
+ "comment": "Every form of narration that names a payee: one payment of Wages from Bank A each, amounts from 101 to 4285 paise, all different. f01 to f05 and f09 name ALPHA TRADERS: f01 in the first UPI layout; f02 in lower and mixed case; f03 with leading spaces, a tab and spaces inside the name, a space before the closing hyphen and a newline at the end; f04 with further hyphens after the name (the name ends at the first); f05 with the closing hyphen as the last character; f09 by IMPS, so the row's channels are IMPS and UPI. f06 has a digit, a full stop, an ampersand and an apostrophe in the name (A1 B.C & D'E); f07 a one-letter name, Z; f08 names PHONEPE in the first UPI layout, where it is a payee. f10 to f12 and f14 name BETA STORES by IMPS: f11 in lower case, f12 with a one-digit reference and the closing hyphen last, f14 with a space before the closing hyphen. f13 is an IMPS narration whose name field is the word UPI: the payee is UPI. f20 to f25 name GAMMA MILLS: f20 by NEFT, f21 with no space before DR, f22 by RTGS (the row's channels are NEFT and RTGS), f23 in lower case with a one-character code, f24 by RTGS with no space, a one-letter code and the closing hyphen last, f25 with a space before the closing hyphen. f30 to f33 name DELTAWO in the second UPI layout, the spaces inside the name removed: f30 with a space inside the reference, f31 with a space after TO TRANSFER- and the name split elsewhere, f32 in lower case with two spaces after TO, f33 with a reference of one space. f34's name field holds a hyphen, a digit, an ampersand and a full stop (D-7&CO.); f35 (PHONEPE1) and f36 (BANKACCT) are near the two placeholders and are payees. f40 to f47 name EPSILON CARRIERS on a cheque: f40 with text after CHQ PAID, f41 with no space round the hyphen, f42 to f45 after WITHDRAWAL BY, WITHDRWAL BY, WITHDRAWL BY and WITHDRWL BY, f46 in lower case with two spaces after BY and none after the hyphen, f47 with CHQ PAIDX. f48 (M.K. ZETA) and f49 (ZETA.) keep their full stops; f50 (MYSELF) and f51 (CASH PAID) only resemble the two refused beginnings. f52 (WITHDRAWAL BY), f53 (WITHDRAWALBY ETA), f54 (PAID TO THETA) and f55 (WITHDRAWAL BYWAY CARRIERS) are read whole as names. f56 is a cheque with a one-letter name and no space, Z: it joins f07's row, whose channels are CHEQUE_COUNTER and UPI. Twenty payees, no payment unread, no finding.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_forms-100"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_forms-101"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_forms-102"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 96559,
+   "closing": -96559
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 96559,
+   "credit": 0,
+   "closing": 96559
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "f01",
+   "date": "2025-04-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-PAYMENT FOR MAY",
+   "lines": [
+    [
+     "Wages",
+     101
+    ],
+    [
+     "Bank A",
+     -101
+    ]
+   ]
+  },
+  {
+   "guid": "f02",
+   "date": "2025-04-03",
+   "base_type": "Payment",
+   "narration": "upi-Alpha Traders-may wages",
+   "lines": [
+    [
+     "Wages",
+     199
+    ],
+    [
+     "Bank A",
+     -199
+    ]
+   ]
+  },
+  {
+   "guid": "f03",
+   "date": "2025-04-04",
+   "base_type": "Payment",
+   "narration": "  UPI-ALPHA \t TRADERS -WAGES\n",
+   "lines": [
+    [
+     "Wages",
+     299
+    ],
+    [
+     "Bank A",
+     -299
+    ]
+   ]
+  },
+  {
+   "guid": "f04",
+   "date": "2025-04-05",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-BETA STORES-GAMMA MILLS",
+   "lines": [
+    [
+     "Wages",
+     401
+    ],
+    [
+     "Bank A",
+     -401
+    ]
+   ]
+  },
+  {
+   "guid": "f05",
+   "date": "2025-04-06",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-",
+   "lines": [
+    [
+     "Wages",
+     505
+    ],
+    [
+     "Bank A",
+     -505
+    ]
+   ]
+  },
+  {
+   "guid": "f06",
+   "date": "2025-04-07",
+   "base_type": "Payment",
+   "narration": "UPI-A1 B.C & D'E-WAGES",
+   "lines": [
+    [
+     "Wages",
+     594
+    ],
+    [
+     "Bank A",
+     -594
+    ]
+   ]
+  },
+  {
+   "guid": "f07",
+   "date": "2025-04-08",
+   "base_type": "Payment",
+   "narration": "UPI-Z-WAGES",
+   "lines": [
+    [
+     "Wages",
+     685
+    ],
+    [
+     "Bank A",
+     -685
+    ]
+   ]
+  },
+  {
+   "guid": "f08",
+   "date": "2025-04-09",
+   "base_type": "Payment",
+   "narration": "UPI-PHONEPE-BILLPAY",
+   "lines": [
+    [
+     "Wages",
+     795
+    ],
+    [
+     "Bank A",
+     -795
+    ]
+   ]
+  },
+  {
+   "guid": "f09",
+   "date": "2025-04-10",
+   "base_type": "Payment",
+   "narration": "IMPS-55-ALPHA TRADERS-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     890
+    ],
+    [
+     "Bank A",
+     -890
+    ]
+   ]
+  },
+  {
+   "guid": "f10",
+   "date": "2025-04-11",
+   "base_type": "Payment",
+   "narration": "IMPS-4021-BETA STORES-ZZBK-XX12",
+   "lines": [
+    [
+     "Wages",
+     987
+    ],
+    [
+     "Bank A",
+     -987
+    ]
+   ]
+  },
+  {
+   "guid": "f11",
+   "date": "2025-04-12",
+   "base_type": "Payment",
+   "narration": "imps-4021-beta stores-zzbk",
+   "lines": [
+    [
+     "Wages",
+     1086
+    ],
+    [
+     "Bank A",
+     -1086
+    ]
+   ]
+  },
+  {
+   "guid": "f12",
+   "date": "2025-04-13",
+   "base_type": "Payment",
+   "narration": "IMPS-7-BETA STORES-",
+   "lines": [
+    [
+     "Wages",
+     1170
+    ],
+    [
+     "Bank A",
+     -1170
+    ]
+   ]
+  },
+  {
+   "guid": "f13",
+   "date": "2025-04-14",
+   "base_type": "Payment",
+   "narration": "IMPS-55-UPI-ALPHA TRADERS-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1273
+    ],
+    [
+     "Bank A",
+     -1273
+    ]
+   ]
+  },
+  {
+   "guid": "f14",
+   "date": "2025-04-15",
+   "base_type": "Payment",
+   "narration": "IMPS-55-BETA STORES -ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1378
+    ],
+    [
+     "Bank A",
+     -1378
+    ]
+   ]
+  },
+  {
+   "guid": "f20",
+   "date": "2025-04-16",
+   "base_type": "Payment",
+   "narration": "NEFT DR-ZZBK77-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     1468
+    ],
+    [
+     "Bank A",
+     -1468
+    ]
+   ]
+  },
+  {
+   "guid": "f21",
+   "date": "2025-04-17",
+   "base_type": "Payment",
+   "narration": "NEFTDR-ZZBK77-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     1560
+    ],
+    [
+     "Bank A",
+     -1560
+    ]
+   ]
+  },
+  {
+   "guid": "f22",
+   "date": "2025-04-18",
+   "base_type": "Payment",
+   "narration": "RTGS DR-ZZBK77-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     1654
+    ],
+    [
+     "Bank A",
+     -1654
+    ]
+   ]
+  },
+  {
+   "guid": "f23",
+   "date": "2025-04-19",
+   "base_type": "Payment",
+   "narration": "neft dr-7-gamma mills-net",
+   "lines": [
+    [
+     "Wages",
+     1750
+    ],
+    [
+     "Bank A",
+     -1750
+    ]
+   ]
+  },
+  {
+   "guid": "f24",
+   "date": "2025-04-20",
+   "base_type": "Payment",
+   "narration": "RTGSDR-Q-GAMMA MILLS-",
+   "lines": [
+    [
+     "Wages",
+     1848
+    ],
+    [
+     "Bank A",
+     -1848
+    ]
+   ]
+  },
+  {
+   "guid": "f25",
+   "date": "2025-04-21",
+   "base_type": "Payment",
+   "narration": "NEFT DR-ZZBK77-GAMMA MILLS -NET",
+   "lines": [
+    [
+     "Wages",
+     1948
+    ],
+    [
+     "Bank A",
+     -1948
+    ]
+   ]
+  },
+  {
+   "guid": "f30",
+   "date": "2025-04-22",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/DELTA WO/",
+   "lines": [
+    [
+     "Wages",
+     2050
+    ],
+    [
+     "Bank A",
+     -2050
+    ]
+   ]
+  },
+  {
+   "guid": "f31",
+   "date": "2025-04-23",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER- UPI/DR/512/DEL TAWO/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2154
+    ],
+    [
+     "Bank A",
+     -2154
+    ]
+   ]
+  },
+  {
+   "guid": "f32",
+   "date": "2025-04-24",
+   "base_type": "Payment",
+   "narration": "to  transfer-upi/dr/5 1 2/delta wo/zzbk/",
+   "lines": [
+    [
+     "Wages",
+     2243
+    ],
+    [
+     "Bank A",
+     -2243
+    ]
+   ]
+  },
+  {
+   "guid": "f33",
+   "date": "2025-04-25",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/ /DELTAWO/",
+   "lines": [
+    [
+     "Wages",
+     2334
+    ],
+    [
+     "Bank A",
+     -2334
+    ]
+   ]
+  },
+  {
+   "guid": "f34",
+   "date": "2025-04-26",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/D-7 & CO./ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2444
+    ],
+    [
+     "Bank A",
+     -2444
+    ]
+   ]
+  },
+  {
+   "guid": "f35",
+   "date": "2025-04-27",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/PHONEPE1/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2539
+    ],
+    [
+     "Bank A",
+     -2539
+    ]
+   ]
+  },
+  {
+   "guid": "f36",
+   "date": "2025-04-28",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/BANK ACCT/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2636
+    ],
+    [
+     "Bank A",
+     -2636
+    ]
+   ]
+  },
+  {
+   "guid": "f40",
+   "date": "2025-05-01",
+   "base_type": "Payment",
+   "narration": "EPSILON CARRIERS - CHQ PAID - 12",
+   "lines": [
+    [
+     "Wages",
+     2735
+    ],
+    [
+     "Bank A",
+     -2735
+    ]
+   ]
+  },
+  {
+   "guid": "f41",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "EPSILON CARRIERS-CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2819
+    ],
+    [
+     "Bank A",
+     -2819
+    ]
+   ]
+  },
+  {
+   "guid": "f42",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "narration": "WITHDRAWAL BY EPSILON CARRIERS - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     2922
+    ],
+    [
+     "Bank A",
+     -2922
+    ]
+   ]
+  },
+  {
+   "guid": "f43",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "narration": "WITHDRWAL BY EPSILON CARRIERS - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3027
+    ],
+    [
+     "Bank A",
+     -3027
+    ]
+   ]
+  },
+  {
+   "guid": "f44",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "WITHDRAWL BY EPSILON CARRIERS - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3117
+    ],
+    [
+     "Bank A",
+     -3117
+    ]
+   ]
+  },
+  {
+   "guid": "f45",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "narration": "WITHDRWL BY EPSILON CARRIERS - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3209
+    ],
+    [
+     "Bank A",
+     -3209
+    ]
+   ]
+  },
+  {
+   "guid": "f46",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "narration": "withdrawal by  epsilon carriers -chq paid",
+   "lines": [
+    [
+     "Wages",
+     3303
+    ],
+    [
+     "Bank A",
+     -3303
+    ]
+   ]
+  },
+  {
+   "guid": "f47",
+   "date": "2025-05-08",
+   "base_type": "Payment",
+   "narration": "EPSILON CARRIERS- CHQ PAIDX",
+   "lines": [
+    [
+     "Wages",
+     3399
+    ],
+    [
+     "Bank A",
+     -3399
+    ]
+   ]
+  },
+  {
+   "guid": "f48",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "narration": "M.K. ZETA - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3497
+    ],
+    [
+     "Bank A",
+     -3497
+    ]
+   ]
+  },
+  {
+   "guid": "f49",
+   "date": "2025-05-10",
+   "base_type": "Payment",
+   "narration": "ZETA. - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3597
+    ],
+    [
+     "Bank A",
+     -3597
+    ]
+   ]
+  },
+  {
+   "guid": "f50",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "narration": "MYSELF - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3699
+    ],
+    [
+     "Bank A",
+     -3699
+    ]
+   ]
+  },
+  {
+   "guid": "f51",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "narration": "CASH PAID - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3803
+    ],
+    [
+     "Bank A",
+     -3803
+    ]
+   ]
+  },
+  {
+   "guid": "f52",
+   "date": "2025-05-13",
+   "base_type": "Payment",
+   "narration": "WITHDRAWAL BY - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3892
+    ],
+    [
+     "Bank A",
+     -3892
+    ]
+   ]
+  },
+  {
+   "guid": "f53",
+   "date": "2025-05-14",
+   "base_type": "Payment",
+   "narration": "WITHDRAWALBY ETA - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3983
+    ],
+    [
+     "Bank A",
+     -3983
+    ]
+   ]
+  },
+  {
+   "guid": "f54",
+   "date": "2025-05-15",
+   "base_type": "Payment",
+   "narration": "PAID TO THETA - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     4093
+    ],
+    [
+     "Bank A",
+     -4093
+    ]
+   ]
+  },
+  {
+   "guid": "f55",
+   "date": "2025-05-16",
+   "base_type": "Payment",
+   "narration": "WITHDRAWAL BYWAY CARRIERS - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     4188
+    ],
+    [
+     "Bank A",
+     -4188
+    ]
+   ]
+  },
+  {
+   "guid": "f56",
+   "date": "2025-05-17",
+   "base_type": "Payment",
+   "narration": "Z-CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     4285
+    ],
+    [
+     "Bank A",
+     -4285
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

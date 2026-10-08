@@ -1,9 +1,10 @@
 use std::{
+    fmt,
     io::{self, Read, Write},
     net::{Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        mpsc, Arc,
+        Arc,
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -24,6 +25,28 @@ const MAX_REQUEST_BYTES: usize = 128 * 1024;
 /// six per paired read, plus the identity and ledger legs around them.
 pub const MAX_SEQUENCE_REQUESTS: usize = 128;
 
+/// The payload of the `TimedOut` error returned when no request reached a plan
+/// within the accept deadline: `plan` is its zero-based place in a sequence of
+/// `plans`. A test failing here names the scripted request its client never
+/// sent (#1248), not only that one is missing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NoRequestForPlan {
+    pub plan: usize,
+    pub plans: usize,
+}
+
+impl fmt::Display for NoRequestForPlan {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "simulator received no request for plan {} of {} (zero-based)",
+            self.plan, self.plans
+        )
+    }
+}
+
+impl std::error::Error for NoRequestForPlan {}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObservedRequest {
     pub method: String,
@@ -35,6 +58,10 @@ pub struct ObservedRequest {
     pub bytes_received: usize,
     pub request_body_bytes: usize,
     pub request_body_sha256: String,
+    /// The same fingerprint of the body with the field-list word `,REFERENCEDATE` removed (UTF-8 or UTF-16LE),
+    /// for tests that pin a request recorded before the voucher read named that field (#1257): equal to
+    /// `request_body_sha256` for every request that does not carry the word.
+    pub request_body_sha256_without_reference_date: String,
     pub request_processed: bool,
     pub cancelled: bool,
     /// The client stopped consuming a response after the request was processed.
@@ -71,16 +98,11 @@ impl Simulator {
         debug_assert!(address.ip().is_loopback());
         let cancelled = Arc::new(AtomicBool::new(false));
         let worker_cancelled = Arc::clone(&cancelled);
-        let (ready_tx, ready_rx) = mpsc::channel();
+        // No wait for the worker to start: the listener is already bound, so a
+        // connection made before the worker runs waits in the backlog (#1248).
         let worker = thread::Builder::new()
             .name("tally-protocol-simulator".to_owned())
-            .spawn(move || {
-                let _ = ready_tx.send(());
-                serve_once(listener, plan, worker_cancelled)
-            })?;
-        ready_rx
-            .recv_timeout(Duration::from_secs(1))
-            .map_err(|_| io::Error::other("simulator worker did not become ready"))?;
+            .spawn(move || serve_once(listener, plan, worker_cancelled))?;
         Ok(Self {
             address,
             cancelled,
@@ -128,16 +150,18 @@ impl SequenceSimulator {
         let worker_cancelled = Arc::clone(&cancelled);
         let received = Arc::new(AtomicUsize::new(0));
         let worker_received = Arc::clone(&received);
-        let (ready_tx, ready_rx) = mpsc::channel();
+        // As in `Simulator::spawn`: no wait for the worker to start (#1248).
         let worker = thread::Builder::new()
             .name("tally-protocol-sequence-simulator".to_owned())
             .spawn(move || {
-                let _ = ready_tx.send(());
-                serve_sequence(listener, plans, worker_cancelled, worker_received)
+                serve_sequence(
+                    listener,
+                    plans,
+                    worker_cancelled,
+                    worker_received,
+                    ACCEPT_DEADLINE,
+                )
             })?;
-        ready_rx
-            .recv_timeout(Duration::from_secs(1))
-            .map_err(|_| io::Error::other("simulator sequence worker did not become ready"))?;
         Ok(Self {
             address,
             cancelled,
@@ -213,7 +237,15 @@ fn serve_once(
     plan: ScenarioPlan,
     cancelled: Arc<AtomicBool>,
 ) -> io::Result<ObservedRequest> {
-    serve_request(&listener, plan, &cancelled, &AtomicUsize::new(0))
+    let unanswered = NoRequestForPlan { plan: 0, plans: 1 };
+    serve_request(
+        &listener,
+        plan,
+        &cancelled,
+        &AtomicUsize::new(0),
+        unanswered,
+        ACCEPT_DEADLINE,
+    )
 }
 
 fn serve_sequence(
@@ -221,13 +253,26 @@ fn serve_sequence(
     plans: Vec<ScenarioPlan>,
     cancelled: Arc<AtomicBool>,
     received: Arc<AtomicUsize>,
+    accept_deadline: Duration,
 ) -> io::Result<Vec<ObservedRequest>> {
-    let mut observed = Vec::with_capacity(plans.len());
-    for plan in plans {
+    let plans_len = plans.len();
+    let mut observed = Vec::with_capacity(plans_len);
+    for (index, plan) in plans.into_iter().enumerate() {
         if cancelled.load(Ordering::Acquire) {
             break;
         }
-        observed.push(serve_request(&listener, plan, &cancelled, &received)?);
+        let unanswered = NoRequestForPlan {
+            plan: index,
+            plans: plans_len,
+        };
+        observed.push(serve_request(
+            &listener,
+            plan,
+            &cancelled,
+            &received,
+            unanswered,
+            accept_deadline,
+        )?);
     }
     Ok(observed)
 }
@@ -237,17 +282,16 @@ fn serve_request(
     plan: ScenarioPlan,
     cancelled: &AtomicBool,
     received: &AtomicUsize,
+    unanswered: NoRequestForPlan,
+    accept_deadline: Duration,
 ) -> io::Result<ObservedRequest> {
     let started = Instant::now();
     let (mut stream, request) = loop {
         let (mut stream, _) = match listener.accept() {
             Ok(accepted) => accepted,
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                if started.elapsed() >= ACCEPT_DEADLINE {
-                    return Err(io::Error::new(
-                        io::ErrorKind::TimedOut,
-                        "simulator received no request",
-                    ));
+                if started.elapsed() >= accept_deadline {
+                    return Err(io::Error::new(io::ErrorKind::TimedOut, unanswered));
                 }
                 thread::sleep(Duration::from_millis(2));
                 continue;
@@ -319,6 +363,9 @@ fn serve_request(
         bytes_received: request.len(),
         request_body_bytes: request_body.len(),
         request_body_sha256: hex::encode(Sha256::digest(request_body)),
+        request_body_sha256_without_reference_date: hex::encode(Sha256::digest(
+            without_reference_date_word(request_body),
+        )),
         request_processed: false,
         cancelled: cancelled.load(Ordering::Acquire),
         client_stopped_reading_response: false,
@@ -706,3 +753,50 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 #[cfg(test)]
 #[path = "server_tests.rs"]
 mod tests;
+
+/// Test-only and temporary: it exists because ten recorded request fingerprints predate the voucher read's
+/// REFERENCEDATE (#1257); remove it when those recordings are next captured.
+///
+/// The body with the FIRST `,REFERENCEDATE` (UTF-8 or UTF-16LE) removed: a request that carries the word twice,
+/// or that carries it elsewhere than the field list of the one voucher read, does not equal the recorded one.
+fn without_reference_date_word(body: &[u8]) -> Vec<u8> {
+    let utf16: Vec<u8> = ",REFERENCEDATE"
+        .encode_utf16()
+        .flat_map(|unit| unit.to_le_bytes())
+        .collect();
+    for word in [utf16.as_slice(), b",REFERENCEDATE".as_slice()] {
+        if let Some(at) = body.windows(word.len()).position(|window| window == word) {
+            let mut out = body[..at].to_vec();
+            out.extend_from_slice(&body[at + word.len()..]);
+            return out;
+        }
+    }
+    body.to_vec()
+}
+
+#[cfg(test)]
+mod reference_date_word_tests {
+    use super::without_reference_date_word;
+
+    #[test]
+    fn only_the_first_word_is_removed_in_either_encoding() {
+        assert_eq!(
+            without_reference_date_word(b"A,REFERENCEDATE</FETCH>"),
+            b"A</FETCH>"
+        );
+        assert_eq!(
+            without_reference_date_word(b"A,REFERENCEDATE,REFERENCEDATE"),
+            b"A,REFERENCEDATE"
+        );
+        let wide = |text: &str| -> Vec<u8> {
+            text.encode_utf16()
+                .flat_map(|unit| unit.to_le_bytes())
+                .collect()
+        };
+        assert_eq!(
+            without_reference_date_word(&wide("A,REFERENCEDATE</FETCH>")),
+            wide("A</FETCH>")
+        );
+        assert_eq!(without_reference_date_word(b"no word"), b"no word");
+    }
+}

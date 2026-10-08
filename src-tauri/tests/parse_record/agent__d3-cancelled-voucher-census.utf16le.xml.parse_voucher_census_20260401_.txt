@@ -1,0 +1,255 @@
+# fixture: agent/d3-cancelled-voucher-census.utf16le.xml
+# parser: parse_voucher_census(20260401)
+# source: captured
+Ok([
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1680,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000054e",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1677,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000054f",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1685,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000550",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1423,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000551",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1424,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000552",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1425,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000553",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1426,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000554",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1427,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000555",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1428,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000556",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1429,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000557",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1430,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000558",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1431,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000559",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1432,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000055a",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1433,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000055b",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1434,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000055c",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1435,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000055d",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1436,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000055e",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1437,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000055f",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1438,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000560",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1439,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000561",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1440,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000562",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1441,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000563",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1442,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000564",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1443,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000565",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1444,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000566",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1445,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000567",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1446,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000568",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1447,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000569",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1448,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000056a",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1449,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000056b",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1450,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000056c",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1451,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000056d",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1452,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000056e",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1453,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000056f",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1454,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000570",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1455,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000571",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1456,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000572",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1457,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000573",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1458,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000574",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1459,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000575",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1460,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000576",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1461,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000577",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1462,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000578",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1463,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-00000579",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1464,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000057a",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1465,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000057b",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1466,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000057c",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1467,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000057d",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1468,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000057e",
+    },
+    CensusRow {
+        day: 2026-04-01,
+        alter_id: 1469,
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000057f",
+    },
+])

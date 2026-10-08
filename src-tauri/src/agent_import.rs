@@ -753,6 +753,14 @@ impl Server {
             let mut report = masters_for_payload(&payload, &catalogue)?;
             annotate_folded_twins(&mut report, &requested_names, ledger_masters.catalog().parents());
             if report.iter().any(|value| value["match_state"] != "exact") {
+                let report = in_batch_order(
+                    requested_names.iter().zip(report).collect(),
+                    &payload.vouchers,
+                    |(name, _)| name.as_str(),
+                )
+                .into_iter()
+                .map(|(_, master)| master)
+                .collect::<Vec<_>>();
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                         "state":"refused", "reason":"masters_not_exact", "masters":report,
@@ -764,7 +772,11 @@ impl Server {
                     truncated: false,
                 });
             }
-            let twins = folded_twins(&requested_names, ledger_masters.catalog().parents());
+            let twins = in_batch_order(
+                folded_twins(&requested_names, ledger_masters.catalog().parents()),
+                &payload.vouchers,
+                |twins| twins.requested.as_str(),
+            );
             if !twins.is_empty() {
                 return Ok(ToolOutcome {
                     payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
@@ -1590,7 +1602,8 @@ impl Server {
             };
             let mut proof = proof;
             if let Some(masters) = &masters_after_post {
-                proof["masters_after_post"] = masters.clone();
+                proof["masters_after_post"] =
+                    served_masters_verdict(masters.clone(), &line.vouchers);
             }
             // Whether a person's recorded review still covers this doubt and
             // this voucher (#239). Beside the verdict, never instead of it.
@@ -1710,11 +1723,40 @@ impl Server {
         company_name: &str,
     ) -> Result<(Vec<super::ledger_candidates::CatalogueLedger>, Evidence), ToolFailure> {
         let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
-        let ledgers = catalogue
-            .spellings()
-            .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
-            .collect();
-        Ok((ledgers, evidence))
+        Ok((resolvable_ledgers(&catalogue), evidence))
+    }
+
+    /// The same catalogue read, with each ledger's immediate parent group as Tally returned it
+    /// (`None` when it returned none), for the group summaries of `vouchers` (#1230).
+    pub(super) async fn read_ledger_parents(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<(Vec<(String, Option<String>)>, Evidence), ToolFailure> {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        Ok((owned_parents(&catalogue), evidence))
+    }
+
+    /// One catalogue read that serves both a typed ledger name (the spellings it resolves against) and
+    /// the group placements (each ledger's parent), so a group summary with `ledger` reads the list once.
+    pub(super) async fn read_resolvable_ledgers_with_parents(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company_name: &str,
+    ) -> Result<
+        (
+            Vec<super::ledger_candidates::CatalogueLedger>,
+            Vec<(String, Option<String>)>,
+            Evidence,
+        ),
+        ToolFailure,
+    > {
+        let (catalogue, evidence) = self.read_v1_catalogue(identity, company_name).await?;
+        Ok((
+            resolvable_ledgers(&catalogue),
+            owned_parents(&catalogue),
+            evidence,
+        ))
     }
 
     async fn read_v1_catalogue(
@@ -1766,10 +1808,11 @@ impl Server {
         ))
     }
 
-    /// The company's group tree, read only when a payload needs one leg
-    /// classified as cash or bank. A ledger row carries a single `PARENT` hop
-    /// and no `PARENTSTRUCTURE`, so the group identities live here.
-    async fn read_group_collection(
+    /// The company's group tree, read when a payload needs one leg
+    /// classified as cash or bank and for the group summaries of `vouchers`. A
+    /// ledger row carries a single `PARENT` hop and no `PARENTSTRUCTURE`, so the
+    /// group identities live here.
+    pub(super) async fn read_group_collection(
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company_name: &str,
@@ -2443,11 +2486,11 @@ fn approval_invalid(error: bill_wise::ApprovalError) -> ToolFailure {
     failure
 }
 
-const BILL_WISE_UNAPPROVED_NEXT_STEP: &str = "No file was written. Each party listed is a ledger that keeps bills in Tally. An entry on it with no bill allocation lands On Account, and the person must then match it to a bill in Tally by hand. Show the person each party with its row_count, its debit_total and credit_total, and the rows listed, and say how many more rows there are (rows_omitted, refused_parties_omitted); raise BRIDGE_AGENT_MAX_BYTES to list them all. Ask whether each party's entries may be posted On Account, one party per question. Only for the parties the person says yes to, build again with on_account_approvals: a list with one {party_digest} for each, the digest copied from this answer (a ledger copied beside it is not read, so a masked name does no harm). The digest ties the approval to this exact batch, this company and this endpoint, and changing any row changes every party's digest, so the person is asked again. It does not prove that a person said yes, and a hand import of the file is not checked at all: never approve on the person's behalf. The native approval dialog lists each voucher of a small batch but does not mark which entries land On Account. If this batch amends an earlier one, importing it also replaces any bill allocations the person made in Tally.";
+const BILL_WISE_UNAPPROVED_NEXT_STEP: &str = "No file was written. Each party listed is a ledger that keeps bills in Tally. An entry on it with no bill allocation lands On Account, and the person must then match it to a bill in Tally by hand. Show the person each party with its row_count, its debit_total and credit_total, and the rows listed, and say how many more rows there are (rows_omitted, refused_parties_omitted); raise BRIDGE_AGENT_MAX_BYTES to list them all. Ask whether each party's entries may be posted On Account, one party per question. Only for the parties the person says yes to, build again with on_account_approvals: a list with one {party_digest} for each, the digest copied from this answer (a ledger copied beside it is not read, so a masked name does no harm). The digest ties the approval to this exact batch, this company and this endpoint, and changing any row changes every party's digest, so the person is asked again. It does not prove that a person said yes, and a hand import of the file is not checked at all: never approve on the person's behalf. When the batch is posted, the native approval dialog marks each approved party On Account, from this build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines). That dialog is one answer for the whole batch and asks nothing about any one party, so it does not replace these questions. If this batch amends an earlier one, importing it also replaces any bill allocations the person made in Tally.";
 
 const BILL_WISE_NONE_NOTE: &str = "Checked: none of the ledgers this batch names is a bill-wise ledger, as read from Tally in the ledger list during this build. ComplyEaze Bridge reads the ledger list again before posting and refuses the post (import_bill_wise_changed) if a named ledger has become bill-wise since. This reads each ledger's own bill-wise setting, not the company's bill-wise feature. A hand import of the file is not checked at all.";
 
-const BILL_WISE_APPROVED_NOTE: &str = "Entries on the bill-wise ledgers listed in on_account_approved carry no bill allocation, so each amount lands On Account and must be matched to bills in Tally afterwards. Each has an approval digest that matches this batch; ComplyEaze Bridge cannot tell whether a person said yes, and the native approval dialog lists each voucher of a small batch but does not mark which entries land On Account. Any other ledger this batch names that has become bill-wise by the time of posting is refused (import_bill_wise_changed).";
+const BILL_WISE_APPROVED_NOTE: &str = "Entries on the bill-wise ledgers listed in on_account_approved carry no bill allocation, so each amount lands On Account and must be matched to bills in Tally afterwards. Each has an approval digest that matches this batch; ComplyEaze Bridge cannot tell whether a person said yes. If this batch is posted natively, the approval dialog marks each of these ledgers On Account, from this build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines); a hand import of the file shows no dialog. Any other ledger this batch names that has become bill-wise by the time of posting is refused (import_bill_wise_changed).";
 
 /// Why `post_import` would refuse a saved batch, for the build's warning. The
 /// code is the one `post_import` returns; the text only explains it. A code
@@ -2473,6 +2516,9 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
         }
         "import_review_too_large" => {
             "the approval text does not fit in one native dialog".to_string()
+        }
+        "import_review_on_account_unmarked" => {
+            "the approval text would leave an approved bill-wise ledger without its On Account mark".to_string()
         }
         _ => "post_import refuses this batch for the same reason".to_string(),
     }
@@ -2995,7 +3041,10 @@ fn cash_bank_refusals(
     max_bytes: usize,
 ) -> CashBankRefusals {
     let mut classified = BTreeMap::<&str, CashBankState>::new();
-    let mut refused = BTreeMap::<(&str, &'static str), Value>::new();
+    // One row per ledger and requirement, in the order the batch's legs are
+    // first refused, never by name, with or without masking. The order also
+    // decides which rows the budget below keeps.
+    let mut refused = Vec::<((&str, &'static str), Value)>::new();
     let mut legs = 0_usize;
     for (voucher, side, ledger, requirement) in constrained_legs(payload) {
         let state = classified
@@ -3011,7 +3060,11 @@ fn cash_bank_refusals(
             LegRequirement::Money => "cash_bank",
             LegRequirement::Counterparty => "not_cash_bank",
         };
-        refused.entry((ledger, requires)).or_insert_with(|| {
+        if refused.iter().any(|(row, _)| *row == (ledger, requires)) {
+            continue;
+        }
+        refused.push((
+            (ledger, requires),
             json!({
                 "ledger": party_name(ledger),
                 "requires": requires,
@@ -3021,13 +3074,14 @@ fn cash_bank_refusals(
                 // One voucher a caller can open to see the problem, rather
                 // than every voucher that repeats it.
                 "first_bridge_txn_id": voucher.bridge_txn_id,
-            })
-        });
+            }),
+        ));
     }
     let mut budget = refusal_diagnostic_budget(max_bytes);
     let distinct = refused.len();
     let ledgers = refused
-        .into_values()
+        .into_iter()
+        .map(|(_, row)| row)
         // Filter rather than stop at the first row that will not fit: an
         // oversized row is one long ledger name, not a reason to discard every
         // shorter refusal behind it. Budget is only spent on rows that are
@@ -3352,14 +3406,15 @@ fn requested_master_report(
 /// cash-in-hand answer's ledger outside Cash-in-Hand
 /// (`cash_ledger_not_cash_in_hand`), else another answer's ledger under
 /// Suspense A/c (`cash_answer_ledger_in_suspense`). One row per ledger with the
-/// reserved group it reaches, bounded like the cash/bank refusal.
+/// reserved group it reaches, in the order the answers first name them and
+/// never by name, bounded like the cash/bank refusal.
 fn answered_ledger_refusals(
     required: &[super::bank_statement::AnsweredCashLedger],
     observed: &ObservedMasters,
     max_bytes: usize,
 ) -> Option<(&'static str, Vec<Value>, usize)> {
-    let mut not_cash = BTreeMap::<&str, Value>::new();
-    let mut in_suspense = BTreeMap::<&str, Value>::new();
+    let mut not_cash = Vec::<(&str, Value)>::new();
+    let mut in_suspense = Vec::<(&str, Value)>::new();
     for need in required {
         let state = observed.classify(&need.ledger);
         let (refused, requires) = if need.cash_in_hand && !state.is_cash_in_hand() {
@@ -3369,9 +3424,12 @@ fn answered_ledger_refusals(
         } else {
             continue;
         };
-        refused.entry(need.ledger.as_str()).or_insert_with(|| {
-            refused_ledger_row(&need.ledger, requires, &state, Some(&need.bridge_txn_id))
-        });
+        if !refused.iter().any(|(ledger, _)| *ledger == need.ledger) {
+            refused.push((
+                need.ledger.as_str(),
+                refused_ledger_row(&need.ledger, requires, &state, Some(&need.bridge_txn_id)),
+            ));
+        }
     }
     let (reason, refused) = if !not_cash.is_empty() {
         ("cash_ledger_not_cash_in_hand", not_cash)
@@ -3381,8 +3439,10 @@ fn answered_ledger_refusals(
         return None;
     };
     let mut budget = refusal_diagnostic_budget(max_bytes);
-    let (rows, omitted) =
-        super::bank_statement::bounded(refused.into_values().collect(), &mut budget);
+    let (rows, omitted) = super::bank_statement::bounded(
+        refused.into_iter().map(|(_, row)| row).collect(),
+        &mut budget,
+    );
     Some((reason, rows, omitted))
 }
 
@@ -3434,6 +3494,41 @@ fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
     })
 }
 
+/// `rows` in the order the batch first names each row's ledger. A list of the
+/// batch's ledgers goes out in this order and never by name, with or without
+/// masking. A ledger the batch does not name goes last, in its incoming order:
+/// the lists built from the batch hold none, and a recorded verdict names the
+/// ledgers the batch was bound to.
+fn in_batch_order<T>(
+    mut rows: Vec<T>,
+    vouchers: &[ImportVoucher],
+    ledger: impl for<'a> Fn(&'a T) -> &'a str,
+) -> Vec<T> {
+    rows.sort_by_cached_key(|row| {
+        vouchers
+            .iter()
+            .flat_map(|voucher| &voucher.entries)
+            .position(|entry| entry.ledger == ledger(row))
+            .unwrap_or(usize::MAX)
+    });
+    rows
+}
+
+/// A masters verdict as an answer carries it: the ledgers it names in the order
+/// the batch names them (`in_batch_order`), not the order they were recorded
+/// in. The recorded verdict is left as it was saved: a recorded review is bound
+/// to its bytes.
+fn served_masters_verdict(mut verdict: Value, vouchers: &[ImportVoucher]) -> Value {
+    if let Some(ledgers) = verdict.get_mut("ledgers").and_then(Value::as_array_mut) {
+        *ledgers = in_batch_order(std::mem::take(ledgers), vouchers, |ledger| {
+            ledger.as_str().unwrap_or_default()
+        });
+    }
+    verdict
+}
+
+/// The ledgers a batch names, each once, in name order. A list of them sent to
+/// the caller is put `in_batch_order` first.
 fn requested_ledger_names(payload: &ImportPayload) -> Vec<String> {
     payload
         .vouchers
@@ -4102,3 +4197,23 @@ fn served_verification_page(persisted: &[u8], offset: usize) -> Result<(Value, V
 #[cfg(test)]
 #[path = "agent_import_file_tests.rs"]
 mod file_tests;
+
+/// The catalogue's ledgers as a request can reach them: each row spelling with its stored name (#1085).
+fn resolvable_ledgers(
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) -> Vec<super::ledger_candidates::CatalogueLedger> {
+    catalogue
+        .spellings()
+        .map(|(row, stored)| super::ledger_candidates::CatalogueLedger::new(row, stored))
+        .collect()
+}
+
+/// Each ledger of a catalogue with its immediate parent group as Tally returned it (#1230).
+fn owned_parents(
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalog,
+) -> Vec<(String, Option<String>)> {
+    catalogue
+        .parents()
+        .map(|(ledger, parent)| (ledger.to_string(), parent.map(str::to_string)))
+        .collect()
+}

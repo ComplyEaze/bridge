@@ -1,0 +1,1772 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "narration_payees",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "491f22a8d7ad83c5",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded): debits to the ledgers the client lists, and any 194C-mapped ledger whose payees the TDS payee test could not name, when that test's finding lists them; bank payments read for the printed payee.",
+  "figures": [
+    {
+      "id": "narration_payees.added_ledgers_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "67832d0c861c0d90",
+      "definition_text": "194C-mapped ledgers read besides those the client lists, because the TDS payee test could not name the payee of their payments (its finding lists them; on a book whose vouchers share a blank or repeated identifier, a ledger debited on another voucher with the same identifier too). With no ledger listed or added, nothing was read.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.configured_ledgers_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "db736a29e0c67c2e",
+      "definition_text": "Ledgers the client lists as paid to payees named only in the bank narration.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.cut_handle_unjoined_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "572435bbb39da9af",
+      "definition_text": "Bank payments whose UPI address one bank printed cut short and no single full address among the bank payments completes under an agreeing name (none, several, or one printed under another name): joined to no other payee by it.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.elsewhere_over_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "1b9226a248db354e",
+      "definition_text": "Payees under both s.194C limits on the ledgers read, whose total with their debits to other ledgers exceeds the aggregate limit, or one of whose payments debits other ledgers by more than the single-sum limit.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.elsewhere_over_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "bef05cdfc659c919",
+      "definition_text": "The debits to other ledgers of every such payee, added together.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.not_through_bank_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "62b8d7662ebec896",
+      "definition_text": "Debits on the ledgers read with no bank leg (cash or journal): no payee is read from a bank narration for them.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payee_channel_005e336e",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWAL BY",
+          "label": "WITHDRAWAL BY"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_0083d0a8",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "MYSELF",
+          "label": "MYSELF"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_06d84751",
+      "value": "NEFT, RTGS",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "GAMMA MILLS",
+          "label": "GAMMA MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_08762431",
+      "value": "IMPS, UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_28289460",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "EPSILON CARRIERS",
+          "label": "EPSILON CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_2c9e5ff2",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWALBY ETA",
+          "label": "WITHDRAWALBY ETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_4d1893b1",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "M.K. ZETA",
+          "label": "M.K. ZETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_5adb20c3",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWAL BYWAY CARRIERS",
+          "label": "WITHDRAWAL BYWAY CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_5d5047d1",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PHONEPE1",
+          "label": "PHONEPE1"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_67647f42",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PHONEPE",
+          "label": "PHONEPE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_7edeadcf",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANKACCT",
+          "label": "BANKACCT"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_8f367ec0",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "A1 B.C & D'E",
+          "label": "A1 B.C & D'E"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_909f99a7",
+      "value": "CHEQUE_COUNTER, UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "Z",
+          "label": "Z"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_9fab0428",
+      "value": "IMPS",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BETA STORES",
+          "label": "BETA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_a2a7b95b",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DELTAWO",
+          "label": "DELTAWO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_b1317e83",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "D-7&CO.",
+          "label": "D-7&CO."
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_c11c7cf5",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ZETA.",
+          "label": "ZETA."
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_c2a696fd",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PAID TO THETA",
+          "label": "PAID TO THETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_d2d520fd",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CASH PAID",
+          "label": "CASH PAID"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_f295b2cd",
+      "value": "IMPS",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPI",
+          "label": "UPI"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_005e336e",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWAL BY",
+          "label": "WITHDRAWAL BY"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_0083d0a8",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "MYSELF",
+          "label": "MYSELF"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_06d84751",
+      "value": 6,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "GAMMA MILLS",
+          "label": "GAMMA MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_08762431",
+      "value": 6,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_28289460",
+      "value": 8,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "EPSILON CARRIERS",
+          "label": "EPSILON CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_2c9e5ff2",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWALBY ETA",
+          "label": "WITHDRAWALBY ETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_4d1893b1",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "M.K. ZETA",
+          "label": "M.K. ZETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_5adb20c3",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWAL BYWAY CARRIERS",
+          "label": "WITHDRAWAL BYWAY CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_5d5047d1",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PHONEPE1",
+          "label": "PHONEPE1"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_67647f42",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PHONEPE",
+          "label": "PHONEPE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_7edeadcf",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANKACCT",
+          "label": "BANKACCT"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_8f367ec0",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "A1 B.C & D'E",
+          "label": "A1 B.C & D'E"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_909f99a7",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "Z",
+          "label": "Z"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_9fab0428",
+      "value": 4,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BETA STORES",
+          "label": "BETA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_a2a7b95b",
+      "value": 4,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DELTAWO",
+          "label": "DELTAWO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_b1317e83",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "D-7&CO.",
+          "label": "D-7&CO."
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_c11c7cf5",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ZETA.",
+          "label": "ZETA."
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_c2a696fd",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PAID TO THETA",
+          "label": "PAID TO THETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_d2d520fd",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CASH PAID",
+          "label": "CASH PAID"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_f295b2cd",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPI",
+          "label": "UPI"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_005e336e",
+      "value": 3892,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWAL BY",
+          "label": "WITHDRAWAL BY"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_0083d0a8",
+      "value": 3699,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "MYSELF",
+          "label": "MYSELF"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_06d84751",
+      "value": 1948,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "GAMMA MILLS",
+          "label": "GAMMA MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_08762431",
+      "value": 890,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_28289460",
+      "value": 3399,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "EPSILON CARRIERS",
+          "label": "EPSILON CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_2c9e5ff2",
+      "value": 3983,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWALBY ETA",
+          "label": "WITHDRAWALBY ETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_4d1893b1",
+      "value": 3497,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "M.K. ZETA",
+          "label": "M.K. ZETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_5adb20c3",
+      "value": 4188,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWAL BYWAY CARRIERS",
+          "label": "WITHDRAWAL BYWAY CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_5d5047d1",
+      "value": 2539,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PHONEPE1",
+          "label": "PHONEPE1"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_67647f42",
+      "value": 795,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PHONEPE",
+          "label": "PHONEPE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_7edeadcf",
+      "value": 2636,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANKACCT",
+          "label": "BANKACCT"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_8f367ec0",
+      "value": 594,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "A1 B.C & D'E",
+          "label": "A1 B.C & D'E"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_909f99a7",
+      "value": 4285,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "Z",
+          "label": "Z"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_9fab0428",
+      "value": 1378,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BETA STORES",
+          "label": "BETA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_a2a7b95b",
+      "value": 2334,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DELTAWO",
+          "label": "DELTAWO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_b1317e83",
+      "value": 2444,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "D-7&CO.",
+          "label": "D-7&CO."
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_c11c7cf5",
+      "value": 3597,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ZETA.",
+          "label": "ZETA."
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_c2a696fd",
+      "value": 4093,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PAID TO THETA",
+          "label": "PAID TO THETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_d2d520fd",
+      "value": 3803,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CASH PAID",
+          "label": "CASH PAID"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_f295b2cd",
+      "value": 1273,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPI",
+          "label": "UPI"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_005e336e",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWAL BY",
+          "label": "WITHDRAWAL BY"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_0083d0a8",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "MYSELF",
+          "label": "MYSELF"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_06d84751",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "GAMMA MILLS",
+          "label": "GAMMA MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_08762431",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_28289460",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "EPSILON CARRIERS",
+          "label": "EPSILON CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_2c9e5ff2",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWALBY ETA",
+          "label": "WITHDRAWALBY ETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_4d1893b1",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "M.K. ZETA",
+          "label": "M.K. ZETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_5adb20c3",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWAL BYWAY CARRIERS",
+          "label": "WITHDRAWAL BYWAY CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_5d5047d1",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PHONEPE1",
+          "label": "PHONEPE1"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_67647f42",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PHONEPE",
+          "label": "PHONEPE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_7edeadcf",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANKACCT",
+          "label": "BANKACCT"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_8f367ec0",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "A1 B.C & D'E",
+          "label": "A1 B.C & D'E"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_909f99a7",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "Z",
+          "label": "Z"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_9fab0428",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BETA STORES",
+          "label": "BETA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_a2a7b95b",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DELTAWO",
+          "label": "DELTAWO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_b1317e83",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "D-7&CO.",
+          "label": "D-7&CO."
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_c11c7cf5",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ZETA.",
+          "label": "ZETA."
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_c2a696fd",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PAID TO THETA",
+          "label": "PAID TO THETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_d2d520fd",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CASH PAID",
+          "label": "CASH PAID"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_f295b2cd",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPI",
+          "label": "UPI"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_005e336e",
+      "value": 3892,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWAL BY",
+          "label": "WITHDRAWAL BY"
+        },
+        {
+          "kind": "voucher",
+          "id": "f52",
+          "label": "Payment f52 on 2025-05-13"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_0083d0a8",
+      "value": 3699,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "MYSELF",
+          "label": "MYSELF"
+        },
+        {
+          "kind": "voucher",
+          "id": "f50",
+          "label": "Payment f50 on 2025-05-11"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_06d84751",
+      "value": 10228,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "GAMMA MILLS",
+          "label": "GAMMA MILLS"
+        },
+        {
+          "kind": "voucher",
+          "id": "f20",
+          "label": "Payment f20 on 2025-04-16"
+        },
+        {
+          "kind": "voucher",
+          "id": "f21",
+          "label": "Payment f21 on 2025-04-17"
+        },
+        {
+          "kind": "voucher",
+          "id": "f22",
+          "label": "Payment f22 on 2025-04-18"
+        },
+        {
+          "kind": "voucher",
+          "id": "f23",
+          "label": "Payment f23 on 2025-04-19"
+        },
+        {
+          "kind": "voucher",
+          "id": "f24",
+          "label": "Payment f24 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "f25",
+          "label": "Payment f25 on 2025-04-21"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_08762431",
+      "value": 2395,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        },
+        {
+          "kind": "voucher",
+          "id": "f01",
+          "label": "Payment f01 on 2025-04-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "f02",
+          "label": "Payment f02 on 2025-04-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "f03",
+          "label": "Payment f03 on 2025-04-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "f04",
+          "label": "Payment f04 on 2025-04-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "f05",
+          "label": "Payment f05 on 2025-04-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "f09",
+          "label": "Payment f09 on 2025-04-10"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_28289460",
+      "value": 24531,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "EPSILON CARRIERS",
+          "label": "EPSILON CARRIERS"
+        },
+        {
+          "kind": "voucher",
+          "id": "f40",
+          "label": "Payment f40 on 2025-05-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "f41",
+          "label": "Payment f41 on 2025-05-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "f42",
+          "label": "Payment f42 on 2025-05-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "f43",
+          "label": "Payment f43 on 2025-05-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "f44",
+          "label": "Payment f44 on 2025-05-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "f45",
+          "label": "Payment f45 on 2025-05-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "f46",
+          "label": "Payment f46 on 2025-05-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "f47",
+          "label": "Payment f47 on 2025-05-08"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_2c9e5ff2",
+      "value": 3983,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWALBY ETA",
+          "label": "WITHDRAWALBY ETA"
+        },
+        {
+          "kind": "voucher",
+          "id": "f53",
+          "label": "Payment f53 on 2025-05-14"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_4d1893b1",
+      "value": 3497,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "M.K. ZETA",
+          "label": "M.K. ZETA"
+        },
+        {
+          "kind": "voucher",
+          "id": "f48",
+          "label": "Payment f48 on 2025-05-09"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_5adb20c3",
+      "value": 4188,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "WITHDRAWAL BYWAY CARRIERS",
+          "label": "WITHDRAWAL BYWAY CARRIERS"
+        },
+        {
+          "kind": "voucher",
+          "id": "f55",
+          "label": "Payment f55 on 2025-05-16"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_5d5047d1",
+      "value": 2539,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PHONEPE1",
+          "label": "PHONEPE1"
+        },
+        {
+          "kind": "voucher",
+          "id": "f35",
+          "label": "Payment f35 on 2025-04-27"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_67647f42",
+      "value": 795,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PHONEPE",
+          "label": "PHONEPE"
+        },
+        {
+          "kind": "voucher",
+          "id": "f08",
+          "label": "Payment f08 on 2025-04-09"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_7edeadcf",
+      "value": 2636,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANKACCT",
+          "label": "BANKACCT"
+        },
+        {
+          "kind": "voucher",
+          "id": "f36",
+          "label": "Payment f36 on 2025-04-28"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_8f367ec0",
+      "value": 594,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "A1 B.C & D'E",
+          "label": "A1 B.C & D'E"
+        },
+        {
+          "kind": "voucher",
+          "id": "f06",
+          "label": "Payment f06 on 2025-04-07"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_909f99a7",
+      "value": 4970,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "Z",
+          "label": "Z"
+        },
+        {
+          "kind": "voucher",
+          "id": "f07",
+          "label": "Payment f07 on 2025-04-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "f56",
+          "label": "Payment f56 on 2025-05-17"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_9fab0428",
+      "value": 4621,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BETA STORES",
+          "label": "BETA STORES"
+        },
+        {
+          "kind": "voucher",
+          "id": "f10",
+          "label": "Payment f10 on 2025-04-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "f11",
+          "label": "Payment f11 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "f12",
+          "label": "Payment f12 on 2025-04-13"
+        },
+        {
+          "kind": "voucher",
+          "id": "f14",
+          "label": "Payment f14 on 2025-04-15"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_a2a7b95b",
+      "value": 8781,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DELTAWO",
+          "label": "DELTAWO"
+        },
+        {
+          "kind": "voucher",
+          "id": "f30",
+          "label": "Payment f30 on 2025-04-22"
+        },
+        {
+          "kind": "voucher",
+          "id": "f31",
+          "label": "Payment f31 on 2025-04-23"
+        },
+        {
+          "kind": "voucher",
+          "id": "f32",
+          "label": "Payment f32 on 2025-04-24"
+        },
+        {
+          "kind": "voucher",
+          "id": "f33",
+          "label": "Payment f33 on 2025-04-25"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_b1317e83",
+      "value": 2444,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "D-7&CO.",
+          "label": "D-7&CO."
+        },
+        {
+          "kind": "voucher",
+          "id": "f34",
+          "label": "Payment f34 on 2025-04-26"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_c11c7cf5",
+      "value": 3597,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ZETA.",
+          "label": "ZETA."
+        },
+        {
+          "kind": "voucher",
+          "id": "f49",
+          "label": "Payment f49 on 2025-05-10"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_c2a696fd",
+      "value": 4093,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PAID TO THETA",
+          "label": "PAID TO THETA"
+        },
+        {
+          "kind": "voucher",
+          "id": "f54",
+          "label": "Payment f54 on 2025-05-15"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_d2d520fd",
+      "value": 3803,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CASH PAID",
+          "label": "CASH PAID"
+        },
+        {
+          "kind": "voucher",
+          "id": "f51",
+          "label": "Payment f51 on 2025-05-12"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_f295b2cd",
+      "value": 1273,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPI",
+          "label": "UPI"
+        },
+        {
+          "kind": "voucher",
+          "id": "f13",
+          "label": "Payment f13 on 2025-04-14"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payees_count",
+      "value": 20,
+      "unit": "count",
+      "definition_sha256_16": "b6f907568524af65",
+      "definition_text": "Distinct payees printed by the bank: payments sharing a printed name or a whole UPI handle are one payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_over_194c_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "2400a2096d06bfa0",
+      "definition_text": "Of those, payees over a s.194C threshold.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_over_194c_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "121fee500217c9d5",
+      "definition_text": "Total paid to the payees over a threshold.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.placeholder_payee_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "78e46136ab75d08c",
+      "definition_text": "Bank payments on the ledgers read where the bank printed a placeholder (such as \"Bank Acc\" or \"PhonePe\") in place of the payee: not read as any payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.possible_same_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "4f94c204008d6113",
+      "definition_text": "Groups of payees that a shortened UPI address might join, listed apart and never joined.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.resolved_total",
+      "value": 96559,
+      "unit": "paise",
+      "definition_sha256_16": "0a0479b3fe570ca0",
+      "definition_text": "Total bank payments with a printed payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.same_day_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f0d6e165f7e7002d",
+      "definition_text": "Payees paid two or more times on one day, the day's total over the s.194C single-sum limit, counted once per payee and day.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.same_day_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8bc394ef74148d1d",
+      "definition_text": "The day totals of every payee paid more than once on one day, over the s.194C single-sum limit, added together.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.unresolved_bank_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "bb150e6493cc3554",
+      "definition_text": "Bank payments on the ledgers read whose narration names no payee that can be read (a placeholder in place of the payee included).",
+      "evidence": []
+    }
+  ],
+  "findings": [],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "narration_payees.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

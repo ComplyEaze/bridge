@@ -37,7 +37,7 @@ const CASH_SHARE_NOTABLE_BP: i64 = 3000;
 const LSC1_TOL_PAISE: i64 = 100;
 /// The reference's `DEFAULT_LEDGER_SCRUTINY` large-entry threshold (Rs 50,000), used when the
 /// rules file has no `[ledger_scrutiny]` table.
-const DEFAULT_LARGE_ENTRY_PAISE: i64 = 5_000_000;
+pub(crate) const DEFAULT_LARGE_ENTRY_PAISE: i64 = 5_000_000;
 
 type Entries<'a> = BTreeMap<String, (&'a Voucher, i64)>;
 

@@ -1,0 +1,665 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "specified_persons_40a2b",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "e3b0c44298fc1c14",
+  "population_note_text": "",
+  "figures": [
+    {
+      "id": "specified_persons_40a2b.applicable",
+      "value": "yes",
+      "unit": "text",
+      "definition_sha256_16": "2d8a39297f56ab6a",
+      "definition_text": "Whether any related person has been confirmed by the client for this engagement (the SAME [related_parties] config related_parties_cl23 reads). 'no' means none were confirmed and this test reports nothing further.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "specified_persons_40a2b/comparable_required/08409dd2/salary",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_08409dd2"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L11 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p11",
+          "label": "Payment p11 on 2025-06-21"
+        }
+      ],
+      "title_sha256_16": "6274007c36fe6f07",
+      "title_text": "A comparable is needed to test the 'salary' amount paid to related person (tag 08409dd2) under s.40A(2)(b)",
+      "limits_sha256_16": "627396b16ec27518",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the part of this amount that lies above a market comparable; the books show only the amount that moved, never a market rate or price, so this test takes no view on how any part of it compares to the comparable."
+      ],
+      "ask_client_sha256_16": "6190d32f1a251862",
+      "ask_client_text": [
+        "Obtain the prevailing salary for a comparable role, qualifications and hours and record it as the basis for this amount.",
+        "Confirm the business need for the transaction."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/comparable_required/0e74b791/salary",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_0e74b791"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L07 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p07",
+          "label": "Payment p07 on 2025-11-17"
+        }
+      ],
+      "title_sha256_16": "e293cd50179ab3a0",
+      "title_text": "A comparable is needed to test the 'salary' amount paid to related person (tag 0e74b791) under s.40A(2)(b)",
+      "limits_sha256_16": "627396b16ec27518",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the part of this amount that lies above a market comparable; the books show only the amount that moved, never a market rate or price, so this test takes no view on how any part of it compares to the comparable."
+      ],
+      "ask_client_sha256_16": "6190d32f1a251862",
+      "ask_client_text": [
+        "Obtain the prevailing salary for a comparable role, qualifications and hours and record it as the basis for this amount.",
+        "Confirm the business need for the transaction."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/comparable_required/0e7808aa/salary",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_0e7808aa"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L08 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Payment p08 on 2025-12-18"
+        }
+      ],
+      "title_sha256_16": "6a2a3cdaa33d6630",
+      "title_text": "A comparable is needed to test the 'salary' amount paid to related person (tag 0e7808aa) under s.40A(2)(b)",
+      "limits_sha256_16": "627396b16ec27518",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the part of this amount that lies above a market comparable; the books show only the amount that moved, never a market rate or price, so this test takes no view on how any part of it compares to the comparable."
+      ],
+      "ask_client_sha256_16": "6190d32f1a251862",
+      "ask_client_text": [
+        "Obtain the prevailing salary for a comparable role, qualifications and hours and record it as the basis for this amount.",
+        "Confirm the business need for the transaction."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/comparable_required/4ece4da1/salary",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_4ece4da1"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L15 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p14",
+          "label": "Payment p14 on 2025-09-24"
+        }
+      ],
+      "title_sha256_16": "62c7d840b6bdd8db",
+      "title_text": "A comparable is needed to test the 'salary' amount paid to related person (tag 4ece4da1) under s.40A(2)(b)",
+      "limits_sha256_16": "627396b16ec27518",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the part of this amount that lies above a market comparable; the books show only the amount that moved, never a market rate or price, so this test takes no view on how any part of it compares to the comparable."
+      ],
+      "ask_client_sha256_16": "6190d32f1a251862",
+      "ask_client_text": [
+        "Obtain the prevailing salary for a comparable role, qualifications and hours and record it as the basis for this amount.",
+        "Confirm the business need for the transaction."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/comparable_required/6e6fc64b/salary",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_6e6fc64b"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L13 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p13",
+          "label": "Payment p13 on 2025-08-23"
+        }
+      ],
+      "title_sha256_16": "3eb80d3ff4542f9b",
+      "title_text": "A comparable is needed to test the 'salary' amount paid to related person (tag 6e6fc64b) under s.40A(2)(b)",
+      "limits_sha256_16": "627396b16ec27518",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the part of this amount that lies above a market comparable; the books show only the amount that moved, never a market rate or price, so this test takes no view on how any part of it compares to the comparable."
+      ],
+      "ask_client_sha256_16": "6190d32f1a251862",
+      "ask_client_text": [
+        "Obtain the prevailing salary for a comparable role, qualifications and hours and record it as the basis for this amount.",
+        "Confirm the business need for the transaction."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/comparable_required/8ed7bfad/salary",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_8ed7bfad"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L10 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p10",
+          "label": "Payment p10 on 2025-05-20"
+        }
+      ],
+      "title_sha256_16": "7f830d52e6e09ea9",
+      "title_text": "A comparable is needed to test the 'salary' amount paid to related person (tag 8ed7bfad) under s.40A(2)(b)",
+      "limits_sha256_16": "627396b16ec27518",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the part of this amount that lies above a market comparable; the books show only the amount that moved, never a market rate or price, so this test takes no view on how any part of it compares to the comparable."
+      ],
+      "ask_client_sha256_16": "6190d32f1a251862",
+      "ask_client_text": [
+        "Obtain the prevailing salary for a comparable role, qualifications and hours and record it as the basis for this amount.",
+        "Confirm the business need for the transaction."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/comparable_required/c090c2ae/salary",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_c090c2ae"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L12 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p12",
+          "label": "Payment p12 on 2025-07-22"
+        }
+      ],
+      "title_sha256_16": "292f9c76a89a57df",
+      "title_text": "A comparable is needed to test the 'salary' amount paid to related person (tag c090c2ae) under s.40A(2)(b)",
+      "limits_sha256_16": "627396b16ec27518",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the part of this amount that lies above a market comparable; the books show only the amount that moved, never a market rate or price, so this test takes no view on how any part of it compares to the comparable."
+      ],
+      "ask_client_sha256_16": "6190d32f1a251862",
+      "ask_client_text": [
+        "Obtain the prevailing salary for a comparable role, qualifications and hours and record it as the basis for this amount.",
+        "Confirm the business need for the transaction."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/comparable_required/de5a482a/salary",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_de5a482a"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L09 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p09",
+          "label": "Payment p09 on 2025-04-19"
+        }
+      ],
+      "title_sha256_16": "e62b441887b40eeb",
+      "title_text": "A comparable is needed to test the 'salary' amount paid to related person (tag de5a482a) under s.40A(2)(b)",
+      "limits_sha256_16": "627396b16ec27518",
+      "limits_text": [
+        "s.40A(2)(b) disallows only the part of this amount that lies above a market comparable; the books show only the amount that moved, never a market rate or price, so this test takes no view on how any part of it compares to the comparable."
+      ],
+      "ask_client_sha256_16": "6190d32f1a251862",
+      "ask_client_text": [
+        "Obtain the prevailing salary for a comparable role, qualifications and hours and record it as the basis for this amount.",
+        "Confirm the business need for the transaction."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/s40b_governs/0c05ee00/salary",
+      "clauses": [
+        "s.40A(2)(b)",
+        "s.40(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_0c05ee00"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L05 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p05",
+          "label": "Payment p05 on 2025-09-15"
+        }
+      ],
+      "title_sha256_16": "3dde0f5097537ce3",
+      "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 0c05ee00) -- s.40(b) governs instead (confirm)",
+      "limits_sha256_16": "6e0b090584d26105",
+      "limits_text": [
+        "Related person (tag 0c05ee00) is recorded with relationship 'partner', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+      ],
+      "ask_client_sha256_16": "5826bab93282b266",
+      "ask_client_text": [
+        "Confirm the partnership deed treats this amount as partner interest or remuneration under s.40(b), not a separate related-party payment under s.40A(2)(b)."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/s40b_governs/0ceecd7a/salary",
+      "clauses": [
+        "s.40A(2)(b)",
+        "s.40(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_0ceecd7a"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L02 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Payment p02 on 2025-06-12"
+        }
+      ],
+      "title_sha256_16": "0376528728dc88ac",
+      "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 0ceecd7a) -- s.40(b) governs instead (confirm)",
+      "limits_sha256_16": "db22f05ca2e972a7",
+      "limits_text": [
+        "Related person (tag 0ceecd7a) is recorded with relationship 'partner', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+      ],
+      "ask_client_sha256_16": "5826bab93282b266",
+      "ask_client_text": [
+        "Confirm the partnership deed treats this amount as partner interest or remuneration under s.40(b), not a separate related-party payment under s.40A(2)(b)."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/s40b_governs/3e0265a9/salary",
+      "clauses": [
+        "s.40A(2)(b)",
+        "s.40(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_3e0265a9"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L03 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p03",
+          "label": "Payment p03 on 2025-07-13"
+        }
+      ],
+      "title_sha256_16": "aa55e948063ed6c0",
+      "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 3e0265a9) -- s.40(b) governs instead (confirm)",
+      "limits_sha256_16": "92fb7f8a27ba4b9d",
+      "limits_text": [
+        "Related person (tag 3e0265a9) is recorded with relationship 'Working Partner', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+      ],
+      "ask_client_sha256_16": "5826bab93282b266",
+      "ask_client_text": [
+        "Confirm the partnership deed treats this amount as partner interest or remuneration under s.40(b), not a separate related-party payment under s.40A(2)(b)."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/s40b_governs/64909c92/salary",
+      "clauses": [
+        "s.40A(2)(b)",
+        "s.40(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_64909c92"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L04 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Payment p04 on 2025-08-14"
+        }
+      ],
+      "title_sha256_16": "3ae04e78eb9152b5",
+      "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 64909c92) -- s.40(b) governs instead (confirm)",
+      "limits_sha256_16": "32066476f68e7ea6",
+      "limits_text": [
+        "Related person (tag 64909c92) is recorded with relationship 'Partner in the firm', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+      ],
+      "ask_client_sha256_16": "5826bab93282b266",
+      "ask_client_text": [
+        "Confirm the partnership deed treats this amount as partner interest or remuneration under s.40(b), not a separate related-party payment under s.40A(2)(b)."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/s40b_governs/74b1dab5/interest",
+      "clauses": [
+        "s.40A(2)(b)",
+        "s.40(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_interest_74b1dab5"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L01 Interest",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "j01",
+          "label": "Journal j01 on 2026-03-31"
+        }
+      ],
+      "title_sha256_16": "5f1328edd80acfe1",
+      "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 74b1dab5) -- s.40(b) governs instead (confirm)",
+      "limits_sha256_16": "cf07f0f077984bc0",
+      "limits_text": [
+        "Related person (tag 74b1dab5) is recorded with relationship 'PARTNER', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+      ],
+      "ask_client_sha256_16": "5826bab93282b266",
+      "ask_client_text": [
+        "Confirm the partnership deed treats this amount as partner interest or remuneration under s.40(b), not a separate related-party payment under s.40A(2)(b)."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/s40b_governs/74b1dab5/salary",
+      "clauses": [
+        "s.40A(2)(b)",
+        "s.40(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_74b1dab5"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L01 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Payment p01 on 2025-05-11"
+        }
+      ],
+      "title_sha256_16": "5f1328edd80acfe1",
+      "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 74b1dab5) -- s.40(b) governs instead (confirm)",
+      "limits_sha256_16": "cf07f0f077984bc0",
+      "limits_text": [
+        "Related person (tag 74b1dab5) is recorded with relationship 'PARTNER', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+      ],
+      "ask_client_sha256_16": "5826bab93282b266",
+      "ask_client_text": [
+        "Confirm the partnership deed treats this amount as partner interest or remuneration under s.40(b), not a separate related-party payment under s.40A(2)(b)."
+      ]
+    },
+    {
+      "id": "specified_persons_40a2b/s40b_governs/7e3c8da1/salary",
+      "clauses": [
+        "s.40A(2)(b)",
+        "s.40(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "related_parties_cl23.amount_salary_7e3c8da1"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Person L06 Remuneration",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "p06",
+          "label": "Payment p06 on 2025-10-16"
+        }
+      ],
+      "title_sha256_16": "df3bce620cda0cac",
+      "title_text": "s.40A(2)(b) does not apply to this amount for related person (tag 7e3c8da1) -- s.40(b) governs instead (confirm)",
+      "limits_sha256_16": "65682579b206130e",
+      "limits_text": [
+        "Related person (tag 7e3c8da1) is recorded with relationship 'WORKING PARTNER', a client confirmation of partner status, and this engagement's rules apply s.40(b) to a partner's interest and remuneration; on that basis s.40A(2)(b) does not additionally apply to the same amount. This rests on the client's own confirmation, not a reading of the deed, so it is stated here for confirmation, not as a settled fact."
+      ],
+      "ask_client_sha256_16": "5826bab93282b266",
+      "ask_client_text": [
+        "Confirm the partnership deed treats this amount as partner interest or remuneration under s.40(b), not a separate related-party payment under s.40A(2)(b)."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/comparable_required/08409dd2/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_08409dd2"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/comparable_required/0e74b791/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_0e74b791"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/comparable_required/0e7808aa/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_0e7808aa"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/comparable_required/4ece4da1/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_4ece4da1"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/comparable_required/6e6fc64b/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_6e6fc64b"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/comparable_required/8ed7bfad/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_8ed7bfad"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/comparable_required/c090c2ae/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_c090c2ae"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/comparable_required/de5a482a/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_de5a482a"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/s40b_governs/0c05ee00/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_0c05ee00"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/s40b_governs/0ceecd7a/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_0ceecd7a"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/s40b_governs/3e0265a9/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_3e0265a9"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/s40b_governs/64909c92/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_64909c92"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/s40b_governs/74b1dab5/interest",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_interest_74b1dab5"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/s40b_governs/74b1dab5/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_74b1dab5"
+    },
+    {
+      "invariant": "REND-0",
+      "subject": "specified_persons_40a2b/s40b_governs/7e3c8da1/salary",
+      "detail": "fact amount -> missing figure related_parties_cl23.amount_salary_7e3c8da1"
+    }
+  ],
+  "module_invariants_evaluated": [
+    "specified_persons_40a2b.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

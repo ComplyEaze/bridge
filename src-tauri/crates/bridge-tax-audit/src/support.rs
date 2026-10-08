@@ -189,7 +189,6 @@ pub(crate) fn py_is_word(c: char) -> bool {
 
 /// Python 3.13's `str.split()` with no argument: split on runs of Python whitespace, dropping empty
 /// pieces.
-#[cfg_attr(not(test), allow(dead_code))] // first caller: the batch-2 ports
 pub(crate) fn py_split(text: &str) -> Vec<&str> {
     text.split(py_isspace).filter(|p| !p.is_empty()).collect()
 }

@@ -65,8 +65,10 @@ requests it comes from, except where it names an issue.
   marked required and still starts off. Claude Desktop now starts ComplyEaze
   Bridge, and until you tick the setting every tool answers
   `terms_not_accepted`, naming the setting. The setting no longer shows
-  "(required)" beside its title. This was seen on one Mac with a test package;
-  it has not yet been checked on Windows (#1413).
+  "(required)" beside its title, and its description now begins "Tick to use
+  ComplyEaze Bridge: it refuses every tool call until you accept the Terms of
+  Use." This was seen on one Mac with a test package; it has not yet been
+  checked on Windows (#1413).
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
   the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
   text already said; the schema said 500 even when the row limit was lower or higher (#1148).

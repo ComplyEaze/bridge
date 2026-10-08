@@ -48,7 +48,7 @@
     "accept_terms_2026_10_1": {
       "type": "boolean",
       "title": "I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)",
-      "description": "Required: ComplyEaze Bridge refuses every tool call until you accept. Terms: https://bridge.complyeaze.com/terms. Privacy: https://bridge.complyeaze.com/privacy.",
+      "description": "Tick to use ComplyEaze Bridge: it refuses every tool call until you accept the Terms of Use. Terms: https://bridge.complyeaze.com/terms. Privacy: https://bridge.complyeaze.com/privacy.",
       "default": false
     },
     "host": {

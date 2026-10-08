@@ -56,20 +56,41 @@ fn table_top(page_lines: &[Line], bank: Bank) -> Option<f64> {
     })
 }
 
+/// The words of one visual line, bucketed by column.
+fn cells_of(line: &Line, bank: Bank) -> Cells {
+    let mut cells = Cells::new();
+    for word in &line.words {
+        cells
+            .entry(bank.column_of(word.x0, word.x1))
+            .or_default()
+            .push(word.clone());
+    }
+    cells
+}
+
 /// Statement rows, in printed order (`parse_pages`).
 ///
 /// Page anchors, column bounds, row-start detection, multi-line row assembly
-/// and the wrap heuristic, reachable without a PDF.
+/// and the wrap heuristic, reachable without a PDF. For ICICI these are the printed
+/// rows, newest first, each balance still carrying its glued `Cr`/`Dr` marker: read a
+/// statement through [`parse_statement`], which orders and signs them.
 pub fn parse_pages(pages: &[Page], bank: Bank) -> Vec<Row> {
     let mut rows: Vec<BTreeMap<&'static str, Vec<(String, f64)>>> = Vec::new();
     let mut stop = false;
+    let mut header_seen = false;
     for page in pages {
         if stop {
             break;
         }
         let page_lines = lines(page);
-        let Some(top) = table_top(&page_lines, bank) else {
-            continue;
+        let top = match table_top(&page_lines, bank) {
+            Some(top) => {
+                header_seen = true;
+                top
+            }
+            // a header printed once: every later page's table starts at its top
+            None if bank.header_once() && header_seen => f64::NEG_INFINITY,
+            None => continue,
         };
         if !bank.end_anchors().is_empty()
             && page_lines
@@ -91,17 +112,14 @@ pub fn parse_pages(pages: &[Page], bank: Bank) -> Vec<Row> {
             {
                 continue;
             }
-            let mut cells = Cells::new();
-            for word in &line.words {
-                cells
-                    .entry(bank.column_of(word.x0, word.x1))
-                    .or_default()
-                    .push(word.clone());
-            }
+            let cells = cells_of(line, bank);
             // A line that opens a transaction is a transaction whatever else it
             // says: the date decides, and the footer anchor only breaks ties.
             let started = bank.is_row_start(&cells);
-            if !started && !bank.bottom_anchors().is_empty() && matches(line, bank.bottom_anchors())
+            let words: Vec<&str> = line.words.iter().map(|word| word.text.as_str()).collect();
+            if !started
+                && ((!bank.bottom_anchors().is_empty() && matches(line, bank.bottom_anchors()))
+                    || bank.column_footer(&words).is_some())
             {
                 break;
             }
@@ -160,9 +178,16 @@ pub fn parse_pages(pages: &[Page], bank: Bank) -> Vec<Row> {
 /// Statement rows for any layout, or the refusal a single-line table raises.
 ///
 /// A column layout cannot tell a stray line from a wrapped cell, so it has no
-/// refusals of its own here; the balance replay is its proof.
+/// refusals of its own here beyond the rules ICICI adds (a footer on every page, a
+/// row at the top of every later page, dates, value dates and balance markers a
+/// layout can produce, and newest-first order); the balance replay is its proof.
 pub fn parse_statement(pages: &[Page], bank: Bank) -> Result<Vec<Row>, Refusal> {
     match bank.layout() {
+        Layout::Columns if bank == Bank::Icici => {
+            require_page_footers(pages, bank)?;
+            require_later_pages_start_with_a_row(pages, bank)?;
+            Bank::icici_rows(parse_pages(pages, bank))
+        }
         Layout::Columns => Ok(parse_pages(pages, bank)),
         Layout::SingleLine => parse_single_line_pages(pages, bank),
     }
@@ -193,15 +218,7 @@ fn parse_single_line_pages(pages: &[Page], bank: Bank) -> Result<Vec<Row>, Refus
             !matches!(bank.classify_line(words), LineKind::Row(_))
                 && page_footer(words) == Some((index + 1, pages.len()))
         }) {
-            return Err(Refusal::new(
-                "page_sequence_unproven",
-                format!(
-                    "page {} does not print \"Page {} of {}\"; without printed totals, every page must be accounted for",
-                    index + 1,
-                    index + 1,
-                    pages.len()
-                ),
-            ));
+            return Err(page_sequence_unproven(index, pages.len()));
         }
         let Some(top) = table_top(&page_lines, bank) else {
             continue;
@@ -240,6 +257,63 @@ fn parse_single_line_pages(pages: &[Page], bank: Bank) -> Result<Vec<Row>, Refus
         }
     }
     Ok(rows)
+}
+
+fn page_sequence_unproven(index: usize, count: usize) -> Refusal {
+    Refusal::new(
+        "page_sequence_unproven",
+        format!(
+            "page {} does not print \"Page {} of {count}\"; without printed totals, every page must be accounted for",
+            index + 1,
+            index + 1,
+        ),
+    )
+}
+
+/// A table whose column header is printed once starts every later page with a row: that
+/// is what the two statements measured did on all of their 7 later pages, so a later page
+/// opening with anything else is a banner, a note or a row split across the break, and
+/// none of them is read into the row above it.
+fn require_later_pages_start_with_a_row(pages: &[Page], bank: Bank) -> Result<(), Refusal> {
+    let mut header_seen = false;
+    for (index, page) in pages.iter().enumerate() {
+        let page_lines = lines(page);
+        if table_top(&page_lines, bank).is_some() {
+            header_seen = true;
+            continue;
+        }
+        if !(bank.header_once() && header_seen) {
+            continue;
+        }
+        if let Some(first) = page_lines.first() {
+            if !bank.is_row_start(&cells_of(first, bank)) {
+                return Err(Refusal::new(
+                    "unexpected_line_in_table",
+                    format!(
+                        "page {} does not start with a transaction; a banner, a note or a row split across the page break is not read into the row above it",
+                        index + 1
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A column layout without printed totals: every page must print its own footer
+/// `Page N of M`, N its position and M the document's page count, so a dropped page
+/// whose two sides cancel is refused (the balance replay cannot see one).
+fn require_page_footers(pages: &[Page], bank: Bank) -> Result<(), Refusal> {
+    for (index, page) in pages.iter().enumerate() {
+        let proven = lines(page).iter().any(|line| {
+            let words: Vec<&str> = line.words.iter().map(|word| word.text.as_str()).collect();
+            bank.column_footer(&words) == Some((index + 1, pages.len()))
+        });
+        if !proven {
+            return Err(page_sequence_unproven(index, pages.len()));
+        }
+    }
+    Ok(())
 }
 
 static DIGIT_RUN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\d+").unwrap());
@@ -308,6 +382,9 @@ pub fn require_account_match(
             ),
         ));
     }
+    if bank == Bank::Icici {
+        return icici_account_match(pages, &digits);
+    }
     let runs = account_number_runs(pages, bank);
     if runs.is_empty() {
         return Err(Refusal::new(
@@ -330,4 +407,68 @@ pub fn require_account_match(
             "the account digits match more than one number on the account-number line; supply more digits",
         )),
     }
+}
+
+/// ICICI prints its own account number masked (`ddd` + `XXXXXXXX` + `ddd`, 14
+/// characters, in the page-1 header block above the table), so a tail cannot bind
+/// it: the supplied digits must begin with the clear leading digits, end with the
+/// clear trailing ones and carry more digits than those, so a tail is refused. Only
+/// those clear digits are compared; the masked middle cannot be, and the number's real
+/// length is not known (whether the mask keeps it is unverified), so the length is not
+/// checked either. Returns the masked number as printed. Masked numbers further down are
+/// a narration's counterparty, not this account, and are never read.
+fn icici_account_match(pages: &[Page], digits: &str) -> Result<String, Refusal> {
+    static MASKED: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^([0-9]+)[Xx*]+([0-9]+)$").unwrap());
+    let mut printed: BTreeSet<String> = BTreeSet::new();
+    for page in pages {
+        let page_lines = lines(page);
+        let Some(top) = table_top(&page_lines, Bank::Icici) else {
+            continue;
+        };
+        for line in page_lines.iter().filter(|line| line.y < top) {
+            printed.extend(
+                line.words
+                    .iter()
+                    .filter(|word| MASKED.is_match(&word.text))
+                    .map(|word| word.text.clone()),
+            );
+        }
+    }
+    let mut tokens = printed.iter();
+    let (Some(token), None) = (tokens.next(), tokens.next()) else {
+        return Err(if printed.is_empty() {
+            Refusal::new(
+                "no_account_number_line",
+                "no masked account number was found above the table's column header row; the header row itself may be missing, the layout may have changed, or this is not an ICICI statement",
+            )
+        } else {
+            Refusal::new(
+                "ambiguous_account_match",
+                "the statement prints more than one masked account number above its table",
+            )
+        });
+    };
+    let found = MASKED
+        .captures(token)
+        .expect("the token matched the pattern above");
+    if digits.chars().count() <= found[1].len() + found[2].len() {
+        return Err(Refusal::new(
+            "unbindable_account",
+            format!(
+                "an ICICI statement prints its account number masked (only its first {} and last {} digits clear); the account label must carry the whole number",
+                found[1].len(),
+                found[2].len()
+            ),
+        ));
+    }
+    if !(digits.starts_with(&found[1]) && digits.ends_with(&found[2])) {
+        return Err(Refusal::new(
+            "account_not_in_statement",
+            "the account digits supplied disagree with the clear digits of the statement's masked account number; refusing to post it anywhere",
+        ));
+    }
+    // the number the statement prints, not the label's digits: the same statement must
+    // give the same transaction ids whatever the operator typed in the masked middle
+    Ok(token.clone())
 }

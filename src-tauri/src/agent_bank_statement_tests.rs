@@ -168,7 +168,7 @@ async fn inputs_are_refused_before_the_statement_is_opened() {
             json!("statement.password"),
             "argument_invalid:password_file",
         ),
-        ("bank", json!("icici"), "argument_invalid:bank"),
+        ("bank", json!("axis"), "argument_invalid:bank"),
         (
             "total_debits",
             json!("-8,800.00"),
@@ -1709,4 +1709,56 @@ fn the_build_is_told_which_bank_and_suspense_ledgers_the_file_was_parsed_for() {
     )
     .unwrap();
     assert!(inline.statement_ledgers.is_none());
+}
+
+#[tokio::test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+async fn an_icici_statement_parses_from_the_callers_balances_with_an_empty_password_file() {
+    assert!(env::var_os("BRIDGE_PDFIUM_LIBRARY").is_some());
+    let directory = tempfile::tempdir().unwrap();
+    // a downloaded statement opens without a password: the password file is empty
+    let (statement, password_file) = statement_files(directory.path(), "icici-synthetic.pdf", "");
+    let server = server(directory.path(), true, Redaction::None);
+    let args = json!({
+        "statement_path": statement.to_str().unwrap(),
+        "password_file": password_file.to_str().unwrap(),
+        "bank": "icici",
+        "account_label": "ICICI CA 12399999999456",
+        "opening_balance": "10,000.00",
+        "closing_balance": "-16,141.16",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    });
+    let open = server.call_tool("parse_bank_statement", args.clone()).await;
+    let result = &open["structuredContent"]["result"];
+    assert_eq!(result["statement_rows"], 14, "{open}");
+    let questions = result["cash_questions"].as_array().unwrap();
+    assert_eq!(questions.len(), 1, "{open}");
+    assert_eq!(questions[0]["movement"], "deposit");
+    assert_eq!(questions[0]["amount"], "750.50");
+    let mut args = args;
+    args["cash_answers"] =
+        json!([{"bridge_txn_id": questions[0]["bridge_txn_id"], "answer": "dont_know"}]);
+    let response = server.call_tool("parse_bank_statement", args.clone()).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["vouchers"], 14, "{response}");
+    assert_eq!(result["cash_questions"], json!([]));
+    assert_eq!(result["reconciled"]["closing_balance"], "-16141.16");
+    assert_eq!(result["reconciled"]["total_debits"], Value::Null);
+    assert_eq!(result["reconciled"]["totals_match_statement"], false);
+
+    // the label must carry the whole number: a tail cannot bind a masked one
+    let mut tail = args.clone();
+    tail["account_label"] = json!("ICICI CA xx0456");
+    assert_eq!(
+        error_code(&server.call_tool("parse_bank_statement", tail).await),
+        Some("statement_unbindable_account")
+    );
+    // and a closing balance the rows do not reach is refused
+    let mut short = args;
+    short["closing_balance"] = json!("0.00");
+    assert_eq!(
+        error_code(&server.call_tool("parse_bank_statement", short).await),
+        Some("statement_extent_unproven")
+    );
 }

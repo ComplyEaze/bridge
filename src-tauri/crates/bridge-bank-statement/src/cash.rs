@@ -16,8 +16,8 @@
 //! purpose nobody knows is visible rather than held back.
 //!
 //! Recognition is by the party name the parser gives a row: SBI's `ATM WDL`
-//! and Union Bank's `BY CASH` rules, each from a captured statement, name the
-//! two cash parties ([`crate::bank`]). A parser that extracts one of those two
+//! and the `BY CASH` rules of Union Bank and ICICI, each from a measured
+//! statement, name the two cash parties ([`crate::bank`]). A parser that extracts one of those two
 //! names from other text makes that row a cash line too, which fails safe: it
 //! is asked, never defaulted.
 
@@ -28,7 +28,7 @@ use std::collections::BTreeMap;
 
 /// The party the SBI parser names an `ATM WDL` row.
 pub const CASH_WITHDRAWAL: &str = "ATM CASH WITHDRAWAL";
-/// The party the Union Bank parser names a `BY CASH` row.
+/// The party the Union Bank and ICICI parsers name a `BY CASH` row.
 pub const CASH_DEPOSIT: &str = "CASH DEPOSIT";
 
 /// The narration tag of a line posted to suspense because a person answered

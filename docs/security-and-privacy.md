@@ -7,8 +7,8 @@ page was not read again at it, except as said below). Three
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
-`ledger_movement` read took, in section 2 (#1366), and where the released
-program loads the PDF library from, in section 5 (#1422). It was written from a reading
+`ledger_movement` read took, in section 2 (#1366), and where a program built
+from this repository loads the PDF library from, in section 5 (#1422). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
@@ -317,9 +317,9 @@ workflow run and commit produced a file. In the workflow's own words, it is
 not a code signature, no client checks it yet, and it does not show the code
 is safe. The package includes an unsigned
 third-party PDF library (PDFium, from a pinned release, checked by SHA-256 at
-build time), used only to read the bank statement PDF you name; the released
-program loads it from the folder that holds its own executable, and checks no
-SHA-256 or other digest of it when it loads it. **Not
+build time), used only to read the bank statement PDF you name; a program built
+from this repository from #1422 on loads it from the folder that holds its own
+executable, and checks no SHA-256 or other digest of it when it loads it. **Not
 measured:** which files PDFium opens, and when, or whether it opens any network
 connection. What the source does show: ComplyEaze Bridge, not PDFium, opens the
 statement file. It reads the file itself, refusing one larger than 32 MiB, and hands

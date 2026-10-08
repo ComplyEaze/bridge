@@ -1,6 +1,8 @@
 // Proves the test-only native-approval seam (bridge#583) and the test-only
-// PDFium library override are absent from every shipped executable, and
-// present where they must be, so that their absence means something.
+// PDFium library override are absent from the executables it is given (Tauri's
+// bundle hook, CI's bundle job, the release workflow and package-mcpb call it),
+// and that their markers survive into a test build, so that absence means
+// something.
 //
 // The seam lives in src-tauri/src/tally/approved_import.rs under bare
 // `#[cfg(test)]` and carries SEAM_MARKER, which it uses at runtime so the
@@ -18,8 +20,12 @@
 //       executables `tauri build` just produced.
 //   node scripts/check-no-test-seam.mjs --test-harness [--release]
 //       Builds (or reuses) the bridge lib unit-test executable and requires
-//       every marker in it: proof the scan can see the test-only code when it
-//       is compiled in, in that profile.
+//       every marker in it, in that profile. For SEAM_MARKER that is the seam
+//       itself. PDFIUM_OVERRIDE_MARKER also appears in the unit tests' own
+//       sources (their #[ignore] reasons and asserts), so for it the control
+//       shows only that the name survives into a test build; the test "the
+//       PDFium marker is the variable the Rust override reads, under bare
+//       cfg(test)" in check-no-test-seam.test.mjs ties it to the lookup.
 //
 // Only uncompressed executables prove anything. A .dmg, .msi, .zip, .mcpb or
 // installer compresses its contents, so a clean scan of one would pass
@@ -129,7 +135,7 @@ export function assertNoTestSeam(paths) {
   if (marked.length > 0) {
     throw new Error(
       `test-only code compiled into: ${marked.map((path) => `${path} (${markersIn(path).join(", ")})`).join(", ")}; ` +
-        "a shipped binary was built with cfg(test)",
+        "a shipped binary was built with cfg(test), or non-test code names a test-only marker",
     );
   }
 }

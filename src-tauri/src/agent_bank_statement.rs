@@ -318,7 +318,8 @@ fn read_statement(path: &LocalDiskPath) -> Result<Vec<u8>, String> {
 /// Where the bundled PDFium library is: beside this executable. This crate's
 /// own unit tests may name another by an absolute path in
 /// `BRIDGE_PDFIUM_LIBRARY`; any other build has no such lookup, which
-/// `scripts/check-no-test-seam.mjs` proves on every shipped executable.
+/// `scripts/check-no-test-seam.mjs` checks on the executables the Tauri
+/// bundle hook, CI's bundle job and the release workflow produce.
 fn pdfium_library() -> Result<PathBuf, String> {
     #[cfg(test)]
     if let Some(path) = env::var_os("BRIDGE_PDFIUM_LIBRARY") {

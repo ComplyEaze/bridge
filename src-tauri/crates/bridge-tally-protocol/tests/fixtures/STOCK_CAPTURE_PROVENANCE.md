@@ -75,7 +75,7 @@ Every file is a live capture, never hand-written.
 
 ## A sale of an item that held no stock (captured 2026-10-07)
 
-- **What:** the stock items collection and the plain Stock Summary read from one synthetic lab company after one sales item invoice (5 Nos at 25.00, dated 8 July 2025, no batch, no godown) was imported for an item whose closing balance read empty before it. The same two reads before the sale showed that item with an empty balance and no report line.
+- **What:** the stock items collection and the plain Stock Summary read from one synthetic lab company after one sales item invoice (5 Nos at 25.00, dated 8 July 2025, no batch, no godown) was imported for an item whose closing balance read empty before it. The same two reads made before the sale showed that item with an empty balance and no report line; those two answers are not committed.
 - **Host / gateway:** TallyPrime **Silver (licensed)**, 7.1, `education_mode=false`, a lab instance, one request at a time through a built `bridge_mcp` (the tool's own requests: `AuditStockItemsV1` over 20250401 to 20260331, and `Stock Summary`).
 - **Edits (the only ones):** the company GUID prefix of every row GUID is replaced by `7f3c9a10-5b2d-4e6a-9c41-0d2e8b6a1f37` (same length), and the two item names' lab prefix is replaced by `Lab`. Everything else is the bytes Tally sent, BOM-less UTF-16LE, with the HTTP header removed. The sizes below are of the edited files.
 - **What the captures show:** the item has `CLOSINGBALANCE` `-5 Nos` and an empty `CLOSINGVALUE`, and the report has a line for it with `DSPCLQTY` `-5 Nos` and an empty `DSPCLAMTA`; the other item reads ` 18 Nos` with `-186.00`, in both.

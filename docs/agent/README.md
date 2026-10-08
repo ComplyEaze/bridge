@@ -578,9 +578,11 @@ quantity is returned:
   is also counted in `totals.closing_quantity_unread_count` and does not refuse
   the read.
 - `inside_stock_group`: the item's own parent is not the root, that is a stock
-  group (any other parent text gets this state too, which only withholds). The
-  report lists only what sits directly under the root (it is not expanded), so the
-  item has no line of its own, whatever a line of the same name shows.
+  group (any other parent text gets this state too, which only withholds). In
+  the captures the report listed only what sits directly under the root (it is
+  not expanded; no capture yet holds a group and an item under the root side by
+  side), so the item is taken to have no line of its own, whatever a line of the
+  same name shows.
 - `report_has_no_line`: the item sits directly under the root and no line of the
   report carries its name: it has nothing to show, or the report names it
   differently (an alias, a spacing difference, a case difference). It is also

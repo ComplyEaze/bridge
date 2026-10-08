@@ -1341,9 +1341,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         "ack_stop_tally_unreadable" => Some(
             "A release is recorded with what ComplyEaze Bridge can see of the invoice in \
-             Tally, so it needs a Tally it can read, and the read did not run. Nothing was \
-             recorded and no dialog was shown. Ask the user to open the company in Tally, and \
-             call again. A book that cannot be read cannot post an invoice either."
+             Tally, and Tally did not answer the read. Nothing was recorded and no dialog was \
+             shown. Ask the user to open the company in Tally and call again. A Tally that does \
+             not answer cannot post an invoice either."
         ),
         "invoice_stop_unreadable" => Some(
             "ComplyEaze Bridge could not read its own import journal to see whether an earlier \

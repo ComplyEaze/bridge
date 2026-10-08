@@ -16,6 +16,11 @@ fn server_without_tally(directory: &std::path::Path) -> Server {
 fn saved(server: &Server, voucher_type: &str) -> ImportLedgerLine {
     let origin =
         crate::tally::connection::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    saved_for(server, voucher_type, &origin)
+}
+
+/// As [`saved`], recorded against the Tally endpoint `origin` names.
+fn saved_for(server: &Server, voucher_type: &str, origin: &str) -> ImportLedgerLine {
     let id = format!("bridge-{}", Uuid::new_v4());
     let voucher = if voucher_type == "Sales" {
         json!({"bridge_txn_id":"t1","date":"20260907","voucher_type":"Sales",
@@ -357,4 +362,33 @@ fn a_post_refused_for_a_stopped_company_says_what_to_do() {
         .as_str()
         .unwrap()
         .contains("invoice_stop"));
+}
+
+/// A failed read that no wait cures (the batch was sent to another endpoint
+/// than the one now set) must not leave the company stopped for good: the
+/// release goes through, says the read failed, and is journaled as the
+/// invoice possibly being in the book, so it stays the number control.
+#[tokio::test]
+async fn a_release_is_not_refused_for_a_failure_waiting_cannot_cure() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_without_tally(directory.path());
+    let line = saved_for(&server, "Sales", "http://127.0.0.1:9000");
+    dispatched(&server, &line);
+    assert_eq!(stop(&server), Some(line.batch_id.clone()));
+    let approval = ScriptedApproval::approving();
+    let response = release(&server, args(&line), approval.clone()).await;
+    assert_eq!(result(&response)["state"], "stop_released", "{response}");
+    assert_eq!(result(&response)["invoice_found_at_release"], true);
+    let shown = &approval.reviews()[0];
+    assert!(shown.contains("Tally could not be read"), "{shown}");
+    assert_eq!(stop(&server), None);
+    assert_eq!(
+        server
+            .import_invoice_number_control(GUID, ("20260401", "20270331"))
+            .unwrap(),
+        ledger::NumberControl::Known {
+            number: "BP/26-27/0010".to_string(),
+            date: "20260907".to_string()
+        }
+    );
 }

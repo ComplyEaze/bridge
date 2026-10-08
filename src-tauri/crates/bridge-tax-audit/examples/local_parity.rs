@@ -37,8 +37,8 @@
 //! `dep_expense_ledgers`, all REQUIRED, and an optional `put_to_use_by_voucher`) is read the same
 //! way. `PYTHON_DUMP_JSON` is that script's output for the same config, read and test id.
 //! `ENGINE_RULES_TOML` is the reference engine's full rules file: the vendored excerpt must still
-//! be a byte-for-byte verbatim part of it (checked block by block; see `src/rules.rs`) and give
-//! the same values.
+//! be a verbatim part of it, a trailing `#` comment apart (checked block by block;
+//! `rules::vendored_blocks_in_source`, `src/rules.rs`), and give the same values.
 //!
 //! **Identity binding.** `CLIENT_TOML`'s `[ledger_ids]`/`[group_ids]` are resolved through
 //! `Engagement::bind` (`src/binding.rs`, `docs/tax-audit/config-identity-binding-v1.md`) exactly
@@ -67,7 +67,7 @@ use std::time::Instant;
 use bridge_tax_audit::canonical::hex;
 use bridge_tax_audit::compare::compare;
 use bridge_tax_audit::registry::{self, CallerData};
-use bridge_tax_audit::rules::{Rules, SOURCE_SHA256, VENDORED};
+use bridge_tax_audit::rules::{vendored_blocks_in_source, Rules, SOURCE_SHA256, VENDORED};
 use bridge_tax_audit::{load_book, Engagement};
 use sha2::{Digest, Sha256};
 
@@ -77,17 +77,13 @@ fn fail(message: impl std::fmt::Display) -> ExitCode {
 }
 
 /// Every vendored TOML block (separated by a blank line in `rules/ay2026-27.s44ab.toml`) must
-/// independently be a byte-for-byte verbatim substring of the live source. The blocks are not
-/// contiguous in the source file (two are truncated mid-table to skip a private research
-/// citation, and `[s44ab.turnover]`/`[s271da]` sit between them), so checking the whole
-/// post-header body as a single substring -- this example's earlier, `cash_44ab`-only check --
-/// no longer applies.
+/// independently be a run of the live source's lines, a trailing `#` comment on any line apart:
+/// a reworded comment moves no value, a changed key, header, value or string is found. The blocks
+/// are not contiguous in the source file (two are truncated mid-table to skip a private research
+/// citation, and `[s44ab.turnover]`/`[s271da]` sit between them), so the whole post-header body
+/// is not tested as one piece.
 fn vendored_blocks_are_verbatim(source: &str) -> bool {
-    let body = &VENDORED[VENDORED.find("\n[meta]\n").map_or(0, |i| i + 1)..];
-    body.split("\n\n")
-        .map(str::trim_end)
-        .filter(|block| !block.is_empty())
-        .all(|block| source.contains(block))
+    vendored_blocks_in_source(VENDORED, source)
 }
 
 /// Narrows `[ledger_ids]`/`[group_ids]` to the labels the locations this port's `Engagement`

@@ -16,8 +16,9 @@
 //! under a header explaining why each block stops where it does (see the file itself). The
 //! source file had sha256 [`SOURCE_SHA256`] when it was read at reference commit
 //! [`SOURCE_COMMIT`]. The local parity example re-checks, against a local copy of the reference
-//! implementation, that every block is still a verbatim substring of the live source and that
-//! both files give the same values.
+//! implementation, that every block is still a verbatim substring of the live source
+//! ([`vendored_blocks_in_source`]: a trailing `#` comment is not compared, every key, header,
+//! value and string is) and that both files give the same values.
 //!
 //! [`VENDORED_SHA256`] is the vendored file's own hash; a unit test fails if the file changes
 //! without that constant (and so without a reviewer seeing the provenance above) changing too.
@@ -554,10 +555,156 @@ impl Rules {
     }
 }
 
+/// `line` without a trailing `#` comment and the whitespace before it. A `#` inside a basic
+/// (`"..."`, with `\"` escapes) or literal (`'...'`) string on the line is part of it. The
+/// vendored file holds no multi-line string, which this does not read.
+fn without_comment(line: &str) -> &str {
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    for (at, c) in line.char_indices() {
+        match quote {
+            Some(q) => {
+                if escaped {
+                    escaped = false;
+                } else if c == '\\' && q == '"' {
+                    escaped = true;
+                } else if c == q {
+                    quote = None;
+                }
+            }
+            None if c == '"' || c == '\'' => quote = Some(c),
+            None if c == '#' => return line[..at].trim_end(),
+            None => {}
+        }
+    }
+    line.trim_end()
+}
+
+/// Whether every block of `vendored` (the lines after its `[meta]` line, separated by a blank
+/// line) is, line for line and in order, a run of consecutive lines of `source`, a trailing
+/// comment on any line left out of the comparison on both sides. A reworded comment in the
+/// reference's rules file changes no value, so it must not stop a parity run; any other change
+/// to a key, header, value or string does.
+pub fn vendored_blocks_in_source(vendored: &str, source: &str) -> bool {
+    let body = &vendored[vendored.find("\n[meta]\n").map_or(0, |i| i + 1)..];
+    let live: Vec<&str> = source.lines().map(without_comment).collect();
+    body.split("\n\n")
+        .map(str::trim_end)
+        .filter(|block| !block.is_empty())
+        .all(|block| {
+            let want: Vec<&str> = block.lines().map(without_comment).collect();
+            live.windows(want.len()).any(|w| w == want.as_slice())
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use sha2::{Digest, Sha256};
+
+    /// A copy of the vendored text with `old` replaced by `new`, which must occur once.
+    fn edited(old: &str, new: &str) -> String {
+        assert_eq!(VENDORED.matches(old).count(), 1, "{old}");
+        VENDORED.replace(old, new)
+    }
+
+    #[test]
+    fn the_vendored_file_is_in_itself() {
+        assert!(vendored_blocks_in_source(VENDORED, VENDORED));
+    }
+
+    #[test]
+    fn a_reworded_trailing_comment_changes_nothing() {
+        let live = edited(
+            "thirty_day_periods\"]  # TRACES reportedly calendar months; ITAT 2019 orders used 30-day periods: compute both",
+            "thirty_day_periods\"]  # reworded",
+        );
+        assert_ne!(live, VENDORED);
+        assert!(vendored_blocks_in_source(VENDORED, &live));
+        let gone = edited(
+            "  # 1% per month or part, deductible date -> deducted date",
+            "",
+        );
+        assert!(
+            vendored_blocks_in_source(VENDORED, &gone),
+            "a removed comment"
+        );
+        // The space before a comment is not compared either.
+        let tight = edited(
+            "   # 1% per month or part, deductible date -> deducted date",
+            "# x",
+        );
+        assert!(
+            vendored_blocks_in_source(VENDORED, &tight),
+            "a comment without its space"
+        );
+    }
+
+    #[test]
+    fn a_changed_key_value_header_or_string_is_found() {
+        for (old, new) in [
+            (
+                "rate_before_deduction_bp = 100",
+                "rate_before_deduction_bp = 101",
+            ),
+            (
+                "rate_before_deduction_bp = 100",
+                "rate_before_deduction_bq = 100",
+            ),
+            ("\n[s201_1a]\n", "\n[s201_1b]\n"),
+            ("authority = \"s.201(1A)\"", "authority = \"s.201(1B)\""),
+            ("\"thirty_day_periods\"]", "\"thirty_day_periods\", \"x\"]"),
+        ] {
+            let live = edited(old, new);
+            assert!(
+                !vendored_blocks_in_source(VENDORED, &live),
+                "{old} -> {new}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_block_must_keep_its_lines_adjacent_and_in_order() {
+        // A line between two lines of a block, and a comment-only line there, split it.
+        let split = edited(
+            "rate_after_deduction_bp = 150",
+            "rate_after_deduction_bp = 150\n# a note\nrate_x = 1",
+        );
+        let split = split.replace("rate_x = 1\n", "");
+        assert_ne!(split, VENDORED);
+        assert!(!vendored_blocks_in_source(VENDORED, &split));
+        let swapped = edited(
+            "rate_before_deduction_bp = 100   # 1% per month or part, deductible date -> deducted date\nrate_after_deduction_bp = 150    # 1.5% per month or part, deducted date -> paid date",
+            "rate_after_deduction_bp = 150\nrate_before_deduction_bp = 100",
+        );
+        assert!(!vendored_blocks_in_source(VENDORED, &swapped));
+    }
+
+    #[test]
+    fn a_hash_inside_a_string_is_not_a_comment() {
+        assert_eq!(without_comment("a = \"x # y\"  # note"), "a = \"x # y\"");
+        assert_eq!(without_comment("a = 'x # y' # note"), "a = 'x # y'");
+        assert_eq!(
+            without_comment("a = \"x \\\" # y\"  # note"),
+            "a = \"x \\\" # y\""
+        );
+        assert_eq!(
+            without_comment("a = 'x\\' # note"),
+            "a = 'x\\'",
+            "a literal string has no escapes"
+        );
+        assert_eq!(without_comment("a = 1   "), "a = 1");
+        assert_eq!(without_comment("# only"), "");
+        // A string that differs after the hash is a different string.
+        assert!(!vendored_blocks_in_source(
+            "[meta]\na = \"x # y\"",
+            "[meta]\na = \"x # z\""
+        ));
+        assert!(vendored_blocks_in_source(
+            "[meta]\na = \"x # y\"",
+            "[meta]\na = \"x # y\" # c"
+        ));
+    }
 
     #[test]
     fn vendored_rules_match_their_recorded_hash() {

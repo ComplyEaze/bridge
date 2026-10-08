@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/native/group_snapshot_aarav.xml
+# parser: parse_native_group_snapshot(Aarav)
+# source: captured
+Err(InvalidResponse("group_response_company_guid_missing"))

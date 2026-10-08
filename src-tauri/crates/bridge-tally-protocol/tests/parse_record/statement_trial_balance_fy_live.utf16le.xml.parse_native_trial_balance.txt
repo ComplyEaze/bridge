@@ -1,0 +1,132 @@
+# fixture: tests/fixtures/statement_trial_balance_fy_live.utf16le.xml
+# parser: parse_native_trial_balance
+# source: captured
+Ok(NativeTrialBalance {
+    rows: [
+        NativeTrialBalanceRow {
+            name: "Cash",
+            guid: "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000001f",
+            parent: Returned(
+                "Cash-in-Hand",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: PresentEmpty,
+        },
+        NativeTrialBalanceRow {
+            name: "G1 Party A Later GSTIN",
+            guid: "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000ce",
+            parent: Returned(
+                "Sundry Creditors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: PresentEmpty,
+        },
+        NativeTrialBalanceRow {
+            name: "G1 Party B Flat GSTIN",
+            guid: "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000cf",
+            parent: Returned(
+                "Sundry Creditors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: PresentEmpty,
+        },
+        NativeTrialBalanceRow {
+            name: "G1 Party C Unregistered",
+            guid: "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d0",
+            parent: Returned(
+                "Sundry Creditors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: Present(
+                ExactDecimal(
+                    "4250.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "4250.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "G1 Party D Two GSTINs",
+            guid: "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d1",
+            parent: Returned(
+                "Sundry Creditors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: PresentEmpty,
+        },
+        NativeTrialBalanceRow {
+            name: "Profit & Loss A/c",
+            guid: "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000001e",
+            parent: Returned(
+                "�#4; Primary",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Purchases",
+            guid: "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d6",
+            parent: Returned(
+                "Purchase Accounts",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-4250.00",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-4250.00",
+                ),
+            ),
+        },
+    ],
+})

@@ -280,22 +280,264 @@ fn seam_users_outside_tests(root: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// Lines that set `cfg(test)` for a build: a `--cfg test` flag or a build
-/// script's `rustc-cfg=test`.
-fn cfg_test_settings(text: &str) -> Vec<String> {
-    text.lines()
-        .filter(|line| {
-            let compact: String = line
-                .chars()
-                .filter(|character| !character.is_whitespace())
-                .collect();
-            compact.contains("--cfgtest")
-                || compact.contains("--cfg=test")
-                || compact.contains("\"--cfg\",\"test\"")
-                || compact.contains("rustc-cfg=test")
+/// The tracked files a build takes its configuration from (bridge#836): every workflow and
+/// composite action, every `.cargo/config` or `.cargo/config.toml` at any depth, every
+/// `build.rs`, the root `package.json`, and the scripts and Dockerfile that start cargo.
+fn build_configuration_files(tracked: &[String]) -> Vec<&str> {
+    const STARTS_CARGO: [&str; 4] = [
+        "package.json",
+        "scripts/check-no-test-seam.mjs",
+        "scripts/package-mcpb.mjs",
+        "glama/Dockerfile",
+    ];
+    tracked
+        .iter()
+        .map(String::as_str)
+        .filter(|path| {
+            let (directory, name) = path.rsplit_once('/').unwrap_or(("", path));
+            path.starts_with(".github/workflows/")
+                || path.starts_with(".github/actions/")
+                || name == "build.rs"
+                || (matches!(name, "config" | "config.toml")
+                    && (directory == ".cargo" || directory.ends_with("/.cargo")))
+                || STARTS_CARGO.contains(path)
         })
+        .collect()
+}
+
+/// The repository's tracked files: what a build can be given, unlike an untracked directory or
+/// a second checkout under the root.
+fn tracked_files() -> Vec<String> {
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the gate lists the repository's tracked files with git; no network is involved"
+    )]
+    let output = std::process::Command::new("git")
+        .args(["ls-files", "-z"])
+        .current_dir(repo())
+        .output()
+        .expect("git ls-files runs");
+    assert!(output.status.success(), "git ls-files must succeed");
+    String::from_utf8(output.stdout)
+        .expect("UTF-8 paths")
+        .split('\0')
+        .filter(|path| !path.is_empty())
         .map(str::to_string)
         .collect()
+}
+
+/// A file's text with every run of separators made one space: whitespace, U+001F (the separator
+/// of `CARGO_ENCODED_RUSTFLAGS`), quotes, brackets, commas and backslash escapes (`\t`, `\n`,
+/// `\r`, `\x1f`, `\u001f`, `\u{1f}`, or a lone backslash). A flag split over lines, quoted or
+/// escaped then reads as one phrase.
+fn normalised(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut separated = false;
+    let mut rest = text;
+    while let Some(character) = rest.chars().next() {
+        let mut taken = character.len_utf8();
+        let separator = if character == '\\' {
+            let escape = &rest[1..];
+            for spelled in [
+                "x1f", "x1F", "u001f", "u001F", "u{1f}", "u{1F}", "t", "n", "r",
+            ] {
+                if escape.starts_with(spelled) {
+                    taken += spelled.len();
+                    break;
+                }
+            }
+            true
+        } else {
+            character.is_whitespace()
+                || matches!(character, '\u{1f}' | '"' | '\'' | '`' | '[' | ']' | ',')
+        };
+        if separator {
+            separated = true;
+        } else {
+            if separated && !out.is_empty() {
+                out.push(' ');
+            }
+            separated = false;
+            out.push(character);
+        }
+        rest = &rest[taken..];
+    }
+    out
+}
+
+/// Whether `text` begins with the whole word `word`: what follows is not part of an identifier.
+fn starts_with_word(text: &str, word: &str) -> bool {
+    text.strip_prefix(word).is_some_and(|after| {
+        !after
+            .chars()
+            .next()
+            .is_some_and(|next| next.is_alphanumeric() || next == '_')
+    })
+}
+
+/// The same text as a shell joins it: quotes and backslashes removed rather than made
+/// separators, so `te"st"`, `te\\st` and `\\test` read as `test`, and every run of whitespace
+/// (or U+001F) made one space.
+fn joined(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut separated = false;
+    for character in text.chars() {
+        if matches!(character, '"' | '\'' | '`' | '\\') {
+            continue;
+        }
+        if character.is_whitespace() || character == '\u{1f}' {
+            separated = true;
+        } else {
+            if separated && !out.is_empty() {
+                out.push(' ');
+            }
+            separated = false;
+            out.push(character);
+        }
+    }
+    out
+}
+
+/// The `--cfg test` and `rustc-cfg=test` settings in one form of a text.
+fn settings_in(text: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    for (flag, separators) in [("--cfg", " = "), ("rustc-cfg=", " ")] {
+        for (at, _) in text.match_indices(flag) {
+            let value = text[at + flag.len()..].trim_start_matches(|c| separators.contains(c));
+            if starts_with_word(value, "test") {
+                let end = (at + 60).min(text.len());
+                let end = (end..=text.len())
+                    .find(|&i| text.is_char_boundary(i))
+                    .unwrap_or(end);
+                found.push(text[at..end].to_string());
+            }
+        }
+    }
+    found
+}
+
+/// Settings that give a build `cfg(test)`: a `--cfg` flag whose value is the word `test`, or a
+/// build script's `rustc-cfg=test`. They are read from the whole normalised text, where quotes,
+/// brackets and escapes separate words; when that finds none, from the text as a shell joins it,
+/// where a word written in pieces is one word. `--cfg testing` is not one.
+fn cfg_test_settings(text: &str) -> Vec<String> {
+    let found = settings_in(&normalised(text));
+    if found.is_empty() {
+        settings_in(&joined(text))
+    } else {
+        found
+    }
+}
+
+/// A build script's `rustc-cfg` emissions that are not a plain literal cfg name other than
+/// `test`: a value built by `format!` (`{}`, `{name}`), split from its key, or `test` itself
+/// cannot be judged from the text, so it is refused (bridge#836).
+fn build_script_cfg_problems(script: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (at, _) in script.match_indices("rustc-cfg") {
+        let after = &script[at + "rustc-cfg".len()..];
+        let value = after.strip_prefix('=').map(|value| {
+            let end = value.find('"').unwrap_or(value.len());
+            &value[..end]
+        });
+        let literal = value.is_some_and(|value| {
+            let mut characters = value.chars();
+            characters
+                .next()
+                .is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
+                && characters.all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && value != "test"
+        });
+        if !literal {
+            let shown: String = after.chars().take(40).collect();
+            problems.push(format!("rustc-cfg{shown}"));
+        }
+    }
+    problems
+}
+
+/// A manifest that names its build script: the gate reads only files named `build.rs`, so such
+/// a manifest is refused rather than its script left unread. The key is found as TOML spells it
+/// (bridge#1399 review): `build` under `[package]` (bare or quoted), the dotted `package.build`
+/// at the top of the file (parts bare or quoted), or `build` inside an inline `package = { .. }`.
+/// A string value names a script; `build = false` does not.
+fn named_build_script(manifest: &str) -> bool {
+    let key = |text: &str| -> String {
+        text.chars()
+            .filter(|c| !c.is_whitespace() && !matches!(c, '"' | '\''))
+            .collect()
+    };
+    let names_a_script = |value: &str| value.trim_start().starts_with(['"', '\'']);
+    let mut table = String::new();
+    for line in manifest.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(header) = line.strip_prefix('[') {
+            let header = header.trim_start_matches('[');
+            table = key(header.split(']').next().unwrap_or(""));
+            continue;
+        }
+        let Some((left, value)) = line.split_once('=') else {
+            continue;
+        };
+        let name = if table.is_empty() {
+            key(left)
+        } else {
+            format!("{table}.{}", key(left))
+        };
+        if name == "package.build" && names_a_script(value) {
+            return true;
+        }
+        if name == "package" {
+            let inner = value.trim().trim_start_matches('{').trim_end_matches('}');
+            let names = inner
+                .split(',')
+                .filter_map(|pair| pair.split_once('='))
+                .any(|(inner_key, inner_value)| {
+                    key(inner_key) == "build" && names_a_script(inner_value)
+                });
+            if names {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// The gate's whole verdict over a tree, given its tracked paths and a reader: the files it
+/// examined, and every problem found.
+fn build_configuration_verdict(
+    tracked: &[String],
+    read: impl Fn(&str) -> String,
+) -> (Vec<String>, Vec<String>) {
+    let mut examined = Vec::new();
+    let mut problems = Vec::new();
+    for path in build_configuration_files(tracked) {
+        let text = read(path);
+        for setting in cfg_test_settings(&text) {
+            problems.push(format!("{path} sets cfg(test): {setting}"));
+        }
+        if path.ends_with("build.rs") {
+            for emission in build_script_cfg_problems(&text) {
+                problems.push(format!(
+                    "{path} emits a cfg not a plain literal: {emission}"
+                ));
+            }
+        }
+        examined.push(path.to_string());
+    }
+    for manifest in tracked
+        .iter()
+        .filter(|path| path.rsplit('/').next() == Some("Cargo.toml"))
+    {
+        if named_build_script(&read(manifest)) {
+            problems.push(format!(
+                "{manifest} names its build script; name it build.rs"
+            ));
+        }
+    }
+    (examined, problems)
 }
 
 #[test]
@@ -1016,47 +1258,188 @@ fn only_test_files_name_the_seam() {
 
 #[test]
 fn nothing_sets_cfg_test_for_a_build() {
-    let mut candidates: Vec<PathBuf> = [
-        ".cargo/config.toml",
-        ".cargo/config",
-        "src-tauri/.cargo/config.toml",
-        "src-tauri/.cargo/config",
-    ]
-    .iter()
-    .map(|path| repo().join(path))
-    .collect();
-    candidates.extend(
-        fs::read_dir(repo().join(".github").join("workflows"))
-            .unwrap()
-            .map(|entry| entry.unwrap().path()),
-    );
-    candidates.push(repo().join("src-tauri").join("build.rs"));
-    for crate_dir in fs::read_dir(repo().join("src-tauri").join("crates")).unwrap() {
-        candidates.push(crate_dir.unwrap().path().join("build.rs"));
-    }
-    candidates.push(repo().join("package.json"));
-    let mut examined = 0;
-    for path in candidates.iter().filter(|path| path.is_file()) {
-        examined += 1;
-        let settings = cfg_test_settings(&fs::read_to_string(path).unwrap());
+    let tracked = tracked_files();
+    let (examined, problems) = build_configuration_verdict(&tracked, |path| read(path));
+    assert_eq!(problems, Vec::<String>::new());
+    // A gate that stops finding its files passes vacuously: these are read today.
+    for path in [
+        ".github/workflows/ci.yml",
+        ".github/actions/setup-windows-native/action.yml",
+        "src-tauri/build.rs",
+        "tools/bridge-tally-qualification/build.rs",
+        "package.json",
+        "scripts/check-no-test-seam.mjs",
+        "scripts/package-mcpb.mjs",
+        "glama/Dockerfile",
+    ] {
         assert!(
-            settings.is_empty(),
-            "{} sets cfg(test): {settings:?}",
-            path.display()
+            examined.iter().any(|seen| seen == path),
+            "the gate must read {path}"
         );
     }
-    assert!(
-        examined >= 3,
-        "the gate must have looked at the workflows and build scripts"
-    );
-    for setting in [
-        "RUSTFLAGS: --cfg test",
-        "rustflags = [\"--cfg\", \"test\"]",
-        "println!(\"cargo:rustc-cfg=test\");",
-        "RUSTFLAGS=\"--cfg=test\" cargo build",
-    ] {
-        assert_eq!(cfg_test_settings(setting).len(), 1, "{setting}");
+    // ...and every tracked build script and Cargo config, whatever else the selection keeps.
+    for path in &tracked {
+        let (directory, name) = path.rsplit_once('/').unwrap_or(("", path));
+        let cargo_config = matches!(name, "config" | "config.toml")
+            && (directory == ".cargo" || directory.ends_with("/.cargo"));
+        if name == "build.rs" || cargo_config {
+            assert!(examined.contains(path), "the gate must read {path}");
+        }
     }
+}
+
+/// bridge#836: each way of setting `cfg(test)`, in each place a build reads, on a synthetic tree;
+/// the whole verdict is asserted, so a rule that stops matching, or starts over-matching, fails.
+#[test]
+fn every_spelling_and_place_that_sets_cfg_test_is_refused() {
+    let verdict = |files: &[(&str, &str)]| {
+        let tracked: Vec<String> = files.iter().map(|(path, _)| path.to_string()).collect();
+        build_configuration_verdict(&tracked, |path| {
+            files
+                .iter()
+                .find(|(listed, _)| *listed == path)
+                .map(|(_, text)| text.to_string())
+                .unwrap_or_default()
+        })
+        .1
+    };
+    let clean = "name: x\non: push\n";
+    for (path, text, setting) in [
+        (
+            ".github/workflows/x.yml",
+            "env:\n  RUSTFLAGS: --cfg test\n",
+            "--cfg test",
+        ),
+        (
+            ".github/workflows/x.yml",
+            "env:\n  RUSTFLAGS: \"--cfg 'test'\"\n",
+            "--cfg test",
+        ),
+        (
+            ".github/workflows/x.yml",
+            "env:\n  RUSTFLAGS: --cfg=\"test\"\n",
+            "--cfg= test",
+        ),
+        (
+            ".github/workflows/x.yml",
+            "env:\n  CARGO_ENCODED_RUSTFLAGS: \"--cfg\\x1ftest\"\n",
+            "--cfg test",
+        ),
+        (
+            ".github/workflows/x.yml",
+            "env:\n  CARGO_ENCODED_RUSTFLAGS: \"--cfg\u{1f}test\"\n",
+            "--cfg test",
+        ),
+        (
+            ".github/workflows/x.yml",
+            "run: cargo build --config \"build.rustflags=[\\\"--cfg\\\",\\\"test\\\"]\"\n",
+            "--cfg test",
+        ),
+        (
+            ".github/actions/other/action.yml",
+            "runs:\n  env:\n    RUSTFLAGS: --cfg test\n",
+            "--cfg test",
+        ),
+        (
+            ".cargo/config.toml",
+            "[build]\nrustflags = [\n  \"--cfg\",\n  \"test\",\n]\n",
+            "--cfg test",
+        ),
+        (
+            "tools/.cargo/config",
+            "[build]\nrustflags = [\"--cfg\", \"test\"]\n",
+            "--cfg test",
+        ),
+        (
+            "package.json",
+            "{\"scripts\": {\"b\": \"RUSTFLAGS='--cfg test' cargo build\"}}\n",
+            "--cfg test",
+        ),
+        (
+            "glama/Dockerfile",
+            "ENV RUSTFLAGS=\"--cfg test\"\n",
+            "--cfg test",
+        ),
+        (
+            "scripts/package-mcpb.mjs",
+            "spawn(\"cargo\", [\"build\"], { env: { RUSTFLAGS: \"--cfg test\" } });\n",
+            "--cfg test",
+        ),
+    ] {
+        let problems = verdict(&[(path, text), (".github/workflows/ci.yml", clean)]);
+        assert_eq!(problems.len(), 1, "{path}: {text:?} -> {problems:?}");
+        assert!(
+            problems[0].starts_with(&format!("{path} sets cfg(test): {setting}")),
+            "{path}: {text:?} -> {problems:?}"
+        );
+    }
+    // A literal `rustc-cfg=test` in a build script is refused twice: as a cfg(test) setting and
+    // as a cfg value other than a plain non-test name.
+    assert_eq!(
+        verdict(&[(
+            "tools/x/build.rs",
+            "fn main() { println!(\"cargo::rustc-cfg=test\"); }\n"
+        )]),
+        [
+            "tools/x/build.rs sets cfg(test): rustc-cfg=test ); }",
+            "tools/x/build.rs emits a cfg not a plain literal: rustc-cfg=test\"); }\n",
+        ]
+    );
+    // A build script's cfg judged by value, and a named build script refused.
+    for script in [
+        "fn main() { println!(\"cargo:rustc-cfg={}\", \"test\"); }\n",
+        "fn main() { let c = \"test\"; println!(\"cargo:rustc-cfg={c}\"); }\n",
+        "fn main() { println!(concat!(\"cargo:rustc-cfg\", \"=test\")); }\n",
+    ] {
+        let problems = verdict(&[("src-tauri/crates/x/build.rs", script)]);
+        assert_eq!(problems.len(), 1, "{script:?} -> {problems:?}");
+        assert!(problems[0]
+            .starts_with("src-tauri/crates/x/build.rs emits a cfg not a plain literal: "));
+    }
+    // Every TOML spelling of the build-script key (bridge#1399 review, P2 a).
+    for manifest in [
+        "[package]\nname = \"x\"\nbuild = \"setup.rs\"\n",
+        "[package]\nname = \"x\"\n\"build\" = \"setup.rs\"\n",
+        "[package]\nname = \"x\"\n'build' = 'setup.rs'\n",
+        "package.name = \"x\"\npackage.build = \"setup.rs\"\n",
+        "\"package\" . \"build\" = \"setup.rs\"\n",
+        "package = { name = \"x\", build = \"setup.rs\" }\n",
+        "[ \"package\" ]\nbuild=\"setup.rs\"\n",
+    ] {
+        assert_eq!(
+            verdict(&[("tools/x/Cargo.toml", manifest)]),
+            ["tools/x/Cargo.toml names its build script; name it build.rs"],
+            "{manifest:?}"
+        );
+    }
+    // A shell joins a word written in pieces (bridge#1399 review, P2 b): each is one setting.
+    for text in [
+        "run: RUSTFLAGS=\"--cfg te\"st cargo build\n",
+        "run: RUSTFLAGS='--cfg te'\"st\" cargo build\n",
+        "run: RUSTFLAGS=--cfg\\ te\\st cargo build\n",
+        "run: RUSTFLAGS=\"--cfg \\test\" cargo build\n",
+        "run: RUSTFLAGS=\"--c\"fg\" test\" cargo build\n",
+    ] {
+        let problems = verdict(&[(".github/workflows/x.yml", text)]);
+        assert_eq!(problems.len(), 1, "{text:?} -> {problems:?}");
+        assert!(
+            problems[0].starts_with(".github/workflows/x.yml sets cfg(test): --cfg test"),
+            "{text:?} -> {problems:?}"
+        );
+    }
+    // What is not a cfg(test) setting, or not a place a build reads, passes.
+    assert_eq!(
+        verdict(&[
+            (".github/workflows/x.yml", "env:\n  RUSTFLAGS: --cfg testing --cfg tests_x --cfg feature=\"test\"\n"),
+            ("src-tauri/build.rs", "fn main() { println!(\"cargo:rustc-cfg=shipping\"); println!(\"cargo:rustc-check-cfg=cfg(shipping)\"); }\n"),
+            ("tools/x/Cargo.toml", "[package]\nname = \"x\"\nbuild = false\n"),
+            ("tools/y/Cargo.toml", "[package]\nname = \"y\"\n[dependencies]\nbuild = \"1.0\"\n"),
+            ("tools/z/Cargo.toml", "[package.metadata.x]\nbuild = \"notes\"\n"),
+            ("docs/notes.md", "RUSTFLAGS=--cfg test\n"),
+            ("scripts/other.sh", "RUSTFLAGS=--cfg test cargo build\n"),
+        ]),
+        Vec::<String>::new()
+    );
 }
 
 #[test]

@@ -20,4 +20,6 @@ pub use master_generator::{
     generate_master_corpus, GeneratedMasterCorpus, MasterCorpusSpec, MasterGenerationError,
     MAX_GENERATED_MASTERS, MAX_MASTER_TEXT_WIDTH,
 };
-pub use server::{ObservedRequest, SequenceSimulator, Simulator, MAX_SEQUENCE_REQUESTS};
+pub use server::{
+    NoRequestForPlan, ObservedRequest, SequenceSimulator, Simulator, MAX_SEQUENCE_REQUESTS,
+};

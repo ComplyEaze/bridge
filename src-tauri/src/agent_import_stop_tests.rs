@@ -122,6 +122,14 @@ async fn a_release_needs_the_person_works_without_tally_and_survives_a_restart()
     assert!(shown.contains("Tally could not be read"), "{shown}");
     assert!(approval.previews().is_empty(), "not a post dialog");
     assert_eq!(stop(&server), None);
+    // What the read found is journaled: nothing found, so the invoice is no
+    // longer counted as sent (a found one would be the control instead).
+    assert_eq!(
+        server
+            .import_invoice_number_control(GUID, ("20260401", "20270331"))
+            .unwrap(),
+        ledger::NumberControl::NeverSent
+    );
 
     // A new server over the same directory reads the same journal.
     let restarted = server_without_tally(directory.path());

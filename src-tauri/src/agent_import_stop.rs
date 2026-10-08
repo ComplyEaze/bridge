@@ -132,7 +132,7 @@ impl Server {
             .unwrap_or_default();
         let preview = release_preview(&held, &company_name, &seen);
         let count = VoucherCount::new(1).ok_or_else(|| "ack_stop_batch_not_sent".to_string())?;
-        ReviewAcknowledged::confirm(count, &preview)
+        let _acknowledged = ReviewAcknowledged::confirm(count, &preview)
             .await
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
 

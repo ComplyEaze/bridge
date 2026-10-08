@@ -1612,7 +1612,10 @@ voucher mark moved by exactly that many. Otherwise it is
 `reconciliation_required` (`batch_step_unconfirmed` when only the mark
 was not confirmed). Review a doubted batch's vouchers in Tally and do not rebuild it;
 `acknowledge_post_review` records that review, one doubt at a time, and changes
-no verdict.
+no verdict. Its `invoice_stop` value is the one exception to "review": it
+releases the stop a sent Sales invoice that is not verified posted puts on its
+company (`invoice_company_stopped`), after the person has checked Tally, in the
+same dialog the model cannot answer.
 
 All three switches accept `true`/`false` or `1`/`0`; invalid values stop startup. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**

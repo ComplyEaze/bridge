@@ -8,6 +8,8 @@
 //! as its SHA-256 and length. A mismatch names the fixture, the parser and the first differing line,
 //! and no more (AGENTS.md P5). `every_response_fixture_is_recorded_or_named` keeps the table total:
 //! a response fixture added later fails until it gets a row or a stated reason.
+//! `every_fixture_left_to_the_app_crate_is_in_its_record` holds the two records together: a
+//! fixture this table leaves to the app crate's record must be in it, and only those may be.
 #![allow(
     clippy::disallowed_methods,
     reason = "the test reads and, in its recording mode, writes its own record files"
@@ -2793,6 +2795,103 @@ fn coverage_names_each_way_the_table_drifts() {
             "tests/fixtures/a.xml has a row and a reason not to record it",
             "tests/fixtures/c.xml is named as not recorded but is no response fixture",
         ]
+    );
+}
+
+/// The start of every reason that leaves a fixture to the app crate's record
+/// (`src/agent_parse_record_tests.rs`, with its records in `src-tauri/tests/parse_record/`).
+const APP_RECORD: &str = "recorded by the app crate's record (#1198 slice 2)";
+
+/// The fixture each of the app crate's records names in its `# fixture:` header (a path from
+/// this crate's `tests/fixtures/`), as a path from this crate's directory. A record that names
+/// none fails the test rather than counting as nothing.
+fn app_record_fixtures() -> BTreeSet<String> {
+    let dir = crate_dir().join("../../tests/parse_record");
+    let mut found = BTreeSet::new();
+    for entry in fs::read_dir(&dir).expect("the app crate's records directory") {
+        let path = entry.expect("entry").path();
+        if path.file_name().is_some_and(|name| name == "README.md") {
+            continue;
+        }
+        let text = fs::read_to_string(&path).expect("an app record");
+        let fixture = text
+            .lines()
+            .next()
+            .and_then(|line| line.strip_prefix("# fixture: "))
+            .unwrap_or_else(|| panic!("{}: names no fixture", path.display()));
+        found.insert(format!("tests/fixtures/{fixture}"));
+    }
+    found
+}
+
+/// Where this table and the app crate's record disagree, by fixture.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct AppRecordGaps {
+    /// Left to the app crate's record, which has no record of it: in neither record.
+    unrecorded: Vec<String>,
+    /// In the app crate's record, which this table does not leave it to.
+    unclaimed: Vec<String>,
+}
+
+fn app_record_gaps(
+    not_recorded: &[(&str, &str)],
+    app_fixtures: &BTreeSet<String>,
+) -> AppRecordGaps {
+    let left: BTreeSet<&str> = not_recorded
+        .iter()
+        .filter(|(_, reason)| reason.starts_with(APP_RECORD))
+        .map(|(fixture, _)| *fixture)
+        .collect();
+    AppRecordGaps {
+        unrecorded: left
+            .iter()
+            .filter(|fixture| !app_fixtures.contains(**fixture))
+            .map(|fixture| (*fixture).to_string())
+            .collect(),
+        unclaimed: app_fixtures
+            .iter()
+            .filter(|fixture| !left.contains(fixture.as_str()))
+            .cloned()
+            .collect(),
+    }
+}
+
+/// Every fixture this table leaves to the app crate's record is in it, and that record holds no
+/// other fixture.
+#[test]
+fn every_fixture_left_to_the_app_crate_is_in_its_record() {
+    assert_eq!(
+        app_record_gaps(NOT_RECORDED, &app_record_fixtures()),
+        AppRecordGaps::default()
+    );
+}
+
+/// A fixture left to the app crate's record that it lacks is named, and so is one it holds that
+/// this table records itself or leaves for another reason.
+#[test]
+fn app_record_gaps_name_each_fixture() {
+    let app_fixtures: BTreeSet<String> = [
+        "tests/fixtures/a.xml",
+        "tests/fixtures/c.xml",
+        "tests/fixtures/d.xml",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect();
+    let not_recorded = [
+        ("tests/fixtures/a.xml", APP_VOUCHER_ROWS),
+        ("tests/fixtures/b.xml", APP_CENSUS),
+        ("tests/fixtures/c.xml", IMPORT_REQUEST),
+    ];
+    assert_eq!(
+        app_record_gaps(&not_recorded, &app_fixtures),
+        AppRecordGaps {
+            unrecorded: vec!["tests/fixtures/b.xml".to_string()],
+            unclaimed: vec![
+                "tests/fixtures/c.xml".to_string(),
+                "tests/fixtures/d.xml".to_string()
+            ],
+        }
     );
 }
 

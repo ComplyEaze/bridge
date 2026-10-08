@@ -1,0 +1,89 @@
+# fixture: agent/native-entry-wildcard-allocations.utf16le.xml
+# parser: parse_agent_rows(REGISTER_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(33),
+        "amounts": Array [
+            Object {
+                "amount": String("-118000.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-118000.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Sundar Steel Traders"),
+            },
+            Object {
+                "amount": String("118000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Bank - SBI Current"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250703"),
+        "guid": String("ae1490be-52c5-4544-9ffc-4b7da85f9797-00000021"),
+        "is_invoice": Bool(false),
+        "master_id": String("33"),
+        "narration": String("CASE-REGISTER-BANK-01 B-001 bank reference 534607300941"),
+        "optional": Bool(false),
+        "party": String("Sundar Steel Traders"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Payment"),
+    },
+    Object {
+        "alter_id": Number(1),
+        "amounts": Array [
+            Object {
+                "amount": String("-55000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Purchase - Goods"),
+            },
+            Object {
+                "amount": String("-4950.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Input CGST"),
+            },
+            Object {
+                "amount": String("-4950.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Input SGST"),
+            },
+            Object {
+                "amount": String("64900.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("64900.00"),
+                        "bill_date": String("20250627"),
+                        "bill_type": String("New Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SST/25-26/0398"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Sundar Steel Traders"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250627"),
+        "guid": String("ae1490be-52c5-4544-9ffc-4b7da85f9797-00000001"),
+        "is_invoice": Bool(false),
+        "master_id": String("1"),
+        "narration": String("Supplier document reference: SST/25-26/0398"),
+        "optional": Bool(false),
+        "party": String("Sundar Steel Traders"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Purchase"),
+    },
+])

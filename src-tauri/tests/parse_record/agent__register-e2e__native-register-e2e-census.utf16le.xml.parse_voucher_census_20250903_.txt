@@ -1,0 +1,10 @@
+# fixture: agent/register-e2e/native-register-e2e-census.utf16le.xml
+# parser: parse_voucher_census(20250903)
+# source: captured
+Ok([
+    CensusRow {
+        day: 2025-09-03,
+        alter_id: 48,
+        guid: "ae1490be-52c5-4544-9ffc-4b7da85f9797-0000002f",
+    },
+])

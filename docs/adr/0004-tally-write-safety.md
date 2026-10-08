@@ -623,3 +623,37 @@ is accepted, and loud.
   intent: nothing recorded or sent, and the approval withdrawn.
 - **New readback statuses:** `bound_not_in_window` and `book_rolled_back`.
   Neither is ever absence.
+
+## Amendment — owner decision, 2026-10-08: the order of the GST Sales slices after the invoice core
+
+The owner approved this order on 8 Oct 2026: lab groundwork first, then each guard as a refusal inside the Sales build. Nothing below is built yet. It fixes the order of the work that follows the Sales invoice core (#1342, a draft at this change, with its own amendment "GST invoices, Sales first" and the owed list there and in its protocol-reference section), so that each slice's pull request can cite one place. A slice that is later dropped or reordered says so here with a dated note. Every safeguard of the earlier amendments applies to every slice, and no slice below switches Sales on. Where a slice names a decision still to be taken, that decision is made, and recorded, before the slice is built.
+
+**Where the guards go.** Each check below is to be a refusal inside the Sales build, so a build that would fail it is refused on every call. It is not a separate read tool, because a check a caller must remember to run does not guard a build that skips it (AGENTS.md P2, P7).
+
+**Before any slice: lab groundwork, no code.** None of the slices can be proven until these hold.
+
+- A synthetic lab company whose own GSTIN Tally accepts as valid. On the 7 Oct rehearsal's company, whose invented GSTIN carries another state's code, Tally's GSTR-1 counted all four vouchers as uncertain and gave the company's registration details as invalid or not specified; the cause was not isolated, and a status check proves nothing on such a company. Its GSTIN stays within the synthetic family that test fixtures may carry.
+- An unregistered buyer keyed by hand on screen, then read natively. This gives the fields Tally itself writes for such a buyer.
+- A Gold edition the lab can reach, so that the Sales slices are also measured on the edition a client's book may use. The 7 Oct Sales rehearsal ran on Silver; Sales on Gold rests on hand imports only. This is a measurement prerequisite, not a release gate: the concurrent-writers amendment keeps one policy for every edition.
+
+**Slice 1 — refuse an incomplete company registration.** The build is to read the company's own GST registration in force on the invoice date: GSTIN, registration type, state and applicable-from. It is to refuse a company whose registration is absent, starts after the invoice date, is not Regular, or any of whose fields Tally does not return. A missing field is refused, never read as Regular. More than one registration in force on the date is refused until how one is chosen is decided. This closes the owed item "the company's own registration on the invoice date is not read". Today the core reads only the company's state.
+
+**Slice 2 — GST status and the buyer block in the Sales read-back.** The read-back is to read each posted invoice's GST status (Tally's included and uncertain flags) and the buyer and consignee fields the build wrote. `posted_verified` is to be kept only when the invoice reads as included and not uncertain, and those fields equal what the build wrote. A status that reads uncertain, or that the read does not return ("not established"), keeps the invoice out of `posted_verified` and counts as GST-uncertain for slice 4. Equality with what the build wrote does not show the names are right: the build writes the ledger name, because the mailing name is not read, and that read stays owed in the core's list. The slice's lab evidence compares a posted invoice, field by field, with a hand-keyed invoice of the same shape on the same company. Not measured: whether the status fields come back in a field-listed read, or only in a native one.
+
+**Slice 3 — refuse a sales ledger whose GST details do not fit its leg.** The build is to read each sales ledger's GST rate, HSN/SAC and taxability as of the invoice date. It is to refuse a ledger that is not taxable, a ledger without an HSN/SAC, and a leg whose ledger rate differs from the slab the invoice's tax amounts imply. This closes the blended-bill item owed in the core's list. One decision comes first: what a sales ledger with no rate of its own means.
+
+**Slice 4 — a stop latch per company, with a release.** A Sales batch for a company, keyed by the company's GUID, that ends `reconciliation_required`, `posted_divergent` or GST-uncertain (as slice 2 defines it) is to block every further Sales post for that company. The latch lives in the import journal, so it survives a restart. Its release is a person's recorded act, naming the batch, in a native dialog the model cannot answer. Today's acknowledgement step (`acknowledge_post_review`) is not that release: it admits only a review of a doubt beside vouchers that all read back verified, and it unblocks nothing. Slice 4 is to extend it, or add a release beside it, for every state that latches. The release owed in the core's list is to ship in this slice: the core's number control refuses a build for a company that has sent an invoice but holds none verified posted (`invoice_number_control_unavailable`), which never clears when Tally declined that invoice or it was deleted, so a latch shipped without the release would add a second lock with no key. Decided in the slice's pull request: whether a declined or lost-answer batch also sets the latch, and whether a later verification that reaches `posted_verified` lifts the latch by itself.
+
+**After slice 4 (listed for order only).** These come after slice 4: switching Sales on once the owed items of the core's list are done; several invoices per approval, after batch posting's own proof (#1090); invoices from a CSV file in a template ComplyEaze Bridge defines, through the proposals route, generalised beyond bank statements; and two rates on one invoice, after measurement.
+
+**Rejected while the order was drafted:**
+
+| Rejected | Why |
+| --- | --- |
+| A standalone readiness read tool | A check a caller can skip does not guard the build. |
+| Creating masters through the approval window | It would ship a second dispatch path into the release (AGENTS.md P8). |
+| An xlsx reader | It needs a new dependency, and the bank-statement crate already reads CSV. |
+| A reader for one billing layout | One layout is not a product shape. |
+| Rollback inside ComplyEaze Bridge | No compensating Tally operation is implemented and verified (Decision, above). |
+
+**Not measured.** None of this has been measured against Tally: the native shape of a company's GST registration, the native shape of a sales ledger's dated GST rows, the transport of the GST status fields, and where GSTR-1 places a posted invoice.

@@ -246,7 +246,8 @@ to `true` or `1` is not asked.
 - **A terms record** (`terms-acceptance.jsonl`): the extension asks you to
   accept the ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings,
   and every tool refuses with `terms_not_accepted` until you do (section 1 says
-  what was seen once). When the server
+  what was seen once after an update: the extension was not started and a
+  request failed with a 400 error). When the server
   starts with the setting on, it appends a line with the terms version, the
   time, and that the acceptance came through the setting (once per version; two
   servers starting together can each add a line). If that line cannot be

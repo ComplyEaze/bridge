@@ -56,7 +56,7 @@ with no figures, to a log on this computer.
 | --- | --- | --- |
 | `balance_sheet` | The Balance Sheet for a date range, by primary group, from TallyPrime’s Trial Balance (a book with stock items is expected to be refused) | Nothing |
 | `build_import_xml` | Checks a Journal, Payment, Receipt or Contra batch and writes an import file | An import file and a ledger record on this computer |
-| `cash_flow` | Tally’s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, returned only after its net total matches the trial balance (not a cash flow statement under AS 3) | Nothing |
+| `cash_flow` | Tally’s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, returned only after its net total matches the trial balance; the split into months is Tally’s own and is not checked (not a cash flow statement under AS 3) | Nothing |
 | `egress_log` | The receipts ComplyEaze Bridge keeps of its own tool calls, with no figures | Nothing |
 | `ledger_masters` | Ledgers with their opening balances; optionally GSTIN, PAN and other party details | Nothing |
 | `ledger_movement` | A ledger’s opening, debits, credits and closing for a period | Nothing |
@@ -228,7 +228,7 @@ Not yet run by us in a controlled test: posting with a published package
 against a live TallyPrime; each way of declining in the Windows approval window
 (one was tried); the tools answering through Claude Desktop on macOS after the
 Terms are accepted (`tally_status` and `list_companies` answered on a CI build
-of 0.4.1 and again on a CI build of 0.4.2); posting on TallyPrime Education; posting on TallyPrime Gold
+of 0.4.1, again on a CI build of 0.4.2 and on one Mac on a CI build of 0.5.0); posting on TallyPrime Education; posting on TallyPrime Gold
 with its approval step recorded. Each release package is built and launched,
 its tool list checked and a synthetic encrypted bank statement parsed, on
 hosted CI runners for Windows x64 and Apple Silicon Mac.
@@ -406,7 +406,9 @@ it. Before you do, know what it is and is not:
   your Tally, or in conversation inside Claude Desktop. What has been run
   against a real TallyPrime, and on which builds, is
   [listed above](#what-has-been-run-against-a-real-tallyprime); the published
-  0.4.2 package itself has not been run by us against a live TallyPrime.
+  0.5.0 package itself has not been run by us against a live TallyPrime; a build
+  of 0.5.0 made by our checks was installed once, on one Mac, and answered two
+  reads from a lab TallyPrime (see the 8 October 2026 entry above).
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.
 - **On a Mac, Tally must run on that same Mac**, in a local Windows virtual
   machine or through approved local forwarding. Bridge only talks to Tally on

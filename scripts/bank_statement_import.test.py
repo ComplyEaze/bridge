@@ -1010,7 +1010,10 @@ def test_a_label_the_parser_gives_is_not_written_as_the_statement_party(m):
 
 def test_a_narration_the_app_would_refuse_refuses_the_run(m):
     refuses(m, "party_not_admissible", m._statement_payee, "A|B", 4)
-    for party in ("A\x07B", "A\x7fB", "A\x85B", "X [BRIDGE:1] Y", "X [Bridge:1] Y"):
+    # the C0 range at its ends (\x00 and \x1f), DEL, and the C1 range at its ends
+    # (\x80 and \x9f), and a C0 character `_squash` does not fold (\x1b)
+    for party in ("A\x00B", "A\x07B", "A\x1bB", "A\x1fB", "A\x7fB", "A\x80B", "A\x85B",
+                  "A\x9fB", "X [BRIDGE:1] Y", "X [Bridge:1] Y"):
         refuses(m, "party_not_admissible", m._statement_party_segment, party, "n", 4)
     # the limit is on the whole narration, measured with the segment
     segment = " | Statement party: P"

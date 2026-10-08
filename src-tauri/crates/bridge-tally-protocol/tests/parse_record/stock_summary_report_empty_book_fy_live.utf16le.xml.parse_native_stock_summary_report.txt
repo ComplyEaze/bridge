@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/stock_summary_report_empty_book_fy_live.utf16le.xml
+# parser: parse_native_stock_summary_report
+# source: captured
+Ok(Empty)

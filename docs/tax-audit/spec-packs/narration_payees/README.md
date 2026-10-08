@@ -1,6 +1,6 @@
 # Spec pack: `narration_payees` (payees named only in the bank narration, against the s.194C limits)
 
-The goldens in this pack were produced by the reference engine at commit `ee17d80f` and are the
+The goldens in this pack were produced by the reference engine at commit `2b329354` and are the
 contract; this note explains them and cites [`docs/tax-audit/parity-spec-v1.md`](../../parity-spec-v1.md)
 (parity spec sections 1, 2.1, 2.2, 3, 3.1, 4, 4.1, 5, 6, 7, 10 and 11, as relevant); where the note and a
 golden differ, the golden wins and the reference's maintainers should be told on the pull request or issue.
@@ -167,7 +167,8 @@ names.
 
 - **The two placeholders** of the second UPI layout: `BANKACC` and `PHONEPE`, compared after
   upper-casing and removing spaces (README section 3.2).
-- **The two refused cheque beginnings**: `CASH PAID TO` and `SELF` (README section 3.2).
+- **The two refused cheque beginnings**: `CASH PAID TO` and `SELF`, as words (README section 3.2).
+- **The channel words** that are no name in forms 1 to 3: `UPI`, `IMPS`, `NEFT`, `RTGS` (README section 3.1).
 - **The channel names**: `UPI`, `IMPS`, `NEFT`, `RTGS`, `CHEQUE_COUNTER`.
 - **The groups whose ledgers are not "other ledgers"**: `Bank Accounts`, `Bank OD A/c`,
   `Cash-in-Hand`, `Duties & Taxes` (README section 6.4).
@@ -216,6 +217,12 @@ starts (`np_forms`' f04), and a character outside the set before that hyphen mea
 match at all (`np_unread`'s u06 to u08). A space left at the end of the name is removed (`np_forms`'
 f03, f14 and f25); nothing else is.
 
+A name that is exactly `UPI`, `IMPS`, `NEFT` or `RTGS`, once that space is removed, is no name: the
+form fits, the text names no one and no other form is tried (`np_unread`'s u84 to u88; u85 has the
+space). A name that only begins with one of these words is a name (`np_forms`' f59 and f60). Forms 4
+and 5 have no such rule: a name field `UPI` and a cheque named `UPI` are both the payee `UPI`
+(`np_forms`' f61 and f62).
+
 ### 3.2 The five forms
 
 They are tried in this order and the first that fits is used. A text can fit two: `UPI-CHQ PAID-X` fits
@@ -246,23 +253,25 @@ from the field. Then:
 The placeholders belong to this form alone: in the first UPI layout `PHONEPE` is a payee like any
 other (`np_forms`' f08).
 
-**Form 5.** The prefix is `WITHDR`, an optional `A`, `W`, an optional `A`, `L BY` and a space: that
-is `WITHDRAWAL BY`, `WITHDRWAL BY`, `WITHDRAWL BY` or `WITHDRWL BY`, each followed by a space
-(`np_forms`' f42 to f45). A cheque name is one character A to Z followed by zero or more characters
+**Form 5.** The prefix is `WITHDR`, an optional `A`, `W`, an optional `A` and `L BY`: that is
+`WITHDRAWAL BY`, `WITHDRWAL BY`, `WITHDRAWL BY` or `WITHDRWL BY` (`np_forms`' f42 to f45), not
+followed by a character A to Z (`WITHDRAWAL BYWAY` is no prefix, `np_forms`' f55); any spaces after
+it are part of it. A cheque name is one character A to Z followed by zero or more characters
 each A to Z, a space or a full stop; no digit, `&` or `'` (`np_unread`'s u65 to u67). It is followed
 by an optional space, a hyphen, an optional space and `CHQ PAID`; as the name cannot hold a hyphen,
 that hyphen is the first one in it (`np_unread`'s u68). The name does not take in the optional space
 before the hyphen: `EPSILON CARRIERS - CHQ PAID` names `EPSILON CARRIERS` (`np_forms`' f40). `CHQ PAID`
 need not end a word (`np_forms`' f47).
 
-- When the text starts with the prefix but what follows cannot be read as a cheque name and the
-  rest, the text is read once more from its start with no prefix, so the prefix's own words become
-  the name: `WITHDRAWAL BY - CHQ PAID` names `WITHDRAWAL BY` (`np_forms`' f52). Text that only
-  resembles the prefix is a name from the start (`np_forms`' f53 and f55).
-- A name that starts with the characters `CASH PAID TO` or `SELF` is refused: no payee. This is a
-  test on the name's first characters, not on whole words, and it is made on the first reading that
-  fits, with no second try (`np_unread`'s u60 to u64; `MYSELF` and `CASH PAID` are payees,
-  `np_forms`' f50 and f51).
+- A text that starts with the prefix is read only after it. When what follows cannot be read as a
+  cheque name and the rest, the text names no one; it is not read again from its start
+  (`np_unread`'s u72 and u89 to u91: `WITHDRAWAL BY - CHQ PAID`, the same with no space round the
+  hyphen, and a full stop after `BY`). Text that only resembles the prefix is a name from the start
+  (`np_forms`' f53 and f55).
+- A name that starts with `SELF` or `CASH PAID TO`, followed by a character other than A to Z or
+  by nothing, is refused: no payee (`np_unread`'s u60, u61, u63 and u92, the last `SELF.`). A name
+  that only begins with those characters is a payee: `SELFMADE MILLS` and `CASH PAID TOWER`
+  (`np_forms`' f57 and f58), as are `MYSELF` and `CASH PAID` (f50 and f51).
 - Otherwise the name is the payee, channel `CHEQUE_COUNTER`.
 
 A text that fits none of the five has no payee.
@@ -678,7 +687,8 @@ Boundaries: each limit has a book at the limit and one paisa either side of it (
 payment and for a day's payments, `np_aggregate`, `np_else_agg`, `np_else_single`).
 
 Every rule HASHES.md lists changes at least one golden when it alone is changed (measured by changing
-a copy of the reference one rule at a time and running every book again).
+a copy of the reference one rule at a time and running every book again: the rows HASHES.md marks † at
+commit `2b329354`, the others at commit `ee17d80f`, before `np_forms` and `np_unread` changed).
 
 ## 13. Behaviour that may look like a defect
 
@@ -701,13 +711,9 @@ in the port.
   neither this nor the internal error above; the edge harness builds the book directly and does.
 - **A payment's amount is the whole debit**, also when only part of it was paid by bank (`np_rows`'
   r08), and a credit on the same ledger in the same voucher does not reduce it (r02).
-- **A cheque name starting with `SELF` or `CASH PAID TO` is refused whatever follows**:
-  `SELFMADE MILLS` and `CASH PAID TOWER` are not read (`np_unread`'s u62 and u64).
-- **The cheque prefix can become the name**: `WITHDRAWAL BY - CHQ PAID` names a payee
-  `WITHDRAWAL BY`, and any words before the hyphen that fit the name's characters are a name
-  (`np_forms`' f52 to f55).
-- **An IMPS narration whose name field is `UPI` names the payee `UPI`** (`np_forms`' f13): the forms
-  are read by position.
+- **A channel word is no name only in forms 1 to 3, and only as the whole name**: in forms 4 and 5
+  `UPI` is the payee `UPI` (`np_forms`' f61 and f62), and a name such as `UPI.`, with its full stop, is
+  a name in every form (no book has one).
 - **Two payees can show one name.** A name written with a combining accent and the same name
   written composed are two keys and two rows, and the dump normalises both names to the same text
   (`np_text`'s t29 to t31). Only form 4 can read such a name.
@@ -727,18 +733,19 @@ in the port.
 
 ## 14. The books
 
-All are invented: synthetic ledger names, payee names from the Greek alphabet and from trees,
-made-up bank-style tokens, nothing read from Tally or from a statement. Each book's
-`comment` says what it reaches, voucher by voucher. Small books use amounts under 100,000 paise with
-irregular paise; the books at a limit use multiples of 10,000 paise and the limit's own neighbours.
+All are invented: synthetic ledger names, payee names from the Greek alphabet, from trees or built
+from the reader's own words, made-up bank-style tokens, nothing read from Tally or from a statement.
+Each book's `comment` says what it reaches, voucher by voucher. Small books use amounts under
+100,000 paise with irregular paise; the books at a limit use multiples of 10,000 paise and the limit's
+own neighbours.
 Every book also runs `tds_payees`, whose golden is beside it.
 
 | Book | Reaches |
 | --- | --- |
 | `np_empty` | No voucher: the fifteen figures, no finding; golden byte-identical to `np_quiet`'s. |
 | `np_quiet` | Twelve near misses, nothing read: optional, cancelled and post-dated payments; a ledger not read; a receipt; a nil line; a ledger not listed; 194C payments pooled exactly at both limits (nothing added); a named payee over the limit in the TDS payee test (nothing added). |
-| `np_forms` | Every form that names a payee, with its variants: case, spacing, optional spaces, one-character names and codes, the closing character last, the cheque prefixes, names near the placeholders and the refused beginnings, a prefix read as a name; a name joined across two channels. Twenty payees. |
-| `np_unread` | Fifty-nine narrations that name no one, one per rule of the five forms; the two placeholders; an empty, an absent and a blank narration. No payee row. |
+| `np_forms` | Every form that names a payee, with its variants: case, spacing, optional spaces, one-character names and codes, the closing character last, the cheque prefixes, names near the placeholders, the refused beginnings and the channel words, text that only resembles the prefix; a name joined across two channels; the channel word UPI as a name in the second UPI layout and on a cheque. Twenty-three payees. |
+| `np_unread` | Sixty-six narrations that name no one: one per rule of the five forms, a channel word as the name, the cheque prefix with no name after it; the two placeholders; an empty, an absent and a blank narration. No payee row. |
 | `np_text` | Upper-casing that lengthens or changes a letter; letters and digits of other scripts; Python whitespace and characters that are not whitespace; two spellings of one accented name; labels with another voucher type, an empty number, a number of spaces and combining marks. |
 | `np_handles` | What is and is not a handle in both UPI layouts; one handle under two names, one name on two handles, a chain; the key's smallest handle; a receipt that joins nothing. Thirty-six payees. |
 | `np_cut` | Cut handles: completed (each way the names can agree, an equal handle, a whole handle from the second layout) and not completed (no candidate, two, one under another name); the count and the four groups; a cut payment outside the rows. |

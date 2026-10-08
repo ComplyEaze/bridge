@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/masters_godowns_reads_lab_live.utf16le.xml
+# parser: parse_native_masters(Godowns)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Main Location",
+            guid: "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000063",
+            master_id: 99,
+            alter_id: 100,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: Plain,
+        },
+    ],
+})

@@ -48,7 +48,7 @@
 //! `tae/run.py`'s own `load()`, so a renamed ledger's identity entry (or a bare name that still
 //! matches) resolves on both sides of the comparison, not just this one. Those two tables are
 //! written for the reference implementation's FULL pack, though, and a real client TOML typically
-//! binds many labels this port never reads (`gst_outward`, `related_parties`, ...);
+//! binds many labels this port never reads (`gst_outward`, ...);
 //! `narrow_identity_tables` below strips `[ledger_ids]`/`[group_ids]` down to just the labels the
 //! locations this port's `Engagement` reads actually use (a legacy trade-creditor source's names
 //! included, read relative to `CLIENT_TOML`'s directory as the reference reads them), before `Engagement::from_toml` ever

@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/native/master_fields_lab_partial_alter.response.xml
+# parser: parse_import_outcome
+# source: captured
+Err(Tally import response contained an unexpected element)

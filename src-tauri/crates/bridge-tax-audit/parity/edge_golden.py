@@ -100,7 +100,7 @@ def main() -> int:
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
     from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined, cash_book_integrity, cash_payments_40a3, clause21a_candidates, counter_cheques_40a3,
-                                 creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, stale_balances_41_1,
+                                 creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
     from tae.config import load_rules, related_parties_config
@@ -367,6 +367,14 @@ def main() -> int:
             client_state=tc.client_state(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg),
             deductor_activity=tc.deductor_activity(cfg), goods_carriage_ledgers=tc.tds_goods_carriage_ledgers(cfg))
 
+    def specified_persons_run():
+        # As the pack's runner: related_parties_cl23 on the same table first, its result this test's input.
+        rp = related_parties_config({"related_parties": spec.get("related_parties", {})})
+        cl23 = related_parties_cl23.run(eng, rules, rp)
+        module = SimpleNamespace(TEST_ID=specified_persons_40a2b.TEST_ID, check_invariants=lambda e, res:
+                                 specified_persons_40a2b.check_invariants(e, rules, rp, cl23, res))
+        return module, specified_persons_40a2b.run(eng, rules, rp, cl23)
+
     from tae.party_identity import build_party_index
     runners = {
         "applicability_44ab": lambda: (applicability_44ab, applicability_44ab.run(
@@ -414,6 +422,7 @@ def main() -> int:
         "read_scope": lambda: (read_scope, read_scope.run(eng, rules)),
         "related_parties_cl23": lambda: (related_parties_cl23, related_parties_cl23.run(
             eng, rules, related_parties_config({"related_parties": spec.get("related_parties", {})}))),
+        "specified_persons_40a2b": specified_persons_run,
         "stale_balances_41_1": lambda: (stale_balances_41_1, stale_balances_41_1.run(eng, rules)),
         "statutory_dues_43b": lambda: (statutory_dues_43b, statutory_dues_43b.run(
             eng, rules, dict(sd.get("nature_by_ledger", {})), frozenset(sd.get("salary_expense_ledgers", [])))),

@@ -7,10 +7,20 @@ All notable changes to ComplyEaze Bridge are documented here. The project follow
 
 Published builds are MCPB packages that are not yet code-signed (tags
 `mcp-preview-*` and, from 0.4.0, `mcp-v*`): so far
-`mcp-preview-0.2.0`, `mcp-preview-0.3.0`, `mcp-v0.4.0`, `mcp-v0.4.1` and `mcp-v0.4.2`. The
+`mcp-preview-0.2.0`, `mcp-preview-0.3.0`, `mcp-v0.4.0`, `mcp-v0.4.1`, `mcp-v0.4.2` and `mcp-v0.5.0`. The
 number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
+
+### In plain words: the next build, since 0.5.0
+
+These changes are in source and not yet in a published build.
+
+**Fixed**
+
+- The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
+  the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
+  text already said; the schema said 500 even when the row limit was lower or higher (#1148).
 
 ## [0.5.0] - 2026-10-08
 
@@ -22,13 +32,27 @@ counter Tally keeps that moves when vouchers or ledgers change.
 
 **Should I upgrade?**
 
-- **After installing, accept the Terms again.** 0.5.0 names the setting that
-  accepts the Terms for version 2026-10.1, so every tool refuses until you tick
-  it in the extension's settings and quit and reopen Claude Desktop. Whether
-  0.5.0 installs over an existing 0.4.2 as an update, and whether your Tally
-  port, posting and Response redaction settings carry over, has not been tried
-  by us. If Claude Desktop installs it beside the older extension, remove the
-  older one first (as for 0.4.2) and enter your settings again (#1010).
+- **After updating, accept the Terms again, and check the posting setting.**
+  0.5.0 names the setting that accepts the Terms for version 2026-10.1, a
+  different setting from the one you accepted for 0.4.2. After updating, tick
+  the new Terms setting in the extension's settings, check that "Allow voucher
+  posting" is as you want it, then quit and reopen Claude Desktop. What we saw:
+  we installed the package our checks built for this release (not the published
+  file) over 0.4.2 on one Mac. It replaced 0.4.2 and kept the Tally port,
+  Response redaction and Allow voucher posting as they were (a posting
+  setting that was on stayed on); the old Terms setting was gone and the new one
+  had no value. Before the tick, and before any quit, Claude Desktop did not
+  start ComplyEaze Bridge, and a request to one of its tools failed with a 400
+  error that did not mention the Terms. After the tick was saved Claude Desktop
+  started it at once and a new chat got an answer from it, but the assistant
+  first called a leftover second entry for the same extension, which failed with
+  the same error. After Claude Desktop was quit and reopened there was one connector and
+  no error. Not tried: quitting and reopening without the tick, installing over a
+  release older than 0.4.2 (remove such a release first), and Windows. If
+  Settings, Extensions lists two ComplyEaze Bridge entries (as happened when
+  0.4.2 was installed beside an older release), remove the older entry before
+  you use either. Then enter your settings in the new one, tick the Terms
+  setting, and quit and reopen Claude Desktop (#1010).
 - **If you turn posting on: do not post a batch built by 0.5.0 with an older
   version.** Versions 0.3.0 to 0.4.2 refuse to post a batch built with 0.5.0,
   and nothing is posted. Their message says to build the batch again; do not do
@@ -50,16 +74,17 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **How:** ComplyEaze Bridge does not update itself. Follow the
   [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
   (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
-  Desktop, Settings, Extensions, install the new file; (3) keep ComplyEaze
-  Bridge's data folder; (4) accept the Terms setting, enter your other settings
-  again if they were cleared, and check that the extension shows 0.5.0 and
-  that "Allow voucher posting" is as you want it; (5) quit Claude Desktop
+  Desktop, Settings, Extensions, install the new file (remove a release older than
+  0.4.2 first, and see the first bullet above if two entries are listed); (3) keep ComplyEaze
+  Bridge's data folder; (4) tick the new Terms setting, check that the extension shows 0.5.0 and
+  that "Allow voucher posting" is as you want it, and enter your other settings
+  again only if they were cleared; (5) quit Claude Desktop
   completely and reopen it.
 
 **What you can do now**
 
-- `masters` can list a company's cost centres (`cost_centres`, with each centre's category) and cost categories (`cost_categories`, with their three allocation flags). They are returned whether or not the company's Cost Centres setting is on: a book whose setting read No still returned its two centres, so a No setting is not "no centres", and an empty list does not say whether the feature is off or none is defined. A centre without a category, and an answer whose collection does not carry the type of the kind asked for, are refused rather than read as "none". An empty cost-category list is refused (`masters_cost_categories_empty`) on the expectation that the predefined Primary Cost Category always exists, which was seen in both books whose categories were captured and was not captured for a book with no centre defined. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre. Measured on three synthetic books for cost centres and two for cost categories (the setting reading No on two, Yes on one: that book, captured in a separate sitting, returned its three centres, one under another, and the default category, in the same shape); a larger book is refused when its master mark is too large for the response budget (1,037 for cost centres, 1,264 for cost categories). Not measured: centres nested more than one level deep, an alias beyond a centre's own name, a larger book.
-- `vouchers`, `changes` and the sales and purchase registers now return `reference_date`, a voucher's
+- `masters` can list a company's cost centres (`cost_centres`, with each centre's category) and cost categories (`cost_categories`, with their three allocation flags). They are returned whether or not the company's Cost Centres setting is on: a book whose setting read No still returned its two centres, so a No setting is not "no centres", and an empty list does not say whether the feature is off or none is defined. A centre without a category, and an answer whose collection does not carry the type of the kind asked for, are refused rather than read as "none". An empty cost-category list is refused (`masters_cost_categories_empty`) on the expectation that the predefined Primary Cost Category always exists, which was seen in both books whose categories were captured and was not captured for a book with no centre defined. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre. Measured on three synthetic books for cost centres and two for cost categories (the setting reading No on two, Yes on one: that book, captured in a separate sitting, returned its three centres, one under another, and the default category, in the same shape); a larger book is refused when its master mark is too large for the response budget (1,037 for cost centres, 1,264 for cost categories). Not measured: centres nested more than one level deep, an alias beyond a centre's own name, a larger book (#1398).
+- `vouchers` and the sales and purchase registers now return `reference_date`, a voucher's
   `REFERENCEDATE` (`YYYYMMDD`), where the voucher has one (#1257). Checked once against a
   live TallyPrime 7.1 on one synthetic book: the element came back on every voucher, empty on all but one
   and filled on that one (a Purchase) and on a voucher keyed for the check; it was not checked on a sale or on
@@ -227,8 +252,8 @@ counter Tally keeps that moves when vouchers or ledgers change.
   at the moment of a post, another Tally connector that can change entries
   without the approval window, and that dealing with a voucher that reaches the
   wrong company remains yours. The setting that accepts the Terms is now named
-  for version 2026-10.1, so the next build asks you to accept the Terms once
-  more; version 2026-10 stays published for the builds that asked for it
+  for version 2026-10.1, so the new setting has to be accepted after an update
+  (see "Should I upgrade?"); version 2026-10 stays published for the builds that asked for it
   (#1010).
 - When a ledger name you gave is not in the book, the candidates now list ahead
   of the others the ledgers that hold every word you typed

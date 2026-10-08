@@ -8,7 +8,7 @@
   "figures": [
     {
       "id": "related_parties_cl23.amount_rent_4bf6c4e4",
-      "value": 1100000,
+      "value": 1400000,
       "unit": "paise",
       "definition_sha256_16": "c0d8fa2648a32fec",
       "definition_text": "Net Dr+/Cr- population-line movement on related person (tag 4bf6c4e4)'s 'rent' ledger(s), confirmed by the client.",
@@ -17,6 +17,11 @@
           "kind": "ledger",
           "id": "Gamma Rent",
           "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "g01",
+          "label": "Payment 1 on 2025-05-01"
         },
         {
           "kind": "voucher",
@@ -37,7 +42,7 @@
     },
     {
       "id": "related_parties_cl23.amount_total_4bf6c4e4",
-      "value": 1100000,
+      "value": 1400000,
       "unit": "paise",
       "definition_sha256_16": "645f13e5478a9711",
       "definition_text": "Sum of amount_<nature>_4bf6c4e4 across every nature configured for person (tag 4bf6c4e4).",

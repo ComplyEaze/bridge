@@ -313,7 +313,7 @@ jobs:
 
           gh release create "$RELEASE_TAG" release-assets/* \
             --verify-tag \
-            --title "Bridge MCPB unsigned preview: $RELEASE_TAG" \
+            --title "ComplyEaze Bridge MCP $version" \
             --notes-file "$RUNNER_TEMP/release-notes.md" \
             --prerelease
       # GitHub's grouped change list (.github/release.yml) goes under the written notes. It is added

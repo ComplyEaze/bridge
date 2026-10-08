@@ -1,0 +1,280 @@
+{
+ "comment": "loans_interest, bridge#1259 item 2, a firm: the TDS on a voucher counted in a loan's repaid or taken total is inside that total, so it is published as tds_in_principal and LOAN-1 leaves it out of its tie (Loan Repaid: a repayment booked net of TDS; Loan Taken: a loan taken carrying a TDS line; Loan Mixed: an interest journal with TDS beside a repayment net of TDS, only the repayment's part is in principal). Loan Journal has TDS only on an interest journal: the figure is absent.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_tds_in_principal-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_tds_in_principal-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_tds_in_principal-002"
+  },
+  {
+   "name": "Loan Repaid",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_in_principal-003"
+  },
+  {
+   "name": "Loan Taken",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_in_principal-004"
+  },
+  {
+   "name": "Loan Mixed",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_in_principal-005"
+  },
+  {
+   "name": "Loan Journal",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_in_principal-006"
+  },
+  {
+   "name": "Interest Mixed",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_in_principal-007"
+  },
+  {
+   "name": "Interest Journal",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_in_principal-008"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 3100000,
+   "credit": 2700000,
+   "closing": 400000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Interest Journal",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Interest Mixed",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Loan Journal",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 900000,
+   "closing": -5900000
+  },
+  {
+   "ledger": "Loan Mixed",
+   "opening": -5000000,
+   "debit": 2000000,
+   "credit": 900000,
+   "closing": -3900000
+  },
+  {
+   "ledger": "Loan Repaid",
+   "opening": -5000000,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": -4000000
+  },
+  {
+   "ledger": "Loan Taken",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 3000000,
+   "closing": -8000000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 600000,
+   "closing": -600000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan Repaid",
+     1000000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ],
+    [
+     "Bank A",
+     -900000
+    ]
+   ]
+  },
+  {
+   "guid": "t01",
+   "date": "2025-06-12",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Loan Taken",
+     -3000000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ],
+    [
+     "Bank A",
+     3100000
+    ]
+   ]
+  },
+  {
+   "guid": "m01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Mixed",
+     1000000
+    ],
+    [
+     "Loan Mixed",
+     -900000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "m02",
+   "date": "2025-07-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan Mixed",
+     2000000
+    ],
+    [
+     "TDS Payable",
+     -200000
+    ],
+    [
+     "Bank A",
+     -1800000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Journal",
+     1000000
+    ],
+    [
+     "Loan Journal",
+     -900000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan Repaid": {
+   "lender": "Invented Repaid Lender",
+   "lender_type": "person"
+  },
+  "Loan Taken": {
+   "lender": "Invented Taken Lender",
+   "lender_type": "person"
+  },
+  "Loan Mixed": {
+   "lender": "Invented Mixed Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Mixed"
+  },
+  "Loan Journal": {
+   "lender": "Invented Journal Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Journal"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

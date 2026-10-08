@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/trial_balance_forex_live.utf16le.xml
+# parser: parse_native_trial_balance
+# source: captured
+Err(InvalidAmount)

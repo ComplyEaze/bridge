@@ -1,0 +1,21 @@
+# fixture: tests/fixtures/native/bills_payable_validation_lab.xml
+# parser: parse_native_bill_rows(20250401..20260817)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "BVL Delta Mixed Payable",
+        reference: "DELTA-PAY",
+        bill_date: TallyDate(
+            "20260801",
+        ),
+        due_date: TallyDate(
+            "20260801",
+        ),
+        closing_balance: ExactDecimal(
+            "66666.00",
+        ),
+        tally_overdue_days: Some(
+            0,
+        ),
+    },
+])

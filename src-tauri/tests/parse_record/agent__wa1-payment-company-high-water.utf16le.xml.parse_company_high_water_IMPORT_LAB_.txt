@@ -1,0 +1,7 @@
+# fixture: agent/wa1-payment-company-high-water.utf16le.xml
+# parser: parse_company_high_water(IMPORT_LAB)
+# source: captured
+Ok(Object {
+    "altmstid": Number(229),
+    "altvchid": Number(1676),
+})

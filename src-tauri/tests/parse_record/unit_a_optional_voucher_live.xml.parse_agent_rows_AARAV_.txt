@@ -1,0 +1,79 @@
+# fixture: unit_a_optional_voucher_live.xml
+# parser: parse_agent_rows(AARAV)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(101602),
+        "amounts": Array [
+            Object {
+                "amount": String("9999.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("9999.00"),
+                        "bill_date": String("20260401"),
+                        "bill_type": String("New Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("BRIDGE-OPT-0001"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("BRIDGE PROBE PARTY OPT"),
+            },
+            Object {
+                "amount": String("-9999.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Cash"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260401"),
+        "guid": String("bb8ad19e-6aef-4239-a917-87fec0c6215e-00018c4b"),
+        "is_invoice": Bool(false),
+        "master_id": String("101451"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": String("BRIDGE PROBE PARTY OPT"),
+        "voucher_number": String("1"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(101603),
+        "amounts": Array [
+            Object {
+                "amount": String("9999.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("9999.00"),
+                        "bill_date": String("20260401"),
+                        "bill_type": String("Agst Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("BRIDGE-OPT-0001"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("BRIDGE PROBE PARTY OPT"),
+            },
+            Object {
+                "amount": String("-9999.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Cash"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260401"),
+        "guid": String("bb8ad19e-6aef-4239-a917-87fec0c6215e-00018c4c"),
+        "is_invoice": Bool(false),
+        "master_id": String("101452"),
+        "narration": Null,
+        "optional": Bool(true),
+        "party": String("BRIDGE PROBE PARTY OPT"),
+        "voucher_number": String("2"),
+        "voucher_type": String("Receipt"),
+    },
+])

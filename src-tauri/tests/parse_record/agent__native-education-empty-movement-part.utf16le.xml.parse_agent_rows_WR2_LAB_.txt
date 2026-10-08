@@ -1,0 +1,4 @@
+# fixture: agent/native-education-empty-movement-part.utf16le.xml
+# parser: parse_agent_rows(WR2_LAB)
+# source: captured
+Ok([])

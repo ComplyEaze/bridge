@@ -1,0 +1,154 @@
+{
+ "comment": "loans_interest, bridge#1259 item 2, a firm: a repayment net of TDS shares its GUID with a voucher that has a credit line and a debit line on the loan of one amount (its lines on the loan net to nil) and carries TDS. The re-derivation by GUID takes a voucher that has a line with an amount on the loan, not one whose lines net to an amount, so it takes that voucher's TDS too and LOAN-1 says so. The Trial Balance closing is 50000 above the lines on the vouchers, which is what the tie expects of that voucher's TDS, so the tie holds and only the re-derivation line is written.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_shared_guid_nil_net-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_shared_guid_nil_net-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_shared_guid_nil_net-002"
+  },
+  {
+   "name": "Suspense",
+   "chain": [
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_shared_guid_nil_net-003"
+  },
+  {
+   "name": "Loan K",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_shared_guid_nil_net-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 900000,
+   "closing": -900000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Loan K",
+   "opening": -5000000,
+   "debit": 1200000,
+   "credit": 200000,
+   "closing": -3950000
+  },
+  {
+   "ledger": "Suspense",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 0,
+   "closing": 50000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 150000,
+   "closing": -150000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "g01",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan K",
+     1000000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ],
+    [
+     "Bank A",
+     -900000
+    ]
+   ]
+  },
+  {
+   "guid": "g01",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan K",
+     200000
+    ],
+    [
+     "Loan K",
+     -200000
+    ],
+    [
+     "TDS Payable",
+     -50000
+    ],
+    [
+     "Suspense",
+     50000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan K": {
+   "lender": "Invented K Lender",
+   "lender_type": "person"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

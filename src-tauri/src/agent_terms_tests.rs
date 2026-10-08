@@ -307,6 +307,18 @@ fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
         .unwrap()
         .ends_with(&format!("(version {TERMS_VERSION})")));
     let description = setting["description"].as_str().unwrap();
+    // The setting is not marked required (below), so its text must not say it is: it says what ticking
+    // does and what happens until then.
+    assert!(
+        description.starts_with(
+            "Tick to use ComplyEaze Bridge: it refuses every tool call until you accept the Terms of Use."
+        ),
+        "{description}"
+    );
+    assert!(
+        !description.to_ascii_lowercase().contains("required"),
+        "{description}"
+    );
     assert!(description.contains("https://bridge.complyeaze.com/terms"));
     assert!(description.contains("https://bridge.complyeaze.com/privacy"));
     assert_eq!(

@@ -24,7 +24,7 @@ These changes are in source and not yet in a published build.
   `narration_not_admissible`, as the app does (`party_not_admissible` when the party's own segment is what breaks
   the rule). Importing its file again for a statement already imported is expected to rewrite those vouchers'
   narrations in the book: their keys do not depend on the narration the script writes. A same-key re-import has been measured over
-  the gateway, not through Tally's own Import menu, which is how this script's file is imported.
+  the gateway; through Tally's own Import menu, which is how this script's file is imported, only an unchanged re-import of a file the app built has been seen, on one Windows computer (#1413).
 
 ## [0.5.1] - 2026-10-09
 
@@ -48,12 +48,12 @@ requests it comes from, except where it names an issue.
   only after Claude Desktop was quit and reopened), and with the setting off its
   tools gave that answer. On one Windows 10 computer with Claude Desktop 2.26454.2
   from the Microsoft Store, the published 0.5.0 file over 0.4.2 was not started
-  either (no ComplyEaze Bridge tool in the chat and no error), and the build our
+  (no ComplyEaze Bridge tool in the chat and no error), and the build our
   checks made for this release (commit d744d25a, not the published file) was
   started after a fresh install, after an
-  update from 0.4.2 and after an update from 0.5.0 (as the update leaves it, and
-  with the Terms ticked); with the Terms off every tool gave that answer, and with
-  them on the Tally check ran. Not tried: the published 0.5.1 file, and a release
+  update from 0.4.2 and after an update from 0.5.0 that was switched on (as the
+  update leaves it, and with the Terms ticked); with the Terms off every tool gave
+  that answer, and with them on the Tally check ran. Not tried: the published 0.5.1 file, and a release
   older than 0.4.2 (#1413).
 - **If 0.5.0 already starts for you:** the other changes below are the reason
   to update, if any.
@@ -62,7 +62,7 @@ requests it comes from, except where it names an issue.
   text (see "What you can do now" below). Vouchers already imported keep their
   narration, but amending a batch built before this change rewrites the
   narrations of that batch's vouchers in the book (#1430).
-- **After updating, if the assistant does not find ComplyEaze Bridge, check that it is switched on in Settings, Extensions.** An update keeps the extension's switch as it was: on one Windows computer, an extension switched off before the update was still off after it, and the assistant showed no ComplyEaze Bridge tools and no error. Switching it on was enough there (#1413).
+- **After updating, if the assistant does not find ComplyEaze Bridge, check that it is switched on in Settings, Extensions.** On one Windows computer, an update kept the extension's switch as it was: an extension switched off before the update was still off after it, and the assistant showed no ComplyEaze Bridge tools and no error. Switching it on brought the tools back there, and they then answered `terms_not_accepted` until the Terms setting was on (#1413).
 - **If you use ComplyEaze Bridge on Windows:** the build of this release made by our checks was tried on one Windows 10 computer, with TallyPrime 7.1 (Silver) and a company made for the test; see "Known limits" below for what was and was not tried.
 - **How:** ComplyEaze Bridge does not update itself. Follow the
   [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):

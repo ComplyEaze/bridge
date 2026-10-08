@@ -68,8 +68,8 @@ actually on.
    not read from Tally, and from release 0.5.1 every Bridge tool answers that
    the Terms of Use are not accepted and names this setting (seen on one Mac
    with a test package, and on one Windows computer with the build our checks made for this release). (In 0.5.0, after an update
-   from 0.4.2, Claude Desktop may not start Bridge, with an error that does not
-   mention the Terms; bridge#1413.)
+   from 0.4.2, Claude Desktop may not start Bridge: on a Mac with an error that
+   does not mention the Terms, on one Windows computer with no error; bridge#1413.)
 5. Save the extension settings, then quit Claude Desktop completely and reopen
    it. (On that Mac Claude Desktop
    started Bridge as soon as the settings were saved and a new chat got an answer

@@ -361,6 +361,11 @@ fn serve_request(
         let (mut stream, _) = match listener.accept() {
             Ok(accepted) => accepted,
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                // A cancel ends the wait here too, so it does not depend on
+                // the wake-up connection reaching `accept` (#1441).
+                if cancelled.load(Ordering::Acquire) {
+                    return Ok(observe(&[], true));
+                }
                 if started.elapsed() >= deadline {
                     return Err(io::Error::new(io::ErrorKind::TimedOut, unanswered));
                 }
@@ -426,23 +431,7 @@ fn serve_request(
             Err(ReadError::Io(error)) => return Err(error),
         }
     };
-    let (method, path) = request_line(&request);
-    let request_body = request_body(&request);
-    let mut observed = ObservedRequest {
-        method,
-        path,
-        request_content_type_is_tally_xml_utf16: has_tally_xml_utf16_content_type(&request),
-        request_content_type_is_plain_tally_xml: has_plain_tally_xml_content_type(&request),
-        bytes_received: request.len(),
-        request_body_bytes: request_body.len(),
-        request_body_sha256: hex::encode(Sha256::digest(request_body)),
-        request_body_sha256_without_reference_date: hex::encode(Sha256::digest(
-            without_reference_date_word(request_body),
-        )),
-        request_processed: false,
-        cancelled: cancelled.load(Ordering::Acquire),
-        client_stopped_reading_response: false,
-    };
+    let mut observed = observe(&request, cancelled.load(Ordering::Acquire));
     if observed.cancelled {
         return Ok(observed);
     }
@@ -515,6 +504,27 @@ fn serve_request(
         }
     }
     Ok(observed)
+}
+
+/// What the simulator records of a request before answering it.
+fn observe(request: &[u8], cancelled: bool) -> ObservedRequest {
+    let (method, path) = request_line(request);
+    let request_body = request_body(request);
+    ObservedRequest {
+        method,
+        path,
+        request_content_type_is_tally_xml_utf16: has_tally_xml_utf16_content_type(request),
+        request_content_type_is_plain_tally_xml: has_plain_tally_xml_content_type(request),
+        bytes_received: request.len(),
+        request_body_bytes: request_body.len(),
+        request_body_sha256: hex::encode(Sha256::digest(request_body)),
+        request_body_sha256_without_reference_date: hex::encode(Sha256::digest(
+            without_reference_date_word(request_body),
+        )),
+        request_processed: false,
+        cancelled,
+        client_stopped_reading_response: false,
+    }
 }
 
 /// Writes the response head. A client that has already gone away (its

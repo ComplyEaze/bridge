@@ -355,3 +355,38 @@ fn the_declared_frame_is_parsed_once_and_fails_closed() {
         assert_eq!(parse_head(raw.as_bytes()), Err(fault), "{raw:?}");
     }
 }
+
+#[test]
+fn a_cancel_ends_the_wait_for_a_request_even_when_no_wake_up_arrives() {
+    // `cancel()` sets the flag and then connects once to wake `accept`. Here
+    // the flag is set and nothing ever connects, as when that connection fails:
+    // the wait ends with the cancelled entry, not with the deadline's
+    // "no request" (#1441).
+    let listener = bind_loopback_listener().expect("bind loopback listener");
+    listener
+        .set_nonblocking(true)
+        .expect("set the listener non-blocking");
+    let received = AtomicUsize::new(0);
+
+    let observed = serve_request(
+        &listener,
+        ScenarioPlan::new(crate::Fixture::ExportStatusOne),
+        &AtomicBool::new(true),
+        &received,
+        NoRequestForPlan { plan: 0, plans: 1 },
+        Duration::from_secs(1),
+    )
+    .expect("a cancelled wait is not a failure");
+
+    // The same entry the wake-up connection gives: no method, no bytes, cancelled.
+    assert_eq!(
+        (
+            observed.method.as_str(),
+            observed.bytes_received,
+            observed.cancelled,
+            observed.request_processed
+        ),
+        ("", 0, true, false)
+    );
+    assert_eq!(received.load(Ordering::Acquire), 0);
+}

@@ -27,7 +27,7 @@ Bridge is not made by, or affiliated with, Tally Solutions, and we have not run
 the two side by side. TallyPrime also has its own Bank Statement import, which
 takes statement files in the formats Tally lists for each bank.
 
-**Current release:** <!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,
+**Current release:** <!-- managed:current-release -->[`mcp-v0.5.0`](https://github.com/ComplyEaze/bridge/releases/latest) (8 October 2026)<!-- /managed:current-release -->,
 for Windows x64 and Apple Silicon Macs, as a Claude Desktop extension (an .mcpb
 file); it has not been run in other MCP clients. We check each release before
 we publish it: the release check confirms that each package launches, lists its
@@ -49,13 +49,14 @@ Not yet code-signed; your computer may warn you before opening it.
 - "Show the trial balance for 1 April to 31 March."
 - "Check these ledger names against the book before I post: …"
 
-**Its tools.** Release 0.4.2 installs these 22, in name order. None of them changes your TallyPrime books, and every call adds a receipt line,
+**Its tools.** Release 0.5.0 installs these 23, in name order. None of them changes your TallyPrime books, and every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
 | --- | --- | --- |
 | `balance_sheet` | The Balance Sheet for a date range, by primary group, from TallyPrime’s Trial Balance (a book with stock items is expected to be refused) | Nothing |
 | `build_import_xml` | Checks a Journal, Payment, Receipt or Contra batch and writes an import file | An import file and a ledger record on this computer |
+| `cash_flow` | Tally’s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, returned only after its net total matches the trial balance (not a cash flow statement under AS 3) | Nothing |
 | `egress_log` | The receipts ComplyEaze Bridge keeps of its own tool calls, with no figures | Nothing |
 | `ledger_masters` | Ledgers with their opening balances; optionally GSTIN, PAN and other party details | Nothing |
 | `ledger_movement` | A ledger’s opening, debits, credits and closing for a period | Nothing |
@@ -75,7 +76,7 @@ with no figures, to a log on this computer.
 | `verify_import` | Reads back a batch you imported by hand in TallyPrime | Proof files and status records on this computer |
 | `voucher_presence` | Which proposed vouchers are already in the book | Nothing |
 | `voucher_schema` | The voucher-file format, without asking TallyPrime | Nothing |
-| `vouchers` | The vouchers in a period. Search by voucher number, reference, narration or amount, and summaries by ledger, month, voucher type, group or primary group, are in the next build and not in 0.4.2 (search and the first three summaries checked once, and the group and primary-group summaries in a second run, on a synthetic book of 67 vouchers; not checked on a large book) | Nothing |
+| `vouchers` | The vouchers in a period. Search by voucher number, reference, narration or amount, and summaries by ledger, month, voucher type, group or primary group, are in release 0.5.0 and not in 0.4.2 (search and the first three summaries checked once, and the group and primary-group summaries in a second run, on a synthetic book of 67 vouchers; not checked on a large book) | Nothing |
 
 With posting turned on in the extension, two more appear: `post_import` posts one saved voucher after you approve it in a
 ComplyEaze Bridge window, and `acknowledge_post_review` asks you, in its own window, to record that you reviewed a posted voucher

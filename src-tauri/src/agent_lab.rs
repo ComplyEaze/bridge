@@ -480,7 +480,7 @@ fn parse_lab_master_rows(
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let tag = event.name().as_ref().to_ascii_uppercase();
                 let at_collection = path == ["ENVELOPE", "BODY", "DATA", "COLLECTION"];
                 if at_collection {
                     if tag != row_tag {
@@ -490,13 +490,10 @@ fn parse_lab_master_rows(
                     for attribute in event.attributes() {
                         let attribute =
                             attribute.map_err(|_| "agent_read_protocol_invalid".to_string())?;
-                        if attribute.key.as_ref().eq_ignore_ascii_case(b"NAME") {
+                        if attribute.key.as_ref().eq_ignore_ascii_case("NAME") {
                             attribute_name = Some(
                                 attribute
-                                    .decoded_and_normalized_value(
-                                        quick_xml::XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )
+                                    .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                                     .map_err(|_| "agent_read_protocol_invalid".to_string())?
                                     .into_owned(),
                             );
@@ -528,15 +525,11 @@ fn parse_lab_master_rows(
             // wrong number that still looks like one. Same buffer, so a value
             // split across Text, GeneralRef and CDATA rejoins in order.
             Ok(quick_xml::events::Event::CData(text)) => {
-                buffer.push(
-                    &text
-                        .decode()
-                        .map_err(|_| "agent_read_protocol_invalid".to_string())?,
-                );
+                buffer.push(&text);
             }
             Ok(quick_xml::events::Event::Empty(_)) => buffer.abandon(),
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 // A field belongs to the row when its parent chain is exactly
                 // COLLECTION_PREFIX + [row_tag]; `path` still holds the closing
                 // element, so the parent chain is everything before it.
@@ -662,7 +655,7 @@ fn parse_lab_inventory_vouchers(xml: &str) -> Result<Vec<Value>, String> {
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let tag = event.name().as_ref().to_ascii_uppercase();
                 // `path` is the parent chain of the element about to open.
                 if path_is(&path, &COLLECTION_PREFIX) {
                     if tag != "VOUCHER" {
@@ -695,15 +688,11 @@ fn parse_lab_inventory_vouchers(xml: &str) -> Result<Vec<Value>, String> {
             // wrong number that still looks like one. Same buffer, so a value
             // split across Text, GeneralRef and CDATA rejoins in order.
             Ok(quick_xml::events::Event::CData(text)) => {
-                buffer.push(
-                    &text
-                        .decode()
-                        .map_err(|_| "agent_read_protocol_invalid".to_string())?,
-                );
+                buffer.push(&text);
             }
             Ok(quick_xml::events::Event::Empty(_)) => buffer.abandon(),
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 // `path` still holds the closing element, so its parent chain
                 // names the container the field belongs to. Resolving this at
                 // `End` rather than at each text event is what keeps a

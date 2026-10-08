@@ -111,7 +111,6 @@ pub(crate) fn parse_source_xml(
                 start(
                     &mut stack,
                     &event,
-                    &reader,
                     &mut current,
                     &mut entry,
                     &mut saw_root,
@@ -123,7 +122,6 @@ pub(crate) fn parse_source_xml(
                 start(
                     &mut stack,
                     &event,
-                    &reader,
                     &mut current,
                     &mut entry,
                     &mut saw_root,
@@ -134,14 +132,9 @@ pub(crate) fn parse_source_xml(
             Ok(Event::Text(text)) => {
                 append_text(&stack, &mut current, &mut entry, decode_text(text)?)?
             }
-            Ok(Event::CData(text)) => append_text(
-                &stack,
-                &mut current,
-                &mut entry,
-                text.decode()
-                    .map_err(|_| SourceXmlError::InvalidUtf8)?
-                    .into_owned(),
-            )?,
+            Ok(Event::CData(text)) => {
+                append_text(&stack, &mut current, &mut entry, text.to_string())?
+            }
             Ok(Event::GeneralRef(reference)) => append_text(
                 &stack,
                 &mut current,
@@ -193,14 +186,13 @@ pub(crate) fn parse_source_xml(
 fn start(
     stack: &mut Vec<String>,
     event: &quick_xml::events::BytesStart<'_>,
-    reader: &Reader<&[u8]>,
     current: &mut Option<WorkingVoucher>,
     entry: &mut Option<WorkingEntry>,
     saw_root: &mut bool,
     notices: &mut BTreeMap<String, usize>,
 ) -> Result<(), SourceXmlError> {
     let tag = tag_name(event.name().as_ref())?;
-    validate_attribute_bounds(event, reader)?;
+    validate_attribute_bounds(event)?;
     if stack.len() >= MAX_DEPTH {
         return Err(SourceXmlError::UnsupportedShape);
     }
@@ -254,7 +246,7 @@ fn start(
             let attr = attr.map_err(|_| SourceXmlError::UnsupportedShape)?;
             let key = tag_name(attr.key.as_ref())?;
             let value = attr
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .normalized_value(XmlVersion::Implicit1_0)
                 .map_err(|_| SourceXmlError::InvalidUtf8)?;
             let value = bounded(value.into_owned())?;
             match key.as_str() {
@@ -418,23 +410,20 @@ fn append_text(
     Ok(())
 }
 
-fn tag_name(raw: &[u8]) -> Result<String, SourceXmlError> {
+fn tag_name(raw: &str) -> Result<String, SourceXmlError> {
     if raw.len() > MAX_TAG_BYTES {
         return Err(SourceXmlError::UnsupportedShape);
     }
-    std::str::from_utf8(raw)
-        .map(str::to_owned)
-        .map_err(|_| SourceXmlError::InvalidUtf8)
+    Ok(raw.to_owned())
 }
 fn validate_attribute_bounds(
     event: &quick_xml::events::BytesStart<'_>,
-    reader: &Reader<&[u8]>,
 ) -> Result<(), SourceXmlError> {
     for attribute in event.attributes().with_checks(true) {
         let attribute = attribute.map_err(|_| SourceXmlError::UnsupportedShape)?;
         let _ = tag_name(attribute.key.as_ref())?;
         let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .normalized_value(XmlVersion::Implicit1_0)
             .map_err(|_| SourceXmlError::InvalidUtf8)?;
         bounded(value.into_owned())?;
     }
@@ -446,15 +435,10 @@ fn unescape(value: &str) -> Result<String, SourceXmlError> {
         .map_err(|_| SourceXmlError::InvalidEntity)
 }
 fn decode_text(text: BytesText<'_>) -> Result<String, SourceXmlError> {
-    unescape(&text.decode().map_err(|_| SourceXmlError::InvalidUtf8)?)
+    unescape(&text)
 }
 fn decode_reference(reference: BytesRef<'_>) -> Result<String, SourceXmlError> {
-    unescape(&format!(
-        "&{};",
-        reference
-            .decode()
-            .map_err(|_| SourceXmlError::InvalidUtf8)?
-    ))
+    unescape(&format!("&{};", &*reference))
 }
 fn bounded(value: String) -> Result<String, SourceXmlError> {
     if value.len() > MAX_TEXT_BYTES {

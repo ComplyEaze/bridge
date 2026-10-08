@@ -77,8 +77,10 @@ fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
         let mut fields = Vec::new();
         loop {
             match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(event) if event.name().as_ref() == b"FETCH" => {
-                    fields = String::from_utf8_lossy(&reader.read_text(event.name()).unwrap())
+                quick_xml::events::Event::Start(event) if event.name().as_ref() == "FETCH" => {
+                    fields = reader
+                        .read_text(event.name())
+                        .unwrap()
                         .split(',')
                         .map(str::to_string)
                         .collect();
@@ -265,13 +267,12 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
             .expect("request must be well-formed XML")
         {
             quick_xml::events::Event::Start(event)
-                if event.name().as_ref() == b"SVCURRENTCOMPANY" =>
+                if event.name().as_ref() == "SVCURRENTCOMPANY" =>
             {
                 let raw = reader
                     .read_text(event.name())
                     .expect("SVCURRENTCOMPANY must have a matching close tag");
-                let decoded = raw.decode().expect("text must decode as UTF-8");
-                return quick_xml::escape::unescape(&decoded)
+                return quick_xml::escape::unescape(&raw)
                     .expect("text must unescape")
                     .into_owned();
             }

@@ -2989,18 +2989,14 @@ fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_per
             match reader.read_event().unwrap() {
                 quick_xml::events::Event::Start(tag) => {
                     let name = tag.name();
-                    if name.as_ref() == b"SYSTEM" {
+                    if name.as_ref() == "SYSTEM" {
                         let text = reader.read_text(name).unwrap();
-                        let decoded = text.decode().unwrap();
-                        formulae.push(quick_xml::escape::unescape(&decoded).unwrap().into_owned());
-                    } else if matches!(name.as_ref(), b"SVFROMDATE" | b"SVTODATE") {
-                        let value = reader
-                            .read_text(name)
-                            .unwrap()
-                            .decode()
-                            .unwrap()
-                            .into_owned();
-                        assert!(bounds.insert(name.as_ref().to_vec(), value).is_none());
+                        formulae.push(quick_xml::escape::unescape(&text).unwrap().into_owned());
+                    } else if matches!(name.as_ref(), "SVFROMDATE" | "SVTODATE") {
+                        let value = reader.read_text(name).unwrap().to_string();
+                        assert!(bounds
+                            .insert(name.as_ref().as_bytes().to_vec(), value)
+                            .is_none());
                     }
                 }
                 quick_xml::events::Event::Eof => break,
@@ -3912,12 +3908,11 @@ fn decoded_element_text(xml: &str, tag: &str) -> String {
             .read_event()
             .expect("request must be well-formed XML")
         {
-            quick_xml::events::Event::Start(event) if event.name().as_ref() == tag.as_bytes() => {
+            quick_xml::events::Event::Start(event) if event.name().as_ref() == tag => {
                 let raw = reader
                     .read_text(event.name())
                     .unwrap_or_else(|_| panic!("<{tag}> must have a matching close tag"));
-                let decoded = raw.decode().expect("text must decode as UTF-8");
-                return quick_xml::escape::unescape(&decoded)
+                return quick_xml::escape::unescape(&raw)
                     .expect("text must unescape")
                     .into_owned();
             }
@@ -3976,8 +3971,8 @@ fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
     assert_eq!(decoded_element_text(&xml, "LEDGERNAME"), ledger);
     // A conforming XML parser folds a literal CR LF (and a lone CR) to LF
     // before the application sees the text (XML 1.0, end-of-line handling);
-    // character references are not folded. quick_xml's decode() skips that
-    // step, so apply it here: only an escaped CR LF survives it (bridge#626).
+    // character references are not folded. The text quick_xml hands over skips
+    // that step, so apply it here: only an escaped CR LF survives it (bridge#626).
     let folded = xml.replace("\r\n", "\n").replace('\r', "\n");
     assert_eq!(decoded_element_text(&folded, "LEDGERNAME"), ledger);
     assert!(!xml.contains('\r'), "no literal CR may reach the request");

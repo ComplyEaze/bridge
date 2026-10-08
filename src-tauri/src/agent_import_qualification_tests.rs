@@ -212,19 +212,16 @@ fn journal_renderer_preserves_create_remote_identity_with_optional_number() {
         let mut numbers = Vec::new();
         loop {
             match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"VOUCHER" => {
+                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "VOUCHER" => {
                     vouchers += 1;
                     let attributes = tag
                         .attributes()
                         .map(|attribute| {
                             let attribute = attribute.unwrap();
                             (
-                                String::from_utf8(attribute.key.as_ref().to_vec()).unwrap(),
+                                attribute.key.as_ref().to_string(),
                                 attribute
-                                    .decoded_and_normalized_value(
-                                        quick_xml::XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )
+                                    .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                                     .unwrap()
                                     .into_owned(),
                             )
@@ -243,20 +240,13 @@ fn journal_renderer_preserves_create_remote_identity_with_optional_number() {
                         ])
                     );
                 }
-                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"VOUCHERNUMBER" => {
-                    numbers.push(
-                        reader
-                            .read_text(tag.name())
-                            .unwrap()
-                            .decode()
-                            .unwrap()
-                            .into_owned(),
-                    );
+                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "VOUCHERNUMBER" => {
+                    numbers.push(reader.read_text(tag.name()).unwrap().to_string());
                 }
                 quick_xml::events::Event::Start(tag) | quick_xml::events::Event::Empty(tag) => {
                     assert!(!matches!(
                         tag.name().as_ref(),
-                        b"GUID" | b"MASTERID" | b"REMOTEID"
+                        "GUID" | "MASTERID" | "REMOTEID"
                     ));
                 }
                 quick_xml::events::Event::Eof => break,

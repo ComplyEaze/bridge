@@ -100,8 +100,9 @@
 //    - windows-sys's ShellExecuteW, ShellExecuteA, CreateProcessW,
 //      CreateProcessA and WinExec: unresolved only in build.rs's host graph,
 //      whose windows-sys 0.61.2 copy (through tauri-build) lacks the features
-//      that compile them in. They are live in the shipped targets: a call
-//      there fires the lint and fails the census.
+//      that compile them in. They are live in the shipped targets (seen
+//      firing for WinExec in bridge_lib, and failing the census; the other
+//      four resolve there the same way).
 //    - ShellExecuteExW: compiled out everywhere, because it needs
 //      Win32_System_Registry, which no crate enables; a call would not compile.
 //    The static half refuses all of those function names (and execv, execvp,
@@ -446,7 +447,7 @@ function trackedFiles() {
 
 // Clippy reads the nearest clippy.toml, so a second one under src-tauri would replace these lists
 // for its crate, and CLIPPY_CONF_DIR would point it elsewhere. An edit to the lists needs review.
-const CLIPPY_CONFIG_DIGEST = "d62a79874ba7fda19880a39ede8c1de7e2a90dd0f3315d3927ee34271d5410dc";
+const CLIPPY_CONFIG_DIGEST = "732846f2f44102be57f5763faa789cb5a54b3ca1f0ac5282d754a2d47a9ed33a";
 const clippyConfig = createHash("sha256").update(readFileSync(`${root}src-tauri/clippy.toml`)).digest("hex");
 if (clippyConfig !== CLIPPY_CONFIG_DIGEST) {
   egressViolations.push(`src-tauri/clippy.toml changed; review its egress lists, then set CLIPPY_CONFIG_DIGEST to ${clippyConfig}`);

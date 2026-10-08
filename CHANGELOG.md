@@ -32,6 +32,18 @@ These changes are in source and not yet in a published build.
   narrations in the book: their keys do not depend on the narration the script writes. A same-key re-import has been measured over
   the gateway, not through Tally's own Import menu, which is how this script's file is imported.
 
+- **Verifying a batch no longer replaces its saved proof, so the host need not ask before each
+  read-back.** Each `verify_import`, and each of the two verifications `acknowledge_post_review`
+  runs, now saves its proof as a new pair of files, `<batch>.proof.<time saved>.<SHA-256>.json`
+  and `.md`, beside every earlier pair, and the status it adds to the import journal names which
+  pair is current. The finished masters check and the first verified ALTERIDs go to files of their
+  own, written once. Nothing these two tools find in the folder is replaced or deleted, so they are
+  now marked as writes that are not destructive. The folder therefore grows with every
+  verification; nothing deletes old proofs. A batch last verified by an earlier build keeps its
+  single `<batch>.proof.json`, which no longer changes. After the first verification with this
+  build, a connector older than it refuses the import journal (a downgrade was already refused after
+  the first native post), so keep this version for recovery (#911).
+
 **Fixed**
 
 - **An update now starts ComplyEaze Bridge before the Terms are ticked, and its

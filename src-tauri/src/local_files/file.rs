@@ -64,6 +64,19 @@ pub(crate) fn open_local_file(path: &Path, writable: bool) -> io::Result<File> {
     Ok(file)
 }
 
+/// Create a private file at a name nothing holds yet. A name that exists, a
+/// link or an alias included, fails with `AlreadyExists` and is left as it is.
+pub(crate) fn create_new_local_file(path: &Path) -> io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)
+}
+
 pub(crate) fn lock_error(error: std::fs::TryLockError) -> String {
     match error {
         std::fs::TryLockError::WouldBlock => "import_admission_busy",

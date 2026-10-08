@@ -113,7 +113,11 @@ async fn an_approved_review_is_recorded_once_and_changes_no_verdict() {
     let (server, args) = doubted(&simulator, directory.path());
     let approval = ScriptedApproval::approving();
 
+    // Its two verifications and the record replace and remove nothing they
+    // find (#911), the pending masters mark and the doubt included.
+    let found = every_file(directory.path());
     let response = acknowledge(&server, args.clone(), approval.clone()).await;
+    assert_nothing_replaced(&found, directory.path());
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["operator_review"]["state"], "current", "{response}");
     assert_eq!(approval.reviews().len(), 1, "{response}");
@@ -134,7 +138,9 @@ async fn an_approved_review_is_recorded_once_and_changes_no_verdict() {
     );
 
     // A later readback keeps every verdict it had, and reports the review.
+    let found = every_file(directory.path());
     let verified = server.call_tool("verify_import", args).await;
+    assert_nothing_replaced(&found, directory.path());
     let result = &verified["structuredContent"]["result"];
     assert_eq!(
         result["dispatch"]["state"], "reconciliation_required",
@@ -1393,13 +1399,7 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
         result["dispatch"]["state"], "reconciliation_required",
         "{verified}"
     );
-    let markdown = fs::read_to_string(
-        server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{D3_BATCH}.proof.md")),
-    )
-    .unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(D3_BATCH)[1]).unwrap();
     assert!(
         markdown
             .contains("Readback counts: matching 49, divergent 0, not effective 1, not found 0"),
@@ -1545,13 +1545,7 @@ async fn a_cancelled_voucher_entered_again_by_hand_is_reported_not_attributed() 
                  "alter_id":1790,"voucher_number":"353","before_pre_import_mark":false}]}}]),
         "{verified}"
     );
-    let markdown = fs::read_to_string(
-        server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{L1_BATCH}.proof.md")),
-    )
-    .unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(L1_BATCH)[1]).unwrap();
     assert!(
         markdown
             .contains("Readback counts: matching 49, divergent 0, not effective 1, not found 0"),
@@ -1671,13 +1665,7 @@ async fn a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown
         result["verification_status"], "verification_incomplete",
         "{verified}"
     );
-    let markdown = fs::read_to_string(
-        server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{D3_BATCH}.proof.md")),
-    )
-    .unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(D3_BATCH)[1]).unwrap();
     assert!(
         markdown.contains("this report does not confirm posting"),
         "{markdown}"

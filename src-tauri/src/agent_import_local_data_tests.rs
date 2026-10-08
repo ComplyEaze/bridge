@@ -46,6 +46,9 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     write(&root.join("imports/b.xml"), b"0123456789");
     write(&root.join("imports/b.proof.json"), b"12345");
     write(&root.join("imports/b.proof.md"), b"123456");
+    let saved = format!("b.proof.20261009T101500123Z.{}", "a".repeat(64));
+    write(&root.join(format!("imports/{saved}.json")), b"1");
+    write(&root.join(format!("imports/{saved}.md")), b"12");
     write(&root.join("imports/b.masters_verdict.json"), b"123");
     write(&root.join("imports/b.baseline.1.json"), b"1234");
     write(&root.join("imports/b.baseline.x.json"), b"1");
@@ -69,7 +72,7 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     expect("locks", 2, 0);
     expect("other", 3, 8);
     expect("import_files", 1, 10);
-    expect("proofs", 2, 11);
+    expect("proofs", 4, 14);
     expect("approval_notes", 1, 7);
     expect("review_records", 5, 25);
     expect("bank_statements", 1, 11);

@@ -1090,13 +1090,7 @@ async fn a_declined_post_sends_nothing_and_journals_no_intent() {
     );
     // The readback before the post left a proof of a batch never sent: it says
     // the batch is not verified, and must not forbid sending it (bridge#804).
-    let markdown = fs::read_to_string(
-        server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{}.proof.md", line.batch_id)),
-    )
-    .unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(&line.batch_id)[1]).unwrap();
     assert!(
         markdown.contains("**Not verified — this report does not confirm posting.**"),
         "{markdown}"
@@ -4523,7 +4517,9 @@ async fn post_and_verify(
         )
         .unwrap();
         origin = later_origin;
+        let found = every_file(directory.path());
         verified.push(later_server.call_tool("verify_import", args.clone()).await);
+        assert_nothing_replaced(&found, directory.path());
         let _ = sent(simulator);
     }
     let verdicts = String::from_utf8(journal(directory.path()))
@@ -4533,6 +4529,53 @@ async fn post_and_verify(
         .filter(|record| record["record_type"] == "post_span_verdict")
         .collect::<Vec<_>>();
     (posted, verified, verdicts)
+}
+
+/// Every file under `root`, by path: its bytes and, on Unix, its inode, so a
+/// file replaced by one with the same bytes still reads as changed.
+fn every_file(root: &Path) -> std::collections::BTreeMap<PathBuf, (Vec<u8>, u64)> {
+    let mut found = std::collections::BTreeMap::new();
+    let mut folders = vec![root.to_path_buf()];
+    while let Some(folder) = folders.pop() {
+        for entry in fs::read_dir(&folder).unwrap() {
+            let entry = entry.unwrap();
+            let kind = entry.file_type().unwrap();
+            if kind.is_dir() {
+                folders.push(entry.path());
+            } else if kind.is_file() {
+                #[cfg(unix)]
+                let identity = std::os::unix::fs::MetadataExt::ino(&entry.metadata().unwrap());
+                #[cfg(not(unix))]
+                let identity = 0;
+                found.insert(entry.path(), (fs::read(entry.path()).unwrap(), identity));
+            }
+        }
+    }
+    found
+}
+
+/// A call that is not destructive replaces and removes nothing it found under
+/// `root` (#911): each file is the same file with the same bytes, except that
+/// a journal or log (`.jsonl`) may have grown, its earlier bytes kept.
+fn assert_nothing_replaced(
+    before: &std::collections::BTreeMap<PathBuf, (Vec<u8>, u64)>,
+    root: &Path,
+) {
+    let after = every_file(root);
+    for (path, (bytes, identity)) in before {
+        let (now, now_identity) = after
+            .get(path)
+            .unwrap_or_else(|| panic!("{} was removed", path.display()));
+        assert_eq!(now_identity, identity, "{} was replaced", path.display());
+        if path
+            .extension()
+            .is_some_and(|extension| extension == "jsonl")
+        {
+            assert!(now.starts_with(bytes), "{} lost bytes", path.display());
+        } else {
+            assert_eq!(now, bytes, "{} was rewritten", path.display());
+        }
+    }
 }
 
 fn bound_journal_identity() -> Value {

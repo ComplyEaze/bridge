@@ -189,11 +189,8 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             .unwrap();
         let paths = [
             server.settings.data_dir.join("agent-import-ledger.jsonl"),
-            server
-                .imports_dir()
-                .unwrap()
-                .join("mode-history.proof.json"),
-            server.imports_dir().unwrap().join("mode-history.proof.md"),
+            server.current_proof_paths("mode-history")[0].clone(),
+            server.current_proof_paths("mode-history")[1].clone(),
         ];
         let before = paths
             .iter()

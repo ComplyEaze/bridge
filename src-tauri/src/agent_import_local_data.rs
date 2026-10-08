@@ -117,7 +117,10 @@ const ENTRY_CAP: usize = 100_000;
 fn import_class(name: &str) -> &'static str {
     if name.ends_with(".xml") {
         "import_files"
-    } else if name.ends_with(".proof.json") || name.ends_with(".proof.md") {
+    } else if name.ends_with(".proof.json")
+        || name.ends_with(".proof.md")
+        || ((name.ends_with(".json") || name.ends_with(".md")) && name.contains(".proof."))
+    {
         "proofs"
     } else if name.ends_with(".approval_lapse.json") {
         "approval_notes"

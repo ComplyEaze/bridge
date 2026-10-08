@@ -314,8 +314,8 @@ fn lab_tools_env_enabled() -> bool {
 pub(super) const READ_RECEIPT_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to ComplyEaze Bridge's local log on this computer; it writes nothing to Tally.";
 const BUILD_IMPORT_SENTENCE: &str = "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally.";
 const PARSE_STATEMENT_SENTENCE: &str = "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally.";
-const VERIFY_IMPORT_SENTENCE: &str = "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally.";
-const ACKNOWLEDGE_SENTENCE: &str = "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally.";
+const VERIFY_IMPORT_SENTENCE: &str = "Reads the batch's date window from Tally, then adds new proof files for the batch beside every earlier one and a status record naming them current, and may also add a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer, replacing and deleting nothing there (paging an existing proof only reads it); writes nothing to Tally.";
+const ACKNOWLEDGE_SENTENCE: &str = "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also adds proof files and status records there, replacing and deleting nothing; writes nothing to Tally.";
 
 /// What a shipped (non-lab) tool does beyond answering, which decides its MCP
 /// annotations. A host reads an absent annotation as "not read-only,
@@ -330,12 +330,10 @@ const ACKNOWLEDGE_SENTENCE: &str = "Writes one acknowledgement record to ComplyE
 pub(super) enum ToolEffect {
     Read,
     /// Writes a local file the user or a later tool relies on, adding new files
-    /// only; nothing to Tally. The sentence is appended to the description.
+    /// and appending records only, never replacing or removing one that was
+    /// there before the call (the MCP definition of "additive updates only");
+    /// nothing to Tally. The sentence is appended to the description.
     LocalWrite(&'static str),
-    /// As `LocalWrite`, but it also replaces a file it wrote earlier (a newer
-    /// verification replaces the batch's saved proof), so the MCP definition of
-    /// "additive updates only" does not hold and it is marked destructive.
-    LocalRewrite(&'static str),
     /// Posts one voucher into Tally after the native approval.
     TallyPost,
 }
@@ -345,7 +343,7 @@ impl ToolEffect {
         // One arm per tool, in name order, so two pull requests that add
         // different tools touch different lines (#995).
         Some(match name {
-            "acknowledge_post_review" => Self::LocalRewrite(ACKNOWLEDGE_SENTENCE),
+            "acknowledge_post_review" => Self::LocalWrite(ACKNOWLEDGE_SENTENCE),
             "balance_sheet" => Self::Read,
             "build_import_xml" => Self::LocalWrite(BUILD_IMPORT_SENTENCE),
             "cash_flow" => Self::Read,
@@ -367,7 +365,7 @@ impl ToolEffect {
             "tally_status" => Self::Read,
             "trial_balance" => Self::Read,
             "validate_masters" => Self::Read,
-            "verify_import" => Self::LocalRewrite(VERIFY_IMPORT_SENTENCE),
+            "verify_import" => Self::LocalWrite(VERIFY_IMPORT_SENTENCE),
             "voucher_presence" => Self::Read,
             "voucher_schema" => Self::Read,
             "vouchers" => Self::Read,
@@ -382,9 +380,6 @@ impl ToolEffect {
             }
             Self::LocalWrite(_) => {
                 json!({"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":false})
-            }
-            Self::LocalRewrite(_) => {
-                json!({"readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":false})
             }
             Self::TallyPost => {
                 json!({"readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":false})
@@ -642,7 +637,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         json!({"type":"object", "additionalProperties":false, "required":["company_guid","ledgers"], "properties":{"company_guid":{"type":"string"},"ledgers":{"type":"array","minItems":1,"maxItems":agent_import::MAX_MASTER_NAMES,"items":{"type":"string","minLength":1,"maxLength":agent_import::MAX_MASTER_NAME_CHARS,"pattern":r"\S"}}}}),
                     ),
                     "verify_import" => (
-                        "Read back a manually imported local batch and write Proof-of-Post files. This never dispatches import XML to Tally. The result gives `verification_status`, `counts`, every voucher that is not posted_verified (`unverified_vouchers`; for a native post a voucher may be `bound_not_in_window`, `book_rolled_back` or `sent_not_attributed`, never absence, with `post_span_binding` naming how the post was attributed and a plain `summary` to give the person first; a book restored from a backup and then keyed past the post's voucher mark before this check is not seen as rolled back, and if Tally then reused the post's MasterIDs a bound voucher could read `posted_verified` while being another voucher with the same content: unmeasured, bridge#1050), `duplicates`, `unrelated_duplicates_in_window` and `ambiguous_within_batch` in full, never cut to fit. Only the posted_verified vouchers are paged, as `items` from `offset` out of `verified_total`; when the response cap shortens them it sets `truncated` and `next_offset`. To read further pages, call again with `proof_sha256` set to the returned `proof.sha256` and `offset` set to `next_offset`: those pages come from the persisted proof and never read Tally again. The call is refused with `verification_proof_changed` if a newer verification replaced that proof, and with `verification_too_large_to_report` if the parts never cut do not fit the response cap. The full proof is always written to disk.",
+                        "Read back a manually imported local batch and write Proof-of-Post files. This never dispatches import XML to Tally. The result gives `verification_status`, `counts`, every voucher that is not posted_verified (`unverified_vouchers`; for a native post a voucher may be `bound_not_in_window`, `book_rolled_back` or `sent_not_attributed`, never absence, with `post_span_binding` naming how the post was attributed and a plain `summary` to give the person first; a book restored from a backup and then keyed past the post's voucher mark before this check is not seen as rolled back, and if Tally then reused the post's MasterIDs a bound voucher could read `posted_verified` while being another voucher with the same content: unmeasured, bridge#1050), `duplicates`, `unrelated_duplicates_in_window` and `ambiguous_within_batch` in full, never cut to fit. Only the posted_verified vouchers are paged, as `items` from `offset` out of `verified_total`; when the response cap shortens them it sets `truncated` and `next_offset`. To read further pages, call again with `proof_sha256` set to the returned `proof.sha256` and `offset` set to `next_offset`: those pages come from the persisted proof and never read Tally again. The call is refused with `verification_proof_changed` if a newer verification has since become the batch's current proof, with `verification_proof_altered` if the saved proof no longer matches its recorded SHA-256, and with `verification_too_large_to_report` if the parts never cut do not fit the response cap. Every verification's full proof is kept on disk; none is replaced.",
                         json!({"type":"object", "additionalProperties":false, "required":["company_guid","batch_id"], "properties":{"company_guid":{"type":"string"},"batch_id":{"type":"string"},"offset":{"type":"integer","minimum":0,"default":0},"proof_sha256":{"type":"string","pattern":SHA256_HEX_PATTERN}}}),
                     ),
                     "voucher_presence" => (
@@ -689,7 +684,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                 };
                 let description = match effect {
                     Some(ToolEffect::Read) => format!("{description} {READ_RECEIPT_SENTENCE}"),
-                    Some(ToolEffect::LocalWrite(sentence) | ToolEffect::LocalRewrite(sentence)) => {
+                    Some(ToolEffect::LocalWrite(sentence)) => {
                         format!("{description} {sentence}")
                     }
                     Some(ToolEffect::TallyPost) | None => description,

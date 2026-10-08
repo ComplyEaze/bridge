@@ -1,6 +1,7 @@
-//! Recoverable proof publication under the import admission lock.
-//! Multiple file replacements are not crash-atomic. An interrupted transaction
-//! retains its backups and blocks admission until its state is reconciled.
+//! Proof publication under the import admission lock, additive (#911), and
+//! the build's recoverable publication. An interrupted build, or a journal
+//! append whose outcome is unknown, keeps its transaction folder and blocks
+//! admission until its state is reconciled.
 use super::*;
 
 const TRANSACTION: &str = ".proof-publication";
@@ -87,99 +88,85 @@ fn persist_build_with_stage(
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum PublicationStep {
-    StageJson,
-    StageMarkdown,
-    BackupJson,
-    BackupMarkdown,
-    PublishJson,
-    PublishMarkdown,
+    WriteJson,
+    WriteMarkdown,
+    MarkAppend,
     AppendStatus,
 }
 
+/// Save a verification's proof pair beside every earlier one and name it
+/// current in the journal (#911). Nothing that existed before is replaced or
+/// removed. The pair is written under names no earlier pair can hold (its
+/// stamp and the digest of its JSON), and the status record appended after it
+/// is what makes it current, so a stop at any step before the append leaves
+/// the earlier proof current and only files no record names. Only the append
+/// is indeterminate: it runs inside `.proof-publication`, created here and
+/// removed once the journal is known whole, so a stop or a failed truncate
+/// during it blocks admission as before (`require_settled`).
 pub(super) fn publish_proofs(
     imports: &Path,
     update: &ImportLedgerLine,
     json: &[u8],
     markdown: &[u8],
-    append_status: impl FnOnce() -> Result<(), String>,
+    append_status: impl FnOnce(&ledger::StatusRecord) -> Result<(), String>,
     mut before: impl FnMut(PublicationStep) -> Result<(), String>,
-) -> Result<(), String> {
+) -> Result<ledger::ProofName, String> {
+    let name = ledger::ProofName::of(json, Utc::now());
+    before(PublicationStep::WriteJson)?;
+    write_new_file(&imports.join(name.json_file(&update.batch_id)), json)?;
+    before(PublicationStep::WriteMarkdown)?;
+    write_new_file(
+        &imports.join(name.markdown_file(&update.batch_id)),
+        markdown,
+    )?;
+    sync_directory(imports);
+    let record = ledger::StatusRecord::verified(update, name.clone());
+    before(PublicationStep::MarkAppend)?;
     let transaction = imports.join(TRANSACTION);
     create_transaction(&transaction)
         .map_err(|_| "proof_publication_recovery_required".to_string())?;
-    let targets = [
-        imports.join(format!("{}.proof.json", update.batch_id)),
-        imports.join(format!("{}.proof.md", update.batch_id)),
-    ];
-    let staged = [transaction.join("next.json"), transaction.join("next.md")];
-    let backups = [
-        transaction.join("previous.json"),
-        transaction.join("previous.md"),
-    ];
-    let mut backed_up = [false; 2];
-    let mut published = [false; 2];
-    let result = (|| {
-        // Preserve enough context for explicit recovery after process death.
+    let appended = (|| {
+        // Enough context for a person to reconcile after process death.
         write_private(
             &transaction.join("update.json"),
-            &serde_json::to_vec_pretty(&ledger::StatusRecord::from(update))
+            &serde_json::to_vec_pretty(&record)
                 .map_err(|_| "proof_serialization_failed".to_string())?,
         )?;
-        before(PublicationStep::StageJson)?;
-        write_private(&staged[0], json)?;
-        before(PublicationStep::StageMarkdown)?;
-        write_private(&staged[1], markdown)?;
-        for (index, step) in [PublicationStep::BackupJson, PublicationStep::BackupMarkdown]
-            .into_iter()
-            .enumerate()
-        {
-            before(step)?;
-            match fs::symlink_metadata(&targets[index]) {
-                Ok(metadata) if metadata.is_file() => {
-                    fs::rename(&targets[index], &backups[index])
-                        .map_err(|_| "proof_publication_failed".to_string())?;
-                    backed_up[index] = true;
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                _ => return Err("proof_publication_failed".into()),
-            }
-        }
-        for (index, step) in [
-            PublicationStep::PublishJson,
-            PublicationStep::PublishMarkdown,
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            before(step)?;
-            fs::rename(&staged[index], &targets[index])
-                .map_err(|_| "proof_publication_failed".to_string())?;
-            published[index] = true;
-        }
         before(PublicationStep::AppendStatus)?;
-        append_status()
+        append_status(&record)
     })();
-    if let Err(error) = result {
-        let mut rollback_failed = false;
-        for index in (0..2).rev() {
-            if published[index] && fs::remove_file(&targets[index]).is_err() {
-                rollback_failed = true;
-                continue;
-            }
-            if backed_up[index] && fs::rename(&backups[index], &targets[index]).is_err() {
-                rollback_failed = true;
-            }
+    match appended {
+        // The journal may hold part of the record: keep the marker, which
+        // blocks every later append until a person has looked.
+        Err(error) if error == "import_ledger_rollback_failed" => {
+            Err("proof_publication_rollback_failed".into())
         }
-        // A failed ledger rollback is also indeterminate; retain transaction
-        // evidence and block later reads/builds instead of concealing it.
-        if rollback_failed || error == "import_ledger_rollback_failed" {
-            return Err("proof_publication_rollback_failed".into());
+        Err(error) => {
+            fs::remove_dir_all(&transaction)
+                .map_err(|_| "proof_publication_recovery_required".to_string())?;
+            Err(error)
         }
-        fs::remove_dir_all(&transaction)
-            .map_err(|_| "proof_publication_recovery_required".to_string())?;
-        return Err(error);
+        Ok(()) => fs::remove_dir_all(&transaction)
+            .map(|()| name)
+            .map_err(|_| "proof_publication_recovery_required".to_string()),
     }
-    fs::remove_dir_all(&transaction).map_err(|_| "proof_publication_recovery_required".to_string())
+}
+
+/// Write `bytes` to a name nothing holds yet, synced. A file of the same
+/// bytes already there is the same proof saved twice in one millisecond and
+/// is accepted as it is; any other file there is never touched.
+fn write_new_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    match crate::local_files::file::create_new_local_file(path) {
+        Ok(mut file) => file
+            .write_all(bytes)
+            .and_then(|()| file.sync_data())
+            .map_err(|_| "import_file_write_failed".to_string()),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => match fs::read(path) {
+            Ok(existing) if existing == bytes => Ok(()),
+            _ => Err("proof_publication_failed".into()),
+        },
+        Err(_) => Err("import_file_write_failed".into()),
+    }
 }
 
 /// Why a record could not be placed by [`write_record_once`].

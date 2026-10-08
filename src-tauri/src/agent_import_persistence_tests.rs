@@ -334,198 +334,6 @@ fn interruption_after_xml_publication_keeps_admission_blocked() {
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
 }
 
-#[test]
-fn publication_failures_restore_prior_proofs_and_leave_status_unchanged() {
-    for existing in [false, true] {
-        for fail_at in [
-            PublicationStep::StageJson,
-            PublicationStep::StageMarkdown,
-            PublicationStep::BackupJson,
-            PublicationStep::BackupMarkdown,
-            PublicationStep::PublishJson,
-            PublicationStep::PublishMarkdown,
-            PublicationStep::AppendStatus,
-        ] {
-            let directory = tempfile::tempdir().unwrap();
-            let imports = directory.path();
-            let json_path = imports.join("batch-proof.proof.json");
-            let md_path = imports.join("batch-proof.proof.md");
-            if existing {
-                fs::write(&json_path, b"previous JSON").unwrap();
-                fs::write(&md_path, b"previous Markdown").unwrap();
-            }
-            let ledger = imports.join("ledger.jsonl");
-            fs::write(&ledger, b"previous status\n").unwrap();
-            let result = publish_proofs(
-                imports,
-                &line(),
-                b"next JSON",
-                b"next Markdown",
-                || append_private_import_ledger(&ledger, b"next status\n", set_private_file),
-                |step| {
-                    if step == fail_at {
-                        Err("injected_publication_failure".into())
-                    } else {
-                        Ok(())
-                    }
-                },
-            );
-            assert_eq!(result, Err("injected_publication_failure".into()));
-            if existing {
-                assert_eq!(fs::read(&json_path).unwrap(), b"previous JSON");
-                assert_eq!(fs::read(&md_path).unwrap(), b"previous Markdown");
-            } else {
-                assert!(!json_path.exists());
-                assert!(!md_path.exists());
-            }
-            assert_eq!(fs::read(&ledger).unwrap(), b"previous status\n");
-            assert_eq!(require_settled(imports), Ok(()));
-        }
-    }
-}
-
-#[test]
-fn markdown_stage_io_failure_never_replaces_the_existing_proof() {
-    let directory = tempfile::tempdir().unwrap();
-    let imports = directory.path();
-    fs::write(imports.join("batch-proof.proof.json"), b"previous").unwrap();
-    let result = publish_proofs(
-        imports,
-        &line(),
-        b"next",
-        b"next",
-        || panic!("status must not append"),
-        |step| {
-            if step == PublicationStep::StageMarkdown {
-                fs::create_dir(imports.join(TRANSACTION).join("next.md")).unwrap();
-            }
-            Ok(())
-        },
-    );
-    assert_eq!(result, Err("import_file_write_failed".into()));
-    assert_eq!(
-        fs::read(imports.join("batch-proof.proof.json")).unwrap(),
-        b"previous"
-    );
-    assert_eq!(require_settled(imports), Ok(()));
-}
-
-#[test]
-fn failed_status_sync_restores_real_ledger_bytes_and_both_proofs() {
-    struct FailOnce {
-        file: fs::File,
-        failed: bool,
-    }
-    impl ImportLedgerWriter for FailOnce {
-        fn length(&mut self) -> std::io::Result<u64> {
-            self.file.metadata().map(|m| m.len())
-        }
-        fn append(&mut self, bytes: &[u8]) -> std::io::Result<()> {
-            self.file.write_all(bytes)
-        }
-        fn sync(&mut self) -> std::io::Result<()> {
-            if !self.failed {
-                self.failed = true;
-                Err(std::io::Error::other("injected sync failure"))
-            } else {
-                self.file.sync_data()
-            }
-        }
-        fn truncate(&mut self, length: u64) -> std::io::Result<()> {
-            self.file.set_len(length)
-        }
-    }
-    let directory = tempfile::tempdir().unwrap();
-    let imports = directory.path();
-    let ledger = imports.join("ledger.jsonl");
-    fs::write(&ledger, b"previous status\n").unwrap();
-    fs::write(imports.join("batch-proof.proof.json"), b"previous JSON").unwrap();
-    fs::write(imports.join("batch-proof.proof.md"), b"previous Markdown").unwrap();
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(&ledger)
-        .unwrap();
-    file.seek(SeekFrom::End(0)).unwrap();
-    let result = publish_proofs(
-        imports,
-        &line(),
-        b"next JSON",
-        b"next Markdown",
-        || {
-            append_import_ledger_bytes(
-                &mut FailOnce {
-                    file,
-                    failed: false,
-                },
-                b"next status\n",
-            )
-        },
-        |_| Ok(()),
-    );
-    assert_eq!(result, Err("import_ledger_unavailable".into()));
-    assert_eq!(fs::read(&ledger).unwrap(), b"previous status\n");
-    assert_eq!(
-        fs::read(imports.join("batch-proof.proof.json")).unwrap(),
-        b"previous JSON"
-    );
-    assert_eq!(
-        fs::read(imports.join("batch-proof.proof.md")).unwrap(),
-        b"previous Markdown"
-    );
-    assert_eq!(require_settled(imports), Ok(()));
-}
-
-#[test]
-fn rollback_failure_retains_recovery_material_and_blocks_import_admission() {
-    let directory = tempfile::tempdir().unwrap();
-    let imports = directory.path().join("imports");
-    fs::create_dir(&imports).unwrap();
-    let json_path = imports.join("batch-proof.proof.json");
-    fs::write(&json_path, b"previous JSON").unwrap();
-    let result = publish_proofs(
-        &imports,
-        &line(),
-        b"next JSON",
-        b"next Markdown",
-        || Ok(()),
-        |step| {
-            if step == PublicationStep::PublishMarkdown {
-                fs::remove_file(&json_path).unwrap();
-                fs::create_dir(&json_path).unwrap();
-                return Err("injected_publication_failure".into());
-            }
-            Ok(())
-        },
-    );
-    assert_eq!(result, Err("proof_publication_rollback_failed".into()));
-    assert_eq!(
-        fs::read(imports.join(TRANSACTION).join("previous.json")).unwrap(),
-        b"previous JSON"
-    );
-    let server = Server::new(crate::agent::Settings {
-        endpoint: bridge_tally_transport::TallyEndpointConfig {
-            host: "127.0.0.1".into(),
-            port: 9,
-        },
-        data_dir: directory.path().to_path_buf(),
-        max_rows: 10,
-        max_bytes: 200_000,
-        redaction: crate::agent::Redaction::None,
-        import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
-    });
-    assert_eq!(
-        server.lock_import_admission().err(),
-        Some("proof_publication_recovery_required".into())
-    );
-    assert_eq!(
-        server.lock_import_admission_shared().err(),
-        Some("proof_publication_recovery_required".into())
-    );
-}
-
 /// Every file under `directory`, by name: its bytes and, on Unix, its inode,
 /// so a file replaced by one with the same bytes still reads as changed.
 fn files(directory: &Path) -> BTreeMap<String, (Vec<u8>, u64)> {
@@ -564,6 +372,205 @@ fn assert_kept(before: &BTreeMap<String, (Vec<u8>, u64)>, directory: &Path) {
     }
 }
 
+fn publish(imports: &Path, ledger: &Path, json: &[u8]) -> Result<ledger::ProofName, String> {
+    publish_proofs(
+        imports,
+        &line(),
+        json,
+        b"markdown",
+        |record| {
+            append_private_import_ledger(
+                ledger,
+                format!("{}\n", serde_json::to_string(record).unwrap()).as_bytes(),
+                set_private_file,
+            )
+        },
+        |_| Ok(()),
+    )
+}
+
+#[test]
+fn two_publications_keep_both_proofs_and_the_journal_names_each() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let ledger = imports.join("ledger.jsonl");
+    fs::write(imports.join("batch-proof.proof.json"), b"legacy JSON").unwrap();
+    fs::write(imports.join("batch-proof.proof.md"), b"legacy Markdown").unwrap();
+    let first = publish(imports, &ledger, b"first JSON").unwrap();
+    let kept = files(imports);
+    // A later millisecond, so the order of the names is the order saved.
+    std::thread::sleep(std::time::Duration::from_millis(2));
+    let second = publish(imports, &ledger, b"second JSON").unwrap();
+    assert_ne!(first, second);
+    assert_kept(&kept, imports);
+    for (name, json) in [(&first, &b"first JSON"[..]), (&second, b"second JSON")] {
+        assert_eq!(
+            fs::read(imports.join(name.json_file("batch-proof"))).unwrap(),
+            json
+        );
+        assert_eq!(
+            fs::read(imports.join(name.markdown_file("batch-proof"))).unwrap(),
+            b"markdown"
+        );
+        assert_eq!(name.sha256(), sha256_hex(json));
+    }
+    let records = fs::read_to_string(&ledger).unwrap();
+    let proofs = records
+        .lines()
+        .map(|record| serde_json::from_str::<Value>(record).unwrap()["proof"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        proofs,
+        [
+            json!(String::from(first.clone())),
+            json!(String::from(second.clone()))
+        ]
+    );
+    // The names sort in the order the proofs were saved.
+    assert!(first.json_file("batch-proof") < second.json_file("batch-proof"));
+    assert_eq!(require_settled(imports), Ok(()));
+}
+
+#[test]
+fn a_failure_at_any_step_keeps_every_earlier_file_and_blocks_nothing() {
+    for fail_at in [
+        PublicationStep::WriteJson,
+        PublicationStep::WriteMarkdown,
+        PublicationStep::MarkAppend,
+        PublicationStep::AppendStatus,
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let imports = directory.path();
+        let ledger = imports.join("ledger.jsonl");
+        fs::write(imports.join("batch-proof.proof.json"), b"legacy JSON").unwrap();
+        publish(imports, &ledger, b"earlier JSON").unwrap();
+        let kept = files(imports);
+        let result = publish_proofs(
+            imports,
+            &line(),
+            b"next JSON",
+            b"next Markdown",
+            |_| panic!("the status must not be appended"),
+            |step| {
+                if step == fail_at {
+                    Err("injected_publication_failure".into())
+                } else {
+                    Ok(())
+                }
+            },
+        );
+        assert_eq!(
+            result,
+            Err("injected_publication_failure".into()),
+            "{fail_at:?}"
+        );
+        assert_kept(&kept, imports);
+        assert_eq!(fs::read(&ledger).unwrap(), kept["ledger.jsonl"].0);
+        assert_eq!(require_settled(imports), Ok(()), "{fail_at:?}");
+        // The next publication is admitted and becomes current.
+        publish(imports, &ledger, b"later JSON").unwrap();
+    }
+}
+
+#[test]
+fn a_failed_append_that_was_rolled_back_leaves_the_journal_and_blocks_nothing() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let ledger = imports.join("ledger.jsonl");
+    fs::write(&ledger, b"previous status\n").unwrap();
+    let result = publish_proofs(
+        imports,
+        &line(),
+        b"next JSON",
+        b"next Markdown",
+        |_| Err("import_ledger_unavailable".into()),
+        |_| Ok(()),
+    );
+    assert_eq!(result, Err("import_ledger_unavailable".into()));
+    assert_eq!(fs::read(&ledger).unwrap(), b"previous status\n");
+    assert_eq!(require_settled(imports), Ok(()));
+}
+
+#[test]
+fn an_append_of_unknown_outcome_keeps_its_marker_and_blocks_import_admission() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path().join("imports");
+    fs::create_dir(&imports).unwrap();
+    let result = publish_proofs(
+        &imports,
+        &line(),
+        b"next JSON",
+        b"next Markdown",
+        |_| Err("import_ledger_rollback_failed".into()),
+        |_| Ok(()),
+    );
+    assert_eq!(result, Err("proof_publication_rollback_failed".into()));
+    let record: Value =
+        serde_json::from_slice(&fs::read(imports.join(TRANSACTION).join("update.json")).unwrap())
+            .unwrap();
+    assert_eq!(record["batch_id"], "batch-proof");
+    assert!(record["proof"].is_string());
+    let server = Server::new(crate::agent::Settings {
+        endpoint: bridge_tally_transport::TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    assert_eq!(
+        server.lock_import_admission().err(),
+        Some("proof_publication_recovery_required".into())
+    );
+    assert_eq!(
+        server.lock_import_admission_shared().err(),
+        Some("proof_publication_recovery_required".into())
+    );
+}
+
+#[test]
+fn an_older_builds_interrupted_publication_still_blocks_and_is_never_touched() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    fs::create_dir(imports.join(TRANSACTION)).unwrap();
+    fs::write(
+        imports.join(TRANSACTION).join("previous.json"),
+        b"older proof",
+    )
+    .unwrap();
+    assert_eq!(
+        require_settled(imports),
+        Err("proof_publication_recovery_required".into())
+    );
+    let result = publish(imports, &imports.join("ledger.jsonl"), b"next JSON");
+    assert_eq!(result, Err("proof_publication_recovery_required".into()));
+    assert_eq!(
+        fs::read(imports.join(TRANSACTION).join("previous.json")).unwrap(),
+        b"older proof"
+    );
+}
+
+#[test]
+fn a_proof_name_never_takes_a_file_already_there() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("taken.json");
+    fs::write(&path, b"other bytes").unwrap();
+    let kept = files(directory.path());
+    assert_eq!(
+        write_new_file(&path, b"proof bytes"),
+        Err("proof_publication_failed".into())
+    );
+    assert_kept(&kept, directory.path());
+    // The same bytes are the same proof: accepted, and still not rewritten.
+    assert_eq!(write_new_file(&path, b"other bytes"), Ok(()));
+    assert_kept(&kept, directory.path());
+}
+
 #[test]
 fn a_record_written_once_is_whole_alone_and_never_replaced() {
     let directory = tempfile::tempdir().unwrap();
@@ -575,6 +582,25 @@ fn a_record_written_once_is_whole_alone_and_never_replaced() {
     assert_eq!(write_record_once(&path, b"second"), Err(RecordOnce::Exists));
     assert_kept(&kept, directory.path());
     assert_eq!(files(directory.path()).len(), 1);
+}
+
+#[test]
+fn a_proof_name_parses_only_its_own_shape() {
+    let name = ledger::ProofName::of(b"proof", Utc::now());
+    let text = String::from(name.clone());
+    assert_eq!(ledger::ProofName::try_from(text.clone()), Ok(name));
+    for bad in [
+        String::new(),
+        text.replace('T', "t"),
+        text.replace('Z', "z"),
+        format!("{text}0"),
+        format!("../{text}"),
+        text.to_uppercase(),
+        text.replacen('.', "/", 1),
+        format!("{}.{}", &text[..19], "0".repeat(63)),
+    ] {
+        assert!(ledger::ProofName::try_from(bad.clone()).is_err(), "{bad}");
+    }
 }
 
 #[test]

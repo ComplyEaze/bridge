@@ -455,7 +455,7 @@ fn external_import_ledger_read_refuses_busy_admission_without_waiting() {
 }
 
 #[test]
-fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission() {
+fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
     let directory = tempfile::tempdir().expect("temporary agent directory");
     let settings = super::super::Settings {
         endpoint: TallyEndpointConfig {
@@ -529,9 +529,17 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
     let results: Vec<_> = (0..2)
         .map(|_| done_rx.recv_timeout(std::time::Duration::from_secs(2)))
         .collect();
-    let json_path = directory.path().join("imports/batch-proof.proof.json");
-    let md_path = directory.path().join("imports/batch-proof.proof.md");
-    assert!(!json_path.exists() && !md_path.exists());
+    // Neither busy writer saved a proof.
+    assert!(
+        !directory.path().join("imports").exists()
+            || fs::read_dir(directory.path().join("imports"))
+                .unwrap()
+                .all(|entry| !entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .contains(".proof."))
+    );
     drop(admission);
     for writer in writers {
         writer.join().expect("publication writer");
@@ -552,6 +560,7 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
             assert_eq!(result, Err("import_verification_conflict_retry".into()));
         }
     }
+    let [json_path, md_path] = server.current_proof_paths("batch-proof");
     let proof: Value =
         serde_json::from_slice(&fs::read(json_path).expect("JSON proof")).expect("parseable proof");
     let markdown = fs::read_to_string(md_path).expect("Markdown proof");
@@ -564,6 +573,78 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
     // The files carry the status the ledger records, not the caller's copy.
     assert_eq!(proof["verification_status"], latest.batch.status);
     assert!(markdown.contains(&format!("- Verification status: `{}`", latest.batch.status)));
+}
+
+/// A batch whose latest verification an older build recorded reads that
+/// build's single proof file; a later verification's proof is current beside
+/// it, and the older file is never touched (#911).
+#[test]
+fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
+    let directory = tempfile::tempdir().expect("temporary agent directory");
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let line = ImportLedgerLine {
+        ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
+        endpoint_origin: None,
+        identity_scheme: None,
+        amends_batch_id: None,
+        batch_id: "batch-legacy".into(),
+        company_guid: GUID.into(),
+        company: None,
+        txn_ids: vec![],
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
+        sha256: "hash".into(),
+        built_at: now(),
+        status: "posted_verified".into(),
+        pre_import_mark: PreImportMark {
+            kind: "company_high_water".into(),
+            value: Some(10),
+            master_value: Some(10),
+        },
+        vouchers: vec![],
+    };
+    server.append_import_ledger(&line).unwrap();
+    let older = |server: &Server| {
+        let _admission = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::from(&line))
+            .unwrap();
+    };
+    older(&server);
+    let imports = server.imports_dir().unwrap();
+    fs::create_dir_all(&imports).unwrap();
+    let legacy = imports.join("batch-legacy.proof.json");
+    fs::write(&legacy, b"older proof").unwrap();
+    assert_eq!(
+        server.read_persisted_proof("batch-legacy").unwrap(),
+        b"older proof"
+    );
+    server.save_current_proof("batch-legacy", b"newer proof");
+    assert_eq!(
+        server.read_persisted_proof("batch-legacy").unwrap(),
+        b"newer proof"
+    );
+    assert_eq!(fs::read(&legacy).unwrap(), b"older proof");
+    // An older build verifies again: its file is current once more.
+    older(&server);
+    assert_eq!(
+        server.read_persisted_proof("batch-legacy").unwrap(),
+        b"older proof"
+    );
 }
 
 #[test]
@@ -2144,16 +2225,12 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
             proof.payload["result"]["counts"]["matching_content_observed"],
             2
         );
-        assert!(directory
-            .path()
-            .join("imports")
-            .join(format!(
-                "{}.proof.md",
-                proof.payload["result"]["batch_id"]
-                    .as_str()
-                    .expect("batch id")
-            ))
-            .exists());
+        assert!(server.current_proof_paths(
+            proof.payload["result"]["batch_id"]
+                .as_str()
+                .expect("batch id")
+        )[1]
+        .exists());
         // 50 before the pre-flight volume bound, plus the six legs of the one
         // high-water read verify_import now makes (protocol reference §11c).
         assert_eq!(simulator.finish().expect("requests").len(), 56);
@@ -3451,16 +3528,9 @@ async fn a_hand_imported_batchs_alter_id_delta_is_measured_from_its_build_mark()
             json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id}),
         )
         .await;
-    let proof: Value = serde_json::from_slice(
-        &fs::read(
-            server
-                .imports_dir()
-                .unwrap()
-                .join(format!("{batch_id}.proof.json")),
-        )
-        .unwrap(),
-    )
-    .unwrap();
+    let proof: Value =
+        serde_json::from_slice(&fs::read(&server.current_proof_paths(&batch_id)[0]).unwrap())
+            .unwrap();
     assert_eq!(proof["alter_id_delta"]["from"], "build_mark", "{proof}");
     assert_eq!(
         proof["alter_id_delta"]["before"], proof["pre_import_mark"]["value"],
@@ -3505,10 +3575,7 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
         .value;
     let page = &first["structuredContent"]["result"];
     assert_ne!(first["isError"], true, "{first}");
-    let proof_path = server
-        .imports_dir()
-        .unwrap()
-        .join(format!("{batch_id}.proof.json"));
+    let [proof_path, _] = server.current_proof_paths(&batch_id);
     let persisted = fs::read(&proof_path).unwrap();
     assert_eq!(
         page["proof"]["sha256"],
@@ -3587,11 +3654,30 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
         refused["structuredContent"]["result"]["error"]["code"],
         "verification_page_requires_proof"
     );
-    fs::write(&proof_path, [persisted.as_slice(), b" "].concat()).unwrap();
-    let refused = server.call_tool_response("verify_import", next).await.value;
+    // A newer verification became the batch's current proof: the page's own
+    // proof is refused, and still on disk as it was (#911).
+    let newer = [persisted.as_slice(), b" "].concat();
+    server.save_current_proof(&batch_id, &newer);
+    let refused = server
+        .call_tool_response("verify_import", next.clone())
+        .await
+        .value;
     assert_eq!(
         refused["structuredContent"]["result"]["error"]["code"],
         "verification_proof_changed"
+    );
+    assert_eq!(fs::read(&proof_path).unwrap(), persisted);
+    // The current proof's bytes no longer match the digest the journal records.
+    fs::write(&server.current_proof_paths(&batch_id)[0], b"{}").unwrap();
+    let mut altered = next;
+    altered["proof_sha256"] = json!(crate::agent::sha256_hex(&newer));
+    let refused = server
+        .call_tool_response("verify_import", altered)
+        .await
+        .value;
+    assert_eq!(
+        refused["structuredContent"]["result"]["error"]["code"],
+        "verification_proof_altered"
     );
 }
 
@@ -3656,13 +3742,7 @@ async fn verify_saved_batch_after_dispatch(
         simulator.finish().expect("captured plan requests").len(),
         56
     );
-    let markdown = fs::read_to_string(
-        server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{batch_id}.proof.md")),
-    )
-    .unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(&batch_id)[1]).unwrap();
     (response, snapshot, markdown)
 }
 
@@ -3733,13 +3813,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
         .await
         .expect("current dispatch verification");
     let persisted: Value = serde_json::from_slice(
-        &std::fs::read(
-            server
-                .imports_dir()
-                .expect("imports directory")
-                .join(format!("{batch_id}.proof.json")),
-        )
-        .expect("persisted proof"),
+        &std::fs::read(&server.current_proof_paths(&batch_id)[0]).expect("persisted proof"),
     )
     .expect("proof JSON");
     let latest = server
@@ -4359,11 +4433,9 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
     // the older plain format (plain names, and a message listing the ledgers)
     // and in the current, marked one.
     let divergent = divergent_verification();
-    let proof_path = masked
-        .imports_dir()
-        .unwrap()
-        .join(format!("{batch_id}.proof.json"));
-    let original: Value = serde_json::from_slice(&fs::read(&proof_path).unwrap()).unwrap();
+    let original: Value =
+        serde_json::from_slice(&fs::read(&masked.current_proof_paths(&batch_id)[0]).unwrap())
+            .unwrap();
     let names = ["Private Synthetic Party", "Private Changed Ledger"];
     for old_format in [true, false] {
         let mut proof = original.clone();
@@ -4374,7 +4446,7 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
             proof = super::super::redact_value(proof, super::super::Redaction::None);
         }
         let bytes = serde_json::to_vec_pretty(&proof).unwrap();
-        fs::write(&proof_path, &bytes).unwrap();
+        masked.save_current_proof(&batch_id, &bytes);
         let mut saved = args.clone();
         saved["proof_sha256"] = json!(crate::agent::sha256_hex(&bytes));
         saved["offset"] = json!(0);

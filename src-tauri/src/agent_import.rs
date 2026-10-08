@@ -1721,7 +1721,7 @@ impl Server {
             update,
             &json,
             markdown.as_bytes(),
-            || self.append_import_record_while_admitted(&ledger::StatusRecord::from(update)),
+            |record| self.append_import_record_while_admitted(record),
             |_| Ok(()),
         )?;
         // The first verified ALTERID of each voucher, for a later amendment to
@@ -2142,18 +2142,21 @@ impl Server {
         Ok((mark, evidence))
     }
 
-    /// The proof the last verification of `batch_id` persisted, read whole.
-    /// The batch must be one the import journal records, and the file is
-    /// named exactly as `publish_proofs` names it, from the recorded id, so
-    /// a caller's argument never becomes a path on its own.
+    /// The proof the journal names current for `batch_id`, read whole. The
+    /// batch must be one the import journal records, and the file is named
+    /// exactly as `publish_proofs` names it, from the recorded id and the
+    /// recorded proof name, so a caller's argument never becomes a path on
+    /// its own. A saved proof must hash to the digest its name records.
     fn read_persisted_proof(&self, batch_id: &str) -> Result<Vec<u8>, String> {
         const MAX_PERSISTED_PROOF_BYTES: usize = 32 * 1024 * 1024;
-        let recorded = self
+        let snapshot = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?
-            .batch
-            .batch_id;
-        let path = self.imports_dir()?.join(format!("{recorded}.proof.json"));
+            .ok_or_else(|| "import_batch_not_found".to_string())?;
+        let recorded = &snapshot.batch.batch_id;
+        let path = self.imports_dir()?.join(match &snapshot.current_proof {
+            ledger::CurrentProof::Saved(name) => name.json_file(recorded),
+            ledger::CurrentProof::Legacy => format!("{recorded}.proof.json"),
+        });
         let file = super::local_file::open_local_file(&path, false)
             .map_err(|_| "verification_proof_missing".to_string())?;
         let mut bytes = Vec::new();
@@ -2165,7 +2168,48 @@ impl Server {
         if bytes.len() > MAX_PERSISTED_PROOF_BYTES {
             return Err("verification_proof_too_large".into());
         }
+        if let ledger::CurrentProof::Saved(name) = &snapshot.current_proof {
+            if sha256_hex(&bytes) != name.sha256() {
+                return Err("verification_proof_altered".into());
+            }
+        }
         Ok(bytes)
+    }
+
+    /// The JSON and Markdown files of the proof the journal names current.
+    #[cfg(test)]
+    pub(super) fn current_proof_paths(&self, batch_id: &str) -> [PathBuf; 2] {
+        let snapshot = self.latest_import_snapshot(batch_id).unwrap().unwrap();
+        let imports = self.imports_dir().unwrap();
+        match &snapshot.current_proof {
+            ledger::CurrentProof::Saved(name) => [
+                imports.join(name.json_file(batch_id)),
+                imports.join(name.markdown_file(batch_id)),
+            ],
+            ledger::CurrentProof::Legacy => [
+                imports.join(format!("{batch_id}.proof.json")),
+                imports.join(format!("{batch_id}.proof.md")),
+            ],
+        }
+    }
+
+    /// Save `json` as the batch's current proof, as a verification would.
+    #[cfg(test)]
+    pub(super) fn save_current_proof(&self, batch_id: &str, json: &[u8]) {
+        let _admission = self.lock_import_admission().unwrap();
+        let snapshot = self
+            .import_snapshot_while_admitted(Some(batch_id))
+            .unwrap()
+            .unwrap();
+        persistence::publish_proofs(
+            &self.imports_dir().unwrap(),
+            &snapshot.batch,
+            json,
+            b"",
+            |record| self.append_import_record_while_admitted(record),
+            |_| Ok(()),
+        )
+        .unwrap();
     }
 
     /// The XML file Bridge persisted when it built `batch_id`, read whole. The

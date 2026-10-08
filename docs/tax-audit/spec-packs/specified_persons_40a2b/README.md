@@ -354,7 +354,7 @@ the comment lists their relationships (`Person L01` also has a governed interest
 ## 10. Running the books
 
 The crate's `tests/edge_books.rs` reads `entity_type` and `related_parties`, and runs the
-related-party test, but does not run this test yet. A port adds that: run this test with the same
+related-party test and, since the port in #1400, this test too. A port adds that: run this test with the same
 `related_parties` table, the rules for the book's entity type and the related-party result; run the
 module check with the same three inputs and this test's result; and compare each whole dump with
 its golden as the other edge books do (parity spec section 7). The side

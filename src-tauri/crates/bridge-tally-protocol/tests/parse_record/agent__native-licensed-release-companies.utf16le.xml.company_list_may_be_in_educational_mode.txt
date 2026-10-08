@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/agent/native-licensed-release-companies.utf16le.xml
+# parser: company_list_may_be_in_educational_mode
+# source: captured
+false

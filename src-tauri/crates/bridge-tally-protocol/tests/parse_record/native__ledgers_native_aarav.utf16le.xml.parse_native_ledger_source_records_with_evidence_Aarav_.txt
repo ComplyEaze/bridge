@@ -1,0 +1,2828 @@
+# fixture: tests/fixtures/native/ledgers_native_aarav.utf16le.xml
+# parser: parse_native_ledger_source_records_with_evidence(Aarav)
+# source: captured
+Ok(ParsedExport {
+    records: [
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Adarsh Packaging Co",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "19AAACP7104Q1Z4",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000107",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000107",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "263",
+                ),
+            },
+            alter_id: Some(
+                "291",
+            ),
+            raw_source_sha256: "20423afa41486cde35e051a4afdcd505a7f10475771931bba63c569b6913be24",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Amrut Beverages",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "19AABCU9622R1Z2",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000100",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000100",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "256",
+                ),
+            },
+            alter_id: Some(
+                "284",
+            ),
+            raw_source_sha256: "e90c311953a7933e66a00485368edb8d0e558713a104908798d18d178511c232",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Anand Electricals",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "27AABCU9607R1Z7",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f1",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f1",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "241",
+                ),
+            },
+            alter_id: Some(
+                "269",
+            ),
+            raw_source_sha256: "a993f8028cda3c8c3459373822d057866b74d6fe34740d309e1448be12ee77a7",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Balaji Traders",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "27AABCU9601R1Z1",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000eb",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000eb",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "235",
+                ),
+            },
+            alter_id: Some(
+                "263",
+            ),
+            raw_source_sha256: "5b4344bd2f51d58ba32506c9c3a606da778c90f5c99b993515f3a40c6df59745",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Bhagwati Rubber Co",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "06AABCU9621R1Z1",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ff",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ff",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "255",
+                ),
+            },
+            alter_id: Some(
+                "283",
+            ),
+            raw_source_sha256: "3e15c6143efd6a1569954e60ed25b5b71fd990fe6642475ccf730a17773ef6e2",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Bharat Chemicals Ltd",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "27AAACP7101Q1Z1",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000104",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000104",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "260",
+                ),
+            },
+            alter_id: Some(
+                "288",
+            ),
+            raw_source_sha256: "360dd718a9e1c452f558283c6262bf1ba367a2458736a3249b06e57d229b02b3",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "BRIDGE-PROBE-LEDGER-A",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e5",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e5",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "229",
+                ),
+            },
+            alter_id: Some(
+                "257",
+            ),
+            raw_source_sha256: "772942f0d5cea6f3c572f79fe52786c07aa42097897e337a2dfd2141371abc8b",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "BRIDGE-PROBE-LEDGER-B",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e6",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e6",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "230",
+                ),
+            },
+            alter_id: Some(
+                "255",
+            ),
+            raw_source_sha256: "0897d496be8470d6404ab4540a9768a37b9fe468f258c8f0aff1e8bca3fafe4d",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "BRIDGE PROBE PARTY OPT",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000126",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000126",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "294",
+                ),
+            },
+            alter_id: Some(
+                "327",
+            ),
+            raw_source_sha256: "17fdcff301d9463b2fa2982f8a9f85b3a59b65c0d5bdb9250671c709366b8dca",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Bright Retail Pvt Ltd",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ce",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ce",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "206",
+                ),
+            },
+            alter_id: Some(
+                "231",
+            ),
+            raw_source_sha256: "22261793859c90bfdd71e2e6361519e9ff30dc3b56fd6d0a9d54979959bfd4b2",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Capital Account - Arjun Mehta",
+                parent: Returned(
+                    "Capital Account",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "-800000.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e4",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e4",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "228",
+                ),
+            },
+            alter_id: Some(
+                "253",
+            ),
+            raw_source_sha256: "23c47040366ec8cf2cdb2115ebe610c00c285bdba578c0376b7080a8795b3b61",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Cash",
+                parent: Returned(
+                    "Cash-in-Hand",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000001f",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000001f",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "31",
+                ),
+            },
+            alter_id: Some(
+                "32",
+            ),
+            raw_source_sha256: "fa95cbb23e26560cce6f89d85cbf9a520fbe1025b1d615d1b0233208529b0068",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Crescent Office Mart",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000cf",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000cf",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "207",
+                ),
+            },
+            alter_id: Some(
+                "232",
+            ),
+            raw_source_sha256: "2cb27b399316689b2b7a32f5a7d1a845e499d540df720ddd49f695786b16b8c0",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Deepak Hardware Mart",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "19AABCU9610R1Z0",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f4",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f4",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "244",
+                ),
+            },
+            alter_id: Some(
+                "272",
+            ),
+            raw_source_sha256: "20bcc0672bb65027604d0c0c6824519c1082a1de1f150982da5c580965c83d4c",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Discount Allowed",
+                parent: Returned(
+                    "Indirect Expenses",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e3",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e3",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "227",
+                ),
+            },
+            alter_id: Some(
+                "312",
+            ),
+            raw_source_sha256: "7055ecee091e50d592ef74b6089a74af1986a2e1243cf7527ed3ed2455562083",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Disha Enterprises",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d0",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d0",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "208",
+                ),
+            },
+            alter_id: Some(
+                "233",
+            ),
+            raw_source_sha256: "102d592bbc0565fb62f04c4f77eac372730ece17801ce71ac5e81d0afb80986e",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Evergreen Supplies",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d1",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d1",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "209",
+                ),
+            },
+            alter_id: Some(
+                "234",
+            ),
+            raw_source_sha256: "08624d29f68282ce7f3fb6b970bb8ea74302c248568abad31100987329fd65e1",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Freight & Cartage",
+                parent: Returned(
+                    "Indirect Expenses",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000df",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000df",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "223",
+                ),
+            },
+            alter_id: Some(
+                "248",
+            ),
+            raw_source_sha256: "7948bf5b18cf723cf72f7e2c6e0d2ede7321ea110295b3940ad33f48f516404b",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Freight Outward",
+                parent: Returned(
+                    "Indirect Expenses",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000119",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000119",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "281",
+                ),
+            },
+            alter_id: Some(
+                "311",
+            ),
+            raw_source_sha256: "6218b473255dff3ba069a0738a848fb92c03a209144cf7dbb99fc750ce51aa60",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Ganesh Auto Parts",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "19AABCU9604R1Z4",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ee",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ee",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "238",
+                ),
+            },
+            alter_id: Some(
+                "266",
+            ),
+            raw_source_sha256: "57a745bfa79cda3ed37941c721bc24632bc34215bb35bf13e6cf4e944ef41562",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Girnar Cotton Mills",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "24AABCU9624R1Z4",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000102",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000102",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "258",
+                ),
+            },
+            alter_id: Some(
+                "286",
+            ),
+            raw_source_sha256: "1602bd772e0187622c54cc02a96f4b0589d512cedf5e22a319dd88e0c638fc0a",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Gujarat Poly Industries",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "06AAACP7103Q1Z3",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000106",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000106",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "262",
+                ),
+            },
+            alter_id: Some(
+                "290",
+            ),
+            raw_source_sha256: "356a37631c5e5a81355891417c37137ba3f233a3a64dc924bae580fc990b8515",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "HDFC Bank Current Account",
+                parent: Returned(
+                    "Bank Accounts",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "350000.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d5",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d5",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "213",
+                ),
+            },
+            alter_id: Some(
+                "238",
+            ),
+            raw_source_sha256: "49ae2fd43562a0716dff42a91eab82f4e62e41e24c932a8d5980a5743150dfa3",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Hind Steel Suppliers",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "29AAACP7102Q1Z2",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000105",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000105",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "261",
+                ),
+            },
+            alter_id: Some(
+                "289",
+            ),
+            raw_source_sha256: "0b13ec07d6a03f77bf6c8a67a628ac07da5b6c70648f88c41ca9c67ba6124a6c",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "ICICI Bank CA 4471",
+                parent: Returned(
+                    "Bank Accounts",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011a",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011a",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "282",
+                ),
+            },
+            alter_id: Some(
+                "313",
+            ),
+            raw_source_sha256: "26819f10cd34d4f23c70d4691ea8371e527d6da7a2c9f6c5cb3e1d0cf761f919",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Indus Cable Corp",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "27AAACP7113Q1Z3",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000110",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000110",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "272",
+                ),
+            },
+            alter_id: Some(
+                "300",
+            ),
+            raw_source_sha256: "a96d293d38c97de1e723e4ee246b0d17d47093c08926fb29c5ebf30664739f44",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Input CGST 9%",
+                parent: Returned(
+                    "Duties & Taxes",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000dd",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000dd",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "221",
+                ),
+            },
+            alter_id: Some(
+                "246",
+            ),
+            raw_source_sha256: "a64bc57238fcfcd7de4695038287aeb0e859d64b56536ac16bf2238c91a80662",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Input CGST 9% BR",
+                parent: Returned(
+                    "Duties & Taxes",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000117",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000117",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "279",
+                ),
+            },
+            alter_id: Some(
+                "309",
+            ),
+            raw_source_sha256: "85343d4d4a65120f7f6f3faf0d00448b2f2b5681441cfd5b265cfd482d6ed0c2",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Input SGST 9%",
+                parent: Returned(
+                    "Duties & Taxes",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000de",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000de",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "222",
+                ),
+            },
+            alter_id: Some(
+                "247",
+            ),
+            raw_source_sha256: "b224cef1cca2860e40e08f4def59b57f621e63834d6d5a65f14d21f136a374e4",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Input SGST 9% BR",
+                parent: Returned(
+                    "Duties & Taxes",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000118",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000118",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "280",
+                ),
+            },
+            alter_id: Some(
+                "310",
+            ),
+            raw_source_sha256: "eb3f261f60410c71c4265133029d43c114ee7605f9402f12bfe0c78886cdd805",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Jaisurya Exports",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "19AABCU9616R1Z6",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000fa",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000fa",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "250",
+                ),
+            },
+            alter_id: Some(
+                "278",
+            ),
+            raw_source_sha256: "2458dd579e46376a6c4102c1e978f968ab58adbd813f59ee76900bf32bb63c2d",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Kalpataru Ceramics",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "29AABCU9620R1Z0",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000fe",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000fe",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "254",
+                ),
+            },
+            alter_id: Some(
+                "282",
+            ),
+            raw_source_sha256: "227208db38f4c677eb3a2cea5ad4b5a8dd3fd238ff26785d5d4599f60b508ce1",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Kohinoor Fabrics",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "29AAACP7108Q1Z8",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010b",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010b",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "267",
+                ),
+            },
+            alter_id: Some(
+                "295",
+            ),
+            raw_source_sha256: "171ca10230cbd03ed1290de1f8d78f0184fbf816d278f29c17eb47dcc911e3a6",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Krishna Agro Industries",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "06AABCU9609R1Z9",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f3",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f3",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "243",
+                ),
+            },
+            alter_id: Some(
+                "271",
+            ),
+            raw_source_sha256: "88a31ccb548f25f4995802bacd9892b2cf0e7185c45dcd88a8300e48658cd051",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Laxmi Narayan Traders",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "27AABCU9613R1Z3",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f7",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f7",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "247",
+                ),
+            },
+            alter_id: Some(
+                "275",
+            ),
+            raw_source_sha256: "d963a10c8ff15bd3e373605d76fb1b997dd1b78ed7b41713ec3d188c499ceeb7",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Mahavir Packaging",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "29AABCU9608R1Z8",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f2",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f2",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "242",
+                ),
+            },
+            alter_id: Some(
+                "270",
+            ),
+            raw_source_sha256: "f3cd5fb0c8924e7714f473d8537a2f4cff667f486588f5273e3e133f8ba78679",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Meghdoot Transport",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "19AAACP7110Q1Z0",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010d",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010d",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "269",
+                ),
+            },
+            alter_id: Some(
+                "297",
+            ),
+            raw_source_sha256: "e58251cd91b9dd7592d947b1dd3efe5c6448ed56f2bf95bfb24c1459963e4b21",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Nakoda Steel Corp",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "29AABCU9602R1Z2",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ec",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ec",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "236",
+                ),
+            },
+            alter_id: Some(
+                "264",
+            ),
+            raw_source_sha256: "4ca374458bf104267a414d2342c8d7260d21a97c6962ba91b4aa20bc5f293a45",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Navkar Plastics",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "24AABCU9612R1Z2",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f6",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f6",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "246",
+                ),
+            },
+            alter_id: Some(
+                "274",
+            ),
+            raw_source_sha256: "5dcd5009cd50476d8e787de04d101689febc7bbcda76b758c0c8102c4739f860",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Neelkanth Traders",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "24AAACP7106Q1Z6",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000109",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000109",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "265",
+                ),
+            },
+            alter_id: Some(
+                "293",
+            ),
+            raw_source_sha256: "daf9c20f4139152f609fd1fe02fb4fff3f86272287fc17870ed2e4387b2b3a6a",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Nova Components LLP",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d2",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d2",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "210",
+                ),
+            },
+            alter_id: Some(
+                "235",
+            ),
+            raw_source_sha256: "684ad361b1de1f0940dbc26953747b4bef15bbb837f4a1a3c66fc3074bbcb3ed",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Office Rent",
+                parent: Returned(
+                    "Indirect Expenses",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e0",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e0",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "224",
+                ),
+            },
+            alter_id: Some(
+                "249",
+            ),
+            raw_source_sha256: "a2bf762d77700a67230335c83d9641fa4d83e193b0c7ec750dac1e3f502b1c18",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Om Packaging House",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d3",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d3",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "211",
+                ),
+            },
+            alter_id: Some(
+                "236",
+            ),
+            raw_source_sha256: "c8d5dbd9565478f8637ecfdd2e31f42113ac2414fbc4fd2b3ec8036496a93f57",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Om Sai Distributors",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "29AABCU9614R1Z4",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f8",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f8",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "248",
+                ),
+            },
+            alter_id: Some(
+                "276",
+            ),
+            raw_source_sha256: "5b54dc5a3943028a2886ced736cbf3ecc261952f2f83344bae4914ed9b2d48f6",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Output CGST 9%",
+                parent: Returned(
+                    "Duties & Taxes",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000db",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000db",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "219",
+                ),
+            },
+            alter_id: Some(
+                "306",
+            ),
+            raw_source_sha256: "bf1c57bb6e6adafc5af9b0b82696903289401dcef0fe1e24f2811f3ef99dc2b2",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Output IGST 18%",
+                parent: Returned(
+                    "Duties & Taxes",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000116",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000116",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "278",
+                ),
+            },
+            alter_id: Some(
+                "308",
+            ),
+            raw_source_sha256: "efe56f71c62e67d8598b5e565f365240543ada6e74d849e463890b5d36d23e7d",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Output SGST 9%",
+                parent: Returned(
+                    "Duties & Taxes",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000dc",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000dc",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "220",
+                ),
+            },
+            alter_id: Some(
+                "307",
+            ),
+            raw_source_sha256: "eb200313734bc34e4bad5d601d72fafbb1b58f48f2d9624206a9c484cff5fa91",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Parekh Stationers",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "33AAACP7111Q1Z1",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010e",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010e",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "270",
+                ),
+            },
+            alter_id: Some(
+                "298",
+            ),
+            raw_source_sha256: "b3dad0e2928ce57a88d3e46fd7441e07c1f151efa59a943509fed05c62847ce5",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Petty Cash",
+                parent: Returned(
+                    "Cash-in-Hand",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "25000.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d6",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d6",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "214",
+                ),
+            },
+            alter_id: Some(
+                "239",
+            ),
+            raw_source_sha256: "f466cfd2aef1dd06e2ade10a5b7ab5825902194576034c2ded99e7b54edba965",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Petty Cash Counter",
+                parent: Returned(
+                    "Cash-in-Hand",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011b",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011b",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "283",
+                ),
+            },
+            alter_id: Some(
+                "314",
+            ),
+            raw_source_sha256: "dbb4ec3b9c6684ad72ef0b35a165f4063069f3c2d8548ea95647dd0e9236ac0d",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Prakash Logistics",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d4",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d4",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "212",
+                ),
+            },
+            alter_id: Some(
+                "237",
+            ),
+            raw_source_sha256: "1838b466427adc0be76e9804b8133d7069f21302895c8a750e7c94b26d856aee",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Prakash Raw Materials",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "24AAACP7100Q1Z0",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000103",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000103",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "259",
+                ),
+            },
+            alter_id: Some(
+                "287",
+            ),
+            raw_source_sha256: "2a6b209c8da7a46527f37db180e0cd1d9d439920659c7416a8bce0401e63192d",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Profit & Loss A/c",
+                parent: Returned(
+                    "�#4; Primary",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000001e",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000001e",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "30",
+                ),
+            },
+            alter_id: Some(
+                "31",
+            ),
+            raw_source_sha256: "ef65966bf3d623f4cb1fba46d18e74d7db21c1eacee68b3fa96c2ad3cd59aa88",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Purchase - Consumables",
+                parent: Returned(
+                    "Purchase Accounts",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000115",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000115",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "277",
+                ),
+            },
+            alter_id: Some(
+                "305",
+            ),
+            raw_source_sha256: "2418de2d0a6e21aec4a25e40e066ba92f89837d3db092ac02349b6882565541c",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Purchase - Electronics",
+                parent: Returned(
+                    "Purchase Accounts",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d8",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d8",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "216",
+                ),
+            },
+            alter_id: Some(
+                "241",
+            ),
+            raw_source_sha256: "6d44669e0cb425bfea8099774296538316641f9e2bb99fbe4ff5bdf3b3a60de6",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Purchase - Raw Material",
+                parent: Returned(
+                    "Purchase Accounts",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000114",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000114",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "276",
+                ),
+            },
+            alter_id: Some(
+                "304",
+            ),
+            raw_source_sha256: "095c03e538fb5134b807be88d9880dbc911be550455b3ef18fcbf7a7df13f568",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Purchase Return",
+                parent: Returned(
+                    "Purchase Accounts",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000da",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000da",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "218",
+                ),
+            },
+            alter_id: Some(
+                "243",
+            ),
+            raw_source_sha256: "30b7100691906329df76038fccd5733c5362b70075cc7dab34fde7fb350c8c0e",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Rajhans Textiles",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "06AABCU9603R1Z3",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ed",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ed",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "237",
+                ),
+            },
+            alter_id: Some(
+                "265",
+            ),
+            raw_source_sha256: "06472925cc9677c0f186101549bbc6e6ce8fa7f6933620c78f562ddaa91bac13",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Repairs & Maintenance",
+                parent: Returned(
+                    "Indirect Expenses",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e2",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e2",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "226",
+                ),
+            },
+            alter_id: Some(
+                "251",
+            ),
+            raw_source_sha256: "e8634644766faf6edb8908c1c7c2c14b22bc959fba186ead2d05ccb04ac16feb",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Riddhi Siddhi Foods",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "27AABCU9619R1Z9",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000fd",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000fd",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "253",
+                ),
+            },
+            alter_id: Some(
+                "281",
+            ),
+            raw_source_sha256: "2252720fcafea988cf97857c8fd227e49b28503a7132fdff9456b679c44ef48a",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Sagar Timber Depot",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "27AAACP7107Q1Z7",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010a",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010a",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "266",
+                ),
+            },
+            alter_id: Some(
+                "294",
+            ),
+            raw_source_sha256: "81e8aec165b69375b8fad5fbb3407714cf56665e500afd6869b616cede9dc0cf",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Sai Krupa Agencies",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "24AABCU9606R1Z6",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f0",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f0",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "240",
+                ),
+            },
+            alter_id: Some(
+                "268",
+            ),
+            raw_source_sha256: "f102429cad86488bd45b0f5e686352e949a922195265e781550eeca9eabf37b7",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Salaries",
+                parent: Returned(
+                    "Indirect Expenses",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e1",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000e1",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "225",
+                ),
+            },
+            alter_id: Some(
+                "250",
+            ),
+            raw_source_sha256: "0789172d0eed264ffd64196b44caff5f7713dad915fe87dbef4ae9ca5bbf2986",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Sales - Electronics",
+                parent: Returned(
+                    "Sales Accounts",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d7",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d7",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "215",
+                ),
+            },
+            alter_id: Some(
+                "240",
+            ),
+            raw_source_sha256: "f640c0621518052ec0346e27b2a71097c2dc33714268e8d715df47d488aadc6b",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Sales Return",
+                parent: Returned(
+                    "Sales Accounts",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d9",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000d9",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "217",
+                ),
+            },
+            alter_id: Some(
+                "242",
+            ),
+            raw_source_sha256: "9132dc2c8a3216217efb2baada0d9809141e16531099b401ee52f685d434658a",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Sales - Services",
+                parent: Returned(
+                    "Sales Accounts",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000113",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000113",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "275",
+                ),
+            },
+            alter_id: Some(
+                "303",
+            ),
+            raw_source_sha256: "d391ca575244fbbea6d5d3a9ee9608e24fe453b2f40514f1427b572f3b186a2c",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Sales - Trading",
+                parent: Returned(
+                    "Sales Accounts",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000112",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000112",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "274",
+                ),
+            },
+            alter_id: Some(
+                "302",
+            ),
+            raw_source_sha256: "4b9a731940347dc49c0ac36f2ce8242f1c9a27c7ec1f791e8842f66c8cb04826",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Sanghvi Papers",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "24AABCU9618R1Z8",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000fc",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000fc",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "252",
+                ),
+            },
+            alter_id: Some(
+                "280",
+            ),
+            raw_source_sha256: "946312b795b87d41c2c7b94dc28797919717d5a76bc089fe042ac74a6b8bb4f5",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Shreeji Enterprises",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "24AABCU9600R1Z0",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ea",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ea",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "234",
+                ),
+            },
+            alter_id: Some(
+                "262",
+            ),
+            raw_source_sha256: "d4bb3b0509d7f786abdb3a5c6a28e0f34e690bf0a7cf8fbdfc755b581eb7fb58",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Sunrise Electricals",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "06AAACP7109Q1Z9",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010c",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010c",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "268",
+                ),
+            },
+            alter_id: Some(
+                "296",
+            ),
+            raw_source_sha256: "15cde4a6c61c2c45adb8debdc14d5be5d6977bed77c94ae0471ff765b17e8a66",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Suryodaya Chemicals",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "33AABCU9611R1Z1",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f5",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f5",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "245",
+                ),
+            },
+            alter_id: Some(
+                "273",
+            ),
+            raw_source_sha256: "2d57d5261dfbe8b10c7da76aed963f9ba04557f357dc3ae4297e5731af23dcc4",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Tirupati Marketing",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "06AABCU9615R1Z5",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f9",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000f9",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "249",
+                ),
+            },
+            alter_id: Some(
+                "277",
+            ),
+            raw_source_sha256: "eeafc82149d665b0901b419835804e23e5f1e8d621979c378048ace7e1376f69",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Trishul Engineering",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "29AAACP7114Q1Z4",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000111",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000111",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "273",
+                ),
+            },
+            alter_id: Some(
+                "301",
+            ),
+            raw_source_sha256: "493c530cfd7e79cef8cb01f232f0f13db0c1a198ac106eb81954299b706462b5",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Universal Components",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "33AAACP7105Q1Z5",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000108",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000108",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "264",
+                ),
+            },
+            alter_id: Some(
+                "292",
+            ),
+            raw_source_sha256: "2d4693ba6b4eeddc4c4ab8501f457ad8a2445da91b707e83ecc0d9a23ffff621",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Vaibhav Machinery",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: Returned(
+                    "24AAACP7112Q1Z2",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010f",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000010f",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "271",
+                ),
+            },
+            alter_id: Some(
+                "299",
+            ),
+            raw_source_sha256: "e98adf89fdbfb6a3aeb9cf238ff9e247266647ef6bdea297dd0a596c8d84db3f",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Vardhman Polymers",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "33AABCU9605R1Z5",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ef",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000ef",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "239",
+                ),
+            },
+            alter_id: Some(
+                "267",
+            ),
+            raw_source_sha256: "5a98f07a039c581f0f96d1748a6f29fce15d99b108687d40aef8b0e14ec52fc9",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Vishal Metal Works",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "33AABCU9617R1Z7",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000fb",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-000000fb",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "251",
+                ),
+            },
+            alter_id: Some(
+                "279",
+            ),
+            raw_source_sha256: "5bd41e0ed0e6867e83153802db0265ecc6c753591ebba815fcc597a1c5a81ade",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "Yashoda Pharma Distributors",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: Returned(
+                    "33AABCU9623R1Z3",
+                ),
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000101",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000101",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "257",
+                ),
+            },
+            alter_id: Some(
+                "285",
+            ),
+            raw_source_sha256: "039d094bb8c7af827c70a310e071285c0bd962016e7fdcb6bb9ac6645bec7730",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "ZZ CafÃ© NaÃ¯ve Ledger",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000124",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000124",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "292",
+                ),
+            },
+            alter_id: Some(
+                "323",
+            ),
+            raw_source_sha256: "6405798943f7d1c8f275adf9cf3c15251221a711c8f401d89dd69ff088d49413",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "ZZ Curly â\u{80}\u{9c}Quotedâ\u{80}\u{9d} Ledger",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000121",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000121",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "289",
+                ),
+            },
+            alter_id: Some(
+                "320",
+            ),
+            raw_source_sha256: "f0392ff7aae15b98133014478a575c3c9f2cd4b315d333750a7e43c0ecc4b72f",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "ZZ Emâ\u{80}\u{94}Dash â\u{80}¦ Ledger",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000122",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000122",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "290",
+                ),
+            },
+            alter_id: Some(
+                "321",
+            ),
+            raw_source_sha256: "5580fba873dc53a0ea7044a8707e9cc9686433a47dadfc182f6a9953532ac64f",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "ZZ-PIN-OMITTED",
+                parent: Returned(
+                    "Sundry Creditors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000125",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000125",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "293",
+                ),
+            },
+            alter_id: Some(
+                "324",
+            ),
+            raw_source_sha256: "e6951fe1b9a7ee2ceef36e15784c732f78ff93040e6df54232185d57f42eba1b",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "ZZ Ram & Sons Pvt Ltd",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000123",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000123",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "291",
+                ),
+            },
+            alter_id: Some(
+                "322",
+            ),
+            raw_source_sha256: "f86d3144777736a38c60f6772cc471e144dae2310d190b53d316a179fa26d840",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "ZZ Rupee Test â\u{82}¹ Ledger",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000120",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-00000120",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "288",
+                ),
+            },
+            alter_id: Some(
+                "319",
+            ),
+            raw_source_sha256: "af53b4730ffa58a2c020479ea6b3a60428d09344d3eb695dd668dfa45b2a4e23",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "à¤¶à¥\u{8d}à¤°à¥\u{80} à¤\u{97}à¤£à¥\u{87}à¤¶ à¤\u{9f}à¥\u{8d}à¤°à¥\u{87}à¤¡à¤°à¥\u{8d}à¤¸",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011c",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011c",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "284",
+                ),
+            },
+            alter_id: Some(
+                "315",
+            ),
+            raw_source_sha256: "f5abd2e518fc8f91e326c9d3b56f52662e48f245c04216f077e48497864ac7c5",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "à¦°à¦¾à¦¯à¦¼ à¦\u{8f}à¦¨à§\u{8d}à¦¡ à¦¸à¦¨à§\u{8d}à¦¸",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011f",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011f",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "287",
+                ),
+            },
+            alter_id: Some(
+                "318",
+            ),
+            raw_source_sha256: "cc0060640b3898a5277ae7b7e04ad377f849c33495832eee4affc405bc0f009c",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "àª¶à«\u{8d}àª°à«\u{80} àª\u{95}à«\u{83}àª·à«\u{8d}àª£ àª\u{8f}àª¨à«\u{8d}àª\u{9f}àª°àªªà«\u{8d}àª°àª¾àª\u{87}àª\u{9d}",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011d",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011d",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "285",
+                ),
+            },
+            alter_id: Some(
+                "316",
+            ),
+            raw_source_sha256: "7d38f63944f10229339a6eb976bf7503c771a7a3b822f22edf48115e181f59c3",
+        },
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "à®®à¯\u{81}à®°à¯\u{81}à®\u{95}à®©à¯\u{8d} à®\u{9f}à®¿à®°à¯\u{87}à®\u{9f}à®°à¯\u{8d}à®¸à¯\u{8d}",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "0.00",
+                ),
+            },
+            source_id: Some(
+                "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011e",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "bb8ad19e-6aef-4239-a917-87fec0c6215e-0000011e",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "286",
+                ),
+            },
+            alter_id: Some(
+                "317",
+            ),
+            raw_source_sha256: "6922f29efcff2b54482950339245c90f1eeb1110f34e665c9ef6f216ca5b187b",
+        },
+    ],
+    evidence: ExportEvidence {
+        company_context: None,
+        schema: None,
+        object_type: None,
+        observed_record_count: Some(
+            88,
+        ),
+        source_record_count: None,
+        identified_record_count: 88,
+        duplicate_identities: [],
+        company_guid_prefix_match_count: 88,
+        company_guid_prefix_mismatch_count: 0,
+    },
+})

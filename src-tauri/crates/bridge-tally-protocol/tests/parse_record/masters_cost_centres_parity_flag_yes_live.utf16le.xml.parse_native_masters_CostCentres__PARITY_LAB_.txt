@@ -1,0 +1,43 @@
+# fixture: tests/fixtures/masters_cost_centres_parity_flag_yes_live.utf16le.xml
+# parser: parse_native_masters(CostCentres, PARITY LAB)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Parity CC A",
+            guid: "7c0de000-0000-4000-8000-0000000000a1-000000ce",
+            master_id: 206,
+            alter_id: 211,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: CostCentre {
+                category: "Primary Cost Category",
+            },
+        },
+        NativeMasterRow {
+            name: "Parity CC A1",
+            guid: "7c0de000-0000-4000-8000-0000000000a1-000000d0",
+            master_id: 208,
+            alter_id: 213,
+            parent: Some(
+                "Parity CC A",
+            ),
+            detail: CostCentre {
+                category: "Primary Cost Category",
+            },
+        },
+        NativeMasterRow {
+            name: "Parity CC B",
+            guid: "7c0de000-0000-4000-8000-0000000000a1-000000cf",
+            master_id: 207,
+            alter_id: 212,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: CostCentre {
+                category: "Primary Cost Category",
+            },
+        },
+    ],
+})

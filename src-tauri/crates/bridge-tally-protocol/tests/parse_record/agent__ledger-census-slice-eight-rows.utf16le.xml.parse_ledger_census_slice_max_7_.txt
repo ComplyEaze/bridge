@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/agent/ledger-census-slice-eight-rows.utf16le.xml
+# parser: parse_ledger_census_slice(max 7)
+# source: captured
+Err(BoundsViolation)

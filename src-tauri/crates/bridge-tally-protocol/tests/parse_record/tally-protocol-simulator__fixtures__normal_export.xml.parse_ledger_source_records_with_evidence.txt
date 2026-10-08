@@ -1,0 +1,63 @@
+# fixture: ../tally-protocol-simulator/fixtures/normal_export.xml
+# parser: parse_ledger_source_records_with_evidence
+# source: synthetic: not evidence of what Tally sends
+Ok(ParsedExport {
+    records: [
+        ParsedSourceRecord {
+            record: TallyLedger {
+                name: "BRIDGE SYNTHETIC LEDGER",
+                parent: Returned(
+                    "BRIDGE SYNTHETIC GROUP",
+                ),
+                party_gstin: NotObserved,
+                opening_balance: Some(
+                    "-1180.00",
+                ),
+            },
+            source_id: Some(
+                "00000000-0000-4000-8000-000000000101",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "00000000-0000-4000-8000-000000000101",
+                ),
+                remote_id: None,
+                master_id: None,
+            },
+            alter_id: None,
+            raw_source_sha256: "91864393b29e71219029155fd09d0182281a2b465db16a7b5d19825621e5cd7d",
+        },
+    ],
+    evidence: ExportEvidence {
+        company_context: Some(
+            CompanyContextEvidence {
+                name: Some(
+                    "BRIDGE SYNTHETIC BOOK",
+                ),
+                guid: Some(
+                    "00000000-0000-4000-8000-000000000001",
+                ),
+                query_identity_set_sha256: None,
+                requested_from_yyyymmdd: None,
+                requested_to_yyyymmdd: None,
+            },
+        ),
+        schema: Some(
+            "bridge.tally.ledgers/1",
+        ),
+        object_type: Some(
+            "LEDGER",
+        ),
+        observed_record_count: None,
+        source_record_count: Some(
+            1,
+        ),
+        identified_record_count: 1,
+        duplicate_identities: [],
+        company_guid_prefix_match_count: 0,
+        company_guid_prefix_mismatch_count: 0,
+    },
+})

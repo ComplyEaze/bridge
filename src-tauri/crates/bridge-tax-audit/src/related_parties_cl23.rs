@@ -62,8 +62,9 @@ fn texts(value: &toml::Value, key: &str, field: &str) -> Result<Vec<String>> {
 
 /// The `[related_parties]` table, typed. A field that is present with the wrong type is refused,
 /// naming the person key and the field; an absent field keeps its default, and an empty person
-/// is a person. The reference leaves both uncovered (spec pack §2.2); this is a deliberate,
-/// stated divergence on input no golden covers.
+/// is a person. A relationship that is not text the reference refuses too (spec pack §10); a
+/// person or ledger list of the wrong shape no golden covers (§2.2), and refusing it is this
+/// port's own stated choice.
 pub fn related_persons(cfg: &RelatedPartiesConfig) -> Result<BTreeMap<String, RelatedPerson>> {
     let mut persons = BTreeMap::new();
     for (key, value) in &cfg.persons {
@@ -106,7 +107,8 @@ pub fn related_persons(cfg: &RelatedPartiesConfig) -> Result<BTreeMap<String, Re
 /// Each person's tag: the first 8 hex digits of the SHA-1 of the key's UTF-8 bytes as written
 /// (no trimming, case folding or normalisation). Two keys sharing a tag would share every figure
 /// id, so the table is refused, naming both keys, rather than one person being dropped or merged.
-/// The reference stops on the duplicate figure id instead (spec pack §10); this refuses this test
+/// The reference refuses it too, naming the tag and every key sharing it (spec pack §10); the
+/// form is the port's own. This one names the first two keys in key order and refuses this test
 /// alone, as the crate's other config refusals do.
 pub fn person_tags(persons: &BTreeMap<String, RelatedPerson>) -> Result<BTreeMap<String, String>> {
     let mut by_tag: BTreeMap<String, &String> = BTreeMap::new();

@@ -1,13 +1,13 @@
-//! Payees named only in the bank narration, against the s.194C limits: the bank payments debited
-//! to the ledgers the client lists (and to the 194C ledgers whose payees the TDS payee test could
-//! not name), the payee the bank printed on each, payments joined into payees by a shared printed
-//! name or UPI handle, and each payee's largest payment and total against the two limits. A port of
-//! the reference Python implementation's `narration_payees` test module, version 1; its contract is
-//! the spec pack in `docs/tax-audit/spec-packs/narration_payees/` (cited below as "README section N").
+//! Payees named only in the bank narration, against the s.194C limits: the bank payments debited to
+//! the ledgers the client lists (and to the 194C ledgers whose payees the TDS payee test could not
+//! name), the payee the bank printed on each, payments joined into payees by a shared printed name
+//! or UPI handle, and each payee's largest payment and total against the two limits. A port of the
+//! reference Python implementation's `narration_payees` test module, version 1; its contract is the
+//! spec pack in `docs/tax-audit/spec-packs/narration_payees/` (cited below as "README section N").
 //!
-//! It reaches no conclusion: every finding is a question. Its narration reader (README section 3) is this
-//! module's own. `bridge-bank-statement`'s `hdfc_party`/`sbi_party` read statement rows and differ
-//! on purpose (#1428).
+//! It reaches no conclusion: every finding is a question. Its narration reader (README section 3)
+//! is this module's own. `bridge-bank-statement`'s `hdfc_party`/`sbi_party` read statement rows and
+//! differ on purpose (#1428).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -28,7 +28,7 @@ const CHANNEL_WORDS: [&str; 4] = ["UPI", "IMPS", "NEFT", "RTGS"];
 const PLACEHOLDERS: [&str; 2] = ["BANKACC", "PHONEPE"];
 /// A cheque name beginning with one of these words is the assessee's own (README section 3.2).
 const SELF_CHEQUES: [&str; 2] = ["SELF", "CASH PAID TO"];
-/// A debit to a ledger under one of these groups is not a debit to another ledger (README section 6.4).
+/// Debits to ledgers under these groups are not debits to other ledgers (README section 6.4).
 const NOT_OTHER_GROUPS: [&str; 4] = [
     "Bank Accounts",
     "Bank OD A/c",
@@ -308,9 +308,9 @@ fn unnamed_finding_id(book: &Book) -> Result<String> {
     ))
 }
 
-/// The ledgers read besides those listed (README section 2.4): on every population voucher whose GUID
-/// `tds_payees`' finding for unnamed 194C payees cites, each ledger mapped exactly `194C` with a
-/// debit line.
+/// The ledgers read besides those listed (README section 2.4): on every population voucher whose
+/// GUID `tds_payees`' finding for unnamed 194C payees cites, each ledger mapped exactly `194C` with
+/// a debit line.
 ///
 /// # Errors
 ///
@@ -341,7 +341,7 @@ pub fn unnamed_194c_ledgers(
         .collect())
 }
 
-/// A voucher's citation: `<type name> <number> on <date>`, the number as it is (README section 6.6).
+/// A voucher's citation, `<type name> <number> on <date>`, its number as is (README section 6.6).
 fn voucher_ref(v: &Voucher) -> EvidenceRef {
     EvidenceRef::with_label(
         "voucher",
@@ -688,13 +688,13 @@ fn finding(
     }
 }
 
-/// Run the test. `bank` is the bank ledgers (README section 2.2), `listed` the ledgers the client lists
-/// and `added` those [`unnamed_194c_ledgers`] adds; both are read alike.
+/// Run the test. `bank` is the bank ledgers (README section 2.2), `listed` the ledgers the client
+/// lists and `added` those [`unnamed_194c_ledgers`] adds; both are read alike.
 ///
 /// # Errors
 ///
-/// Rules with no `[s194c]`; a voucher of unknown status; a total that overflows; two payees, or
-/// two cut handles, with one tag (`DuplicateFigureId`, as the reference raises).
+/// Rules with no `[s194c]`; a voucher of unknown status; a total that overflows; two payees, or two
+/// cut handles, with one tag (`DuplicateFigureId`, as the reference raises).
 #[allow(clippy::too_many_lines)]
 pub fn run(
     book: &Book,
@@ -1158,14 +1158,14 @@ fn int_of(f: &Figure) -> i64 {
     }
 }
 
-/// The module's own check, NP-1 to NP-7 (README section 8), given the book, the result, the bank ledgers
-/// and the ledgers read. A cited GUID resolves to the last population voucher carrying it.
+/// The module's own check, NP-1 to NP-7 (README section 8), given the book, the result, the bank
+/// ledgers and the ledgers read. A cited GUID resolves to the last population voucher carrying it.
 ///
 /// # Errors
 ///
-/// A population that cannot be formed; and where the reference stops
-/// with an internal error (README section 13): a `payee_total_` figure citing a GUID whose last population
-/// voucher has no bank leg.
+/// A population that cannot be formed; and where the reference stops with an internal error (README
+/// section 13): a `payee_total_` figure citing a GUID whose last population voucher has no bank
+/// leg.
 #[allow(clippy::too_many_lines)]
 pub fn check_invariants(
     book: &Book,
@@ -1266,10 +1266,11 @@ pub fn check_invariants(
                     f.id, e.id
                 )),
                 Some(at) if !w.outgoing.contains(&at) => {
-                    return Err(AuditError::ModuleCheck(format!(
-                        "NP-2: {} evidence voucher {} carries no bank leg",
-                        f.id, e.id
-                    )));
+                    return Err(AuditError::ModuleInvariant {
+                        module: TEST_ID,
+                        code: "NP-2",
+                        detail: format!("{} evidence voucher {} carries no bank leg", f.id, e.id),
+                    });
                 }
                 Some(at) => {
                     let got = w
@@ -1427,8 +1428,8 @@ mod tests {
         }
     }
 
-    /// README section 3.1: Python's upper-casing, which can lengthen the text; Python's whitespace, made
-    /// one space; A to Z only (`np_text`).
+    /// README section 3.1: Python's upper-casing, which can lengthen the text; Python's whitespace,
+    /// made one space; A to Z only (`np_text`).
     #[test]
     fn the_text_is_upper_cased_and_spaced_as_python_does_it_then_read_in_ascii() {
         use Channel::Upi;
@@ -1460,9 +1461,9 @@ mod tests {
         ]);
     }
 
-    /// README section 3.1: a name of forms 1 to 3 runs to its first hyphen, from A to Z, through A to Z,
-    /// 0 to 9, space, `.`, `&` and `'`, and loses one space at its end; every form starts at the
-    /// text's first character (`np_forms`, `np_unread`).
+    /// README section 3.1: a name of forms 1 to 3 runs to its first hyphen, from A to Z, through A
+    /// to Z, 0 to 9, space, `.`, `&` and `'`, and loses one space at its end; every form starts at
+    /// the text's first character (`np_forms`, `np_unread`).
     #[test]
     fn a_name_runs_to_its_first_hyphen_from_the_texts_start() {
         use Channel::{Imps, Neft, Upi};
@@ -1507,8 +1508,8 @@ mod tests {
         ]);
     }
 
-    /// README section 3.1: a channel word alone, the trailing space removed, names no one in forms 1 to
-    /// 3 and stops the reading; a name that only begins with one is a name, and forms 4 and 5
+    /// README section 3.1: a channel word alone, the trailing space removed, names no one in forms
+    /// 1 to 3 and stops the reading; a name that only begins with one is a name, and forms 4 and 5
     /// read `UPI` as a payee.
     #[test]
     fn a_channel_word_alone_names_no_one_in_forms_one_to_three_only() {
@@ -1539,8 +1540,8 @@ mod tests {
         );
     }
 
-    /// README section 3.2 forms 2 and 3: the IMPS reference takes any decimal digit, the NEFT code A to Z
-    /// and 0 to 9 only.
+    /// README section 3.2 forms 2 and 3: the IMPS reference takes any decimal digit, the NEFT code
+    /// A to Z and 0 to 9 only.
     #[test]
     fn imps_neft_and_rtgs() {
         use Channel::{Imps, Neft, Rtgs};
@@ -1581,8 +1582,8 @@ mod tests {
         ]);
     }
 
-    /// README section 3.2 form 4: spaces removed from the name field, the two placeholders, and a field
-    /// with no letter A to Z naming no one.
+    /// README section 3.2 form 4: spaces removed from the name field, the two placeholders, and a
+    /// field with no letter A to Z naming no one.
     #[test]
     fn the_second_upi_layout() {
         for (text, name) in [
@@ -1800,9 +1801,10 @@ mod tests {
         names.iter().map(|n| (*n).to_string()).collect()
     }
 
-    /// README section 13: where a payee total cites a GUID whose last population voucher has no bank
-    /// leg, the reference's check stops after forming its NP-2 message; so does this one, with
-    /// the message. The control, the same two vouchers the other way round, runs.
+    /// README section 13: where a payee total cites a GUID whose last population voucher has no
+    /// bank leg, the reference's check stops after forming its NP-2 message; so does this one,
+    /// with the code and the message's detail. The control, the same two vouchers the other way
+    /// round, runs.
     #[test]
     fn a_cited_guid_whose_last_voucher_has_no_bank_leg_stops_the_check() {
         let rules = Rules::vendored().unwrap();
@@ -1824,11 +1826,14 @@ mod tests {
         };
         let err = run_check(vec![paid.clone(), journal.clone()]).unwrap_err();
         let want = format!(
-            "NP-2: narration_payees.payee_total_{} evidence voucher g1 carries no bank leg",
+            "narration_payees.payee_total_{} evidence voucher g1 carries no bank leg",
             hash8("ALPHA")
         );
         assert!(
-            matches!(&err, AuditError::ModuleCheck(m) if *m == want),
+            matches!(
+                &err,
+                AuditError::ModuleInvariant { module: TEST_ID, code: "NP-2", detail } if *detail == want
+            ),
             "{err:?}"
         );
         assert_eq!(

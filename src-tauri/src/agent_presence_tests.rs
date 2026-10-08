@@ -711,11 +711,11 @@ fn plans(steps: Vec<Step>) -> Vec<ScenarioPlan> {
 fn presence_plans() -> Vec<ScenarioPlan> {
     let catalogue = catalogue_xml();
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
-    // Catalogue, then the voucher window, then the paired-snapshot catalogue
-    // reread the nonempty (necessarily `Partial`) window path takes before it
-    // can still produce `present`/`possibly_present` verdicts.
+    // Catalogue, then the marks, the census of the window (#1029) and the
+    // voucher window, then the paired-snapshot catalogue reread.
     steps.extend(paired_read(&catalogue));
     steps.extend(paired_read(&high_water_xml()));
+    steps.extend(paired_read(&window_xml()));
     steps.extend(paired_read(&window_xml()));
     steps.extend(paired_read(&catalogue));
     plans(steps)
@@ -723,7 +723,8 @@ fn presence_plans() -> Vec<ScenarioPlan> {
 
 /// The voucher high-water mark the pre-flight volume bound reads before the
 /// window (protocol reference §11c). Small enough that the window is read
-/// whole, in the synthetic shape the import tests already replay.
+/// whole after its census, in the synthetic shape the import tests already
+/// replay.
 fn high_water_xml() -> String {
     format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{CAPTURED_GUID}</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>")
 }
@@ -758,13 +759,15 @@ fn marker_presence_plans(marker: &str) -> Vec<ScenarioPlan> {
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue));
     steps.extend(paired_read(&high_water_xml()));
+    // The census of the window (#1029), then the window.
+    steps.extend(paired_read(&window));
     steps.extend(paired_read(&window));
     steps.extend(paired_read(&catalogue));
     plans(steps)
 }
 
 #[tokio::test]
-async fn a_nonempty_window_without_a_control_total_still_answers_but_never_issues_absent() {
+async fn a_small_book_window_is_counted_so_a_proposal_nothing_resembles_is_absent() {
     let simulator = SequenceSimulator::spawn(presence_plans()).expect("simulator");
     let directory = tempfile::tempdir().expect("directory");
     let server = Server::new(Settings {
@@ -799,33 +802,89 @@ async fn a_nonempty_window_without_a_control_total_still_answers_but_never_issue
             }),
         )
         .await;
-    // A nonempty response has no source-side cardinality control, so the
-    // window is `Partial` and can never license `Absent` -- but `Present` and
-    // `PossiblyPresent` need no completeness proof, so the tool still answers
-    // rather than refusing the whole request the way it used to.
+    // The book's mark is small, but `voucher_presence` counts every book that
+    // has held a voucher (#1029): the census is the window's control total, so
+    // the window is `complete` and a proposal nothing resembles is `absent`.
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["window"]["read"], "complete");
+    assert_eq!(
+        result["totals"],
+        json!({"requested": 3, "present": 2, "possibly_present": 0, "absent": 1})
+    );
+    let items = result["items"].as_array().expect("items");
+    assert_eq!(items[0]["presence"], "present", "{items:?}");
+    assert_eq!(items[1]["presence"], "present", "{items:?}");
+    assert_eq!(items[2]["presence"], "absent", "{items:?}");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"],
+        "complete"
+    );
+    let observed = simulator.finish().expect("requests");
+    // 22 before the pre-flight volume bound, plus its high-water read and the
+    // census of the window (#1029), six legs each.
+    assert_eq!(observed.len(), 34);
+}
+
+/// #1029: the one window nothing counts is a nonempty one read from a company
+/// whose mark says it never held a voucher. The window stays `partial`, so no
+/// proposal is `absent`: the tool's own wiring from an uncounted window to
+/// `possibly_present` (`window_not_proven_complete`) is pinned here, since a
+/// small book is now counted.
+#[tokio::test]
+async fn an_uncounted_nonempty_window_issues_no_absent() {
+    let catalogue = catalogue_xml();
+    let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
+    steps.extend(paired_read(&catalogue));
+    steps.extend(paired_read(
+        &high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>0</ALTVCHID>"),
+    ));
+    steps.extend(paired_read(&window_xml()));
+    steps.extend(paired_read(&catalogue));
+    let simulator = SequenceSimulator::spawn(plans(steps)).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let response = server
+        .call_tool(
+            "voucher_presence",
+            json!({
+                "company_guid": CAPTURED_GUID,
+                "from": "20260901",
+                "to": "20260930",
+                "numbering": [{"voucher_type":"Journal","numbering_method":"manual"}],
+                "vouchers": [proposal("JV-9", "नमस्ते ट्रेडर्स", "99.00")],
+            }),
+        )
+        .await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["window"]["read"], "partial");
     assert_eq!(
         result["totals"],
-        json!({"requested": 3, "present": 2, "possibly_present": 1, "absent": 0})
+        json!({"requested": 1, "present": 0, "possibly_present": 1, "absent": 0})
     );
-    let items = result["items"].as_array().expect("items");
-    assert_eq!(items[0]["presence"], "present", "{items:?}");
-    assert_eq!(items[1]["presence"], "present", "{items:?}");
-    assert_eq!(items[2]["presence"], "possibly_present", "{items:?}");
     assert_eq!(
-        items[2]["reason"], "window_not_proven_complete",
-        "nothing resembled JV-9, but the window that found nothing was never \
-         proven complete, so it must not be reported absent"
+        result["items"][0]["reason"], "window_not_proven_complete",
+        "{result}"
     );
     assert_eq!(
         response["structuredContent"]["evidence"]["state"],
         "partial"
     );
-    let observed = simulator.finish().expect("requests");
-    // 22 before the pre-flight volume bound, plus its one high-water read.
-    assert_eq!(observed.len(), 28);
+    // The marks read, and no census: a mark of zero has nothing to count.
+    assert_eq!(simulator.finish().expect("requests").len(), 28);
 }
 
 /// #985, the same window on a book large enough to need a census: the census
@@ -872,7 +931,8 @@ async fn a_nonempty_window_counted_by_its_census_can_issue_absent() {
     assert_eq!(items[1]["presence"], "present", "{items:?}");
     assert_eq!(items[2]["presence"], "absent", "{items:?}");
     let observed = simulator.finish().expect("requests");
-    // The uncounted control's 28, plus the census's paired read.
+    // The same 34 as a small book: the catalogue, marks, census, window and
+    // repeated catalogue reads, six legs each, after the four identity legs.
     assert_eq!(observed.len(), 34);
 }
 
@@ -888,7 +948,7 @@ async fn a_nonempty_window_counted_by_its_census_can_issue_absent() {
 /// therefore proves the marker path carries it, rather than restating the
 /// voucher-number path the sibling test above already covers.
 #[tokio::test]
-async fn a_narration_marker_decides_a_present_from_a_nonempty_partial_window() {
+async fn a_narration_marker_decides_a_present_from_a_nonempty_window() {
     let marker = agent_import::import_identity(BATCH, "txn-001").to_string();
     let simulator = SequenceSimulator::spawn(marker_presence_plans(&marker)).expect("simulator");
     let directory = tempfile::tempdir().expect("directory");
@@ -929,7 +989,8 @@ async fn a_narration_marker_decides_a_present_from_a_nonempty_partial_window() {
         .await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
-    assert_eq!(result["window"]["read"], "partial");
+    // The small book is counted (#1029), so the window is complete.
+    assert_eq!(result["window"]["read"], "complete");
     let items = result["items"].as_array().expect("items");
     assert_eq!(items[0]["presence"], "present", "{items:?}");
     assert_eq!(items[0]["basis"], "narration_marker", "{items:?}");
@@ -1085,6 +1146,8 @@ async fn a_ledger_missing_from_the_catalogue_fails_closed() {
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue));
     steps.extend(paired_read(&high_water_xml()));
+    // The census of the window (#1029), then the window.
+    steps.extend(paired_read(&unlisted));
     steps.extend(paired_read(&unlisted));
     let simulator = SequenceSimulator::spawn(plans(steps)).expect("simulator");
     let directory = tempfile::tempdir().expect("directory");
@@ -1870,6 +1933,8 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue_xml()));
     steps.extend(paired_read(&high_water_xml()));
+    // The census of the window (#1029), then the window.
+    steps.extend(paired_read(&window_with_composite_vouchers(1)));
     steps.extend(paired_read(&window_with_composite_vouchers(1)));
     let simulator = SequenceSimulator::spawn(plans(steps)).expect("simulator");
     let directory = tempfile::tempdir().expect("directory");

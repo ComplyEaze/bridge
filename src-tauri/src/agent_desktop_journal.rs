@@ -6,7 +6,7 @@ use super::super::{
 use super::desktop_journal_review::{
     DesktopJournalCompany, DesktopJournalDetails, DesktopJournalEntry, DesktopJournalReview,
 };
-use super::post::{admit_saved_journal, admit_saved_journal_integrity};
+use super::post::{admit_saved_journal, admit_saved_journal_integrity, OnAccountMarks};
 use super::*;
 use crate::tally::{TallyConfig, TallyRuntime};
 use bridge_tally_transport::canonical_loopback_origin;
@@ -131,6 +131,12 @@ impl DesktopJournalService {
             .vouchers
             .first()
             .ok_or_else(|| "import_post_requires_one_journal".to_string())?;
+        let marks = OnAccountMarks::of(&snapshot.batch);
+        let ledgers = || voucher.entries.iter().map(|entry| entry.ledger.as_str());
+        let on_account_note = Some(marks.legend(ledgers()))
+            .filter(|note| !note.is_empty())
+            .map(str::to_owned);
+        let on_account: Vec<bool> = ledgers().map(|ledger| marks.marks(ledger)).collect();
         let company = snapshot
             .batch
             .company
@@ -143,15 +149,18 @@ impl DesktopJournalService {
             entries: voucher
                 .entries
                 .iter()
-                .map(|entry| DesktopJournalEntry {
+                .zip(on_account)
+                .map(|(entry, on_account)| DesktopJournalEntry {
                     ledger: entry.ledger.clone(),
                     side: match entry.side {
                         EntrySide::Dr => "Dr".into(),
                         EntrySide::Cr => "Cr".into(),
                     },
                     amount: entry.amount.clone(),
+                    on_account,
                 })
                 .collect(),
+            on_account_note,
             total_debit: total_debit.as_str().to_owned(),
             total_credit: total_credit.as_str().to_owned(),
         };

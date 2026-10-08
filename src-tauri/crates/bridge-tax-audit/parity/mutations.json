@@ -9572,8 +9572,8 @@
   "by": "author",
   "what": "related_parties_cl23: XCL-1 fires at the tolerance",
   "file": "src/related_parties_cl23.rs",
-  "from": "        if gap > TOLERANCE_PAISE {",
-  "to": "        if gap >= TOLERANCE_PAISE {"
+  "from": "        if gap > TOLERANCE_PAISE {\n            out.push(format!(\n                \"XCL-1: {} = {paid}p",
+  "to": "        if gap >= TOLERANCE_PAISE {\n            out.push(format!(\n                \"XCL-1: {} = {paid}p"
  },
  {
   "id": "RP-13",
@@ -9886,5 +9886,581 @@
   "file": "src/loans_interest.rs",
   "from": "                            .any(|l| l.ledger == **name && l.amount_paise != 0)",
   "to": "                            .filter(|l| l.ledger == **name)\n                            .map(|l| i128::from(l.amount_paise))\n                            .sum::<i128>()\n                            != 0"
+ },
+ {
+  "id": "CC21-01",
+  "by": "author",
+  "what": "a term after a digit matches",
+  "file": "src/clause21a_candidates.rs",
+  "from": "c.is_ascii_digit() || c.is_ascii_lowercase()",
+  "to": "c.is_ascii_lowercase()"
+ },
+ {
+  "id": "CC21-02",
+  "by": "author",
+  "what": "a term after a non-ASCII lower-case letter does not match",
+  "file": "src/clause21a_candidates.rs",
+  "from": "c.is_ascii_digit() || c.is_ascii_lowercase()",
+  "to": "c.is_ascii_digit() || c.is_lowercase()"
+ },
+ {
+  "id": "CC21-03",
+  "by": "author",
+  "what": "terms are not stripped",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".map(|t| py_strip(t))",
+  "to": ".map(String::as_str)"
+ },
+ {
+  "id": "CC21-04",
+  "by": "author",
+  "what": "terms are not lowered",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".map(|t| py_lower(t).chars().collect())",
+  "to": ".map(|t| t.chars().collect())"
+ },
+ {
+  "id": "CC21-05",
+  "by": "author",
+  "what": "blank terms are kept",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".filter(|t| !t.is_empty())",
+  "to": ".filter(|_| true)"
+ },
+ {
+  "id": "CC21-06",
+  "by": "author",
+  "what": "a term inside a longer word matches (no left boundary)",
+  "file": "src/clause21a_candidates.rs",
+  "from": "(at == 0 || !bounding(text[at - 1]))",
+  "to": "true"
+ },
+ {
+  "id": "CC21-07",
+  "by": "author",
+  "what": "a term at the start of a longer word matches (no right boundary)",
+  "file": "src/clause21a_candidates.rs",
+  "from": "&& text.get(end).is_none_or(|&c| !bounding(c))",
+  "to": "&& true"
+ },
+ {
+  "id": "CC21-08",
+  "by": "author",
+  "what": "a term at the very start of the text is not searched",
+  "file": "src/clause21a_candidates.rs",
+  "from": "(0..text.len()).any(|at| {",
+  "to": "(1..text.len()).any(|at| {"
+ },
+ {
+  "id": "CC21-09",
+  "by": "author",
+  "what": "an unknown key in the keyword table is read",
+  "file": "src/clause21a_candidates.rs",
+  "from": "row.keys().find(|k| !KEYS.contains(&k.as_str()))",
+  "to": "row.keys().find(|_| false)"
+ },
+ {
+  "id": "CC21-10",
+  "by": "author",
+  "what": "a list of words that strips to nothing is read as none",
+  "file": "src/clause21a_candidates.rs",
+  "from": "if words.is_empty() {",
+  "to": "if words.is_empty() || Matcher::new(&words).is_none() {"
+ },
+ {
+  "id": "CC21-11",
+  "by": "author",
+  "what": "qualified terms without qualifiers are read",
+  "file": "src/clause21a_candidates.rs",
+  "from": "let w = required(\"qualifiers\")?.ok_or_else(|| {",
+  "to": "let w = required(\"qualifiers\")?.or_else(|| Matcher::new(&[String::from(\"x\")])).ok_or_else(|| {"
+ },
+ {
+  "id": "CC21-12",
+  "by": "author",
+  "what": "the large-entry ledger words are not read",
+  "file": "src/clause21a_candidates.rs",
+  "from": "large_entry_ledgers = Matcher::new(&list(\"large_entry_ledger_terms\")?);",
+  "to": "large_entry_ledgers = None;"
+ },
+ {
+  "id": "CC21-13",
+  "by": "author",
+  "what": "a keyword table missing an item is read",
+  "file": "src/clause21a_candidates.rs",
+  "from": "if let Some(missing) = Bucket::ALL.iter().find(|b| !items.contains_key(b)) {",
+  "to": "if let Some(missing) = None::<&Bucket> {"
+ },
+ {
+  "id": "CC21-14",
+  "by": "author",
+  "what": "a [clause21a] that is not a table is read as none",
+  "file": "src/clause21a_candidates.rs",
+  "from": "let Some(clause21a) = clause21a else {",
+  "to": "let Some(clause21a) = clause21a.filter(|v| v.is_table()) else {"
+ },
+ {
+  "id": "CC21-15",
+  "by": "author",
+  "what": "an extra-terms item the table does not have is dropped, not refused",
+  "file": "src/clause21a_candidates.rs",
+  "from": "if !unknown.is_empty() {",
+  "to": "if false {"
+ },
+ {
+  "id": "CC21-16",
+  "by": "author",
+  "what": "a malformed list of extra terms is read as none",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".ok_or_else(malformed)?;",
+  "to": ".unwrap_or_default();"
+ },
+ {
+  "id": "CC21-17",
+  "by": "author",
+  "what": "a blank partner ledger is kept",
+  "file": "src/clause21a_candidates.rs",
+  "from": "if !name.is_empty() {",
+  "to": "if true {"
+ },
+ {
+  "id": "CC21-18",
+  "by": "author",
+  "what": "the partners' remuneration ledgers are not excepted",
+  "file": "src/clause21a_candidates.rs",
+  "from": "for location in [\"interest_ledger\", \"remuneration_ledger\"] {",
+  "to": "for location in [\"interest_ledger\"] {"
+ },
+ {
+  "id": "CC21-19",
+  "by": "author",
+  "what": "a partner ledger that is not a name is skipped, not refused",
+  "file": "src/clause21a_candidates.rs",
+  "from": "                Some(_) => {\n                    return Err(AuditError::Config(format!(\n                        \"[partners].{key}.{location} is not a name\"\n                    )))\n                }",
+  "to": "                Some(_) => {}"
+ },
+ {
+  "id": "CC21-20",
+  "by": "author",
+  "what": "a partner entry that is not a table is skipped, not refused",
+  "file": "src/clause21a_candidates.rs",
+  "from": "        let entry = entry\n            .as_table()\n            .ok_or_else(|| AuditError::Config(format!(\"[partners].{key} is not a table\")))?;",
+  "to": "        let Some(entry) = entry.as_table() else {\n            continue;\n        };"
+ },
+ {
+  "id": "CC21-21",
+  "by": "author",
+  "what": "a partner's interest or remuneration credited to capital is a personal candidate",
+  "file": "src/clause21a_candidates.rs",
+  "from": "&& !partner_ledgers.contains(&l.ledger)",
+  "to": "&& true"
+ },
+ {
+  "id": "CC21-22",
+  "by": "author",
+  "what": "a P&L credit in a voucher that credits capital is a personal candidate",
+  "file": "src/clause21a_candidates.rs",
+  "from": "&& l.amount_paise > 0",
+  "to": "&& true"
+ },
+ {
+  "id": "CC21-23",
+  "by": "author",
+  "what": "a voucher that debits capital makes its P&L debits personal candidates",
+  "file": "src/clause21a_candidates.rs",
+  "from": "capital_ledgers.contains(&l.ledger) && l.amount_paise < 0",
+  "to": "capital_ledgers.contains(&l.ledger)"
+ },
+ {
+  "id": "CC21-24",
+  "by": "author",
+  "what": "the capital ledgers are looked for under another group",
+  "file": "src/clause21a_candidates.rs",
+  "from": "CAPITAL_ACCOUNT_GROUP: &str = \"Capital Account\";",
+  "to": "CAPITAL_ACCOUNT_GROUP: &str = \"Capital Accounts\";"
+ },
+ {
+  "id": "CC21-25",
+  "by": "author",
+  "what": "the capital-credit rule lists capital, not personal, candidates",
+  "file": "src/clause21a_candidates.rs",
+  "from": "if *b == Bucket::Personal",
+  "to": "if *b == Bucket::Capital"
+ },
+ {
+  "id": "CC21-26",
+  "by": "author",
+  "what": "the large-entry rule lists personal, not capital, candidates",
+  "file": "src/clause21a_candidates.rs",
+  "from": "*b == Bucket::Capital",
+  "to": "*b == Bucket::Personal"
+ },
+ {
+  "id": "CC21-27",
+  "by": "author",
+  "what": "an entry of exactly the threshold is large",
+  "file": "src/clause21a_candidates.rs",
+  "from": "&& l.amount_paise > large",
+  "to": "&& l.amount_paise >= large"
+ },
+ {
+  "id": "CC21-28",
+  "by": "author",
+  "what": "the large-entry ledger words are read in the narration and party field too",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".is_some_and(|m| m.search(&own[0]))",
+  "to": ".is_some_and(|m| m.search(&text))"
+ },
+ {
+  "id": "CC21-29",
+  "by": "author",
+  "what": "with no threshold in the rules, no entry is large",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".unwrap_or(crate::ledger_scrutiny::DEFAULT_LARGE_ENTRY_PAISE);",
+  "to": ".unwrap_or(i64::MAX);"
+ },
+ {
+  "id": "CC21-30",
+  "by": "author",
+  "what": "the rules' own threshold is ignored",
+  "file": "src/clause21a_candidates.rs",
+  "from": "let large = rules\n        .ledger_scrutiny_large_entry_paise\n",
+  "to": "let large = rules\n        .ledger_scrutiny_large_entry_paise\n        .filter(|_| false)\n"
+ },
+ {
+  "id": "CC21-31",
+  "by": "author",
+  "what": "\"new\" is read in the party field too",
+  "file": "src/clause21a_candidates.rs",
+  "from": "hit = own.iter().any(|f| m.search(f));",
+  "to": "hit = m.search(&text);"
+ },
+ {
+  "id": "CC21-32",
+  "by": "author",
+  "what": "\"fine\" counts with its qualifier in another field",
+  "file": "src/clause21a_candidates.rs",
+  "from": "hit = own.iter().any(|f| q.search(f) && w.search(f));",
+  "to": "hit = own.iter().any(|f| q.search(f)) && own.iter().any(|f| w.search(f));"
+ },
+ {
+  "id": "CC21-33",
+  "by": "author",
+  "what": "\"fine\" counts without a qualifier",
+  "file": "src/clause21a_candidates.rs",
+  "from": "hit = own.iter().any(|f| q.search(f) && w.search(f));",
+  "to": "hit = own.iter().any(|f| q.search(f));"
+ },
+ {
+  "id": "CC21-34",
+  "by": "author",
+  "what": "a club fee or service needs no club word",
+  "file": "src/clause21a_candidates.rs",
+  "from": "hit = c.search(&text);",
+  "to": "hit = true;"
+ },
+ {
+  "id": "CC21-35",
+  "by": "author",
+  "what": "the club word is not read in the party field",
+  "file": "src/clause21a_candidates.rs",
+  "from": "hit = c.search(&text);",
+  "to": "hit = c.search(&own[0]) || c.search(&own[1]);"
+ },
+ {
+  "id": "CC21-36",
+  "by": "author",
+  "what": "the party field is not searched",
+  "file": "src/clause21a_candidates.rs",
+  "from": "py_lower(&format!(\"{} {} {}\", l.ledger, v.narration, v.party_field))",
+  "to": "py_lower(&format!(\"{} {}\", l.ledger, v.narration))"
+ },
+ {
+  "id": "CC21-37",
+  "by": "author",
+  "what": "ledger-or-narration and qualified words are not read in the narration",
+  "file": "src/clause21a_candidates.rs",
+  "from": "py_lower(&v.narration).chars().collect(),",
+  "to": "Vec::new(),"
+ },
+ {
+  "id": "CC21-38",
+  "by": "author",
+  "what": "Direct Expenses ledgers are not searched",
+  "file": "src/clause21a_candidates.rs",
+  "from": "\"Direct Expenses\", \"Indirect Expenses\"]",
+  "to": "\"Direct Expense\", \"Indirect Expenses\"]"
+ },
+ {
+  "id": "CC21-39",
+  "by": "author",
+  "what": "lines on ledgers outside the P&L groups are searched",
+  "file": "src/clause21a_candidates.rs",
+  "from": "if !pl.contains(&l.ledger) {",
+  "to": "if pl.is_empty() {"
+ },
+ {
+  "id": "CC21-40",
+  "by": "author",
+  "what": "the client's extra terms are not added",
+  "file": "src/clause21a_candidates.rs",
+  "from": "let extra = extra_terms.0.get(b).into_iter().flatten();",
+  "to": "let extra = std::iter::empty::<&String>();"
+ },
+ {
+  "id": "CC21-41",
+  "by": "author",
+  "what": "the table's own terms are not read",
+  "file": "src/clause21a_candidates.rs",
+  "from": "(*b, Matcher::new(t.terms.iter().chain(extra)))",
+  "to": "(*b, Matcher::new(extra))"
+ },
+ {
+  "id": "CC21-42",
+  "by": "author",
+  "what": "club words are not read from the table",
+  "file": "src/clause21a_candidates.rs",
+  "from": "club: required(\"club_terms\")?,",
+  "to": "club: None,"
+ },
+ {
+  "id": "CC21-43",
+  "by": "author",
+  "what": "ledger-or-narration words are not read from the table",
+  "file": "src/clause21a_candidates.rs",
+  "from": "own_only: required(\"ledger_or_narration_terms\")?,",
+  "to": "own_only: None,"
+ },
+ {
+  "id": "CC21-44",
+  "by": "author",
+  "what": "qualified words are not read from the table",
+  "file": "src/clause21a_candidates.rs",
+  "from": "Some((q, w))\n",
+  "to": "{\n                    let _ = (q, w);\n                    None\n                }\n"
+ },
+ {
+  "id": "CC21-45",
+  "by": "author",
+  "what": "a nil line counts as a debit",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".filter(|h| h.3 > 0)",
+  "to": ".filter(|h| h.3 >= 0)"
+ },
+ {
+  "id": "CC21-46",
+  "by": "author",
+  "what": "an item with credits only is listed",
+  "file": "src/clause21a_candidates.rs",
+  "from": "if debits.is_empty() {",
+  "to": "if false {"
+ },
+ {
+  "id": "CC21-47",
+  "by": "author",
+  "what": "debits are summed as credits",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".filter(|h| h.3 < 0)",
+  "to": ".filter(|h| h.3 > 0)"
+ },
+ {
+  "id": "CC21-48",
+  "by": "author",
+  "what": "every candidate is labelled a multiple match",
+  "file": "src/clause21a_candidates.rs",
+  "from": "if in_buckets[key] > 1 {",
+  "to": "if in_buckets[key] >= 1 {"
+ },
+ {
+  "id": "CC21-49",
+  "by": "author",
+  "what": "a line matching two items is counted once",
+  "file": "src/clause21a_candidates.rs",
+  "from": "*in_buckets.entry(key).or_default() += 1;",
+  "to": "*in_buckets.entry(key).or_default() = 1;"
+ },
+ {
+  "id": "CC21-50",
+  "by": "author",
+  "what": "the limit counts the credits beside as candidate lines",
+  "file": "src/clause21a_candidates.rs",
+  "from": "debits.len(),",
+  "to": "matched.len(),"
+ },
+ {
+  "id": "CC21-51",
+  "by": "author",
+  "what": "the evidence label leaves out the ledger",
+  "file": "src/clause21a_candidates.rs",
+  "from": "\"{}, {ledger}, {}{multiple}\",",
+  "to": "\"{}, {}{multiple}\","
+ },
+ {
+  "id": "CC21-52",
+  "by": "author",
+  "what": "the registry runs the test without the client's extra terms",
+  "file": "src/lib.rs",
+  "from": "let extra_terms = clause21a_candidates::extra_terms(engagement.clause21a.as_ref())?;",
+  "to": "let extra_terms = clause21a_candidates::ExtraTerms::default();"
+ },
+ {
+  "id": "CC21-53",
+  "by": "author",
+  "what": "the registry takes the partners' ledgers from the unbound engagement",
+  "file": "src/lib.rs",
+  "from": "clause21a_candidates::partner_ledgers(&bound.partners)?",
+  "to": "clause21a_candidates::partner_ledgers(&engagement.partners)?"
+ },
+ {
+  "id": "CC21-54",
+  "by": "author",
+  "what": "the engagement does not keep [clause21a]",
+  "file": "src/lib.rs",
+  "from": "clause21a: cfg.get(\"clause21a\").cloned(),",
+  "to": "clause21a: None,"
+ },
+ {
+  "id": "CC21-55",
+  "by": "reviewer",
+  "what": "the candidates are cited in the books' order, not sorted",
+  "file": "src/clause21a_candidates.rs",
+  "from": "debits.sort_by(|x, y| y.3.cmp(&x.3).then_with(|| x.1.guid.cmp(&y.1.guid)));",
+  "to": "debits.sort_by(|_, _| std::cmp::Ordering::Equal);"
+ },
+ {
+  "id": "CC21-56",
+  "by": "reviewer",
+  "what": "the candidates are cited smallest first",
+  "file": "src/clause21a_candidates.rs",
+  "from": "debits.sort_by(|x, y| y.3.cmp(&x.3)",
+  "to": "debits.sort_by(|x, y| x.3.cmp(&y.3)"
+ },
+ {
+  "id": "CC21-57",
+  "by": "reviewer",
+  "what": "candidates of one amount are cited in the books' order, not by GUID",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".then_with(|| x.1.guid.cmp(&y.1.guid))",
+  "to": ".then_with(|| std::cmp::Ordering::Equal)"
+ },
+ {
+  "id": "CC21-58",
+  "by": "reviewer",
+  "what": "a debit total past the 64-bit range wraps",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".try_fold(0i64, |s, h| s.checked_add(h.3))",
+  "to": ".try_fold(0i64, |s, h| Some(s.wrapping_add(h.3)))"
+ },
+ {
+  "id": "CC21-59",
+  "by": "reviewer",
+  "what": "a credit total past the 64-bit range wraps",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".try_fold(0i64, |s, h| s.checked_sub(h.3))",
+  "to": ".try_fold(0i64, |s, h| Some(s.wrapping_sub(h.3)))"
+ },
+ {
+  "id": "CC21-60",
+  "by": "reviewer",
+  "what": "Purchase Accounts ledgers are not searched",
+  "file": "src/clause21a_candidates.rs",
+  "from": "[\"Purchase Accounts\", \"Direct Expenses\"",
+  "to": "[\"Purchase Account\", \"Direct Expenses\""
+ },
+ {
+  "id": "CC21-61",
+  "by": "reviewer",
+  "what": "Indirect Expenses ledgers are not searched",
+  "file": "src/clause21a_candidates.rs",
+  "from": "\"Direct Expenses\", \"Indirect Expenses\"];",
+  "to": "\"Direct Expenses\", \"Indirect Expense\"];"
+ },
+ {
+  "id": "CC21-62",
+  "by": "reviewer",
+  "what": "the credit-to-capital rule needs every line of the voucher to be a capital credit, so it never fires",
+  "file": "src/clause21a_candidates.rs",
+  "from": ".any(|l| capital_ledgers.contains(&l.ledger) && l.amount_paise < 0);",
+  "to": ".all(|l| capital_ledgers.contains(&l.ledger) && l.amount_paise < 0);"
+ },
+ {
+  "id": "CC21-63",
+  "by": "reviewer",
+  "what": "the candidates are cited by GUID first, then largest first",
+  "file": "src/clause21a_candidates.rs",
+  "from": "debits.sort_by(|x, y| y.3.cmp(&x.3).then_with(|| x.1.guid.cmp(&y.1.guid)));",
+  "to": "debits.sort_by(|x, y| x.1.guid.cmp(&y.1.guid).then_with(|| y.3.cmp(&x.3)));"
+ },
+ {
+  "id": "RP-21",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 says nothing of a paid figure with no accrued figure",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        let Some(accrued) = value_of(&accrued_id) else {\n            out.push(format!(\"XCL-1: {} has no matching {accrued_id}\", figure.id));",
+  "to": "        let Some(accrued) = value_of(&accrued_id) else {\n            let _ = &accrued_id;"
+ },
+ {
+  "id": "RP-22",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 says nothing of a paid figure citing no ledger",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if names.is_empty() {\n            out.push(format!(\n                \"XCL-1: {} carries no ledger evidence to verify against the Trial Balance\",\n                figure.id\n            ));",
+  "to": "        if names.is_empty() {"
+ },
+ {
+  "id": "RP-23",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 never compares a published opening or closing payable",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                if gap > TOLERANCE_PAISE {\n                    out.push(format!(\n                        \"XCL-1: {id} = {published}p",
+  "to": "                if gap > TOLERANCE_PAISE && false {\n                    out.push(format!(\n                        \"XCL-1: {id} = {published}p"
+ },
+ {
+  "id": "RP-24",
+  "by": "author",
+  "what": "related_parties_cl23: the tag-collision refusal names one key twice",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                    \"{TEST_ID}: related persons {first:?} and {key:?} share the tag {tag}; \\",
+  "to": "                    \"{TEST_ID}: related persons {key:?} and {key:?} share the tag {tag}; \\"
+ },
+ {
+  "id": "RP-25",
+  "by": "author",
+  "what": "related_parties_cl23: the shape refusal drops the person key",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        format!(\"{TEST_ID}: related_parties.{key:?}.{field} is present but is not {expected}\"),",
+  "to": "        format!(\"{TEST_ID}: related_parties.{field} is present but is not {expected}\"),"
+ },
+ {
+  "id": "RP-26",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1's per-row movement subtracts unchecked",
+  "file": "src/related_parties_cl23.rs",
+  "from": "row.closing_paise.checked_sub(row.opening_paise)",
+  "to": "Some(row.closing_paise - row.opening_paise)"
+ },
+ {
+  "id": "RP-27",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 compares a published opening or closing payable exactly",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                if gap > TOLERANCE_PAISE {",
+  "to": "                if gap != 0 {"
+ },
+ {
+  "id": "RP-28",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 fires on a published opening or closing payable at the tolerance",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                if gap > TOLERANCE_PAISE {",
+  "to": "                if gap >= TOLERANCE_PAISE {"
+ },
+ {
+  "id": "RP-29",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1's movement subtracts the column sums, not each row's",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            let movement = names.iter().try_fold(0i64, |acc, name| {\n                let row_movement = book.tb.get(*name).map_or(Some(0), |row| {\n                    row.closing_paise.checked_sub(row.opening_paise)\n                });\n                row_movement\n                    .and_then(|m| acc.checked_add(m))\n                    .ok_or_else(overflow)\n            })?;",
+  "to": "            let movement = tb_sum(&names, |row| row.closing_paise)?\n                .checked_sub(tb_sum(&names, |row| row.opening_paise)?)\n                .ok_or_else(overflow)?;"
  }
 ]

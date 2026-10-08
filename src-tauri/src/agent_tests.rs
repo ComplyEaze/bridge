@@ -108,6 +108,8 @@ fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
             "REFERENCE",
             "ISINVOICE",
             "PARTYGSTIN",
+            // Same inertness trap: `reference_date` is parsed only if the request names it (#1257).
+            "REFERENCEDATE",
         ] {
             assert!(fields.iter().any(|value| value == field), "missing {field}");
         }
@@ -748,9 +750,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // name, so a new tool must either be given a sample or be listed here
     // deliberately. `acknowledge_post_review` writes one local record and its
     // module marks no party name; `local_data_report` returns only static
-    // strings, counts, sizes and whole days.
+    // strings, counts, sizes and whole days; `cash_flow` returns only months,
+    // amounts and counts of ledgers, and no ledger name.
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
-    let mut without_a_sample = vec!["acknowledge_post_review", "local_data_report"];
+    let mut without_a_sample = vec!["acknowledge_post_review", "cash_flow", "local_data_report"];
     // The lab-only tools, compiled in with the `lab-writes` feature, are not
     // sampled yet: `lab_read_inventory` returns party-bearing fields and the two
     // import tools were not examined (#999).
@@ -2220,6 +2223,14 @@ async fn voucher_read_evidence_uses_utf16_transport_bytes() {
         status_plan(),
         high_water_plan(),
         status_plan(),
+        // The census of the window (#1029), then the window, both of the
+        // captured vouchers.
+        company_plan(),
+        company_plan(),
+        voucher_plan(),
+        status_plan(),
+        voucher_plan(),
+        status_plan(),
         company_plan(),
         company_plan(),
         voucher_plan(),
@@ -2256,16 +2267,18 @@ async fn voucher_read_evidence_uses_utf16_transport_bytes() {
     let expected_bytes = bridge_tally_protocol::encode_tally_xml_request_utf16le(&company_xml)
         .len()
         + bridge_tally_protocol::encode_tally_xml_request_utf16le(high_water_xml).len()
-        + bridge_tally_protocol::encode_tally_xml_request_utf16le(captured_vouchers).len();
+        // The census and the window both serve the captured vouchers.
+        + 2 * bridge_tally_protocol::encode_tally_xml_request_utf16le(captured_vouchers).len();
     assert_eq!(
         response["structuredContent"]["evidence"]["bytes"],
         expected_bytes * 2
     );
     assert_ne!(
         response["structuredContent"]["evidence"]["bytes"],
-        company_xml.len() + high_water_xml.len() + captured_vouchers.len()
+        company_xml.len() + high_water_xml.len() + 2 * captured_vouchers.len()
     );
-    assert_eq!(simulator.finish().expect("simulator result").len(), 16);
+    // 16 before the census (#1029) and its six legs.
+    assert_eq!(simulator.finish().expect("simulator result").len(), 22);
 }
 
 /// `vouchers` over an empty window on a company whose high-water row carries

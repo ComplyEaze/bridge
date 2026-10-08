@@ -23,13 +23,13 @@ notarized. Each archive has a same-named `.sha256` file and
 a small provenance record on its release so an organization can identify the
 downloaded bytes and source commit.
 
-## At a glance, release 0.4.2
+## At a glance, release 0.5.0
 
-- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range, and one ledger's movement.
-- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, values only, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, and it has not yet been run on a real bank statement.
-- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, and tax-audit flags.
+- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), and one ledger's movement.
+- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, values only, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
+- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags, and Tally's Funds Flow, Ratio Analysis and negative-balance reports.
 
-"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.4.2 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.5.0 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
 ## Before you install
 
@@ -64,11 +64,17 @@ actually on.
    port. Changing it changes only where Bridge calls Tally, not Tally's own
    HTTP setting.
 4. Read the Terms of Use linked in the extension settings, then turn on **I
-   accept the ComplyEaze Bridge Terms of Use**. Until you do, Bridge refuses
-   every tool call and the assistant reports why; it reads nothing from Tally.
+   accept the ComplyEaze Bridge Terms of Use**. Until you do, Bridge does
+   not read from Tally. (On one Mac, with the package our checks built for 0.5.0
+   installed over 0.4.2, Claude Desktop did not start Bridge before the box was
+   ticked and before any quit, and a request to a Bridge tool failed with a 400 error that did not
+   mention the Terms.)
 5. Save the extension settings, then quit Claude Desktop completely and reopen
-   it: Bridge reads the acceptance when it starts, and the tools can be listed
-   while every call is still refused. In a new chat, use **Connectors** to confirm Bridge is connected.
+   it. (On that Mac Claude Desktop
+   started Bridge as soon as the settings were saved and a new chat got an answer
+   from it, but the assistant first called a leftover second entry for the same extension,
+   which failed with the same error; after Claude Desktop was quit and reopened there
+   was one connector and no error.) In a new chat, use **Connectors** to confirm Bridge is connected.
 
 Voucher file preparation and bank-statement parsing are available by default;
 they write nothing to Tally. **Voucher posting is off by default** while four
@@ -98,15 +104,24 @@ and leave Tally's product/licence mode unchanged. Bridge's checks do not lock
 out changes made directly in Tally or by other software.
 
 Stop Bridge and every client running its connector before upgrading, then restart
-them with the newer version. Release 0.4.2 installs as a second extension beside
+them with the newer version. Release 0.4.2 installed as a second extension beside
 an older release instead of replacing it (its author line changed, and Claude
 Desktop includes the author in an extension's identity; seen on a Mac, not tried
-on Windows): remove the older extension first, in Claude Desktop's Extensions
-settings, and do not delete the data folder, which both versions use. The new
-extension does not carry over your settings: enter the Tally port, the posting
-setting (posting starts off), the Terms setting and Response redaction (it
-starts at none; set it again if you had shortened or masked names); every tool
-refuses until the Terms setting is on. Dispatch coordination uses the operating system's
+on Windows). The package our checks built for release 0.5.0, installed on one Mac
+over 0.4.2, replaced it as an update: one extension at version 0.5.0, the Tally
+port, Response redaction and the posting setting as they were (a posting
+setting that was on stayed on), the old Terms setting gone and no value for the
+new one (version 2026-10.1). This was not tried with the published file or on
+Windows. So after updating, tick the Terms setting, check the posting setting, then
+quit and reopen Claude Desktop; on that Mac, before the tick, Claude Desktop did
+not start Bridge and a request to one of its tools failed with a 400 error that
+did not mention the Terms. Installing over a release older than 0.4.2 was not
+tried: remove such a release first. If Settings,
+Extensions then lists two ComplyEaze Bridge entries (as happened when 0.4.2 was
+installed beside an older release), remove the older entry before you use
+either, and do not delete the data folder, which both versions use. Then enter the Tally port, the posting setting (posting starts
+off), the Terms setting and Response redaction (it starts at none; set it again
+if you had shortened or masked names), and quit and reopen Claude Desktop. Dispatch coordination uses the operating system's
 local app-data folder on Windows and account home on macOS, independently of
 launcher environment variables. Older processes may use a different coordination path.
 Keep the recovery data when upgrading. New posting attempts add a native request
@@ -128,9 +143,15 @@ is sent to the AI provider used for that conversation, so the conversation is
 not wholly local. Choose the package's redaction setting when it suits the
 workflow.
 
-Private MCPB downloads do not update automatically. To upgrade from a release
-older than 0.4.2, remove the older extension in Claude Desktop's Extensions
-settings first (0.4.2 installs beside it, not over it), keep the data folder,
-install the newer release from the same screen, then confirm its version and
-enter your settings again. Use the same screen to uninstall. Neither action changes Tally's
+Private MCPB downloads do not update automatically. To upgrade, keep the data
+folder, install the newer release from the Extensions screen in Claude Desktop's
+settings, then confirm its version. On one Mac the package our checks built for 0.5.0
+(not the published file) replaced 0.4.2 and kept its Tally port, Response redaction and posting setting
+(see above): there, tick the new Terms setting and check the posting setting,
+then quit and reopen Claude Desktop. Installing over a release older than 0.4.2
+was not tried: remove it first. If
+Settings, Extensions lists two ComplyEaze Bridge entries instead (as happened
+when 0.4.2 was installed beside an older release), remove
+the older entry before you use either, enter your settings in the new one, tick
+the new Terms setting, and quit and reopen Claude Desktop. Use the same screen to uninstall. Neither action changes Tally's
 HTTP gateway configuration.

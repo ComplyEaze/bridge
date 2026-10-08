@@ -12,12 +12,73 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-### In plain words: the next build, since 0.4.2
+## [0.5.0] - 2026-10-08
 
-These changes are in source and not yet in a published build.
+### In plain words: ComplyEaze Bridge 0.5.0, since 0.4.2 (3 Oct 2026)
 
-**New**
+These changes are in ComplyEaze Bridge 0.5.0. Each line names the pull
+requests it comes from, except where it names an issue. A "mark" below is a
+counter Tally keeps that moves when vouchers or ledgers change.
 
+**Should I upgrade?**
+
+- **After updating, accept the Terms again, and check the posting setting.**
+  0.5.0 names the setting that accepts the Terms for version 2026-10.1, a
+  different setting from the one you accepted for 0.4.2. After updating, tick
+  the new Terms setting in the extension's settings, check that "Allow voucher
+  posting" is as you want it, then quit and reopen Claude Desktop. What we saw:
+  we installed the package our checks built for this release (not the published
+  file) over 0.4.2 on one Mac. It replaced 0.4.2 and kept the Tally port,
+  Response redaction and Allow voucher posting as they were (a posting
+  setting that was on stayed on); the old Terms setting was gone and the new one
+  had no value. Before the tick, and before any quit, Claude Desktop did not
+  start ComplyEaze Bridge, and a request to one of its tools failed with a 400
+  error that did not mention the Terms. After the tick was saved Claude Desktop
+  started it at once and a new chat got an answer from it, but the assistant
+  first called a leftover second entry for the same extension, which failed with
+  the same error. After Claude Desktop was quit and reopened there was one connector and
+  no error. Not tried: quitting and reopening without the tick, installing over a
+  release older than 0.4.2 (remove such a release first), and Windows. If
+  Settings, Extensions lists two ComplyEaze Bridge entries (as happened when
+  0.4.2 was installed beside an older release), remove the older entry before
+  you use either. Then enter your settings in the new one, tick the Terms
+  setting, and quit and reopen Claude Desktop (#1010).
+- **If you turn posting on: do not post a batch built by 0.5.0 with an older
+  version.** Versions 0.3.0 to 0.4.2 refuse to post a batch built with 0.5.0,
+  and nothing is posted. Their message says to build the batch again; do not do
+  that there: reinstall 0.5.0 (or a newer version) and post the batch from it.
+  An older version makes none of 0.5.0's checks on bill-wise and cash-in-hand
+  ledgers for what it builds and posts itself. As before, from the first post
+  attempted with 0.4.2 or later, versions before 0.4.2 stop reading the import
+  history. 0.2.0 and earlier have no such refusal: do not run them over a data
+  folder 0.5.0 has built in (#1234, #1343).
+- **A batch built by an earlier version must be built again once** before it
+  can be posted (the bill-wise and cash-in-hand records); check first whether
+  its file was already imported by hand (#815, #1234).
+- **If you only read your books:** nothing here is urgent. The reasons to
+  update are the search and summaries in `vouchers`, the small-company count,
+  the new `cash_flow` tool and the safer refusals below.
+- **If you use ComplyEaze Bridge on Windows, treat it as untried:** no one on
+  our side has installed the Windows package of this build in Claude
+  Desktop.
+- **How:** ComplyEaze Bridge does not update itself. Follow the
+  [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
+  (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
+  Desktop, Settings, Extensions, install the new file (remove a release older than
+  0.4.2 first, and see the first bullet above if two entries are listed); (3) keep ComplyEaze
+  Bridge's data folder; (4) tick the new Terms setting, check that the extension shows 0.5.0 and
+  that "Allow voucher posting" is as you want it, and enter your other settings
+  again only if they were cleared; (5) quit Claude Desktop
+  completely and reopen it.
+
+**What you can do now**
+
+- `masters` can list a company's cost centres (`cost_centres`, with each centre's category) and cost categories (`cost_categories`, with their three allocation flags). They are returned whether or not the company's Cost Centres setting is on: a book whose setting read No still returned its two centres, so a No setting is not "no centres", and an empty list does not say whether the feature is off or none is defined. A centre without a category, and an answer whose collection does not carry the type of the kind asked for, are refused rather than read as "none". An empty cost-category list is refused (`masters_cost_categories_empty`) on the expectation that the predefined Primary Cost Category always exists, which was seen in both books whose categories were captured and was not captured for a book with no centre defined. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre. Measured on three synthetic books for cost centres and two for cost categories (the setting reading No on two, Yes on one: that book, captured in a separate sitting, returned its three centres, one under another, and the default category, in the same shape); a larger book is refused when its master mark is too large for the response budget (1,037 for cost centres, 1,264 for cost categories). Not measured: centres nested more than one level deep, an alias beyond a centre's own name, a larger book.
+- `vouchers`, `changes` and the sales and purchase registers now return `reference_date`, a voucher's
+  `REFERENCEDATE` (`YYYYMMDD`), where the voucher has one (#1257). Checked once against a
+  live TallyPrime 7.1 on one synthetic book: the element came back on every voucher, empty on all but one
+  and filled on that one (a Purchase) and on a voucher keyed for the check; it was not checked on a sale or on
+  another voucher type, and a value that is not a date refuses the read.
 - `vouchers` and the `outstandings` party detail now reach a ledger by either
   spelling of its name when Tally's own name for it differs in case or symbols from the
   spelling its vouchers carry (26 of 4,017 ledgers in a separate census of 13 books,
@@ -31,13 +92,38 @@ These changes are in source and not yet in a published build.
   trail reads carries for it, so a party detail that finds no bill or no unallocated
   row for such a ledger says `report_spelling: not_established`; that the first name
   list is the primary language (#1085).
+- `ledger_movement` now says what a slow read cost, as `vouchers` does: when its two reads of the voucher window together took 20 seconds or more, or the census was 16 reads or more, the result carries `read_cost` with both reads' observed seconds, a floor derived from the gaps between census reads (derived, not measured), and whether those two voucher reads together stayed inside the one measured host limit, which leaves out the two ledger catalogue reads, the company check and the wider read an empty window gets (#1239). It makes no estimate for another window, adds no request and refuses nothing. Checked once live on a synthetic book whose voucher mark is 29,900: a one-day window (82 vouchers) took 24.6 seconds and carried no block; August (2,542 vouchers) took 80.9 seconds and carried a block of 65 seconds over the two voucher reads, 4 census reads and a floor of 1 second, its voucher and census counts equal to the relay's own log. Not measured: the sixteen-census-read case (a much larger book) and a call that is slow for reasons the block leaves out.
+- `cash_flow` reads Tally's own Cash Flow for whole months (the month-wise
+  movement of the cash and bank ledgers, not a cash flow statement under AS 3). The
+  months are returned only after their net total has been compared with the
+  trial balance's cash and bank ledgers and found equal; the split into months is
+  Tally's own and is not checked, and Tally's debit and credit columns are not
+  returned. A ledger under Bank OD A/c or Bank OCC A/c with movement refuses the
+  result: Tally was seen counting one such ledger, which the check does not yet
+  count, and the refusal is covered by tests and has not been seen against Tally.
+  The tool was run against Tally on two synthetic books: the net total tied on
+  five windows (three with only debits, two with a credit amount, one of them
+  with a positive closing as well) and a quiet window was answered as nothing to
+  compare. Tally's own answers were captured on four synthetic books in all, one
+  of them a year of empty months on a large book. A Bank OD credit or a Bank OCC ledger, a contra, a month with entries that
+  cancel, a window ending in February, a window crossing a financial year,
+  optional or post-dated vouchers, a several-currency book and a large book with
+  cash activity are not measured (#1232).
 - `vouchers` can now find a voucher by its number, reference, a phrase of its
   narration or an amount (`voucher_number`, `reference`, `narration_contains`,
-  `amount`), and can add a window up by ledger, month or voucher type
-  (`summarise_by`), with debit, credit and voucher counts per bucket and the
-  cancelled, optional and entry-less vouchers counted apart. Both run on the
-  rows the window read already holds, so they send no new request to Tally; a
-  zero from a counted window is a checked zero. A narration phrase is refused
+  `amount`), and can add a window up by ledger, month, voucher type, group or
+  primary group (`summarise_by`), with debit, credit and voucher counts per bucket and the
+  cancelled, optional and entry-less vouchers counted apart. Search and the
+  ledger, month and voucher-type summaries run on the rows the window read already
+  holds and send no new request to Tally; the group and primary-group summaries
+  also read the ledger list and the group list, before and after the window. They
+  refuse when any ledger's group chain, or the set of ledgers, changed meanwhile, and
+  when a ledger the window touches cannot be placed, so no entry is left out of a
+  group total, naming the ledger it could not place. A book whose master-alteration
+  mark is above 11,983 (a provisional limit, computed and not measured, about half of what the transport admits for the same list) is refused before the
+  ledger list is read. A `group` summary also
+  gives each group's whole figure, descendants included, as `subtree_totals`, and every
+  row says what it `covers`. A zero from a counted window is a checked zero. A narration phrase is refused
   where narrations are withheld from the assistant. A summary sums post-dated
   vouchers (counted, with the vouchers Tally sent no flag for counted apart) and any
   non-posting voucher type a book uses, and says so in the result. Checked once
@@ -45,20 +131,49 @@ These changes are in source and not yet in a published build.
   equalled the sums over the listed vouchers, the ledger buckets equalled
   `trial_balance` for the same year, and each search returned what the same
   criterion selects from the listing; it did not cover a large book, a memorandum,
-  a reversing journal or a voucher withheld for a foreign-currency amount (#1230).
+  a reversing journal or a voucher withheld for a foreign-currency amount. That check
+  covered search and the ledger, month and voucher-type summaries. A second check on
+  7 October 2026 on the same book read the whole year once as `group` and once as
+  `primary_group`: 12 and 8 buckets over the 64 vouchers that count (a cancelled, an optional and
+  an entry-less voucher left out); every group bucket equalled the ledger buckets added up by the
+  trial balance's own parent column, the 18 `subtree_totals` equalled the trial balance rolled up
+  the group tree, and each call took 64 requests (the window's 34 and the group modes' 30, as counted from the code) and
+  about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
+  read, or a held later page (#1230).
 
 **Safer or fixed**
 
 - `purchase_register` and `sales_register` now take their `state` from the rule
   `vouchers` uses. A non-empty window is `complete` only when every voucher read
-  was checked against a separate count of the window; a window nothing counted,
-  which only a book small enough to need no census gets (a few dozen vouchers), is
-  `partial` with `reason` `nonempty_window_unqualified`, and its rows are still
-  returned. Before, the registers called such a window `complete` on the
-  company marks and the ledger masters alone, so the same window had two answers.
-  A row's `status` is unchanged. Not measured live: a window admitted against a
-  census through the registers on a large book; the change sends no new request,
-  it uses the census the read already makes (#1031).
+  was checked against a separate count of the window. Before, the registers called
+  such a window `complete` on the company marks and the ledger masters alone, so
+  the same window had two answers. A row's `status` is unchanged. Not measured live:
+  a window admitted against a census through the registers on a large book (#1031).
+- `vouchers`, `voucher_presence`, `purchase_register` and `sales_register` now
+  count a small book's window too (a company with a few dozen vouchers or fewer),
+  where they used to read it without a count. A nonempty window of such a book can
+  now be `complete`, and `voucher_presence` can say `absent` for it, which it
+  could not before. The cost is one more read of the book's vouchers: six more
+  requests to Tally on every call that counts (a `vouchers` call on a small book
+  goes from 16 to 22 requests, `voucher_presence` from 28 to 34); the added time
+  was measured on windows of one voucher, on debug builds, at 0.5 to 2 seconds a
+  call (one run of the day and week calls, three of the presence call), and not
+  on a larger book. `absent` still needs a window proven complete, nothing
+  resembling the proposal, the voucher number of a `manual` type, and a party that was
+  supplied and compared completely: a proposal with no party (a Journal), no manual
+  number, or a party whose comparison was cut short reads `possibly_present` with its
+  reason, however complete the window. A voucher created, altered or deleted between the
+  count and the read now refuses a small book as `voucher_window_part_not_admitted`
+  (cause `part_census_mismatch`), as a large one always did. The Ledger Entries
+  screen reads through `vouchers`' window read, so it counts too and meets the
+  same refusal. An empty window of a small book is answered as before, by the
+  check of an empty window: the count adds its requests there and changes
+  nothing else. `ledger_movement`, `verify_import`, `outstandings` and that check
+  are unchanged. Not measured against a live book: what Tally does when it cannot serve the
+  count, which refuses the call as `voucher_window_volume_unestimated` where the small book used
+  to answer `partial` (it served the count every time in the run above), a
+  larger book, and the registers and the Ledger Entries screen, which use the same
+  count but were not called live (#1029).
 - `profit_and_loss` now compares Tally's `Cost of Sales :` heading with the
   derived cost of sales (Purchase Accounts plus Direct Expenses) even when the
   heading reads zero or empty. Over a non-zero cost of sales such a heading
@@ -84,8 +199,30 @@ These changes are in source and not yet in a published build.
   is refused for posting as `import_batch_predates_bill_wise_record` and is
   rebuilt (check first whether its file was already imported by hand). The
   approval is the assistant's word, not proof that a person said yes, and a hand
-  import of the file is not checked. Not measured: a large book, and the bills
-  of a ledger whose flag reads No (#1234).
+  import of the file is not checked. The approval dialog of a native post
+  shows the person which ledgers these are: "On Account" stands before the name
+  of each approved ledger, on each of its entries for one voucher and on its
+  totals line for a batch, with one sentence saying the ledger was bill-wise
+  when the batch was built and its entries carry no bill allocation; the
+  desktop Journal review shows the mark and the sentence too. A batch's
+  per-voucher lines carry no mark, and their heading then says it is marked
+  below; in such a batch a narration that holds the sentence's opening is
+  withheld on its per-voucher line. A dialog that
+  cannot show the mark refuses. The mark adds no line, only characters, so a
+  batch already at the dialog's 100-character line limit or its character
+  limit can now be refused as too large (`import_review_too_large`). The
+  dialog for one voucher ends with the voucher's own text: its reference and
+  narration are the last two lines, quoted as they will be posted, under a
+  line saying that no line below it is an entry, a total or an instruction;
+  every line the dialog writes itself stands above that line, and the date
+  line says where the two are. That line and the note on the date line count
+  toward the dialog's 100-character line limit and its 1,600-character limit.
+  Looked at once on each system, with a one-voucher text at all three limits
+  (24 lines, 1,600 characters, a 100-character narration line): on one Mac
+  and on one Windows PC the whole text, its last two lines included, and the
+  buttons were visible without scrolling. Not measured: a smaller screen or a
+  larger display scaling, a batch dialog on either system, a large book, and
+  the bills of a ledger whose flag reads No (#1234).
 - Versions 0.3.0 to 0.4.2 refuse to post a batch this version builds. They do
   not read the cash-in-hand and bill-wise records a saved batch now carries,
   so after a rollback they could have posted it with neither check; the batch's
@@ -105,8 +242,8 @@ These changes are in source and not yet in a published build.
   at the moment of a post, another Tally connector that can change entries
   without the approval window, and that dealing with a voucher that reaches the
   wrong company remains yours. The setting that accepts the Terms is now named
-  for version 2026-10.1, so the next build asks you to accept the Terms once
-  more; version 2026-10 stays published for the builds that asked for it
+  for version 2026-10.1, so the new setting has to be accepted after an update
+  (see "Should I upgrade?"); version 2026-10 stays published for the builds that asked for it
   (#1010).
 - When a ledger name you gave is not in the book, the candidates now list ahead
   of the others the ledgers that hold every word you typed
@@ -125,8 +262,127 @@ These changes are in source and not yet in a published build.
   same ledgers are found and refused as before.
   Where a list is cut (`ledgers_changed` names eight; a small response cap
   leaves rows of `refused_ledgers` out), which ledgers are named, and how many
-  `refused_ledgers_omitted` counts, can differ from before. Other lists are
-  unchanged (#1234).
+  `refused_ledgers_omitted` counts, can differ from before. The ledgers a
+  `post_import` or `verify_import` answer names in `masters_after_post.ledgers`
+  come in the same order, where the batch first names each, in the answer and
+  in the proof saved from it (the desktop screen names the first eight of
+  them); the recorded verdict, and the review dialog that reads it, keep the
+  order they were recorded in. Other lists are unchanged (#1234).
+- The approved-party list in the build result is new in this release and
+  follows the masking setting, as the refusal's list does. Under
+  `mask_parties` the party lists `build_import_xml` returns come in the order of
+  each party's digest, not of the names, so the order does not follow the
+  alphabet of the real names; the order can change from one call to the next
+  (#1234, #1338, #1345).
+- What redaction does and does not hide is now stated in the extension. Its
+  description, its Response redaction setting and the descriptions of the two
+  log tools say that redaction only shortens party and ledger names and bank
+  account numbers (or drops narrations), and does not hide amounts, company
+  names, PAN, GSTIN, IFSC, MSME or Udyam numbers, contact details or
+  references, nor a name written inside a narration or reference. This replaces
+  the earlier wording "can only mask party names or drop narration". Not
+  measured: the shortening of bank account numbers rests on code, not on a live
+  capture (#1046, #1364).
+- `post_import` refuses a business-cash entry whose cash ledger was moved out of
+  Cash-in-Hand after the batch was built, before any approval and again when the
+  post is queued (`cash_ledger_not_cash_in_hand`); a batch built before this
+  release is built again once (`import_batch_predates_cash_ledger_record`).
+  Tested on captured data only; not measured: a live regroup between build and
+  post (#815, #1228, #1229).
+- `build_import_xml` refuses a bank statement built onto a Cash-in-Hand ledger
+  (`statement_bank_ledger_not_a_bank`), and warns, without refusing, about a
+  suspense ledger that is outside Suspense A/c, whose group is not established,
+  or that is not in the book. No live run; the read-only check of the
+  bank ledger in Tally against the statement is not in this build (#1211, #1214).
+- An HDFC statement that 0.4.2 refused with `unparseable_date` at the last row of
+  a page is read with the statement-period line skipped, so its dates are no
+  longer mixed into the previous row. No real statement has been run through a
+  package with this fix; one whose period line does not match still ends in the
+  old refusal (#1310, #1325).
+- When Tally rejects a post entirely, the post's summary now says so and no
+  longer suggests posting again. Not measured: a live post that Tally rejects
+  whole (#1108, #1213).
+- A busy Tally port gets four answers. Busy before `post_import` sends anything:
+  the refusal tells the assistant to call `post_import` again with the same
+  batch after 5 seconds, that you will be asked to approve again, and not to
+  rebuild it. Busy after the send: it tells the assistant to use
+  `verify_import` with the original batch and never to post again. Whether the
+  post was sent could not be observed: the refusal says to use `verify_import`
+  with the original batch. The second pass of an approved post has no time left:
+  it refuses at once as `tally_endpoint_busy` with nothing sent (#869, #893,
+  #1219, #1244).
+- The approval dialog for a batch of up to ten vouchers lists each voucher on
+  one line (type, date, amount, ledger, narration cut at 40 characters); a larger
+  batch, one with an unsafe narration or reference, or one whose lines do not
+  fit the dialog shows the totals with a line saying why. A narration that reads like a line of the dialog itself is not
+  shown. A single-voucher dialog shows the narration without its outer spaces,
+  as posted. The per-voucher lines were seen on macOS only (#1055, #1063,
+  #1223, #1226, #1278, #1283).
+- `ledger_movement` no longer refuses a read because of a zero entry written as
+  -0.00 and flagged with Tally's debit-side sign flag. We have not seen Tally
+  send one (#1251, #1265).
+- `ledger_masters`: a refused native ledger export now names a fixed cause
+  (`native_collection_not_success`, `native_collection_status_absent`,
+  `native_collection_malformed_response`, `native_collection_identity_mismatch`,
+  `native_collection_bounds_exceeded`, `native_collection_row_unusable`); a
+  company ledger-count answer past the response cap refuses as
+  `ledger_count_company_response_too_large`; the catalogue read is sent once and
+  a timeout refuses as `ledger_export_invalid` with `request_deadline_exceeded`
+  (#718, #937, #1033, #1144, #1167, #1184, #1216).
+- A refused date carries one next step: give each date as YYYYMMDD or YYYY-MM-DD,
+  a real day, with from no later than to (#1268, #1273).
+- `verify_import` lists, on a voucher cancelled in Tally, any effective unmarked
+  copy entered again by hand (`effective_copies_observed`), as a report only
+  that does not attribute it. Proven on Journal vouchers only (#806, #1221).
+- The tool descriptions the assistant reads are clearer: every input is
+  described, six easily confused pairs end with "use X instead", and the two log
+  tools say when to use each and that reading changes nothing but its own
+  receipt line. The `ledger_masters` description is about 4 percent shorter than
+  in 0.4.2 (6,714 to 6,448 characters in the source) without dropping a limit or safety
+  phrase, and the `vouchers` description says a bill allocation carries its bill
+  date and credit period when Tally sends them. No claim is made that assistants
+  choose better (#945, #1155, #1157, #1161, #1164, #1166, #1176, #1180, #1191,
+  #1260).
+- The extension's listing text (a long description, keywords and links) is
+  added to the manifest; it says the extension is untested outside Claude Desktop
+  and that ComplyEaze Bridge is not affiliated with Tally Solutions (#1375).
+- ComplyEaze Bridge is named in full in the text of the desktop app's screens
+  and messages that these changes reached. The app's product name and window
+  title in its configuration still read "Bridge", and some error strings in
+  its source still begin with it (#962, #1163, #1165, #1168, #1170, #1179, #1190).
+
+**Known limits**
+
+- Search and summaries were checked on one synthetic book of 67 vouchers; large
+  books, masking and foreign-currency vouchers are not checked, and a group
+  summary is refused above a provisional limit that was not measured (#1230).
+- On a large book a voucher read is practical a day at a time: one day took
+  about 170 seconds on the largest book measured, and a month is read day by day.
+  What a read cost is stated after it, not before (#485, #595, #703, #1239).
+- The either-spelling ledger lookup was checked live on one book and one ledger;
+  a second check on a book where a ledger's spelling differs from its own name is
+  pending (#1085).
+- Bill-wise approval is the assistant's word, not proof that a person said yes;
+  batch posting is not offered (#1090, #1234).
+- A bill's trail and an unallocated amount's detail read the whole date window;
+  a party-scoped request is not built (#945, #1356). The slice L captures of
+  #1257 (a duty-head change or delete moving the master change counter; an item
+  purchase on the class-entry shape) have not been run.
+- Whether a company has cost centres or GST switched on, how a voucher is
+  allocated to a cost centre, and bank-reconciliation fields are not read
+  (`trial_balance` and `cash_flow` do return the company's currency, and
+  `stock_summary` the inventory settings) (#1231).
+  Tally's Funds Flow, Ratio Analysis, Negative Stock and Negative Ledgers
+  reports are not read (#1358).
+- GST Sales and Purchase posting are not in this build (#628).
+- No Windows install of this build has been tried in Claude Desktop; the
+  per-voucher approval lines were seen on macOS only.
+- Posting limits: Terms of Use section 9.2 lists the four known limits.
+- What Claude's AI provider receives is stated in the README and the security
+  page; the list there is open, and redaction shortens names rather than hiding
+  them (#1350, #1354, #1361, #1368).
+- A bank statement is not checked against the bank ledger in Tally (#1211); the
+  HDFC fix has not been run on a real statement.
 
 ## [0.4.2] - 2026-10-03
 
@@ -411,7 +667,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   run showed (such as cess), an invoice of another shape than the one run (for
   example several goods lines), a sale typed on Tally's screen,
   accounting-invoice mode, a post-dated sale, a `REFERENCE` or a filled
-  `PARTYGSTIN` on a sale, a `REFERENCEDATE` (it is not returned), or a currency
+  `PARTYGSTIN` on a sale, a `REFERENCEDATE` on a sale, or a currency
   other than the book's base. The invoice it was replayed on was imported by
   this project. Its `complete` state rests on the company marks and the ledger
   masters reading the same before and after, not on a separate voucher count

@@ -1365,9 +1365,11 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         "import_invoice_figures_unreadable" => Some(
             "An invoice of this batch has an amount or a date ComplyEaze Bridge cannot read, so \
-             it cannot tell whether that invoice is already in the book, and nothing was sent. \
-             Build the invoice again from its values; if the refusal repeats, tell the user this \
-             invoice has to be entered in Tally itself.",
+             it cannot check that invoice against the other batches this computer has sent. This \
+             can come before a post or while verifying a batch that may already be in Tally, so \
+             do not build or send it again on this answer alone: look for the invoice in Tally \
+             first, and if it is not there, tell the user this invoice has to be entered in \
+             Tally itself.",
         ),
         // A date argument a caller can correct. `TallyDate` admits years 0001
         // to 9999, and the edge codes come from widening an empty window past

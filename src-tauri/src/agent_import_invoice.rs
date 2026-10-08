@@ -368,6 +368,34 @@ const SLAB_RATES: &[i128] = &[5, 12, 18, 28, 40];
 /// paise of per-line rounding on a multi-line bill, never a rupee.
 const TAX_LEG_TOLERANCE_PAISE: i128 = 5;
 
+/// The two tax legs of an intra-state invoice, in paise. They are equal, or
+/// differ by one paisa: a bill whose total tax is odd cannot split evenly, and
+/// the return reports the odd paisa on one head. Built only by `new`, so a
+/// pair that differs by more is not a value of this type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct TaxLegs {
+    cgst: i128,
+    state: i128,
+}
+
+impl TaxLegs {
+    fn new(cgst: i128, state: i128) -> Option<Self> {
+        (cgst.abs_diff(state) <= 1).then_some(Self { cgst, state })
+    }
+
+    /// Whether EACH leg is half the tax at `rate` percent of `taxable`, to
+    /// within `TAX_LEG_TOLERANCE_PAISE`. Checked arithmetic: an amount too
+    /// large to multiply matches no rate.
+    fn is_half_of(&self, taxable: i128, rate: i128) -> bool {
+        [self.cgst, self.state].into_iter().all(|leg| {
+            leg.checked_mul(200)
+                .zip(taxable.checked_mul(rate))
+                .and_then(|(left, right)| left.checked_sub(right))
+                .is_some_and(|difference| difference.abs() <= TAX_LEG_TOLERANCE_PAISE * 200)
+        })
+    }
+}
+
 /// The alphabet of an invoice number, as GST rule 46(b) allows it: at most 16
 /// characters, letters and digits and the two characters hyphen and slash. A
 /// number outside it is rejected by the GSTR-1 upload, so it is refused here,
@@ -658,25 +686,21 @@ pub(super) fn classify_sales_invoice(
     ) else {
         return Err(vec![refuse("invoice_amount_invalid")]);
     };
-    if cgst_amount != state_amount {
+    let Some(legs) = TaxLegs::new(cgst_amount, state_amount) else {
         return Err(vec![refuse("invoice_cgst_and_state_tax_differ")]);
-    }
+    };
     let Some(base) = taxable
-        .checked_add(cgst_amount)
-        .and_then(|sum| sum.checked_add(state_amount))
+        .checked_add(legs.cgst)
+        .and_then(|sum| sum.checked_add(legs.state))
     else {
         return Err(vec![refuse("invoice_amount_invalid")]);
     };
     // Each leg is half the tax at one slab rate, to within a few paise: a
-    // 10.00 sale carrying 0.02 of tax is not 5 percent. Checked arithmetic: an
-    // amount too large to multiply matches no rate.
-    if !SLAB_RATES.iter().any(|rate| {
-        cgst_amount
-            .checked_mul(200)
-            .zip(taxable.checked_mul(*rate))
-            .and_then(|(left, right)| left.checked_sub(right))
-            .is_some_and(|difference| difference.abs() <= TAX_LEG_TOLERANCE_PAISE * 200)
-    }) {
+    // 10.00 sale carrying 0.02 of tax is not 5 percent.
+    if !SLAB_RATES
+        .iter()
+        .any(|rate| legs.is_half_of(taxable, *rate))
+    {
         return Err(vec![refuse("invoice_tax_matches_no_slab_rate")]);
     }
     let round = match round_off {

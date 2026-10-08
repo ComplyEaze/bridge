@@ -322,6 +322,49 @@ fn arithmetic_must_close_and_tax_must_be_a_slab() {
     v.entries[1].amount = "10000.03".to_string();
     v.entries[0].amount = "11200.03".to_string();
     assert!(classify_sales_invoice(&v, &good_facts(), RAJ).is_ok());
+    // An odd paisa between the heads (a bill whose total tax is odd): either
+    // head may carry it, and the party total follows the legs.
+    for (cgst, state) in [("4.69", "4.68"), ("4.68", "4.69")] {
+        let mut v = voucher();
+        v.entries[0].amount = "196.87".to_string();
+        v.entries[1].amount = "187.50".to_string();
+        v.entries[2].amount = cgst.to_string();
+        v.entries[3].amount = state.to_string();
+        assert!(
+            classify_sales_invoice(&v, &good_facts(), RAJ).is_ok(),
+            "{cgst} / {state}"
+        );
+    }
+    // Two paise between the heads is refused, though each is within the slab.
+    let mut v = voucher();
+    v.entries[0].amount = "196.88".to_string();
+    v.entries[1].amount = "187.50".to_string();
+    v.entries[2].amount = "4.70".to_string();
+    v.entries[3].amount = "4.68".to_string();
+    assert_eq!(
+        codes(classify_sales_invoice(&v, &good_facts(), RAJ)),
+        vec!["invoice_cgst_and_state_tax_differ"]
+    );
+    // EACH head is held to the slab: 5 percent of 10,000.00 is 250.00 a head;
+    // 250.05 is within five paise, 250.06 is not, and the heads differ by one.
+    let mut v = voucher();
+    v.entries[0].amount = "10500.11".to_string();
+    v.entries[2].amount = "250.05".to_string();
+    v.entries[3].amount = "250.06".to_string();
+    assert_eq!(
+        codes(classify_sales_invoice(&v, &good_facts(), RAJ)),
+        vec!["invoice_tax_matches_no_slab_rate"]
+    );
+    v.entries[2].amount = "250.06".to_string();
+    v.entries[3].amount = "250.05".to_string();
+    assert_eq!(
+        codes(classify_sales_invoice(&v, &good_facts(), RAJ)),
+        vec!["invoice_tax_matches_no_slab_rate"]
+    );
+    v.entries[0].amount = "10500.09".to_string();
+    v.entries[2].amount = "250.05".to_string();
+    v.entries[3].amount = "250.04".to_string();
+    assert!(classify_sales_invoice(&v, &good_facts(), RAJ).is_ok());
     // 7 percent is no GST slab: 700 + 700.
     let mut v = voucher();
     v.entries[2].amount = "700.00".to_string();

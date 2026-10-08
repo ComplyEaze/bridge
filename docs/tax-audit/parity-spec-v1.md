@@ -48,8 +48,8 @@ One JSON object per (test id, Book) pair:
 
 `spec_version` is this document's own version (semver-ish, currently `"1.0.0"`). A change to any
 rule below that changes what a conforming dump looks like bumps it. Two dumps with different
-`spec_version`s are reported as differing (§7.3), so a dump written to another version of this
-spec never passes as identical.
+`spec_version`s are reported as differing by this crate's `compare` (§7 step 4), so a dump written
+to another version of this spec never passes as identical.
 
 ## 2. Figure
 
@@ -225,9 +225,13 @@ Three reports, one dump:
 | `result_*` | result-level checks: findings cite real figures, evidence resolves, no non-accounting evidence leaks in | `REND-0`, `EVID-1`, `POP-4` |
 | `module_*` | the test module's own invariant check, if it defines one | `<test_id>.check_invariants`, or nothing at all if the module has none |
 
-The invariant **code** for a book-level or result-level function is read from its own docstring's
-leading `CODE-n:` token — not hardcoded a second time in the serialiser, so a new invariant that
-follows the convention is picked up automatically.
+In the reference, the invariant **code** for a book-level or result-level function is read from
+its own docstring's leading `CODE-n:` token — not hardcoded a second time in the serialiser, so a
+new invariant that follows the convention is picked up automatically. This crate has no docstring
+to read and writes each code by hand twice: where a violation is raised, and again in the list of
+codes evaluated (`src/invariants.rs:178` for the book, `:244` for the result). What keeps the crate
+in step is this section's comparison of the evaluated code sets: an invariant added to the
+reference fails parity until the crate lists it.
 
 **Known gap, inherited, not hidden:** as of this spec's writing, not every ported test has a
 module-level invariant check yet. Until one is added for a given test, `module_invariants_evaluated`
@@ -261,28 +265,41 @@ the content is complete and correct.
    stops the comparison outright — a badly-typed document cannot be meaningfully diffed further.
 2. **Refuse empty-vs-empty.** If both sides report zero figures, that is itself a failure
    regardless of anything else being equal. An empty result must never look like success.
-3. **`spec_version`, `test_id`, `test_version` and `rules_version` equality.** The reference
+3. **Structure of each side**, a check this crate's `compare` adds and the reference's own
+   `tae/parity/compare.py` does not make. Each side is checked for unknown keys (in the dump, a
+   figure, a finding or an evidence ref) and for a figure or finding id that appears more than
+   once (`src/compare.rs:165-197`, called at `:346-347`); the reference's tool ignores unknown keys
+   and keeps one of two entries that share an id. These findings are collected with the rest and
+   do not stop the comparison.
+4. **`spec_version`, `test_id`, `test_version` and `rules_version` equality.** The reference
    implementation's own `tae/parity/compare.py` checks `test_id` and `rules_version` only; this
    crate's `compare` also checks the two versions, so a port that bumps a test's version (or
    writes another spec version) without the reference doing the same is reported, not passed.
-4. **Minimum figure count**, per test id. Anchored to the committed synthetic fixture's own
-   current figure count, so the fixture and the reference engine cannot silently drift the count
-   without the anchor being updated together. A real client's count is far larger and is measured
-   separately (section 9 below); it is never committed as a CI gate value, consistent with the
-   rule that no client data enters this repository or its CI.
-5. **Figure key-set equality** (the full symmetric difference is reported, not just the
+5. **Minimum figure count**, per test id. In this crate's `compare` the floor is held per test in
+   the registry (`min_figures` in `src/registry.rs`, explained in `src/compare.rs:15-67`): the
+   fewest figures a run of that test that did its work publishes, set from the code, low enough
+   that a quiet real book passes and high enough that an empty dump does not. The crate does not
+   anchor it to the synthetic fixture's own figure count: of the 27 registered tests, 26 have a
+   synthetic golden, and 17 of those 26 floors are below the golden's figure count and 9 equal it.
+   The reference's own comparison tool anchors a floor to its fixture for two tests only
+   (`cash_44ab` 7, `cash_payments_40a3` 28) and holds a floor of 1 for every other test. A real
+   client's count is measured separately, in the local run of section 9 below that compares the two
+   engines; it is never committed as a CI gate value, consistent with the rule that no client data
+   enters this repository or its CI.
+6. **Figure key-set equality** (the full symmetric difference is reported, not just the
    intersection — comparing only the intersection would let a comparison pass on nothing shared).
-6. **Per common figure:** unit, value, `definition_sha256_16`, evidence (§2.2).
-7. **Finding key-set equality**, same symmetric-difference treatment.
-8. **Per common finding:** clauses (ordered), confidence, facts, evidence, and the three prose
+7. **Per common figure:** unit, value, `definition_sha256_16`, evidence (§2.2).
+8. **Finding key-set equality**, same symmetric-difference treatment.
+9. **Per common finding:** clauses (ordered), confidence, facts, evidence, and the three prose
    hashes (§4).
-9. **`population_note_sha256_16` equality.**
-10. **`*_invariants_evaluated` set equality and `*_invariant_violations` list equality** (§5), for
+10. **`population_note_sha256_16` equality.**
+11. **`*_invariants_evaluated` set equality and `*_invariant_violations` list equality** (§5), for
     all three reports.
 
-Any violation from steps 3–10 is collected and reported together (not fail-fast) so a single run
-shows every difference, not just the first one found; the process still exits non-zero if the list
-is non-empty. Steps 1–2 are the only ones that stop early, because a badly-typed or empty document
+On both sides, any violation from steps 3–11 (on the reference's side, from those of the steps
+its tool makes) is collected and reported together (not fail-fast) so a single run shows every
+difference, not just the first one found; the process still exits non-zero if the list is
+non-empty. Steps 1–2 are the only ones that stop early, because a badly-typed or empty document
 cannot be diffed meaningfully at all.
 
 ## 8. What is NOT part of the contract
@@ -310,16 +327,21 @@ figure or byte enters this repository or its CI.
    builder already calls that module's `run()`.
 2. Add a fixture-builder branch (or a new fixture module) covering that test's own interesting
    rows and boundaries, invented names only.
-3. Generate and commit a golden file for the new test; add its own minimum-figure-count entry
-   anchored to that golden's actual figure count.
+3. Generate and commit a golden file for the new test. In this crate, give the test's registry
+   entry its `min_figures` (§7 step 5): the fewest figures a run of the test that did its work
+   publishes, set from the code; the golden's own figure count is not the anchor.
 4. Add the new golden to the reference implementation's own parity-golden test.
 5. If the module has (or gains) a module-level invariant check, nothing else changes here — §5's
    generic handling already covers it; only its own code appearing on both sides is new
    information.
 6. Type a test's own configuration lazily. Loading a client config (`Engagement::from_toml`) and
    binding it (`Engagement::bind`) run for EVERY test, so a malformed value in one test's own
-   table must not refuse the others. That is also how the reference behaves: its loaders read a
-   test's table only when that test runs.
+   table must not refuse the others. That is also how the reference's parity harness behaves
+   (`parity/edge_golden.py` and `parity/python_golden.py`): it calls a test's table reader only
+   inside that test's own runner, so a malformed table fails that test alone. The reference's full
+   run is different: it always runs every test and calls the readers of several tables (the TDS,
+   depreciation, partner and 26AS tables among them) before the first test, so there a malformed
+   table stops the run.
    - Binding checks only the shape of the name locations the reference's binding reads (a list of
      names, a table keyed by names), refusing `BIND-ID-MALFORMED` there as the reference's
      `names_at` does.
@@ -330,9 +352,20 @@ figure or byte enters this repository or its CI.
    `CreditorAgeingConfig` and `StatutoryDuesConfig` in `src/lib.rs` are the pattern. A test in the
    crate's registry must have a unit test showing that a malformed value in its table fails that
    test and leaves the others running.
-   Known exception: `tds_payees` (batch C1) was written before this convention. It types `[tds]`
-   and `[tds_payees]` when the config loads, so a malformed value there refuses every test. It
-   stays that way until it is brought in line.
+
+   Known exceptions: this crate's `Engagement::from_toml` still refuses these when the config
+   loads, so a malformed value there refuses every test. They stay that way until they are brought
+   in line, which is a change inside the crate.
+   - `[tds]` and `[tds_payees]` (`src/lib.rs:821-889`): `tds_payees` (batch C1) was written before
+     this convention. With them go two values the same test reads elsewhere, `[client].state` and
+     `[deductor]` with its `activity` (`src/lib.rs:956-957`, `src/tds_payees.rs:380-414`).
+   - `[depreciation]`, when a required key is missing or an entry is wrongly typed
+     (`src/lib.rs:669-755`).
+   - `[tds_tcs_26as]`, when it is not a table or a key has the wrong type (`src/lib.rs:769-820`).
+   - `[partners]`, when it or a partner is not a table, or an `interest_ledger` is not text
+     (`src/lib.rs:890-914`).
+   - `[presumptive_history]`, when it is not a table (`src/lib.rs:966-973`), although the bullet
+     above says such a table is refused only when its test runs.
 
 ## 11. Ledger tags: figure/finding ids keyed by GUID, not by name
 
@@ -342,10 +375,13 @@ master (`ROUND OFF` -> `Round Off`) with no edit having happened, and a name-has
 for no reason connected to the books. Both engines derive this id from the ledger's Tally GUID
 instead (the reference engine's ledger-tag module; this crate's `src/ledger_ids.rs`):
 
-1. **Normalise.** Trim surrounding whitespace, then lowercase (ASCII only — a GUID is hex digits
-   and hyphens). Two engines, or two Tally exports of the same GUID in different casing, must
-   agree on the same tag; the binding logic elsewhere in this stack already treats GUIDs as
-   case-insensitive, so the tag has to match that, not hash the raw, differently-cased bytes.
+1. **Normalise.** Trim surrounding whitespace, then lowercase, the same way on both sides (§4.1):
+   the reference trims with Python's `str.strip()` and lower-cases with `str.lower()` (Python's
+   whitespace and full Unicode lower-casing, on its Unicode 15.1 tables), and this crate
+   reproduces both (`src/ledger_ids.rs:38-40`). Two engines, or two Tally exports of the same GUID
+   in different casing, must agree on the same tag; the binding logic elsewhere in this stack
+   already treats GUIDs as case-insensitive, so the tag has to match that, not hash the raw,
+   differently-cased bytes.
 2. **Hash.** `sha1(normalised_guid.encode("utf-8")).hexdigest()[:8]`.
 3. **Fallback to a name hash** — `sha1(name.encode("utf-8")).hexdigest()[:8]`, no GUID involved —
    in two cases:

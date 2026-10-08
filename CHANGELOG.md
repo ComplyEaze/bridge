@@ -12,6 +12,16 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+### In plain words: the next build, since 0.5.0
+
+These changes are in source and not yet in a published build.
+
+**Fixed**
+
+- The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
+  the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
+  text already said; the schema said 500 even when the row limit was lower or higher (#1148).
+
 ## [0.5.0] - 2026-10-08
 
 ### In plain words: ComplyEaze Bridge 0.5.0, since 0.4.2 (3 Oct 2026)

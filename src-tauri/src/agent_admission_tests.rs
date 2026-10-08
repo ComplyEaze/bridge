@@ -1300,3 +1300,28 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         );
     }
 }
+
+/// A paged tool's `limit` defaults to the configured row limit (`BRIDGE_AGENT_MAX_ROWS`), which an
+/// operator can change, so its schema names no default of its own: a fixed 500 there was false
+/// whenever the row limit was not 500 (#1148). The two evidence reads default to 20 and keep it.
+#[test]
+fn a_paged_tools_limit_names_no_default_its_handler_does_not_apply() {
+    for tool in registered_tool_definitions(true, true)
+        .as_array()
+        .expect("tools")
+    {
+        let name = tool["name"].as_str().expect("tool name");
+        let limit = &tool["inputSchema"]["properties"]["limit"];
+        if limit.is_null() {
+            continue;
+        }
+        if matches!(name, "egress_log" | "read_evidence") {
+            assert_eq!(limit["default"], json!(20), "{name}");
+        } else {
+            assert!(
+                limit.get("default").is_none(),
+                "{name}: its limit defaults to the configured row limit, so the schema names no default"
+            );
+        }
+    }
+}

@@ -202,6 +202,70 @@ fn a_declared_length_that_cannot_be_trusted_is_refused_by_its_own_fault() {
     }
 }
 
+/// A simulator whose worker has refused a request cut short, with that
+/// refusal. The worker has returned by the time the connection closes.
+fn failed_simulator() -> (Simulator, RefusedRequest) {
+    let head = "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\n";
+    let simulator =
+        Simulator::spawn(ScenarioPlan::new(Fixture::ExportStatusOne)).expect("spawn simulator");
+    let mut stream = TcpStream::connect(simulator.address()).expect("connect loopback simulator");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .expect("set read timeout");
+    stream
+        .write_all(format!("{head}abc").as_bytes())
+        .expect("write synthetic request");
+    stream
+        .shutdown(Shutdown::Write)
+        .expect("end the request stream");
+    let mut response = Vec::new();
+    stream
+        .read_to_end(&mut response)
+        .expect("the simulator closes the connection");
+    assert!(response.is_empty(), "a refused request is not answered");
+    let refused = RefusedRequest {
+        plan: 0,
+        plans: 1,
+        fault: RequestFault::EndedEarly {
+            received: head.len() + 3,
+            expected: Some(head.len() + 100),
+        },
+    };
+    (simulator, refused)
+}
+
+#[test]
+fn dropping_a_simulator_whose_worker_failed_fails_the_test() {
+    // Before #1148 `Drop` discarded the worker's result, so a test that never
+    // called `finish()` could not tell a failed double from a quiet one.
+    let (simulator, refused) = failed_simulator();
+
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(simulator)))
+        .expect_err("dropping a failed simulator fails the test");
+
+    assert_eq!(
+        panic.downcast_ref::<String>(),
+        Some(&format!("simulator worker failed: {refused}"))
+    );
+}
+
+#[test]
+fn a_failed_simulator_dropped_while_a_test_panics_leaves_that_panic_alone() {
+    // A second panic while unwinding would abort the whole test binary.
+    let (simulator, _) = failed_simulator();
+
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+        let _held = simulator;
+        panic!("the test's own failure");
+    }))
+    .expect_err("the test's own panic propagates");
+
+    assert_eq!(
+        panic.downcast_ref::<&str>(),
+        Some(&"the test's own failure")
+    );
+}
+
 fn element_values(xml: &str, element_name: &[u8]) -> Result<Vec<String>, String> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);

@@ -276,10 +276,7 @@ fn bind_loopback_listener() -> io::Result<TcpListener> {
 impl Drop for SequenceSimulator {
     fn drop(&mut self) {
         if let Some(worker) = self.worker.take() {
-            if !worker.is_finished() {
-                self.cancel();
-            }
-            let _ = worker.join();
+            join_unfinished(worker, || self.cancel());
         }
     }
 }
@@ -287,11 +284,27 @@ impl Drop for SequenceSimulator {
 impl Drop for Simulator {
     fn drop(&mut self) {
         if let Some(worker) = self.worker.take() {
-            if !worker.is_finished() {
-                self.cancel();
-            }
-            let _ = worker.join();
+            join_unfinished(worker, || self.cancel());
         }
+    }
+}
+
+/// Joins a worker the test dropped without `finish()`, cancelling it first if
+/// it still runs, so a cancelled wait is `Ok`. Its result is surfaced, not
+/// discarded (#1148): a worker that failed or panicked fails the test that
+/// dropped it, unless that thread is already panicking.
+fn join_unfinished<T>(worker: JoinHandle<io::Result<T>>, cancel: impl FnOnce()) {
+    if !worker.is_finished() {
+        cancel();
+    }
+    let outcome = worker.join();
+    if thread::panicking() {
+        return;
+    }
+    match outcome {
+        Ok(Ok(_)) => {}
+        Ok(Err(error)) => panic!("simulator worker failed: {error}"),
+        Err(_) => panic!("simulator worker panicked"),
     }
 }
 

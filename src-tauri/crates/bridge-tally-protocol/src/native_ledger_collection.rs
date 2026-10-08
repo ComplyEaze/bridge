@@ -334,7 +334,7 @@ fn parse_native_ledger_collection_with_evidence<T>(
             .map_err(|_| crate::NativeCollectionError::MalformedResponse)?
         {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if path.is_empty() && name != b"ENVELOPE" {
                     return Err(crate::NativeCollectionError::MalformedResponse.into());
                 }
@@ -427,7 +427,7 @@ fn parse_native_ledger_collection_with_evidence<T>(
                 path.push(name);
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 // A self-closing STATUS is no answer, and is still a STATUS.
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     if std::mem::replace(&mut status_seen, true) {
@@ -442,7 +442,7 @@ fn parse_native_ledger_collection_with_evidence<T>(
                     return Err(crate::NativeCollectionError::RowUnusable.into());
                 }
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())
+            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref().as_bytes())
                 .map_err(|_| crate::NativeCollectionError::MalformedResponse)?,
             Event::Eof => break,
             _ => {}
@@ -569,7 +569,7 @@ fn parse_native_ledger_collection_row_with_master_fields(
     openings: OpeningAdmission<'_>,
 ) -> anyhow::Result<ParsedNativeLedgerCollectionRow> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
-    let name = attr_value(reader, element, b"NAME")
+    let name = attr_value(element, b"NAME")
         .ok_or_else(|| anyhow::anyhow!("native ledger row omitted NAME"))?;
     let mut ledger = TallyLedger {
         name,
@@ -596,7 +596,13 @@ fn parse_native_ledger_collection_row_with_master_fields(
     let mut gst_registrations: Option<Vec<RawGstRegistrationEntry>> = None;
     loop {
         match reader.read_event()? {
-            Event::Start(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Start(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"GUID" => {
                     validate_only_attributes(&child, &[b"TYPE"])?;
                     if std::mem::replace(&mut guid_seen, true) {
@@ -799,11 +805,17 @@ fn parse_native_ledger_collection_row_with_master_fields(
                     gst_registrations.get_or_insert_with(Vec::new).push(entry);
                 }
                 _ => {
-                    let child_name = child.name().as_ref().to_vec();
+                    let child_name = child.name().as_ref().to_owned();
                     reader.read_to_end(QName(&child_name).to_owned())?;
                 }
             },
-            Event::Empty(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Empty(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"LEDGSTREGDETAILS.LIST" => {
                     if retain_master_fields {
                         gst_registrations
@@ -926,8 +938,8 @@ fn parse_native_ledger_collection_row_with_master_fields(
                 )?,
                 _ => {}
             },
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"LEDGER") => break,
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("LEDGER") => break,
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("native ledger row contained unexpected text");
             }
             Event::Eof => return Err(crate::RowCutOff.into()),
@@ -977,7 +989,7 @@ fn read_gst_registration_entry(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<RawGstRegistrationEntry> {
-    let list_name = element.name().as_ref().to_vec();
+    let list_name = element.name().as_ref().as_bytes().to_vec();
     let mut entry = RawGstRegistrationEntry::default();
     // Which fields were seen, empty or not: a second sighting is a repeat
     // even when the first carried no text.
@@ -990,7 +1002,7 @@ fn read_gst_registration_entry(
     };
     loop {
         match reader.read_event()? {
-            Event::Start(child) => match field_index(child.name().as_ref()) {
+            Event::Start(child) => match field_index(child.name().as_ref().as_bytes()) {
                 Some(index) => {
                     let value = read_optional_text(reader, child.name())?;
                     if std::mem::replace(&mut seen[index], true) {
@@ -1005,18 +1017,18 @@ fn read_gst_registration_entry(
                     }
                 }
                 None => {
-                    let child_name = child.name().as_ref().to_vec();
+                    let child_name = child.name().as_ref().to_owned();
                     reader.read_to_end(QName(&child_name).to_owned())?;
                 }
             },
             Event::Empty(child) => {
-                if let Some(index) = field_index(child.name().as_ref()) {
+                if let Some(index) = field_index(child.name().as_ref().as_bytes()) {
                     if std::mem::replace(&mut seen[index], true) {
                         entry.repeated_field = true;
                     }
                 }
             }
-            Event::End(end) if end.name().as_ref() == list_name.as_slice() => break,
+            Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
             Event::Eof => return Err(crate::RowCutOff.into()),
             _ => {}
         }
@@ -1048,28 +1060,27 @@ fn read_scalar_rejecting_nested_markup(
     reader: &mut Reader<&[u8]>,
     name: QName<'_>,
 ) -> anyhow::Result<Option<String>> {
-    let expected = name.as_ref().to_ascii_uppercase();
+    let expected = name.as_ref().as_bytes().to_ascii_uppercase();
     with_untrimmed_text(reader, |reader| {
         let mut current = String::new();
         loop {
             match reader.read_event()? {
                 Event::Start(child) | Event::Empty(child) => {
-                    let child = String::from_utf8_lossy(child.name().as_ref()).to_ascii_uppercase();
+                    let child = child.name().as_ref().to_ascii_uppercase();
                     anyhow::bail!("party/ledger master scalar contained nested markup <{child}>");
                 }
                 Event::Text(text) => {
-                    let decoded = text.decode()?;
-                    let value = quick_xml::escape::unescape(&decoded)?;
+                    let value = quick_xml::escape::unescape(&text)?;
                     current.push_str(&value);
                 }
                 Event::GeneralRef(reference) => {
                     current.push_str(&resolve_party_ledger_master_reference(reference)?);
                 }
                 Event::CData(text) => {
-                    current.push_str(&text.decode()?);
+                    current.push_str(&text);
                 }
                 Event::End(end) => {
-                    if end.name().as_ref().to_ascii_uppercase() != expected {
+                    if end.name().as_ref().as_bytes().to_ascii_uppercase() != expected {
                         anyhow::bail!("party/ledger master field closed unexpectedly");
                     }
                     break;
@@ -1094,7 +1105,7 @@ fn retain_party_ledger_master_scalar(
 ) -> anyhow::Result<()> {
     validate_only_attributes(element, &[b"TYPE"])?;
     let name = element.name();
-    let key = name.as_ref().to_ascii_uppercase();
+    let key = name.as_ref().as_bytes().to_ascii_uppercase();
     if !seen.insert(key) {
         anyhow::bail!("native ledger row repeated a party/ledger master field");
     }
@@ -1114,7 +1125,7 @@ fn retain_party_ledger_master_field(
 ) -> anyhow::Result<()> {
     validate_only_attributes(element, &[b"TYPE"])?;
     let name = element.name();
-    let key = name.as_ref().to_ascii_uppercase();
+    let key = name.as_ref().as_bytes().to_ascii_uppercase();
     if !seen.insert(key) {
         anyhow::bail!("native ledger row repeated a party/ledger master field");
     }
@@ -1132,7 +1143,7 @@ fn retain_empty_party_ledger_master_field(
     target: &mut PartyLedgerMasterFieldObservation,
 ) -> anyhow::Result<()> {
     validate_only_attributes(element, &[b"TYPE"])?;
-    let key = element.name().as_ref().to_ascii_uppercase();
+    let key = element.name().as_ref().as_bytes().to_ascii_uppercase();
     if !seen.insert(key) {
         anyhow::bail!("native ledger row repeated a party/ledger master field");
     }
@@ -1146,7 +1157,7 @@ fn read_flattened_optional_text(
     reader: &mut Reader<&[u8]>,
     name: QName<'_>,
 ) -> anyhow::Result<Option<String>> {
-    let expected = name.as_ref().to_ascii_uppercase();
+    let expected = name.as_ref().as_bytes().to_ascii_uppercase();
     with_untrimmed_text(reader, |reader| {
         let mut nested_depth = 0_usize;
         let mut parts = Vec::new();
@@ -1159,19 +1170,18 @@ fn read_flattened_optional_text(
                 }
                 Event::Empty(_) => flush_flattened_part(&mut current, &mut parts),
                 Event::Text(text) => {
-                    let decoded = text.decode()?;
-                    let value = quick_xml::escape::unescape(&decoded)?;
+                    let value = quick_xml::escape::unescape(&text)?;
                     current.push_str(&value);
                 }
                 Event::GeneralRef(reference) => {
                     current.push_str(&resolve_party_ledger_master_reference(reference)?);
                 }
                 Event::CData(text) => {
-                    current.push_str(&text.decode()?);
+                    current.push_str(&text);
                 }
                 Event::End(end) => {
                     if nested_depth == 0 {
-                        if end.name().as_ref().to_ascii_uppercase() != expected {
+                        if end.name().as_ref().as_bytes().to_ascii_uppercase() != expected {
                             anyhow::bail!("party/ledger master field closed unexpectedly");
                         }
                         flush_flattened_part(&mut current, &mut parts);
@@ -1232,7 +1242,7 @@ fn flush_flattened_part(current: &mut String, parts: &mut Vec<String>) {
 pub(crate) fn resolve_party_ledger_master_reference(
     reference: quick_xml::events::BytesRef<'_>,
 ) -> anyhow::Result<String> {
-    let decoded = reference.decode()?;
+    let decoded = &*reference;
     Ok(quick_xml::escape::unescape(&format!("&{decoded};"))?.into_owned())
 }
 

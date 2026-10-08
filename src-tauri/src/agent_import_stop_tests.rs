@@ -192,19 +192,92 @@ async fn a_release_needs_the_person_and_survives_a_restart() {
     );
 }
 
-/// Any voucher of the invoice present counts as found, however it reads; none
-/// present is not found.
+/// A release records the invoice as absent only when every row reads a state
+/// that means absent; every other state the verification can give (including
+/// the ones it rewrites `not_found` into after a native post) reads as found,
+/// as do no rows and duplicates.
 #[test]
-fn a_release_records_found_for_any_voucher_present() {
-    let counts = |verified, divergent, not_effective, not_found| {
-        json!({"counts":{"posted_verified":verified,"posted_divergent":divergent,
-            "posted_not_effective":not_effective,"not_found":not_found}})
+fn a_release_records_absent_only_for_states_that_mean_absent() {
+    use super::super::super::stop::Seen;
+    let result = |statuses: &[&str]| {
+        json!({"vouchers": statuses.iter().map(|status| json!({"status": status})).collect::<Vec<_>>(),
+            "duplicates": []})
     };
-    assert!(super::super::super::stop::Seen::of(&counts(1, 0, 0, 0)).found());
-    assert!(super::super::super::stop::Seen::of(&counts(0, 1, 0, 0)).found());
-    assert!(super::super::super::stop::Seen::of(&counts(0, 0, 1, 0)).found());
-    assert!(!super::super::super::stop::Seen::of(&counts(0, 0, 0, 1)).found());
-    assert!(!super::super::super::stop::Seen::of(&json!({})).found());
+    for absent in ["not_found", "tally_reported_not_created"] {
+        assert!(!Seen::of(&result(&[absent])).found(), "{absent}");
+    }
+    for present in [
+        "posted_verified",
+        "posted_divergent",
+        "posted_not_effective",
+        "matching_content_observed",
+        "not_attributable",
+        "duplicate_fingerprint",
+        "bound_not_in_window",
+        "cancelled_with_effective_copy",
+        "sent_not_attributed",
+        "book_rolled_back",
+        "a_state_not_yet_invented",
+    ] {
+        assert!(Seen::of(&result(&[present])).found(), "{present}");
+        // One present row among absent ones is still found.
+        assert!(
+            Seen::of(&result(&["not_found", present])).found(),
+            "{present}"
+        );
+    }
+    assert!(Seen::of(&json!({})).found(), "no rows");
+    assert!(Seen::of(&result(&[])).found(), "an empty row list");
+    let mut duplicated = result(&["not_found"]);
+    duplicated["duplicates"] = json!([["a", "b"]]);
+    assert!(Seen::of(&duplicated).found(), "duplicates");
+}
+
+/// Only the failures no wait cures let a release go ahead of its readback;
+/// every other, and any code not listed, refuses it.
+#[test]
+fn a_release_goes_ahead_of_a_failed_read_only_for_the_incurable_ones() {
+    use super::super::super::stop::failure_waiting_cannot_cure;
+    for code in [
+        "import_post_endpoint_mismatch",
+        "company_identity_mismatch",
+        "host_setting_invalid",
+        "verification_mode_unqualified",
+        "verification_too_large_to_report",
+    ] {
+        assert!(
+            failure_waiting_cannot_cure(&ToolFailure::from(code.to_string())),
+            "{code}"
+        );
+    }
+    for code in [
+        "import_mode_probe_failed",
+        "tally_endpoint_busy",
+        "company_identity_not_found",
+        "request_cancelled",
+        "import_batch_company_mismatch",
+        "a_code_not_yet_invented",
+    ] {
+        assert!(
+            !failure_waiting_cannot_cure(&ToolFailure::from(code.to_string())),
+            "{code}"
+        );
+    }
+}
+
+/// The dialog shows names from the journal and Tally with anything that could
+/// reorder or hide text, and any line break, as `?`, and still shows them.
+#[test]
+fn the_release_dialog_does_not_show_text_that_could_mislead() {
+    use super::super::super::stop::{release_preview, Seen};
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_without_tally(directory.path());
+    let line = saved(&server, "Sales");
+    let preview = release_preview(&line, "Acme\u{202e}Ltd\nPaid", &Seen::NotFound);
+    assert!(preview.contains("Acme?Ltd?Paid"), "{preview}");
+    assert!(!preview.contains('\u{202e}'));
+    assert!(preview.contains(&line.batch_id));
+    assert!(preview.contains("BP/26-27/0010"));
 }
 
 /// What is not a stop cannot be released: a batch never sent, one holding no
@@ -412,4 +485,59 @@ async fn a_release_naming_another_company_is_refused_before_any_read() {
     );
     assert!(approval.reviews().is_empty(), "no dialog: {response}");
     assert_eq!(stop(&server), Some(line.batch_id));
+}
+
+/// After a native post whose readback cannot attribute the voucher to its
+/// post, the verification reads the unmatched voucher as sent but not
+/// attributed, which says it may be in the book: the release records it as
+/// found, and the number control keeps it.
+#[tokio::test]
+async fn a_release_after_a_native_post_that_reads_not_attributed_records_found() {
+    let directory = tempfile::tempdir().unwrap();
+    let plans = posted_readback().into_iter().chain(probe()).collect();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let line = saved(&server, "Sales");
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
+                &line,
+                &native,
+                Some(8),
+            ))
+            .unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::response(
+                &line,
+                ledger::DispatchResponse {
+                    request_sha256: native.request_sha256.clone(),
+                    ..super::super::tests::dispatch_response("success", 1, 0)
+                },
+            ))
+            .unwrap();
+    }
+    let approval = ScriptedApproval::approving();
+    let response = release(&server, args(&line), approval.clone()).await;
+    assert_eq!(result(&response)["state"], "stop_released", "{response}");
+    assert_eq!(
+        result(&response)["invoice_found_at_release"],
+        true,
+        "{response}"
+    );
+    assert!(
+        approval.reviews()[0].contains("found in Tally"),
+        "{:?}",
+        approval.reviews()
+    );
+    assert_eq!(
+        server
+            .import_invoice_number_control(GUID, ("20260401", "20270331"))
+            .unwrap(),
+        ledger::NumberControl::Known {
+            number: "BP/26-27/0010".to_string(),
+            date: "20260907".to_string()
+        }
+    );
 }

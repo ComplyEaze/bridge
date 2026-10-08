@@ -34,16 +34,32 @@ pub(super) enum Seen {
 }
 
 impl Seen {
+    /// Absent only when every row of the batch reads one of the two states
+    /// that mean the voucher is not in the book: `not_found`, and
+    /// `tally_reported_not_created` (Tally's own answer said it created none).
+    /// Every other state, and a result with no rows or with duplicates, reads
+    /// as found: `sent_not_attributed`, `book_rolled_back`,
+    /// `bound_not_in_window`, `matching_content_observed`, `not_attributable`,
+    /// `duplicate_fingerprint` and `cancelled_with_effective_copy` all say a
+    /// voucher may be there, and a release that dropped it from the number
+    /// control would be wrong the cheap way.
     pub(super) fn of(result: &Value) -> Self {
-        let present = [
-            "posted_verified",
-            "posted_divergent",
-            "posted_not_effective",
-        ]
-        .iter()
-        .map(|state| counted(result, state))
-        .sum::<u64>();
-        if present > 0 {
+        let Some(rows) = result["vouchers"]
+            .as_array()
+            .filter(|rows| !rows.is_empty())
+        else {
+            return Self::Found;
+        };
+        let duplicates = result["duplicates"]
+            .as_array()
+            .is_some_and(|duplicates| !duplicates.is_empty());
+        let absent = |row: &Value| {
+            matches!(
+                row["status"].as_str(),
+                Some("not_found" | "tally_reported_not_created")
+            )
+        };
+        if duplicates || !rows.iter().all(absent) {
             Self::Found
         } else {
             Self::NotFound
@@ -68,26 +84,48 @@ impl Seen {
 /// Whether a failed read is one no wait cures, because it fails before any
 /// Tally read, or independently of what Tally holds: the batch was sent to
 /// another endpoint than the one now set, the company now open is not the one
-/// the batch recorded, or the host setting is unusable. Refusing the release for these would leave the company stopped for
+/// the batch recorded, the host setting is unusable, the product, release or
+/// licence is not one a vouchers-absent verdict is qualified for, or the
+/// window is too large to report. Refusing the release for these would leave the company stopped for
 /// good. Every other failure (Tally not answering, the company not open, a
 /// cancelled or cut-short read) is cured by waiting or by opening Tally, so the
 /// release is refused and made once the read runs; a code not listed here
 /// defaults to that refusal.
-fn failure_waiting_cannot_cure(failure: &ToolFailure) -> bool {
+pub(super) fn failure_waiting_cannot_cure(failure: &ToolFailure) -> bool {
     matches!(
         failure.code.as_str(),
-        "import_post_endpoint_mismatch" | "company_identity_mismatch" | "host_setting_invalid"
+        "import_post_endpoint_mismatch"
+            | "company_identity_mismatch"
+            | "host_setting_invalid"
+            | "verification_mode_unqualified"
+            | "verification_too_large_to_report"
     )
-}
-
-fn counted(result: &Value, state: &str) -> u64 {
-    result["counts"][state].as_u64().unwrap_or(0)
 }
 
 /// The words of the dialog. They say what is being released and what it
 /// allows, before anything about the batch, because the title of the shared
 /// review dialog names only a review.
-fn release_preview(line: &ImportLedgerLine, company_name: &str, seen: &Seen) -> String {
+/// `text` as the dialog shows it: a character that could reorder or hide what
+/// the person reads (the same ones the review dialog refuses) shows as `?`.
+/// The text comes from the journal and Tally, and a release must not become
+/// impossible for a name that carries one.
+fn shown(text: &str) -> String {
+    text.chars()
+        .map(|character| {
+            let one = character.to_string();
+            if post::has_unsafe_review_layout_character(&one)
+                || post::has_unreviewable_format_character(&one)
+            {
+                '?'
+            } else {
+                character
+            }
+        })
+        .collect()
+}
+
+pub(super) fn release_preview(line: &ImportLedgerLine, company_name: &str, seen: &Seen) -> String {
+    let (company_name, batch_id) = (shown(company_name), shown(&line.batch_id));
     let invoices = line
         .vouchers
         .iter()
@@ -95,8 +133,8 @@ fn release_preview(line: &ImportLedgerLine, company_name: &str, seen: &Seen) -> 
         .map(|voucher| {
             format!(
                 "  {} dated {}",
-                voucher.voucher_number.as_deref().unwrap_or("(no number)"),
-                voucher.date
+                shown(voucher.voucher_number.as_deref().unwrap_or("(no number)")),
+                shown(&voucher.date)
             )
         })
         .collect::<Vec<_>>()
@@ -110,7 +148,7 @@ fn release_preview(line: &ImportLedgerLine, company_name: &str, seen: &Seen) -> 
          Click the button only if you have checked this invoice in Tally yourself. \
          ComplyEaze Bridge will then build and post invoices for this company again. \
          This changes nothing in Tally.",
-        line.batch_id,
+        batch_id,
         seen.words()
     )
 }

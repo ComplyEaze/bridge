@@ -13,9 +13,9 @@
 //! and that is a release. It tries a fresh readback so the dialog can say what
 //! ComplyEaze Bridge sees, and what it saw is recorded: an invoice it found
 //! stays the control for the next invoice number read, and one it did not find
-//! no longer counts as sent. A Tally that is not answering is waited for; any
-//! other failed read is shown and recorded as the invoice possibly being there,
-//! so a stop is never unreleasable.
+//! no longer counts as sent. A read that fails for a cause waiting cures is waited
+//! for; a failure no wait cures is shown and recorded as the invoice possibly
+//! being there, so a stop is never unreleasable by such a failure.
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, VoucherCount};
 
@@ -65,16 +65,22 @@ impl Seen {
     }
 }
 
-/// Whether a failed read is one a person cures by waiting or by opening Tally:
-/// the release is then refused, and made once Tally answers. Any other failure
-/// is permanent for this batch, and refusing the release would leave the
-/// company stopped for good.
-fn tally_not_answering(failure: &ToolFailure) -> bool {
-    failure.unanswered.is_some()
-        || matches!(
-            failure.code.as_str(),
-            "tally_endpoint_busy" | "import_mode_probe_failed"
-        )
+/// Whether a failed read is one no wait cures, because it fails before any
+/// Tally read, or independently of what Tally holds: the batch was sent to
+/// another endpoint or company than the one now set, or the host setting is
+/// unusable. Refusing the release for these would leave the company stopped for
+/// good. Every other failure (Tally not answering, the company not open, a
+/// cancelled or cut-short read) is cured by waiting or by opening Tally, so the
+/// release is refused and made once the read runs; a code not listed here
+/// defaults to that refusal.
+fn failure_waiting_cannot_cure(failure: &ToolFailure) -> bool {
+    matches!(
+        failure.code.as_str(),
+        "import_post_endpoint_mismatch"
+            | "company_identity_mismatch"
+            | "import_batch_company_mismatch"
+            | "host_setting_invalid"
+    )
 }
 
 fn counted(result: &Value, state: &str) -> u64 {
@@ -133,16 +139,17 @@ impl Server {
         }
         self.require_stop(&line)?;
 
-        // What Tally holds now, to show and to record. A Tally that is not
-        // answering is waited for: a release made blind could drop a possibly
-        // posted invoice from the number control, and a Tally that is not
-        // answering posts nothing anyway. A failure that waiting cannot cure
-        // does not refuse the release (the stop would never lift); it is shown
-        // and recorded as the invoice possibly being in the book.
+        // What Tally holds now, to show and to record. A read that fails for a
+        // cause waiting cures (Tally not answering, the company not open) is
+        // waited for: a release made blind could drop a possibly posted invoice
+        // from the number control, and such a Tally posts nothing anyway. A
+        // failure waiting cannot cure does not refuse the release (the stop
+        // would never lift); it is shown and recorded as the invoice possibly
+        // being in the book.
         let mut rows = None;
         let (seen, evidence) = match self.verify_for_review(args, &mut rows).await {
             Ok(outcome) => (Seen::of(&outcome.payload["result"]), outcome.evidence),
-            Err(failure) if tally_not_answering(&failure) => {
+            Err(failure) if !failure_waiting_cannot_cure(&failure) => {
                 let mut refused = ToolFailure::from("ack_stop_tally_unreadable".to_string());
                 refused.evidence = failure.evidence;
                 return Err(refused);

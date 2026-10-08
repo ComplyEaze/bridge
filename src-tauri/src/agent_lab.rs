@@ -988,13 +988,19 @@ mod tests {
     #[test]
     fn env_lab_writes_enabled_requires_exact_truthy_value() {
         let _guard = lock_env();
+        // Put the variable back as it was: removing it decided another test's
+        // result whenever this one ran first (#1435).
+        let previous = std::env::var_os("BRIDGE_LAB_WRITES");
         std::env::remove_var("BRIDGE_LAB_WRITES");
         assert!(!env_lab_writes_enabled());
         std::env::set_var("BRIDGE_LAB_WRITES", "1");
         assert!(env_lab_writes_enabled());
         std::env::set_var("BRIDGE_LAB_WRITES", "yes");
         assert!(!env_lab_writes_enabled());
-        std::env::remove_var("BRIDGE_LAB_WRITES");
+        match previous {
+            Some(value) => std::env::set_var("BRIDGE_LAB_WRITES", value),
+            None => std::env::remove_var("BRIDGE_LAB_WRITES"),
+        }
     }
 
     #[test]

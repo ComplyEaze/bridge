@@ -3884,6 +3884,121 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
     }
 }
 
+/// #1241: the same cycle on a book large enough to be counted (a mark of 1,000):
+/// verify_import's window is counted by a census of its own, read whole, refused
+/// by Tally as too large, and read again as its two days, each admitted against
+/// that census; the marks read after the last day equal the ones it opened on.
+/// Such a read is not replayed: nothing follows the closing marks.
+fn verify_counted_split_plans() -> Vec<ScenarioPlan> {
+    let cycle = qualified_import_cycle_plans();
+    let (company, status) = (cycle[44].clone(), cycle[46].clone());
+    let counted = |plan: &ScenarioPlan| {
+        let mut plan = plan.clone();
+        let body = plan.fixture.body().into_owned();
+        assert!(body.contains("<ALTVCHID>10</ALTVCHID>"), "a marks answer");
+        plan.fixture = Fixture::SyntheticXml(
+            body.replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>1000</ALTVCHID>"),
+        );
+        plan
+    };
+    let premark = counted(&cycle[39]);
+    let readback = cycle[45].fixture.body().into_owned();
+    let first = readback.find("<VOUCHER ").unwrap();
+    let second = readback.rfind("<VOUCHER ").unwrap();
+    let end = readback.rfind("</COLLECTION>").unwrap();
+    let day = |voucher: &str| {
+        let mut plan = cycle[45].clone();
+        plan.fixture = Fixture::SyntheticXml(format!(
+            "{}{voucher}{}",
+            &readback[..first],
+            &readback[end..]
+        ));
+        plan
+    };
+    let (day_one, day_two) = (day(&readback[first..second]), day(&readback[second..end]));
+    let paired = |body: &ScenarioPlan| {
+        vec![
+            company.clone(),
+            body.clone(),
+            status.clone(),
+            body.clone(),
+            status.clone(),
+            company.clone(),
+        ]
+    };
+    let mut plans = cycle[..44].to_vec();
+    // verify_import's own marks read: the book is counted from here.
+    plans[39] = counted(&cycle[39]);
+    plans[41] = counted(&cycle[41]);
+    // The census of the window, then the whole window, refused as over the cap.
+    plans.extend(paired(&cycle[45]));
+    plans.push(company.clone());
+    plans.push(
+        cycle[45]
+            .clone()
+            .with_framing(ResponseFraming::DeclaredContentLength {
+                bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+            }),
+    );
+    for body in [&day_one, &day_two, &premark] {
+        plans.extend(paired(body));
+    }
+    plans
+}
+
+#[tokio::test]
+async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says_so() {
+    // 44 legs to open verify_import through its marks, the census (6), the
+    // whole window Tally refuses (2), the two days and the closing marks (18).
+    // A replay would add 18 more, which this plan does not script. (A read
+    // that had a part refused is never admitted for a post, as the test above
+    // pins, so this runs the verification alone.)
+    let simulator = SequenceSimulator::spawn(verify_counted_split_plans()).expect("simulator");
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let built = server
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
+        .await
+        .expect("build");
+    let batch_id = built.payload["result"]["batch_id"]
+        .as_str()
+        .expect("batch id")
+        .to_string();
+    let args = json!({"company_guid":CAPTURED_GUID, "batch_id": batch_id});
+    let proof = server.verify_import(&args).await.expect("verify");
+    assert_eq!(
+        proof.payload["result"]["counts"]["matching_content_observed"],
+        2
+    );
+    let persisted: Value = serde_json::from_slice(
+        &std::fs::read(
+            server
+                .imports_dir()
+                .expect("imports directory")
+                .join(format!("{batch_id}.proof.json")),
+        )
+        .expect("persisted proof"),
+    )
+    .expect("proof JSON");
+    assert_eq!(
+        persisted["evidence"]["voucher_read_corroboration"],
+        json!({"state": "not_sent", "reason": "counted_and_bracketed_read"})
+    );
+    assert_eq!(simulator.finish().expect("requests").len(), 44 + 6 + 2 + 18);
+}
+
 // bridge#626: a ledger whose stored name ends in CR LF. The catalogue carries
 // it verbatim; these pin that the build can now name it, by its exact bytes
 // only, and write it so an XML reader recovers those bytes.

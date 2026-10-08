@@ -279,7 +279,12 @@ request is predicted over a budget well below the cap.
    AlterID-limited parts reads only up to the first read's ceilings: a voucher posted in the window
    between the two reads takes an AlterID above them, both reads miss it, and their responses match
    byte for byte. A replay of a divided read without a witness is refused as
-   `voucher_window_replay_unwitnessed`.
+   `voucher_window_replay_unwitnessed`. The import-verification read is not replayed at all when it
+   was divided, every part was admitted against a census naming each voucher's GUID, and the marks
+   read after its last part equal the marks it opened on (#1241): each part is already a paired
+   read that matched the census voucher for voucher, and any create, alter, cancel, re-date or
+   delete between the opening and the closing marks moves a mark (§11c.5), so the replay could only
+   observe a later state. A window read whole, or divided with no census, is still replayed.
 9. **A caller that must send the undivided request itself decides on what was measured.** The
    pre-post check inside the import dispatch lease sends the whole verification window as one
    request. Before approval it is admitted on the `verify_import` read of the same window that runs
@@ -303,6 +308,19 @@ request is predicted over a budget well below the cap.
   inventory-heavy book with a mark of about 250,000 (31 census spans): a one-day `vouchers` call took
   34 s (7.5 s before the rectify) and a one-month `ledger_movement` 105 s (53 s before). The MCP
   host's own timeout is not measured.
+- **The import-verification read's second read is skipped for a divided, counted, bracketed read
+  (#1241).** That rests on the marks moving for every change that could alter what a window
+  returns, which §11c.5 measured for gateway writes and the screen actions listed there, once each;
+  changes made in the Edit Log SKU, in Education, by synchronisation, or by another connector on a
+  multi-user book were not tested. A change that altered a voucher's export without moving either
+  mark, made between two parts, would be caught by the census (a part holds the counted
+  AlterIDs and GUIDs) only if it also changed the voucher's AlterID or GUID. **Confidence: PARTIAL**:
+  the request counts are from scripted doubles through the tool call; no live Tally was read, and the
+  saving in seconds was not measured here (the issue (#1241) states 93.4 s to verify a 4,972-voucher
+  window against 48.8 s for its build read).
+  `ledger_movement` keeps its second read: it compares two ledger catalogues taken either side of
+  the voucher read, and skipping the replay would leave the second catalogue outside the marks
+  bracket.
 - **An abandoned call is not cancelled mid-read.** For every tool but `post_import`, the stdio server
   awaits a tool call to completion before reading its input again, so a host's cancellation or
   closed input is seen only afterwards, and the read dispatches its remaining (bounded) requests.

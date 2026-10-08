@@ -61,6 +61,13 @@ These changes are in source and not yet in a published build.
   desktop journal screen, stop until the record is put right, and the local data report shows the
   journal as not read. No release has written such a date, so only a record edited by hand can hold
   one, and the stored bytes do not change (#1307).
+- `verify_import` no longer reads its window a second time when the first read was divided, every part was
+  checked against a count of the window that names each voucher, and the company's marks were unchanged when
+  read again after the last part (#1241). That is a window of more than about 170 vouchers (or one Tally
+  would not serve whole), which holds every voucher of the book in those dates, not only the batch's. The proof's `voucher_read_corroboration` then
+  reads `{"state": "not_sent", "reason": "counted_and_bracketed_read"}` instead of a second read. A window read
+  in one request, or divided without a count, is read twice as before. `ledger_movement` still reads its
+  window twice. The request counts come from test doubles, not from a live Tally.
 
 ## [0.5.0] - 2026-10-08
 

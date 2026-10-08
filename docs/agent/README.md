@@ -2221,7 +2221,9 @@ Per tool:
   2. the company read;
   3. the window read's marks and census, data parts and closing marks;
   4. the corroborating window's data parts and closing marks (no marks read:
-     it replays the first window's);
+     it replays the first window's), unless the first window was divided, every
+     part was admitted against a census that names each voucher's GUID, and its
+     closing marks equal its opening marks: that read is not repeated (#1241);
   5. a scoped read of the company's marks (if the batch was posted natively
      and its voucher mark before the post was recorded, `current_voucher_mark`);
   6. the closing probe (if any voucher was not found);
@@ -2231,7 +2233,9 @@ Per tool:
 
   `evidence.mode_opening` is the opening probe and `mode_closing` the closing
   one (or null). `company` is the company read. `voucher_read` is the first
-  window's data parts only, and `voucher_read_corroboration` the second's.
+  window's data parts only, and `voucher_read_corroboration` the second's, or
+  `{"state": "not_sent", "reason": "counted_and_bracketed_read"}` when no second
+  read was made.
   No named key covers the marks or census requests, which is what the lab
   capture in #726 showed. A later page read with `proof_sha256` sends no
   request: its request digest hashes

@@ -21,6 +21,9 @@ These changes are in source and not yet in a published build.
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
   the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
   text already said; the schema said 500 even when the row limit was lower or higher (#1148).
+- A State Bank of India statement line whose UPI, NEFT, RTGS or transfer text prints an empty name
+  field now names its party as `UNNAMED`, as the IMPS reader already did. Before, the party was empty, no mapping
+  row could match it, and the suspense line's narration named no one (#1429).
 
 ## [0.5.0] - 2026-10-08
 

@@ -1571,8 +1571,9 @@ that turns that on.
    (`<batch>.proof.<time saved>.<SHA-256>.json` and `.md`) beside every earlier
    one, and appends the verification status, which names that pair current, to
    the local import ledger. No file is replaced: the journal decides which pair
-   is current. A batch last verified by an earlier build keeps its single
-   `<batch>.proof.json`, which no longer changes. It compares the
+   is current. Every pair is kept until you delete it; nothing in ComplyEaze
+   Bridge deletes one. A batch last verified by an earlier build keeps its
+   single `<batch>.proof.json`, which no longer changes. It compares the
    date, voucher type and entries; it does **not** compare `EFFECTIVEDATE` or
    `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see
    the limits noted in reference §9.13.
@@ -2535,7 +2536,21 @@ before the append leaves the earlier proof current. Builds create
 the journal first, write and sync staged XML, then expose the importable filename. An interrupted
 build, or a status append whose outcome is unknown because its rollback failed,
 leaves a recovery journal and blocks further import
-admission until the local files and ledger are reconciled. Preserve the journal
+admission until the local files and ledger are reconciled. A verification
+stopped around its journal append leaves `imports/.proof-publication`. Compare
+the status record in its `update.json` with the journal's last line, as JSON
+(the file is indented, the line is not):
+
+- the same record: the append finished, and its proof is current;
+- an earlier, whole record: the append never began, and the earlier proof is
+  current;
+- a torn last line: the append stopped part-way. Keep a copy of the journal,
+  then remove only that partial line;
+- no `update.json`: the stop came before the record was written, and the
+  journal is as it was.
+
+Then remove the folder. Proof files that no journal record names are left
+over from the stopped verification; nothing reads them. Preserve the journal
 and generated XML; do not delete it merely to retry. This is explicit
 recovery after a partial file transaction, not a power-loss atomicity guarantee.
 

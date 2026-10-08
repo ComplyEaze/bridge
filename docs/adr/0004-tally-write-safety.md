@@ -475,7 +475,7 @@ gate (owner, 21 September): what matters is a second writer, not the licence tie
    which every later `verify_import` or reconcile reads as a doubt. The first of those that finds
    the vouchers finishes the check, against the ledger identities recorded at build (#616), and
    records its verdict. An observed doubt is also written to a file of its own that nothing
-   removes and only another doubt replaces, and readers check it first, so no later verdict,
+   removes or replaces (since #911 it is written once, and a later doubt keeps the first), and readers check it first, so no later verdict,
    pending mark or race can clear it; the readback compares by name and cannot either. It stays even after a person
    corrects the voucher in Tally, and while a doubt or a pending check stands, the batch is no
    baseline for an amendment. Bridge has no way to clear it. Follow-up: an explicit operator
@@ -485,12 +485,16 @@ gate (owner, 21 September): what matters is a second writer, not the licence tie
    Residuals, stated rather than closed:
    - a pending check finished by a later readback, perhaps days later, lengthens the window in
      which a ledger swapped away and back goes unseen;
-   - the records are renamed into place but their directory is not synced, so a power loss can
-     lose a pending mark or a doubt file whose dispatch record survived, and the batch then reads
-     as its remaining record says, or as one dispatched before these records existed;
-   - an observed doubt whose own file cannot be written is kept only by the check record, where
-     a later verdict or a losing second post's pending mark can replace it; if neither can be
-     written, it is lost. Since #722 that verdict carries `doubt_record: unavailable`, and a
+   - the pending mark is renamed into place and its directory is not synced, so a power loss can
+     lose it, or a doubt file, whose dispatch record survived, and the batch then reads as its
+     remaining record says, or as one dispatched before these records existed. Since #911 a
+     finished verdict and a doubt are each written once to a file of their own
+     (`*.masters_verdict.json`, `*.masters_doubt.json`), never replaced, and their directory is
+     synced; one that exists but cannot be read reads as pending, which no later verdict can then
+     replace, so the batch stays in doubt;
+   - an observed doubt whose own file cannot be written is kept only by its verdict record (the
+     verdict file, or for a batch step the check record, which a losing second post's pending
+     mark can replace); if neither can be written, it is lost. Since #722 that verdict carries `doubt_record: unavailable`, and a
      doubt the check record holds without its own file, whether its write failed or the file
      was lost later, is refused for review (`ack_doubt_record_unavailable`) and reported as
      `operator_review` `doubt_record_unavailable`, rather than read as no doubt. A review
@@ -562,9 +566,9 @@ dialog has not yet been shown on Windows or macOS (UNVERIFIED).
 - the masters check finds no doubt;
 - the target's voucher mark moved by exactly CREATED (`post_location.target_voucher_step`).
 
-The step verdict is durable. It is recorded beside the masters verdict in the masters-check
-records, pending before the POST, and an observed mismatch is kept in its own file that nothing
-removes. So no later readback can lose it, and neither verdict masks the other. If that file
+The step verdict is durable. It is recorded in the check record beside the masters verdict,
+pending before the POST (the finished masters verdict has its own file since #911), and an
+observed mismatch is kept in its own file that nothing removes. So no later readback can lose it, and neither verdict masks the other. If that file
 cannot be written, the check record keeps the mismatch, marked `doubt_record: unavailable`
 (#722), as it keeps a masters doubt (the residuals of #239's window 3, "After the POST").
 A mismatch, or a verdict never recorded, reads `reconciliation_required` with

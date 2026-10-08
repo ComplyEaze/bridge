@@ -334,8 +334,8 @@ fn interruption_after_xml_publication_keeps_admission_blocked() {
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
 }
 
-/// Every file under `directory`, by name: its bytes and, on Unix, its inode,
-/// so a file replaced by one with the same bytes still reads as changed.
+/// Every file under `directory`, by name: its bytes and its identity on the
+/// volume, so a file replaced by one with the same bytes still reads as changed.
 fn files(directory: &Path) -> BTreeMap<String, (Vec<u8>, u64)> {
     let mut found = BTreeMap::new();
     for entry in fs::read_dir(directory).unwrap() {
@@ -343,10 +343,7 @@ fn files(directory: &Path) -> BTreeMap<String, (Vec<u8>, u64)> {
         if !entry.file_type().unwrap().is_file() {
             continue;
         }
-        #[cfg(unix)]
-        let identity = std::os::unix::fs::MetadataExt::ino(&entry.metadata().unwrap());
-        #[cfg(not(unix))]
-        let identity = 0;
+        let identity = crate::local_files::file::file_identity(&entry.path());
         found.insert(
             entry.file_name().into_string().unwrap(),
             (fs::read(entry.path()).unwrap(), identity),
@@ -469,6 +466,65 @@ fn a_failure_at_any_step_keeps_every_earlier_file_and_blocks_nothing() {
         assert_eq!(require_settled(imports), Ok(()), "{fail_at:?}");
         // The next publication is admitted and becomes current.
         publish(imports, &ledger, b"later JSON").unwrap();
+    }
+}
+
+/// A stop of the process at any step, as against a failure the call
+/// handles: nothing it found is changed, the earlier proof stays current, and
+/// only a stop inside the marked append blocks admission, as a stop there did
+/// before (#911). A stop after the record is whole but before the marker is
+/// removed blocks too, with the new proof already current: a person removes
+/// the marker after checking the journal.
+#[test]
+fn a_stop_at_any_step_keeps_every_earlier_file_and_blocks_only_inside_the_append() {
+    for (stop_at, blocks) in [
+        (Some(PublicationStep::WriteJson), false),
+        (Some(PublicationStep::WriteMarkdown), false),
+        (Some(PublicationStep::MarkAppend), false),
+        (Some(PublicationStep::AppendStatus), true),
+        (None, true),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let imports = directory.path();
+        let ledger = imports.join("ledger.jsonl");
+        let earlier = publish(imports, &ledger, b"earlier JSON").unwrap();
+        let kept = files(imports);
+        let stopped = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            publish_proofs(
+                imports,
+                &line(),
+                b"next JSON",
+                b"next Markdown",
+                |record| {
+                    append_private_import_ledger(
+                        &ledger,
+                        format!("{}\n", serde_json::to_string(record).unwrap()).as_bytes(),
+                        set_private_file,
+                    )?;
+                    panic!("stopped after the append")
+                },
+                |step| {
+                    if Some(step) == stop_at {
+                        panic!("stopped at {step:?}")
+                    }
+                    Ok(())
+                },
+            )
+        }));
+        assert!(stopped.is_err(), "{stop_at:?}");
+        assert_kept(&kept, imports);
+        let records = fs::read_to_string(&ledger).unwrap();
+        let last: Value = serde_json::from_str(records.lines().last().unwrap()).unwrap();
+        if stop_at.is_some() {
+            assert_eq!(
+                last["proof"],
+                json!(String::from(earlier.clone())),
+                "{stop_at:?}"
+            );
+        } else {
+            assert_ne!(last["proof"], json!(String::from(earlier.clone())));
+        }
+        assert_eq!(require_settled(imports).is_err(), blocks, "{stop_at:?}");
     }
 }
 

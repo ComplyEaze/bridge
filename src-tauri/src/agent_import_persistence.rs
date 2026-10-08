@@ -178,28 +178,33 @@ pub(super) enum RecordOnce {
 }
 
 /// Place `bytes` at `path` whole, only if nothing is there: staged under a
-/// name of its own, synced, then hard-linked, which fails when the name
-/// exists. The stage is then unlinked; if that fails, the new name is
-/// unlinked too (this call made it), because a record with a second link is
-/// refused by every reader (`open_local_file`) and would stick.
+/// name of its own, synced, then renamed into place by a rename that fails
+/// when the name exists ([`rename_new`]), so a stop at any point leaves the
+/// record whole and alone or absent, never with a second link, which every
+/// reader refuses (`open_local_file`). A stage that is not placed is removed.
+///
+/// [`rename_new`]: crate::local_files::file::rename_new
 pub(super) fn write_record_once(path: &Path, bytes: &[u8]) -> Result<(), RecordOnce> {
     let staged = path.with_extension(format!("{}.next", Uuid::new_v4()));
-    write_private(&staged, bytes).map_err(|_| RecordOnce::Failed)?;
-    let linked = fs::hard_link(&staged, path);
-    let unstaged = fs::remove_file(&staged);
-    match linked {
-        Ok(()) if unstaged.is_ok() => {
+    if write_private(&staged, bytes).is_err() {
+        let _ = fs::remove_file(&staged);
+        return Err(RecordOnce::Failed);
+    }
+    match crate::local_files::file::rename_new(&staged, path) {
+        Ok(()) => {
             // Make the new name durable; a record lost to a power failure
             // reads as absent, never as someone else's.
             sync_directory(path.parent().unwrap_or(path));
             Ok(())
         }
-        Ok(()) => {
-            let _ = fs::remove_file(path);
-            Err(RecordOnce::Failed)
+        Err(error) => {
+            let _ = fs::remove_file(&staged);
+            Err(if error.kind() == std::io::ErrorKind::AlreadyExists {
+                RecordOnce::Exists
+            } else {
+                RecordOnce::Failed
+            })
         }
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Err(RecordOnce::Exists),
-        Err(_) => Err(RecordOnce::Failed),
     }
 }
 

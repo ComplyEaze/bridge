@@ -293,17 +293,16 @@ impl StatusRecord {
 }
 
 impl StatusRecord {
-    /// A verification's status record, naming the proof pair it saved.
+    /// A verification's status record, naming the proof pair it saved: the
+    /// only verification record this build writes (#911).
     pub(super) fn verified(batch: &ImportLedgerLine, proof: ProofName) -> Self {
         Self {
             proof: Some(proof),
-            ..Self::from(batch)
+            ..Self::verification(batch)
         }
     }
-}
 
-impl From<&ImportLedgerLine> for StatusRecord {
-    fn from(batch: &ImportLedgerLine) -> Self {
+    fn verification(batch: &ImportLedgerLine) -> Self {
         Self {
             record_type: StatusKind::VerificationStatus,
             batch_id: batch.batch_id.clone(),
@@ -318,6 +317,14 @@ impl From<&ImportLedgerLine> for StatusRecord {
             binding_refusal: None,
             proof: None,
         }
+    }
+}
+
+/// A verification record that names no proof, as an older build wrote one.
+#[cfg(test)]
+impl From<&ImportLedgerLine> for StatusRecord {
+    fn from(batch: &ImportLedgerLine) -> Self {
+        Self::verification(batch)
     }
 }
 

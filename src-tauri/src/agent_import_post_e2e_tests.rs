@@ -4531,8 +4531,8 @@ async fn post_and_verify(
     (posted, verified, verdicts)
 }
 
-/// Every file under `root`, by path: its bytes and, on Unix, its inode, so a
-/// file replaced by one with the same bytes still reads as changed.
+/// Every file under `root`, by path: its bytes and its identity on the volume,
+/// so a file replaced by one with the same bytes still reads as changed.
 fn every_file(root: &Path) -> std::collections::BTreeMap<PathBuf, (Vec<u8>, u64)> {
     let mut found = std::collections::BTreeMap::new();
     let mut folders = vec![root.to_path_buf()];
@@ -4543,10 +4543,7 @@ fn every_file(root: &Path) -> std::collections::BTreeMap<PathBuf, (Vec<u8>, u64)
             if kind.is_dir() {
                 folders.push(entry.path());
             } else if kind.is_file() {
-                #[cfg(unix)]
-                let identity = std::os::unix::fs::MetadataExt::ino(&entry.metadata().unwrap());
-                #[cfg(not(unix))]
-                let identity = 0;
+                let identity = crate::local_files::file::file_identity(&entry.path());
                 found.insert(entry.path(), (fs::read(entry.path()).unwrap(), identity));
             }
         }

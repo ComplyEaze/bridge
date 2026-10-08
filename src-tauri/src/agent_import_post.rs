@@ -1368,8 +1368,9 @@ impl Server {
                     &mut accumulated,
                 )
                 .await;
-            // The verdict replaces the pending record before the readback, so no
-            // later reconcile, which compares by name, can clear a doubt (#239).
+            // The verdict is recorded, beside the pending mark, before the readback,
+            // so no later reconcile, which compares by name, can clear a doubt
+            // (#239, #911).
             let masters_after_post = self.record_masters_verdict_for(
                 batch_id,
                 masters_after_post,

@@ -85,7 +85,7 @@ capability from assumption, and a completed request from a verified snapshot.
 
   Full proposals stay in a private file under the agent data directory; the tool result is a
   counterparty summary (names marked for `mask_parties`), and the PDF password is read from a
-  local file named by `password_file` (on a Mac it must be owned by the user with no group or other permission bits; on Windows no owner or access check is made), never from an argument. `build_import_xml`
+  local file named by `password_file` (on a Mac it must be owned by the user with no group or other permission bits; on Windows it must be owned by the user or Administrators, with an access list that lets no one but the user, SYSTEM and Administrators read or change it), never from an argument. `build_import_xml`
   builds from that file when given `proposals_id` and the `proposals_sha256` the parse returned,
   refusing a file changed since; its vouchers pass the same admission as inline ones. Correct an
   imported batch by re-parsing with the fixed mapping and building with `amends_batch_id`. The MCPB carries the pinned PDFium beside

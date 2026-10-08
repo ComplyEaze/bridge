@@ -8820,8 +8820,8 @@
   "by": "author",
   "what": "bind drops the bound party identity table",
   "file": "src/binding.rs",
-  "from": "        party_identity,\n        ..engagement.clone()",
-  "to": "        ..engagement.clone()"
+  "from": "        party_identity,\n        party_groups,\n        party_identity_not_a_table,\n        ..engagement.clone()",
+  "to": "        party_groups,\n        party_identity_not_a_table,\n        ..engagement.clone()"
  },
  {
   "id": "EG-52",

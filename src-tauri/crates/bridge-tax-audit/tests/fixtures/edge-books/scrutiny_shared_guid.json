@@ -1,0 +1,159 @@
+{
+ "comment": "ledger_scrutiny, two vouchers that share a GUID (#1243): on Repairs, one GUID on two bank payments of Rs 60,000 in the last days of the year, each large and a round sum, beside a unique small one (each sharer is its own entry in the entries, large, round-sum and last-days subsets; the finding cites both under the one GUID, by label, Payment 10 before Payment 9 although 9 comes first in the books); on Office Rent, one GUID on two payments with the same number, type and day (two entries, one cited ref).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "lsg-cash"
+  },
+  {
+   "name": "Bank One",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "lsg-bank-one"
+  },
+  {
+   "name": "Repairs",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "lsg-repairs"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "lsg-office-rent"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank One",
+   "opening": 0,
+   "debit": 0,
+   "credit": 18250000,
+   "closing": -18250000
+  },
+  {
+   "ledger": "Repairs",
+   "opening": 0,
+   "debit": 12250000,
+   "credit": 0,
+   "closing": 12250000
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 6000000,
+   "credit": 0,
+   "closing": 6000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "rep-a",
+   "date": "2025-07-10",
+   "base_type": "Payment",
+   "number": "R-1",
+   "lines": [
+    [
+     "Repairs",
+     250000
+    ],
+    [
+     "Bank One",
+     -250000
+    ]
+   ]
+  },
+  {
+   "guid": "rep-dup",
+   "date": "2026-03-26",
+   "base_type": "Payment",
+   "number": "9",
+   "lines": [
+    [
+     "Repairs",
+     6000000
+    ],
+    [
+     "Bank One",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "rep-dup",
+   "date": "2026-03-28",
+   "base_type": "Payment",
+   "number": "10",
+   "lines": [
+    [
+     "Repairs",
+     6000000
+    ],
+    [
+     "Bank One",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "rent-dup",
+   "date": "2025-09-15",
+   "base_type": "Payment",
+   "number": "R1",
+   "lines": [
+    [
+     "Office Rent",
+     3000000
+    ],
+    [
+     "Bank One",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "rent-dup",
+   "date": "2025-09-15",
+   "base_type": "Payment",
+   "number": "R1",
+   "lines": [
+    [
+     "Office Rent",
+     3000000
+    ],
+    [
+     "Bank One",
+     -3000000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "tests": [
+  "ledger_scrutiny"
+ ]
+}

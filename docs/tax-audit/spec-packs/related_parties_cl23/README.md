@@ -1,7 +1,7 @@
 # Spec pack: `related_parties_cl23` (Form 3CD clause 23, s.40A(2)(b))
 
-The goldens in this pack were produced by the reference engine at commit `4df1cc43` and are the
-contract; this note explains them and cites [`docs/tax-audit/parity-spec-v1.md`](../../parity-spec-v1.md)
+The goldens in this pack are the reference engine's, regenerated at its commit `ee17d80f` (see
+`HASHES.md`), and are the contract; this note explains them and cites [`docs/tax-audit/parity-spec-v1.md`](../../parity-spec-v1.md)
 (sections 1, 2, 2.1, 2.2, 3, 3.1, 4, 5, 6 and 11, as relevant); where the note and a golden differ,
 the golden wins and the reference's maintainers should be told on the pull request or issue.
 
@@ -145,11 +145,15 @@ one ledger twice). A ledger named under two natures counts in both, and twice in
 Amounts are integers in paise and can pass 32 bits (`rp_walk`); use `i64`.
 
 **Evidence** (parity spec section 2.2): a `ledger` ref per name in the set, id the name, label
-`""`; and for `amount_<nature>` a `voucher` ref per entry, id the voucher GUID, label
+`""`; and for `amount_<nature>` a `voucher` ref per distinct (GUID, label) pair among its entries, id the voucher GUID, label
 `"<voucher type> <number> on <ISO date>"`, where an empty number is replaced by the GUID's last 12
 characters (`rp_walk`). The voucher type is the voucher's own type, not its base type (`rp_walk`:
-`Rent Payment`). The crate's `support::voucher_label` builds this label. A name in the set with no
-ledger master is still cited (section 7). Sorting is by `"<kind>:<id>"`, then label, so ledger refs
+`Rent Payment`). The crate's `support::voucher_label` builds this label. Two vouchers with one GUID,
+number, type and day are two entries, counted twice in the amount, and cited once
+(`rp_shared_guid_places`: the blank-GUID pair); two with one GUID and different labels are cited
+twice. The reference's own readers refuse a read in which a voucher has no GUID or two vouchers
+share one, so only a book built directly, as these edge books are, reaches these rows. A name in
+the set with no ledger master is still cited (section 7). Sorting is by `"<kind>:<id>"`, then label, so ledger refs
 come before voucher refs.
 
 **Definitions** are fixed sentences with the tag and the nature substituted. Their exact text is in
@@ -198,10 +202,14 @@ For a person and a nature with a ledger set:
    on two ledgers of the set, are all summed: `rp_walk`). That is the voucher's net on the set.
 3. A voucher whose net is zero is dropped: it is no entry and is not cited (`rp_walk`'s
    reclassification between two ledgers of one set; `rp_quiet`).
-4. Every other voucher is one entry, keyed by its GUID. When two population vouchers share a GUID,
-   the later one's entry replaces the earlier one's; a later one that nets to zero replaces
-   nothing (`rp_shared_guid`, where the book's own GUID check, POP-5, also fires). The replaced
-   amount is not counted.
+4. Every other voucher is its own entry. Its key is its GUID when no other population voucher has
+   that GUID; otherwise the GUID together with the voucher's place among the population vouchers
+   that share it, in book order. Two vouchers that share a GUID are therefore both counted, and
+   one that nets to zero is still no entry (`rp_shared_guid`, where the book's own GUID check,
+   POP-5, also fires). The evidence does not follow the entries one for one: it is the distinct
+   (GUID, label) pairs of the entries. Two entries with the same GUID and different labels are both
+   cited; two with the same GUID, number, type and day are two entries (both in the amount) and one
+   citation (`rp_shared_guid_places`).
 5. `amount_<nature>_<tag>` is the sum of the entries' nets, and may be negative (`rp_core` salary,
    `rp_walk` minus 37 paise in one entry).
 
@@ -229,7 +237,9 @@ accrued - closing payable (`rp_core`, both payable natures).
 including `rp_none`. Each violation is `{"invariant": "related_parties_cl23.check_invariants",
 "subject": "related_parties_cl23", "detail": <text>}`; with invariant and subject fixed, the dump's
 order is by detail text (parity spec section 5). The detail texts are in the goldens that fire.
-Both checks use a tolerance of 100 paise and fire only when it is exceeded.
+Both checks use a tolerance of 100 paise and fire only when it is exceeded: every comparison in them,
+including the two that compare a published opening or closing payable with the recomputed one
+(under XCL-1 below), is `more than 100`, never an exact match.
 
 **SUM-1** (fires in `rp_sum_check`). For each `amount_<nature>` figure: the Trial Balance movement
 of its set is the sum, over the ledgers that figure cites, of `closing - opening` (0 for a
@@ -248,7 +258,7 @@ paid differs from opening payable + accrued - closing payable by more than 100. 
 row's debit is 100 over (silent); the interest row's is 101 over (fires). The check has three more
 messages: a paid figure with no matching accrued figure (`XCL-1: <paid id> has no matching <accrued id>`), a paid figure
 with no ledger evidence (`XCL-1: <paid id> carries no ledger evidence to verify against the Trial Balance`),
-and published opening or closing payable that disagrees with the recomputed value (`XCL-1: <id> = <value>p but the TB
+and published opening or closing payable that differs from the recomputed value by more than 100 paise (`XCL-1: <id> = <value>p but the TB
 itself gives opening payable <value>p for the same ledger set`, and the same with `closing`). The test's own
 output cannot reach them (it always emits the four figures together, with the same ledger
 evidence, from the same rows), so no golden shows them.
@@ -314,15 +324,18 @@ what it reaches.
 | `rp_payable_break` | XCL-1: transposed debit and credit (fires); 100 over (silent); 101 over (fires). |
 | `rp_sum_check` | SUM-1: two ledgers each at the tolerance, the set over it (fires, POP-1 silent); one ledger exactly at it (silent); opposite signs (silent; POP-1 fires). |
 | `rp_unknown_ledger` | A set naming a ledger the book has no master or TB row for; EVID-1 per citation. |
-| `rp_shared_guid` | Population vouchers sharing a GUID: the later entry replaces the earlier; a zero-net later one does not. |
+| `rp_shared_guid` | Population vouchers sharing a GUID: each is its own entry, so both count; a zero-net one is still no entry. |
+| `rp_shared_guid_places` | Four population vouchers on one GUID and a blank-GUID pair: each is its own entry (the fourth, netting to zero on the rent set, is none); the rent figure cites the distinct (GUID, label) pairs sorted by GUID then label, so the blank-GUID pair is cited once and the shared GUID's labels sort `Payment 10`, `2`, `3`. |
 
 ## 12. Running the books
 
-The crate's `tests/edge_books.rs` reads `related_parties` (absent meaning `{}`, `tests/edge_books.rs:419-428`),
-runs the test on the book with it (`:646-650`), and compares the whole dump with the golden as the other edge
-books do (parity spec section 7). The side of the harness that runs the reference, `parity/edge_golden.py`, is
-kept by the reference's maintainers, together with its runner for this test in its `runners` table. The goldens
-are regenerated only by the reference's maintainers.
+The crate's `tests/edge_books.rs` reads `related_parties` (absent meaning `{}`), runs the test on the
+book with it and compares the whole dump with the golden, as it does for the other edge books (parity
+spec section 7); a port written from this pack does the same. The side of the harness that runs the
+reference is the crate's own `parity/edge_golden.py`, which already runs this test (`HASHES.md` gives
+the command), so a porter does not write one. Running it needs the reference, which is private: a porter
+compares with the goldens in this pack and cannot regenerate them. When the reference's behaviour
+changes, its maintainers regenerate them and say so in `HASHES.md`.
 
 ## 13. Registering the test in the crate
 

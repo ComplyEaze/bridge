@@ -36,6 +36,12 @@ pub enum AuditError {
     /// it, with [`crate::documents::StatementRefusal::reason`].
     #[error("{0}")]
     StatementRefused(crate::documents::StatementRefusal),
+    /// Two vouchers of one population would take one key (`book::voucher_keys`), which only a
+    /// voucher GUID holding a NUL can make; no read produces one. The reference raises the same
+    /// wherever it forms the keys; `partners_40b_194t` forms them only for a configured partner (as
+    /// the reference does), so a firm with none is not refused there.
+    #[error("a voucher GUID holds a NUL character, so two vouchers would take one key")]
+    VoucherKeysNotUnique,
     #[error("{path}: {source}")]
     Io {
         path: String,

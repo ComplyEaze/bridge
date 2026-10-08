@@ -573,9 +573,12 @@ async fn a_window_that_is_not_whole_months_is_refused_before_any_cash_flow_reque
 
 // ---- the refusals the Cash Flow shares with the statements (#1347) ----
 
-/// A `cash_flow` call that must be refused with `code` once `plans` have been answered: the
-/// whole refusal, and every planned request sent and no other. Each set of plans ends before the
-/// Trial Balance report, so the Cash Flow request (later in the bracket) was never sent.
+/// A `cash_flow` call that must be refused with `code` once `plans` have been answered, with the
+/// whole refusal checked. Each set of plans ends before the Trial Balance report, and the Cash
+/// Flow request comes later in the bracket. The simulator serves only the planned requests, so a
+/// request past them has nothing to answer it. That the tool still returns the refusal's own code
+/// is what shows no Cash Flow request was sent. The count only confirms that every planned request
+/// was served: it is never above the plan, and a count below it ends in the error from `finish()`.
 async fn assert_refused_before_the_cash_flow(
     plans: Vec<ScenarioPlan>,
     from: &str,
@@ -590,7 +593,7 @@ async fn assert_refused_before_the_cash_flow(
         json!({"code": code, "message": "ComplyEaze Bridge refused this operation."}),
         "{response}"
     );
-    assert_eq!(sent, total, "{code}: no request past the refusal");
+    assert_eq!(sent, total, "{code}: every planned request served");
 }
 
 #[tokio::test]

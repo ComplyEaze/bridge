@@ -347,6 +347,11 @@ def main() -> int:
             frozenset(led for q in partners.values() for led in (q.get("interest_ledger"), q.get("remuneration_ledger"))
                       if led))
 
+    def knock_off_candidates_run():
+        from tae.audit_tests import knock_off_candidates
+        return knock_off_candidates, knock_off_candidates.run(
+            eng, rules, tuple(spec.get("party_identity", {}).get("party_groups", ())))
+
     def tds_payees_run():
         # As tae/pack.py's _tds_payees: every client-config input through the reference's own reader, from a
         # config built out of the spec's keys.
@@ -421,6 +426,7 @@ def main() -> int:
             eng, rules, cash, bank, build_party_index(book, {"party_identity": spec.get("party_identity", {})}),
             round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])))),
         "high_value_register": high_value_register_run,
+        "knock_off_candidates": knock_off_candidates_run,
         "ledger_scrutiny": lambda: (ledger_scrutiny, ledger_scrutiny.run(eng, rules, cash)),
         "loans_interest": loans_interest_run,
         "partners_40b_194t": lambda: (partners_40b_194t, partners_40b_194t.run(

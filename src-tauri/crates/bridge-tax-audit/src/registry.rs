@@ -140,6 +140,12 @@ pub const PORTED: &[PortedTest] = &[
         },
     },
     PortedTest {
+        id: "knock_off_candidates",
+        // The seven fixed figures, on every book.
+        min_figures: 7,
+        run_on: |e, b, r, _| crate::knock_off_candidates_on(e, b, r),
+    },
+    PortedTest {
         id: "ledger_scrutiny",
         min_figures: 1,
         run_on: |e, b, r, _| crate::ledger_scrutiny_on(e, b, r),

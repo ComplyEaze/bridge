@@ -30,17 +30,49 @@ use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
     cash_book_integrity, cash_payments_40a3, clause21a_candidates, counter_cheques_40a3,
-    creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register, ledger_scrutiny,
-    loans_interest, partners_40b_194t, party_identity, party_monthly, questionnaire_cl13,
-    read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
-    statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as, trial_balance,
-    twentysixas_receipts, PartnersConfig, RelatedPartiesConfig, Tds26asConfig, TdsConfig,
+    creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register,
+    knock_off_candidates, ledger_scrutiny, loans_interest, partners_40b_194t, party_identity,
+    party_monthly, questionnaire_cl13, read_scope, related_parties_cl23, specified_persons_40a2b,
+    stale_balances_41_1, statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as,
+    trial_balance, twentysixas_receipts, PartnersConfig, RelatedPartiesConfig, Tds26asConfig,
+    TdsConfig,
 };
 use serde_json::Value;
 
 fn spec(name: &str) -> Value {
     let path = common::fixtures().join(format!("edge-books/{name}.json"));
     serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+}
+
+/// `knock_off_candidates`' extra party groups: the book's `party_identity.party_groups`, `[]` when
+/// the table or the key is absent. Anything but a table there, or a list of text, is refused (the
+/// pack's README section 10), as the real pipeline's binding refuses it; `strs()` would not.
+fn party_groups(s: &Value) -> Vec<String> {
+    let table = typed(s, "party_identity", false, "a table", |v| {
+        v.is_object().then(|| v.clone())
+    });
+    table
+        .and_then(|t| {
+            typed(&t, "party_groups", false, "a list of text", |v| {
+                v.as_array()?
+                    .iter()
+                    .map(|g| g.as_str().map(str::to_string))
+                    .collect()
+            })
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+#[should_panic(expected = "party_groups must be a list of text, got \"Sundry Debtors\"")]
+fn a_party_groups_value_that_is_not_a_list_is_refused() {
+    party_groups(&serde_json::json!({"party_identity": {"party_groups": "Sundry Debtors"}}));
+}
+
+#[test]
+#[should_panic(expected = "party_groups must be a list of text, got [\"Sundry Debtors\",1]")]
+fn a_party_groups_item_that_is_not_text_is_refused() {
+    party_groups(&serde_json::json!({"party_identity": {"party_groups": ["Sundry Debtors", 1]}}));
 }
 
 /// The `party_identity` table of an edge book, as the engagement's TOML table would give it.
@@ -982,6 +1014,15 @@ fn check(name: &str) {
                     Err(e) => panic!("{name}: the statement is malformed: {e}"),
                 }
             }
+            "knock_off_candidates" => {
+                // No module check: the dump lists none (the pack's README section 6).
+                let r = knock_off_candidates::run(&book, &rules, &party_groups(&s)).unwrap();
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
+            }
             "high_value_register" => {
                 // As `parity/edge_golden.py` runs it: the statement and the AIS rows optional, the
                 // counterparty types already merged, the recipient type from `entity_type` unless
@@ -1120,7 +1161,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 27] = [
+const EDGE_TESTS: [&str; 28] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1133,6 +1174,7 @@ const EDGE_TESTS: [&str; 27] = [
     "depreciation",
     "entity_269st_gap",
     "high_value_register",
+    "knock_off_candidates",
     "ledger_scrutiny",
     "loans_interest",
     "partners_40b_194t",

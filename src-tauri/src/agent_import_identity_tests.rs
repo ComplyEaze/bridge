@@ -158,31 +158,21 @@ fn renderer_uses_one_derived_identity_for_remote_id_and_marker() {
         let mut narrations = Vec::new();
         loop {
             match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"VOUCHER" => {
+                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "VOUCHER" => {
                     for attribute in tag.attributes() {
                         let attribute = attribute.unwrap();
-                        if attribute.key.as_ref() == b"REMOTEID" {
+                        if attribute.key.as_ref() == "REMOTEID" {
                             remote_ids.push(
                                 attribute
-                                    .decoded_and_normalized_value(
-                                        quick_xml::XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )
+                                    .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                                     .unwrap()
                                     .into_owned(),
                             );
                         }
                     }
                 }
-                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"NARRATION" => {
-                    narrations.push(
-                        reader
-                            .read_text(tag.name())
-                            .unwrap()
-                            .decode()
-                            .unwrap()
-                            .into_owned(),
-                    );
+                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "NARRATION" => {
+                    narrations.push(reader.read_text(tag.name()).unwrap().to_string());
                 }
                 quick_xml::events::Event::Eof => break,
                 _ => {}

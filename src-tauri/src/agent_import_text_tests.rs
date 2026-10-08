@@ -114,17 +114,12 @@ fn maximum_unicode_text_is_preserved_by_import_rendering() {
     loop {
         match reader.read_event().unwrap() {
             quick_xml::events::Event::Start(tag)
-                if matches!(tag.name().as_ref(), b"NARRATION" | b"REFERENCE") =>
+                if matches!(tag.name().as_ref(), "NARRATION" | "REFERENCE") =>
             {
-                let value = reader
-                    .read_text(tag.name())
-                    .unwrap()
-                    .decode()
-                    .unwrap()
-                    .into_owned();
-                if tag.name().as_ref() == b"NARRATION" && narration.is_none() {
+                let value = reader.read_text(tag.name()).unwrap().to_string();
+                if tag.name().as_ref() == "NARRATION" && narration.is_none() {
                     narration = Some(value);
-                } else if tag.name().as_ref() == b"REFERENCE" && reference.is_none() {
+                } else if tag.name().as_ref() == "REFERENCE" && reference.is_none() {
                     reference = Some(value);
                 }
             }

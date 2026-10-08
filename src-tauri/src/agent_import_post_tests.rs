@@ -1239,13 +1239,13 @@ fn native_request_uses_a_private_remote_identity_and_an_untagged_narration() {
         let mut reader = quick_xml::Reader::from_str(xml);
         loop {
             match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"VOUCHER" => {
+                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "VOUCHER" => {
                     let attribute = tag
                         .attributes()
                         .map(Result::unwrap)
-                        .find(|attribute| attribute.key.as_ref() == b"REMOTEID")
+                        .find(|attribute| attribute.key.as_ref() == "REMOTEID")
                         .unwrap();
-                    break Uuid::parse_str(std::str::from_utf8(&attribute.value).unwrap()).unwrap();
+                    break Uuid::parse_str(&attribute.value).unwrap();
                 }
                 quick_xml::events::Event::Eof => panic!("voucher missing"),
                 _ => {}
@@ -2830,12 +2830,12 @@ fn a_native_request_renders_every_voucher_with_its_own_remote_id() {
     let mut remote_ids = Vec::new();
     loop {
         match reader.read_event().unwrap() {
-            quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"VOUCHER" => {
+            quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "VOUCHER" => {
                 let remote_id = tag
                     .attributes()
                     .map(Result::unwrap)
-                    .find(|attribute| attribute.key.as_ref() == b"REMOTEID")
-                    .map(|attribute| String::from_utf8(attribute.value.to_vec()).unwrap());
+                    .find(|attribute| attribute.key.as_ref() == "REMOTEID")
+                    .map(|attribute| attribute.value.into_owned());
                 remote_ids.push(remote_id.unwrap());
             }
             quick_xml::events::Event::Eof => break,

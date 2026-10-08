@@ -1,0 +1,81 @@
+# fixture: agent/vouchers-reference-date-year-rows.utf16le.xml
+# parser: parse_agent_rows(SHAPE_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(19),
+        "amounts": Array [
+            Object {
+                "amount": String("-2500.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Purchase - Local"),
+            },
+            Object {
+                "amount": String("2500.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("2500.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Chem Supplier 4"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250401"),
+        "guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000013"),
+        "is_invoice": Bool(false),
+        "master_id": String("19"),
+        "narration": String("SHAPELAB-T-0401"),
+        "optional": Bool(false),
+        "party": String("Chem Supplier 4"),
+        "post_dated": Bool(false),
+        "voucher_number": String("7"),
+        "voucher_type": String("Purchase"),
+    },
+    Object {
+        "alter_id": Number(45),
+        "amounts": Array [
+            Object {
+                "amount": String("2500.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("2500.00"),
+                        "bill_date": String("20250401"),
+                        "bill_type": String("New Ref"),
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("MANUAL-1"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Chem Supplier 4"),
+            },
+            Object {
+                "amount": String("-2500.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Purchase - Local"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250401"),
+        "guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000002d"),
+        "is_invoice": Bool(true),
+        "master_id": String("45"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("Chem Supplier 4"),
+        "post_dated": Bool(false),
+        "reference": String("SHAPELAB-MANUAL-1"),
+        "reference_date": String("20250401"),
+        "voucher_number": String("10"),
+        "voucher_type": String("Purchase"),
+    },
+])

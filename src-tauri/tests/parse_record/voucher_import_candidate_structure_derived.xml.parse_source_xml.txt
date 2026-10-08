@@ -1,0 +1,2253 @@
+# fixture: voucher_import_candidate_structure_derived.xml
+# parser: parse_source_xml
+# source: synthetic: not evidence of what Tally sends
+Ok(ParsedSource {
+    filename: "voucher-import-candidate.xml",
+    sha256: "ed485e898bbabf59a2a93631cc2215bcfe3d7b393a2dcde2987965cfb9157e62",
+    utf8: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ENVELOPE>\n  <HEADER>\n    <TALLYREQUEST>Import Data</TALLYREQUEST>\n  </HEADER>\n  <BODY>\n    <IMPORTDATA>\n      <REQUESTDESC>\n        <REPORTNAME>Vouchers</REPORTNAME>\n        <STATICVARIABLES>\n          <SVCURRENTCOMPANY>Synthetic Ledger Set</SVCURRENTCOMPANY>\n        </STATICVARIABLES>\n      </REQUESTDESC>\n      <REQUESTDATA>\n        <TALLYMESSAGE>\n        <VOUCHER REMOTEID=\"fixture-001\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010101</DATE>\n            <EFFECTIVEDATE>20010101</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010101-S0000010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 001</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>-7.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>7.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-002\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010604</DATE>\n            <EFFECTIVEDATE>20010604</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010604-T6540010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 002</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>-95.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>95.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-003\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011107</DATE>\n            <EFFECTIVEDATE>20011107</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011107-U3190010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 003</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>-814.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>814.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-004\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010410</DATE>\n            <EFFECTIVEDATE>20010410</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010410-V0731010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 004</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>-4510.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4510.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-005\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010913</DATE>\n            <EFFECTIVEDATE>20010913</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010913-W6281010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 005</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Bravo</LEDGERNAME>\n              <AMOUNT>31644.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-31644.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-006\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010216</DATE>\n            <EFFECTIVEDATE>20010216</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010216-X3822010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 006</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-12.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>12.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-007\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010719</DATE>\n            <EFFECTIVEDATE>20010719</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010719-Y0472010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 007</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>100.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-100.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-008\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011222</DATE>\n            <EFFECTIVEDATE>20011222</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011222-Z6913010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 008</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-819.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>819.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-009\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010525</DATE>\n            <EFFECTIVEDATE>20010525</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010525-S3563010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 009</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-4515.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4515.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-010\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011028</DATE>\n            <EFFECTIVEDATE>20011028</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011028-T0114010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 010</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-31649.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>31649.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-011\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010303</DATE>\n            <EFFECTIVEDATE>20010303</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010303-U7654010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 011</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-17.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>17.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-012\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010806</DATE>\n            <EFFECTIVEDATE>20010806</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010806-V3205010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 012</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>105.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-105.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-013\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010109</DATE>\n            <EFFECTIVEDATE>20010109</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010109-W0845010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 013</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-824.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>824.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-014\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010612</DATE>\n            <EFFECTIVEDATE>20010612</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010612-X7395010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 014</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>4520.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-4520.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-015\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011115</DATE>\n            <EFFECTIVEDATE>20011115</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011115-Y3936010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 015</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-31654.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>31654.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-016\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010418</DATE>\n            <EFFECTIVEDATE>20010418</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010418-Z0586010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 016</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-22.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>22.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-017\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010921</DATE>\n            <EFFECTIVEDATE>20010921</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010921-S7037010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 017</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-110.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>110.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-018\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010224</DATE>\n            <EFFECTIVEDATE>20010224</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010224-T3677010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 018</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>829.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-829.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-019\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010727</DATE>\n            <EFFECTIVEDATE>20010727</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010727-U0228010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 019</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>4525.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-4525.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-020\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20011202</DATE>\n            <EFFECTIVEDATE>20011202</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011202-V7768010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 020</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>31659.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-31659.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-021\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010505</DATE>\n            <EFFECTIVEDATE>20010505</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010505-W4319010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 021</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>27.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-27.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-022\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011008</DATE>\n            <EFFECTIVEDATE>20011008</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011008-X0959010</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 022</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-115.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>115.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-023\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010311</DATE>\n            <EFFECTIVEDATE>20010311</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010311-Y7400110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 023</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-834.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>834.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-024\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010814</DATE>\n            <EFFECTIVEDATE>20010814</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010814-Z4050110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 024</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-4530.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4530.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-025\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010117</DATE>\n            <EFFECTIVEDATE>20010117</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010117-S0690110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 025</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-31664.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>31664.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-026\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010620</DATE>\n            <EFFECTIVEDATE>20010620</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010620-T7141110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 026</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>32.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-32.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-027\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20011123</DATE>\n            <EFFECTIVEDATE>20011123</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011123-U4781110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 027</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>120.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-120.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-028\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010426</DATE>\n            <EFFECTIVEDATE>20010426</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010426-V033211</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 028</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>839.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-839.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-029\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010901</DATE>\n            <EFFECTIVEDATE>20010901</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010901-W7872110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 029</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-4535.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4535.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-030\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010204</DATE>\n            <EFFECTIVEDATE>20010204</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010204-X442311</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 030</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-31669.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>31669.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-031\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010707</DATE>\n            <EFFECTIVEDATE>20010707</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010707-Y1073110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 031</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>37.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-37.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-032\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20011210</DATE>\n            <EFFECTIVEDATE>20011210</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011210-Z751411</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 032</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>125.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-125.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-033\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010513</DATE>\n            <EFFECTIVEDATE>20010513</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010513-S416411</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 033</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-844.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>844.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-034\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011016</DATE>\n            <EFFECTIVEDATE>20011016</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011016-T1705110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 034</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-4540.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4540.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-035\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010319</DATE>\n            <EFFECTIVEDATE>20010319</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010319-U7255110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 035</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>31674.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-31674.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-036\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010822</DATE>\n            <EFFECTIVEDATE>20010822</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010822-V4895110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 036</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>42.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-42.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-037\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010125</DATE>\n            <EFFECTIVEDATE>20010125</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010125-W1446110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 037</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-130.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>130.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-038\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010628</DATE>\n            <EFFECTIVEDATE>20010628</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010628-X7986110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 038</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Echo</LEDGERNAME>\n              <AMOUNT>849.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-849.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-039\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011103</DATE>\n            <EFFECTIVEDATE>20011103</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011103-Y4537110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 039</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Kilo</LEDGERNAME>\n              <AMOUNT>-4545.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4545.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-040\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010406</DATE>\n            <EFFECTIVEDATE>20010406</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010406-Z1187110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 040</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Echo</LEDGERNAME>\n              <AMOUNT>31679.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-31679.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-041\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010909</DATE>\n            <EFFECTIVEDATE>20010909</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010909-S8628110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 041</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Lima</LEDGERNAME>\n              <AMOUNT>-47.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>47.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-042\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010212</DATE>\n            <EFFECTIVEDATE>20010212</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010212-T4278110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 042</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Bravo</LEDGERNAME>\n              <AMOUNT>135.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-135.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-043\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010715</DATE>\n            <EFFECTIVEDATE>20010715</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010715-U1819110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 043</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Mike</LEDGERNAME>\n              <AMOUNT>-854.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>854.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-044\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011218</DATE>\n            <EFFECTIVEDATE>20011218</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011218-V8369110</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 044</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-4550.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4550.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-045\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010521</DATE>\n            <EFFECTIVEDATE>20010521</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010521-W4900210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 045</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Lima</LEDGERNAME>\n              <AMOUNT>-31684.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>31684.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-046\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011024</DATE>\n            <EFFECTIVEDATE>20011024</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011024-X1550210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 046</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>-52.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>52.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-047\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010327</DATE>\n            <EFFECTIVEDATE>20010327</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010327-Y8001210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 047</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Oscar</LEDGERNAME>\n              <AMOUNT>-140.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>140.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-048\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010802</DATE>\n            <EFFECTIVEDATE>20010802</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010802-Z4641WX</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 048</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Bravo</LEDGERNAME>\n              <AMOUNT>859.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-859.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-049\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010105</DATE>\n            <EFFECTIVEDATE>20010105</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010105-S1291210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 049</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>4555.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-4555.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-050\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010608</DATE>\n            <EFFECTIVEDATE>20010608</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010608-T8732210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 050</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Kilo</LEDGERNAME>\n              <AMOUNT>-31689.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>31689.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-051\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20011111</DATE>\n            <EFFECTIVEDATE>20011111</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011111-U5382210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 051</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>57.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-57.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-052\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010414</DATE>\n            <EFFECTIVEDATE>20010414</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010414-V1923210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 052</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>-145.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>145.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-053\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010917</DATE>\n            <EFFECTIVEDATE>20010917</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010917-W8473210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 053</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Bravo</LEDGERNAME>\n              <AMOUNT>864.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-864.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-054\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010220</DATE>\n            <EFFECTIVEDATE>20010220</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010220-X5024210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 054</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>-4560.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4560.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-055\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010723</DATE>\n            <EFFECTIVEDATE>20010723</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010723-Y1664210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 055</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Echo</LEDGERNAME>\n              <AMOUNT>31694.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-31694.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-056\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011226</DATE>\n            <EFFECTIVEDATE>20011226</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011226-Z8115210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 056</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Papa</LEDGERNAME>\n              <AMOUNT>-62.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>62.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-057\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010501</DATE>\n            <EFFECTIVEDATE>20010501</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010501-S5755210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 057</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Oscar</LEDGERNAME>\n              <AMOUNT>-150.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>150.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-058\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20011004</DATE>\n            <EFFECTIVEDATE>20011004</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011004-T1306210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 058</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Echo</LEDGERNAME>\n              <AMOUNT>869.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-869.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-059\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010307</DATE>\n            <EFFECTIVEDATE>20010307</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010307-U8846210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 059</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Mike</LEDGERNAME>\n              <AMOUNT>-4565.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4565.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-060\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010810</DATE>\n            <EFFECTIVEDATE>20010810</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010810-V5496210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 060</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>31699.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-31699.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-061\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010113</DATE>\n            <EFFECTIVEDATE>20010113</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010113-W2047210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 061</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>-67.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>67.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-062\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010616</DATE>\n            <EFFECTIVEDATE>20010616</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010616-X858721</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 062</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Delta</LEDGERNAME>\n              <AMOUNT>155.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-155.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-063\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011119</DATE>\n            <EFFECTIVEDATE>20011119</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011119-Y5138210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 063</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Mike</LEDGERNAME>\n              <AMOUNT>-874.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>874.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-064\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010422</DATE>\n            <EFFECTIVEDATE>20010422</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010422-Z2778210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 064</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>-4570.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4570.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-065\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010925</DATE>\n            <EFFECTIVEDATE>20010925</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010925-S8229210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 065</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>31704.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-31704.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-066\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010228</DATE>\n            <EFFECTIVEDATE>20010228</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010228-T5869210</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 066</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Bravo</LEDGERNAME>\n              <AMOUNT>72.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-72.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-067\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010703</DATE>\n            <EFFECTIVEDATE>20010703</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010703-U241031</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 067</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Quebec</LEDGERNAME>\n              <AMOUNT>-160.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>160.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-068\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011206</DATE>\n            <EFFECTIVEDATE>20011206</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011206-V8950310</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 068</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Romeo</LEDGERNAME>\n              <AMOUNT>-879.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>879.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-069\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010509</DATE>\n            <EFFECTIVEDATE>20010509</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010509-W5501310</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 069</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Sierra</LEDGERNAME>\n              <AMOUNT>-4575.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>4575.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-070\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011012</DATE>\n            <EFFECTIVEDATE>20011012</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011012-X2151310</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 070</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Tango</LEDGERNAME>\n              <AMOUNT>-31709.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>31709.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-071\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010315</DATE>\n            <EFFECTIVEDATE>20010315</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010315-Y9691310</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 071</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Kilo</LEDGERNAME>\n              <AMOUNT>-77.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>77.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-072\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010818</DATE>\n            <EFFECTIVEDATE>20010818</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010818-Z5242310</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 072</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Bravo</LEDGERNAME>\n              <AMOUNT>165.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-165.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-073\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010121</DATE>\n            <EFFECTIVEDATE>20010121</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010121-S288231</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 073</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Quebec</LEDGERNAME>\n              <AMOUNT>-884.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>884.00</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-074\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010624</DATE>\n            <EFFECTIVEDATE>20010624</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010624-T9333310</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 074</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Echo</LEDGERNAME>\n              <AMOUNT>4580.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-4580.75</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-075\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20011127</DATE>\n            <EFFECTIVEDATE>20011127</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20011127-U5973310</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 075</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Alpha</LEDGERNAME>\n              <AMOUNT>-31714.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>31714.10</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-076\" VCHTYPE=\"Receipt\" ACTION=\"Create\">\n            <DATE>20010402</DATE>\n            <EFFECTIVEDATE>20010402</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010402-V2524310</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 076</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Mike</LEDGERNAME>\n              <AMOUNT>-82.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>82.50</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        <VOUCHER REMOTEID=\"fixture-077\" VCHTYPE=\"Payment\" ACTION=\"Create\">\n            <DATE>20010905</DATE>\n            <EFFECTIVEDATE>20010905</EFFECTIVEDATE>\n            <VOUCHERNUMBER>BNK-20010905-W9074310</VOUCHERNUMBER>\n            <NARRATION>Synthetic narration 077</NARRATION>\n            <PARTYLEDGERNAME>Ledger Zero</PARTYLEDGERNAME>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Bravo</LEDGERNAME>\n              <AMOUNT>170.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n            <ALLLEDGERENTRIES.LIST>\n              <LEDGERNAME>Ledger Zero</LEDGERNAME>\n              <AMOUNT>-170.25</AMOUNT>\n            </ALLLEDGERENTRIES.LIST>\n          </VOUCHER>\n        </TALLYMESSAGE>\n      </REQUESTDATA>\n    </IMPORTDATA>\n  </BODY>\n</ENVELOPE>",
+    vouchers: [
+        SourceVoucher {
+            position: 1,
+            remote_id: "fixture-001",
+            date: "20010101",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 001",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "-7.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "7.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 2,
+            remote_id: "fixture-002",
+            date: "20010604",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 002",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "-95.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "95.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 3,
+            remote_id: "fixture-003",
+            date: "20011107",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 003",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "-814.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "814.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 4,
+            remote_id: "fixture-004",
+            date: "20010410",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 004",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "-4510.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4510.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 5,
+            remote_id: "fixture-005",
+            date: "20010913",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 005",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Bravo",
+                    amount: "31644.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-31644.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 6,
+            remote_id: "fixture-006",
+            date: "20010216",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 006",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-12.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "12.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 7,
+            remote_id: "fixture-007",
+            date: "20010719",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 007",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "100.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-100.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 8,
+            remote_id: "fixture-008",
+            date: "20011222",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 008",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-819.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "819.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 9,
+            remote_id: "fixture-009",
+            date: "20010525",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 009",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-4515.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4515.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 10,
+            remote_id: "fixture-010",
+            date: "20011028",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 010",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-31649.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "31649.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 11,
+            remote_id: "fixture-011",
+            date: "20010303",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 011",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-17.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "17.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 12,
+            remote_id: "fixture-012",
+            date: "20010806",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 012",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "105.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-105.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 13,
+            remote_id: "fixture-013",
+            date: "20010109",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 013",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-824.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "824.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 14,
+            remote_id: "fixture-014",
+            date: "20010612",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 014",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "4520.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-4520.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 15,
+            remote_id: "fixture-015",
+            date: "20011115",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 015",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-31654.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "31654.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 16,
+            remote_id: "fixture-016",
+            date: "20010418",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 016",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-22.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "22.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 17,
+            remote_id: "fixture-017",
+            date: "20010921",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 017",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-110.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "110.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 18,
+            remote_id: "fixture-018",
+            date: "20010224",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 018",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "829.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-829.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 19,
+            remote_id: "fixture-019",
+            date: "20010727",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 019",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "4525.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-4525.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 20,
+            remote_id: "fixture-020",
+            date: "20011202",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 020",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "31659.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-31659.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 21,
+            remote_id: "fixture-021",
+            date: "20010505",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 021",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "27.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-27.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 22,
+            remote_id: "fixture-022",
+            date: "20011008",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 022",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-115.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "115.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 23,
+            remote_id: "fixture-023",
+            date: "20010311",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 023",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-834.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "834.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 24,
+            remote_id: "fixture-024",
+            date: "20010814",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 024",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-4530.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4530.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 25,
+            remote_id: "fixture-025",
+            date: "20010117",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 025",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-31664.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "31664.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 26,
+            remote_id: "fixture-026",
+            date: "20010620",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 026",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "32.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-32.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 27,
+            remote_id: "fixture-027",
+            date: "20011123",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 027",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "120.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-120.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 28,
+            remote_id: "fixture-028",
+            date: "20010426",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 028",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "839.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-839.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 29,
+            remote_id: "fixture-029",
+            date: "20010901",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 029",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-4535.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4535.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 30,
+            remote_id: "fixture-030",
+            date: "20010204",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 030",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-31669.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "31669.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 31,
+            remote_id: "fixture-031",
+            date: "20010707",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 031",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "37.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-37.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 32,
+            remote_id: "fixture-032",
+            date: "20011210",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 032",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "125.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-125.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 33,
+            remote_id: "fixture-033",
+            date: "20010513",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 033",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-844.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "844.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 34,
+            remote_id: "fixture-034",
+            date: "20011016",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 034",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-4540.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4540.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 35,
+            remote_id: "fixture-035",
+            date: "20010319",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 035",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "31674.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-31674.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 36,
+            remote_id: "fixture-036",
+            date: "20010822",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 036",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "42.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-42.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 37,
+            remote_id: "fixture-037",
+            date: "20010125",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 037",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-130.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "130.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 38,
+            remote_id: "fixture-038",
+            date: "20010628",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 038",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Echo",
+                    amount: "849.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-849.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 39,
+            remote_id: "fixture-039",
+            date: "20011103",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 039",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Kilo",
+                    amount: "-4545.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4545.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 40,
+            remote_id: "fixture-040",
+            date: "20010406",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 040",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Echo",
+                    amount: "31679.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-31679.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 41,
+            remote_id: "fixture-041",
+            date: "20010909",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 041",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Lima",
+                    amount: "-47.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "47.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 42,
+            remote_id: "fixture-042",
+            date: "20010212",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 042",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Bravo",
+                    amount: "135.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-135.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 43,
+            remote_id: "fixture-043",
+            date: "20010715",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 043",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Mike",
+                    amount: "-854.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "854.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 44,
+            remote_id: "fixture-044",
+            date: "20011218",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 044",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-4550.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4550.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 45,
+            remote_id: "fixture-045",
+            date: "20010521",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 045",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Lima",
+                    amount: "-31684.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "31684.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 46,
+            remote_id: "fixture-046",
+            date: "20011024",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 046",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "-52.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "52.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 47,
+            remote_id: "fixture-047",
+            date: "20010327",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 047",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Oscar",
+                    amount: "-140.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "140.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 48,
+            remote_id: "fixture-048",
+            date: "20010802",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 048",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Bravo",
+                    amount: "859.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-859.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 49,
+            remote_id: "fixture-049",
+            date: "20010105",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 049",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "4555.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-4555.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 50,
+            remote_id: "fixture-050",
+            date: "20010608",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 050",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Kilo",
+                    amount: "-31689.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "31689.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 51,
+            remote_id: "fixture-051",
+            date: "20011111",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 051",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "57.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-57.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 52,
+            remote_id: "fixture-052",
+            date: "20010414",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 052",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "-145.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "145.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 53,
+            remote_id: "fixture-053",
+            date: "20010917",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 053",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Bravo",
+                    amount: "864.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-864.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 54,
+            remote_id: "fixture-054",
+            date: "20010220",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 054",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "-4560.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4560.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 55,
+            remote_id: "fixture-055",
+            date: "20010723",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 055",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Echo",
+                    amount: "31694.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-31694.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 56,
+            remote_id: "fixture-056",
+            date: "20011226",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 056",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Papa",
+                    amount: "-62.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "62.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 57,
+            remote_id: "fixture-057",
+            date: "20010501",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 057",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Oscar",
+                    amount: "-150.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "150.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 58,
+            remote_id: "fixture-058",
+            date: "20011004",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 058",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Echo",
+                    amount: "869.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-869.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 59,
+            remote_id: "fixture-059",
+            date: "20010307",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 059",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Mike",
+                    amount: "-4565.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4565.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 60,
+            remote_id: "fixture-060",
+            date: "20010810",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 060",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "31699.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-31699.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 61,
+            remote_id: "fixture-061",
+            date: "20010113",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 061",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "-67.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "67.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 62,
+            remote_id: "fixture-062",
+            date: "20010616",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 062",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Delta",
+                    amount: "155.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-155.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 63,
+            remote_id: "fixture-063",
+            date: "20011119",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 063",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Mike",
+                    amount: "-874.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "874.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 64,
+            remote_id: "fixture-064",
+            date: "20010422",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 064",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "-4570.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4570.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 65,
+            remote_id: "fixture-065",
+            date: "20010925",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 065",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "31704.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-31704.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 66,
+            remote_id: "fixture-066",
+            date: "20010228",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 066",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Bravo",
+                    amount: "72.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-72.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 67,
+            remote_id: "fixture-067",
+            date: "20010703",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 067",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Quebec",
+                    amount: "-160.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "160.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 68,
+            remote_id: "fixture-068",
+            date: "20011206",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 068",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Romeo",
+                    amount: "-879.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "879.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 69,
+            remote_id: "fixture-069",
+            date: "20010509",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 069",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Sierra",
+                    amount: "-4575.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "4575.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 70,
+            remote_id: "fixture-070",
+            date: "20011012",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 070",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Tango",
+                    amount: "-31709.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "31709.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 71,
+            remote_id: "fixture-071",
+            date: "20010315",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 071",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Kilo",
+                    amount: "-77.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "77.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 72,
+            remote_id: "fixture-072",
+            date: "20010818",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 072",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Bravo",
+                    amount: "165.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-165.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 73,
+            remote_id: "fixture-073",
+            date: "20010121",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 073",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Quebec",
+                    amount: "-884.00",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "884.00",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 74,
+            remote_id: "fixture-074",
+            date: "20010624",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 074",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Echo",
+                    amount: "4580.75",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-4580.75",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 75,
+            remote_id: "fixture-075",
+            date: "20011127",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 075",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Alpha",
+                    amount: "-31714.10",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "31714.10",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 76,
+            remote_id: "fixture-076",
+            date: "20010402",
+            voucher_type: "Receipt",
+            narration: Some(
+                "Synthetic narration 076",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Mike",
+                    amount: "-82.50",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "82.50",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+        SourceVoucher {
+            position: 77,
+            remote_id: "fixture-077",
+            date: "20010905",
+            voucher_type: "Payment",
+            narration: Some(
+                "Synthetic narration 077",
+            ),
+            entries: [
+                SourceEntry {
+                    position: 1,
+                    ledger: "Ledger Bravo",
+                    amount: "170.25",
+                    polarity: None,
+                },
+                SourceEntry {
+                    position: 2,
+                    ledger: "Ledger Zero",
+                    amount: "-170.25",
+                    polarity: None,
+                },
+            ],
+            omitted_fields: [
+                "VOUCHER/@ACTION",
+                "VOUCHER/EFFECTIVEDATE",
+                "VOUCHER/PARTYLEDGERNAME",
+                "VOUCHER/VOUCHERNUMBER",
+            ],
+        },
+    ],
+    source_notices: [
+        SourceNotice {
+            kind: "Ignored ENVELOPE/HEADER metadata",
+            count: 1,
+        },
+        SourceNotice {
+            kind: "Ignored IMPORTDATA/REQUESTDESC metadata",
+            count: 1,
+        },
+    ],
+})

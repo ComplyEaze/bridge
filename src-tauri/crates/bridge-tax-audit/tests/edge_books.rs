@@ -22,18 +22,19 @@ use bridge_tax_audit::book::{
 use bridge_tax_audit::canonical::canonical_test_result;
 use bridge_tax_audit::compare::compare;
 use bridge_tax_audit::documents::{bank_statement_from_json, traces_documents_from_json};
-use bridge_tax_audit::error::AuditError;
+use bridge_tax_audit::error::{AuditError, Result};
+use bridge_tax_audit::findings::{EvidenceRef, TestResult};
 use bridge_tax_audit::read::Window;
 use bridge_tax_audit::rules::Rules;
 use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
     cash_book_integrity, cash_payments_40a3, clause21a_candidates, counter_cheques_40a3,
-    creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest,
-    partners_40b_194t, party_identity, party_monthly, questionnaire_cl13, read_scope,
-    related_parties_cl23, specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock,
-    stock_read, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
-    RelatedPartiesConfig, Tds26asConfig, TdsConfig,
+    creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register, ledger_scrutiny,
+    loans_interest, partners_40b_194t, party_identity, party_monthly, questionnaire_cl13,
+    read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
+    statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as, trial_balance,
+    twentysixas_receipts, PartnersConfig, RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -300,6 +301,43 @@ fn creditor_ageing_params(c: &Value) -> creditor_ageing_43bh::Params {
             })
             .unwrap_or_default(),
         mse_interest_ledgers: strs(&c["mse_interest_ledgers"]).into_iter().collect(),
+    }
+}
+
+/// `creditor_ageing_43bh` on an edge book, as `parity/edge_golden.py` runs it.
+fn creditor_ageing_result(s: &Value, book: &Book, rules: &Rules) -> Result<TestResult> {
+    let creditors: BTreeSet<String> = strs(&s["creditors"]).into_iter().collect();
+    creditor_ageing_43bh::run(
+        book,
+        rules,
+        &period(s),
+        &creditors,
+        &creditor_ageing_params(&s["creditor_ageing"]),
+    )
+}
+
+/// `statutory_dues_43b` on an edge book, as `parity/edge_golden.py` runs it.
+fn statutory_dues_result(s: &Value, book: &Book, rules: &Rules) -> Result<TestResult> {
+    let sd = &s["statutory_dues"];
+    let nature_by_ledger: BTreeMap<String, String> = sd["nature_by_ledger"]
+        .as_object()
+        .map(|m| {
+            m.iter()
+                .map(|(k, v)| (k.clone(), v.as_str().unwrap().to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let salary: BTreeSet<String> = strs(&sd["salary_expense_ledgers"]).into_iter().collect();
+    statutory_dues_43b::run(book, rules, &period(s), &nature_by_ledger, &salary)
+}
+
+/// The result of the one test a statutory-dues or creditor-ageing book names.
+fn dues_or_ageing_result(s: &Value) -> Result<TestResult> {
+    let (book, rules) = (build(s), rules(s));
+    match strs(&s["tests"]).as_slice() {
+        [test] if test == "creditor_ageing_43bh" => creditor_ageing_result(s, &book, &rules),
+        [test] if test == "statutory_dues_43b" => statutory_dues_result(s, &book, &rules),
+        other => panic!("{other:?}: not a statutory-dues or creditor-ageing book"),
     }
 }
 
@@ -706,6 +744,43 @@ fn check(name: &str) {
                 assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
                 continue;
             }
+            "depreciation" => {
+                // As `parity/edge_golden.py` runs it: the spec's `depreciation` table is the
+                // client config's, each of its three tables required, with the put-to-use dates
+                // `run` takes (absent meaning none).
+                let d = &s["depreciation"];
+                let table = |k: &str| {
+                    d[k].as_object()
+                        .unwrap_or_else(|| panic!("{name}: depreciation.{k} must be a table"))
+                };
+                assert!(
+                    d["dep_expense_ledgers"].is_array(),
+                    "{name}: depreciation.dep_expense_ledgers must be a list"
+                );
+                let r = depreciation::run(
+                    &book,
+                    &rules,
+                    &period(&s),
+                    &table("block_by_ledger")
+                        .iter()
+                        .map(|(l, b)| (l.clone(), b.as_str().unwrap().to_string()))
+                        .collect(),
+                    &table("opening_wdv_paise")
+                        .iter()
+                        .map(|(b, p)| (b.clone(), int(p)))
+                        .collect(),
+                    &strs(&d["dep_expense_ledgers"]).into_iter().collect(),
+                    &d["put_to_use_by_voucher"]
+                        .as_object()
+                        .into_iter()
+                        .flatten()
+                        .map(|(g, day)| (g.clone(), date(day.as_str().unwrap())))
+                        .collect(),
+                )
+                .unwrap();
+                let c = depreciation::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
             "entity_269st_gap" => {
                 // As `parity/edge_golden.py` runs it: the party index from the book's own
                 // `party_identity` table (the engagement's), the round-off ledgers as given.
@@ -765,33 +840,12 @@ fn check(name: &str) {
                 continue;
             }
             "creditor_ageing_43bh" => {
-                let creditors: BTreeSet<String> = strs(&s["creditors"]).into_iter().collect();
-                let r = creditor_ageing_43bh::run(
-                    &book,
-                    &rules,
-                    &period(&s),
-                    &creditors,
-                    &creditor_ageing_params(&s["creditor_ageing"]),
-                )
-                .unwrap();
+                let r = creditor_ageing_result(&s, &book, &rules).unwrap();
                 let c = creditor_ageing_43bh::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
             "statutory_dues_43b" => {
-                let sd = &s["statutory_dues"];
-                let nature_by_ledger: BTreeMap<String, String> = sd["nature_by_ledger"]
-                    .as_object()
-                    .map(|m| {
-                        m.iter()
-                            .map(|(k, v)| (k.clone(), v.as_str().unwrap().to_string()))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let salary: BTreeSet<String> =
-                    strs(&sd["salary_expense_ledgers"]).into_iter().collect();
-                let r =
-                    statutory_dues_43b::run(&book, &rules, &period(&s), &nature_by_ledger, &salary)
-                        .unwrap();
+                let r = statutory_dues_result(&s, &book, &rules).unwrap();
                 let c = statutory_dues_43b::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
@@ -1066,7 +1120,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 26] = [
+const EDGE_TESTS: [&str; 27] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1076,6 +1130,7 @@ const EDGE_TESTS: [&str; 26] = [
     "clause21a_candidates",
     "counter_cheques_40a3",
     "creditor_ageing_43bh",
+    "depreciation",
     "entity_269st_gap",
     "high_value_register",
     "ledger_scrutiny",
@@ -1557,6 +1612,135 @@ fn a_repeated_books_guid_is_refused_not_panicked() {
         matches!(&err, AuditError::DuplicateFigureId(id) if id == "bank_reconciliation.match_pair_093394bf"),
         "{err}"
     );
+}
+
+/// A row's refs as (kind, id, label), in the order the module emitted them.
+fn emitted(evidence: &[EvidenceRef]) -> Vec<(&str, &str, &str)> {
+    evidence
+        .iter()
+        .map(|e| (e.kind.as_str(), e.id.as_str(), e.label.as_str()))
+        .collect()
+}
+
+/// The canonical dump sorts a row's refs, so no golden shows the order a module emits them in.
+/// The reference emits a row's voucher refs sorted by GUID and then label, by code point: measured
+/// at `ee17d80f`, through `parity/edge_golden.py` with its serialiser wrapped, on the six books
+/// below (78 runs of voucher refs, each ascending). The two lists are what it emitted there for
+/// those rows: upper case before lower, a decomposed accent before `z` and the composed one after
+/// it, a full-width letter before a character beyond U+FFFF, and a creditor's ledger first.
+#[test]
+fn dues_and_ageing_emit_voucher_refs_by_guid_then_label() {
+    let mut results = BTreeMap::new();
+    for name in [
+        "creditor_ageing_shared_guid",
+        "creditor_ageing_short",
+        "statutory_dues_more",
+        "statutory_dues_ref_order",
+        "statutory_dues_shared_guid",
+        "statutory_dues_shared_guid_employee",
+    ] {
+        let r = dues_or_ageing_result(&spec(name)).unwrap();
+        let rows = (r.figures.iter().map(|f| (&f.id, &f.evidence)))
+            .chain(r.findings.iter().map(|f| (&f.id, &f.evidence)));
+        let mut pairs = 0;
+        for (id, evidence) in rows {
+            for run in evidence.split(|e| e.kind != "voucher") {
+                pairs += run.len().saturating_sub(1);
+                assert!(
+                    run.windows(2)
+                        .all(|w| (&w[0].id, &w[0].label) < (&w[1].id, &w[1].label)),
+                    "{name} {id}: {:?}",
+                    emitted(run)
+                );
+            }
+        }
+        assert!(pairs > 0, "{name}: no row cites two vouchers");
+        results.insert(name, r);
+    }
+    let dues = &results["statutory_dues_ref_order"];
+    let charged = (dues.figures.iter())
+        .find(|f| f.id == "statutory_dues_43b.charged_gst_payable")
+        .unwrap();
+    assert_eq!(
+        emitted(&charged.evidence),
+        [
+            ("voucher", "", "Payment PAY-B on 2025-12-01"),
+            ("voucher", "", "Payment pay-b on 2025-12-01"),
+            ("voucher", "edge-so-G", "Payment G1 on 2025-12-02"),
+            ("voucher", "edge-so-case", "Journal INV-A on 2025-10-01"),
+            ("voucher", "edge-so-case", "Journal Inv-a on 2025-10-01"),
+            ("voucher", "edge-so-case", "Journal inv-a on 2025-10-01"),
+            ("voucher", "edge-so-g", "Payment G0 on 2025-12-03"),
+            ("voucher", "edge-so-g", "Payment G1 on 2025-12-02"),
+            ("voucher", "edge-so-uni", "Journal e\u{301}1 on 2025-11-01"),
+            ("voucher", "edge-so-uni", "Journal z1 on 2025-10-31"),
+            ("voucher", "edge-so-uni", "Journal z1 on 2025-11-01"),
+            ("voucher", "edge-so-uni", "Journal \u{e9}1 on 2025-11-01"),
+            ("voucher", "edge-so-uni", "Journal \u{ff21}1 on 2025-11-01"),
+            ("voucher", "edge-so-uni", "Journal \u{1f4d1}1 on 2025-11-01"),
+            ("voucher", "edge-so-uni", "journal z1 on 2025-11-01"),
+        ]
+    );
+    let ageing = &results["creditor_ageing_shared_guid"];
+    let unclassified = (ageing.findings.iter())
+        .find(|f| f.id == "creditor_ageing_43bh/unknown_classification/729e41a8")
+        .unwrap();
+    assert_eq!(
+        emitted(&unclassified.evidence),
+        [
+            ("ledger", "Cedar Unclassified", ""),
+            ("voucher", "", "Purchase C-B1 on 2025-11-01"),
+            ("voucher", "", "Purchase c-b1 on 2025-11-01"),
+            ("voucher", "edge-cg-uni", "Purchase e\u{301}1 on 2025-11-02"),
+            ("voucher", "edge-cg-uni", "Purchase z1 on 2025-11-02"),
+            ("voucher", "edge-cg-uni", "Purchase \u{e9}1 on 2025-11-02"),
+            ("voucher", "edge-cg-uni", "Purchase \u{ff21}1 on 2025-11-02"),
+            (
+                "voucher",
+                "edge-cg-uni",
+                "Purchase \u{1f4d1}1 on 2025-11-02"
+            ),
+        ]
+    );
+}
+
+/// A GUID that is the text of another voucher's key (a NUL and a place) makes two keys equal. The
+/// reference's `voucher_keys` raises on each of these two books so edited, and for
+/// `creditor_ageing_43bh` with no creditor in scope too; `statutory_dues_43b` makes keys only for
+/// a mapped nature, so with none it returns its empty result, and with one it makes them over the
+/// whole population, so it raises too when the edited voucher touches no mapped ledger (all
+/// measured at `ee17d80f`). Each port refuses with the typed error where the reference raises, and
+/// only there.
+#[test]
+fn a_guid_that_makes_two_voucher_keys_equal_is_refused_by_dues_and_ageing() {
+    for (name, field, value) in [
+        ("statutory_dues_shared_guid", "guid", "EDGE-SG-A"),
+        // A voucher on no mapped ledger.
+        ("statutory_dues_shared_guid", "number", "X-OTHER"),
+        ("creditor_ageing_shared_guid", "guid", "edge-cg-d"),
+    ] {
+        let mut s = spec(name);
+        let voucher = (s["vouchers"].as_array_mut().unwrap().iter_mut())
+            .find(|v| v[field] == value)
+            .unwrap();
+        // The key of the book's first blank-GUID voucher.
+        voucher["guid"] = Value::from("\u{0}00000001");
+        let refused = |s: &Value| {
+            matches!(
+                dues_or_ageing_result(s),
+                Err(AuditError::VoucherKeysNotUnique)
+            )
+        };
+        assert!(refused(&s), "{name} {value}");
+        s["creditors"] = serde_json::json!([]);
+        s["statutory_dues"] = serde_json::json!({});
+        if name == "creditor_ageing_shared_guid" {
+            assert!(refused(&s), "{name} with no creditor");
+        } else {
+            let r = dues_or_ageing_result(&s).unwrap();
+            assert!(r.figures.is_empty() && r.findings.is_empty(), "{name}");
+        }
+    }
 }
 
 /// Two party ledgers whose tags are equal (blank-GUID ledgers named `Debtor 6631` and `Debtor

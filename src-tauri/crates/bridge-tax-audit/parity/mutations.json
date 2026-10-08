@@ -1234,10 +1234,10 @@
  {
   "id": "R06",
   "by": "reviewer-opus",
-  "what": "duplicate-GUID voucher keeps the first, not the last",
+  "what": "of two vouchers sharing a GUID a creditor keeps only the first",
   "file": "src/creditor_ageing_43bh.rs",
-  "from": "                    vs.insert(v.guid.as_str(), *v);",
-  "to": "                    vs.entry(v.guid.as_str()).or_insert(*v);"
+  "from": "                    vs.insert(vk.clone(), v);",
+  "to": "                    if !vs.values().any(|w| w.guid == v.guid) {\n                        vs.insert(vk.clone(), v);\n                    }"
  },
  {
   "id": "R07",
@@ -1316,8 +1316,8 @@
   "by": "reviewer-opus",
   "what": "26(i)(A) payment evidence includes credit-only vouchers",
   "file": "src/statutory_dues_43b.rs",
-  "from": "                .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)",
-  "to": "                .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise != 0)"
+  "from": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)",
+  "to": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise != 0)"
  },
  {
   "id": "R17",
@@ -1354,10 +1354,10 @@
  {
   "id": "R21",
   "by": "reviewer-opus",
-  "what": "voucher evidence keeps the first of a duplicate GUID",
+  "what": "of two vouchers sharing a GUID a nature keeps only the first",
   "file": "src/statutory_dues_43b.rs",
-  "from": "            out.vouchers.insert(v.guid.as_str(), *v);",
-  "to": "            out.vouchers.entry(v.guid.as_str()).or_insert(*v);"
+  "from": "            out.vouchers.insert(vk.clone(), v);",
+  "to": "            if !out.vouchers.values().any(|w| w.guid == v.guid) {\n                out.vouchers.insert(vk.clone(), v);\n            }"
  },
  {
   "id": "R22",
@@ -11630,6 +11630,278 @@
   "file": "src/loans_interest.rs",
   "from": "                            .any(|l| l.ledger == **name && l.amount_paise != 0)",
   "to": "                            .filter(|l| l.ledger == **name)\n                            .map(|l| i128::from(l.amount_paise))\n                            .sum::<i128>()\n                            != 0"
+ },
+ {
+  "id": "P1243-DEP-01",
+  "by": "author",
+  "what": "depreciation: a voucher is a depreciation journal when any voucher holding its GUID carries a depreciation-expense line (by GUID again), so a sale sharing the journal's GUID is book depreciation",
+  "file": "src/depreciation.rs",
+  "from": "        let is_dep_journal = v\n            .lines\n            .iter()\n            .any(|l| dep_expense_ledgers.contains(&l.ledger));\n        for l in &v.lines {\n            if !block_by_ledger.contains_key(&l.ledger) {",
+  "to": "        let is_dep_journal = keyed.iter().any(|(_, o)| {\n            o.guid == v.guid\n                && o.lines\n                    .iter()\n                    .any(|l| dep_expense_ledgers.contains(&l.ledger))\n        });\n        for l in &v.lines {\n            if !block_by_ledger.contains_key(&l.ledger) {"
+ },
+ {
+  "id": "P1243-DEP-02",
+  "by": "author",
+  "what": "depreciation: the same-day search for a cash payment to the supplier skips every voucher holding the addition's GUID again, not only the voucher itself",
+  "file": "src/depreciation.rs",
+  "from": "            if other_key == key {",
+  "to": "            if other_key == key || other.guid == v.guid {"
+ },
+ {
+  "id": "P1243-DEP-03",
+  "by": "author",
+  "what": "depreciation: a cash-flagged addition's row id that repeats takes no suffix (the repeated figure id again)",
+  "file": "src/depreciation.rs",
+  "from": "            let rid = if sharing[base.as_str()] > 1 {",
+  "to": "            let rid = if sharing[base.as_str()] > b.cash_rows.len() {"
+ },
+ {
+  "id": "P1243-DEP-04",
+  "by": "author",
+  "what": "depreciation: every cash-flagged addition's row id takes a suffix, also one that does not repeat",
+  "file": "src/depreciation.rs",
+  "from": "            let rid = if sharing[base.as_str()] > 1 {",
+  "to": "            let rid = if sharing[base.as_str()] > 0 {"
+ },
+ {
+  "id": "P1243-DEP-05",
+  "by": "author",
+  "what": "depreciation: the suffixes of a repeated row id start at 2",
+  "file": "src/depreciation.rs",
+  "from": "                *k += 1;\n                format!(\"{base}_{k}\")",
+  "to": "                *k += 1;\n                format!(\"{base}_{}\", *k + 1)"
+ },
+ {
+  "id": "P1243-DEP-06",
+  "by": "author",
+  "what": "depreciation: the suffixes of a repeated row id are numbered against the rows' order (last row first)",
+  "file": "src/depreciation.rs",
+  "from": "                *k += 1;\n                format!(\"{base}_{k}\")",
+  "to": "                *k += 1;\n                format!(\"{base}_{}\", sharing[base.as_str()] + 1 - *k)"
+ },
+ {
+  "id": "P1243-DEP-07",
+  "by": "author",
+  "what": "depreciation: rows of one voucher GUID on different ledgers count as sharing an id (the ledger's tag left out of what is counted), so an id that does not repeat takes a suffix",
+  "file": "src/depreciation.rs",
+  "from": "        for (base, _) in &tagged {\n            *sharing.entry(base.as_str()).or_insert(0) += 1;\n        }\n        let mut place: BTreeMap<&str, usize> = BTreeMap::new();\n        for (row, (base, h)) in b.cash_rows.iter().zip(&tagged) {\n            let v = row.voucher;\n            let rid = if sharing[base.as_str()] > 1 {\n                let k = place.entry(base.as_str()).or_insert(0);",
+  "to": "        for (base, _) in &tagged {\n            *sharing.entry(&base[..12]).or_insert(0) += 1;\n        }\n        let mut place: BTreeMap<&str, usize> = BTreeMap::new();\n        for (row, (base, h)) in b.cash_rows.iter().zip(&tagged) {\n            let v = row.voucher;\n            let rid = if sharing[&base[..12]] > 1 {\n                let k = place.entry(&base[..12]).or_insert(0);"
+ },
+ {
+  "id": "P1243-DEP-08",
+  "by": "author",
+  "what": "depreciation: every cash-flagged row and its finding cite the first row's voucher",
+  "file": "src/depreciation.rs",
+  "from": "        for (row, (base, h)) in b.cash_rows.iter().zip(&tagged) {\n            let v = row.voucher;",
+  "to": "        for (row, (base, h)) in b.cash_rows.iter().zip(&tagged) {\n            let v = b.cash_rows[0].voucher;"
+ },
+ {
+  "id": "P1243-DEP-09",
+  "by": "author",
+  "what": "depreciation: a population whose voucher keys would repeat (a GUID holding a NUL) is read as no vouchers, not refused",
+  "file": "src/depreciation.rs",
+  "from": "    let keyed = voucher_keys(&book.population()?)?;",
+  "to": "    let keyed = voucher_keys(&book.population()?).unwrap_or_default();"
+ },
+ {
+  "id": "P1243-DEP-10",
+  "by": "author",
+  "what": "depreciation: a put-to-use date given for a GUID reads only on the first voucher holding it, not on every voucher the client's list names",
+  "file": "src/depreciation.rs",
+  "from": "                let put_to_use = put_to_use_by_voucher\n                    .get(&v.guid)\n                    .cloned()",
+  "to": "                let put_to_use = put_to_use_by_voucher\n                    .get(&v.guid)\n                    .filter(|_| {\n                        keyed\n                            .iter()\n                            .find(|(_, o)| o.guid == v.guid)\n                            .is_some_and(|(first, _)| first == key)\n                    })\n                    .cloned()"
+ },
+ {
+  "id": "P1243-DEP-11",
+  "by": "author",
+  "what": "the edge dispatch of depreciation drops a put-to-use date given for the blank GUID",
+  "file": "tests/edge_books.rs",
+  "from": "                        .map(|(g, day)| (g.clone(), date(day.as_str().unwrap())))",
+  "to": "                        .filter(|(g, _)| !g.is_empty())\n                        .map(|(g, day)| (g.clone(), date(day.as_str().unwrap())))"
+ },
+ {
+  "id": "P1243-DEP-12",
+  "by": "reviewer",
+  "what": "depreciation: a repeated row id takes its place among all repeated ids of the block, not among the rows sharing it",
+  "file": "src/depreciation.rs",
+  "from": "                let k = place.entry(base.as_str()).or_insert(0);",
+  "to": "                let k = place.entry(\"\").or_insert(0);"
+ },
+ {
+  "id": "P1243-DEP-13",
+  "by": "reviewer",
+  "what": "depreciation: a voucher is a depreciation journal only when every line is on a depreciation-expense ledger",
+  "file": "src/depreciation.rs",
+  "from": "        let is_dep_journal = v\n            .lines\n            .iter()\n            .any(|l| dep_expense_ledgers.contains(&l.ledger));",
+  "to": "        let is_dep_journal = v\n            .lines\n            .iter()\n            .all(|l| dep_expense_ledgers.contains(&l.ledger));"
+ },
+ {
+  "id": "P1243-SD-01",
+  "by": "author",
+  "what": "statutory_dues_43b: a nature's vouchers are by GUID again: a voucher replaces an earlier one sharing its GUID, which is counted and not cited",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "            out.vouchers.insert(vk.clone(), v);",
+  "to": "            out.vouchers.retain(|_, w| w.guid != v.guid);\n            out.vouchers.insert(vk.clone(), v);"
+ },
+ {
+  "id": "P1243-SD-02",
+  "by": "author",
+  "what": "statutory_dues_43b: the charged and paid figures cite only the last voucher of the nature",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "        let voucher_ev = support::voucher_refs(nl.vouchers.values().copied());",
+  "to": "        let voucher_ev = support::voucher_refs(nl.vouchers.values().copied().last());"
+ },
+ {
+  "id": "P1243-SD-03",
+  "by": "author",
+  "what": "statutory_dues_43b: the due-date walk's figures and findings cite only the last voucher of the nature",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "    let lot_ev = support::voucher_refs(nl.vouchers.values().copied());",
+  "to": "    let lot_ev = support::voucher_refs(nl.vouchers.values().copied().last());"
+ },
+ {
+  "id": "P1243-SD-04",
+  "by": "author",
+  "what": "statutory_dues_43b: the payments cited for clause 26(i)(A) are taken one per GUID before the debit filter, so a payment whose GUID a later charge shares is cited nowhere",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "    let payment_ev = support::voucher_refs(nl.vouchers.values().copied().filter(|v| {",
+  "to": "    let by_guid: BTreeMap<&str, &Voucher> =\n        (nl.vouchers.values().map(|v| (v.guid.as_str(), *v))).collect();\n    let payment_ev = support::voucher_refs(by_guid.values().copied().filter(|v| {"
+ },
+ {
+  "id": "P1243-SD-05",
+  "by": "author",
+  "what": "statutory_dues_43b: a GUID that makes two voucher keys equal is not refused (the nature is walked with no voucher)",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "    for (vk, v) in voucher_keys(pop)? {",
+  "to": "    for (vk, v) in voucher_keys(pop).unwrap_or_default() {"
+ },
+ {
+  "id": "P1243-SD-06",
+  "by": "author",
+  "what": "statutory_dues_43b: voucher keys are made with no nature mapped too, a refusal the reference does not raise there",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "    let pop = book.population()?;",
+  "to": "    let pop = book.population()?;\n    voucher_keys(&pop)?;"
+ },
+ {
+  "id": "P1243-SD-07",
+  "by": "author",
+  "what": "voucher_refs: refs ordered by label before GUID",
+  "file": "src/support.rs",
+  "from": "        .map(|v| (v.guid.as_str(), voucher_label(v)))\n        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .map(|(guid, label)| EvidenceRef::with_label(\"voucher\", guid, &label))",
+  "to": "        .map(|v| (voucher_label(v), v.guid.as_str()))\n        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .map(|(label, guid)| EvidenceRef::with_label(\"voucher\", guid, &label))"
+ },
+ {
+  "id": "P1243-SD-08",
+  "by": "author",
+  "what": "voucher_refs: two vouchers with identical refs (one GUID, number, type and day) are cited twice",
+  "file": "src/support.rs",
+  "from": "    vouchers\n        .into_iter()\n        .map(|v| (v.guid.as_str(), voucher_label(v)))\n        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .map(|(guid, label)| EvidenceRef::with_label(\"voucher\", guid, &label))\n        .collect()",
+  "to": "    let mut refs: Vec<(&str, String)> = vouchers\n        .into_iter()\n        .map(|v| (v.guid.as_str(), voucher_label(v)))\n        .collect();\n    refs.sort();\n    refs.into_iter()\n        .map(|(guid, label)| EvidenceRef::with_label(\"voucher\", guid, &label))\n        .collect()"
+ },
+ {
+  "id": "P1243-SD-09",
+  "by": "author",
+  "what": "voucher_refs: a citation keeps one ref per GUID, so of two vouchers sharing a GUID one is cited",
+  "file": "src/support.rs",
+  "from": "        .collect::<BTreeSet<_>>()",
+  "to": "        .collect::<std::collections::BTreeMap<_, _>>()"
+ },
+ {
+  "id": "P1243-SD-10",
+  "by": "author",
+  "what": "voucher_refs: a voucher is cited without its label",
+  "file": "src/support.rs",
+  "from": "        .map(|v| (v.guid.as_str(), voucher_label(v)))",
+  "to": "        .map(|v| (v.guid.as_str(), String::new()))"
+ },
+ {
+  "id": "P1243-SD-11",
+  "by": "author",
+  "what": "voucher_refs: refs emitted in descending order (the canonical dump sorts them, so only the emitted-order test sees it)",
+  "file": "src/support.rs",
+  "from": "        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .map(|(guid, label)|",
+  "to": "        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .rev()\n        .map(|(guid, label)|"
+ },
+ {
+  "id": "P1243-CA-01",
+  "by": "author",
+  "what": "creditor_ageing_43bh: a creditor's vouchers are by GUID again: a voucher replaces an earlier one sharing its GUID, which is walked and not cited",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "                    vs.insert(vk.clone(), v);",
+  "to": "                    vs.retain(|_, w| w.guid != v.guid);\n                    vs.insert(vk.clone(), v);"
+ },
+ {
+  "id": "P1243-CA-02",
+  "by": "author",
+  "what": "creditor_ageing_43bh: a creditor's figures and findings cite only its last voucher",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "        creditor_ev.extend(support::voucher_refs(d.vouchers.values().copied()));",
+  "to": "        creditor_ev.extend(support::voucher_refs(d.vouchers.values().copied().last()));"
+ },
+ {
+  "id": "P1243-CA-03",
+  "by": "author",
+  "what": "creditor_ageing_43bh: a creditor's voucher refs are emitted in descending order",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "        creditor_ev.extend(support::voucher_refs(d.vouchers.values().copied()));",
+  "to": "        creditor_ev.extend(\n            support::voucher_refs(d.vouchers.values().copied())\n                .into_iter()\n                .rev(),\n        );"
+ },
+ {
+  "id": "P1243-CA-04",
+  "by": "author",
+  "what": "creditor_ageing_43bh: a GUID that makes two voucher keys equal is not refused (the creditors are walked with no voucher)",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "    for (vk, v) in voucher_keys(pop)? {",
+  "to": "    for (vk, v) in voucher_keys(pop).unwrap_or_default() {"
+ },
+ {
+  "id": "P1243-CA-05",
+  "by": "author",
+  "what": "creditor_ageing_43bh: voucher keys are made only with a creditor in scope, so with none a GUID that makes two keys equal is not refused where the reference raises",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "    for (vk, v) in voucher_keys(pop)? {",
+  "to": "    if creditors.is_empty() {\n        return Ok(BTreeMap::new());\n    }\n    for (vk, v) in voucher_keys(pop)? {"
+ },
+ {
+  "id": "P1243-CA-06",
+  "by": "author",
+  "what": "creditor_ageing_43bh: a creditor's ledger is cited after its vouchers, not first",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "        let mut creditor_ev = vec![EvidenceRef::new(\"ledger\", name)];\n        creditor_ev.extend(support::voucher_refs(d.vouchers.values().copied()));",
+  "to": "        let mut creditor_ev = support::voucher_refs(d.vouchers.values().copied());\n        creditor_ev.push(EvidenceRef::new(\"ledger\", name));"
+ },
+ {
+  "id": "P1243-SD-12",
+  "by": "author",
+  "what": "statutory_dues_43b: the payments cited for clause 26(i)(A) are the vouchers with a debit line on any ledger, so a charge is cited by its expense or party line",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)",
+  "to": "            .any(|l| l.amount_paise > 0)"
+ },
+ {
+  "id": "P1243-SD-14",
+  "by": "reviewer",
+  "what": "statutory_dues_43b: the clause 26(i)(A) payments are the vouchers with a credit line, not a debit line",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)\n    }));",
+  "to": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise < 0)\n    }));"
+ },
+ {
+  "id": "P1243-SD-13",
+  "by": "author",
+  "what": "statutory_dues_43b: a nil line on a ledger of the nature counts as a payment for clause 26(i)(A)",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)\n    }));",
+  "to": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise >= 0)\n    }));"
+ },
+ {
+  "id": "P1243-SD-15",
+  "by": "author",
+  "what": "statutory_dues_43b: voucher keys are made over the nature's own vouchers, not the whole population, so two keys that collide away from the nature are not refused",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "    for (vk, v) in voucher_keys(pop)? {",
+  "to": "    let own: Vec<&Voucher> = pop\n        .iter()\n        .copied()\n        .filter(|v| v.lines.iter().any(|l| ledgers.contains(l.ledger.as_str())))\n        .collect();\n    for (vk, v) in voucher_keys(&own)? {"
  },
  {
   "id": "QC-01",

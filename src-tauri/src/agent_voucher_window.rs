@@ -2453,7 +2453,7 @@ pub(super) fn parse_voucher_census(
                 let (Event::Start(event) | Event::Empty(event)) = event else {
                     unreachable!("matched as Start or Empty above")
                 };
-                let name = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let name = event.name().as_ref().to_ascii_uppercase();
                 if name == "VOUCHER" && scope.collection() {
                     if empty {
                         return Err(invalid());
@@ -2491,7 +2491,7 @@ pub(super) fn parse_voucher_census(
                 }
             }
             Ok(Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 scope.end(&end)?;
                 if end == "VOUCHER" && scope.collection() {
                     let row = current.take().ok_or_else(invalid)?;

@@ -16,11 +16,33 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
+**Changed**
+
+- A voucher built from a bank statement and posted to a mapped ledger now ends its narration with
+  `| Statement party: <name>`, the counterparty the statement printed (#1430). A line sent to suspense and a
+  cash line are written as before. A party that contains `|`, that carries the reserved marker, or that makes the narration longer than 2,000
+  characters now refuses the statement run (`party_not_admissible`); `skip` that party or map it to the suspense
+  ledger. A label the parser gives a line by its wording (bank charges, a card fee, an instalment) is not written as a party. Vouchers already imported keep their narration,
+  but amending a batch built before this change rewrites the narrations of that batch's vouchers in the book.
+  The name is part of the narration, so `mask_parties` does not shorten it and `drop_narration` removes it.
+
 **Fixed**
 
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
   the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
   text already said; the schema said 500 even when the row limit was lower or higher (#1148).
+- A State Bank of India statement line whose UPI, NEFT, RTGS or transfer text prints an empty name
+  field now names its party as `UNNAMED`, as the IMPS reader already did. Before, the party was empty, no mapping
+  row could match it, and the suspense line's narration named no one (#1429).
+
+**Changed**
+
+- The import journal (`agent-import-ledger.jsonl`) is now read with each of its dates as a checked
+  date. A record holding a date that is not `YYYYMMDD` refuses the whole journal
+  (`import_ledger_invalid`): building, posting, verifying and reconciling every batch, and the
+  desktop journal screen, stop until the record is put right, and the local data report shows the
+  journal as not read. No release has written such a date, so only a record edited by hand can hold
+  one, and the stored bytes do not change (#1307).
 
 ## [0.5.0] - 2026-10-08
 

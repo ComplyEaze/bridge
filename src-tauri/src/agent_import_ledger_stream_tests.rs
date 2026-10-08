@@ -731,7 +731,7 @@ fn a_typed_transaction_id_matches_only_the_same_shape() {
     );
     assert!(!already_posted(journal(&old), &extra));
     let mut later = same.clone();
-    later.vouchers[0].date = "20260902".into();
+    later.vouchers[0].date = bridge_tally_core::TallyDate::parse("20260902").unwrap();
     assert!(!already_posted(journal(&old), &later));
     // Another id with the same shape is another transaction.
     let renamed = plain("new", "t2", BANK_TO_B);

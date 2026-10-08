@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Helpers shared by the test modules ported from batch 1 onward: the reference's voucher
-//! evidence label, the tag -> ledger lookup the module invariants resolve figures through, and
-//! checked counts and sums.
+//! evidence label and refs, the tag -> ledger lookup the module invariants resolve figures
+//! through, and checked counts and sums.
 
 use std::collections::{BTreeSet, HashMap};
 
 use crate::book::{Book, Voucher};
 use crate::error::{AuditError, Result};
-use crate::findings::Value;
+use crate::findings::{EvidenceRef, Value};
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::iso;
 use crate::text_tables;
@@ -32,6 +32,22 @@ pub(crate) fn voucher_label(v: &Voucher) -> String {
         v.number.as_str()
     };
     format!("{} {} on {}", v.vtype, num, iso(&v.date))
+}
+
+/// Vouchers as evidence, as the reference's `_evidence` cites them: each voucher's own ref (its
+/// GUID and label), distinct, in (GUID, label) order by code point. Vouchers that share a GUID are
+/// each cited, unless their refs are identical too (#1195, #1243). The one shared copy; the modules
+/// that still keep their own move here in a cleanup.
+pub(crate) fn voucher_refs<'a>(
+    vouchers: impl IntoIterator<Item = &'a Voucher>,
+) -> Vec<EvidenceRef> {
+    vouchers
+        .into_iter()
+        .map(|v| (v.guid.as_str(), voucher_label(v)))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|(guid, label)| EvidenceRef::with_label("voucher", guid, &label))
+        .collect()
 }
 
 /// Every ledger by its stable tag, for resolving a `<figure>_<tag>` id back to its ledger. If two

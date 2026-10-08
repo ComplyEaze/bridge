@@ -77,7 +77,11 @@ closing_value?}}, default {}), `stock_opening` and `stock_closing` ({as_of, rows
 rate?}}}), each quantity a number, each value or rate integer paise, absent or null meaning None, and
 `is_integrated` (true, false, or absent/null for unknown); and for `party_monthly`: `cash`, `bank` (both also
 passed to the module invariant, as the reference's pack passes them) and `period` as above, and `top_n` (a non-negative integer, default the module's PARTY_TOP_N; Python would slice
-a negative one from the end, which the Rust `usize` cannot express, so both sides refuse it).
+a negative one from the end, which the Rust `usize` cannot express, so both sides refuse it); and for
+`depreciation`: `depreciation` (the client config's `[depreciation]` table: `block_by_ledger` ({ledger: block}),
+`opening_wdv_paise` ({block: integer paise}) and `dep_expense_ledgers` (a list of text), each required, as the
+reference's own `tae.config.depreciation_config` requires it, and `put_to_use_by_voucher` ({voucher GUID: ISO date},
+default none: the reference's pack passes none, but `run()` takes them).
 """
 from __future__ import annotations
 
@@ -100,7 +104,7 @@ def main() -> int:
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
     from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined, cash_book_integrity, cash_payments_40a3, clause21a_candidates, counter_cheques_40a3,
-                                 creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
+                                 creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
     from tae.config import load_rules, related_parties_config
@@ -375,6 +379,16 @@ def main() -> int:
                                  specified_persons_40a2b.check_invariants(e, rules, rp, cl23, res))
         return module, specified_persons_40a2b.run(eng, rules, rp, cl23)
 
+    def depreciation_run():
+        # As tae/pack.py: the client's three tables through the reference's own reader, and of the rules only the
+        # version and the [depreciation] keys bar its two prose fields. pack.py passes no put-to-use dates.
+        from tae.config import depreciation_config
+        dep = spec["depreciation"]
+        rules_dep = {"version": rules.version,
+                     **{k: v for k, v in rules["depreciation"].items() if k not in ("authority", "status")}}
+        put_to_use = {g: date.fromisoformat(d) for g, d in dep.get("put_to_use_by_voucher", {}).items()}
+        return depreciation, depreciation.run(eng, rules_dep, *depreciation_config({"depreciation": dep}), put_to_use)
+
     from tae.party_identity import build_party_index
     runners = {
         "applicability_44ab": lambda: (applicability_44ab, applicability_44ab.run(
@@ -400,6 +414,7 @@ def main() -> int:
             eng, rules, set(spec.get("creditors", [])), acceptance_lag_days=ca.get("acceptance_lag_days", 0),
             supplier_classification=ca.get("supplier_classification", {}), post_year_payments=post_year,
             mse_interest_ledgers=frozenset(ca.get("mse_interest_ledgers", [])))),
+        "depreciation": depreciation_run,
         # As tae/pack.py: the party index is built from the engagement's [party_identity] table, and
         # the round-off ledgers are passed as given.
         "entity_269st_gap": lambda: (entity_269st_gap, entity_269st_gap.run(

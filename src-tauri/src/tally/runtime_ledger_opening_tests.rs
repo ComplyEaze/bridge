@@ -30,15 +30,8 @@ fn scoped_opening_uses_requested_boundary_without_changing_book_start_default() 
     let mut observed_from = None;
     loop {
         match reader.read_event().unwrap() {
-            quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"SVFROMDATE" => {
-                observed_from = Some(
-                    reader
-                        .read_text(tag.name())
-                        .unwrap()
-                        .decode()
-                        .unwrap()
-                        .into_owned(),
-                );
+            quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "SVFROMDATE" => {
+                observed_from = Some(reader.read_text(tag.name()).unwrap().to_string());
             }
             quick_xml::events::Event::Eof => break,
             _ => {}

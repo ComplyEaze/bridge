@@ -555,10 +555,30 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
                 .iter()
                 .all(|voucher| voucher["status"] == "tally_reported_not_created")
     });
+    // A refused binding leaves each voucher matched by content only (#1039):
+    // the first line says what the book holds without making it this post's.
+    // A match that is cancelled or optional is not in the accounts, so it is
+    // never counted as held.
+    let matched_by_content = vouchers.as_array().map_or(0, |vouchers| {
+        vouchers
+            .iter()
+            .filter(|voucher| {
+                voucher["status"] == "matching_content_observed"
+                    && voucher["accounting_effective"] == true
+            })
+            .count()
+    });
     let summary = if reported_not_created {
         "Tally reported that this post created none of its vouchers: follow each voucher's next step."
-    } else {
+    } else if report["state"] != "refused" || matched_by_content == 0 {
         summary
+    } else if vouchers
+        .as_array()
+        .is_some_and(|vouchers| vouchers.len() == matched_by_content)
+    {
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
+    } else {
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
     };
     report["summary"] = json!(summary);
     report

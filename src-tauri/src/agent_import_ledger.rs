@@ -423,6 +423,10 @@ pub(super) struct Settlement {
     pub(super) unsettled: usize,
     /// Of `unsettled`, the batches with no recorded response.
     pub(super) unsettled_no_response: usize,
+    /// Of `unsettled`, the batches with a response whose binding to their own
+    /// vouchers was refused: matched by content only, they stay unsettled for
+    /// good (#1039).
+    pub(super) unsettled_binding_refused: usize,
     /// Batches with no recorded dispatch that were never found posted. That
     /// includes a batch imported by hand whose verification is incomplete, which
     /// may well be in Tally: this is what the journal holds, not what Tally
@@ -441,6 +445,7 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
         verified: bool,
         /// A readback found the batch posted at some point.
         found: bool,
+        binding_refused: bool,
     }
     let mut batches: BTreeMap<String, Progress> = BTreeMap::new();
     scan_records(reader, |record, _| match record {
@@ -454,7 +459,10 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
             match update.record_type {
                 StatusKind::DispatchIntent => progress.dispatched = true,
                 StatusKind::DispatchResponse => progress.responded = true,
-                StatusKind::VerificationStatus | StatusKind::PostSpanVerdict => {}
+                StatusKind::PostSpanVerdict => {
+                    progress.binding_refused = update.binding_refusal.is_some();
+                }
+                StatusKind::VerificationStatus => {}
             }
             // The latest status of every kind is the batch's status, as
             // `read_snapshot` takes it: a dispatch intent or a response after a
@@ -480,6 +488,10 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
         unsettled_no_response: unsettled
             .clone()
             .filter(|progress| !progress.responded)
+            .count(),
+        unsettled_binding_refused: unsettled
+            .clone()
+            .filter(|progress| progress.responded && progress.binding_refused)
             .count(),
         unsettled: unsettled.count(),
     })

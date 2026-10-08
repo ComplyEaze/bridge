@@ -4485,6 +4485,47 @@ fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_n
     assert_eq!(summary(&[]), refused);
 }
 
+/// A refused binding whose vouchers the book matches by content says what the
+/// book holds, and never that the vouchers are this post's (#1039). Only a
+/// refused binding reads so.
+#[test]
+fn a_refused_binding_says_the_book_holds_vouchers_of_the_same_content() {
+    let every = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.";
+    let some = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.";
+    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+    // A row is its status, or a content match with whether it counts in the
+    // accounts.
+    let summary = |state: &str, rows: &[Value]| {
+        with_post_span_summary(json!({ "state": state }), &json!(rows))["summary"].clone()
+    };
+    let status = |status: &str| json!({ "status": status });
+    let matched = |effective: bool| json!({ "status": "matching_content_observed", "accounting_effective": effective });
+    assert_eq!(summary("refused", &[matched(true)]), every);
+    assert_eq!(summary("refused", &[matched(true), matched(true)]), every);
+    assert_eq!(
+        summary("refused", &[matched(true), status("sent_not_attributed")]),
+        some
+    );
+    assert_eq!(
+        summary("refused", &[matched(true), status("duplicate_fingerprint")]),
+        some
+    );
+    // A cancelled or optional match is not held in the accounts.
+    assert_eq!(summary("refused", &[matched(true), matched(false)]), some);
+    assert_eq!(summary("refused", &[matched(false)]), refused);
+    for other in [
+        "duplicate_fingerprint",
+        "not_attributable",
+        "sent_not_attributed",
+    ] {
+        assert_eq!(summary("refused", &[status(other)]), refused, "{other}");
+    }
+    for state in ["bound", "unsettled", "not_bound", "book_rolled_back"] {
+        let own = summary(state, &[]);
+        assert_eq!(summary(state, &[matched(true)]), own, "{state}");
+    }
+}
+
 #[test]
 fn each_post_span_binding_state_carries_its_own_plain_summary() {
     let states = [

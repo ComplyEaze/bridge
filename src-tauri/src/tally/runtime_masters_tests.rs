@@ -35,6 +35,12 @@ fn capture(kind: NativeMasterKind) -> String {
         NativeMasterKind::StockGroups => include_bytes!(
             "../../crates/bridge-tally-protocol/tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml"
         ),
+        NativeMasterKind::CostCentres => include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/masters_cost_centres_shape_lab_flag_no_live.utf16le.xml"
+        ),
+        NativeMasterKind::CostCategories => include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/masters_cost_categories_shape_lab_live.utf16le.xml"
+        ),
     };
     decode(bytes).replace(CAPTURE_GUID, GUID)
 }
@@ -46,6 +52,7 @@ fn captured_rows(kind: NativeMasterKind) -> usize {
         NativeMasterKind::Godowns => 2,
         NativeMasterKind::Units => 4,
         NativeMasterKind::StockGroups => 3,
+        NativeMasterKind::CostCentres | NativeMasterKind::CostCategories => 2,
     }
 }
 
@@ -125,10 +132,12 @@ fn cause<T: std::error::Error + 'static>(error: &anyhow::Error) -> Option<&T> {
 
 /// The kinds sized by the master mark before their request. Voucher types are
 /// not: they are held by the checks after the read only.
-const SIZED_KINDS: [NativeMasterKind; 3] = [
+const SIZED_KINDS: [NativeMasterKind; 5] = [
     NativeMasterKind::Godowns,
     NativeMasterKind::Units,
     NativeMasterKind::StockGroups,
+    NativeMasterKind::CostCentres,
+    NativeMasterKind::CostCategories,
 ];
 
 #[test]
@@ -137,6 +146,8 @@ fn the_admission_edge_is_the_largest_mark_that_fits_and_the_next_refuses() {
         (NativeMasterKind::Godowns, 1_152),
         (NativeMasterKind::Units, 1_168),
         (NativeMasterKind::StockGroups, 1_160),
+        (NativeMasterKind::CostCentres, 1_037),
+        (NativeMasterKind::CostCategories, 1_264),
     ] {
         assert!(sized_before_the_read(kind), "{kind:?}");
         assert_eq!(largest_admitted_mark(kind), largest, "{kind:?}");

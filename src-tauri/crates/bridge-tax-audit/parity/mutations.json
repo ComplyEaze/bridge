@@ -9572,8 +9572,8 @@
   "by": "author",
   "what": "related_parties_cl23: XCL-1 fires at the tolerance",
   "file": "src/related_parties_cl23.rs",
-  "from": "        if gap > TOLERANCE_PAISE {",
-  "to": "        if gap >= TOLERANCE_PAISE {"
+  "from": "        if gap > TOLERANCE_PAISE {\n            out.push(format!(\n                \"XCL-1: {} = {paid}p",
+  "to": "        if gap >= TOLERANCE_PAISE {\n            out.push(format!(\n                \"XCL-1: {} = {paid}p"
  },
  {
   "id": "RP-13",
@@ -10142,6 +10142,78 @@
   "file": "src/clause21a_candidates.rs",
   "from": "debits.sort_by(|x, y| y.3.cmp(&x.3).then_with(|| x.1.guid.cmp(&y.1.guid)));",
   "to": "debits.sort_by(|x, y| x.1.guid.cmp(&y.1.guid).then_with(|| y.3.cmp(&x.3)));"
+ },
+ {
+  "id": "RP-21",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 says nothing of a paid figure with no accrued figure",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        let Some(accrued) = value_of(&accrued_id) else {\n            out.push(format!(\"XCL-1: {} has no matching {accrued_id}\", figure.id));",
+  "to": "        let Some(accrued) = value_of(&accrued_id) else {\n            let _ = &accrued_id;"
+ },
+ {
+  "id": "RP-22",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 says nothing of a paid figure citing no ledger",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        if names.is_empty() {\n            out.push(format!(\n                \"XCL-1: {} carries no ledger evidence to verify against the Trial Balance\",\n                figure.id\n            ));",
+  "to": "        if names.is_empty() {"
+ },
+ {
+  "id": "RP-23",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 never compares a published opening or closing payable",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                if gap > TOLERANCE_PAISE {\n                    out.push(format!(\n                        \"XCL-1: {id} = {published}p",
+  "to": "                if gap > TOLERANCE_PAISE && false {\n                    out.push(format!(\n                        \"XCL-1: {id} = {published}p"
+ },
+ {
+  "id": "RP-24",
+  "by": "author",
+  "what": "related_parties_cl23: the tag-collision refusal names one key twice",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                    \"{TEST_ID}: related persons {first:?} and {key:?} share the tag {tag}; \\",
+  "to": "                    \"{TEST_ID}: related persons {key:?} and {key:?} share the tag {tag}; \\"
+ },
+ {
+  "id": "RP-25",
+  "by": "author",
+  "what": "related_parties_cl23: the shape refusal drops the person key",
+  "file": "src/related_parties_cl23.rs",
+  "from": "        format!(\"{TEST_ID}: related_parties.{key:?}.{field} is present but is not {expected}\"),",
+  "to": "        format!(\"{TEST_ID}: related_parties.{field} is present but is not {expected}\"),"
+ },
+ {
+  "id": "RP-26",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1's per-row movement subtracts unchecked",
+  "file": "src/related_parties_cl23.rs",
+  "from": "row.closing_paise.checked_sub(row.opening_paise)",
+  "to": "Some(row.closing_paise - row.opening_paise)"
+ },
+ {
+  "id": "RP-27",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 compares a published opening or closing payable exactly",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                if gap > TOLERANCE_PAISE {",
+  "to": "                if gap != 0 {"
+ },
+ {
+  "id": "RP-28",
+  "by": "author",
+  "what": "related_parties_cl23: XCL-1 fires on a published opening or closing payable at the tolerance",
+  "file": "src/related_parties_cl23.rs",
+  "from": "                if gap > TOLERANCE_PAISE {",
+  "to": "                if gap >= TOLERANCE_PAISE {"
+ },
+ {
+  "id": "RP-29",
+  "by": "author",
+  "what": "related_parties_cl23: SUM-1's movement subtracts the column sums, not each row's",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            let movement = names.iter().try_fold(0i64, |acc, name| {\n                let row_movement = book.tb.get(*name).map_or(Some(0), |row| {\n                    row.closing_paise.checked_sub(row.opening_paise)\n                });\n                row_movement\n                    .and_then(|m| acc.checked_add(m))\n                    .ok_or_else(overflow)\n            })?;",
+  "to": "            let movement = tb_sum(&names, |row| row.closing_paise)?\n                .checked_sub(tb_sum(&names, |row| row.opening_paise)?)\n                .ok_or_else(overflow)?;"
  },
  {
   "id": "SP-01",

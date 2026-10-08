@@ -47,10 +47,21 @@ fn capture(kind: &str) -> String {
         "stock_groups" => include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml"
         ),
+        "cost_centres" => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_cost_centres_shape_lab_flag_no_live.utf16le.xml"
+        ),
+        "cost_categories" => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_cost_categories_shape_lab_live.utf16le.xml"
+        ),
+        // The parity book (setting at Yes), scrubbed: three centres, one under another.
+        "cost_centres_parity" => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_cost_centres_parity_flag_yes_live.utf16le.xml"
+        ),
         _ => panic!("no capture for {kind}"),
     };
     decode(bytes)
         .replace(CAPTURE_GUID, GUID)
+        .replace("7c0de000-0000-4000-8000-0000000000a1", GUID)
         .replace("de2e15f2-6d42-4715-b6e7-b7a95a68abe8", GUID)
 }
 
@@ -254,7 +265,7 @@ async fn an_unknown_or_missing_kind_is_refused_before_any_read() {
 }
 
 #[test]
-fn the_tool_definition_admits_only_the_five_kinds_and_states_the_size_limits() {
+fn the_tool_definition_admits_only_the_seven_kinds_and_states_the_size_limits() {
     let definitions = tool_definitions(false, false);
     let tool = definitions
         .as_array()
@@ -270,6 +281,8 @@ fn the_tool_definition_admits_only_the_five_kinds_and_states_the_size_limits() {
             "godowns",
             "units",
             "stock_groups",
+            "cost_centres",
+            "cost_categories",
             "groups"
         ])
     );
@@ -282,6 +295,8 @@ fn the_tool_definition_admits_only_the_five_kinds_and_states_the_size_limits() {
         NativeMasterKind::Godowns,
         NativeMasterKind::Units,
         NativeMasterKind::StockGroups,
+        NativeMasterKind::CostCentres,
+        NativeMasterKind::CostCategories,
     ] {
         let mark = MASTERS_RESPONSE_BUDGET_BYTES / masters_worst_row_bytes(kind);
         let written = format!("{},{:03}", mark / 1000, mark % 1000);
@@ -298,7 +313,9 @@ fn the_tool_definition_admits_only_the_five_kinds_and_states_the_size_limits() {
     assert!(description.contains("masters_too_large"));
     assert!(description.contains("Education mode is refused"));
     // What `mask_parties` masks, and why the rest is not masked.
-    assert!(description.contains("godown and stock-group names and their parents are masked"));
+    assert!(description.contains(
+        "godown, stock-group, cost-centre and cost-category names, their parents and a cost centre's category are masked"
+    ));
     assert!(description.contains("configuration labels, not counterparties"));
     assert!(description.contains("masters_voucher_types_empty"));
 }
@@ -507,6 +524,267 @@ async fn stock_groups_read_end_to_end_with_their_parent() {
     assert_eq!(packaging["parent"], "\u{fffd}#4; Primary");
     assert_eq!(packaging["alter_id"], 264);
     assert!(packaging.get("active").is_none());
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn cost_centres_read_end_to_end_with_their_category_although_the_setting_is_off() {
+    let one = OneServer::spawn(first_page_plans(capture("cost_centres"), 14));
+    let response = one.call(args("cost_centres", 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["kind"], "cost_centres");
+    assert_eq!(page["total"], 2);
+    let rows = page["masters"].as_array().unwrap();
+    let assembly = rows.iter().find(|row| row["name"] == "Assembly").unwrap();
+    assert_eq!(assembly["category"], "Business Line");
+    assert_eq!(assembly["parent"], "\u{fffd}#4; Primary");
+    assert!(page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line
+            .as_str()
+            .unwrap()
+            .contains("whether or not the company's Cost Centres setting is on")));
+    assert!(page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line
+            .as_str()
+            .unwrap()
+            .contains("does not return how a voucher was allocated")));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn cost_categories_read_end_to_end_with_their_allocation_flags() {
+    let one = OneServer::spawn(first_page_plans(capture("cost_categories"), 14));
+    let response = one.call(args("cost_categories", 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["kind"], "cost_categories");
+    assert_eq!(page["total"], 2);
+    let rows = page["masters"].as_array().unwrap();
+    let line = rows
+        .iter()
+        .find(|row| row["name"] == "Business Line")
+        .unwrap();
+    assert_eq!(line["allocates_revenue"], true);
+    assert_eq!(line["allocates_non_revenue"], false);
+    assert_eq!(line["affects_stock"], false);
+    assert!(line.get("parent").is_some(), "the key stays, null");
+    assert_eq!(line["parent"], Value::Null);
+    assert!(page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line
+            .as_str()
+            .unwrap()
+            .contains("predefined Primary Cost Category always exists")));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_category_that_affects_stock_is_returned_as_such() {
+    // The captured answer holds only categories that do not affect stock; the one flag of the last
+    // row is changed in the captured bytes, so the output is read from the wire and not defaulted,
+    // and all three flags of both rows are asserted so that a swap of two flags shows.
+    let captured = capture("cost_categories");
+    let flag = "<AFFECTSSTOCK TYPE=\"Logical\">No</AFFECTSSTOCK>";
+    let at = captured.rfind(flag).expect("a flag");
+    let changed = format!(
+        "{}<AFFECTSSTOCK TYPE=\"Logical\">Yes</AFFECTSSTOCK>{}",
+        &captured[..at],
+        &captured[at + flag.len()..]
+    );
+    let one = OneServer::spawn(first_page_plans(changed, 14));
+    let response = one.call(args("cost_categories", 0, 500, None)).await;
+    let rows = result(&response)["masters"].as_array().unwrap().clone();
+    let stock_flags = rows
+        .iter()
+        .map(|row| {
+            (
+                row["name"].as_str().unwrap().to_string(),
+                json!([
+                    row["allocates_revenue"],
+                    row["allocates_non_revenue"],
+                    row["affects_stock"]
+                ]),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        stock_flags,
+        [
+            ("Business Line".to_string(), json!([true, false, false])),
+            (
+                "Primary Cost Category".to_string(),
+                json!([true, true, true])
+            ),
+        ]
+    );
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn cost_centre_and_category_names_and_categories_are_masked_under_mask_parties() {
+    // A customer can name a cost centre after itself, so the names and the category a centre carries
+    // are masked; the allocation flags of a category are not names and stay.
+    let mut plans = first_page_plans(capture("cost_centres"), 14);
+    plans.extend(first_page_plans(capture("cost_categories"), 14));
+    let one = OneServer::spawn_with(plans, Redaction::MaskParties);
+
+    let response = one.call(args("cost_centres", 0, 500, None)).await;
+    let page = result(&response);
+    let rows = page["masters"].as_array().unwrap();
+    let names = rows
+        .iter()
+        .map(|row| (row["name"].clone(), row["category"].clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        [
+            (json!(mask("Assembly")), json!(mask("Business Line"))),
+            (json!(mask("Trading")), json!(mask("Business Line"))),
+        ]
+    );
+    // A mask that kept the plain text would pass the above if `mask` did.
+    assert_ne!(mask("Business Line"), "Business Line");
+    for plain in ["Assembly", "Trading", "Business Line"] {
+        assert!(!response.to_string().contains(plain), "{plain}");
+    }
+    assert!(rows
+        .iter()
+        .all(|row| row["parent"] == json!("\u{fffd}#4; Primary")));
+
+    let response = one.call(args("cost_categories", 0, 500, None)).await;
+    let page = result(&response);
+    let names = page["masters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["name"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        [
+            json!(mask("Business Line")),
+            json!(mask("Primary Cost Category"))
+        ]
+    );
+    // The rows, not the limitations: a limitation names the predefined category in plain text.
+    for plain in ["Business Line", "Primary Cost Category"] {
+        assert!(!page["masters"].to_string().contains(plain), "{plain}");
+    }
+    assert_eq!(page["masters"][0]["allocates_revenue"], json!(true));
+    // A null parent keeps its key under masking: it is not dropped as if it were text.
+    for row in page["masters"].as_array().unwrap() {
+        assert!(row.get("parent").is_some(), "{row}");
+        assert_eq!(row["parent"], Value::Null);
+    }
+    assert_eq!(one.requests(), 2 * FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_child_cost_centre_under_mask_parties_has_its_parent_masked_and_the_root_left() {
+    // The parity book: two centres at the top level and one under another.
+    let one = OneServer::spawn_with(
+        first_page_plans(capture("cost_centres_parity"), 14),
+        Redaction::MaskParties,
+    );
+    let response = one.call(args("cost_centres", 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(
+        names_and_parents(page),
+        [
+            (mask("Parity CC A"), json!("\u{fffd}#4; Primary")),
+            (mask("Parity CC A1"), json!(mask("Parity CC A"))),
+            (mask("Parity CC B"), json!("\u{fffd}#4; Primary")),
+        ]
+    );
+    for row in page["masters"].as_array().unwrap() {
+        assert_eq!(row["category"], json!(mask("Primary Cost Category")));
+    }
+    assert!(!response.to_string().contains("Parity CC"));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+/// A refusal of the read at once, after the first page: the same request count as the other
+/// refusals of a bad answer (no closing extent, identity or mode read).
+const REFUSED_AT_ONCE: usize = 4 + 3 + 4 + 4;
+
+async fn refused_cause(kind: &str, answer: String) -> (String, usize) {
+    let mut plans = through_opening_extent(14, MARK);
+    pair(&mut plans, xml(answer));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(args(kind, 0, 500, None)).await;
+    assert_eq!(error(&refused)["code"], "masters_read_failed", "{refused}");
+    (
+        error(&refused)["cause"].as_str().unwrap().to_string(),
+        one.requests(),
+    )
+}
+
+#[tokio::test]
+async fn a_cost_centre_without_a_category_is_refused_through_the_tool() {
+    let changed = capture("cost_centres").replacen(
+        "<CATEGORY TYPE=\"String\">Business Line</CATEGORY>",
+        "",
+        1,
+    );
+    assert_ne!(changed, capture("cost_centres"));
+    let (cause, requests) = refused_cause("cost_centres", changed).await;
+    assert_eq!(cause, "masters_row_field_invalid:category");
+    assert_eq!(requests, REFUSED_AT_ONCE);
+}
+
+#[tokio::test]
+async fn a_cost_collection_that_does_not_carry_its_own_type_is_refused_through_the_tool() {
+    for (kind, own, other) in [
+        ("cost_centres", "MSTDEPTYPE=\"32\"", "MSTDEPTYPE=\"16\""),
+        ("cost_categories", "MSTDEPTYPE=\"16\"", "MSTDEPTYPE=\"32\""),
+    ] {
+        let captured = capture(kind);
+        assert!(captured.contains(own), "{kind}");
+        let (cause, requests) = refused_cause(kind, captured.replace(own, other)).await;
+        assert_eq!(cause, "masters_collection_type_unexpected", "{kind}");
+        assert_eq!(requests, REFUSED_AT_ONCE, "{kind}");
+    }
+}
+
+#[tokio::test]
+async fn an_empty_cost_category_answer_is_refused_through_the_tool() {
+    let captured = capture("cost_categories");
+    let start = captured.find("<COLLECTION").unwrap();
+    let open_end = start + captured[start..].find('>').unwrap() + 1;
+    let close = captured.find("</COLLECTION>").unwrap();
+    let empty = format!("{}{}", &captured[..open_end], &captured[close..]);
+    let (cause, requests) = refused_cause("cost_categories", empty).await;
+    assert_eq!(cause, "masters_cost_categories_empty");
+    assert_eq!(requests, REFUSED_AT_ONCE);
+}
+
+#[tokio::test]
+async fn a_cost_category_row_that_carries_a_parent_returns_none() {
+    // A category has no parent: a PARENT on the wire is not read as one, and the key stays.
+    let captured = capture("cost_categories");
+    let tag = "<COSTCATEGORY NAME=\"Business Line\"";
+    let at = captured.find(tag).unwrap();
+    let open_end = at + captured[at..].find('>').unwrap() + 1;
+    let changed = format!(
+        "{}<PARENT TYPE=\"String\">Business Line</PARENT>{}",
+        &captured[..open_end],
+        &captured[open_end..]
+    );
+    let one = OneServer::spawn(first_page_plans(changed, 14));
+    let response = one.call(args("cost_categories", 0, 500, None)).await;
+    let rows = result(&response)["masters"].as_array().unwrap().clone();
+    assert_eq!(rows.len(), 2);
+    for row in &rows {
+        assert!(row.get("parent").is_some(), "the key stays: {row}");
+        assert_eq!(row["parent"], Value::Null, "{row}");
+    }
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 

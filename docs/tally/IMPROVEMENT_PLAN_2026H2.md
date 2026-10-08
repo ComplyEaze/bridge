@@ -263,7 +263,7 @@ not measurement.** Treat the latter two as directional.
 
 ## 3. The debate: what survived, what was ruled, what died
 
-Four persona proposals (CA operator, product strategist, protocol engineer, UX designer) were attacked by two adversarial critics (engineering-reality, CA-adoption) and reconciled by an arbiter. Full transcripts are preserved in the session scratchpad.
+Four persona proposals (CA operator, product strategist, protocol engineer, UX designer) were attacked by two adversarial critics (engineering-reality, CA-adoption) and reconciled by an arbiter.
 
 ### 3.1 Consensus (adopt)
 1. **Full-fidelity reads first** — narration, party GSTIN/address, bill allocations, GST/inventory lines; quarantine-on-unknown for custom TDL/UDF; encoding/name-normalization hardening (non-English fixtures). Everything else depends on this.
@@ -272,7 +272,7 @@ Four persona proposals (CA operator, product strategist, protocol engineer, UX d
 4. **Excel/CSV → review grid → post pipeline** with saved per-client column mappings — the expansion product.
 5. **Drift Sentinel** — checkpoint → "changed/new/deleted/back-dated since sign-off" with before/after diffs. Firm-maintained books only in v1; calm "backup restored, re-baselining" state distinct from tamper alarm.
 6. **Honest freshness UX** — Sync Beacon with dual timestamps; Gap Map reborn as a fix-it list; Truth States compressed to three visual tiers (Verified+time / Attention+reason+fix / Broken+remediation).
-7. **Incremental sync v2** — ALTMSTID/ALTVCHID cheap probe, segmented per-FY/month GUID+AlterID scans (a full-books unbounded export can hang a 500k-voucher Tally at 11am — segment + off-hours + visible progress/cancel), verified-scan-only tombstones, wired to the existing `bridge-tally-incremental` crate (well-shaped, just unwired).
+7. **Incremental sync v2** — ALTMSTID/ALTVCHID cheap probe, segmented per-FY/month GUID+AlterID scans (a full-books unbounded export can hang Tally on a large book during working hours — segment + off-hours + visible progress/cancel), verified-scan-only tombstones, wired to the existing `bridge-tally-incremental` crate (well-shaped, just unwired).
 8. **Kill the ceremony, keep the evidence** — rule adopted verbatim: *no safety mechanism without a demonstrated failure mode it prevents; no capability claim without a receipt.*
 9. **Declared topology honesty** — v1 supports: local single-machine, loaded-company, licensed Tally, no TallyVault, no gateway auth. Tally-on-cloud/RDP (**internal hypothesis: market prevalence is unverified**), multi-user LAN, gateway-security setups = explicit `Unsupported` Passport states, not silent failures.
 

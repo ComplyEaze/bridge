@@ -1,0 +1,354 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "narration_payees",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "491f22a8d7ad83c5",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded): debits to the ledgers the client lists, and any 194C-mapped ledger whose payees the TDS payee test could not name, when that test's finding lists them; bank payments read for the printed payee.",
+  "figures": [
+    {
+      "id": "narration_payees.added_ledgers_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "67832d0c861c0d90",
+      "definition_text": "194C-mapped ledgers read besides those the client lists, because the TDS payee test could not name the payee of their payments (its finding lists them; on a book whose vouchers share a blank or repeated identifier, a ledger debited on another voucher with the same identifier too). With no ledger listed or added, nothing was read.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.configured_ledgers_count",
+      "value": 5,
+      "unit": "count",
+      "definition_sha256_16": "db736a29e0c67c2e",
+      "definition_text": "Ledgers the client lists as paid to payees named only in the bank narration.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.cut_handle_unjoined_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "572435bbb39da9af",
+      "definition_text": "Bank payments whose UPI address one bank printed cut short and no single full address among the bank payments completes under an agreeing name (none, several, or one printed under another name): joined to no other payee by it.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.elsewhere_over_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "1b9226a248db354e",
+      "definition_text": "Payees under both s.194C limits on the ledgers read, whose total with their debits to other ledgers exceeds the aggregate limit, or one of whose payments debits other ledgers by more than the single-sum limit.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.elsewhere_over_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "bef05cdfc659c919",
+      "definition_text": "The debits to other ledgers of every such payee, added together.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.not_through_bank_total",
+      "value": 2750,
+      "unit": "paise",
+      "definition_sha256_16": "62b8d7662ebec896",
+      "definition_text": "Debits on the ledgers read with no bank leg (cash or journal): no payee is read from a bank narration for them.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "m05",
+          "label": "Payment m05 on 2025-05-06"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_08762431",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_9fab0428",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BETA STORES",
+          "label": "BETA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_08762431",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_9fab0428",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BETA STORES",
+          "label": "BETA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_elsewhere_08762431",
+      "value": 7130,
+      "unit": "paise",
+      "definition_sha256_16": "a270b2c1ce3d5763",
+      "definition_text": "Debits to other ledgers on outgoing bank payments to this payee -- ledgers other than those read, a bank or cash ledger, or a duties ledger (the vouchers, and the ledgers debited): listed beside the s.194C limits, not added into them.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Ghost Advances",
+          "label": ""
+        },
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        },
+        {
+          "kind": "voucher",
+          "id": "m02",
+          "label": "Payment m02 on 2025-05-03"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_08762431",
+      "value": 5210,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_9fab0428",
+      "value": 3170,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BETA STORES",
+          "label": "BETA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_08762431",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_9fab0428",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BETA STORES",
+          "label": "BETA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_08762431",
+      "value": 5210,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ALPHA TRADERS",
+          "label": "ALPHA TRADERS"
+        },
+        {
+          "kind": "voucher",
+          "id": "m01",
+          "label": "Payment m01 on 2025-05-02"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_9fab0428",
+      "value": 3170,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BETA STORES",
+          "label": "BETA STORES"
+        },
+        {
+          "kind": "voucher",
+          "id": "m03",
+          "label": "Payment m03 on 2025-05-04"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payees_count",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "b6f907568524af65",
+      "definition_text": "Distinct payees printed by the bank: payments sharing a printed name or a whole UPI handle are one payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_over_194c_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "2400a2096d06bfa0",
+      "definition_text": "Of those, payees over a s.194C threshold.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_over_194c_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "121fee500217c9d5",
+      "definition_text": "Total paid to the payees over a threshold.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.placeholder_payee_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "78e46136ab75d08c",
+      "definition_text": "Bank payments on the ledgers read where the bank printed a placeholder (such as \"Bank Acc\" or \"PhonePe\") in place of the payee: not read as any payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.possible_same_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "4f94c204008d6113",
+      "definition_text": "Groups of payees that a shortened UPI address might join, listed apart and never joined.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.resolved_total",
+      "value": 8380,
+      "unit": "paise",
+      "definition_sha256_16": "0a0479b3fe570ca0",
+      "definition_text": "Total bank payments with a printed payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.same_day_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f0d6e165f7e7002d",
+      "definition_text": "Payees paid two or more times on one day, the day's total over the s.194C single-sum limit, counted once per payee and day.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.same_day_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8bc394ef74148d1d",
+      "definition_text": "The day totals of every payee paid more than once on one day, over the s.194C single-sum limit, added together.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.unresolved_bank_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "bb150e6493cc3554",
+      "definition_text": "Bank payments on the ledgers read whose narration names no payee that can be read (a placeholder in place of the payee included).",
+      "evidence": []
+    }
+  ],
+  "findings": [],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "MAP-0",
+      "subject": "Ghost Advances",
+      "detail": "1 in-books voucher line(s) post to it; the book has no ledger master for it"
+    },
+    {
+      "invariant": "MAP-0",
+      "subject": "Ghost Bank",
+      "detail": "1 in-books voucher line(s) post to it; the book has no ledger master for it"
+    },
+    {
+      "invariant": "MAP-0",
+      "subject": "Ghost Wages",
+      "detail": "1 in-books voucher line(s) post to it; the book has no ledger master for it"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [
+    {
+      "invariant": "EVID-1",
+      "subject": "narration_payees",
+      "detail": "unresolved ledger:Ghost Advances"
+    }
+  ],
+  "module_invariants_evaluated": [
+    "narration_payees.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

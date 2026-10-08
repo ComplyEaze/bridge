@@ -44,9 +44,13 @@ creation with `agent_data_dir_encoding_invalid`; no lossy path alias is used.
 Before requesting financial data through an MCP client, the client may send the selected
 Tally result to its AI provider, including company
 identity, party or open-bill details, and amounts. An unset
-`BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` masks party names
-(in `stock_summary` it also masks stock item names and stock-group parents; GUIDs
-and Tally's reserved root stay plain) and `drop_narration` drops narration. Neither setting removes amounts. Set the
+`BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
+names and bank account numbers to their first two and last two characters (a name of
+four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
+and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
+drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
+GSTIN, IFSC, MSME or Udyam registration numbers or contact details, and the bank statement tool's `account_last4` (the last
+four digits of the statement's account number) is sent under every setting. Set the
 environment variable before launch when that better fits the workflow.
 
 On Unix, new data directories use mode `0700`; an existing data directory
@@ -83,6 +87,7 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 The ordinary default tools, in name order:
 
 - `balance_sheet`
+- `cash_flow`
 - `egress_log`
 - `ledger_masters`
 - `ledger_movement`
@@ -105,7 +110,7 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `local_data_report` (also
+0.4.2. `cash_flow` is in source and not yet in a published build. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -198,8 +203,8 @@ answer was larger than the response limit (#1033); a count that is equal, lower 
 or sizes anything, and the
 result of a counted read says which it was in `ledger_count_cross_check.status` (`matched`,
 `company_count_lower` or `unavailable`, the last meaning the check did not run). Equality was measured
-on three books only (one synthetic with its answer captured in the tree, two real books read by
-another lane and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
+on three books only (one synthetic with its answer captured in the tree, two real books read separately
+and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
 against the rows the read returns, not by this check. A mark
 above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
 `size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the
@@ -328,11 +333,28 @@ reads. Use `ledger_movement` with narrow dates when voucher detail is needed.
 ### Masters
 
 Use `masters` with `company_guid` and one `kind`: `voucher_types`, `godowns`,
-`units`, `stock_groups` or `groups`. It lists a company's masters of that
+`units`, `stock_groups`, `cost_centres`, `cost_categories` or `groups`. It lists a company's masters of that
 kind, for example a voucher type's numbering method (`automatic`, `manual` or
 `default`, as Tally reports it) and its `active` and `optional` flags. Each row
 carries `name`, `guid`, `master_id`, `alter_id` and `parent`; units add
-`decimal_places` and `simple`. A `groups` row carries `name`,
+`decimal_places` and `simple`; cost centres add `category` (always present: a centre without one is refused as `masters_row_field_invalid:category`) and
+cost categories `allocates_revenue`, `allocates_non_revenue` and `affects_stock`.
+Cost centres and categories are returned whether or not the company's Cost
+Centres setting is on: a book whose setting read No still returned its two
+centres and two categories (one synthetic book), and a book whose setting read Yes
+returned its three centres, one under another, with the same shape (a third synthetic
+book, captured in a separate sitting), so a No setting is not "no centres", and an empty cost-centre list (one synthetic book with no cost centre defined
+answered an empty list) does not say whether the feature is off or none is defined; this
+call does not return the setting. An empty cost-category list is refused
+(`masters_cost_categories_empty`) on the expectation that the predefined Primary Cost
+Category always exists: it was present in the two books whose categories were captured (one
+with the setting at No, one at Yes), and the categories of a book with no cost centre defined were not captured. The two
+cost collections must carry the `MSTDEPTYPE` Tally printed on every captured answer
+(32 for centres, 16 for categories), or the read is refused as
+`masters_collection_type_unexpected`, so an empty answer that was not resolved to the
+type asked for is not read as "none defined". Under `mask_parties` the names of cost centres and categories, a cost centre's parent
+and a cost centre's category are masked, as godown and stock-group names are. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool
+reads those allocations yet. A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
 parent that is Tally's reserved root keeps its marker form, as in
 `trial_balance`. Alias names are not returned.
@@ -345,15 +367,16 @@ its read in memory and a later page continues from it while the extent is
 unchanged (`snapshot`, `snapshot_id`, `listing_snapshot_changed`), as
 `trial_balance` does.
 
-Godowns, units and stock groups are read whole only when the master-alteration
+Godowns, units, stock groups, cost centres and cost categories are read whole only when the master-alteration
 mark (`ALTMSTID`) times an assumed worst-case row for that kind fits 16 MB. The
 mark counts the masters of every kind, so a book with few of this kind can be
-refused. That admits a mark of at most 1,152 for godowns, 1,168 for units and
-1,160 for stock groups; a larger book is refused before any collection request
+refused. That admits a mark of at most 1,152 for godowns, 1,168 for units,
+1,160 for stock groups, 1,037 for cost centres and 1,264 for cost categories; a larger book is refused before any collection request
 as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
 `limit_bytes`, and `limit_master_alter_id`, the largest mark this kind would be
 read at). Retrying refuses again. Both stock-heavy client books measured, with
-marks of about 100,000 and 300,000, refuse these three kinds; how common such
+marks of about 100,000 and 300,000, refuse godowns, units and stock groups (cost
+centres and categories were not tried on them); how common such
 marks are across live books is unmeasured (protocol reference §12a.12). `voucher_types` and `groups` have no size check
 before the read: voucher types keep the policy of Bridge's other voucher-type
 read, and groups that of the group read `profit_and_loss` and `balance_sheet`
@@ -370,10 +393,11 @@ extent shows the book moved, which is reported instead
 (`masters_extent_changed`). A response Bridge cannot read refuses at once with
 a `masters_*` cause, without waiting for the closing extent. A `voucher_types`
 answer with no rows refuses as `masters_voucher_types_empty`, because every
-company has predefined voucher types; the other kinds may answer with none.
+company has predefined voucher types, and a `cost_categories` answer with no rows as
+`masters_cost_categories_empty`; the other kinds may answer with none.
 
-Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1
-(`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
+Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1 (cost centres: three synthetic books, cost
+categories: two; the third book's sitting recorded TallyPrime 7.1, licence Silver, Education mode off in its own status read, which is not committed; see the provenance file) (`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
 `Default`, `Automatic` and `Manual` are the only numbering methods observed; any
 other value is returned as `{"unrecognised": "<raw text>"}` rather than refused.
 `default` is Tally's reported value, not evidence that a type numbers
@@ -387,11 +411,95 @@ characters a name, four aliases a master) that no capture has measured; a row
 that breaks them refuses the read as `masters_row_exceeds_bound`. No counts or
 hints (the company's `NUM*` fields), stock items or writes are part of this tool.
 
-Under `mask_parties`, godown and stock-group names and their `parent` values
-are masked like a party name, because a job-work godown or a supplier-named
-stock group can carry a party's name; Tally's reserved root as a parent is a
+Under `mask_parties`, godown, stock-group, cost-centre and cost-category names, their `parent`
+values and a cost centre's `category` are masked like a party name, because a job-work
+godown, a supplier-named stock group or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is a
 fixed marker and is left as it is. Voucher-type, unit and account-group names
 are not masked: they are configuration labels, not counterparties.
+
+### Cash Flow
+
+Use `cash_flow` with `company_guid`, `from` and `to` for Tally's own Cash Flow: the
+month-wise movement of the cash and bank ledgers. It is not a cash flow
+statement under AS 3. The window must be whole months: `from` the 1st of a month,
+`to` the last day of a month, at most twelve months, so that each row Tally prints
+(a month name, with no year) can be placed in its year. Otherwise the call is
+refused before any trial balance or report request, after the status and company reads (`cash_flow_window_not_month_start`,
+`cash_flow_window_not_month_end`, `cash_flow_window_too_many_months`; a window starting
+before the book is `trial_balance_before_books`; a reversed window is `invalid_date_range`).
+Education mode and a book with several currency masters are refused, as for the statements.
+
+The months are returned only once the **net total** of the whole window has been
+compared with the trial balance read for the same window and found equal: the
+months' closing amounts added up, against the debit and credit totals of every
+ledger under Cash-in-Hand or Bank Accounts (a ledger under a group a user made inside
+one is counted by the group tree and was not measured). Both sides must carry an amount.
+The top-level `state` is `observed` when the months are returned and
+`not_established` otherwise, with `reason`:
+
+- `cash_flow_differs_from_trial_balance`: the two figures differ, or only one side
+  carries an amount (an empty amount is not a zero: that side shows as `null`).
+  `months` is `null`; `net_total` carries both figures for investigation only (`use` says so),
+  and a count of ledgers with movement whose group could not be resolved, which is
+  where to look. Neither figure is the cash movement.
+- `cash_flow_money_group_unmeasured`: a ledger under Bank OD A/c or Bank OCC A/c
+  has movement in the window. Tally's Cash Flow was seen counting one such ledger
+  (debit only, one book), which the tie does not count, so the refusal stands in
+  place of a difference; it is covered by tests and has not been seen against Tally,
+  and a Bank OD credit and a Bank OCC ledger were not measured. `months` is `null`.
+- `cash_flow_nothing_to_compare`: nothing could be tied. Either neither the cash and
+  bank ledgers of the trial balance nor Tally's Cash Flow carry an amount for the
+  window (an empty amount is not a zero), or both sides net to zero, which would be
+  equal under any sign convention and any meaning of the columns. `months` is
+  `null`. Months that net to zero over no cash or bank ledger at all are
+  `cash_flow_differs_from_trial_balance`, not a tie.
+
+`unmeasured_in_this_answer` lists, in the result itself, what this answer holds that
+was never compared with Tally's own Cash Flow screen: `credit_amount_present` (a non-zero
+credit column), `positive_closing` (a closing on the credit side) and
+`window_runs_from_march_into_april` (a window across a financial year of the usual
+April-to-March kind). The first two were seen tied to the trial balance in live runs on one
+synthetic book (a credit in two windows, a positive closing in one of them) and are still named; the third was never run. The list is empty only for
+debit-only months in one year, and when it is not empty the lead says to treat each month's
+figure as unverified and compare it with Tally's own Cash Flow. A bank ledger placed under
+another group, a liability one for example, is not counted as cash or bank: if Tally
+counts it the net total differs and the result is `not_established`.
+
+`checks` says per field what was `checked`, `differs` (compared, and the figures
+disagree), `not_checked` or `withheld`: the net total is checked; the split into months is Tally's own and is not checked (a total
+can tie while one month is wrong); Tally's debit and credit columns are read but
+not returned: on the two books with credits each column differed from the debit and credit
+totals of the ledgers Tally counts as cash and bank (on one of them including a Bank OD A/c
+ledger) by one common amount in size (the ledgers' columns larger in both) while the net tied, and what that amount is has not been established. A month
+Tally printed with no amounts is returned with an empty `closing`, which is not zero and does not
+say the month had no entries (whether entries that cancel print an empty closing is not measured).
+A negative amount is a debit: cash and bank grew.
+
+An unknown report name, a reported failure, an empty answer and rows for other
+months than the window holds are each refused, classified by the structure of the
+answer: on licensed 7.1 an unknown name is answered in band (`STATUS` 0 with a
+`LINEERROR`) and is refused as `cash_flow_tally_reported_failure`; only a bare
+`RESPONSE` (an earlier build) is `cash_flow_report_unknown`; the others are
+`cash_flow_empty_envelope` and `cash_flow_months_unexpected`. A change between the
+two paired Cash Flow reads is `native_cash_flow_changed`.
+
+The refusals above reach the caller as an `isError` result whose `error.code` is
+`cash_flow_read_failed` and whose `error.cause` is the code named (the window codes
+are the `error.code` itself).
+
+The tool was run against Tally on two synthetic books on licensed TallyPrime 7.1 (2026-10-07,
+one call at a time through a recording relay): on five windows the net total tied to the trial
+balance and the months were returned (three windows with debits only; two with a credit amount,
+one of them with a positive closing as well), and a quiet window with no cash or bank amount was
+answered as `cash_flow_nothing_to_compare`. An independent recomputation from the raw bytes
+agreed with the tool on all six. Tally's own answers were captured on four synthetic books in all: on
+every captured month with an amount the closing is the debit plus the credit, and a year of empty
+months on a large book was answered at once. Not measured: a ledger under Bank OD A/c or Bank OCC
+A/c in the tool's own run (Tally was seen counting a Bank OD ledger, so the refusal above stands in
+place of a difference; it is covered by tests only), what Tally's debit and credit columns each
+include (each differed from the totals of the ledgers Tally counts as cash and bank by one common amount in size (the ledgers' columns larger in both) while the net tied; on one book that set includes a Bank OD A/c ledger), a contra, a window
+ending in February, a window crossing a financial year, optional or post-dated vouchers, a book with
+several currencies, and a large book with cash activity.
 
 ### Stock Summary
 
@@ -736,7 +844,8 @@ under Duties & Taxes (#969), and says per entry what the books record. Nothing i
 posted and nothing is inferred. It is a register of the books, not a GST return:
 it does not decide input tax credit eligibility or blocked credit, matches
 nothing against GSTR-2B or any portal, checks no GSTIN (`party_gstin` is returned
-only when the voucher carries one), does not return `REFERENCEDATE` yet, does not
+only when the voucher carries one), returns `reference_date` only when the voucher
+carries one (`YYYYMMDD`; measured on one synthetic book, on one Purchase), does not
 classify an item invoice's purchase as taxable, and never sums tax across heads
 or vouchers.
 
@@ -777,13 +886,14 @@ or vouchers.
   is no direction field and nothing is called input credit.
 - **Other fields.** `reference`, `party_gstin`, `is_invoice` and `post_dated`
   follow `vouchers` (absent means not observed). Cancelled, optional and
-  post-dated vouchers are returned flagged, not excluded. `REFERENCEDATE` is not
-  returned yet.
+  post-dated vouchers are returned flagged, not excluded. `reference_date` (the
+  voucher's `REFERENCEDATE`, `YYYYMMDD`) is present only where Tally sent one; one synthetic book
+  was read (protocol reference 8.2f), a sale was not.
 - **What `state` means.** The response `state` follows the rule `vouchers` and
   `voucher_presence` use (#985, #1031): a non-empty window is `complete` only when
   every voucher read was checked against a separate count of the window (a census,
-  which ComplyEaze Bridge sends unless the book's voucher high-water mark alone
-  proves it small, a few dozen vouchers), and an empty window when its
+  which ComplyEaze Bridge sends for every book that has held a voucher, however
+  few), and an empty window when its
   corroboration read confirmed it. Otherwise it is `partial` with `reason`
   `nonempty_window_unqualified` (or the corroboration's own reason for an empty
   window), and the rows are still returned. Before #1031 the registers called a
@@ -807,7 +917,7 @@ or vouchers.
   `register_ledger_currency_excluded`.
 - **Not measured.** A UI-typed purchase; item invoices whose purchase ledger sits
   in an inventory allocation (`taxable_entries` may be empty for them); books
-  with several currencies; any GSTIN, `REFERENCEDATE`, or cancelled, optional or
+  with several currencies; any GSTIN, a `REFERENCEDATE` on a sale, or cancelled, optional or
   post-dated voucher in the captures the tests use. The captures are one
   synthetic lab book and one month.
 
@@ -859,10 +969,10 @@ rate or return section, and matches nothing against any portal.
   1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry
   `-1000.00`, each tax entry `-90.00` and the party entry `1180.00`, where a Sales
   row has the sales and tax entries positive and the party entry negative.
-- **The cost varies by book.** The same call sent 96 requests on a book with 8
-  ledgers and one currency and 118 on one with 44 ledgers and two currencies (a
-  voucher census and base-currency reads are added). The result does not report
-  the cost.
+- **The cost varies by book.** A call sends 102 requests on a book with 8
+  ledgers and one currency (96 were recorded before a small book was counted, plus
+  the six the count adds; not measured since) and 118 on one with 44 ledgers and two
+  currencies (base-currency reads are added). The result does not report the cost.
 - **There are two recognised state-side heads.** One is `state_tax` (raw `State Tax`)
   on one measured book and the other `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
   recognised heads for the same side of the tax, so a caller must not look for
@@ -873,8 +983,8 @@ rate or return section, and matches nothing against any portal.
   head on a sale; more than one voucher in a window; paging; a company with a
   registration; a tax Tally computes itself (rate or HSN on the item); a sale
   typed on Tally's screen; accounting-invoice mode; a post-dated sale; a
-  `REFERENCE` or a populated `PARTYGSTIN` on a sale; `REFERENCEDATE` (not
-  returned); a ledger or voucher kept in a currency other than the book's base
+  `REFERENCE` or a populated `PARTYGSTIN` on a sale; a `REFERENCEDATE` on a
+  sale; a ledger or voucher kept in a currency other than the book's base
   (the Credit Note run's book defines a second currency, but all of its ledgers
   are in the base).
 - **A row of a kind no capture covers says so, where the row itself shows the
@@ -934,8 +1044,8 @@ covers only the identity and marks reads it sent.
   `earlier_snapshot` (`id`, `cause` `book_changed_since_first_page`,
   `offsets_do_not_continue` true): the page is a correct read of the book as it
   is, but its offsets do not continue the earlier pages; start again from offset 0.
-- **What is held.** Only a `complete` window; a `partial` one (an uncounted
-  small book, a withheld foreign-currency voucher) is read again by each page.
+- **What is held.** Only a `complete` window; a `partial` one (a withheld
+  foreign-currency voucher) is read again by each page.
   One window per company and question (dates, ledger, voucher-type selector,
   search, and listing or summary by grouping),
   for ten minutes after the read finished, within 64 MiB of its own, counted as
@@ -992,8 +1102,8 @@ no estimate for a larger or a smaller window.
   fit; no number is given: the census follows the book's mark, not the window, so a
   shorter window saves only the time of its vouchers and how short is enough is not
   established), or `not_established` (no voucher was read, whatever the time: such a window is read
-  twice, the second read wider and with its own census, which these figures do not
-  include; or the read stopped). A call past 240 s on Claude Desktop is cancelled and
+  twice, the second read wider (with its own census on a large book; a small book's
+  wider read sends none), which these figures do not include; or the read stopped). A call past 240 s on Claude Desktop is cancelled and
   its result never arrives, so `window_too_long` is seen on another host.
 - A read that **stopped** (a refusal) states the floor and no verdict: a request
   that failed or hung is not what a window costs.
@@ -1023,14 +1133,30 @@ judged as a whole page. When the block is left out the window says so
 window carries the window timings and no `read_cost`, and a page read afresh is read
 now. The desktop screen's voucher list shares the read and receives the
 block too. `outstandings`, which also reports window timings, keeps its shape; the
-other tools that read a window (`ledger_movement`, `verify_import`,
-`voucher_presence`) do not report it yet; and a `vouchers` refusal raised after the
-whole read carries no window.
+other tools that read a window (`verify_import`, `voucher_presence`) do not report it
+yet; `ledger_movement` does (below); and a `vouchers` refusal raised after the whole
+read carries no window.
+
+`ledger_movement` reads its voucher window twice, a planned read and a replay of the
+same parts that proves nothing moved, so its `result` carries the block (`read_cost`
+or `read_cost_left_out`, beside `ledgers`) when the two reads together were slow
+enough, with `window_reads: 2` and the same rules: the vouchers are the window's,
+counted once; `observed_seconds` add both reads; `floor_seconds` is each read's own
+gaps between consecutive census reads (the replay sends none, so it is the planned
+read's); the 240 s verdict is of the two voucher reads together, so a window whose planned
+read fitted can read `window_too_long` once the replay is added. The figures cover
+the two voucher reads alone: not the two ledger catalogue reads, the company check,
+or the wider read an empty window gets in each of the two reads (each pays its own
+census when the book is large; the verdict is then `not_established`). A
+`ledger_movement` refusal states no block yet. The result of a quick call is
+unchanged.
 
 ### Search and summaries in `vouchers` (#1230)
 
-Both work on the rows `vouchers` has already read and labelled; neither sends a
-Tally request of its own, so each costs what the same `vouchers` call costs.
+Search, and the `ledger`, `month` and `voucher_type` summaries, work on the rows `vouchers`
+has already read and labelled and send no Tally request of their own, so each costs what the
+same `vouchers` call costs. The `group` and `primary_group` summaries also read the ledger
+list and the group list (see below).
 
 **Search.** `voucher_number`, `reference`, `narration_contains` and `amount` keep
 the vouchers that satisfy every criterion given.
@@ -1063,7 +1189,7 @@ the vouchers that satisfy every criterion given.
   question a held window answers. `voucher_types` counts (`included`, `in_scope`)
   are taken before the search, so with a search they do not add up to `total`.
 
-**Summaries.** `summarise_by` (`ledger`, `month` or `voucher_type`) replaces
+**Summaries.** `summarise_by` (`ledger`, `month`, `voucher_type`, `group` or `primary_group`) replaces
 `items` with `buckets`, over the same window, selectors and search. `offset` and
 `limit` page the buckets; a later page comes from the held window as a later page
 of vouchers does. A summary holds its own window (the grouping is part of the
@@ -1116,9 +1242,95 @@ each other.
   when more remain (the next `offset` is this `offset` plus the buckets returned); a page that still does not fit is refused
   `agent_response_too_large`, so lower `limit` or raise the budget. The egress
   receipt counts the buckets as the rows prepared.
-- Ledger names in `group` are masked when parties are masked.
+- Ledger names in `ledger` buckets, and in the `members` of a `group` or `primary_group` bucket, are masked when parties are masked; group names are not (below).
+- **`group` and `primary_group`** add each ledger's entries under the group it sits in:
+  - A `group` bucket holds only the ledgers directly under that group, as the ledger master
+    shows it (a ledger directly under the reserved root is under `Primary`, with `reserved_name`
+    null). So a predefined group whose ledgers all sit in user sub-groups, such as Sundry Debtors
+    split into two, has no bucket of its own, and Indirect Expenses has a smaller one than Tally's
+    group total. The whole figure of a group, descendants included, is in **`subtree_totals`**: each
+    group on any bucket's chain with its `depth` (1 for a group under the root), `vouchers`,
+    `debit`, `credit` and `net` over everything under it, largest movement first, at most 60, with
+    `subtree_totals_total` exact and `subtree_totals_complete`. Each row says what it `covers`: a
+    `subtree_totals` row covers the group and everything under it, a `group` bucket only the
+    ledgers directly under it, so a row is never added to a bucket of the same group. They overlap (a ledger counts under
+    every group above it), so they do not add up to `totals`. Every page carries them. When
+    `subtree_totals_complete` is false the groups past the 60th are not in the answer: the groups
+    directly under the root are all in `primary_group`, and any other group's figure is the sum of
+    its member ledgers' buckets (sum them from a `summarise_by: ledger` call, or narrow the window).
+  - A `group` bucket carries `reserved_name` (empty for a group the book's user made), `chain`
+    (every group from it up to the one under the root, nearest first, each with `name` and
+    `reserved_name`) and `primary_group`. A user group is its own bucket, however deep it sits.
+  - A `primary_group` bucket holds every ledger under the group directly under the root and is
+    keyed by its reserved name, so a renamed predefined group stays one bucket and `group` shows
+    its current name; a group the book's user made there has no reserved name and is keyed by its
+    name, so two such groups are two buckets.
+  - Each bucket lists `members`: the ledgers in it with their own `debit` and `credit`, largest
+    movement first (never by name), at most 10, with `members_total` exact and `members_complete`.
+    Where a bucket is complete, its members add up to it. Every entry of the selected vouchers is
+    counted, also when `ledger` is given.
+  - A group bucket cannot be narrowed with a selector, so its vouchers are traced through a member
+    ledger with `ledger`; only 10 members are named, and `voucher_refs` names up to 5 vouchers.
+  - Group names are shown as the book has them, as `parent` is in `ledger_masters` and
+    `trial_balance` (a group may be named after a party); member ledger names are masked when
+    parties are masked.
+  - The groups are the book's masters read now, not the grouping in force on each voucher's date.
+    Each ledger's group chain is read before the window and again after it and must be the same, or
+    the call refuses: `group_snapshot_drifted` if a chain changed, `ledger_snapshot_drifted` if the
+    set of ledgers did. (A group that no listed ledger sits under could change unseen.)
+  - A ledger the ledger list does not hold, or whose chain cannot be walked to the root, refuses the
+    whole summary as `summary_group_unresolved`, with `cause` one of `no_parent`, `group_absent`,
+    `group_name_repeated`, `reserved_name_missing`, `cycle`, `exhausted`, `top_group_not_under_root`
+    (the top group of the chain has no parent, or none that is the root) or `ledger_not_in_catalogue`
+    (`no_parent` also covers a group name Tally returned that cannot be carried, one with control
+    characters or over 1,024 bytes); `ledger` names the first ledger that could not be placed (masked
+    when parties are masked; more may follow once it is corrected) and the group is not named: a group total that is short of an entry it could not place is the
+    misleading answer, so there is no "unplaced" bucket. A ledger no voucher of the window touches
+    does not matter. A voucher withheld for a foreign-currency amount is still in no bucket (the
+    result is `partial`, as for every summary).
+  - Cost, counted from the code and measured once in total (64 requests a call in the live run below): 30 requests on top of the window read, with or without
+    `ledger` (its name is resolved against the same ledger list). A paired, identity-bracketed read
+    is 6 requests; a group summary makes five: the company's marks first, to size the ledger list,
+    then the ledger list and the group list before the window and again after it. A book whose
+    master-alteration mark is above 11,983 is refused before the ledger list is read
+    (`summary_group_book_too_large`, with `size`). The limit is provisional and computed, not
+    measured: it is 16 MiB divided by an estimate of 1,400 bytes a ledger. The 16 MiB is a size chosen
+    here (half the transport cap) and not verified as safe for the gateway; the 1,400 is the estimate
+    the compliance ledger read uses, which that read measured at 1,104 bytes a ledger (a book of
+    1,989 ledgers) and 1,221 (a real book of about 9,500) on its own list without balances; this list
+    read 1,175 bytes a ledger in the live runs of 6 and 7 October (51,698 bytes both times, for a book of 44 ledgers: a small book, so
+    the fixed part of the answer weighs in, and not a basis to raise the limit).
+    The mark is an upper bound on ledgers (every other master raises it), so a smaller book may be
+    refused, and the limit is about half of what the transport's own rule admits for the same list;
+    it will not be raised without a measurement of bytes a ledger on this list. Then use the ledger, month or
+    voucher_type summaries and `ledger_masters` for each ledger's group. This list has not been
+    measured on a book of thousands of ledgers; a large book's ledger list is large, and a real book's group buckets may need several
+    pages (use `offset`). For ledger totals over a month or more on a large book, `trial_balance` is
+    the cheaper read.
+  - A later page comes from the held window with the placements it was read with, so it reads no
+    masters.
+  - Checked once against a live Tally, and what was not (see the paragraph below): one run on one
+    synthetic book. The tests also use a live ledger catalogue and group snapshot of that book and
+    the same book's `trial_balance` (its parent column comes from the same ledger collection, so it
+    checks the placement logic, while its amounts are independent), and scripted answers for the
+    call itself, with a group snapshot derived from the live one for the end-to-end tests. Not
+    measured: a large book, a group renamed or moved while a window is read, a held later page, the
+    drift refusals.
 
 A summary over a `partial` window is only as complete as that window: `state` and `reason` say which, and `basis` does not repeat them.
+
+**Group summaries checked once against a live Tally** (7 October 2026; TallyPrime 7.1 Silver; a debug build of the
+pull request's head, which is not in a published build, with the response budget raised to 2,000,000; the
+synthetic book of 67 vouchers of the 6 October check below, plus one voucher dated after its year; read-only, one request at a
+time). `summarise_by: group` over the year: `complete`, 12 buckets, 64 vouchers summarised, with exclusions
+`cancelled` 1, `no_accounting_entries` 1 and `optional` 1 (together the book's 67), 18 `subtree_totals`. Every
+bucket's debit, credit and voucher count equalled the 6 October run's ledger buckets added up by the trial
+balance's own parent column; `totals`, `vouchers_summarised` and the exclusions equalled that run's; the
+`subtree_totals` equalled the trial balance rolled up the group tree; each `chain`, `primary_group` and
+`members` list agreed with the book's group tree. `summarise_by: primary_group`: `complete`, 8 buckets, the
+same 64 vouchers and totals. Cost: 64 requests a call (34 for the window and 30 for the group modes, as
+counted from the code), about 10.6 and 11.1 seconds; the answers were 45 KB and 24 KB. One run each, a debug
+build; no large book, no group renamed or moved while a window was read, no held later page.
 
 **Checked once against a live Tally** (6 October 2026; TallyPrime 7.1 Silver; a debug build of master at
 4c30f3f9f, which is not in a published build, with the response budget raised to 2,000,000 (the largest
@@ -1141,9 +1353,9 @@ counted only that ledger's entries.
 Cost, from the same run (one run, a debug build): a plain read of that year took 34 requests (12
 status checks, 12 company-identity reads, 4 marks reads, the window's count as one paired read of 2
 requests, and its two parts as a paired read each, 4 requests), about 7 s and about 6 MB of answers from
-Tally. This book's mark (111) needed one count read; a large book needs many more. Every `summarise_by` or search call reads the window again at the
+Tally. This book's mark (111) needed one count read; a large book needs many more. Every `ledger`, `month` or `voucher_type` summary or search call reads the window again at the
 same cost (34 requests, 6 to 11 s). `ledger` adds 12 requests, four of them reads of the whole ledger
-list, which grows with the ledger count. For a month or more on a large book, read ledger totals with
+list, which grows with the ledger count; the `group` and `primary_group` summaries add 30 (above). For a month or more on a large book, read ledger totals with
 `trial_balance` instead: it has no month or voucher-type grouping and no search. The same year's
 `trial_balance` took 34 requests and 2.5 s on this book. One day of vouchers took minutes on the largest
 book measured (a voucher mark of about a million; see the cost note on window reads above, #595).
@@ -1685,14 +1897,25 @@ Existing batch files and proofs keep their formats; new journal fields are
 optional on read, and no database migration or background queue is introduced.
 Disabling the switch and restarting the connector removes posting from tool
 availability without deleting reconciliation evidence.
-**Keep this connector version for recovery.** The journal reader refuses any
-record carrying a field it does not know. So after a native post, an older
-connector refuses the whole journal, including reconciliation of batches it
+**Keep this connector version for recovery.** The journal reader refuses a
+dispatch or status record, or a voucher, carrying a field it does not know; a
+saved batch's own record can carry fields an older connector does not read. So
+after a native post attempted with 0.4.2 or later, a connector older than 0.4.2
+refuses the whole journal, including reconciliation of batches it
 wrote itself. Since bridge#579, each native dispatch intent records the
-REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post made
-with this version, the dispatch intent also records the pre-POST voucher mark and
-the journal a binding record, which an older connector refuses: do not downgrade
-after posting with it. A downgrade before that first post is harmless.
+REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post attempted
+with 0.4.2 or later, the dispatch intent also records the pre-POST voucher mark and
+the journal a binding record, which a connector older than 0.4.2 refuses: do not
+downgrade after posting with it. A downgrade before that first post leaves the
+journal readable, and versions 0.3.0 to 0.4.2 then refuse to post a batch this
+version built (`import_batch_predates_ledger_binding`, nothing posted): they
+cannot make the cash-in-hand and bill-wise checks it was built with. Their
+message for that refusal says "Build the batch again"; it was written for
+batches older than they are, and for a batch this version built it is the wrong
+step. Reinstall this version (or a newer one) and post the batch from it. What
+an older version builds and posts itself, the same batch built again included,
+has neither check. 0.2.0 and earlier have no such refusal: do not run them over a
+data folder this version has built in.
 
 This is a bounded first posting slice, not blanket host/licence qualification.
 A ledger mapper is unnecessary for exact existing names: `validate_masters`
@@ -1841,7 +2064,7 @@ one request. The building blocks:
 - **Window read.** A bounded voucher window (`read_voucher_window_timed` in
   `src-tauri/src/agent_voucher_window.rs`): the company's voucher marks (when
   not already known), the census spans (when the marks alone do not bound the
-  window), the data parts, then closing marks (only when the window was
+  window, or the tool counts a small book too), the data parts, then closing marks (only when the window was
   divided). Each is folded with the tool-level combination.
 - **Extent check.** On a later page of a listing, the two book-extent requests
   that decide whether the held read can be reused, folded with the runtime
@@ -2225,8 +2448,9 @@ supplier bill, a 20,000 customer advance and a 10,000 credit note to a customer,
 `payable` reads 80,000 and only 50,000 of it is owed to a supplier. The direction
 of an `unallocated` amount is the sign of the party's net unallocated balance, so
 an on-account receipt and an on-account payment on one party net into one figure.
-Separating advances, credit and debit notes and on-account amounts by their
-voucher's bill type is tracked in #945.
+For one party, `detail: unadjusted` separates advances, pending credit and debit notes and
+on-account amounts by their voucher's bill type (below). The book-wide `open_bills.kind` and
+`unallocated` figures do not; what is still to be measured is in #1356, the follow-up to #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted
@@ -2289,9 +2513,9 @@ byte cap retain partial source commitments in the in-process evidence store.
 window by one rule (#985, #1031): `complete`
 only when its rows were admitted voucher for voucher against the census that
 sized the read (protocol reference §11c.3), or it was empty and corroborated;
-otherwise `partial` with reason `nonempty_window_unqualified`. A book whose
-voucher high-water mark alone proves it small (a few dozen vouchers) sends no
-census, so its nonempty windows are `partial`. Voucher selectors are applied
+otherwise `partial` with reason `nonempty_window_unqualified`. A book that has
+held a voucher is counted however small, so a few vouchers can be `complete` (#1029);
+only a book that has never held one sends no census (Tally omits its mark), and a nonempty window read without one is `partial`. Voucher selectors are applied
 after the window is labelled, so a nonempty counted source with no matching
 ledger returns a complete empty selection, and an uncounted one a partial one. Amounts
 must parse as exact decimals, polarity flags must be `Yes` or `No`, and dates

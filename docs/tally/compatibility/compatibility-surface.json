@@ -242,6 +242,14 @@
       "path": "src-tauri/crates/bridge-tally-protocol/src/lib.rs"
     },
     {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_cash_flow.rs",
+      "reason": "Cash Flow read: renders the report request and parses the answer closed over a window of whole months, placing each year-less month row in its year; a defect shows one month's figure as another's or reads an empty or refused answer as a cash flow."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_cash_flow_tests.rs",
+      "reason": "Tests pinning the Cash Flow request to its captured bytes and the parser's and window's refusals, on the live captures; a weakened test lets a month be misplaced or an empty answer pass unseen."
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_ledger_collection.rs"
     },
     {
@@ -387,6 +395,10 @@
       "path": "src-tauri/src/agent_bank_statement.rs"
     },
     {
+      "path": "src-tauri/src/agent_cash_flow.rs",
+      "reason": "The cash_flow tool: returns the months only when their net total tied to the trial balance's cash and bank ledgers, and withholds them otherwise. A defect shows a cash movement Tally's own ledgers contradict."
+    },
+    {
       "path": "src-tauri/src/agent_catalog.rs"
     },
     {
@@ -444,6 +456,10 @@
     },
     {
       "path": "src-tauri/src/agent_import_post_location.rs"
+    },
+    {
+      "path": "src-tauri/src/agent_import_post_on_account.rs",
+      "reason": "Decides which ledgers an approval dialog marks On Account, and holds the check every dialog text passes before a person is asked to approve a post."
     },
     {
       "path": "src-tauri/src/agent_import_span_identity.rs",
@@ -647,6 +663,14 @@
     },
     {
       "path": "src-tauri/src/reports/bulk_party_statement_tests.rs"
+    },
+    {
+      "path": "src-tauri/src/reports/cash_flow.rs",
+      "reason": "The check of Tally's Cash Flow net total against the cash and bank ledgers of the trial balance, and which groups it counts as money; a defect passes a cash movement that does not tie or counts a ledger Tally does not."
+    },
+    {
+      "path": "src-tauri/src/reports/cash_flow_tests.rs",
+      "reason": "Tests pinning the Cash Flow check: the tie measured on live captures, a one-paisa difference, the groups counted as money and the Bank OD refusal; a weakened test lets a cash movement that does not tie ship unseen."
     },
     {
       "path": "src-tauri/src/reports/mod.rs"

@@ -361,14 +361,19 @@ same two points (#815): the build records it, and a post refuses with
 `cash_ledger_not_cash_in_hand` when it now reaches another group. The leg
 classification cannot see that move, since a cash ledger under Bank Accounts is
 still money. A batch recorded before that record refuses with
-`import_batch_predates_cash_ledger_record` and is rebuilt. A ledger that keeps bills in
+`import_batch_predates_cash_ledger_record` and is rebuilt. Releases 0.3.0 to 0.4.2 read
+neither this record nor the bill-wise one below, so a saved batch carries its ledger binding
+under a name they do not read: they refuse it as `import_batch_predates_ledger_binding`
+rather than post it without those checks. A ledger that keeps bills in
 Tally takes an entry On Account when the voucher carries no bill allocation, so the build
 reads each named ledger's `ISBILLWISEON` from the same ledger-list read it already makes
 (§12a.15), refuses until each such party is approved, and records the approved ledgers; the
 post and the queue admission read the flag again and refuse `import_bill_wise_changed` for a
 ledger that became bill-wise since. A batch recorded before that record refuses with
 `import_batch_predates_bill_wise_record` and is rebuilt. The approval is the assistant's word,
-not proof that a person said yes; the native dialog lists each voucher of a small batch but does not mark which entries land On Account (#1234).
+not proof that a person said yes; the native dialog marks each approved ledger On Account from
+the build's record, on each of its entries for one voucher and on its totals line for a batch
+(#1234).
 The queued re-read is not the last request before the POST: the mode and
 company re-admission and the two duplicate-absence reads follow it, because
 duplicate absence stays the final source check. A regroup in Tally during those
@@ -390,7 +395,14 @@ it lists entries in the saved order while the posted XML puts debits first, and
 it does not say which ledger becomes the voucher's party (Tally 7.1 Silver read
 the bank ledger back as the party on Payments and Receipts). A preview over the
 native dialog's caps (24 lines, 100 characters a line, 1,600 characters) is
-refused, never truncated; a bank voucher fits at most seven entries.
+refused, never truncated; a bank voucher fits at most six entries (an
+assistant's post, the route a bank voucher takes, adds the line that says when
+the post happens; a text without that line fits seven). A
+one-voucher preview ends with the voucher's own text: its reference and
+narration are the last two lines, quoted as they will be posted, under a line
+saying that no line below it is an entry, a total or an instruction, and the
+date line says where they are. Every line the preview writes itself, the On
+Account sentence included, stands above that line (#1234).
 
 **Scope.** The desktop "post a saved Journal" action stays Journal-only
 (`PostScope::JournalOnly`); its review was built for one Journal. So does the

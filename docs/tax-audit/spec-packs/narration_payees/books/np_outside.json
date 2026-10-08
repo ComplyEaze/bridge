@@ -1,0 +1,336 @@
+{
+ "comment": "Joins made through payments of a ledger that is not read (Office Expenses); the others are of Wages, all from Bank A. o01 (OMEGA ONE, handle OM.1) and o03 (OMEGA TWO, no handle) are one payee because o02, outside the ledgers read, prints OMEGA TWO with OM.1. o04 (TEAK, no handle) is keyed by the handle TK.7 that only o05 prints. o06 and o07 carry two cut handles and two names; both are completed by the full handle SALTRADERS.9 that only o08 prints, and are one payee. o10 (KADAM STORES, KDM.4) and o11 (cut KDM., name KDMCO) are one payee because o12 prints KDM.4 under a name that starts with KDMCO. o13 and o14 carry one cut handle, NEEMTRA, under two names, completed by the full handle that only o15 prints. o09 names a payee that no payment of Wages names: no row. Five payees. Each of o02, o05, o08, o12 and o15 is listed as its payee's debit to another ledger. The module check fires NP-6 four times, on the rows of o01 and o03, o06 and o07, o10 and o11, and o13 and o14: it reads only a row's own payments, where nothing links them. The row of o04 has one payment and is not checked.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_outside-100"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_outside-101"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_outside-102"
+  },
+  {
+   "name": "Office Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-np_outside-103"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 22331,
+   "closing": -22331
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 12804,
+   "credit": 0,
+   "closing": 12804
+  },
+  {
+   "ledger": "Office Expenses",
+   "opening": 0,
+   "debit": 9527,
+   "credit": 0,
+   "closing": 9527
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "o01",
+   "date": "2025-04-03",
+   "base_type": "Payment",
+   "narration": "UPI-OMEGA ONE-OM.1@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     101
+    ],
+    [
+     "Bank A",
+     -101
+    ]
+   ]
+  },
+  {
+   "guid": "o02",
+   "date": "2025-04-04",
+   "base_type": "Payment",
+   "narration": "UPI-OMEGA TWO-OM.1@ZZBK",
+   "lines": [
+    [
+     "Office Expenses",
+     299
+    ],
+    [
+     "Bank A",
+     -299
+    ]
+   ]
+  },
+  {
+   "guid": "o03",
+   "date": "2025-04-05",
+   "base_type": "Payment",
+   "narration": "UPI-OMEGA TWO-WAGES",
+   "lines": [
+    [
+     "Wages",
+     499
+    ],
+    [
+     "Bank A",
+     -499
+    ]
+   ]
+  },
+  {
+   "guid": "o04",
+   "date": "2025-04-06",
+   "base_type": "Payment",
+   "narration": "UPI-TEAK-WAGES",
+   "lines": [
+    [
+     "Wages",
+     701
+    ],
+    [
+     "Bank A",
+     -701
+    ]
+   ]
+  },
+  {
+   "guid": "o05",
+   "date": "2025-04-07",
+   "base_type": "Payment",
+   "narration": "UPI-TEAK-TK.7@ZZBK",
+   "lines": [
+    [
+     "Office Expenses",
+     905
+    ],
+    [
+     "Bank A",
+     -905
+    ]
+   ]
+  },
+  {
+   "guid": "o06",
+   "date": "2025-04-08",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/SALTR/ZZBK/SALTRADE/PAY",
+   "lines": [
+    [
+     "Wages",
+     1094
+    ],
+    [
+     "Bank A",
+     -1094
+    ]
+   ]
+  },
+  {
+   "guid": "o07",
+   "date": "2025-04-09",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 13/SALTRADE/ZZBK/SALTRADERS/PAY",
+   "lines": [
+    [
+     "Wages",
+     1285
+    ],
+    [
+     "Bank A",
+     -1285
+    ]
+   ]
+  },
+  {
+   "guid": "o08",
+   "date": "2025-04-10",
+   "base_type": "Payment",
+   "narration": "UPI-SAL TRADERS-SALTRADERS.9@ZZBK",
+   "lines": [
+    [
+     "Office Expenses",
+     1495
+    ],
+    [
+     "Bank A",
+     -1495
+    ]
+   ]
+  },
+  {
+   "guid": "o09",
+   "date": "2025-04-11",
+   "base_type": "Payment",
+   "narration": "UPI-PEEPAL-PP.3@ZZBK",
+   "lines": [
+    [
+     "Office Expenses",
+     1690
+    ],
+    [
+     "Bank A",
+     -1690
+    ]
+   ]
+  },
+  {
+   "guid": "o10",
+   "date": "2025-04-12",
+   "base_type": "Payment",
+   "narration": "UPI-KADAM STORES-KDM.4@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1887
+    ],
+    [
+     "Bank A",
+     -1887
+    ]
+   ]
+  },
+  {
+   "guid": "o11",
+   "date": "2025-04-13",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/KDMCO/ZZBK/KDM./PAY",
+   "lines": [
+    [
+     "Wages",
+     2086
+    ],
+    [
+     "Bank A",
+     -2086
+    ]
+   ]
+  },
+  {
+   "guid": "o12",
+   "date": "2025-04-14",
+   "base_type": "Payment",
+   "narration": "UPI-KDMCO TRADERS-KDM.4@QQBK",
+   "lines": [
+    [
+     "Office Expenses",
+     2270
+    ],
+    [
+     "Bank A",
+     -2270
+    ]
+   ]
+  },
+  {
+   "guid": "o13",
+   "date": "2025-04-15",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/NEEMT/ZZBK/NEEMTRA/PAY",
+   "lines": [
+    [
+     "Wages",
+     2473
+    ],
+    [
+     "Bank A",
+     -2473
+    ]
+   ]
+  },
+  {
+   "guid": "o14",
+   "date": "2025-04-16",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 13/NEEMTRAD/ZZBK/NEEMTRA/PAY",
+   "lines": [
+    [
+     "Wages",
+     2678
+    ],
+    [
+     "Bank A",
+     -2678
+    ]
+   ]
+  },
+  {
+   "guid": "o15",
+   "date": "2025-04-17",
+   "base_type": "Payment",
+   "narration": "UPI-NEEM TRADERS-NEEMTRADERS.2@ZZBK",
+   "lines": [
+    [
+     "Office Expenses",
+     2868
+    ],
+    [
+     "Bank A",
+     -2868
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

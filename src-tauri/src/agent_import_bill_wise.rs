@@ -11,7 +11,8 @@
 //! company's whole identity tuple, the endpoint and ALL the party's rows (a
 //! refusal may list only some). It is a consistency binding, not proof that a
 //! person said yes: the assistant holds every input and can supply it without
-//! asking anyone. The human gate is the native dialog (slice 3).
+//! asking anyone. The human gate is the native dialog, which marks each
+//! recorded ledger On Account (slice 3).
 
 use super::{
     party_name, EntrySide, ImportCompanyTuple, ImportEntry, ImportPayload, ImportVoucher,
@@ -289,6 +290,20 @@ pub(super) fn party_digest(context: &DigestContext<'_>, party: &BillWiseParty) -
 pub(super) struct OnAccountApproved {
     pub(super) ledger: String,
     pub(super) party_digest: String,
+}
+
+/// The order a party list is sent in: by ledger name, as the lists are built,
+/// unless party names are masked. The order of masked names would still be the
+/// alphabetical order of the real ones, so a masked list goes by digest.
+pub(super) fn in_listing_order<T>(
+    mut parties: Vec<T>,
+    masked: bool,
+    digest: impl for<'a> Fn(&'a T) -> &'a str,
+) -> Vec<T> {
+    if masked {
+        parties.sort_by(|left, right| digest(left).cmp(digest(right)));
+    }
+    parties
 }
 
 /// The approved parties as a build result lists them: each ledger name marked

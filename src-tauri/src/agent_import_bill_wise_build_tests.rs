@@ -160,12 +160,13 @@ async fn an_unapproved_bill_wise_party_refuses_the_build_and_lists_its_rows() {
         "never approve on the person's behalf",
         "one party per question",
         "hand import of the file is not checked at all",
-        "does not mark which entries land On Account",
+        "the native approval dialog marks each approved party On Account, from this build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines).",
+        "That dialog is one answer for the whole batch and asks nothing about any one party, so it does not replace these questions.",
         "importing it also replaces any bill allocations",
     ] {
         assert!(next_step.contains(phrase), "{phrase}");
     }
-    // It must not suggest a person's own dialog already covers these entries.
+    // The dialog marks the parties; it does not ask about each.
     assert!(!next_step.contains("shows the person its own dialog"));
 }
 
@@ -227,6 +228,10 @@ async fn an_approved_party_builds_and_the_record_carries_the_approval() {
         .find(|text| text.contains("on_account_approved"))
         .expect("the build says an entry lands On Account");
     assert!(note.contains("cannot tell whether a person said yes"));
+    assert!(
+        note.contains("If this batch is posted natively, the approval dialog marks each of these ledgers On Account, from this build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines); a hand import of the file shows no dialog."),
+        "{note}"
+    );
     assert!(!note.contains("approved in chat"));
     let saved = server.import_ledger().unwrap().pop().unwrap();
     assert_eq!(
@@ -331,6 +336,94 @@ async fn every_approved_party_is_listed_under_its_masked_name() {
     for name in [PARTY, SALES] {
         assert!(!response.to_string().contains(name), "{name}: {response}");
     }
+}
+
+/// With party names masked, both party lists the assistant receives are in
+/// digest order: the refusal's and the build result's. The digests change with
+/// the endpoint, so the run is repeated until they fall in the opposite order
+/// to the names (a coin toss each time), where name order would show. On that
+/// same run, with no masking, the refusal's list is in name order as before.
+#[tokio::test]
+async fn masked_party_lists_are_in_digest_order_where_it_differs_from_name_order() {
+    let both = || journal_plans(&[PARTY, SALES]);
+    for _ in 0..64 {
+        let refusal = || both()[..REFUSAL_REQUESTS].to_vec();
+        let simulator = SequenceSimulator::spawn([refusal(), refusal(), both()].concat()).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let mut server = server(directory.path(), simulator.address().port(), 200_000);
+        server.settings.redaction = crate::agent::Redaction::MaskParties;
+        let refused = answered(&server.call_tool("build_import_xml", build_args(None)).await);
+        let parties = refused["result"]["refused_parties"]
+            .as_array()
+            .expect("the refusal lists its parties")
+            .clone();
+        assert_eq!(parties.len(), 2, "{refused}");
+        // PARTY sorts before SALES by name; its masked form begins "Br".
+        let digest_of = |starts: &str| {
+            parties
+                .iter()
+                .find(|party| party["ledger"].as_str().unwrap().starts_with(starts))
+                .map(|party| party["party_digest"].as_str().unwrap().to_string())
+                .expect("each party is listed under its masked name")
+        };
+        let (first_by_name, second_by_name) = (digest_of("Br"), digest_of("WR"));
+        if first_by_name < second_by_name {
+            simulator.cancel();
+            continue;
+        }
+        let digests = |list: &Value| -> Vec<String> {
+            list.as_array()
+                .unwrap()
+                .iter()
+                .map(|party| party["party_digest"].as_str().unwrap().to_string())
+                .collect()
+        };
+        let by_digest = vec![second_by_name, first_by_name];
+        assert_eq!(digests(&refused["result"]["refused_parties"]), by_digest);
+        server.settings.redaction = crate::agent::Redaction::None;
+        let unmasked = answered(&server.call_tool("build_import_xml", build_args(None)).await);
+        assert_eq!(
+            unmasked["result"]["refused_parties"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|party| party["ledger"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            [PARTY, SALES],
+            "{unmasked}"
+        );
+        server.settings.redaction = crate::agent::Redaction::MaskParties;
+        // The approvals are given in name order, so the result's order is its
+        // own and not the argument's.
+        let approvals: Vec<Value> = by_digest
+            .iter()
+            .rev()
+            .map(|digest| json!({"party_digest": digest}))
+            .collect();
+        let built = answered(
+            &server
+                .call_tool("build_import_xml", build_args(Some(json!(approvals))))
+                .await,
+        );
+        assert_eq!(
+            digests(&built["result"]["on_account_approved"]),
+            by_digest,
+            "{built}"
+        );
+        // The saved record keeps its own order, by name.
+        let saved = server.import_ledger().unwrap().pop().unwrap();
+        assert_eq!(
+            saved
+                .on_account_approved
+                .unwrap()
+                .iter()
+                .map(|approved| approved.ledger.as_str())
+                .collect::<Vec<_>>(),
+            [PARTY, SALES]
+        );
+        return;
+    }
+    panic!("no run in 64 put the two digests in the opposite order to the names");
 }
 
 #[tokio::test]
@@ -636,7 +729,7 @@ fn the_tool_text_says_what_the_digest_does_not_prove_and_where_the_gate_is() {
     for phrase in [
         "it does NOT prove that a person said yes",
         "never approve on the person's behalf",
-        "does not mark which entries land On Account",
+        "The native approval dialog marks each approved party On Account, from the build's record: before its name on each of its entries for one voucher, and on its totals line for a batch (not on a batch's per-voucher lines);",
         "a hand import of the file is not checked at all",
         "is refused at post as import_bill_wise_changed",
         "bill_wise_party_unapproved",

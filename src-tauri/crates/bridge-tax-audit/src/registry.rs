@@ -92,6 +92,12 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::cash_payments_40a3_on(e, b, r),
     },
     PortedTest {
+        id: "clause21a_candidates",
+        // Nothing structural: two figures per item with a candidate.
+        min_figures: 2,
+        run_on: |e, b, r, _| crate::clause21a_candidates_on(e, b, r),
+    },
+    PortedTest {
         id: "counter_cheques_40a3",
         // `configured_terms_count`, the six totals and counts, and one total per excluded role:
         // twelve with no term configured, as the reference's own pack runs a client without one.

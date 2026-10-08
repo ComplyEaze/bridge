@@ -3285,6 +3285,42 @@ async fn a_ledger_replaced_under_its_name_since_the_build_is_refused_before_appr
     }
 }
 
+/// The changed ledgers go out in the order the batch names them and never by
+/// name, with or without masking. The saved Journal names `WR2 Sales` before
+/// `Cash`.
+#[tokio::test]
+async fn the_changed_ledgers_of_a_refused_post_are_listed_in_the_order_the_batch_names_them() {
+    for redaction in [
+        crate::agent::Redaction::None,
+        crate::agent::Redaction::MaskParties,
+    ] {
+        let replaced = |name: &str| BoundLedger {
+            name: name.into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000ff".into(),
+        };
+        let (result, ..) = refused_by_build_binding_under(
+            Some(vec![replaced("Cash"), replaced("WR2 Sales")]),
+            false,
+            redaction,
+        )
+        .await;
+        let sent = |name: &str| match redaction {
+            crate::agent::Redaction::MaskParties => crate::agent::mask(name),
+            _ => name.to_string(),
+        };
+        assert_eq!(
+            result["error"]["code"], "import_masters_changed_since_build",
+            "{result}"
+        );
+        assert_eq!(
+            result["error"]["ledgers_changed"],
+            json!([sent("WR2 Sales"), sent("Cash")]),
+            "{result}"
+        );
+        assert_eq!(result["error"]["ledgers_changed_total"], 2, "{result}");
+    }
+}
+
 /// #1234: when a ledger was replaced under its old name AND a named ledger is
 /// bill-wise now, the post reports the replacement (which names the ledger and
 /// says to confirm the intended one), not the flag, so a rebuild is not
@@ -3811,6 +3847,36 @@ async fn a_doubted_post_stays_doubted_when_reconciled_later() {
     assert_eq!(masters_check_of(&server, BATCH), doubt);
 }
 
+/// A recorded verdict's ledgers are answered in the order the batch names them,
+/// never in the order they were recorded (which is by name). The captured
+/// batch names its two ledgers in name order too, so this record is written in
+/// the opposite order to tell the two apart; the record itself is left as it
+/// was saved.
+#[tokio::test]
+async fn a_recorded_verdict_lists_its_ledgers_in_the_order_the_batch_names_them() {
+    let recorded = serde_json::to_vec(&json!({"state":"posted_under_changed_masters",
+        "trigger":"masters_moved","ledgers":["Cash","Bridge Nested Debtor WR4"]}))
+    .unwrap();
+    let (response, _, _, server, _directory) =
+        reconcile_with_masters_check(Some(&recorded), Vec::new()).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["masters_after_post"]["ledgers"],
+        json!(["Bridge Nested Debtor WR4", "Cash"]),
+        "{response}"
+    );
+    assert_eq!(
+        result["masters_after_post"]["state"], "posted_under_changed_masters",
+        "{response}"
+    );
+    // The record's own bytes, not a reading of them.
+    let record = server
+        .imports_dir()
+        .unwrap()
+        .join(format!("{BATCH}.masters_check.json"));
+    assert_eq!(fs::read(record).unwrap(), recorded);
+}
+
 /// A check the post could not finish (a crash, a lost read) is finished by the
 /// next readback that finds the voucher, against the ledgers bound at build.
 #[tokio::test]
@@ -4222,6 +4288,51 @@ async fn a_failed_readback_reports_changed_masters_with_the_ledger_marked() {
             "{response}"
         );
     }
+}
+
+/// The answer of a post whose readback fails lists the changed ledgers in the
+/// order the batch names them too. The saved Journal names `WR2 Sales` before
+/// `Cash`, so the two orders differ; the record keeps the order it was written
+/// in.
+#[tokio::test]
+async fn a_failed_readback_lists_the_changed_ledgers_in_the_order_the_batch_names_them() {
+    let replaced = replaced_once(
+        &replaced_once(
+            &catalogue(),
+            ">61c6de69-1748-461c-ad3f-162cb949df9f-0000001f</GUID>",
+            ">61c6de69-1748-461c-ad3f-162cb949df9f-000000ff</GUID>",
+        ),
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000d0</GUID>",
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000fe</GUID>",
+    );
+    // No readback is scripted, so the read after the post fails.
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(masters_moved_to(8)));
+    plans.extend(paired(replaced));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let _ = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert!(result.get("dispatch").is_none(), "{response}");
+    assert_eq!(
+        result["masters_after_post"]["ledgers"],
+        json!(["WR2 Sales", "Cash"]),
+        "{response}"
+    );
+    assert_eq!(
+        masters_check_of(&server, &line.batch_id)["ledgers"],
+        json!(["Cash", "WR2 Sales"]),
+        "{response}"
+    );
 }
 
 /// A voucher the book already holds that matches the saved batch's row by

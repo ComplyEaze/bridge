@@ -1191,6 +1191,24 @@ mod tests {
     }
 
     #[test]
+    fn a_row_adds_a_second_share_of_the_same_voucher_to_its_first() {
+        // `lines` is keyed per voucher and `run` adds a voucher to a row once, so no book reaches
+        // the sum in `Row::add`; this pins what it does if a voucher is added twice (an overwrite
+        // would lose the first share and line).
+        let v = Voucher {
+            guid: "g1".to_string(),
+            ..Default::default()
+        };
+        let keys = voucher_keys(&[&v]).unwrap();
+        let (vk, voucher) = &keys[0];
+        let mut row = Row::default();
+        row.add(vk, voucher, 7, 10).unwrap();
+        row.add(vk, voucher, 5, 4).unwrap();
+        assert_eq!(row.paise, 12);
+        assert_eq!(row.lines, BTreeMap::from([(vk.clone(), (12, 14))]));
+    }
+
+    #[test]
     fn the_recipient_type_follows_pack_py() {
         for e in ["individual", "huf", "firm", "llp", "company"] {
             assert_eq!(

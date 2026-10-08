@@ -470,11 +470,45 @@ fn every_shape_no_capture_shows_is_refused_under_its_own_name() {
             "{signed_zero}"
         );
     }
-    // a zero composite may quote a zero rate as well as none
+    // a negative rate is not a composite at all
+    assert_eq!(
+        parse("$ 100.00 @ I\u{20b9} -86/$  = I\u{20b9} 8600.00"),
+        Err(CompositeRefusal::NotComposite)
+    );
+}
+
+/// The shapes the parse admits although no committed capture shows them. They
+/// are pinned here so that refusing or widening one is a visible change, and
+/// each waits for a capture (the lab steps in the pull request).
+#[test]
+fn the_shapes_admitted_without_a_capture_are_pinned() {
+    // a zero composite that quotes a zero rate (the captured zero has none)
     assert_eq!(
         parse("$ 0.00 @ I\u{20b9} 0/$  = I\u{20b9} 0.00"),
         Ok(CurrencyComposite::Zero {
             foreign_symbol: "$".to_string()
         })
+    );
+    // a foreign symbol other than `$`, not checked against a list
+    let CurrencyComposite::Valued(valued) =
+        parse("-US$ 100.00 @ I\u{20b9} 86/US$  = -I\u{20b9} 8600.00").unwrap()
+    else {
+        panic!("a valued composite");
+    };
+    assert_eq!(valued.foreign_symbol(), "US$");
+    // a rate with one to three decimals (the captured ones have none or four)
+    for rate in ["86.5", "86.50", "86.500"] {
+        let text = format!("$ 100.00 @ I\u{20b9} {rate}/$  = I\u{20b9} 8650.00");
+        let CurrencyComposite::Valued(valued) = parse(&text).unwrap() else {
+            panic!("a valued composite");
+        };
+        assert_eq!(valued.rate().as_str(), rate);
+    }
+    // a rate below one (every captured rate is 84 or more)
+    assert!(parse("$ 100.00 @ I\u{20b9} 0.5/$  = I\u{20b9} 50.00").is_ok());
+    // a book whose base is not the rupee: the book's own base is accepted
+    let euro = BaseCurrencyName::among_several_for_tests("\u{20ac}");
+    assert!(
+        parse_currency_composite("-$ 100.00 @ \u{20ac} 0.9/$  = -\u{20ac} 90.00", &euro).is_ok()
     );
 }

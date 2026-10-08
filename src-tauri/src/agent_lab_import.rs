@@ -1942,7 +1942,7 @@ fn parse_voucher_readback_nested(xml: &str) -> Result<Vec<ObservedVoucher>, Stri
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let tag = event.name().as_ref().to_ascii_uppercase();
                 if path.len() == 4 && path == ["ENVELOPE", "BODY", "DATA", "COLLECTION"] {
                     if tag != "VOUCHER" {
                         return Err("agent_read_protocol_invalid".to_string());
@@ -1976,15 +1976,11 @@ fn parse_voucher_readback_nested(xml: &str) -> Result<Vec<ObservedVoucher>, Stri
             // And the same CDATA gap: a scalar split across a CDATA section
             // read back short, silently. All three event kinds feed one buffer.
             Ok(quick_xml::events::Event::CData(text)) => {
-                buffer.push(
-                    &text
-                        .decode()
-                        .map_err(|_| "agent_read_protocol_invalid".to_string())?,
-                );
+                buffer.push(&text);
             }
             Ok(quick_xml::events::Event::Empty(_)) => buffer.abandon(),
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 // `path` still holds the closing element, so its parent chain
                 // names the row the field belongs to.
                 if let Some((field, value)) = buffer.close(&end) {

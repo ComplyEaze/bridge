@@ -13,7 +13,7 @@ fn entry(ledger: &str, side: EntrySide, amount: &str) -> ImportEntry {
 fn voucher(txn: &str, voucher_type: VoucherType, entries: Vec<ImportEntry>) -> ImportVoucher {
     ImportVoucher {
         bridge_txn_id: txn.into(),
-        date: "20260401".into(),
+        date: bridge_tally_core::TallyDate::parse("20260401").unwrap(),
         voucher_type,
         narration: None,
         reference: None,
@@ -68,7 +68,7 @@ fn row(txn: &str, voucher_type: VoucherType, entries: &[(EntrySide, &str)]) -> P
     PartyRow {
         bridge_txn_id: txn.into(),
         voucher_type,
-        date: "20260401".into(),
+        date: bridge_tally_core::TallyDate::parse("20260401").unwrap(),
         entries: entries
             .iter()
             .map(|(side, amount)| (side.clone(), (*amount).to_string()))
@@ -437,7 +437,7 @@ fn company() -> ImportCompanyTuple {
         name: "Synthetic Company".into(),
         guid: "synthetic-guid".into(),
         company_number: "1".into(),
-        books_from: "20260401".into(),
+        books_from: bridge_tally_core::TallyDate::parse("20260401").unwrap(),
     }
 }
 
@@ -504,7 +504,7 @@ fn each_field_the_digest_binds_moves_it() {
             0 => other.name.push('!'),
             1 => other.guid.push('!'),
             2 => other.company_number.push('!'),
-            _ => other.books_from = "20250401".into(),
+            _ => other.books_from = bridge_tally_core::TallyDate::parse("20250401").unwrap(),
         }
         moved(party_digest(
             &context(&other, &vouchers),
@@ -537,7 +537,7 @@ fn each_field_the_digest_binds_moves_it() {
     moved(party_digest(&context(&company, &vouchers), &other_side));
 
     let mut other_date = party_a(&vouchers);
-    other_date.rows[0].date = "20260402".into();
+    other_date.rows[0].date = bridge_tally_core::TallyDate::parse("20260402").unwrap();
     moved(party_digest(&context(&company, &vouchers), &other_date));
 
     let mut other_type = party_a(&vouchers);
@@ -557,7 +557,7 @@ fn a_change_to_any_voucher_field_moves_the_batch_digest_and_so_every_partys_dige
         Box::new(|v| v.narration = Some("note".into())),
         Box::new(|v| v.reference = Some("ref".into())),
         Box::new(|v| v.voucher_number = Some("7".into())),
-        Box::new(|v| v.date = "20260402".into()),
+        Box::new(|v| v.date = bridge_tally_core::TallyDate::parse("20260402").unwrap()),
         Box::new(|v| v.bridge_txn_id = "txn-x".into()),
         Box::new(|v| v.voucher_type = VoucherType::Journal),
         Box::new(|v| v.entries[1].ledger = "Other Bank".into()),

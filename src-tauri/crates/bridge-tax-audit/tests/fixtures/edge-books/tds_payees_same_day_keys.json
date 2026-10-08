@@ -1,0 +1,756 @@
+{
+ "comment": "tds_payees: the label list of the TDS seen (first twelve, then 'and N more'), the (ii)(A), (ii)(B), deducted and short-deduction rows, on vouchers of two days (seventeen and five), so within a day each order is the key's alone. On the first day the GUID texts are chosen so the books' order, the GUIDs' order and the keys' order all differ: unique GUIDs that sort before, between and after the keys of a GUID thirteen vouchers share, and of the blank GUID. On the second day (the (ii)(B) rows) the keys' order differs from the books' order and is the GUIDs' order.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Capital Account": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Fixed Assets": null
+ },
+ "ledgers": [
+  {
+   "name": "Contract Work",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "adv-5b603a-000"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "adv-5b603a-001"
+  },
+  {
+   "name": "Contractor P",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "adv-5b603a-002"
+  },
+  {
+   "name": "Contractor R",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "adv-5b603a-003"
+  },
+  {
+   "name": "Contractor U",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "adv-5b603a-004"
+  },
+  {
+   "name": "Input GST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "adv-5b603a-005"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "adv-5b603a-006"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Contract Work",
+   "opening": 0,
+   "debit": 120000000,
+   "credit": 0,
+   "closing": 120000000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1955250,
+   "closing": -1955250
+  },
+  {
+   "ledger": "Contractor P",
+   "opening": 0,
+   "debit": 600000,
+   "credit": 97804750,
+   "closing": -97204750
+  },
+  {
+   "ledger": "Contractor R",
+   "opening": 0,
+   "debit": 0,
+   "credit": 13000000,
+   "closing": -13000000
+  },
+  {
+   "ledger": "Contractor U",
+   "opening": 0,
+   "debit": 0,
+   "credit": 9280000,
+   "closing": -9280000
+  },
+  {
+   "ledger": "Input GST",
+   "opening": 0,
+   "debit": 1440000,
+   "credit": 0,
+   "closing": 1440000
+  },
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 40000,
+   "credit": 40000,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "g",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4100000
+    ],
+    [
+     "Contractor P",
+     -4018000
+    ],
+    [
+     "TDS Payable",
+     -82000
+    ]
+   ],
+   "number": "P01"
+  },
+  {
+   "guid": "g\u0001",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4200000
+    ],
+    [
+     "Contractor P",
+     -4158000
+    ],
+    [
+     "TDS Payable",
+     -42000
+    ]
+   ],
+   "number": "P02"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4300000
+    ],
+    [
+     "Contractor P",
+     -4289250
+    ],
+    [
+     "TDS Payable",
+     -10750
+    ]
+   ],
+   "number": "P03"
+  },
+  {
+   "guid": "g",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4400000
+    ],
+    [
+     "Contractor P",
+     -4389000
+    ],
+    [
+     "TDS Payable",
+     -11000
+    ]
+   ],
+   "number": "P04"
+  },
+  {
+   "guid": "g\u0000",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4500000
+    ],
+    [
+     "Contractor P",
+     -4410000
+    ],
+    [
+     "TDS Payable",
+     -90000
+    ]
+   ],
+   "number": "P05"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4600000
+    ],
+    [
+     "Contractor P",
+     -4508000
+    ],
+    [
+     "TDS Payable",
+     -92000
+    ]
+   ],
+   "number": "P06"
+  },
+  {
+   "guid": "g\u000000000001x",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4700000
+    ],
+    [
+     "Contractor P",
+     -4688250
+    ],
+    [
+     "TDS Payable",
+     -11750
+    ]
+   ],
+   "number": "P07"
+  },
+  {
+   "guid": "\u0000",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4800000
+    ],
+    [
+     "Contractor P",
+     -4752000
+    ],
+    [
+     "TDS Payable",
+     -48000
+    ]
+   ],
+   "number": "P08"
+  },
+  {
+   "guid": "g",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4900000
+    ],
+    [
+     "Contractor P",
+     -4802000
+    ],
+    [
+     "TDS Payable",
+     -98000
+    ]
+   ],
+   "number": "P09"
+  },
+  {
+   "guid": "\u000000000002z",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     5000000
+    ],
+    [
+     "Contractor P",
+     -4987500
+    ],
+    [
+     "TDS Payable",
+     -12500
+    ]
+   ],
+   "number": "P10"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     5100000
+    ],
+    [
+     "Contractor P",
+     -5049000
+    ],
+    [
+     "TDS Payable",
+     -51000
+    ]
+   ],
+   "number": "P11"
+  },
+  {
+   "guid": "G",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     5500000
+    ],
+    [
+     "Contractor P",
+     -5390000
+    ],
+    [
+     "TDS Payable",
+     -110000
+    ]
+   ],
+   "number": "P12"
+  },
+  {
+   "guid": "g-\u00e9",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     5300000
+    ],
+    [
+     "Contractor P",
+     -5286750
+    ],
+    [
+     "TDS Payable",
+     -13250
+    ]
+   ],
+   "number": "P13"
+  },
+  {
+   "guid": "g",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     5400000
+    ],
+    [
+     "Contractor P",
+     -5346000
+    ],
+    [
+     "TDS Payable",
+     -54000
+    ]
+   ],
+   "number": "P14"
+  },
+  {
+   "guid": "g",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contractor P",
+     100000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ]
+   ],
+   "number": "P15"
+  },
+  {
+   "guid": "",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contractor P",
+     200000
+    ],
+    [
+     "TDS Payable",
+     -200000
+    ]
+   ],
+   "number": "P16"
+  },
+  {
+   "guid": "g\u0000!",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contractor P",
+     300000
+    ],
+    [
+     "TDS Payable",
+     -300000
+    ]
+   ],
+   "number": "P17"
+  },
+  {
+   "guid": "h",
+   "date": "2025-07-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     6000000
+    ],
+    [
+     "Contractor P",
+     -5880000
+    ],
+    [
+     "TDS Payable",
+     -120000
+    ]
+   ],
+   "number": "P21"
+  },
+  {
+   "guid": "g",
+   "date": "2025-07-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     7000000
+    ],
+    [
+     "Contractor P",
+     -6860000
+    ],
+    [
+     "TDS Payable",
+     -140000
+    ]
+   ],
+   "number": "P22"
+  },
+  {
+   "guid": "",
+   "date": "2025-07-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     6300000
+    ],
+    [
+     "Contractor P",
+     -6237000
+    ],
+    [
+     "TDS Payable",
+     -63000
+    ]
+   ],
+   "number": "P23"
+  },
+  {
+   "guid": "g\u0000b",
+   "date": "2025-07-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     6400000
+    ],
+    [
+     "Contractor P",
+     -6384000
+    ],
+    [
+     "TDS Payable",
+     -16000
+    ]
+   ],
+   "number": "P24"
+  },
+  {
+   "guid": "g",
+   "date": "2025-07-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     6500000
+    ],
+    [
+     "Contractor P",
+     -6370000
+    ],
+    [
+     "TDS Payable",
+     -130000
+    ]
+   ],
+   "number": "P25"
+  },
+  {
+   "guid": "g",
+   "date": "2025-08-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     3100000
+    ],
+    [
+     "Contractor R",
+     -3100000
+    ]
+   ],
+   "number": "R01"
+  },
+  {
+   "guid": "f",
+   "date": "2025-08-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     3200000
+    ],
+    [
+     "Contractor R",
+     -3200000
+    ]
+   ],
+   "number": "R02"
+  },
+  {
+   "guid": "",
+   "date": "2025-08-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     3300000
+    ],
+    [
+     "Contractor R",
+     -3300000
+    ]
+   ],
+   "number": "R03"
+  },
+  {
+   "guid": "g",
+   "date": "2025-08-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     3400000
+    ],
+    [
+     "Contractor R",
+     -3400000
+    ]
+   ],
+   "number": "R04"
+  },
+  {
+   "guid": "dup-u",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4000000
+    ],
+    [
+     "Input GST",
+     720000
+    ],
+    [
+     "Contractor U",
+     -4640000
+    ],
+    [
+     "TDS Payable",
+     -80000
+    ]
+   ],
+   "number": "U1"
+  },
+  {
+   "guid": "dup-u",
+   "date": "2025-11-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Work",
+     4000000
+    ],
+    [
+     "Input GST",
+     720000
+    ],
+    [
+     "Contractor U",
+     -4640000
+    ],
+    [
+     "TDS Payable",
+     -80000
+    ]
+   ],
+   "number": "U1"
+  },
+  {
+   "guid": "g",
+   "date": "2025-09-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Bank",
+     10000
+    ],
+    [
+     "Bank",
+     -10000
+    ]
+   ],
+   "number": "Z00"
+  },
+  {
+   "guid": "g",
+   "date": "2025-09-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Bank",
+     10000
+    ],
+    [
+     "Bank",
+     -10000
+    ]
+   ],
+   "number": "Z01"
+  },
+  {
+   "guid": "g",
+   "date": "2025-09-03",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Bank",
+     10000
+    ],
+    [
+     "Bank",
+     -10000
+    ]
+   ],
+   "number": "Z02"
+  },
+  {
+   "guid": "g",
+   "date": "2025-09-04",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Bank",
+     10000
+    ],
+    [
+     "Bank",
+     -10000
+    ]
+   ],
+   "number": "Z03"
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Contract Work": "194C"
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ],
+ "gst_ledgers": [
+  "Input GST"
+ ],
+ "challans": [
+  {
+   "date": "2025-07-07",
+   "section": "194C",
+   "month": "2025-06",
+   "amount_paise": 500000
+  }
+ ]
+}

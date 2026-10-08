@@ -1,0 +1,51 @@
+# fixture: tests/fixtures/masters_units_shape_lab_live.utf16le.xml
+# parser: parse_native_masters(Units)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Box",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000d7",
+            master_id: 215,
+            alter_id: 216,
+            parent: None,
+            detail: Unit {
+                decimal_places: 0,
+                simple: true,
+            },
+        },
+        NativeMasterRow {
+            name: "Kgs",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000d1",
+            master_id: 209,
+            alter_id: 211,
+            parent: None,
+            detail: Unit {
+                decimal_places: 3,
+                simple: true,
+            },
+        },
+        NativeMasterRow {
+            name: "Nos",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000d2",
+            master_id: 210,
+            alter_id: 212,
+            parent: None,
+            detail: Unit {
+                decimal_places: 0,
+                simple: true,
+            },
+        },
+        NativeMasterRow {
+            name: "Nos of 10 Box",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000d8",
+            master_id: 216,
+            alter_id: 217,
+            parent: None,
+            detail: Unit {
+                decimal_places: 0,
+                simple: false,
+            },
+        },
+    ],
+})

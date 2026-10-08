@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/native/bills_payable_billwise_lab_empty.xml
+# parser: parse_native_bill_rows(20240401..20260731)
+# source: synthetic: not evidence of what Tally sends
+Ok([])

@@ -147,9 +147,7 @@ impl VerificationCandidates {
 /// the matching use the same key.
 pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFingerprint {
     (
-        normalized_date(&voucher.date)
-            .ok()
-            .map(|date| date.as_str().to_string()),
+        Some(voucher.date.as_str().to_owned()),
         Some(voucher.voucher_type.as_str().to_string()),
         expected_entry_fingerprint(voucher),
     )
@@ -874,10 +872,7 @@ pub(super) fn voucher_diffs(
     entries_match: bool,
 ) -> Vec<Value> {
     let mut diffs = Vec::new();
-    let expected_date = normalized_date(&expected.date).ok();
-    let expected_date = expected_date
-        .as_ref()
-        .map(bridge_tally_core::TallyDate::as_str);
+    let expected_date = Some(expected.date.as_str());
     if actual.date.as_deref() != expected_date {
         diffs.push(json!("date"));
     }

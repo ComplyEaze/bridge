@@ -1,0 +1,7 @@
+# fixture: agent/post-span-journal-company-high-water-before.utf16le.xml
+# parser: parse_company_marks(IMPORT_LAB)
+# source: captured
+Ok((
+    1805,
+    234,
+))

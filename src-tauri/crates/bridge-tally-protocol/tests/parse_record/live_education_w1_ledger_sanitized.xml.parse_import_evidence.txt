@@ -1,0 +1,28 @@
+# fixture: tests/fixtures/live_education_w1_ledger_sanitized.xml
+# parser: parse_import_evidence
+# source: synthetic: not evidence of what Tally sends
+Ok(ParsedImportEvidenceFields {
+    application_status: NotReported,
+    counters: TallyImportResult {
+        created: 1,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 0,
+        line_error_count: 0,
+        counter_presence: TallyImportCounterPresence {
+            created: true,
+            altered: true,
+            deleted: true,
+            ignored: true,
+            errors: true,
+            cancelled: true,
+            exceptions: true,
+        },
+    },
+    exceptions_were_reported: true,
+    response_sha256: "86fd4cd9227e3da1aa2d7d3bed2a58dc4c76bb6e5920b27f00c5506a4decdde0",
+    line_error_sha256: [],
+})

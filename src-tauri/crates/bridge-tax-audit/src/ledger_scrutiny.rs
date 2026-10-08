@@ -7,12 +7,16 @@
 //! Scope is every ledger under Tally's own `Direct Expenses` or `Indirect Expenses` groups. One
 //! entry is one population voucher's own line(s) on one ledger, summed to a single net Dr+/Cr-
 //! amount. Every figure is a plain books fact; every finding is indicative only.
+//!
+//! An entry is keyed by its voucher's own [`VoucherKey`] (#1243), never its GUID: two vouchers
+//! sharing a GUID (blank, or repeated) are two entries in every subset. A figure or finding still
+//! cites a voucher by its GUID and label.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 
-use crate::book::{Book, Voucher};
+use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::depreciation::civil_day_number;
 use crate::error::{AuditError, Result};
 use crate::findings::{pct_bp, Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
@@ -37,9 +41,10 @@ const CASH_SHARE_NOTABLE_BP: i64 = 3000;
 const LSC1_TOL_PAISE: i64 = 100;
 /// The reference's `DEFAULT_LEDGER_SCRUTINY` large-entry threshold (Rs 50,000), used when the
 /// rules file has no `[ledger_scrutiny]` table.
-const DEFAULT_LARGE_ENTRY_PAISE: i64 = 5_000_000;
+pub(crate) const DEFAULT_LARGE_ENTRY_PAISE: i64 = 5_000_000;
 
-type Entries<'a> = BTreeMap<String, (&'a Voucher, i64)>;
+/// One ledger's entries, each voucher's net amount on it, by the voucher's own key.
+type Entries<'a> = BTreeMap<VoucherKey, (&'a Voucher, i64)>;
 
 #[derive(Default)]
 struct Row<'a> {
@@ -48,14 +53,21 @@ struct Row<'a> {
     round_sum: Entries<'a>,
     last_days: Entries<'a>,
     cash_paid: Entries<'a>,
-    journal: BTreeSet<String>,
-    non_journal: BTreeSet<String>,
+    /// Whether a population voucher of base type Journal, or of another base type, touches the
+    /// ledger: the reference keeps these as per-voucher sets and reads only whether each is empty.
+    journal: bool,
+    non_journal: bool,
 }
 
+/// The distinct refs of the entries' vouchers, by GUID and label in that order: two vouchers that
+/// share a GUID are each cited, unless their refs are identical too (#1195, #1243).
 fn evidence(entries: &Entries) -> Vec<EvidenceRef> {
-    entries
-        .iter()
-        .map(|(g, (v, _))| EvidenceRef::with_label("voucher", g, &support::voucher_label(v)))
+    let refs: BTreeSet<(&str, String)> = entries
+        .values()
+        .map(|(v, _)| (v.guid.as_str(), support::voucher_label(v)))
+        .collect();
+    refs.into_iter()
+        .map(|(guid, label)| EvidenceRef::with_label("voucher", guid, &label))
         .collect()
 }
 
@@ -129,7 +141,7 @@ scrutiny entry)."
         .iter()
         .map(|n| (n.as_str(), Row::default()))
         .collect();
-    for v in book.population()? {
+    for (vk, v) in voucher_keys(&book.population()?)? {
         let mut ledger_lines: BTreeMap<&str, i64> = BTreeMap::new();
         for l in &v.lines {
             if expense_ledgers.contains(&l.ledger) {
@@ -147,26 +159,26 @@ scrutiny entry)."
         for (name, net) in ledger_lines {
             let row = rows.get_mut(name).expect("every expense ledger has a row");
             if v.base_type == JOURNAL_BASE_TYPE {
-                row.journal.insert(v.guid.clone());
+                row.journal = true;
             } else {
-                row.non_journal.insert(v.guid.clone());
+                row.non_journal = true;
             }
             if net == 0 {
                 continue;
             }
             let abs = net.checked_abs().ok_or_else(overflow)?;
-            row.entries.insert(v.guid.clone(), (v, net));
+            row.entries.insert(vk.clone(), (v, net));
             if abs > large_entry_paise {
-                row.large.insert(v.guid.clone(), (v, net));
+                row.large.insert(vk.clone(), (v, net));
             }
             if abs % ROUND_SUM_MULTIPLE_PAISE == 0 {
-                row.round_sum.insert(v.guid.clone(), (v, net));
+                row.round_sum.insert(vk.clone(), (v, net));
             }
             if v.date >= start {
-                row.last_days.insert(v.guid.clone(), (v, net));
+                row.last_days.insert(vk.clone(), (v, net));
             }
             if net > 0 && has_cash_leg {
-                row.cash_paid.insert(v.guid.clone(), (v, net));
+                row.cash_paid.insert(vk.clone(), (v, net));
             }
         }
     }
@@ -299,7 +311,7 @@ ledger has no debit entries at all)."
             ),
             Vec::new(),
         )?;
-        let journal_only = !d.journal.is_empty() && d.non_journal.is_empty();
+        let journal_only = d.journal && !d.non_journal;
         let f_journal_only = r.fig(
             &format!("journal_only_{h}"),
             Value::Text(if journal_only { "yes" } else { "no" }.to_string()),

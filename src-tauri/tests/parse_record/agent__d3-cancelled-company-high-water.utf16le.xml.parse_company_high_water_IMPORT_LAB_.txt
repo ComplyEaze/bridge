@@ -1,0 +1,7 @@
+# fixture: agent/d3-cancelled-company-high-water.utf16le.xml
+# parser: parse_company_high_water(IMPORT_LAB)
+# source: captured
+Ok(Object {
+    "altmstid": Number(232),
+    "altvchid": Number(1685),
+})

@@ -1,0 +1,396 @@
+# fixture: tests/fixtures/agent/native-shape-lab-ledger-catalogue.utf16le.xml
+# parser: parse_standard_ledger_catalog_with_identities(SHAPE LAB)
+# source: captured
+Ok(StandardLedgerCatalog {
+    entries: [
+        StandardLedgerCatalogEntry {
+            name: "Bank of Baroda CA",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ce",
+            parent: Some(
+                "Bank Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Capital A/c",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e9",
+            parent: Some(
+                "Capital Account",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Cash",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000001f",
+            parent: Some(
+                "Cash-in-Hand",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Cess",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e4",
+            parent: Some(
+                "Duties & Taxes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "CGST",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e1",
+            parent: Some(
+                "Duties & Taxes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Chem Supplier 1",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ff",
+            parent: Some(
+                "Chemical Suppliers",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Chem Supplier 2",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000100",
+            parent: Some(
+                "Chemical Suppliers",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Chem Supplier 3",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000101",
+            parent: Some(
+                "Chemical Suppliers",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Chem Supplier 4",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000102",
+            parent: Some(
+                "Chemical Suppliers",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "CRLF Supplier\r\n",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000118",
+            parent: Some(
+                "Chemical Suppliers",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Discount Allowed",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000eb",
+            parent: Some(
+                "Indirect Expenses",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Discount Received",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ec",
+            parent: Some(
+                "Indirect Incomes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Drawings",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ea",
+            parent: Some(
+                "Capital Account",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Freight Inward",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ed",
+            parent: Some(
+                "Direct Expenses",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "HDFC CC",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e7",
+            parent: Some(
+                "Bank OD A/c",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "IGST",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e3",
+            parent: Some(
+                "Duties & Taxes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Naive Chemicals & Co Correct",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000117",
+            parent: Some(
+                "Chemical Suppliers",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Näive Chemicals &amp; Co.",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000103",
+            parent: Some(
+                "Chemical Suppliers",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Outstation Buyer 1",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fc",
+            parent: Some(
+                "Trade Debtors - Outstation",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Outstation Buyer 2",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fd",
+            parent: Some(
+                "Trade Debtors - Outstation",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Outstation Buyer 3",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fe",
+            parent: Some(
+                "Trade Debtors - Outstation",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Power Charges",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ee",
+            parent: Some(
+                "Power and Fuel",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Profit & Loss A/c",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000001e",
+            parent: Some(
+                "�#4; Primary",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Purchase - Exempt",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f1",
+            parent: Some(
+                "Purchase Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Purchase - Interstate",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f0",
+            parent: Some(
+                "Purchase Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Purchase - Local",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000ef",
+            parent: Some(
+                "Purchase Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "ROUND OFF",
+            stored_name: Some(
+                "Round Off",
+            ),
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e6",
+            parent: Some(
+                "Indirect Expenses",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Sales - Exempt",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f4",
+            parent: Some(
+                "Sales Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Sales - Interstate",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f3",
+            parent: Some(
+                "Sales Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Sales - Local",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f2",
+            parent: Some(
+                "Sales Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Sales - Nil Rated",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f5",
+            parent: Some(
+                "Sales Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Shape Buyer 1",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f6",
+            parent: Some(
+                "Trade Debtors - Local",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Shape Buyer 2",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f7",
+            parent: Some(
+                "Trade Debtors - Local",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Shape Buyer 3",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f8",
+            parent: Some(
+                "Trade Debtors - Local",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Shape Buyer 4",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000f9",
+            parent: Some(
+                "Trade Debtors - Local",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Shape Buyer 5",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fa",
+            parent: Some(
+                "Trade Debtors - Local",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Shape Buyer 6",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000fb",
+            parent: Some(
+                "Trade Debtors - Local",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "State Tax",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e2",
+            parent: Some(
+                "Duties & Taxes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "TDS Payable",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e5",
+            parent: Some(
+                "Duties & Taxes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Trailing Newline Supplier&#13;&#10;",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000104",
+            parent: Some(
+                "Chemical Suppliers",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Transport Charges",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000cf",
+            parent: Some(
+                "Indirect Expenses",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "USD Import Supplier",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000105",
+            parent: Some(
+                "Chemical Suppliers",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Working Capital Loan",
+            stored_name: None,
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000e8",
+            parent: Some(
+                "Secured Loans",
+            ),
+            parent_unsupported: false,
+        },
+    ],
+})

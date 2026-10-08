@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/agent/native-outstandings-detail-book-extent.utf16le.xml
+# parser: parse_company_book_extent_v2(OUTSTANDINGS LAB)
+# source: captured
+Ok(CompanyBookExtentFields {
+    company_name: "BRIDGE OUTSTANDINGS LAB",
+    company_guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
+    books_from: TallyDate(
+        "20250401",
+    ),
+    last_voucher_date: TallyDate(
+        "20260610",
+    ),
+    voucher_alter_id_high_water: Some(
+        20,
+    ),
+    master_alter_id_high_water: Some(
+        222,
+    ),
+})

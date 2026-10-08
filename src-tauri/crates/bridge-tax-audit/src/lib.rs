@@ -37,6 +37,7 @@ pub mod canonical;
 pub mod cash_44ab;
 pub mod cash_book_integrity;
 pub mod cash_payments_40a3;
+pub mod clause21a_candidates;
 pub mod compare;
 pub mod counter_cheques_40a3;
 pub mod creditor_ageing_43bh;
@@ -59,6 +60,7 @@ pub mod read_scope;
 pub mod registry;
 pub mod related_parties_cl23;
 pub mod rules;
+pub mod specified_persons_40a2b;
 pub mod stale_balances_41_1;
 pub mod statutory_dues_43b;
 pub mod stock;
@@ -181,6 +183,10 @@ pub struct Engagement {
     /// `related_parties_cl23`-only: `[related_parties]`, bound by [`Engagement::bind`]; empty
     /// before binding. See [`RelatedPartiesConfig`].
     pub related_parties: RelatedPartiesConfig,
+    /// `clause21a_candidates`-only: the optional `[clause21a]` table as written, `None` when absent.
+    /// Typed when that test runs ([`clause21a_candidates::extra_terms`]), so a malformed one fails
+    /// that test alone.
+    pub clause21a: Option<toml::Value>,
     /// `creditor_ageing_43bh`-only: the optional `[creditor_ageing_43bh]` table. Filled by
     /// [`Engagement::bind`]; see [`CreditorAgeingConfig`] for what is typed when.
     pub creditor_ageing: CreditorAgeingConfig,
@@ -971,6 +977,7 @@ not YYYY-MM-DD"
             loans: LoansConfig::default(),
             partners: PartnersConfig::default(),
             related_parties: RelatedPartiesConfig::default(),
+            clause21a: cfg.get("clause21a").cloned(),
             creditor_ageing: CreditorAgeingConfig::default(),
             statutory_dues: StatutoryDuesConfig::default(),
             base_dir: base_dir.map_or_else(PathBuf::new, Path::to_path_buf),
@@ -1569,6 +1576,21 @@ pub fn books_examined_on(
     canonical::canonical_test_result(book, &result, None)
 }
 
+/// Run `clause21a_candidates` on a book and return its canonical parity dump: the client's
+/// `[clause21a].extra_terms` and the bound `[partners]` interest and remuneration ledgers, as the
+/// reference's pack passes them. The reference module has no `check_invariants`.
+pub fn clause21a_candidates_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let extra_terms = clause21a_candidates::extra_terms(engagement.clause21a.as_ref())?;
+    let (bound, _report) = engagement.bind(book)?;
+    let partner_ledgers = clause21a_candidates::partner_ledgers(&bound.partners)?;
+    let result = clause21a_candidates::run(book, rules, &extra_terms, &partner_ledgers)?;
+    canonical::canonical_test_result(book, &result, None)
+}
+
 /// Run `read_scope` on a book and return its canonical parity dump. The reference module has no
 /// `check_invariants`, so the dump's module invariants are empty on both sides.
 pub fn read_scope_on(book: &book::Book, rules: &Rules) -> Result<serde_json::Value> {
@@ -1894,6 +1916,26 @@ pub fn related_parties_cl23_on(
     let (bound, _report) = engagement.bind(book)?;
     let result = related_parties_cl23::run(book, rules, &bound.related_parties)?;
     let module_check = related_parties_cl23::check_invariants(book, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `specified_persons_40a2b` on an already-built book: `related_parties_cl23` first, on the
+/// same bound table, then this test on its result, with its module check (SPD-1). Refuses without
+/// `[client].entity_type`.
+pub fn specified_persons_40a2b_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let entity_type = engagement.entity_type.as_deref().ok_or_else(|| {
+        AuditError::Config("specified_persons_40a2b needs [client].entity_type".to_string())
+    })?;
+    let (bound, _report) = engagement.bind(book)?;
+    let table = &bound.related_parties;
+    let related = related_parties_cl23::run(book, rules, table)?;
+    let result = specified_persons_40a2b::run(rules, entity_type, table, &related)?;
+    let module_check =
+        specified_persons_40a2b::check_invariants(rules, entity_type, table, &related, &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 

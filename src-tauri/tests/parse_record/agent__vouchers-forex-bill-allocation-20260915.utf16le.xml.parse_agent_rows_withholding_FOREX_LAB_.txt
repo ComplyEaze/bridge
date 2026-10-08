@@ -1,0 +1,59 @@
+# fixture: agent/vouchers-forex-bill-allocation-20260915.utf16le.xml
+# parser: parse_agent_rows_withholding(FOREX_LAB)
+# source: captured
+Ok([
+    Withheld(
+        WithheldVoucher(
+            Object {
+                "alter_id": Number(18),
+                "amounts": Array [
+                    Object {
+                        "ledger": String("FX Party 01"),
+                    },
+                    Object {
+                        "ledger": String("FX Sales"),
+                    },
+                ],
+                "cancelled": Bool(false),
+                "date": String("20260915"),
+                "guid": String("b14e9b2d-8a63-4779-804d-25d59eb787eb-00000012"),
+                "is_invoice": Bool(false),
+                "master_id": String("18"),
+                "narration": String("C1 Synthetic test"),
+                "optional": Bool(false),
+                "party": String("FX Party 01"),
+                "post_dated": Bool(false),
+                "voucher_number": String("1"),
+                "voucher_type": String("Sales"),
+                "withheld_cause": String("foreign_currency_amount_unparsed"),
+            },
+        ),
+    ),
+    Withheld(
+        WithheldVoucher(
+            Object {
+                "alter_id": Number(19),
+                "amounts": Array [
+                    Object {
+                        "ledger": String("FX Party 01"),
+                    },
+                    Object {
+                        "ledger": String("Cash"),
+                    },
+                ],
+                "cancelled": Bool(false),
+                "date": String("20260915"),
+                "guid": String("b14e9b2d-8a63-4779-804d-25d59eb787eb-00000013"),
+                "is_invoice": Bool(false),
+                "master_id": String("19"),
+                "narration": String(""),
+                "optional": Bool(false),
+                "party": String("FX Party 01"),
+                "post_dated": Bool(false),
+                "voucher_number": String("1"),
+                "voucher_type": String("Receipt"),
+                "withheld_cause": String("foreign_currency_amount_unparsed"),
+            },
+        ),
+    ),
+])

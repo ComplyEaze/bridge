@@ -1,6 +1,6 @@
 [package]
 name = "bridge"
-version = "0.4.2"
+version = "0.5.0"
 description = "ComplyEaze Bridge lets an AI assistant read from, and write to, the TallyPrime running on your own computer."
 authors = ["AXAL"]
 license = "Apache-2.0"
@@ -108,7 +108,7 @@ chrono = { version = "0.4", features = ["serde"] }
 getrandom = "0.4"
 icu_properties = "2.3"
 keyring = { version = "4.1.4", default-features = false, features = ["v1"] }
-quick-xml = { version = "0.41", features = ["serialize"] }
+quick-xml = "0.42"
 # Bridge supports Windows and macOS; rfd's defaults add Linux portal/Wayland code.
 rfd = { version = "0.17", default-features = false }
 rust_xlsxwriter = { version = "0.99.0", default-features = false }

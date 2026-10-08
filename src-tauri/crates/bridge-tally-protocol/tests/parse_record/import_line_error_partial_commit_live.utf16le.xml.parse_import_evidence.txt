@@ -1,0 +1,30 @@
+# fixture: tests/fixtures/import_line_error_partial_commit_live.utf16le.xml
+# parser: parse_import_evidence
+# source: captured
+Ok(ParsedImportEvidenceFields {
+    application_status: NotReported,
+    counters: TallyImportResult {
+        created: 49,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 1,
+        line_error_count: 1,
+        counter_presence: TallyImportCounterPresence {
+            created: true,
+            altered: true,
+            deleted: true,
+            ignored: true,
+            errors: true,
+            cancelled: true,
+            exceptions: true,
+        },
+    },
+    exceptions_were_reported: true,
+    response_sha256: "1f102ce836e895a65ff586ddb4b5d79f9b01ce2eeb31697b9e0806e37927715a",
+    line_error_sha256: [
+        "c6d01348ae1f860d56234f001c712e1f7403359c412533fe929e785008df3646",
+    ],
+})

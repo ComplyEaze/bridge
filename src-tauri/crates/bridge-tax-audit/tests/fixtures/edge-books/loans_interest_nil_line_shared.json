@@ -1,0 +1,164 @@
+{
+ "comment": "loans_interest, bridge#1259 item 3, a firm: Shared Interest is declared shared and is the interest ledger of Loan S. A journal Shared Interest / Loan S beside a nil line on Suspense is an interest journal of Loan S, in the module check's re-derivation of the paired loan's journals as in the figures.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_shared-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_shared-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_nil_line_shared-002"
+  },
+  {
+   "name": "Suspense",
+   "chain": [
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_shared-003"
+  },
+  {
+   "name": "Loan S",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_line_shared-004"
+  },
+  {
+   "name": "Shared Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_nil_line_shared-005"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 300000,
+   "closing": -300000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Loan S",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 400000,
+   "closing": -5400000
+  },
+  {
+   "ledger": "Shared Interest",
+   "opening": 0,
+   "debit": 700000,
+   "credit": 0,
+   "closing": 700000
+  },
+  {
+   "ledger": "Suspense",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "h01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Shared Interest",
+     400000
+    ],
+    [
+     "Loan S",
+     -400000
+    ],
+    [
+     "Suspense",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "h02",
+   "date": "2025-07-31",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Shared Interest",
+     300000
+    ],
+    [
+     "Bank A",
+     -300000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan S": {
+   "lender": "Invented S Lender",
+   "lender_type": "person",
+   "interest_ledger": "Shared Interest"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ],
+ "shared_interest_ledgers": [
+  "Shared Interest"
+ ]
+}

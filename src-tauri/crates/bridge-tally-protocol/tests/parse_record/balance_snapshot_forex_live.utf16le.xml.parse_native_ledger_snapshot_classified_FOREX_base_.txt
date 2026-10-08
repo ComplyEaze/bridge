@@ -1,0 +1,119 @@
+# fixture: tests/fixtures/balance_snapshot_forex_live.utf16le.xml
+# parser: parse_native_ledger_snapshot_classified(FOREX base)
+# source: captured
+Ok(ClassifiedLedgerSnapshot {
+    base: [
+        LedgerSnapshotEntry {
+            name: "BRIDGE INR DEBTOR A",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            closing_balance: Some(
+                ExactDecimal(
+                    "-3000.00",
+                ),
+            ),
+            opening_balance: ExactDecimal(
+                "-1000.00",
+            ),
+            opening_balance_observed: Some(
+                ExactDecimal(
+                    "-1000.00",
+                ),
+            ),
+            bill_wise_on: true,
+            currency_name: Some(
+                "I₹",
+            ),
+        },
+        LedgerSnapshotEntry {
+            name: "Cash",
+            parent: Some(
+                "Cash-in-Hand",
+            ),
+            closing_balance: Some(
+                ExactDecimal(
+                    "-34400.00",
+                ),
+            ),
+            opening_balance: ExactDecimal(
+                "0.00",
+            ),
+            opening_balance_observed: Some(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            bill_wise_on: false,
+            currency_name: Some(
+                "I₹",
+            ),
+        },
+        LedgerSnapshotEntry {
+            name: "FX Party 02",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            closing_balance: Some(
+                ExactDecimal(
+                    "-9500.00",
+                ),
+            ),
+            opening_balance: ExactDecimal(
+                "0.00",
+            ),
+            opening_balance_observed: Some(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            bill_wise_on: true,
+            currency_name: Some(
+                "I₹",
+            ),
+        },
+        LedgerSnapshotEntry {
+            name: "FX Party 03",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            closing_balance: Some(
+                ExactDecimal(
+                    "-10500.00",
+                ),
+            ),
+            opening_balance: ExactDecimal(
+                "0.00",
+            ),
+            opening_balance_observed: Some(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            bill_wise_on: true,
+            currency_name: Some(
+                "I₹",
+            ),
+        },
+    ],
+    foreign: [
+        ForeignCurrencyLedger {
+            ledger: "BRIDGE FX DEBTOR A",
+            currency: "$",
+        },
+        ForeignCurrencyLedger {
+            ledger: "FX USD Debtor 01",
+            currency: "$",
+        },
+        ForeignCurrencyLedger {
+            ledger: "FX USD Debtor 02",
+            currency: "$",
+        },
+    ],
+    mixed: [
+        "FX Party 01",
+        "FX Sales",
+        "Profit & Loss A/c",
+    ],
+    unobserved: 0,
+})

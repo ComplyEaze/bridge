@@ -1,0 +1,20 @@
+src-tauri/Cargo.lock
+src-tauri/crates/bridge-tally-protocol/Cargo.toml
+src-tauri/crates/bridge-tally-protocol/src/bills_payments_observation.rs
+src-tauri/crates/bridge-tally-protocol/src/import_outcome.rs
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/src/native_cash_flow.rs
+src-tauri/crates/bridge-tally-protocol/src/native_ledger_collection.rs
+src-tauri/crates/bridge-tally-protocol/src/native_masters.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/wire.rs
+src-tauri/crates/bridge-tally-protocol/src/native_statement_reports.rs
+src-tauri/crates/bridge-tally-protocol/src/native_stock_summary.rs
+src-tauri/crates/bridge-tally-protocol/src/native_trial_balance/scalar.rs
+src-tauri/crates/bridge-tally-protocol/src/native_trial_balance/wire.rs
+src-tauri/crates/bridge-tally-protocol/src/outstandings/parser.rs
+src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs
+src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs
+src-tauri/crates/tally-protocol-simulator/Cargo.toml
+src-tauri/crates/tally-protocol-simulator/tests/protocol_simulator.rs
+tools/Cargo.lock
+reviewer: lamemustafa

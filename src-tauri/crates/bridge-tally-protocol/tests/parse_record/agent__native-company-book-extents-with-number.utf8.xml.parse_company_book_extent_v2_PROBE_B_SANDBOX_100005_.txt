@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml
+# parser: parse_company_book_extent_v2(PROBE B SANDBOX 100005)
+# source: captured
+Ok(CompanyBookExtentFields {
+    company_name: "BRIDGE PROBE B SANDBOX",
+    company_guid: "ec4454ae-5c4c-4bfa-b3b0-68182a749689",
+    books_from: TallyDate(
+        "20250401",
+    ),
+    last_voucher_date: TallyDate(
+        "20260814",
+    ),
+    voucher_alter_id_high_water: Some(
+        2785,
+    ),
+    master_alter_id_high_water: Some(
+        229,
+    ),
+})

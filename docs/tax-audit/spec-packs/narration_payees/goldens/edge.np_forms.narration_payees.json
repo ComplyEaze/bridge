@@ -55,20 +55,6 @@
       "evidence": []
     },
     {
-      "id": "narration_payees.payee_channel_005e336e",
-      "value": "CHEQUE_COUNTER",
-      "unit": "text",
-      "definition_sha256_16": "bd43e2364d790e61",
-      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
-      "evidence": [
-        {
-          "kind": "payee_name",
-          "id": "WITHDRAWAL BY",
-          "label": "WITHDRAWAL BY"
-        }
-      ]
-    },
-    {
       "id": "narration_payees.payee_channel_0083d0a8",
       "value": "CHEQUE_COUNTER",
       "unit": "text",
@@ -191,6 +177,20 @@
           "kind": "payee_name",
           "id": "PHONEPE",
           "label": "PHONEPE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_67da6382",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CASH PAID TOWER",
+          "label": "CASH PAID TOWER"
         }
       ]
     },
@@ -321,8 +321,50 @@
       ]
     },
     {
-      "id": "narration_payees.payee_channel_f295b2cd",
+      "id": "narration_payees.payee_channel_d72f04ae",
+      "value": "NEFT",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPI STORES",
+          "label": "UPI STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_e309d035",
+      "value": "CHEQUE_COUNTER",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SELFMADE MILLS",
+          "label": "SELFMADE MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_ef260b01",
       "value": "IMPS",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPIKA STORES",
+          "label": "UPIKA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_f295b2cd",
+      "value": "CHEQUE_COUNTER, UPI",
       "unit": "text",
       "definition_sha256_16": "bd43e2364d790e61",
       "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
@@ -331,20 +373,6 @@
           "kind": "payee_name",
           "id": "UPI",
           "label": "UPI"
-        }
-      ]
-    },
-    {
-      "id": "narration_payees.payee_count_005e336e",
-      "value": 1,
-      "unit": "count",
-      "definition_sha256_16": "6266b66730126359",
-      "definition_text": "Bank payments to this payee on the ledgers read.",
-      "evidence": [
-        {
-          "kind": "payee_name",
-          "id": "WITHDRAWAL BY",
-          "label": "WITHDRAWAL BY"
         }
       ]
     },
@@ -475,6 +503,20 @@
       ]
     },
     {
+      "id": "narration_payees.payee_count_67da6382",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CASH PAID TOWER",
+          "label": "CASH PAID TOWER"
+        }
+      ]
+    },
+    {
       "id": "narration_payees.payee_count_7edeadcf",
       "value": 1,
       "unit": "count",
@@ -601,8 +643,50 @@
       ]
     },
     {
-      "id": "narration_payees.payee_count_f295b2cd",
+      "id": "narration_payees.payee_count_d72f04ae",
       "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPI STORES",
+          "label": "UPI STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_e309d035",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SELFMADE MILLS",
+          "label": "SELFMADE MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_ef260b01",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPIKA STORES",
+          "label": "UPIKA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_f295b2cd",
+      "value": 2,
       "unit": "count",
       "definition_sha256_16": "6266b66730126359",
       "definition_text": "Bank payments to this payee on the ledgers read.",
@@ -611,20 +695,6 @@
           "kind": "payee_name",
           "id": "UPI",
           "label": "UPI"
-        }
-      ]
-    },
-    {
-      "id": "narration_payees.payee_max_005e336e",
-      "value": 3892,
-      "unit": "paise",
-      "definition_sha256_16": "9a29a9467e0a9b78",
-      "definition_text": "Largest single payment.",
-      "evidence": [
-        {
-          "kind": "payee_name",
-          "id": "WITHDRAWAL BY",
-          "label": "WITHDRAWAL BY"
         }
       ]
     },
@@ -755,6 +825,20 @@
       ]
     },
     {
+      "id": "narration_payees.payee_max_67da6382",
+      "value": 4507,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CASH PAID TOWER",
+          "label": "CASH PAID TOWER"
+        }
+      ]
+    },
+    {
       "id": "narration_payees.payee_max_7edeadcf",
       "value": 2636,
       "unit": "paise",
@@ -881,8 +965,50 @@
       ]
     },
     {
+      "id": "narration_payees.payee_max_d72f04ae",
+      "value": 4721,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPI STORES",
+          "label": "UPI STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_e309d035",
+      "value": 4391,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SELFMADE MILLS",
+          "label": "SELFMADE MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_ef260b01",
+      "value": 4603,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPIKA STORES",
+          "label": "UPIKA STORES"
+        }
+      ]
+    },
+    {
       "id": "narration_payees.payee_max_f295b2cd",
-      "value": 1273,
+      "value": 4931,
       "unit": "paise",
       "definition_sha256_16": "9a29a9467e0a9b78",
       "definition_text": "Largest single payment.",
@@ -891,20 +1017,6 @@
           "kind": "payee_name",
           "id": "UPI",
           "label": "UPI"
-        }
-      ]
-    },
-    {
-      "id": "narration_payees.payee_over_194c_005e336e",
-      "value": "no",
-      "unit": "text",
-      "definition_sha256_16": "fb6cae51d7a9261b",
-      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
-      "evidence": [
-        {
-          "kind": "payee_name",
-          "id": "WITHDRAWAL BY",
-          "label": "WITHDRAWAL BY"
         }
       ]
     },
@@ -1035,6 +1147,20 @@
       ]
     },
     {
+      "id": "narration_payees.payee_over_194c_67da6382",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CASH PAID TOWER",
+          "label": "CASH PAID TOWER"
+        }
+      ]
+    },
+    {
       "id": "narration_payees.payee_over_194c_7edeadcf",
       "value": "no",
       "unit": "text",
@@ -1161,6 +1287,48 @@
       ]
     },
     {
+      "id": "narration_payees.payee_over_194c_d72f04ae",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPI STORES",
+          "label": "UPI STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_e309d035",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SELFMADE MILLS",
+          "label": "SELFMADE MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_ef260b01",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPIKA STORES",
+          "label": "UPIKA STORES"
+        }
+      ]
+    },
+    {
       "id": "narration_payees.payee_over_194c_f295b2cd",
       "value": "no",
       "unit": "text",
@@ -1171,25 +1339,6 @@
           "kind": "payee_name",
           "id": "UPI",
           "label": "UPI"
-        }
-      ]
-    },
-    {
-      "id": "narration_payees.payee_total_005e336e",
-      "value": 3892,
-      "unit": "paise",
-      "definition_sha256_16": "a17b3cddda9e5600",
-      "definition_text": "Total of those payments.",
-      "evidence": [
-        {
-          "kind": "payee_name",
-          "id": "WITHDRAWAL BY",
-          "label": "WITHDRAWAL BY"
-        },
-        {
-          "kind": "voucher",
-          "id": "f52",
-          "label": "Payment f52 on 2025-05-13"
         }
       ]
     },
@@ -1450,6 +1599,25 @@
       ]
     },
     {
+      "id": "narration_payees.payee_total_67da6382",
+      "value": 4507,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CASH PAID TOWER",
+          "label": "CASH PAID TOWER"
+        },
+        {
+          "kind": "voucher",
+          "id": "f58",
+          "label": "Payment f58 on 2025-05-19"
+        }
+      ]
+    },
+    {
       "id": "narration_payees.payee_total_7edeadcf",
       "value": 2636,
       "unit": "paise",
@@ -1656,8 +1824,65 @@
       ]
     },
     {
+      "id": "narration_payees.payee_total_d72f04ae",
+      "value": 4721,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPI STORES",
+          "label": "UPI STORES"
+        },
+        {
+          "kind": "voucher",
+          "id": "f60",
+          "label": "Payment f60 on 2025-05-21"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_e309d035",
+      "value": 4391,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SELFMADE MILLS",
+          "label": "SELFMADE MILLS"
+        },
+        {
+          "kind": "voucher",
+          "id": "f57",
+          "label": "Payment f57 on 2025-05-18"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_ef260b01",
+      "value": 4603,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "UPIKA STORES",
+          "label": "UPIKA STORES"
+        },
+        {
+          "kind": "voucher",
+          "id": "f59",
+          "label": "Payment f59 on 2025-05-20"
+        }
+      ]
+    },
+    {
       "id": "narration_payees.payee_total_f295b2cd",
-      "value": 1273,
+      "value": 9744,
       "unit": "paise",
       "definition_sha256_16": "a17b3cddda9e5600",
       "definition_text": "Total of those payments.",
@@ -1669,14 +1894,19 @@
         },
         {
           "kind": "voucher",
-          "id": "f13",
-          "label": "Payment f13 on 2025-04-14"
+          "id": "f61",
+          "label": "Payment f61 on 2025-05-22"
+        },
+        {
+          "kind": "voucher",
+          "id": "f62",
+          "label": "Payment f62 on 2025-05-23"
         }
       ]
     },
     {
       "id": "narration_payees.payees_count",
-      "value": 20,
+      "value": 23,
       "unit": "count",
       "definition_sha256_16": "b6f907568524af65",
       "definition_text": "Distinct payees printed by the bank: payments sharing a printed name or a whole UPI handle are one payee.",
@@ -1716,7 +1946,7 @@
     },
     {
       "id": "narration_payees.resolved_total",
-      "value": 96559,
+      "value": 119360,
       "unit": "paise",
       "definition_sha256_16": "0a0479b3fe570ca0",
       "definition_text": "Total bank payments with a printed payee.",

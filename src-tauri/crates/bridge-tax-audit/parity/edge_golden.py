@@ -69,13 +69,19 @@ meaning none supplied, and none supplied with the reader's reason when that read
 recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it); and
 for `cash_payments_40a3`: `loan_ledgers` and `round_off_ledgers` (default []); for `entity_269st_gap`: `party_identity` (the engagement's own
 [party_identity] table, default {}), `round_off_ledgers`, and per ledger `pan` and `gstin` (default ""); for `read_scope`: `currency_read` (default false); for `books_examined`: `documents_read` (the
-names of the documents the pack loaded, in its order: a list of text, default []); and
+names of the documents the pack loaded, in its order: a list of text, default []); for `clause21a_candidates`:
+`clause21a_extra_terms` (the client's `[clause21a].extra_terms`, read by the reference's own reader; absent meaning
+none) and `partners` (as for `partners_40b_194t`; its interest and remuneration ledgers, as pack.py takes them); and
 for `stock`: `stock_items` ({name: {base_unit?, guid?, opening_qty?, opening_value?, closing_qty?,
 closing_value?}}, default {}), `stock_opening` and `stock_closing` ({as_of, rows: {name: {qty?, value?,
 rate?}}}), each quantity a number, each value or rate integer paise, absent or null meaning None, and
 `is_integrated` (true, false, or absent/null for unknown); and for `party_monthly`: `cash`, `bank` (both also
 passed to the module invariant, as the reference's pack passes them) and `period` as above, and `top_n` (a non-negative integer, default the module's PARTY_TOP_N; Python would slice
-a negative one from the end, which the Rust `usize` cannot express, so both sides refuse it).
+a negative one from the end, which the Rust `usize` cannot express, so both sides refuse it); and for
+`depreciation`: `depreciation` (the client config's `[depreciation]` table: `block_by_ledger` ({ledger: block}),
+`opening_wdv_paise` ({block: integer paise}) and `dep_expense_ledgers` (a list of text), each required, as the
+reference's own `tae.config.depreciation_config` requires it, and `put_to_use_by_voucher` ({voucher GUID: ISO date},
+default none: the reference's pack passes none, but `run()` takes them).
 """
 from __future__ import annotations
 
@@ -97,8 +103,8 @@ def main() -> int:
                                              StatementPeriodRefused, load_bank_statement_json)
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
-    from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined, cash_book_integrity, cash_payments_40a3, counter_cheques_40a3,
-                                 creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, stale_balances_41_1,
+    from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined, cash_book_integrity, cash_payments_40a3, clause21a_candidates, counter_cheques_40a3,
+                                 creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
     from tae.config import load_rules, related_parties_config
@@ -319,6 +325,20 @@ def main() -> int:
         integrated = typed(spec, "is_integrated", lambda x: isinstance(x, bool), "true, false or null")
         return module, stock.run(eng, {"version": rules.version}, items, opening, closing, integrated)
 
+    def clause21a_candidates_run():
+        # As tae/pack.py: the client's [clause21a].extra_terms through the reference's own reader, from a config
+        # built out of the spec's key, and the partners' interest and remuneration ledgers, each kept when truthy;
+        # on the crate's vendored keyword table, checked against the reference's.
+        from python_golden import require_vendored_clause21a_keywords
+        from tae.config import clause21a_extra_terms
+        require_vendored_clause21a_keywords(clause21a_candidates)
+        cfg = {"clause21a": {"extra_terms": spec["clause21a_extra_terms"]}} if "clause21a_extra_terms" in spec else {}
+        partners = spec.get("partners", {})
+        return clause21a_candidates, clause21a_candidates.run(
+            eng, rules, clause21a_extra_terms(cfg),
+            frozenset(led for q in partners.values() for led in (q.get("interest_ledger"), q.get("remuneration_ledger"))
+                      if led))
+
     def tds_payees_run():
         # As tae/pack.py's _tds_payees: every client-config input through the reference's own reader, from a
         # config built out of the spec's keys.
@@ -343,6 +363,24 @@ def main() -> int:
             client_state=tc.client_state(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg),
             deductor_activity=tc.deductor_activity(cfg), goods_carriage_ledgers=tc.tds_goods_carriage_ledgers(cfg))
 
+    def specified_persons_run():
+        # As the pack's runner: related_parties_cl23 on the same table first, its result this test's input.
+        rp = related_parties_config({"related_parties": spec.get("related_parties", {})})
+        cl23 = related_parties_cl23.run(eng, rules, rp)
+        module = SimpleNamespace(TEST_ID=specified_persons_40a2b.TEST_ID, check_invariants=lambda e, res:
+                                 specified_persons_40a2b.check_invariants(e, rules, rp, cl23, res))
+        return module, specified_persons_40a2b.run(eng, rules, rp, cl23)
+
+    def depreciation_run():
+        # As tae/pack.py: the client's three tables through the reference's own reader, and of the rules only the
+        # version and the [depreciation] keys bar its two prose fields. pack.py passes no put-to-use dates.
+        from tae.config import depreciation_config
+        dep = spec["depreciation"]
+        rules_dep = {"version": rules.version,
+                     **{k: v for k, v in rules["depreciation"].items() if k not in ("authority", "status")}}
+        put_to_use = {g: date.fromisoformat(d) for g, d in dep.get("put_to_use_by_voucher", {}).items()}
+        return depreciation, depreciation.run(eng, rules_dep, *depreciation_config({"depreciation": dep}), put_to_use)
+
     from tae.party_identity import build_party_index
     runners = {
         "applicability_44ab": lambda: (applicability_44ab, applicability_44ab.run(
@@ -361,12 +399,14 @@ def main() -> int:
         "cash_payments_40a3": lambda: (cash_payments_40a3, cash_payments_40a3.run(
             eng, rules, cash=cash, bank=bank, loan_ledgers_configured=set(spec.get("loan_ledgers", [])),
             round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])))),
+        "clause21a_candidates": clause21a_candidates_run,
         "counter_cheques_40a3": lambda: (counter_cheques_40a3, counter_cheques_40a3.run(
             eng, rules, cash, bank, frozenset(counter_cheque_terms))),
         "creditor_ageing_43bh": lambda: (creditor_ageing_43bh, creditor_ageing_43bh.run(
             eng, rules, set(spec.get("creditors", [])), acceptance_lag_days=ca.get("acceptance_lag_days", 0),
             supplier_classification=ca.get("supplier_classification", {}), post_year_payments=post_year,
             mse_interest_ledgers=frozenset(ca.get("mse_interest_ledgers", [])))),
+        "depreciation": depreciation_run,
         # As tae/pack.py: the party index is built from the engagement's [party_identity] table, and
         # the round-off ledgers are passed as given.
         "entity_269st_gap": lambda: (entity_269st_gap, entity_269st_gap.run(
@@ -388,6 +428,7 @@ def main() -> int:
         "read_scope": lambda: (read_scope, read_scope.run(eng, rules)),
         "related_parties_cl23": lambda: (related_parties_cl23, related_parties_cl23.run(
             eng, rules, related_parties_config({"related_parties": spec.get("related_parties", {})}))),
+        "specified_persons_40a2b": specified_persons_run,
         "stale_balances_41_1": lambda: (stale_balances_41_1, stale_balances_41_1.run(eng, rules)),
         "statutory_dues_43b": lambda: (statutory_dues_43b, statutory_dues_43b.run(
             eng, rules, dict(sd.get("nature_by_ledger", {})), frozenset(sd.get("salary_expense_ledgers", [])))),

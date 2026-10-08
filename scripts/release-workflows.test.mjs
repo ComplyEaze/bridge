@@ -554,6 +554,24 @@ test("the publish step refuses on a failed lookup and on a version already relea
   assert.match(attempt("mcp-v0.4.0", ownTagExists).out, /PASSED/);
 });
 
+// The title is evaluated in bash after the step's own two `version=` lines, so a title built from the
+// tag, or from a second derivation, fails here rather than at the next publication.
+test("the publish step titles the release ComplyEaze Bridge MCP and the version from either tag form", async () => {
+  const release = await workflow("../.github/workflows/release-mcpb-preview.yml");
+  const lines = step(release.jobs["publish-preview"], "Create the immutable GitHub preview release").run.split("\n").map((line) => line.trim());
+  const derivation = lines.filter((line) => line.startsWith("version="));
+  assert.deepEqual(derivation, ['version="${RELEASE_TAG#mcp-preview-}"', 'version="${version#mcp-v}"'], "the version is derived once, from the tag");
+  const titles = lines.filter((line) => line.startsWith("--title "));
+  assert.deepEqual(titles, ['--title "ComplyEaze Bridge MCP $version" \\'], "the release is titled once, from the derived version");
+  const title = titles[0].slice("--title ".length, -" \\".length);
+  for (const [tag, expected] of [["mcp-v0.5.0", "ComplyEaze Bridge MCP 0.5.0"], ["mcp-preview-0.3.0", "ComplyEaze Bridge MCP 0.3.0"]]) {
+    const script = `set -euo pipefail\nRELEASE_TAG=${tag}\n${derivation.join("\n")}\nprintf '%s' ${title}\n`;
+    const result = spawnSync("bash", ["-c", script], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, expected, `${tag} is titled ${expected}`);
+  }
+});
+
 test("the install page workflow keeps the Pages permission and the identity token in the deploy job alone", async () => {
   const page = await workflow("../.github/workflows/deploy-install-page.yml");
   assertInstallPageWorkflow(page);

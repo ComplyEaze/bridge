@@ -65,7 +65,8 @@ error that did not mention the Terms; with the published file, switched on while
 setting had no value, the extension was not started either (section 4). From 0.5.1
 the setting is not marked required: Claude Desktop starts the extension with the
 setting off, and every tool call answers `terms_not_accepted`, naming the setting
-(bridge#1413). A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to `true`
+(bridge#1413). That was seen on one Mac with a test package; it has not yet been
+checked on Windows. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to `true`
 or `1` is not asked.
 
 ## 2. Does anything leave my computer?

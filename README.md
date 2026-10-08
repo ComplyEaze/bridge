@@ -126,8 +126,8 @@ whose ledger now points to a different master.
   update from 0.4.2, Claude Desktop did not start the extension before the box
   was ticked, so that answer was never shown: on one Mac a request failed with a
   400 error that did not mention the Terms. From 0.5.1 the setting is not marked
-  required, so Claude Desktop starts the extension and the answer is shown;
-  #1413.)
+  required, so Claude Desktop starts the extension and the answer is shown, as
+  seen on one Mac with a test package; not yet checked on Windows; #1413.)
 - **Open source** under Apache-2.0.
 
 ## What has been run against a real TallyPrime

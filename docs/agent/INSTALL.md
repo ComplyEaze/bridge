@@ -73,7 +73,8 @@ actually on.
    Bridge before the box was ticked and before any quit, and a request to a
    Bridge tool failed with a 400 error that did not mention the Terms. 0.5.1 no
    longer marks the setting required, so Claude Desktop starts Bridge and Bridge
-   gives the answer itself; bridge#1413.)
+   gives the answer itself, as seen on one Mac with a test package; not yet
+   checked on Windows; bridge#1413.)
 5. Save the extension settings, then quit Claude Desktop completely and reopen
    it. (On that Mac Claude Desktop
    started Bridge as soon as the settings were saved and a new chat got an answer
@@ -124,7 +125,8 @@ error that did not mention the Terms; the published 0.5.0, installed over 0.4.2
 and switched on while the new setting had no value, was not started either, and Claude Desktop
 showed "Unable to connect to extension server" (bridge#1413). From 0.5.1 Claude
 Desktop starts Bridge before the tick, and every tool answers that the Terms of
-Use are not accepted until you tick it. Installing over a release older than 0.4.2 was not
+Use are not accepted until you tick it (seen on one Mac with a test package; not
+yet checked on Windows). Installing over a release older than 0.4.2 was not
 tried: remove such a release first. If Settings,
 Extensions then lists two ComplyEaze Bridge entries (as happened when 0.4.2 was
 installed beside an older release), remove the older entry before you use

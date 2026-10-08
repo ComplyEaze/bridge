@@ -4940,11 +4940,14 @@ async fn a_rejected_single_voucher_reads_as_not_created_on_the_silver_answer() {
     assert_reported_not_created(&posted);
 }
 
-/// A later `verify_import` never reads the post's answer: by then someone may
-/// have entered the voucher by hand and edited it, so a voucher it cannot find
-/// is `sent_not_attributed`, with the line that says to check in Tally.
+/// A later `verify_import` never reads a voucher as not created: by then
+/// someone may have entered it by hand and edited it, so a voucher it cannot
+/// find is `sent_not_attributed`. Its next step says what the post's saved
+/// answer reported when the voucher was sent, and to look for it in Tally
+/// before entering it by hand. The summary line is the one for a post that
+/// could not be confirmed.
 #[tokio::test]
-async fn a_rejected_single_voucher_verified_later_is_not_labelled_from_the_old_answer() {
+async fn a_rejected_single_voucher_verified_later_keeps_its_status_and_says_what_tally_reported() {
     let mut plans = before_approval();
     plans.extend(after_approval(xml(rejected_one_silver())));
     plans.push(xml(company_marks(10, 50, "WR2 Unicode Lab")));
@@ -4990,8 +4993,14 @@ async fn a_rejected_single_voucher_verified_later_is_not_labelled_from_the_old_a
     let voucher = &result["unverified_vouchers"][0];
     assert_eq!(voucher["status"], "sent_not_attributed", "{later}");
     assert_eq!(
-        voucher["next_step"].as_str(),
-        super::super::verification::plain_next_step("sent_not_attributed"),
+        voucher["next_step"],
+        "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered by hand with a different date, voucher type, ledger or amount: look for it in Tally first, and enter it in Tally's voucher entry screen only if it is not there; do not import its file through Tally's Import menu. ComplyEaze Bridge will not send this saved voucher again.",
+        "{later}"
+    );
+    assert_eq!(result["post_span_binding"]["state"], "refused", "{later}");
+    assert_eq!(
+        result["post_span_binding"]["summary"],
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.",
         "{later}"
     );
 }
@@ -5297,6 +5306,163 @@ async fn a_batch_tally_rejected_whole_reads_as_not_created_by_tally() {
             "{posted}"
         );
     }
+}
+
+/// Posts the three-Journal batch with `answer` as Tally's answer to the POST,
+/// the voucher mark read after it at `after_mark` (10 before) and `window` as
+/// the book for its dates, then checks it again with `verify_import` against
+/// a simulator of its own, the book unchanged (the journal's origin moved to
+/// it, since a dispatched batch verifies only on the origin it recorded).
+/// Returns the later check's answer.
+async fn batch_posted_then_verified_later(
+    answer: String,
+    after_mark: u64,
+    window: String,
+) -> Value {
+    batch_posted_then_verified_later_with(answer, after_mark, window, true).await
+}
+
+/// As `batch_posted_then_verified_later`; with `keep_step_record` false, the
+/// record of the post's durable checks is removed before the later check, as
+/// for a batch posted before such records existed.
+async fn batch_posted_then_verified_later_with(
+    answer: String,
+    after_mark: u64,
+    window: String,
+    keep_step_record: bool,
+) -> Value {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(answer)));
+    plans.push(xml(company_marks(after_mark, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(window.clone(), after_mark));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = batch_server_at(simulator.address(), directory.path());
+    let (line, args) = saved_partial_batch(&server);
+    let _ = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    let _ = sent(simulator);
+    if !keep_step_record {
+        let record = server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.masters_check.json", line.batch_id));
+        fs::remove_file(&record).expect("the post recorded its checks");
+    }
+    let later_plans = span_readback(window, after_mark);
+    let expected_requests = later_plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(later_plans)).unwrap();
+    let later_server = batch_server_at(simulator.address(), directory.path());
+    let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let later_origin =
+        super::super::super::canonical_loopback_origin(&later_server.settings.endpoint).unwrap();
+    let text = String::from_utf8(journal(directory.path())).unwrap();
+    fs::write(
+        directory.path().join("agent-import-ledger.jsonl"),
+        text.replace(&origin, &later_origin),
+    )
+    .unwrap();
+    let later = later_server.call_tool("verify_import", args).await;
+    assert_eq!(sent(simulator).len(), expected_requests, "{later}");
+    later
+}
+
+/// The next step of each voucher a later check does not find, and the
+/// summary line of that check.
+fn later_next_steps(later: &Value) -> (Vec<String>, String) {
+    let result = &later["structuredContent"]["result"];
+    let steps = result["unverified_vouchers"]
+        .as_array()
+        .expect("the unverified vouchers")
+        .iter()
+        .filter(|voucher| voucher["status"] == "sent_not_attributed")
+        .map(|voucher| {
+            voucher["next_step"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect();
+    let summary = result["post_span_binding"]["summary"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    (steps, summary)
+}
+
+const LATER_SUMMARY: &str = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+
+/// A batch Tally rejected whole, checked again later with the book unchanged:
+/// no voucher is read as not created, each keeps `sent_not_attributed`, and
+/// each next step says what Tally reported when the voucher was sent. The
+/// summary line is the one for a post that could not be confirmed.
+#[tokio::test]
+async fn a_batch_rejected_whole_verified_later_says_what_tally_reported_of_each_voucher() {
+    let later =
+        batch_posted_then_verified_later(rejected_all_three(), 10, empty_collection()).await;
+    let result = &later["structuredContent"]["result"];
+    assert_eq!(later["isError"], json!(true), "{later}");
+    assert_eq!(result["counts"]["sent_not_attributed"], 3, "{later}");
+    assert_eq!(
+        result["counts"].get("tally_reported_not_created"),
+        None,
+        "{later}"
+    );
+    let (steps, summary) = later_next_steps(&later);
+    assert_eq!(
+        steps,
+        [super::super::verification::REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP; 3],
+        "{later}"
+    );
+    assert_eq!(summary, LATER_SUMMARY, "{later}");
+}
+
+/// The same batch when the voucher mark moved by one across the post (the
+/// later check reads the mark where the post left it): the post claimed
+/// nothing about any voucher, and a later check claims nothing either. Each
+/// voucher keeps the line that says to check in Tally.
+#[tokio::test]
+async fn a_batch_rejected_whole_whose_mark_moved_is_not_described_by_a_later_check() {
+    let later =
+        batch_posted_then_verified_later(rejected_all_three(), 11, empty_collection()).await;
+    let result = &later["structuredContent"]["result"];
+    assert_eq!(result["counts"]["sent_not_attributed"], 3, "{later}");
+    let (steps, summary) = later_next_steps(&later);
+    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
+    assert_eq!(steps, [plain; 3], "{later}");
+    assert_eq!(summary, LATER_SUMMARY, "{later}");
+}
+
+/// A batch rejected whole whose post left no record of its checks: a later
+/// check has no verdict on the voucher step to read, so it claims nothing.
+#[tokio::test]
+async fn a_batch_rejected_whole_with_no_step_record_is_not_described_by_a_later_check() {
+    let later =
+        batch_posted_then_verified_later_with(rejected_all_three(), 10, empty_collection(), false)
+            .await;
+    let result = &later["structuredContent"]["result"];
+    assert_eq!(result["counts"]["sent_not_attributed"], 3, "{later}");
+    let (steps, _) = later_next_steps(&later);
+    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
+    assert_eq!(steps, [plain; 3], "{later}");
+}
+
+/// A batch that landed partly, checked again later: the voucher that is not
+/// found keeps the line that says to check in Tally. A count does not say
+/// which voucher Tally rejected.
+#[tokio::test]
+async fn a_partly_created_batch_verified_later_keeps_the_earlier_line() {
+    let later =
+        batch_posted_then_verified_later(created_two_of_three(), 12, partial_window()).await;
+    let result = &later["structuredContent"]["result"];
+    assert_eq!(result["counts"]["sent_not_attributed"], 1, "{later}");
+    let (steps, _) = later_next_steps(&later);
+    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
+    assert_eq!(steps, [plain], "{later}");
 }
 
 /// The same answer with the voucher mark moved by one across the post: Tally

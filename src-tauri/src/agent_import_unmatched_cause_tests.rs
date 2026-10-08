@@ -5,7 +5,7 @@
 //! derived from live captures (counter shape only, see
 //! EDUCATION_IMPORT_COUNTERS_PROVENANCE.md). Tests marked synthetic exist only
 //! to hold the guards that no capture reaches.
-use super::{measured_voucher_step, unmatched_cause, UnmatchedCause};
+use super::{later_unmatched_cause, measured_voucher_step, unmatched_cause, UnmatchedCause};
 use bridge_tally_protocol::{parse_import_outcome, TallyImportResult};
 
 fn utf16(bytes: &[u8]) -> String {
@@ -290,4 +290,89 @@ fn a_voucher_step_is_measured_only_when_both_marks_were_read_and_did_not_go_down
     assert_eq!(measured_voucher_step(Some(10), Some(9)), None);
     assert_eq!(measured_voucher_step(None, Some(10)), None);
     assert_eq!(measured_voucher_step(Some(10), None), None);
+}
+
+/// A later verification reads what the post left on record: a post Tally
+/// rejected whole is "reported as not created when sent", with no count of
+/// what is found now. One voucher needs the answer alone; a batch also needs
+/// the post's own verdict that its voucher step matched. It is never
+/// `ReportedNotCreated`, which only the post's own readback gives.
+#[test]
+fn a_later_verification_reads_what_the_post_left_on_record() {
+    for (answer, sent, step_matched) in [
+        (rejected_one_education(), 1, false),
+        (rejected_one_silver(), 1, false),
+        (rejected_all_three(), 3, true),
+        (rejected_two_carrying_three_missing_ledgers(), 2, true),
+    ] {
+        assert_eq!(
+            later_unmatched_cause(Some(&answer), sent, step_matched),
+            UnmatchedCause::ReportedNotCreatedWhenSent,
+            "{answer:?}"
+        );
+    }
+    // A batch whose post did not record its step as matched: nothing.
+    for (answer, sent) in [
+        (rejected_all_three(), 3),
+        (rejected_two_carrying_three_missing_ledgers(), 2),
+    ] {
+        assert_eq!(
+            later_unmatched_cause(Some(&answer), sent, false),
+            UnmatchedCause::NotEstablished,
+            "{answer:?}"
+        );
+    }
+}
+
+/// Every other saved answer, and none, establishes nothing for a later
+/// verification: a partial commit, a clean create, a missing counter, any
+/// other counter set, fewer or more exceptions than vouchers, an empty post.
+#[test]
+fn a_later_verification_establishes_nothing_from_any_other_answer() {
+    assert_eq!(
+        later_unmatched_cause(None, 1, true),
+        UnmatchedCause::NotEstablished
+    );
+    let mut missing = rejected_one_silver();
+    missing.counter_presence.exceptions = false;
+    let doubled = TallyImportResult {
+        exceptions: 2,
+        ..rejected_one_silver()
+    };
+    let empty = TallyImportResult {
+        exceptions: 0,
+        line_error_count: 0,
+        ..rejected_one_silver()
+    };
+    for (name, answer, sent) in [
+        ("49 of 50 committed", committed_49_of_50(), 50),
+        ("one clean create", created_one(), 1),
+        ("a counter missing", missing, 1),
+        ("fewer exceptions than vouchers", rejected_one_silver(), 2),
+        ("more exceptions than vouchers", doubled, 1),
+        ("nothing sent", empty, 0),
+    ] {
+        assert_eq!(
+            later_unmatched_cause(Some(&answer), sent, true),
+            UnmatchedCause::NotEstablished,
+            "{name}"
+        );
+    }
+    let cases: [(&str, Bump); 6] = [
+        ("created", |c| c.created = 1),
+        ("altered", |c| c.altered = 1),
+        ("deleted", |c| c.deleted = 1),
+        ("ignored", |c| c.ignored = 1),
+        ("errors", |c| c.errors = 1),
+        ("cancelled", |c| c.cancelled = 1),
+    ];
+    for (name, set) in cases {
+        let mut answer = rejected_one_silver();
+        set(&mut answer);
+        assert_eq!(
+            later_unmatched_cause(Some(&answer), 1, true),
+            UnmatchedCause::NotEstablished,
+            "{name}"
+        );
+    }
 }

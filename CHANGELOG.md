@@ -187,6 +187,19 @@ counter Tally keeps that moves when vouchers or ledgers change.
 
 **Safer or fixed**
 
+- A later check (`verify_import`, a repeated `post_import`, or the check
+  before a review is recorded) of a post that Tally answered as creating none
+  of its vouchers no longer suggests the voucher was edited in Tally. Its
+  status is unchanged (`sent_not_attributed`, the batch still
+  `reconciliation_required`), but the voucher's next step now says that Tally
+  reported it as not created when it was sent, that it is not found for these
+  dates now, and to look for it in Tally before entering it by hand, since it
+  may have been entered in another form meanwhile. This reads what the post
+  left on record: its saved answer (every counter reported, none created, one
+  exception for each voucher sent, nothing else counted) and, for a batch,
+  its own verdict that the voucher step matched. A partly created batch, and
+  a batch whose voucher mark moved across the post, keep the earlier line.
+  Not measured against a live Tally (#1108).
 - `purchase_register` and `sales_register` now take their `state` from the rule
   `vouchers` uses. A non-empty window is `complete` only when every voucher read
   was checked against a separate count of the window. Before, the registers called

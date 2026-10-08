@@ -634,7 +634,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let mut rows = validate_then_filter_voucher_rows(rows, from.as_str(), to.as_str(), None)?;
         let empty_window = if rows.is_empty() {
             let (read_evidence, partial, reason) = server
-                .corroborate_empty_voucher_read(&identity, &company.name, &from, &to, source_marks)
+                .corroborate_empty_voucher_read(&identity, &company.name, &from, &to, None, source_marks)
                 .await?;
             accumulate_evidence(&mut accumulated, read_evidence);
             Some((partial, reason))
@@ -1038,49 +1038,16 @@ impl Server {
         Ok((book, evidence))
     }
 
-    /// A second, independent read of the empty window widened by a day each
-    /// side. A book large enough to be counted is corroborated by a census of
-    /// its own and no data part (#1240): the census carries each voucher's day,
-    /// which is all this needs. A book that fits one request is read whole, as
-    /// counting it would cost more requests than the read.
     pub(super) async fn corroborate_empty_voucher_read(
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
         from: &TallyDate,
         to: &TallyDate,
+        ledger: Option<&str>,
         known_marks: Option<CompanyMarks>,
     ) -> Result<(Evidence, bool, Option<&'static str>), ToolFailure> {
         let (wider_from, wider_to) = widened_window(from, to)?;
-        let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
-        let (known_marks, prior) = match self
-            .count_voucher_window(
-                identity,
-                company,
-                (&wider_from, &wider_to),
-                known_marks,
-                limits,
-            )
-            .await?
-        {
-            WindowCount::Counted { census, evidence } => {
-                let found = census
-                    .holds_a_voucher_between(from, to)
-                    .map(|in_window| (in_window, !census.is_empty()))
-                    .map_err(|failure| failure.with_prior_evidence(evidence.clone()));
-                let (any_in_window, any_in_widened) = found?;
-                return self
-                    .corroborate_empty_by_days(
-                        identity,
-                        company,
-                        evidence,
-                        any_in_window,
-                        any_in_widened,
-                    )
-                    .await;
-            }
-            WindowCount::NotCounted { marks, evidence } => (marks, evidence),
-        };
         // The window itself was empty, but the day either side of it need not
         // be, and this read uses the entry wildcard: it is bounded like any
         // other windowed read rather than trusted to be small.
@@ -1093,51 +1060,17 @@ impl Server {
                 known_marks,
                 SmallBooks::Skip,
             )
-            .await
-            .map_err(|failure| match &prior {
-                Some(prior) => failure.with_prior_evidence(prior.clone()),
-                None => failure,
-            })?;
-        // The marks read that came first, when this read had to take them.
-        let evidence = match prior {
-            Some(prior) => combine_evidence(prior, wider.all_evidence()),
-            None => wider.all_evidence(),
-        };
+            .await?;
+        let mut evidence = wider.all_evidence();
         let wider_rows = wider.rows;
-        let found = validate_then_filter_voucher_rows(
-            wider_rows,
-            wider_from.as_str(),
-            wider_to.as_str(),
-            None,
-        )
-        .map(|rows| {
-            (
-                rows.iter()
-                    .any(|row| row_in_window(row, from.as_str(), to.as_str())),
-                !rows.is_empty(),
-            )
-        })
-        .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()));
-        let (any_in_window, any_in_widened) = found?;
-        self.corroborate_empty_by_days(identity, company, evidence, any_in_window, any_in_widened)
-            .await
-    }
-
-    /// The corroboration's verdict from what the widened read found; when it
-    /// found nothing at all, the company's voucher high-water mark decides
-    /// between a book with no vouchers and an uncorroborated empty window.
-    async fn corroborate_empty_by_days(
-        &self,
-        identity: &VerifiedCompanyIdentity,
-        company: &str,
-        mut evidence: Evidence,
-        any_in_window: bool,
-        any_in_widened: bool,
-    ) -> Result<(Evidence, bool, Option<&'static str>), ToolFailure> {
         let outcome = async {
-            let high_water = if any_in_window || any_in_widened {
-                None
-            } else {
+            let wider_rows = validate_then_filter_voucher_rows(
+                wider_rows,
+                wider_from.as_str(),
+                wider_to.as_str(),
+                ledger,
+            )?;
+            let high_water = if wider_rows.is_empty() {
                 let (high_water_xml, high_water_evidence) = self
                     .post_read(identity, company_high_water_read(company))
                     .await?;
@@ -1146,9 +1079,15 @@ impl Server {
                     &high_water_xml,
                     identity.company_guid(),
                 )?)
+            } else {
+                None
             };
-            let (partial, reason) =
-                corroborate_empty_by_days(any_in_window, any_in_widened, high_water)?;
+            let (partial, reason) = corroborate_empty_voucher_window(
+                &wider_rows,
+                from.as_str(),
+                to.as_str(),
+                high_water,
+            )?;
             Ok((evidence.clone(), partial, reason))
         }
         .await;

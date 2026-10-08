@@ -2093,12 +2093,9 @@ one request. The building blocks:
 - **Extent check.** On a later page of a listing, the two book-extent requests
   that decide whether the held read can be reused, folded with the runtime
   combination (`continued_listing` in `src-tauri/src/agent_ledgers.rs`).
-- **Corroboration.** On a book large enough to be counted, a census of the
-  window one day wider on each side, with the marks already known (no read of
-  the neighbouring days' vouchers), then the marks read again if the census took
-  several requests, plus a scoped marks read if that window is empty too. A
-  book that fits one request has the window read whole instead
-  (`corroborate_empty_voucher_read` in `src-tauri/src/agent_vouchers.rs`).
+- **Corroboration.** The window read again, one day wider on each side, with
+  the marks already known, plus a scoped marks read if that window is empty
+  too (`corroborate_empty_voucher_read` in `src-tauri/src/agent_vouchers.rs`).
 
 These requests are sent but never digested anywhere in a result:
 - the identity-bracket company-list requests around each scoped and runtime read;

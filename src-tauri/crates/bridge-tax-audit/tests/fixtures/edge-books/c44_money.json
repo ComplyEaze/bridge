@@ -1,0 +1,612 @@
+{
+ "comment": "clause44: the client's money categories. Interest to a bank goes to the exempt column and bank charges to 'other than composition' whatever the lender's GSTIN (the module check leaves both out); a charge on a journal with no party is still forced to 'other than composition' (a line is placed by its own ledger before the party is read); a ledger in both the bank-charge category and the no-supplier list is 'no supplier' (a reason comes before a forced column); interest to an individual lender keeps the ordinary rule (no GSTIN: unregistered; a GSTIN and no tax: exempt) and raises the judgement finding, including a line on a ledger that is also a depreciation ledger; a depreciation ledger is a depreciation entry even when its category is a judgement one; partner remuneration (also on the no-supplier list) and a mixed interest-and-charges ledger are judgement items outside the columns; round-off beside only a judgement item takes that item's reason. Every GSTIN is invented (fourteenth character Y).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Fixed Assets": null,
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Direct Incomes": null,
+  "Indirect Incomes": null,
+  "Carriage Inward": "Direct Expenses",
+  "Office Costs": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-c44_money-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_money-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_money-002"
+  },
+  {
+   "name": "Input CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_money-003"
+  },
+  {
+   "name": "Input SGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_money-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c44_money-005"
+  },
+  {
+   "name": "Bank B",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_money-006",
+   "gstin": "27BANKB6666B1Y6"
+  },
+  {
+   "name": "Bank Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-007"
+  },
+  {
+   "name": "Bank Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-008"
+  },
+  {
+   "name": "Loan Processing Fee",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-009"
+  },
+  {
+   "name": "Lender Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-010"
+  },
+  {
+   "name": "Director Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-011"
+  },
+  {
+   "name": "Partner Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-012"
+  },
+  {
+   "name": "Bank Interest and Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-013"
+  },
+  {
+   "name": "Courier",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-014"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-015"
+  },
+  {
+   "name": "Lender One",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-c44_money-016",
+   "gstin": ""
+  },
+  {
+   "name": "Lender Two",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-c44_money-017",
+   "gstin": "27LENDT9999L1Y9"
+  },
+  {
+   "name": "Partner A Current",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-c44_money-018"
+  },
+  {
+   "name": "Partner Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-019"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_money-020"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 1611947,
+   "credit": 0,
+   "closing": 1611947
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Input CGST",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Input SGST",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2059615,
+   "closing": -2059615
+  },
+  {
+   "ledger": "Bank B",
+   "opening": 0,
+   "debit": 0,
+   "credit": 196764,
+   "closing": -196764
+  },
+  {
+   "ledger": "Bank Interest",
+   "opening": 0,
+   "debit": 264582,
+   "credit": 0,
+   "closing": 264582
+  },
+  {
+   "ledger": "Bank Charges",
+   "opening": 0,
+   "debit": 71484,
+   "credit": 0,
+   "closing": 71484
+  },
+  {
+   "ledger": "Loan Processing Fee",
+   "opening": 0,
+   "debit": 69697,
+   "credit": 0,
+   "closing": 69697
+  },
+  {
+   "ledger": "Lender Interest",
+   "opening": 0,
+   "debit": 207051,
+   "credit": 0,
+   "closing": 207051
+  },
+  {
+   "ledger": "Director Interest",
+   "opening": 0,
+   "debit": 80042,
+   "credit": 0,
+   "closing": 80042
+  },
+  {
+   "ledger": "Partner Remuneration",
+   "opening": 0,
+   "debit": 394458,
+   "credit": 0,
+   "closing": 394458
+  },
+  {
+   "ledger": "Bank Interest and Charges",
+   "opening": 0,
+   "debit": 33421,
+   "credit": 0,
+   "closing": 33421
+  },
+  {
+   "ledger": "Courier",
+   "opening": 0,
+   "debit": 17099,
+   "credit": 0,
+   "closing": 17099
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 105722,
+   "credit": 0,
+   "closing": 105722
+  },
+  {
+   "ledger": "Lender One",
+   "opening": 0,
+   "debit": 0,
+   "credit": 182872,
+   "closing": -182872
+  },
+  {
+   "ledger": "Lender Two",
+   "opening": 0,
+   "debit": 0,
+   "credit": 104221,
+   "closing": -104221
+  },
+  {
+   "ledger": "Partner A Current",
+   "opening": 0,
+   "debit": 0,
+   "credit": 424328,
+   "closing": -424328
+  },
+  {
+   "ledger": "Partner Interest",
+   "opening": 0,
+   "debit": 29870,
+   "credit": 0,
+   "closing": 29870
+  },
+  {
+   "ledger": "Round Off",
+   "opening": 0,
+   "debit": 82427,
+   "credit": 0,
+   "closing": 82427
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "m01",
+   "date": "2025-04-30",
+   "base_type": "Payment",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Bank Interest",
+     264582
+    ],
+    [
+     "Bank A",
+     -264582
+    ]
+   ],
+   "number": "BP-1"
+  },
+  {
+   "guid": "m02",
+   "date": "2025-05-31",
+   "base_type": "Payment",
+   "party": "Bank B",
+   "lines": [
+    [
+     "Bank Charges",
+     21345
+    ],
+    [
+     "Bank B",
+     -21345
+    ]
+   ],
+   "number": "BP-2"
+  },
+  {
+   "guid": "m03",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Bank Charges",
+     50139
+    ],
+    [
+     "Bank A",
+     -50139
+    ]
+   ],
+   "number": "J-1"
+  },
+  {
+   "guid": "m04",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "Lender One",
+   "lines": [
+    [
+     "Lender Interest",
+     102830
+    ],
+    [
+     "Lender One",
+     -102830
+    ]
+   ],
+   "number": "J-2"
+  },
+  {
+   "guid": "m05",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "Lender Two",
+   "lines": [
+    [
+     "Lender Interest",
+     104221
+    ],
+    [
+     "Lender Two",
+     -104221
+    ]
+   ],
+   "number": "J-3"
+  },
+  {
+   "guid": "m06",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "Partner A Current",
+   "lines": [
+    [
+     "Partner Remuneration",
+     394458
+    ],
+    [
+     "Partner A Current",
+     -394458
+    ]
+   ],
+   "number": "J-4"
+  },
+  {
+   "guid": "m07",
+   "date": "2025-07-31",
+   "base_type": "Payment",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Bank Interest and Charges",
+     13575
+    ],
+    [
+     "Bank A",
+     -13575
+    ]
+   ],
+   "number": "BP-3"
+  },
+  {
+   "guid": "m08",
+   "date": "2025-08-05",
+   "base_type": "Payment",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Courier",
+     17099
+    ],
+    [
+     "Bank A",
+     -17099
+    ]
+   ],
+   "number": "BP-4"
+  },
+  {
+   "guid": "m09",
+   "date": "2025-08-06",
+   "base_type": "Payment",
+   "party": "Bank B",
+   "lines": [
+    [
+     "Rent",
+     105722
+    ],
+    [
+     "Bank B",
+     -105722
+    ]
+   ],
+   "number": "BP-5"
+  },
+  {
+   "guid": "m10",
+   "date": "2025-08-07",
+   "base_type": "Payment",
+   "party": "Bank B",
+   "lines": [
+    [
+     "Loan Processing Fee",
+     69697
+    ],
+    [
+     "Bank B",
+     -69697
+    ]
+   ],
+   "number": "BP-6"
+  },
+  {
+   "guid": "m11",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "Lender One",
+   "lines": [
+    [
+     "Director Interest",
+     80042
+    ],
+    [
+     "Lender One",
+     -80042
+    ]
+   ],
+   "number": "J-5"
+  },
+  {
+   "guid": "m13",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "party": "Partner A Current",
+   "lines": [
+    [
+     "Partner Interest",
+     29870
+    ],
+    [
+     "Partner A Current",
+     -29870
+    ]
+   ],
+   "number": "J-6"
+  },
+  {
+   "guid": "m14",
+   "date": "2025-09-30",
+   "base_type": "Payment",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Bank Interest and Charges",
+     19846
+    ],
+    [
+     "Round Off",
+     82427
+    ],
+    [
+     "Bank A",
+     -102273
+    ]
+   ],
+   "number": "BP-7"
+  },
+  {
+   "guid": "m12",
+   "date": "2025-04-01",
+   "base_type": "Receipt",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Bank A",
+     2059615
+    ],
+    [
+     "Sales",
+     -2059615
+    ]
+   ],
+   "number": "BR-1"
+  }
+ ],
+ "clause44": {
+  "tax_ledgers": {
+   "cgst": [
+    "Input CGST"
+   ],
+   "sgst": [
+    "Input SGST"
+   ]
+  },
+  "dep_expense_ledgers": [
+   "Director Interest",
+   "Partner Interest"
+  ],
+  "no_supplier_expense_ledgers": [
+   "Loan Processing Fee",
+   "Partner Remuneration"
+  ],
+  "round_off_ledgers": [
+   "Round Off"
+  ],
+  "money_category_by_ledger": {
+   "Bank Interest": "interest_bank_nbfc",
+   "Bank Charges": "bank_charges",
+   "Loan Processing Fee": "bank_charges",
+   "Lender Interest": "interest_individual_no_gstin",
+   "Director Interest": "interest_individual_no_gstin",
+   "Partner Remuneration": "partner_interest_or_remuneration",
+   "Partner Interest": "partner_interest_or_remuneration",
+   "Bank Interest and Charges": "mixed_interest_and_charges"
+  }
+ },
+ "tests": [
+  "clause44"
+ ],
+ "cash": [],
+ "bank": []
+}

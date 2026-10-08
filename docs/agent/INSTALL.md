@@ -112,8 +112,9 @@ on Windows). The package our checks built for release 0.5.0, installed on one Ma
 over 0.4.2, replaced it as an update: one extension at version 0.5.0, the Tally
 port, Response redaction and the posting setting as they were (a posting
 setting that was on stayed on), the old Terms setting gone and no value for the
-new one (version 2026-10.1). This was not tried with the published file or on
-Windows. So after updating, tick the Terms setting, check the posting setting, then
+new one (version 2026-10.1). With the published 0.5.0 file, on one Mac, the Tally
+port and Response redaction were kept and the Terms setting was dropped the same
+way (bridge#1413); not tried on Windows. So after updating, tick the Terms setting, check the posting setting, then
 quit and reopen Claude Desktop. Before the box is ticked, Claude Desktop may not
 start 0.5.0 at all; from 0.5.1 it starts Bridge, and every Bridge tool answers
 that the Terms of Use are not accepted (seen on one Mac with a test package; not

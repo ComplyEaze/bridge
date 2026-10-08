@@ -751,9 +751,15 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // deliberately. `acknowledge_post_review` writes one local record and its
     // module marks no party name; `local_data_report` returns only static
     // strings, counts, sizes and whole days; `cash_flow` returns only months,
-    // amounts and counts of ledgers, and no ledger name.
+    // amounts and counts of ledgers, and no ledger name; `company_features`
+    // returns only three settings, a currency symbol and the company's own name.
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
-    let mut without_a_sample = vec!["acknowledge_post_review", "cash_flow", "local_data_report"];
+    let mut without_a_sample = vec![
+        "acknowledge_post_review",
+        "cash_flow",
+        "company_features",
+        "local_data_report",
+    ];
     // The lab-only tools, compiled in with the `lab-writes` feature, are not
     // sampled yet: `lab_read_inventory` returns party-bearing fields and the two
     // import tools were not examined (#999).

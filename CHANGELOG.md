@@ -16,6 +16,17 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
+**New**
+
+- `company_features` reads three settings that a company's record in Tally holds today (cost centres, GST
+  and batch-wise stock) and its currency symbol (part of #1231). Each setting is yes, no or
+  not reported, and says what it rests on: only the cost-centre setting was compared with Tally's own
+  screen (three synthetic books, not this company); batch-wise stock differed across the two committed
+  books and GST differed only on a book that is not committed, and neither was compared. A setting Tally did not send is never read as no, and an empty or odd one refuses the read. The
+  settings are the ones Tally holds today, not what the books contain or what they were during a year. The
+  currency is a symbol, not a currency code. Measured on three synthetic books of one TallyPrime 7.1 Silver;
+  the tool has not been run against Tally, and Education mode and other releases are not measured.
+
 **Fixed**
 
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out

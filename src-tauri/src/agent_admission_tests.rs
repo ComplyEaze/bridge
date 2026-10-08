@@ -89,6 +89,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "balance_sheet",
         "cash_flow",
         "changed_since",
+        "company_features",
         "egress_log",
         "ledger_masters",
         "ledger_movement",
@@ -1244,6 +1245,11 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "masters",
             "returns no partial list",
             "a read that breached its bound returns nothing partial",
+        ),
+        (
+            "company_features",
+            "not_reported, never no",
+            "a setting Tally did not send is not a setting that is off",
         ),
     ];
     let definitions = registered_tool_definitions(true, true);

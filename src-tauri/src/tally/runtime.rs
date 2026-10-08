@@ -69,6 +69,14 @@ pub(crate) use masters::{MastersKind, MastersReadError, MastersRows};
 #[path = "runtime_masters_tests.rs"]
 mod masters_tests;
 
+#[path = "runtime_company_features.rs"]
+mod company_features;
+pub(crate) use company_features::CompanyFeaturesReadError;
+
+#[cfg(test)]
+#[path = "runtime_company_features_tests.rs"]
+mod company_features_tests;
+
 #[path = "runtime_stock_summary.rs"]
 mod stock_summary;
 pub(crate) use stock_summary::StockSummaryReadError;

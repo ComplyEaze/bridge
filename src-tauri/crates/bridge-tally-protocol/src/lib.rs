@@ -43,6 +43,7 @@ pub mod jsonex;
 pub mod jsonex_request;
 pub mod ledger_census;
 pub mod native_cash_flow;
+pub mod native_company_features;
 mod native_ledger_collection;
 pub mod native_masters;
 pub mod native_outstandings;

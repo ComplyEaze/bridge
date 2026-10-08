@@ -12,7 +12,7 @@
 //! path exists anywhere in this file.
 //!
 //! No signed compatibility evidence exists for any inventory field read here
-//! on any Tally release/mode (the plan-research note's §4.2/§4.5 findings):
+//! on any Tally release/mode:
 //! every value this tool returns is exploratory, not a qualified claim.
 
 use super::*;

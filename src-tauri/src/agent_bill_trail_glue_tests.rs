@@ -8,7 +8,7 @@
 //! party's ledger (`Café Naïve Traders` holds -102.02); none names a bill.
 use super::*;
 use crate::agent::bill_trail::{DetailKind, DetailLimits};
-use crate::agent::voucher_window::{VoucherReadShape, WindowReadLimits};
+use crate::agent::voucher_window::{SmallBooks, VoucherReadShape, WindowReadLimits};
 use crate::tally::{ExposureDirection, OpenBillRow, UnallocatedComposition, UnallocatedParty};
 
 /// The outstandings' as-of date, as the bill trail is handed it.
@@ -382,6 +382,7 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
         budget_bytes: crate::agent::WINDOW_READ_BUDGET_BYTES,
         default_bytes_per_voucher: crate::agent::WINDOW_READ_BUDGET_BYTES,
         max_reads: 2,
+        small_books: SmallBooks::Skip,
     };
     // (kind, named reference, code, requests the plan needs): a named bill's
     // window starts at its date, so the empty day before it is not read.
@@ -519,6 +520,85 @@ async fn a_party_named_in_another_case_is_answered_under_the_catalogues_name() {
         "{detail}"
     );
     assert_eq!(detail["state"], "tied", "{detail}");
+}
+
+/// #1085: a party typed as the ledger's own (stored) name, which differs from the
+/// spelling its vouchers carry, is reached, and the trail is still built from the
+/// spelling the vouchers carry. The answer names the stored name and says how the
+/// vouchers spell it. The catalogue here is hand-edited from a capture, so this
+/// shows the wiring; what Tally's bills report carries for such a ledger is not
+/// measured. Mutant killed: using the shown name as the party.
+#[tokio::test]
+async fn a_party_typed_as_its_stored_name_is_answered_from_the_spelling_its_vouchers_carry() {
+    let mut call = Call::new(DetailKind::Unadjusted);
+    call.party = "Cafe Traders";
+    call.unallocated = vec![residual("102.02")];
+    let mut plans = detail_plans(captured_window());
+    for plan in &mut plans {
+        let body = plan.fixture.body().replace(
+            "<NAME>Café Naïve Traders</NAME>",
+            "<NAME>Cafe Traders</NAME>",
+        );
+        plan.fixture = Fixture::SyntheticXml(body);
+    }
+    let (result, _) = run(plans, call).await;
+    let (detail, _) = result.unwrap();
+    assert_eq!(detail["party"], PARTY, "{detail}");
+    assert_eq!(detail["ledger_match"]["matched"], "exact", "{detail}");
+    assert_eq!(detail["ledger_match"]["ledger"], "Cafe Traders", "{detail}");
+    assert_eq!(
+        detail["ledger_match"]["ledger_row_spelling"], PARTY,
+        "{detail}"
+    );
+    assert_eq!(detail["state"], "tied", "{detail}");
+}
+
+/// #1085: when the vouchers spell a ledger differently from its own name, an
+/// answer that found no residual row may be a name Tally's outstandings
+/// reports spell otherwise (and so may a bill trail that names none), so the
+/// result says the report's spelling is not established. A ledger whose spellings agree, and an answer that did find
+/// its row, carry no such field. Mutant killed: dropping the spelling
+/// condition, or the state condition.
+#[tokio::test]
+async fn an_empty_answer_for_a_ledger_with_two_spellings_says_the_reports_spelling_is_not_established(
+) {
+    let renamed = |call: Call| async move {
+        let mut plans = detail_plans(captured_window());
+        for plan in &mut plans {
+            let body = plan.fixture.body().replace(
+                "<NAME>Café Naïve Traders</NAME>",
+                "<NAME>Cafe Traders</NAME>",
+            );
+            plan.fixture = Fixture::SyntheticXml(body);
+        }
+        let (result, _) = run(plans, call).await;
+        result.unwrap().0
+    };
+    // Two spellings, no residual row in Tally's report: the field is there.
+    let mut call = Call::new(DetailKind::Unadjusted);
+    call.party = "Cafe Traders";
+    let detail = renamed(call).await;
+    assert_eq!(detail["state"], "no_residual_row_for_party", "{detail}");
+    assert_eq!(detail["report_spelling"], "not_established", "{detail}");
+    // The named-bill detail of a ledger with two spellings that finds no bill: the field is there.
+    let mut call = Call::new(DetailKind::BillTrail);
+    call.party = "Cafe Traders";
+    let detail = renamed(call).await;
+    assert_eq!(detail["state"], "no_named_bill_for_party", "{detail}");
+    assert_eq!(detail["report_spelling"], "not_established", "{detail}");
+    // Two spellings, but the row was found: no field.
+    let mut call = Call::new(DetailKind::Unadjusted);
+    call.party = "Cafe Traders";
+    call.unallocated = vec![residual("102.02")];
+    let detail = renamed(call).await;
+    assert_eq!(detail["state"], "tied", "{detail}");
+    assert!(detail.get("report_spelling").is_none(), "{detail}");
+    // One spelling, no residual row: no field.
+    let call = Call::new(DetailKind::Unadjusted);
+    let (result, _) = run(detail_plans(captured_window()), call).await;
+    let detail = result.unwrap().0;
+    assert_eq!(detail["state"], "no_residual_row_for_party", "{detail}");
+    assert!(detail.get("report_spelling").is_none(), "{detail}");
 }
 
 /// The case of an accented letter is not folded (#1076 decision A, reference

@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE AMEND LAB through the raw serial sender of a lab sitting that made reads only: no import and no write",
+  "observed_date": "2026-10-06",
+  "source_response_bytes": 25770,
+  "source_response_sha256": "1cc7e7efc5a0feb29df10d7279fe20bdbef1cec64f1c638e7e3e13d23a30f280",
+  "source_request_bytes": 2106,
+  "source_request_sha256": "841a085465f36a1586acbd68e5a74e3271b429b77226fddc26c4fa3bc6579b5b",
+  "request_rendered_by": "ReadOnlyProfile::StandardLedgerCatalogV2 { company }.render() (V1's request plus the one NativeMethod line IsBillWiseOn)",
+  "fixture_bytes": 25770,
+  "fixture_sha256": "1cc7e7efc5a0feb29df10d7279fe20bdbef1cec64f1c638e7e3e13d23a30f280",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "The import family's ledger catalogue (design E of #1234): 19 ledgers (the book has grown since its 27 Sep capture: 14 then) with name, GUID, parent, the company GUID and name computes, and ISBILLWISEON on every row (4 Yes, 15 No). Three ledger names end in a carriage return and line feed and carry a flag like the rest.",
+  "provenance_limit": "One synthetic book on one build, read once (not a paired read). It shows how Tally answers this request for these shapes; it is not evidence about a client's book or a large book. The book has been written to since the V1 capture of the same name, so its ledgers differ from that capture.",
+  "sensitivity_review": "Synthetic BRIDGE company, synthetic ledger names and GUIDs; no client, GSTIN, address or credential.",
+  "observed_at_utc": "2026-10-06T06:20Z"
+}

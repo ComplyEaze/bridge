@@ -5,8 +5,9 @@
 //! `[tds_payees].s194j_category_by_ledger`'s keys, `[loans.loan_ledgers]`'s keys, each loan's
 //! `interest_ledger` and `[loans].shared_interest_ledgers`,
 //! `[depreciation].block_by_ledger`'s keys, `[depreciation].dep_expense_ledgers`,
-//! `[partners.*].interest_ledger`, `[roles].no_supplier_expense_ledgers`,
-//! `[roles.gst_registration_type_by_ledger]`'s and `[clause44].money_category_by_ledger`'s keys,
+//! `[partners.*].interest_ledger`, every list under `[related_parties.*].ledgers_by_nature`,
+//! `[roles].no_supplier_expense_ledgers`, `[roles.gst_registration_type_by_ledger]`'s and
+//! `[clause44].money_category_by_ledger`'s keys,
 //! `[tds_tcs_26as]`'s three ledger lists and its
 //! `deductor_aliases` values (the keys are TANs),
 //! `[statutory_dues]`'s `salary_expense_ledgers` and `nature_by_ledger` keys,
@@ -910,8 +911,10 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
 
     // `[related_parties.*]`'s one name location (spec pack related_parties_cl23 §2.5): every list
     // under each person's `ledgers_by_nature`, whatever the nature (a name the test ignores is
-    // still a ledger the client named). Persons are visited in key order and natures in key
-    // order. A person or `ledgers_by_nature` that is not a table is left as written for the test
+    // still a ledger the client named). Persons and natures are visited in key order where the
+    // reference visits them in the file's, so only which refusal is reported first (and, for a
+    // label used in several places, the order of its locations in the rename report) can differ.
+    // A person or `ledgers_by_nature` that is not a table is left as written for the test
     // to refuse (`RELATED-table-shape`); a list that is not a list of names refuses here, as every
     // malformed name location does. In the reference's LEDGER_PATHS this is location 25 of 42:
     // after the three `[partners.*]` locations and before the two `[statutory_dues]` ones.

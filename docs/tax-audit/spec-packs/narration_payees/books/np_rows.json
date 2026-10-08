@@ -1,0 +1,394 @@
+{
+ "comment": "What makes a bank payment, and its amount. Wages and Loading Charges are listed (Wages twice: configured_ledgers_count is 2); the bank ledgers given are Bank A only. r01 debits both ledgers 2000000 paise each in one voucher: one payment of 4000000, over the single-sum limit. r02 debits Wages 3500000 and credits it 600000: the payment is 3500000 (over), not the net. Not bank payments, all in not_through_bank_total (600000): r03 (paid from Bank B OD, which is not given), r04 (a journal to a creditor), r05 (cash), r06 (a nil line on Bank A, paid in cash), r07 (Bank A debited, not credited). r08 is paid 300000 from Bank A and 500000 in cash: the payment is the whole 800000. r09 (a Journal) and r10 (a Contra) credit Bank A and are payments like any other. r11 has a debit and a credit on Bank A: a payment of its Wages debit, 170000. r12 pays Loading Charges with a narration that is not read (unresolved_bank_total). r13 is a receipt with a nil line on Wages and a credit to Loading Charges: nothing is read. r14 is dated after the books period and is read like any other. Five payees, two over the single-sum limit.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_rows-000"
+  },
+  {
+   "name": "Bank B OD",
+   "chain": [
+    "Bank OD A/c",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-np_rows-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_rows-002"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_rows-003"
+  },
+  {
+   "name": "Loading Charges",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_rows-004"
+  },
+  {
+   "name": "Neem Supplies",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-np_rows-005"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-np_rows-006"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 280000,
+   "credit": 8100000,
+   "closing": -7820000
+  },
+  {
+   "ledger": "Bank B OD",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 750000,
+   "closing": -750000
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 7590000,
+   "credit": 600000,
+   "closing": 6990000
+  },
+  {
+   "ledger": "Loading Charges",
+   "opening": 0,
+   "debit": 2180000,
+   "credit": 190000,
+   "closing": 1990000
+  },
+  {
+   "ledger": "Neem Supplies",
+   "opening": 0,
+   "debit": 0,
+   "credit": 110000,
+   "closing": -110000
+  },
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 200000,
+   "closing": -200000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Loading Charges",
+     2000000
+    ],
+    [
+     "Bank A",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "r02",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "narration": "UPI-EPSILON CARRIERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3500000
+    ],
+    [
+     "Wages",
+     -600000
+    ],
+    [
+     "Bank A",
+     -2900000
+    ]
+   ]
+  },
+  {
+   "guid": "r03",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     100000
+    ],
+    [
+     "Bank B OD",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "r04",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     110000
+    ],
+    [
+     "Neem Supplies",
+     -110000
+    ]
+   ]
+  },
+  {
+   "guid": "r05",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     120000
+    ],
+    [
+     "Cash",
+     -120000
+    ]
+   ]
+  },
+  {
+   "guid": "r06",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     130000
+    ],
+    [
+     "Bank A",
+     0
+    ],
+    [
+     "Cash",
+     -130000
+    ]
+   ]
+  },
+  {
+   "guid": "r07",
+   "date": "2025-05-08",
+   "base_type": "Receipt",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     140000
+    ],
+    [
+     "Bank A",
+     60000
+    ],
+    [
+     "Capital",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "r08",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "narration": "UPI-ETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     800000
+    ],
+    [
+     "Bank A",
+     -300000
+    ],
+    [
+     "Cash",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "r09",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "narration": "UPI-THETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     150000
+    ],
+    [
+     "Bank A",
+     -150000
+    ]
+   ]
+  },
+  {
+   "guid": "r10",
+   "date": "2025-05-11",
+   "base_type": "Contra",
+   "narration": "UPI-THETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     160000
+    ],
+    [
+     "Bank A",
+     -160000
+    ]
+   ]
+  },
+  {
+   "guid": "r11",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "narration": "UPI-IOTA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     170000
+    ],
+    [
+     "Bank A",
+     30000
+    ],
+    [
+     "Bank A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "r12",
+   "date": "2025-05-13",
+   "base_type": "Payment",
+   "narration": "WAGES FOR MAY",
+   "lines": [
+    [
+     "Loading Charges",
+     180000
+    ],
+    [
+     "Bank A",
+     -180000
+    ]
+   ]
+  },
+  {
+   "guid": "r13",
+   "date": "2025-05-14",
+   "base_type": "Receipt",
+   "narration": "UPI-KAPPA-REFUND",
+   "lines": [
+    [
+     "Wages",
+     0
+    ],
+    [
+     "Loading Charges",
+     -190000
+    ],
+    [
+     "Bank A",
+     190000
+    ]
+   ]
+  },
+  {
+   "guid": "r14",
+   "date": "2026-04-02",
+   "base_type": "Payment",
+   "narration": "UPI-IOTA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     210000
+    ],
+    [
+     "Bank A",
+     -210000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages",
+  "Loading Charges",
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

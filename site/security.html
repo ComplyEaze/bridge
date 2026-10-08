@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Security and your clients’ data: ComplyEaze Bridge</title>
-<meta name="description" content="What ComplyEaze Bridge keeps on your computer, what reaches your AI provider and ComplyEaze, how posting is approved, how to report a vulnerability, and what has not been done yet." />
+<meta name="description" content="What ComplyEaze Bridge keeps on your computer, what reaches your AI provider and ComplyEaze, how posting is approved, and what has not been done yet." />
 <link rel="canonical" href="https://bridge.complyeaze.com/security.html" />
 <meta property="og:type" content="article" />
 <meta property="og:site_name" content="ComplyEaze Bridge" />
 <meta property="og:locale" content="en_IN" />
 <meta property="og:title" content="Security and your clients’ data: ComplyEaze Bridge" />
-<meta property="og:description" content="What ComplyEaze Bridge keeps on your computer, what reaches your AI provider and ComplyEaze, how posting is approved, how to report a vulnerability, and what has not been done yet." />
+<meta property="og:description" content="What ComplyEaze Bridge keeps on your computer, what reaches your AI provider and ComplyEaze, how posting is approved, and what has not been done yet." />
 <meta property="og:url" content="https://bridge.complyeaze.com/security.html" />
 <link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
 <script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
@@ -64,8 +64,8 @@
 <p>It also keeps copies of the vouchers it prepared or posted, the proof of what Tally read back, every row of a bank statement you asked it to read, and a small record, with your operating-system account name, when you record a review of a posted voucher. The copies hold dates, amounts and narrations. None of these files is encrypted. ComplyEaze&nbsp;Bridge does not delete or trim any of them, and removing the extension may leave them. Section 7 of the Privacy Policy says where they are and how to archive them.</p>
 
 <h2>What reaches your AI provider</h2>
-<p>Your AI provider (Anthropic, if you use Claude) receives whatever the assistant reads, as part of the chat: company names, party names, amounts and, when it asks for them, details such as PAN, GSTIN and bank account numbers. Claude Desktop may also keep its own record of the conversation and results on your computer.</p>
-<p>The extension’s “Response redaction” setting (off by default) can shorten party and ledger names or drop narrations. Neither choice hides amounts, company names, or PAN and GSTIN numbers. Masking leaves a name written inside a narration or reference as it is; dropping narrations removes narrations but not references. How long the provider keeps what it receives, whether it trains on it, and where it is processed (which may be outside India) depend on your plan and the provider’s own terms.</p>
+<p>Your AI provider (Anthropic, if you use Claude) receives whatever the assistant reads, as part of the chat, including company, party and ledger names, amounts, dates, narrations, references, GSTINs and, when it reads ledger details, PAN, bank account numbers, IFSC, MSME or Udyam registration numbers, email, phone and address, and, when it builds a voucher file, that file&rsquo;s local path (which can include your computer user name). Claude Desktop may also keep its own record of the conversation and results on your computer.</p>
+<p>The extension’s “Response redaction” setting (off by default) takes one value, not both: shorten party and ledger names and bank account numbers to their first two and last two characters (four characters or fewer become “…”), or drop narrations. Neither choice hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or references, and a shortened name can still be identified, not least from the GSTIN or PAN sent beside it. Masking leaves a name written inside a narration or reference as it is; dropping narrations removes narrations but not references. How long the provider keeps what it receives, whether it trains on it, and where it is processed (which may be outside India) depend on your plan and the provider’s own terms.</p>
 
 <h2>What reaches ComplyEaze</h2>
 <p>Through ComplyEaze&nbsp;Bridge on your computer, we do not receive your Tally data, your conversations with your AI assistant, the files it keeps on your computer, or usage statistics, crash reports or device identifiers (section 4 of the Privacy Policy). We found no analytics, usage tracking, crash reporting or automatic update check in it. That comes from our reading of the published code and our own checks; it has not been independently audited.</p>

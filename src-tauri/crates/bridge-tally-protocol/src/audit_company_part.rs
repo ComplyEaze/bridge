@@ -24,7 +24,7 @@ pub struct AuditCompanyPart {
     pub books_from_yyyymmdd: String,
     /// `None` when the company carries no `ISINTEGRATED`, or an empty one, as
     /// the Python loader reads both. The stock test then
-    /// reports integration as "unknown" (Lane B, 2026-09-21), which is visible,
+    /// reports integration as "unknown", which is visible,
     /// so absence is admitted; a repeated tag is not.
     pub is_integrated: Option<String>,
 }

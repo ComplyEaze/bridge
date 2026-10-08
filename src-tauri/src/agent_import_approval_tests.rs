@@ -1381,7 +1381,7 @@ fn high_water_read() -> AgentReadRequest {
 }
 
 fn cash_binding() -> bridge_tally_protocol::StandardLedgerCatalogBinding {
-    bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue(),
         "WR2 Unicode Lab",
         GUID,
@@ -1432,7 +1432,7 @@ async fn granted(
 }
 
 fn binding_of(line: &ImportLedgerLine, preview: &str) -> ApprovalBinding {
-    let binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue(),
         "WR2 Unicode Lab",
         GUID,
@@ -1830,7 +1830,12 @@ fn the_agent_preview_says_when_the_post_happens() {
     // Exactly at the width cap, which refuses only past it: no margin.
     assert_eq!(now.chars().count(), BATCH_REVIEW_MAX_LINE_CHARS, "{now}");
     let single = agent_review_preview(&one, &endpoint).unwrap();
-    assert!(single.ends_with(&format!("\n{now}")), "{single}");
+    // The last line ComplyEaze Bridge writes: only the voucher's own text,
+    // under its heading, follows it.
+    assert!(
+        single.contains(&format!("\n{now}\n{VOUCHER_TEXT_HEADING}\nReference: ")),
+        "{single}"
+    );
     assert!(!admit_fresh_saved_voucher(&one, &endpoint)
         .unwrap()
         .contains(&now));
@@ -2330,6 +2335,11 @@ async fn a_redeem_only_pass_of_the_desktop_post_is_refused_and_asks_nobody() {
     assert_eq!(intents(directory.path()), 0);
 }
 
+/// The wire-wait policy of `two_pass_call_with_the_wire_taken_between`: how
+/// long a pass with time left waits for the endpoint's wire lock. The two tests
+/// below stand on either side of it.
+const WIRE_WAIT_POLICY: std::time::Duration = std::time::Duration::from_secs(2);
+
 /// A whole post call whose Join finds the person's click and hands on a
 /// redeem-only pass (#725 slice 2.0), with another holder taking the
 /// endpoint's wire lock between the passes and a 2 s wire-wait policy (#893).
@@ -2357,9 +2367,7 @@ async fn two_pass_call_with_the_wire_taken_between(
     let wire = crate::tally::TallyRuntime::default()
         .wire_gate_config()
         .clone()
-        .with_retry(
-            WireRetryPolicy::new(Duration::from_millis(50), Duration::from_secs(2)).unwrap(),
-        );
+        .with_retry(WireRetryPolicy::new(Duration::from_millis(50), WIRE_WAIT_POLICY).unwrap());
     server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(wire.clone());
     let (line, args) = saved_batch(&server);
     let scripted = ScriptedApproval::held();
@@ -2417,15 +2425,19 @@ fn assert_refused_busy_and_lapsed(answer: &Value, line: &ImportLedgerLine, serve
 /// A redeem-only pass that starts with no time left under the call's ceiling
 /// waits for nothing (#893): its first admission read meets the held lock and
 /// is refused at once as `tally_endpoint_busy`, before the attempt is recorded,
-/// rather than waiting on what the call's shared budget still holds.
+/// rather than waiting on what the call's shared budget still holds. That it
+/// waited for nothing is the zero budget it ran on. The time is checked only
+/// against the policy itself: a pass that waited would take at least that
+/// long, as the control below does, so the bound is not a guess at how fast a
+/// loaded machine runs the rest of the call.
 #[tokio::test]
 async fn a_redeem_pass_with_no_time_left_is_refused_busy_at_once() {
     let (answer, budget, took, line, server, directory) =
         two_pass_call_with_the_wire_taken_between(Some(std::time::Duration::from_secs(40))).await;
     assert_eq!(budget, std::time::Duration::ZERO, "{answer}");
     assert!(
-        took < std::time::Duration::from_secs(1),
-        "the 2 s policy budget was not waited: {took:?}"
+        took < WIRE_WAIT_POLICY,
+        "the policy budget was not waited: {took:?}"
     );
     assert_refused_busy_and_lapsed(&answer, &line, &server);
     assert_eq!(intents(directory.path()), 0, "{answer}");
@@ -2437,9 +2449,9 @@ async fn a_redeem_pass_with_no_time_left_is_refused_busy_at_once() {
 async fn a_redeem_pass_with_time_left_waits_the_shared_budget() {
     let (answer, budget, took, line, server, directory) =
         two_pass_call_with_the_wire_taken_between(None).await;
-    assert_eq!(budget, std::time::Duration::from_secs(2), "{answer}");
+    assert_eq!(budget, WIRE_WAIT_POLICY, "{answer}");
     assert!(
-        took >= std::time::Duration::from_secs(2),
+        took >= WIRE_WAIT_POLICY,
         "the pass waited its budget: {took:?}"
     );
     assert_refused_busy_and_lapsed(&answer, &line, &server);

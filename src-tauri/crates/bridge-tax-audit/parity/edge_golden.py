@@ -69,7 +69,9 @@ meaning none supplied, and none supplied with the reader's reason when that read
 recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it); and
 for `cash_payments_40a3`: `loan_ledgers` and `round_off_ledgers` (default []); for `entity_269st_gap`: `party_identity` (the engagement's own
 [party_identity] table, default {}), `round_off_ledgers`, and per ledger `pan` and `gstin` (default ""); for `read_scope`: `currency_read` (default false); for `books_examined`: `documents_read` (the
-names of the documents the pack loaded, in its order: a list of text, default []); for `clause44`:
+names of the documents the pack loaded, in its order: a list of text, default []); for `clause21a_candidates`:
+`clause21a_extra_terms` (the client's `[clause21a].extra_terms`, read by the reference's own reader; absent meaning
+none) and `partners` (as for `partners_40b_194t`; its interest and remuneration ledgers, as pack.py takes them); for `clause44`:
 `clause44` ({dep_expense_ledgers?, tax_ledgers?: {head: [ledger, ...]}, no_supplier_expense_ledgers?,
 round_off_ledgers?, registration_type_by_ledger?, money_category_by_ledger?}, each default empty, read
 through the reference's own `tae.config` readers from the client-config keys they stand for), with per
@@ -101,7 +103,7 @@ def main() -> int:
                                              StatementPeriodRefused, load_bank_statement_json)
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
-    from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined, cash_book_integrity, cash_payments_40a3, clause44, counter_cheques_40a3,
+    from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined, cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
                                  creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
@@ -340,6 +342,20 @@ def main() -> int:
         integrated = typed(spec, "is_integrated", lambda x: isinstance(x, bool), "true, false or null")
         return module, stock.run(eng, {"version": rules.version}, items, opening, closing, integrated)
 
+    def clause21a_candidates_run():
+        # As tae/pack.py: the client's [clause21a].extra_terms through the reference's own reader, from a config
+        # built out of the spec's key, and the partners' interest and remuneration ledgers, each kept when truthy;
+        # on the crate's vendored keyword table, checked against the reference's.
+        from python_golden import require_vendored_clause21a_keywords
+        from tae.config import clause21a_extra_terms
+        require_vendored_clause21a_keywords(clause21a_candidates)
+        cfg = {"clause21a": {"extra_terms": spec["clause21a_extra_terms"]}} if "clause21a_extra_terms" in spec else {}
+        partners = spec.get("partners", {})
+        return clause21a_candidates, clause21a_candidates.run(
+            eng, rules, clause21a_extra_terms(cfg),
+            frozenset(led for q in partners.values() for led in (q.get("interest_ledger"), q.get("remuneration_ledger"))
+                      if led))
+
     def tds_payees_run():
         # As tae/pack.py's _tds_payees: every client-config input through the reference's own reader, from a
         # config built out of the spec's keys.
@@ -382,6 +398,7 @@ def main() -> int:
         "cash_payments_40a3": lambda: (cash_payments_40a3, cash_payments_40a3.run(
             eng, rules, cash=cash, bank=bank, loan_ledgers_configured=set(spec.get("loan_ledgers", [])),
             round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])))),
+        "clause21a_candidates": clause21a_candidates_run,
         "clause44": clause44_run,
         "counter_cheques_40a3": lambda: (counter_cheques_40a3, counter_cheques_40a3.run(
             eng, rules, cash, bank, frozenset(counter_cheque_terms))),

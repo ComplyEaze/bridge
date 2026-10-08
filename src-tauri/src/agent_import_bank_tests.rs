@@ -30,7 +30,7 @@ fn captured_groups() -> Vec<TallyNamedMaster> {
 
 fn captured_ledger_parents() -> Vec<(String, Option<String>)> {
     let bytes = include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
     );
     let xml = String::from_utf16(
         &bytes
@@ -39,11 +39,15 @@ fn captured_ledger_parents() -> Vec<(String, Option<String>)> {
             .collect::<Vec<_>>(),
     )
     .expect("captured native catalogue");
-    parse_standard_ledger_catalog_response(&xml, "WR2 Unicode Lab", CAPTURED_GUID)
-        .expect("captured catalogue rows")
-        .parents()
-        .map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))
-        .collect()
+    crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &xml,
+        "WR2 Unicode Lab",
+        CAPTURED_GUID,
+    )
+    .expect("captured catalogue rows")
+    .parents()
+    .map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))
+    .collect()
 }
 
 fn observed(
@@ -491,7 +495,7 @@ fn group_read_plans() -> Vec<ScenarioPlan> {
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-groups.utf16le.xml"
     );
     let groups = captured_group_collection();
-    let mut plans = import_cycle_plans()[4..10].to_vec();
+    let mut plans = import_family_cycle_plans()[4..10].to_vec();
     for index in [1, 3] {
         plans[index].fixture = Fixture::SyntheticXml(groups.clone());
         plans[index].encoding = WireEncoding::Utf16LeNoBom;
@@ -506,8 +510,8 @@ fn group_read_plans() -> Vec<ScenarioPlan> {
 
 /// The build request sequence for a payload that carries a cash/bank voucher:
 /// the Journal cycle plus a paired group read after each catalogue read.
-fn bank_build_plans() -> Vec<ScenarioPlan> {
-    let cycle = import_cycle_plans();
+pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
+    let cycle = import_family_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
     [
         probe.clone(),
@@ -522,7 +526,7 @@ fn bank_build_plans() -> Vec<ScenarioPlan> {
     .concat()
 }
 
-fn captured_bank_payload() -> ImportPayload {
+pub(super) fn captured_bank_payload() -> ImportPayload {
     serde_json::from_value(json!({"company_guid":CAPTURED_GUID,"vouchers":[
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Payment","narration":"Settled on account",
          "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"12.50","side":"Dr"},
@@ -534,7 +538,7 @@ fn captured_bank_payload() -> ImportPayload {
     .expect("captured bank payload")
 }
 
-fn bank_server(directory: &std::path::Path, port: u16) -> Server {
+pub(super) fn bank_server(directory: &std::path::Path, port: u16) -> Server {
     Server::new(crate::agent::Settings {
         endpoint: TallyEndpointConfig {
             host: "127.0.0.1".into(),
@@ -765,14 +769,17 @@ fn utf16le(bytes: &[u8]) -> String {
 
 fn captured_shape_lab_masters() -> (Vec<(String, Option<String>)>, Vec<TallyNamedMaster>) {
     let catalogue = utf16le(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-ledger-catalogue.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-ledger-catalogue-v2.utf16le.xml"
     ));
-    let ledgers =
-        parse_standard_ledger_catalog_response(&catalogue, "BRIDGE SHAPE LAB", SHAPE_LAB_GUID)
-            .expect("captured Shape Lab catalogue rows")
-            .parents()
-            .map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))
-            .collect();
+    let ledgers = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue,
+        "BRIDGE SHAPE LAB",
+        SHAPE_LAB_GUID,
+    )
+    .expect("captured Shape Lab catalogue rows")
+    .parents()
+    .map(|(name, parent)| (name.to_string(), parent.map(str::to_string)))
+    .collect();
     let groups = bridge_tally_protocol::native_outstandings::parse_native_group_snapshot(
         &utf16le(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-groups.utf16le.xml"
@@ -791,7 +798,7 @@ fn a_captured_ledger_under_bank_od_is_established_as_bank() {
     // an overdraft or cash-credit account needed before it could fund a
     // Payment or sit in a Contra.
     let (ledgers, groups) = captured_shape_lab_masters();
-    assert_eq!(ledgers.len(), 43, "the whole captured catalogue is swept");
+    assert_eq!(ledgers.len(), 44, "the whole captured catalogue is swept");
     assert!(ledgers
         .iter()
         .any(|(name, parent)| name == "HDFC CC" && parent.as_deref() == Some("Bank OD A/c")));
@@ -811,8 +818,14 @@ fn a_captured_ledger_under_bank_od_is_established_as_bank() {
         .collect::<Vec<_>>();
     assert_eq!(
         money,
-        ["Bank of Baroda CA", "Cash", "HDFC CC"],
-        "no other captured ledger of the 43 is admitted as money"
+        [
+            "Bank of Baroda CA",
+            "Cash",
+            "HDFC CC",
+            // A probe ledger a lab reparent test left under a bank group.
+            "Shape Reparent Probe 20260922"
+        ],
+        "no other captured ledger of the 44 is admitted as money"
     );
     for (voucher_type, dr, cr) in [
         ("Contra", "HDFC CC", "Bank of Baroda CA"),
@@ -1193,9 +1206,9 @@ fn refusal_diagnostics_stay_inside_a_byte_budget() {
             "no row is exempt from the budget"
         );
     }
-    // One oversized row does not discard the shorter refusals behind it. The
-    // rows are sorted by ledger, so a long name early in the order would
-    // otherwise take every later one down with it.
+    // One oversized row does not discard the shorter refusals behind it: the
+    // short ledger's voucher comes last, so every long name is tried first and
+    // would otherwise take it down with them.
     let mut mixed = batch.clone();
     let short = "AA Bank";
     ledgers.push((short.to_string(), Some("Migrated Debtors".into())));
@@ -1321,6 +1334,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
         let line = ImportLedgerLine {
             ledger_identities: None,
             cash_in_hand_ledgers: Some(Vec::new()),
+            on_account_approved: Some(Vec::new()),
             endpoint_origin: None,
             identity_scheme: None,
             amends_batch_id: None,
@@ -2404,9 +2418,12 @@ fn a_multi_entry_voucher_with_a_repeated_ledger_pairs_as_a_multiset() {
 // which holds a ledger stored as `CRLF Supplier` plus CR LF.
 
 fn captured_shape_lab_catalogue() -> String {
-    utf16le(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-ledger-catalogue.utf16le.xml"
-    ))
+    crate::agent::agent_import::tests::with_bill_wise_flags(
+        &utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-shape-lab-ledger-catalogue-v2.utf16le.xml"
+        )),
+        &[],
+    )
 }
 
 /// The captured catalogue with `Chem Supplier 4` renamed `CRLF Supplier`, so
@@ -2552,6 +2569,267 @@ async fn a_build_naming_either_spelling_of_a_folded_twin_is_refused_without_a_fi
                     .is_none(),
             "{ledger:?}"
         );
+    }
+}
+
+// A refusal lists a batch's ledgers in the batch's own order and never by
+// name, with or without masking. Each test below puts first the ledger that
+// sorts last, reads the answer as the assistant receives it, and holds with
+// the names plain and masked.
+
+const PLAIN_AND_MASKED: [crate::agent::Redaction; 2] = [
+    crate::agent::Redaction::None,
+    crate::agent::Redaction::MaskParties,
+];
+
+/// `names` as a tool result carries them under `redaction`.
+fn as_sent(names: &[&str], redaction: crate::agent::Redaction) -> Vec<String> {
+    names
+        .iter()
+        .map(|name| match redaction {
+            crate::agent::Redaction::MaskParties => crate::agent::mask(name),
+            _ => (*name).to_string(),
+        })
+        .collect()
+}
+
+/// The `key` of each row of `list`, in the order sent.
+fn sent_in_order(list: &Value, key: &str) -> Vec<String> {
+    list.as_array()
+        .expect("the refusal carries its list")
+        .iter()
+        .map(|row| {
+            row[key]
+                .as_str()
+                .expect("a name is sent as text")
+                .to_string()
+        })
+        .collect()
+}
+
+/// No list holds a ledger its batch does not name, so no tool call reaches
+/// this: such a ledger goes after the named ones and never ahead of them.
+#[test]
+fn a_ledger_the_batch_does_not_name_is_listed_after_those_it_names() {
+    // The batch names Bridge Nested Debtor WR4, Cash and WR2 Sales, in that order.
+    let listed = in_batch_order(
+        vec!["Not Named B", "WR2 Sales", "Not Named A", "Cash"],
+        &captured_bank_payload().vouchers,
+        |ledger| *ledger,
+    );
+    assert_eq!(listed, ["Cash", "WR2 Sales", "Not Named B", "Not Named A"]);
+}
+
+/// A build refused on the shape lab's catalogue read, as the assistant
+/// receives it.
+async fn shape_lab_refusal(
+    catalogue: &str,
+    vouchers: Value,
+    redaction: crate::agent::Redaction,
+) -> Value {
+    let plans = [
+        mode_tests::licensed_import_probe(),
+        shape_lab_catalogue_plans(catalogue),
+    ]
+    .concat();
+    let simulator = SequenceSimulator::spawn(plans.clone()).expect("shape lab plan");
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = bank_server(directory.path(), simulator.address().port());
+    server.settings.redaction = redaction;
+    let response = server
+        .call_tool(
+            "build_import_xml",
+            json!({"company_guid":SHAPE_LAB_GUID,"vouchers":vouchers}),
+        )
+        .await;
+    assert_eq!(simulator.finish().unwrap().len(), plans.len(), "{response}");
+    response["structuredContent"]["result"].clone()
+}
+
+fn one_rupee_journal(bridge_txn_id: &str, ledger: &str) -> Value {
+    json!({"bridge_txn_id":bridge_txn_id,"date":"2026-09-01","voucher_type":"Journal",
+        "entries":[{"ledger":ledger,"amount":"1.00","side":"Dr"},
+                   {"ledger":"Cash","amount":"1.00","side":"Cr"}]})
+}
+
+#[tokio::test]
+async fn the_masters_of_a_refused_build_are_listed_in_the_order_the_batch_names_them() {
+    for redaction in PLAIN_AND_MASKED {
+        let result = shape_lab_refusal(
+            &captured_shape_lab_catalogue(),
+            json!([
+                one_rupee_journal("txn-a", "Chem Supplier 4"),
+                one_rupee_journal("txn-b", "Absent Ledger"),
+            ]),
+            redaction,
+        )
+        .await;
+        assert_eq!(result["reason"], "masters_not_exact", "{result}");
+        assert_eq!(
+            sent_in_order(&result["masters"], "requested"),
+            as_sent(&["Chem Supplier 4", "Cash", "Absent Ledger"], redaction),
+            "{result}"
+        );
+        // Each row moved with its name: only the last is not in the book.
+        let exact = result["masters"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|master| master["match_state"] == "exact")
+            .collect::<Vec<_>>();
+        assert_eq!(exact, [true, true, false], "{result}");
+    }
+}
+
+#[tokio::test]
+async fn the_twins_of_a_refused_build_are_listed_in_the_order_the_batch_names_them() {
+    for redaction in PLAIN_AND_MASKED {
+        let result = shape_lab_refusal(
+            &shape_lab_catalogue_with_folded_twin(),
+            json!([
+                one_rupee_journal("txn-a", "CRLF Supplier\r\n"),
+                one_rupee_journal("txn-b", "CRLF Supplier"),
+            ]),
+            redaction,
+        )
+        .await;
+        assert_eq!(result["reason"], "ledger_has_folded_twin", "{result}");
+        assert_eq!(
+            sent_in_order(&result["ledger_twins"], "requested"),
+            as_sent(&["CRLF Supplier\r\n", "CRLF Supplier"], redaction),
+            "{result}"
+        );
+    }
+}
+
+/// `body` with `ledger`'s group in a catalogue answer rewritten to Bank
+/// Accounts, or unchanged when it does not hold that ledger.
+fn under_bank_accounts(body: &str, ledger: &str) -> String {
+    let Some(row) = body.find(&format!("<LEDGER NAME=\"{ledger}\"")) else {
+        return body.to_string();
+    };
+    let open = "<PARENT TYPE=\"String\">";
+    let from = row + body[row..].find(open).expect("a ledger row has a parent") + open.len();
+    let to = from + body[from..].find("</PARENT>").expect("the parent closes");
+    format!("{}Bank Accounts{}", &body[..from], &body[to..])
+}
+
+fn contra_from(bridge_txn_id: &str, ledger: &str) -> Value {
+    json!({"bridge_txn_id":bridge_txn_id,"date":"2026-09-01","voucher_type":"Contra",
+        "entries":[{"ledger":ledger,"amount":"12.50","side":"Dr"},
+                   {"ledger":"Cash","amount":"12.50","side":"Cr"}]})
+}
+
+#[tokio::test]
+async fn the_refused_cash_bank_ledgers_are_listed_in_the_order_the_batch_refuses_them() {
+    for redaction in PLAIN_AND_MASKED {
+        let simulator =
+            SequenceSimulator::spawn(bank_build_plans()[..18].to_vec()).expect("refusal plan");
+        let directory = tempfile::tempdir().unwrap();
+        let mut server = bank_server(directory.path(), simulator.address().port());
+        server.settings.redaction = redaction;
+        let response = server
+            .call_tool(
+                "build_import_xml",
+                json!({"company_guid":CAPTURED_GUID,"vouchers":[
+                    contra_from("txn-001", "WR2 Sales"),
+                    contra_from("txn-002", "Bridge Nested Debtor WR4"),
+                    contra_from("txn-003", "WR2 Sales"),
+                ]}),
+            )
+            .await;
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(
+            result["reason"], "cash_bank_ledger_not_established",
+            "{response}"
+        );
+        assert_eq!(
+            sent_in_order(&result["refused_ledgers"], "ledger"),
+            as_sent(&["WR2 Sales", "Bridge Nested Debtor WR4"], redaction),
+            "{response}"
+        );
+        // One row a ledger, however many vouchers repeat it.
+        assert_eq!(
+            sent_in_order(&result["refused_ledgers"], "first_bridge_txn_id"),
+            ["txn-001", "txn-002"]
+        );
+        assert_eq!(result["refused_leg_count"], 3, "{response}");
+        assert_eq!(simulator.finish().expect("requests").len(), 18);
+    }
+}
+
+/// Both ledgers are moved under Bank Accounts for this test only, as in
+/// `a_business_cash_answer_naming_a_bank_ledger_is_refused_at_build`.
+#[tokio::test]
+async fn the_refused_cash_answer_ledgers_are_listed_in_the_order_the_answers_name_them() {
+    const ANSWERED: [&str; 2] = ["WR2 Sales", "Bridge Nested Debtor WR4"];
+    for redaction in PLAIN_AND_MASKED {
+        let plans = bank_build_plans()[..18]
+            .iter()
+            .cloned()
+            .map(|mut plan| {
+                if let Fixture::SyntheticXml(body) = &plan.fixture {
+                    let moved = ANSWERED.iter().fold(body.clone(), |body, ledger| {
+                        under_bank_accounts(&body, ledger)
+                    });
+                    plan.fixture = Fixture::SyntheticXml(moved);
+                }
+                plan
+            })
+            .collect::<Vec<_>>();
+        let simulator = SequenceSimulator::spawn(plans).expect("refusal plan");
+        let directory = tempfile::tempdir().unwrap();
+        let mut server = bank_server(directory.path(), simulator.address().port());
+        server.settings.redaction = redaction;
+        let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+        let record = |row: usize, bridge_txn_id: &str, ledger: &str| {
+            json!({"row": row, "disposition": {"voucher": "Contra"}, "party": "ATM CASH WITHDRAWAL",
+                "ledger": ledger, "suspense": false, "bridge_txn_id": bridge_txn_id,
+                "cash_movement": "withdrawal", "cash_answer": "business_cash"})
+        };
+        let bytes = serde_json::to_vec_pretty(&json!({
+            "schema": "bridge.bank_statement.proposals.v1",
+            "proposals_id": proposals_id,
+            // The vouchers come in another order than the answers, and it
+            // is the answers' order the list takes.
+            "vouchers": [
+                contra_from("txn-002", ANSWERED[1]),
+                contra_from("txn-001", ANSWERED[0]),
+                contra_from("txn-003", ANSWERED[0]),
+            ],
+            "records": [
+                record(1, "txn-001", ANSWERED[0]),
+                record(2, "txn-002", ANSWERED[1]),
+                record(3, "txn-003", ANSWERED[0]),
+            ],
+        }))
+        .unwrap();
+        let statements = directory.path().join("bank-statements");
+        std::fs::create_dir_all(&statements).unwrap();
+        std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+        let response = server
+            .call_tool(
+                "build_import_xml",
+                json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id,
+                    "proposals_sha256": sha256_hex(&bytes)}),
+            )
+            .await;
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(
+            result["reason"], "cash_ledger_not_cash_in_hand",
+            "{response}"
+        );
+        assert_eq!(
+            sent_in_order(&result["refused_ledgers"], "ledger"),
+            as_sent(&ANSWERED, redaction),
+            "{response}"
+        );
+        // One row a ledger, however many answers repeat it.
+        assert_eq!(
+            sent_in_order(&result["refused_ledgers"], "first_bridge_txn_id"),
+            ["txn-001", "txn-002"]
+        );
+        assert_eq!(simulator.finish().expect("requests").len(), 18);
     }
 }
 

@@ -297,8 +297,13 @@ impl PartyLedgerMasterSourceValidationError {
                     "ledger_span_identity_mismatch"
                 }
                 StandardLedgerCatalogError::BoundsViolation => "ledger_span_slice_over_bound",
+                // The census slice has no bill-wise flag to be missing, so the
+                // flag errors cannot arrive here; they read as malformed.
                 StandardLedgerCatalogError::MalformedResponse
-                | StandardLedgerCatalogError::LedgerNameUnusable => "ledger_span_slice_malformed",
+                | StandardLedgerCatalogError::LedgerNameUnusable
+                | StandardLedgerCatalogError::BillWiseFlagMissing
+                | StandardLedgerCatalogError::BillWiseFlagInvalid
+                | StandardLedgerCatalogError::BillWiseFlagRepeated => "ledger_span_slice_malformed",
             },
             Self::LedgerSpanSliceResponseTooLarge { .. } => "ledger_span_slice_response_too_large",
             Self::LedgerCountDiffers { .. } => "ledger_count_differs",
@@ -696,6 +701,8 @@ pub(crate) enum PairedReadValidationError {
     CompanyCurrencyName,
     #[error("Tally's own statement changed between paired reads")]
     NativeStatement,
+    #[error("Tally's own Cash Flow changed between paired reads")]
+    NativeCashFlow,
     #[error("Tally company book changed during currency detection")]
     CurrencyExtent,
     #[error("Tally company changed between the currency read and the master read")]
@@ -726,6 +733,7 @@ impl PairedReadValidationError {
             Self::CurrencyMaster => "currency_master_changed",
             Self::CompanyCurrencyName => "company_currency_name_changed",
             Self::NativeStatement => "native_statement_changed",
+            Self::NativeCashFlow => "native_cash_flow_changed",
             Self::CurrencyExtent => "currency_extent_changed",
             Self::CurrencyToMasterExtent => "currency_to_master_extent_changed",
             Self::MastersCollection => "masters_collection_changed",

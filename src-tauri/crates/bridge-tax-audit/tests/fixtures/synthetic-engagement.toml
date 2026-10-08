@@ -82,6 +82,12 @@ computers_40 = 0
 capital_ledgers = ["Partner Capital - A"]
 interest_ledger = "Interest to Partners"
 
+# clause21a_candidates only (invented): a word the CA adds to the capital item, so the purchases
+# ledger's debits are listed as capital candidates. The partner's interest, credited to the
+# partner's capital, is not a personal candidate, because its ledger is the partner's above.
+[clause21a.extra_terms]
+capital = ["hardware"]
+
 # applicability_44ab only: client confirmation of one year's s.44AD history (invented), restated by
 # the test and never interpreted.
 [presumptive_history]

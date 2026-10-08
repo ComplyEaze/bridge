@@ -30,9 +30,12 @@ fn companies() -> String {
 }
 
 fn catalogue() -> String {
-    captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
-    ))
+    crate::agent::agent_import::tests::with_bill_wise_flags(
+        &captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+        )),
+        &[],
+    )
 }
 
 /// The captured Currency masters of a book with exactly one (`I₹`).
@@ -252,12 +255,13 @@ fn server_redacting(
 /// answer no bank cash line, so their cash-in-hand ledgers are none (#815).
 fn bind_to_captured_catalogue(line: &mut ImportLedgerLine) {
     line.cash_in_hand_ledgers = Some(Vec::new());
+    line.on_account_approved = Some(Vec::new());
     let payload = ImportPayload {
         company_guid: line.company_guid.clone(),
         vouchers: line.vouchers.clone(),
         amends_batch_id: None,
     };
-    let binding = bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+    let binding = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
         &catalogue(),
         "WR2 Unicode Lab",
         GUID,
@@ -292,7 +296,7 @@ fn saved_batch_with_narration(server: &Server, narration: &str) -> (ImportLedger
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
         "txn_ids":["journal-583"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":10,"master_value":7},
         "vouchers":[{"bridge_txn_id":"journal-583","date":"20260901","voucher_type":"Journal",
             "narration":narration,"entries":[
@@ -1314,6 +1318,17 @@ fn saved_bank_batch_recording(
     voucher: Value,
     cash_in_hand: Value,
 ) -> (ImportLedgerLine, Value) {
+    saved_bank_batch_recording_all(server, voucher, cash_in_hand, json!([]))
+}
+
+/// As `saved_bank_batch_recording`, with `on_account` as the bill-wise
+/// approvals its build recorded (#1234); `null` for a record written before.
+fn saved_bank_batch_recording_all(
+    server: &Server,
+    voucher: Value,
+    cash_in_hand: Value,
+    on_account: Value,
+) -> (ImportLedgerLine, Value) {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":BANK_BATCH, "identity_scheme":"batch_v1",
@@ -1321,7 +1336,7 @@ fn saved_bank_batch_recording(
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
         "txn_ids":[voucher["bridge_txn_id"].clone()],"date_from":"20260901","date_to":"20260901",
-        "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":10,"master_value":7},
         "vouchers":[voucher]
     }))
@@ -1330,6 +1345,7 @@ fn saved_bank_batch_recording(
     line.sha256 = sha256_hex(rendered.as_bytes());
     bind_to_captured_catalogue(&mut line);
     line.cash_in_hand_ledgers = serde_json::from_value(cash_in_hand).unwrap();
+    line.on_account_approved = serde_json::from_value(on_account).unwrap();
     server.append_import_ledger(&line).unwrap();
     fs::write(
         server
@@ -1709,6 +1725,37 @@ async fn a_batch_recorded_before_its_cash_in_hand_ledgers_is_refused_before_any_
         "This batch was built before ComplyEaze Bridge recorded which of its ledgers must stay \
          under Cash-in-Hand, so it cannot be checked. Nothing was posted. Build the batch again, \
          then post the new batch.",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert!(scripted.previews().is_empty(), "approval must not be asked");
+    assert!(observed.is_empty(), "{response}");
+}
+
+/// #1234: a batch saved before the build recorded its bill-wise approvals is
+/// refused before any Tally request and must be rebuilt, as above.
+#[tokio::test]
+async fn a_batch_recorded_before_its_bill_wise_approvals_is_refused_before_any_request() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_bank_batch_recording_all(&server, contra(), json!([]), Value::Null);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_batch_predates_bill_wise_record",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["message"],
+        "This batch was built before ComplyEaze Bridge began checking ledgers that keep \
+         bills in Tally, so it cannot be checked. Nothing was posted. First check in Tally \
+         whether its file was already imported by hand, since posting the rebuilt batch would import it a second time. \
+         Then build the batch again and post the new batch.",
         "{response}"
     );
     assert_eq!(result["attempt_recorded"], false, "{response}");
@@ -2388,7 +2435,7 @@ fn saved_captured_line(server: &Server) -> ImportLedgerLine {
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
         "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],"date_from":"20260907","date_to":"20260907",
-        "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":7},
         "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1","date":"20260907",
             "voucher_type":"Journal","narration":"Bridge MCP batch namespace qualification",
@@ -2853,6 +2900,92 @@ async fn a_new_ledger_under_an_approved_name_during_approval_is_refused_by_ident
     assert_eq!(observed.len(), expected, "{response}");
 }
 
+/// #1234: the queue re-reads the catalogue after approval, inside
+/// its identity brackets, and its rows carry the flag. A ledger switched to
+/// bill-wise while the approval waits, with no approval recorded for it, is
+/// refused before the intent and the POST under its own code.
+#[tokio::test]
+async fn a_named_ledger_switched_to_bill_wise_during_approval_is_refused_in_the_queue() {
+    let switched =
+        crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue(), &["WR2 Sales"]);
+    let mut plans = before_approval();
+    let mut after = after_approval(xml(created_one()));
+    // The queue's catalogue: its first report and its replay.
+    let catalogue_at = probe().len() + 2;
+    after[catalogue_at + 1] = xml(switched.clone());
+    after[catalogue_at + 3] = xml(switched);
+    // The recheck runs once every queue read is in; only the POST is never sent.
+    after.pop();
+    let expected = plans.len() + after.len();
+    plans.extend(after);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_bill_wise_changed",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert_eq!(observed.len(), expected, "{response}");
+}
+
+/// #1234: the approval the build recorded is what lets a bill-wise ledger
+/// through. The same ledger, bill-wise at the post and again in the queue, is
+/// posted when the saved batch records its approval, and the POST is the
+/// request the intent recorded; with no approval recorded it is the refusal
+/// above. A post that read the approved list as empty would fail here.
+#[tokio::test]
+async fn a_ledger_that_is_bill_wise_and_was_approved_at_the_build_still_posts() {
+    let bill_wise =
+        crate::agent::agent_import::tests::with_bill_wise_flags(&catalogue(), &["WR2 Sales"]);
+    let mut plans = before_approval();
+    for plan in &mut plans {
+        let body = plan.fixture.body().into_owned();
+        if body.contains("<LEDGER NAME=\"") && body.contains("<ISBILLWISEON") {
+            plan.fixture = Fixture::SyntheticXml(
+                crate::agent::agent_import::tests::with_bill_wise_flags(&body, &["WR2 Sales"]),
+            );
+        }
+    }
+    let mut after = after_approval(xml(created_one()));
+    let catalogue_at = probe().len() + 2;
+    after[catalogue_at + 1] = xml(bill_wise.clone());
+    after[catalogue_at + 3] = xml(bill_wise);
+    let post_at = plans.len() + after.len() - 1;
+    plans.extend(after);
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (mut line, args) = saved_batch(&server);
+    line.on_account_approved = Some(vec![super::super::bill_wise::OnAccountApproved {
+        ledger: "WR2 Sales".into(),
+        party_digest: "0".repeat(64),
+    }]);
+    server.append_import_ledger(&line).unwrap();
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), post_at + 1, "{response}");
+    let intent = dispatch_intent(directory.path());
+    assert_eq!(
+        observed[post_at].request_body_sha256,
+        intent["native_request_sha256"].as_str().unwrap()
+    );
+}
+
 /// bridge#634, #641: the queue's catalogue re-read at post time holds a
 /// repeated ledger. The admission recheck refuses before the intent and the
 /// POST under its own code, not the catch-all that says the outcome is
@@ -3149,6 +3282,148 @@ async fn a_ledger_replaced_under_its_name_since_the_build_is_refused_before_appr
         );
         assert_eq!(observed, expected, "{result}");
         assert!(!intent);
+    }
+}
+
+/// The changed ledgers go out in the order the batch names them and never by
+/// name, with or without masking. The saved Journal names `WR2 Sales` before
+/// `Cash`.
+#[tokio::test]
+async fn the_changed_ledgers_of_a_refused_post_are_listed_in_the_order_the_batch_names_them() {
+    for redaction in [
+        crate::agent::Redaction::None,
+        crate::agent::Redaction::MaskParties,
+    ] {
+        let replaced = |name: &str| BoundLedger {
+            name: name.into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000ff".into(),
+        };
+        let (result, ..) = refused_by_build_binding_under(
+            Some(vec![replaced("Cash"), replaced("WR2 Sales")]),
+            false,
+            redaction,
+        )
+        .await;
+        let sent = |name: &str| match redaction {
+            crate::agent::Redaction::MaskParties => crate::agent::mask(name),
+            _ => name.to_string(),
+        };
+        assert_eq!(
+            result["error"]["code"], "import_masters_changed_since_build",
+            "{result}"
+        );
+        assert_eq!(
+            result["error"]["ledgers_changed"],
+            json!([sent("WR2 Sales"), sent("Cash")]),
+            "{result}"
+        );
+        assert_eq!(result["error"]["ledgers_changed_total"], 2, "{result}");
+    }
+}
+
+/// #1234: when a ledger was replaced under its old name AND a named ledger is
+/// bill-wise now, the post reports the replacement (which names the ledger and
+/// says to confirm the intended one), not the flag, so a rebuild is not
+/// advised before the person knows the name now means another ledger.
+#[tokio::test]
+async fn a_replaced_ledger_is_reported_before_a_flag_that_changed() {
+    let mut plans = before_approval();
+    for plan in &mut plans {
+        let body = plan.fixture.body().into_owned();
+        if body.contains("<LEDGER NAME=\"") && body.contains("<ISBILLWISEON") {
+            plan.fixture = Fixture::SyntheticXml(
+                crate::agent::agent_import::tests::with_bill_wise_flags(&body, &["WR2 Sales"]),
+            );
+        }
+    }
+    plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (mut line, args) = saved_batch(&server);
+    line.ledger_identities = Some(vec![
+        BoundLedger {
+            name: "Cash".into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000ff".into(),
+        },
+        BoundLedger {
+            name: "WR2 Sales".into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d0".into(),
+        },
+    ]);
+    server.append_import_ledger(&line).unwrap();
+    let result = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await["structuredContent"]["result"]
+        .clone();
+    assert_eq!(
+        result["error"]["code"], "import_masters_changed_since_build",
+        "{result}"
+    );
+    assert_eq!(sent(simulator).len(), expected, "{result}");
+}
+
+/// #1234: the post's own catalogue read, made before approval,
+/// carries each ledger's flag. A saved batch whose named ledger reads
+/// bill-wise now, with no approval recorded for it, is refused before any
+/// approval is asked and before a dispatch intent, on both surfaces.
+#[tokio::test]
+async fn a_named_ledger_that_became_bill_wise_since_the_build_is_refused_before_approval() {
+    for desktop in [false, true] {
+        let mut plans = before_approval();
+        for plan in &mut plans {
+            let body = plan.fixture.body().into_owned();
+            if body.contains("<LEDGER NAME=\"") && body.contains("<ISBILLWISEON") {
+                plan.fixture = Fixture::SyntheticXml(
+                    crate::agent::agent_import::tests::with_bill_wise_flags(&body, &["WR2 Sales"]),
+                );
+            }
+        }
+        // The Currency read and mode probe after the catalogue are never sent.
+        plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+        let expected = plans.len();
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (line, args) = saved_batch(&server);
+        let scripted = ScriptedApproval::approving();
+        let result = if desktop {
+            let outcome = SCRIPTED_APPROVAL
+                .scope(
+                    scripted.clone(),
+                    server.post_import_checked(&args, Some(&line.sha256), PostScope::JournalOnly),
+                )
+                .await
+                .expect("a refusal is reported as the post's outcome");
+            super::super::desktop_journal::DesktopJournalOperation::from_outcome(outcome).result
+                ["result"]
+                .clone()
+        } else {
+            SCRIPTED_APPROVAL
+                .scope(scripted.clone(), server.call_tool("post_import", args))
+                .await["structuredContent"]["result"]
+                .clone()
+        };
+        let observed = sent(simulator).len();
+        let intent = String::from_utf8(journal(directory.path()))
+            .unwrap()
+            .contains("\"dispatch_intent\"");
+        assert_eq!(
+            result["error"]["code"], "import_bill_wise_changed",
+            "{result}"
+        );
+        assert_eq!(result["attempt_recorded"], json!(false), "{result}");
+        assert!(result["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("Build the batch again"));
+        assert_eq!(observed, expected, "{result}");
+        assert!(!intent);
+        assert!(scripted.previews().is_empty(), "approval must not be asked");
     }
 }
 
@@ -3572,6 +3847,36 @@ async fn a_doubted_post_stays_doubted_when_reconciled_later() {
     assert_eq!(masters_check_of(&server, BATCH), doubt);
 }
 
+/// A recorded verdict's ledgers are answered in the order the batch names them,
+/// never in the order they were recorded (which is by name). The captured
+/// batch names its two ledgers in name order too, so this record is written in
+/// the opposite order to tell the two apart; the record itself is left as it
+/// was saved.
+#[tokio::test]
+async fn a_recorded_verdict_lists_its_ledgers_in_the_order_the_batch_names_them() {
+    let recorded = serde_json::to_vec(&json!({"state":"posted_under_changed_masters",
+        "trigger":"masters_moved","ledgers":["Cash","Bridge Nested Debtor WR4"]}))
+    .unwrap();
+    let (response, _, _, server, _directory) =
+        reconcile_with_masters_check(Some(&recorded), Vec::new()).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["masters_after_post"]["ledgers"],
+        json!(["Bridge Nested Debtor WR4", "Cash"]),
+        "{response}"
+    );
+    assert_eq!(
+        result["masters_after_post"]["state"], "posted_under_changed_masters",
+        "{response}"
+    );
+    // The record's own bytes, not a reading of them.
+    let record = server
+        .imports_dir()
+        .unwrap()
+        .join(format!("{BATCH}.masters_check.json"));
+    assert_eq!(fs::read(record).unwrap(), recorded);
+}
+
 /// A check the post could not finish (a crash, a lost read) is finished by the
 /// next readback that finds the voucher, against the ledgers bound at build.
 #[tokio::test]
@@ -3983,6 +4288,51 @@ async fn a_failed_readback_reports_changed_masters_with_the_ledger_marked() {
             "{response}"
         );
     }
+}
+
+/// The answer of a post whose readback fails lists the changed ledgers in the
+/// order the batch names them too. The saved Journal names `WR2 Sales` before
+/// `Cash`, so the two orders differ; the record keeps the order it was written
+/// in.
+#[tokio::test]
+async fn a_failed_readback_lists_the_changed_ledgers_in_the_order_the_batch_names_them() {
+    let replaced = replaced_once(
+        &replaced_once(
+            &catalogue(),
+            ">61c6de69-1748-461c-ad3f-162cb949df9f-0000001f</GUID>",
+            ">61c6de69-1748-461c-ad3f-162cb949df9f-000000ff</GUID>",
+        ),
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000d0</GUID>",
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000fe</GUID>",
+    );
+    // No readback is scripted, so the read after the post fails.
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(masters_moved_to(8)));
+    plans.extend(paired(replaced));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let _ = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert!(result.get("dispatch").is_none(), "{response}");
+    assert_eq!(
+        result["masters_after_post"]["ledgers"],
+        json!(["WR2 Sales", "Cash"]),
+        "{response}"
+    );
+    assert_eq!(
+        masters_check_of(&server, &line.batch_id)["ledgers"],
+        json!(["Cash", "WR2 Sales"]),
+        "{response}"
+    );
 }
 
 /// A voucher the book already holds that matches the saved batch's row by

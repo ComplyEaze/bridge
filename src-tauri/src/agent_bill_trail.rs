@@ -869,13 +869,14 @@ impl Server {
         unallocated: &[UnallocatedParty],
         limits: DetailLimits,
     ) -> Result<(Value, Evidence), ToolFailure> {
-        let (catalogue, mut evidence) = self.read_ledger_catalogue(identity, &company.name).await?;
-        let resolved = resolve_ledger_or_refuse(
-            catalogue.iter().map(String::as_str),
+        let (catalogue, mut evidence) = self
+            .read_resolvable_ledgers(identity, &company.name)
+            .await?;
+        let (resolved, party) = resolve_catalogue_ledger_or_refuse(
+            &catalogue,
             party_argument,
             self.settings.redaction,
         )?;
-        let party = resolved.name().to_string();
         let books_from = company
             .books_from
             .clone()
@@ -931,7 +932,20 @@ impl Server {
         )
         .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
         detail["party"] = party_json;
-        detail["ledger_match"] = resolved.to_json(self.settings.redaction);
+        detail["ledger_match"] = ledger_match_json(&resolved, &party, self.settings.redaction);
+        // The bills are matched on the spelling the vouchers carry. When that is
+        // not the ledger's own name, what Tally's outstandings reports call the
+        // ledger is not established, so an answer that found nothing may be a
+        // name that did not match (#1085); say so in the result, not only in
+        // the parameter text.
+        if party != resolved.name()
+            && matches!(
+                detail["state"].as_str(),
+                Some("no_named_bill_for_party" | "no_residual_row_for_party")
+            )
+        {
+            detail["report_spelling"] = json!("not_established");
+        }
         detail["as_of"] = json!(as_of);
         detail["window"] = window;
         Ok((detail, evidence))

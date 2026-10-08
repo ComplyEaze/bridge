@@ -85,7 +85,7 @@ synthetic company, 2026-10-02). One gateway import of three Payment vouchers, in
   naming the ledger. `LASTVCHID` was the last created voucher's MasterID; `LASTMID` was 0.
 - Read back within a minute, the other two vouchers had been created, in request order. The
   company's voucher mark (`ALTVCHID`) stepped by 2. The rejected voucher took no MasterID and no
-  AlterID. This read-back is recorded in the lab notes and is not committed.
+  AlterID. This read-back is not committed.
 
 In this run `EXCEPTIONS` equalled the number of rejected vouchers (one), and nothing in the answer
 named which voucher it was: the `LINEERROR` names a ledger, not a voucher. The answer alone is
@@ -996,6 +996,19 @@ mark was not measured.
 - any other `IMPORTDUPS` value: neither `DupModify` nor `DupCombine` was sent (the reference
   describes `DupCombine` as combining opening balances);
 - any import option other than `IMPORTDUPS`, and any formula name the reference does not document.
+
+### 9.4h A ledger's own name can differ in case or symbols from its row's `NAME` attribute
+
+**Measured on captured `List of Ledgers` collections, 4,017 distinct ledger GUIDs in 13 books (kept outside the repository, counted separately and not re-derived here); one row is committed.** **Confidence: PARTIAL.**
+
+A ledger row names its ledger twice: in the row's `NAME` attribute, and as the first `NAME` under `LANGUAGENAME.LIST/NAME.LIST` (its own name; any later `NAME` is an alias). The voucher rows' `LEDGERNAME` has so far carried the attribute spelling (measured on one book only, not the synthetic book read below, where the two spellings had converged).
+
+- **26** of the 4,017 GUIDs ever had an attribute that differed from their own name, in 4 of the 13 books. Every such pair shares the same letters and digits and differs in case or symbols. The committed capture `native-shape-lab-ledger-catalogue.utf16le.xml` holds one: attribute `ROUND OFF`, own name `Round Off`.
+- For 21 GUIDs the attribute changed between captures (the `ALTERID` advanced) while the own name stayed the same. The own name never varied for a GUID.
+- ComplyEaze Bridge reads the own name (`standard_ledger_catalog.rs`), takes either spelling as an exact request for that one ledger in `vouchers` and the `outstandings` party detail (a spelling that is two ledgers' is `ledger_ambiguous`, and so is a case-and-spaces match over either spelling of two ledgers), and shows the own name. The voucher filter still compares the spelling the voucher rows carry. A party detail of the `outstandings` tool that finds no bill or no unallocated row for a ledger whose two spellings differ carries `report_spelling: not_established`, because the bills are matched on the voucher spelling: it may mean the report names the ledger differently, and is not a finding about the party.
+- **Read on that book again, 6 Oct 2026 (PARTIAL: one book, one ledger; three read-only `vouchers` calls in a maintainers' run on a build of the stored-name change, #1085 slice a; their captures were deleted when the cycle ended, so only the committed parts below can be re-checked).** Committed: the capture `native-shape-lab-ledger-catalogue-v2.utf16le.xml` of the same synthetic book `BRIDGE SHAPE LAB` (44 ledger rows) has the Round Off row's `NAME` attribute `Round Off`, equal to its own name, where the earlier capture above has `ROUND OFF`; `vouchers-shape-lab-fy.rows.json` holds the book's 67 vouchers for its financial year, two of which carry the Round Off entry, both spelled `Round Off`. From that run, not committed: a request for `Round Off` resolved as an exact spelling and one for `ROUND OFF` as a case-and-spaces match, and both returned the same voucher (a Purchase of 21 Apr 2025) for the window the call was given, complete, without a refusal. The window of those two calls was recorded only in a note that is not committed, so which other Round Off voucher (the book holds a second) the window excluded is not shown here. So that state (attribute different from own name) was not present on the book when it was read, and which spelling a voucher row carries when the two differ is still not measured. What moves the attribute is unknown.
+
+**Not measured:** that the first `LANGUAGENAME.LIST` is the primary language when a master has several; what the outstandings (bills) reports carry for such a ledger; which spelling a voucher row carries for a ledger whose two spellings differ at the time of the read (the one read through Bridge found them equal), on any book other than the one the attribute spelling was seen on; whether Tally accepts the attribute spelling in an import when it differs from the own name (imports are unchanged); whether an alias can equal another ledger's own name.
 
 
 #

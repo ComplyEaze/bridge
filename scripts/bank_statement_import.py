@@ -433,8 +433,11 @@ class HDFC(Bank):
     row_scoped = ("ref", "vdt", "dr", "cr", "bal")
     bottom_anchors = (("HDFC", "BANK", "LIMITED"), ("STATEMENT", "SUMMARY"))
     end_anchors = (("STATEMENT", "SUMMARY"),)
-    # page 1 repeats the column header; later pages only repeat the period line
-    top_anchors = (("Narration",), ("Statement", "account"))
+    # page 1 repeats the column header; later pages only repeat the period line, which
+    # prints "Statement of account" and, a hair below it in a smaller font,
+    # "From : <date> To : <date>". A reader that groups those into two lines would
+    # leave the second one below the anchor, so it anchors too.
+    top_anchors = (("Narration",), ("From", "To"), ("Statement", "account"))
     # "Account No :50200000000000"; "Account Status" and "Account Type" print
     # the same first word, which is why the anchor is both words
     account_anchors = (("Account", "No"),)

@@ -363,18 +363,15 @@ fn an_absent_ambiguous_or_unattributed_ancestor_is_refused() {
 }
 
 fn rendered(voucher_type: &str, dr: &str, cr: &str) -> String {
-    let voucher: ImportVoucher = serde_json::from_value(json!({
+    let voucher: ImportVoucher<String> = serde_json::from_value(json!({
         "bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":voucher_type,
         "narration":"Transfer to A & B","entries":[
             {"ledger":dr,"amount":"1000.00","side":"Dr"},
             {"ledger":cr,"amount":"1000.00","side":"Cr"}]
     }))
     .expect("voucher");
-    render_import_xml(
-        "Synthetic Book",
-        std::slice::from_ref(&voucher),
-        "batch-render",
-    )
+    let date = normalized_date(&voucher.date).unwrap();
+    render_import_xml("Synthetic Book", &[voucher.dated(date)], "batch-render")
 }
 
 #[test]
@@ -421,12 +418,14 @@ fn a_bank_voucher_renders_its_debit_first_whatever_order_the_caller_used() {
     // Every measured file put the debit first. A caller's ordering is not a
     // fact about the batch, so it is canonicalised rather than refused — which
     // costs nothing and removes the variance instead of pushing it back.
-    let credit_first: ImportVoucher = serde_json::from_value(json!({
+    let credit_first: ImportVoucher<String> = serde_json::from_value(json!({
         "bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Payment",
         "entries":[{"ledger":"Bank","amount":"1000.00","side":"Cr"},
                    {"ledger":"Supplier","amount":"1000.00","side":"Dr"}]
     }))
     .expect("voucher");
+    let date = normalized_date(&credit_first.date).unwrap();
+    let credit_first = credit_first.dated(date);
     let xml = render_import_xml(
         "Synthetic Book",
         std::slice::from_ref(&credit_first),
@@ -527,7 +526,7 @@ pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
 }
 
 pub(super) fn captured_bank_payload() -> ImportPayload {
-    serde_json::from_value(json!({"company_guid":CAPTURED_GUID,"vouchers":[
+    let wire: ImportPayload<String> = serde_json::from_value(json!({"company_guid":CAPTURED_GUID,"vouchers":[
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Payment","narration":"Settled on account",
          "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"12.50","side":"Dr"},
                     {"ledger":"Cash","amount":"12.50","side":"Cr"}]},
@@ -535,7 +534,8 @@ pub(super) fn captured_bank_payload() -> ImportPayload {
          "entries":[{"ledger":"Cash","amount":"7.50","side":"Dr"},
                     {"ledger":"WR2 Sales","amount":"7.50","side":"Cr"}]}
     ]}))
-    .expect("captured bank payload")
+    .expect("captured bank payload");
+    saved(&wire)
 }
 
 pub(super) fn bank_server(directory: &std::path::Path, port: u16) -> Server {
@@ -643,7 +643,7 @@ async fn a_payment_and_receipt_batch_builds_against_the_captured_masters() {
 /// two-entry evidence.
 #[tokio::test]
 async fn a_multi_entry_receipt_builds_through_tools_call_and_says_it_is_unqualified() {
-    let payload: ImportPayload = serde_json::from_value(json!({"company_guid":CAPTURED_GUID,"vouchers":[
+    let payload: ImportPayload<String> = serde_json::from_value(json!({"company_guid":CAPTURED_GUID,"vouchers":[
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Receipt","narration":"Shared deposit",
          "entries":[{"ledger":"Cash","amount":"20.00","side":"Dr"},
                     {"ledger":"Bridge Nested Debtor WR4","amount":"12.50","side":"Cr"},
@@ -707,12 +707,14 @@ async fn a_multi_entry_receipt_builds_through_tools_call_and_says_it_is_unqualif
 }
 
 fn demo_batch(voucher_type: &str, dr: &str, cr: &str) -> ImportPayload {
-    serde_json::from_value(json!({"company_guid":AARAV_GUID,"vouchers":[
-        {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":voucher_type,
-         "entries":[{"ledger":dr,"amount":"1000.00","side":"Dr"},
-                    {"ledger":cr,"amount":"1000.00","side":"Cr"}]}
-    ]}))
-    .expect("demo batch")
+    let wire: ImportPayload<String> =
+        serde_json::from_value(json!({"company_guid":AARAV_GUID,"vouchers":[
+            {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":voucher_type,
+             "entries":[{"ledger":dr,"amount":"1000.00","side":"Dr"},
+                        {"ledger":cr,"amount":"1000.00","side":"Cr"}]}
+        ]}))
+        .expect("demo batch");
+    saved(&wire)
 }
 
 #[test]
@@ -2195,12 +2197,14 @@ fn the_verification_read_fetches_the_effective_date_and_not_the_party() {
 
 /// A bank voucher of any number of entries, each `(ledger, amount, side)`.
 fn multi_entry_batch(voucher_type: &str, entries: &[(&str, &str, &str)]) -> ImportPayload {
-    serde_json::from_value(json!({"company_guid":AARAV_GUID,"vouchers":[
-        {"bridge_txn_id":"txn-multi","date":"2026-09-01","voucher_type":voucher_type,
-         "entries":entries.iter().map(|(ledger, amount, side)| json!({
-             "ledger":ledger,"amount":amount,"side":side})).collect::<Vec<_>>()}
-    ]}))
-    .expect("multi-entry batch")
+    let wire: ImportPayload<String> =
+        serde_json::from_value(json!({"company_guid":AARAV_GUID,"vouchers":[
+            {"bridge_txn_id":"txn-multi","date":"2026-09-01","voucher_type":voucher_type,
+             "entries":entries.iter().map(|(ledger, amount, side)| json!({
+                 "ledger":ledger,"amount":amount,"side":side})).collect::<Vec<_>>()}
+        ]}))
+        .expect("multi-entry batch");
+    saved(&wire)
 }
 
 /// bridge#466, owner decision 2026-09-22: every leg of a

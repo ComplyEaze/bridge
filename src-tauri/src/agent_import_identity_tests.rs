@@ -94,7 +94,7 @@ fn legacy_record() -> Value {
         "txn_ids":["txn-001"], "date_from":"20260901", "date_to":"20260901",
         "sha256":"hash", "built_at":"2026-09-07T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water", "value":10, "master_value":10},
-        "vouchers":[payload().vouchers.remove(0)]
+        "vouchers":[admitted_payload().vouchers.remove(0)]
     })
 }
 

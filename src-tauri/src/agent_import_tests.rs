@@ -4104,7 +4104,7 @@ fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
     let narration = "Paid & <vendor> \"X\" 'Y'";
     let reference = "REF & <NO> \"1\" 'A'";
     let ledger = "Bridge & <Ledger> \"Q\" 'A'\r\n";
-    let input: ImportPayload = serde_json::from_value(json!({
+    let input: ImportPayload<String> = serde_json::from_value(json!({
         "company_guid": GUID,
         "vouchers": [{
             "bridge_txn_id": "txn-escape",
@@ -4122,7 +4122,7 @@ fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
     payload_verdict(&input).expect("reserved characters and a trailing ledger CR LF are valid");
 
     let company = "BRIDGE & <SYNTHETIC> \"BOOK\" 'X'";
-    let xml = render_import_xml(company, &input.vouchers, "batch-escape");
+    let xml = render_import_xml(company, &saved(&input).vouchers, "batch-escape");
 
     // The whole rendered request must be well-formed XML: an escaping bug can
     // make it exactly not that.
@@ -4156,7 +4156,7 @@ fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
 #[test]
 fn shipped_write_path_round_trips_a_party_ledger_crlf() {
     let party = "Vendor & <Party> \"Q\" 'A'\r\n";
-    let input: ImportPayload = serde_json::from_value(json!({
+    let input: ImportPayload<String> = serde_json::from_value(json!({
         "company_guid": GUID,
         "vouchers": [{
             "bridge_txn_id": "txn-party-escape",
@@ -4174,7 +4174,7 @@ fn shipped_write_path_round_trips_a_party_ledger_crlf() {
 
     let xml = render_import_xml(
         "BRIDGE SYNTHETIC BOOK",
-        &input.vouchers,
+        &saved(&input).vouchers,
         "batch-party-escape",
     );
     assert_eq!(decoded_element_text(&xml, "PARTYLEDGERNAME"), party);

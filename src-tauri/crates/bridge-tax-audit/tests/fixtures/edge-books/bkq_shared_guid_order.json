@@ -1,0 +1,408 @@
+{
+ "comment": "book_keeping_quality entry order on vouchers that share a GUID (#1243): every voucher is its own entry in the creation-order lag and in the vouchers created after the last sale, whether its GUID is blank or repeated. Blank-GUID vouchers of four base types (Payment lags of 60, 30 and 42 days, a Journal of 10, a Receipt of 41, two Purchases created after the last sale with one number, type and day, counted twice and cited once) each keep their own lag, so no base type's population absorbs another's; one GUID on two Payments (lags 46 and 5); one GUID on two Journals created after the last sale (lags -30 and 91) and on a third voucher with an unparseable MASTERID (excluded, though it shares the GUID); a Payment sharing a sale's GUID (lag 92, after the last sale); a blank-GUID Payment created before any sale (no clock, no lag); a blank-GUID sale moving the clock and a later sale dated before it leaving the clock.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-bkqg-0"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-bkqg-1"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-bkqg-2"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-bkqg-3"
+  },
+  {
+   "name": "Supplier",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-bkqg-4"
+  },
+  {
+   "name": "Customer",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bkqg-5"
+  },
+  {
+   "name": "Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-bkqg-6"
+  },
+  {
+   "name": "UPI Collections",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bkqg-7"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "",
+   "number": "PB-0",
+   "date": "2025-04-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     1000
+    ],
+    [
+     "Cash",
+     -1000
+    ]
+   ],
+   "masterid": "0"
+  },
+  {
+   "guid": "s-a",
+   "number": "SA-1",
+   "date": "2025-06-30",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Customer",
+     50000
+    ],
+    [
+     "Sales",
+     -50000
+    ]
+   ],
+   "masterid": "1"
+  },
+  {
+   "guid": "",
+   "number": "PB-1",
+   "date": "2025-05-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     2000
+    ],
+    [
+     "Cash",
+     -2000
+    ]
+   ],
+   "masterid": "2"
+  },
+  {
+   "guid": "",
+   "number": "JB-1",
+   "date": "2025-06-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Expenses",
+     3000
+    ],
+    [
+     "Supplier",
+     -3000
+    ]
+   ],
+   "masterid": "3"
+  },
+  {
+   "guid": "g-twin",
+   "number": "PT-1",
+   "date": "2025-05-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     4000
+    ],
+    [
+     "Cash",
+     -4000
+    ]
+   ],
+   "masterid": "4"
+  },
+  {
+   "guid": "g-twin",
+   "number": "PT-2",
+   "date": "2025-06-25",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     5000
+    ],
+    [
+     "Cash",
+     -5000
+    ]
+   ],
+   "masterid": "5"
+  },
+  {
+   "guid": "",
+   "number": "RB-1",
+   "date": "2025-05-20",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     6000
+    ],
+    [
+     "Customer",
+     -6000
+    ]
+   ],
+   "masterid": "6"
+  },
+  {
+   "guid": "",
+   "number": "SB-1",
+   "date": "2025-07-31",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Customer",
+     70000
+    ],
+    [
+     "Sales",
+     -70000
+    ]
+   ],
+   "masterid": "7"
+  },
+  {
+   "guid": "s-b",
+   "number": "SB-2",
+   "date": "2025-07-15",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Customer",
+     80000
+    ],
+    [
+     "Sales",
+     -80000
+    ]
+   ],
+   "masterid": "8"
+  },
+  {
+   "guid": "",
+   "number": "PB-2",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     9000
+    ],
+    [
+     "Cash",
+     -9000
+    ]
+   ],
+   "masterid": "9"
+  },
+  {
+   "guid": "s-last",
+   "number": "SL-1",
+   "date": "2025-08-31",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Customer",
+     10000
+    ],
+    [
+     "Sales",
+     -10000
+    ]
+   ],
+   "masterid": "10"
+  },
+  {
+   "guid": "",
+   "number": "PB-3",
+   "date": "2025-07-20",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     1100
+    ],
+    [
+     "Cash",
+     -1100
+    ]
+   ],
+   "masterid": "11"
+  },
+  {
+   "guid": "",
+   "number": "PU-1",
+   "date": "2025-08-30",
+   "base_type": "Purchase",
+   "lines": [
+    [
+     "Purchases",
+     1200
+    ],
+    [
+     "Supplier",
+     -1200
+    ]
+   ],
+   "masterid": "12"
+  },
+  {
+   "guid": "",
+   "number": "PU-1",
+   "date": "2025-08-30",
+   "base_type": "Purchase",
+   "lines": [
+    [
+     "Purchases",
+     1300
+    ],
+    [
+     "Supplier",
+     -1300
+    ]
+   ],
+   "masterid": "13"
+  },
+  {
+   "guid": "g-pair",
+   "number": "JP-1",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Expenses",
+     1400
+    ],
+    [
+     "Supplier",
+     -1400
+    ]
+   ],
+   "masterid": "14"
+  },
+  {
+   "guid": "g-pair",
+   "number": "JP-2",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Expenses",
+     1500
+    ],
+    [
+     "Supplier",
+     -1500
+    ]
+   ],
+   "masterid": "15"
+  },
+  {
+   "guid": "s-a",
+   "number": "PS-1",
+   "date": "2025-05-31",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     1600
+    ],
+    [
+     "Cash",
+     -1600
+    ]
+   ],
+   "masterid": "16"
+  },
+  {
+   "guid": "g-pair",
+   "number": "JP-3",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Expenses",
+     1700
+    ],
+    [
+     "Supplier",
+     -1700
+    ]
+   ],
+   "masterid": "x"
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "book_keeping_quality": {
+  "payment_channel_debtors": [],
+  "tax_ledgers": {},
+  "gst_payment_ledgers": [],
+  "reissue_narration_terms": [],
+  "writeoff_discount_ledgers": []
+ },
+ "tests": [
+  "book_keeping_quality"
+ ]
+}

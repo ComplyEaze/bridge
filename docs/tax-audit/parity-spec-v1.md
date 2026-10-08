@@ -355,15 +355,15 @@ figure or byte enters this repository or its CI.
    Known exceptions: this crate's `Engagement::from_toml` still refuses these when the config
    loads, so a malformed value there refuses every test. They stay that way until they are brought
    in line, which is a change inside the crate.
-   - `[tds]` and `[tds_payees]` (`src/lib.rs:821-889`): `tds_payees` (batch C1) was written before
+   - `[tds]` and `[tds_payees]` (`src/lib.rs:822-890`): `tds_payees` (batch C1) was written before
      this convention. With them go two values the same test reads elsewhere, `[client].state` and
-     `[deductor]` with its `activity` (`src/lib.rs:956-957`, `src/tds_payees.rs:380-414`).
+     `[deductor]` with its `activity` (`src/lib.rs:957-958`, `src/tds_payees.rs:383-417`).
    - `[depreciation]`, when a required key is missing or an entry is wrongly typed
-     (`src/lib.rs:669-755`).
-   - `[tds_tcs_26as]`, when it is not a table or a key has the wrong type (`src/lib.rs:769-820`).
+     (`src/lib.rs:670-756`).
+   - `[tds_tcs_26as]`, when it is not a table or a key has the wrong type (`src/lib.rs:770-821`).
    - `[partners]`, when it or a partner is not a table, or an `interest_ledger` is not text
-     (`src/lib.rs:890-914`).
-   - `[presumptive_history]`, when it is not a table (`src/lib.rs:966-973`), although the bullet
+     (`src/lib.rs:891-915`).
+   - `[presumptive_history]`, when it is not a table (`src/lib.rs:967-974`), although the bullet
      above says such a table is refused only when its test runs.
 
 ## 11. Ledger tags: figure/finding ids keyed by GUID, not by name

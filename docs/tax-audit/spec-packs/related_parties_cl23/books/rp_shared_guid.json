@@ -1,5 +1,5 @@
 {
- "comment": "related_parties_cl23: in-books vouchers that share a GUID (the book's own GUID check reports both). The walk keeps one entry per GUID: for g01 the later voucher replaces the earlier one, so the earlier 300000 paise is not counted; for g02 the later voucher nets to zero on the set, so the earlier entry stays. The population net is therefore below the Trial Balance movement.",
+ "comment": "related_parties_cl23: in-books vouchers that share a GUID (the book's own GUID check reports both). Each voucher is its own entry even when it shares a GUID: for g01 both vouchers count (300000 and 500000 paise); for g02 the later voucher nets to zero on the set, so it is no entry and the earlier one stays. The population net therefore equals the Trial Balance movement of the rent ledger.",
  "groups": {
   "Capital Account": null,
   "Current Assets": null,

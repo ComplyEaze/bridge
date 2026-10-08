@@ -19,44 +19,46 @@ use bridge_tally_primitives::TallyDate;
 
 use crate::error::{AuditError, Result};
 
-/// One day's tranche: the credits that became deductible on `day`, their total, their vouchers
-/// (sorted, unique) and each credit as (own date, paise), sorted.
+/// One day's tranche: the credits that became deductible on `day`, their total, their vouchers'
+/// ids (sorted, unique) and each credit as (own date, paise), sorted.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Tranche<'a> {
+pub struct Tranche<'a, K: ?Sized = str> {
     pub day: TallyDate,
     pub paise: i64,
-    pub guids: Vec<&'a str>,
+    pub ids: Vec<&'a K>,
     pub credits: Vec<(TallyDate, i64)>,
 }
 
-/// `credits` are (date, voucher GUID, net paise). Returns the tranches by day. Refuses with no
-/// limit at all, as the reference raises, and on an i64 overflow.
-pub fn crossing_tranches<'a>(
-    credits: &[(TallyDate, &'a str, i64)],
+/// `credits` are (date, voucher id, net paise), the id the caller's own and unique per voucher
+/// (`tds_payees` passes its [`crate::book::VoucherKey`], as the reference's passes its per-voucher
+/// key). Returns the tranches by day. Refuses with no limit at all, as the reference raises, and
+/// on an i64 overflow.
+pub fn crossing_tranches<'a, K: Ord + ?Sized>(
+    credits: &[(TallyDate, &'a K, i64)],
     single_limit: Option<i64>,
     aggregate_limit: Option<i64>,
     test_id: &str,
-) -> Result<Vec<Tranche<'a>>> {
+) -> Result<Vec<Tranche<'a, K>>> {
     if single_limit.is_none() && aggregate_limit.is_none() {
         return Err(AuditError::Config(format!(
             "{test_id}: crossing_tranches needs a single-sum limit, an aggregate limit, or both"
         )));
     }
     let overflow = || AuditError::Config(format!("{test_id}: an amount overflows i64 paise"));
-    let mut sorted: Vec<&(TallyDate, &'a str, i64)> = credits.iter().collect();
-    // The reference sorts by (date, guid); Python's str order is code-point order, as Rust's is.
+    let mut sorted: Vec<&(TallyDate, &'a K, i64)> = credits.iter().collect();
+    // The reference sorts by (date, id); Python's str order is code-point order, as Rust's is.
     sorted.sort_by(|a, b| (&a.0, a.1).cmp(&(&b.0, b.1)));
-    // (own date, guid, paise, deductible day once known)
-    let mut entries: Vec<(&TallyDate, &'a str, i64, Option<TallyDate>)> = Vec::new();
+    // (own date, id, paise, deductible day once known)
+    let mut entries: Vec<(&TallyDate, &'a K, i64, Option<TallyDate>)> = Vec::new();
     let mut running: i64 = 0;
     let mut crossed = false;
-    for (d, guid, paise) in sorted {
+    for (d, id, paise) in sorted {
         if *paise <= 0 {
             continue;
         }
         running = running.checked_add(*paise).ok_or_else(overflow)?;
         let single = single_limit.is_some_and(|limit| *paise > limit);
-        entries.push((d, guid, *paise, (crossed || single).then(|| d.clone())));
+        entries.push((d, id, *paise, (crossed || single).then(|| d.clone())));
         if !crossed && aggregate_limit.is_some_and(|limit| running > limit) {
             crossed = true;
             for e in &mut entries {
@@ -66,10 +68,10 @@ pub fn crossing_tranches<'a>(
             }
         }
     }
-    let mut by_day: BTreeMap<TallyDate, Vec<(&TallyDate, &'a str, i64)>> = BTreeMap::new();
-    for (own, guid, paise, on) in entries {
+    let mut by_day: BTreeMap<TallyDate, Vec<(&TallyDate, &'a K, i64)>> = BTreeMap::new();
+    for (own, id, paise, on) in entries {
         if let Some(day) = on {
-            by_day.entry(day).or_default().push((own, guid, paise));
+            by_day.entry(day).or_default().push((own, id, paise));
         }
     }
     by_day
@@ -79,13 +81,13 @@ pub fn crossing_tranches<'a>(
                 .iter()
                 .try_fold(0_i64, |a, e| a.checked_add(e.2))
                 .ok_or_else(overflow)?;
-            let guids: BTreeSet<&'a str> = es.iter().map(|e| e.1).collect();
+            let ids: BTreeSet<&'a K> = es.iter().map(|e| e.1).collect();
             let mut own: Vec<(TallyDate, i64)> = es.iter().map(|e| (e.0.clone(), e.2)).collect();
             own.sort();
             Ok(Tranche {
                 day,
                 paise,
-                guids: guids.into_iter().collect(),
+                ids: ids.into_iter().collect(),
                 credits: own,
             })
         })
@@ -117,7 +119,7 @@ mod tests {
         let t = crossing_tranches(&credits, Some(30), Some(100), "t").unwrap();
         let got: Vec<(&str, i64, Vec<&str>)> = t
             .iter()
-            .map(|x| (x.day.as_str(), x.paise, x.guids.clone()))
+            .map(|x| (x.day.as_str(), x.paise, x.ids.clone()))
             .collect();
         assert_eq!(
             got,

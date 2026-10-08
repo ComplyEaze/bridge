@@ -1541,21 +1541,28 @@ fn a_repeated_books_guid_is_refused_not_panicked() {
     );
 }
 
-/// A two-line journal whose lines are both on one party ledger gives two figures one id; the
-/// reference raises `duplicate figure id ...journal_transfer_amount_0bce8b28_0431f39b` on this
-/// book, and the port refuses with an error, never a panic.
+/// Two party ledgers whose tags are equal (blank-GUID ledgers named `Debtor 6631` and `Debtor
+/// 69926` share the first eight hex digits of their name's hash), each with a cash receipt on one
+/// day, repeat the figure id of that day's row: the reference raises "duplicate figure id
+/// high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-05-10_5745a08c" on this
+/// book (run at reference `ee17d80f`), and the port refuses with the typed error, not a panic.
 #[test]
-fn a_journal_on_one_ledger_is_refused_not_panicked() {
+fn two_party_ledgers_with_one_tag_are_refused_in_the_high_value_register() {
     let mut s = spec("hvr_bare");
-    for v in s["vouchers"].as_array_mut().unwrap() {
-        if v["guid"] == "b02" {
-            v["lines"] =
-                serde_json::json!([["Customer A", 20_000_000], ["Customer A", -20_000_000]]);
-        }
-    }
+    s["ledgers"].as_array_mut().unwrap().extend([
+        serde_json::json!({"name": "Debtor 6631", "chain": ["Sundry Debtors", "Current Assets"], "guid": ""}),
+        serde_json::json!({"name": "Debtor 69926", "chain": ["Sundry Debtors", "Current Assets"], "guid": ""}),
+    ]);
+    s["vouchers"] = serde_json::json!([
+        {"guid": "r1", "date": "2025-05-10", "base_type": "Receipt",
+         "lines": [["Cash", 21000310], ["Debtor 6631", -21000310]]},
+        {"guid": "r2", "date": "2025-05-10", "base_type": "Receipt",
+         "lines": [["Cash", 22000310], ["Debtor 69926", -22000310]]}
+    ]);
     let (book, rules) = (build(&s), rules(&s));
     let cash: BTreeSet<String> = strs(&s["cash"]).into_iter().collect();
-    let (none, no_types) = (BTreeSet::new(), BTreeMap::new());
+    let none = BTreeSet::new();
+    let no_types = BTreeMap::new();
     let inputs = high_value_register::Inputs {
         cash: &cash,
         bank: &none,
@@ -1572,9 +1579,7 @@ fn a_journal_on_one_ledger_is_refused_not_panicked() {
         .expect("refused, not panicked");
     let err = result.expect_err("a repeated figure id is refused");
     assert!(
-        matches!(&err, AuditError::DuplicateFigureId(id)
-            if id.starts_with("high_value_register.")
-                && id.ends_with("journal_transfer_amount_0bce8b28_0431f39b")),
+        matches!(&err, AuditError::DuplicateFigureId(id) if id == "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-05-10_5745a08c"),
         "{err}"
     );
 }

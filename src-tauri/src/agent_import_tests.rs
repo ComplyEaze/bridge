@@ -2030,6 +2030,47 @@ fn text_that_would_read_back_changed_is_refused_before_posting() {
     }
 }
 
+/// `reads_back_as_other_text` escapes the value with `quick_xml::escape::escape`
+/// before it marks references. quick-xml 0.42 also writes a carriage return as
+/// `&#13;` there, which 0.41 left raw (bridge#1198), so these answers were
+/// measured on 0.41 and pinned before the library moves.
+#[test]
+fn text_with_a_carriage_return_or_replacement_character_reads_back_as_measured() {
+    // A carriage return, alone or beside a replacement character, and
+    // reference-looking text the escape turns into `&amp;`, read back as
+    // written.
+    for text in [
+        "\r",
+        "\r\n",
+        "\r\r",
+        "Ledger\r",
+        "Ledger\r\n",
+        "A\rB",
+        "Paid & <vendor>\r\n",
+        "\u{fffd}",
+        "\u{fffd}\r",
+        "\u{fffd}\r\n",
+        "\r\u{fffd}",
+        "\u{fffd}\r#13;",
+        "&#13;",
+        "&#13;\r",
+        "\r&#4;",
+        "\u{fffd}&#13;",
+    ] {
+        assert!(!reads_back_as_other_text(text), "{text:?}");
+    }
+    // A replacement character directly followed by `#`, digits and `;` is
+    // rewritten by the readers, whether or not a carriage return is beside it.
+    for text in [
+        "\u{fffd}#13;",
+        "\u{fffd}#13;\r",
+        "\r\u{fffd}#13;",
+        "\r\u{fffd}#5;",
+    ] {
+        assert!(reads_back_as_other_text(text), "{text:?}");
+    }
+}
+
 #[test]
 fn batch_company_tuple_rejects_a_same_guid_different_book() {
     let company = |books_from: &str| bridge_tally_protocol::TallyCompany {

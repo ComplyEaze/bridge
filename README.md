@@ -213,21 +213,23 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   a fresh install, and Windows.
 - A package for 0.5.1 on a Mac, on 8 October 2026. What was run: a package built on that Mac from the Terms-setting
   change (#1436), with only its version set to 0.5.1; not a published file and not the CI package. The maintainer
-  installed it in Claude Desktop with Tally not running and posting off: as a fresh install; over 0.4.2 (switched
-  on with its Terms accepted, switched on without them, and switched off and then on); over 0.5.0 as an update
+  installed it in Claude Desktop 2.26454.2 on macOS 26.6.2 with Tally not running and posting off: as a fresh install; over 0.4.2 (switched
+  on with its Terms accepted; left off and then switched on); over 0.5.0 as an update
   leaves it and with the Terms ticked; and after 0.4.2 was removed. Claude Desktop started the program as soon as
   the extension was switched on each time, except once, over a 0.4.2 left switched off, where the assistant had no
   ComplyEaze Bridge tools until Claude Desktop was quit and reopened. With the Terms off, the call was refused and
   named the Terms; with them ticked, it reached the Tally check and reported Tally unreachable. A user-level
   `BRIDGE_TERMS_ACCEPTED` set to true did not change that: the program's own value stayed false. The record is on
   #1436. What was not run: a read of a live Tally with it, the published file, and Windows.
-- Builds of 0.5.1 on a Windows computer, on 9 October 2026 (#1413). One Windows 10 computer (22H2), Claude Desktop
+- Builds of 0.5.1 on a Windows computer, on 9 October 2026, India time (#1413). One Windows 10 computer (22H2), Claude Desktop
   2.26454.2 from the Microsoft Store, TallyPrime Release 7.1 Silver, a company made for the test. What was run: the CI
-  build of commit `d744d25a`: a fresh install; an update from 0.4.2 and from 0.5.0 (as an update leaves it, and with
+  build of commit `d744d25a` (an earlier commit than the published file; later commits reworded some tool texts and the notes): a fresh install; an update from 0.4.2 and from 0.5.0 (as an update leaves it, and with
   the Terms ticked); a user-level `BRIDGE_TERMS_ACCEPTED` set to true; the company list; one bank-statement import
-  file of six vouchers, built under 0.5.0 and under this build, imported by hand and read back (the verification found
-  all six, the narrations were read back, and an August trial balance agreed with Tally's own screen); an unchanged
-  re-import of that file (matched to the six vouchers, none added); and a switched-off extension through two updates.
+  file of six vouchers, built under 0.5.0 and under this build and compared, and this build's file imported by hand and read back (the verification found
+  all six, the narrations were read back, and an August trial balance agreed with Tally's own screen; a first build into the empty
+  company was refused as `empty_book_first_import`, so the test company's ledgers and one 1 April voucher were entered in Tally outside
+  ComplyEaze Bridge first, and that voucher is in the trial balance); an unchanged
+  re-import of that file (matched to the six vouchers, none added); and a switched-off extension through two updates (it stayed off, with no tool and no error in the chat; switching it on was enough).
   Then steps 1 and 2 again on the CI build of the merged commit `b91038a9`, and step 1 on the published 0.5.1 file
   (checked against its `.sha256` file and its build attestation), with Tally closed. The published 0.5.0 file over
   0.4.2 was not started on this computer: the chat had no ComplyEaze Bridge tool and showed no error. What was not
@@ -427,7 +429,7 @@ it. Before you do, know what it is and is not:
   against a real TallyPrime, and on which builds, is
   [listed above](#what-has-been-run-against-a-real-tallyprime); the published
   0.5.1 package itself has been installed on one Windows computer with Tally
-  closed, and has not been run by us against a live TallyPrime; a CI build of 0.5.1
+  closed, and has not been run by us against a live TallyPrime; an earlier CI build of 0.5.1
   was run against TallyPrime 7.1 Silver on one Windows computer (see the 9 October 2026
   entry above).
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.

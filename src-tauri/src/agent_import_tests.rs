@@ -4056,14 +4056,11 @@ async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says
         proof.payload["result"]["counts"]["matching_content_observed"],
         2
     );
+    // The proof the journal names as current (bridge#911), not a fixed name.
     let persisted: Value = serde_json::from_slice(
-        &std::fs::read(
-            server
-                .imports_dir()
-                .expect("imports directory")
-                .join(format!("{batch_id}.proof.json")),
-        )
-        .expect("persisted proof"),
+        &server
+            .read_persisted_proof(&batch_id)
+            .expect("persisted proof"),
     )
     .expect("proof JSON");
     assert_eq!(

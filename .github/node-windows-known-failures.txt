@@ -7,9 +7,6 @@
 # 37 failing tests of 618, on windows-latest (image windows-2025-vs2026, version 20260901.588), Node 24.21.0 (.node-version), run under Git Bash.
 scripts/check-conflict-markers.test.mjs > a tracked file that cannot be read is exit 2, not a clean result
 scripts/check-protocol-section-numbers.test.mjs > scripts\check-protocol-section-numbers.test.mjs
-scripts/check-tally-egress-boundary.test.mjs > a dependency's macro, a listed type and a listed path that resolves to nothing are counted
-scripts/check-tally-egress-boundary.test.mjs > a message about a listed path that is not located in clippy.toml is not counted
-scripts/check-tally-egress-boundary.test.mjs > a verbatim Windows path and a repeated unresolved-path message count as one row
 scripts/generate-frontend-licenses.test.mjs > the committed file's `name version` tokens are exactly what the generator (re-run) produces
 scripts/playwright-install-step.test.mjs > the apt-based install runs only under a timeout that itself runs as root, around node run as root
 scripts/release-workflows.test.mjs > the site summary step is informational, permitted to read deployments, and shows what would go live

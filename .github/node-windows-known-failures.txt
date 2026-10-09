@@ -24,20 +24,6 @@ scripts/check-protocol-section-numbers.test.mjs > scripts\check-protocol-section
 scripts/check-tally-egress-boundary.test.mjs > a dependency's macro, a listed type and a listed path that resolves to nothing are counted
 scripts/check-tally-egress-boundary.test.mjs > a message about a listed path that is not located in clippy.toml is not counted
 scripts/check-tally-egress-boundary.test.mjs > a verbatim Windows path and a repeated unresolved-path message count as one row
-scripts/check-tally-request-builder-hazards.test.mjs > a file named like a test but reached by an ordinary mod is still scanned
-scripts/check-tally-request-builder-hazards.test.mjs > a file production also declares is scanned, and what it declares, whatever test code declares it
-scripts/check-tally-request-builder-hazards.test.mjs > a file reached only through a test-only mod declaration is quarantined, and what it declares too
-scripts/check-tally-request-builder-hazards.test.mjs > a formula reference passes with any declared TYPE; an amount needs TYPE Amount
-scripts/check-tally-request-builder-hazards.test.mjs > a placeholder in an unquoted argument or a report name is reported as unresolved
-scripts/check-tally-request-builder-hazards.test.mjs > every untyped amount shape is reported, each by its FIELD
-scripts/check-tally-request-builder-hazards.test.mjs > the same shapes pass once each FIELD declares TYPE Amount
-scripts/check-unbounded-reads.test.mjs > a call split across lines is read as one call
-scripts/check-unbounded-reads.test.mjs > a take in a neighbouring statement, or beside the reader, does not bound it
-scripts/check-unbounded-reads.test.mjs > a take the reader is unwrapped from does not bound it
-scripts/check-unbounded-reads.test.mjs > an allowed file with no unbounded read left is a stale exception
-scripts/check-unbounded-reads.test.mjs > an allowed path with no file is a stale exception
-scripts/check-unbounded-reads.test.mjs > an exception with no reason is refused
-scripts/check-unbounded-reads.test.mjs > the qualified form without a take is reported
 scripts/generate-frontend-licenses.test.mjs > the committed file's `name version` tokens are exactly what the generator (re-run) produces
 scripts/playwright-install-step.test.mjs > the apt-based install runs only under a timeout that itself runs as root, around node run as root
 scripts/release-workflows.test.mjs > the site summary step is informational, permitted to read deployments, and shows what would go live

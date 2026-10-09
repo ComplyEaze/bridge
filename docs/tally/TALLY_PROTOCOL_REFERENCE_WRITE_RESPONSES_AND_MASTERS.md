@@ -241,7 +241,7 @@ working, and why Bridge's verifier is built on the narration tag rather than on 
 licensed **Journal** path; §9.8 says explicitly that it does not establish other request shapes,
 other voucher types, or universal `REMOTEID` semantics. Treat upsert-on-repeat as verified for
 Journal and **UNVERIFIED elsewhere** (for Payment and Receipt see the 2026-10-09 paragraph above: PARTIAL, readback
-only, no counters, not a qualification).
+only, no counters, not a qualification; Receipt counters from one gateway run are in §9.3a).
 
 **Qualifying another voucher type takes a captured response, not a count.** A repeat that was
 rejected, or whose transport failed before Tally processed it, also leaves the voucher count at
@@ -378,6 +378,66 @@ So a resend with a changed payload reverses a person's cancel or delete, and a d
 voucher to show that the `REMOTEID` was ever used: a book check cannot stand in for a record of
 what was sent. A byte-identical resend after a cancel or delete was **not measured**, so it may not
 be assumed safe either. Note also that a cancel reports `ALTERED`, not `CANCELLED`.
+
+### 9.3a After a refusal, a corrected send under the same `REMOTEID` answered `ALTERED=1` while creating
+
+**PARTIAL: one synthetic company, run by hand over the XML gateway, one run of each step, on the lab's
+TallyPrime 7.1 Silver (the earlier rounds on that lab record the licence and release; these answers do
+not show them). The files were rendered by Bridge's code: Receipt, Accounting Voucher View,
+`ACTION="Create"`, no `VOUCHERNUMBER` sent, so Tally numbered every voucher. Seen again on a second
+book [partial].**
+Every answer below is a complete response read by structure; each window and mark read is a complete
+envelope. The ids are the `REMOTEID`s the files carried.
+
+| Step | Sent | Response | Afterwards |
+|---|---|---|---|
+| 1 | Receipt 100.00, id A | `CREATED=1 ALTERED=0`, `LASTVCHID=12` | one voucher, Receipt 1, `ALTERID` 18 |
+| 2 | the **same file** again, id A | `CREATED=0 ALTERED=1`, `LASTVCHID=12` | still one voucher: same GUID, `MASTERID` and number; `ALTERID` 19 |
+| 3 | the same content, id B | `CREATED=1`, `LASTVCHID=13` | a second voucher, Receipt 2, `MASTERID` 13 |
+| 4 | Receipt 200.00 naming a ledger the book lacks, id C | `CREATED=0 ERRORS=0 EXCEPTIONS=1`, `LASTVCHID=0`, one `LINEERROR` (the ledger does not exist) | the counters show nothing created; the voucher mark did not move (20 to 20); the next window read, after step 5, shows no extra voucher and no number gap |
+| 5 | the corrected 200.00 Receipt, **id C again** | `CREATED=0 ALTERED=1 ERRORS=0 EXCEPTIONS=0`, `LASTVCHID=14` | **a new voucher**: Receipt 3, `MASTERID` 14, vouchers 2 to 3, mark 20 to 21 |
+| 6 | control: Receipt 300.00 naming the missing ledger, id D | refused as in step 4 | the voucher mark did not move (21 to 21); the window read after step 7 shows no extra voucher and no number gap |
+| 7 | the corrected 300.00 Receipt, **a new id E** | `CREATED=1`, `LASTVCHID=15` | a new voucher: Receipt 4, `MASTERID` 15, `ALTERID` 22; the mark read at the end of the run is 22 |
+
+The windows echo each voucher's own GUID as its `REMOTEID` attribute, so which id produced which
+voucher comes from which file was sent, not from a readback. Steps 5 and 7 are **not** a one-variable
+pair: they also differ in amount (200.00 against 300.00) and in the id of the refused file (C against
+D). Only the contrast inside each pair (same id again, or a new id) is the observation.
+
+- **VERIFIED (this book, same-id case): after a refusal, `ALTERED=1` can mean "created".** Step 5
+  created a voucher that did not exist, yet Tally counted it as an alteration. The corrected send under
+  a new id (step 7, a different amount) was counted `CREATED=1`. What Tally remembers about the refused
+  id, and whether the amount or the order matters, is an inference, **UNVERIFIED**; one run each.
+- **VERIFIED (this book): a repeat of the same file under the same id upserts for a Receipt** (step 2):
+  one object, its GUID and `MASTERID` kept, `ALTERID` advanced, nothing new created. That is the response
+  and same-object evidence §9.3 asks for, from one book; recording Receipt as qualified is a separate
+  decision this section does not make.
+- **VERIFIED (this book): the same content under a new id is a second voucher** (step 3).
+- **VERIFIED (this book): a refused send moved neither the voucher mark (`ALTVCHID`, 20 to 20 and 21
+  to 21) nor the master mark (`ALTMSTID`, 223 throughout), and left no gap in the numbers** (steps 4 and
+  6), read from the marks and the later windows, not from a window straight after each refusal. The
+  descriptive counters in the answers' `CMPINFO` block did rise across each refusal (`LEDGER` 23 to 24,
+  then 28 to 29), as they rose across other reads in the run; what they count is not established, so
+  nothing here rests on them.
+- **Rule: the import id (`REMOTEID`), not the voucher number.** A retry after a refusal goes out under
+  a **new** `REMOTEID`. Bridge's native post sends a fresh one for every post (the resend note in the
+  voucher-writes part) and so never reuses one. Never read `ALTERED=1` on a first send as "the voucher was already there", and never read it as
+  "nothing was created": the voucher count and the voucher mark, read back, decide. No request here
+  carried a **voucher number**, so this section measured nothing about it and does not argue against
+  resending a rejection that readback has confirmed absent under the same number.
+- **Bridge's exact check stays as it is.** `is_clean_success_for` requires the counter it expects, so
+  step 5 would read as not clean. That is a loud failure in the safe direction. Do not loosen it to
+  accept `ALTERED=1` for a create.
+- **Not measured:** Manual numbering, so a resend under the same number is not tested here; other
+  kinds of refusal than a missing ledger; Gold and Education; an invoice-view Sales voucher; a restart
+  between the two sends; whether the corrected send of step 5 is the same object a later
+  readback by narration marker would find.
+
+Evidence: the answers (`workorder/aw5-receipt-*.xml`, `aw5-window-*.xml`, `aw5-marks-*.xml` and `aw-marks-end-extra.xml`) are held on
+the repository's `lab/1342-capture-answers` branch at `ec1eaae16`, listed by SHA-256 in its `SHA256.txt`;
+the requests (`w5-receipt-*.xml`) are on `lab/1342-capture-requests` at `5cc927e5`. Step 2 sent
+`w5-receipt-first.xml` a second time; only the answers' `SHA256.txt` ties that answer to it, as there is no
+separate request file.
 
 ### 9.4 Master re-create is a silent Alter
 

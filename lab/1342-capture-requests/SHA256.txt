@@ -9,3 +9,5 @@ aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985  r09-number-new
 40f91b3fdb131279b413910c60f86a3b56989d8646def9bbe6b1fbdc97b6a68b  r11-company-state.xml  (938 bytes, collection id: Bridge Invoice Company)
 28a47c26a29fa799856c112b71e19076946d4c0f85a6dcc65f5cdafe0e1e1bd0  r13-ledger-catalogue-v2.xml  (2106 bytes, collection id: List of Ledgers)
 a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7  r15-verification-window.xml  (1822 bytes, collection id: Bridge Agent Import Verification)
+c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386  r05-ledgers-compliance.xml  (1736 bytes, collection id: List of Ledgers)
+71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f  r06-ledgers-paired.xml  (1284 bytes, collection id: List of Ledgers)

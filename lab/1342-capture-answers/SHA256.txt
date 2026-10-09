@@ -284,3 +284,16 @@ dbe56b80c752e672e1937a29575e2d084dbcaade21f9a93714c4c6ddc791df3f  161573  workor
 7436820914d9fd87be0ddea36da244b952faf5432d6529519e7135a3cdab12ce  320208  workorder/screens/w3-voucher-type-bridge-sales.png
 e72656023ec4cf30624b2e0403db47ce8d271e4974f3cfb11b09b5395a685046  320203  workorder/screens/w3-voucher-type-z0.png
 87ba1598cdc4c31cef4ceecc4e2b27e91a403e534e9cb0918f0a0641a0ddee2c  327409  workorder/screens/w3-voucher-type-z1.png
+#
+# W4 and the end read (10 Oct 2026; d-purchases.xml f03b03c25f5e060ab44aef71935a2c97034555996e7ba250ab6d033676adae8e 708, r15 as before)
+f761387a8f811e1d7b112b131bf901c8139429a6a138af19e4d6e6d3b2da29b3  58321  workorder/purchases-w4.xml  <- d-purchases.xml (curl exit 0, HTTP 200, 0.049294 s)
+bb22b17436520a80d41edf7e893a7c5281c1f2cfe8ee521d971a8e3c0d0c8108  133  workorder/purchases-w4.xml.headers.txt
+2f91eda598c813ffe31a25f35d1324d2c6081f7420a919a76875a8584909d544  87888  workorder/aw-window-0801-end-2.xml  <- r15-verification-window.xml (curl exit 0, HTTP 200, 0.052072 s)
+b296db5d327a9e6e2cc22f950f1d8e17a710be792757f36dad5d933c0c77eec6  135  workorder/aw-window-0801-end-2.xml.headers.txt
+# W4 screenshots
+09f54252863c71a95aa4461ef049c0b5299d8c361c66154a13571b2f42f3b4f2  292878  workorder/screens/w4-ledger-purchase-svc-5.png
+e07317f28359f0e822916e7d036a65f94e4d55ce5ccce8f80fd98d17192fe575  269299  workorder/screens/w4-ledger-supplier-rj.png
+661d4f5e4cb6a83be7f044b591b49000f10a8f89ef3d8953bebfb23a7c4ec303  164008  workorder/screens/w4-purchase-1-before-save.png
+2758ec1f1b72cc3a5436e0cb9dbc60b189a92d1dd5d57ebcf617130eb24576b3  198973  workorder/screens/w4-purchase-2-saved.png
+ee07300550eb7ba0a82ca9e20c4dbab34f3d728f790059ce5c071a16bf3f919e  170397  workorder/screens/w4-supplier-outstandings.png
+1ec52177f6afa337f1954936fa0ba7bd4b22c3d28905408d040747c208342140  283342  workorder/screens/w4-voucher-type-purchase.png

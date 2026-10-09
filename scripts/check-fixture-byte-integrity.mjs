@@ -36,8 +36,15 @@ if (!fixtures.length) {
   throw new Error("fixture trees are empty");
 }
 
-const attributes = runGit(["check-attr", "-z", "text", "--", ...fixtures]);
+// Paths go on stdin: every fixture as an argument is past Windows' command-line limit (#1471).
+const attributes = runGit(["check-attr", "-z", "--stdin", "text"], { input: `${fixtures.join("\0")}\0` });
 const attributeRecords = attributes.stdout.toString("utf8").split("\0");
+// One record per path read, so input Git split differently cannot pass as "every fixture checked".
+if (attributeRecords.length - 1 !== fixtures.length * 3) {
+  throw new Error(
+    `git check-attr returned ${(attributeRecords.length - 1) / 3} record(s) for ${fixtures.length} fixture(s)`,
+  );
+}
 const attributeFailures = [];
 for (let index = 0; index < attributeRecords.length - 1; index += 3) {
   const [path, attribute, value] = attributeRecords.slice(index, index + 3);
@@ -137,15 +144,21 @@ function gitIgnoredPaths(paths) {
 // `ls-tree` invocation itself (bad HEAD, corrupt repo, git missing, ...)
 // throws via runGit's default (non-allowFailure) behaviour instead of being
 // mistaken for "every path is new".
+//
+// The lookup names the fixture roots, not each path: `ls-tree` has no --stdin,
+// and every fixture as an argument is past Windows' command-line limit (#1471).
+// Every path is under a root, so the subset is the same.
 function gitTrackedFixturePaths(paths) {
   if (!paths.length) return new Set();
-  const result = runGit(["ls-tree", "-r", "-z", "--name-only", "HEAD", "--", ...paths]);
+  const wanted = new Set(paths);
+  const result = runGit(["ls-tree", "-r", "-z", "--name-only", "HEAD", "--", ...FIXTURE_ROOTS]);
   return new Set(
     result.stdout
       .toString("utf8")
       .split("\0")
       .filter(Boolean)
-      .map((path) => path.replaceAll("\\", "/")),
+      .map((path) => path.replaceAll("\\", "/"))
+      .filter((path) => wanted.has(path)),
   );
 }
 

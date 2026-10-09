@@ -20,3 +20,7 @@ ab01192ccb7b0fcca3a7a8bd14ec7171db43a7acf2fe6a104da63906e3720b9a  w6-window-0915
 # W7 (reads of the ledger rates and the GSTR-1 status, and an optional three-line invoice; steps in W7-README.md)
 2e728e002305cbaa33c73bd36507ca8d6ab62c5dea5497b02204a07636385d88  w7-ledgers-rates.xml
 60f303bd8a4f363b14264da4c70f9594810b57d80c15f194892a1bacd21159d3  w7-readback-status.xml
+# W8 (three reads of the GSTR-1 status on a short field list and the code's single read-back; steps in W8-README.md)
+352dfca912a53499f058643e61db4febc301f6b53b753de54d7f2aac475db9c1  w8-readback-status-single.xml
+08b3a09d04299611273cff583768f10442b306c68b32d8e31dd42a6ae000f4ec  w8-status-narrow-window-sales.xml
+2a35b46b0d9204edc8c69c633295740ee0e9bc3d54a0c21389f51966b7be1940  w8-status-narrow-window.xml

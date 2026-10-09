@@ -1,0 +1,5 @@
+# Tests of the Node suite (scripts/*.test.mjs) known to fail on windows-latest (bridge#1471).
+# One per line, as "<test file> > <test names from the file down to the test>", in the format the
+# job summary prints. A test that fails and is not listed here turns .github/workflows/node-windows.yml
+# red. Remove a line when its test passes. Captured from the first run of that workflow, not written
+# by hand. Empty now: the first run of this pull request is red by design and lists what to capture.

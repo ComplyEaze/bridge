@@ -58,8 +58,8 @@
       "id": "cash_book_integrity.opening_difference",
       "value": -800000,
       "unit": "paise",
-      "definition_sha256_16": "0c72414cb85a377e",
-      "definition_text": "Sum of every ledger's Trial Balance opening balance (Dr positive). Tally shows a non-zero sum as 'Difference in opening balances'.",
+      "definition_sha256_16": "b58911d560bfb659",
+      "definition_text": "Sum of every ledger's Trial Balance opening balance (Dr positive). Without integrated inventory, Tally shows a non-zero sum as 'Difference in opening balances'; with it, the sum also leaves out the opening stock, and the difference in opening balances is the figure after opening stock.",
       "evidence": []
     },
     {

@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 
-use crate::book::{Book, Voucher};
+use crate::book::{Book, OpeningStock, Voucher};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::ledger_ids::stable_ledger_tag;
@@ -257,7 +257,54 @@ cash was actually paid."
 sum as 'Difference in opening balances'.",
         Vec::new(),
     )?;
-    if diff != 0 {
+    // Opening stock is held on the stock items, never on a ledger, so on a book with integrated
+    // inventory the ledger sum also carries minus the opening stock (#1497, #1486; the date a
+    // stock item's opening value stands at is not measured: TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_
+    // AND_OPEN_QUESTIONS.md §12a.13). A known term is added and the remainder is the difference;
+    // an unknown one is named, and nothing is added.
+    let mut facts = vec![("difference".to_string(), f_diff.clone())];
+    let mut limits = vec![
+        "The books cannot show which opening is missing or wrong; the prior year's closing \
+balance sheet settles it."
+            .to_string(),
+    ];
+    let remainder = match book.opening_stock {
+        OpeningStock::Valued(stock) if stock != 0 => {
+            let f_stock = r.fig(
+                "opening_stock",
+                Value::Int(stock),
+                Unit::Paise,
+                "Opening stock: the stock items' opening values (Dr positive). Tally holds it on \
+the stock items, not on any ledger, so the ledgers' Trial Balance openings leave it out.",
+                Vec::new(),
+            )?;
+            let rest = add(diff, stock)?;
+            let f_rest = r.fig(
+                "opening_difference_after_stock",
+                Value::Int(rest),
+                Unit::Paise,
+                "Sum of every ledger's Trial Balance opening balance with the opening stock added \
+(Dr positive): the difference in opening balances once stock, which no ledger holds, is counted.",
+                Vec::new(),
+            )?;
+            facts = vec![
+                ("difference".to_string(), f_rest),
+                ("ledger_sum".to_string(), f_diff),
+                ("opening_stock".to_string(), f_stock),
+            ];
+            rest
+        }
+        OpeningStock::Unknown(why) => {
+            limits.push(format!(
+                "Opening stock is held on the stock items, not on a ledger, and was not taken \
+({}), so this difference may include it.",
+                why.as_str()
+            ));
+            diff
+        }
+        OpeningStock::NotApplicable | OpeningStock::Valued(_) => diff,
+    };
+    if remainder != 0 {
         let openings: Vec<EvidenceRef> = book
             .tb
             .iter()
@@ -268,14 +315,10 @@ sum as 'Difference in opening balances'.",
             id: format!("{TEST_ID}/opening_difference/all"),
             clauses: Vec::new(),
             title: "Opening balances do not balance".to_string(),
-            facts: vec![("difference".to_string(), f_diff)],
+            facts,
             evidence: openings,
             confidence: Confidence::Computed,
-            limits: vec![
-                "The books cannot show which opening is missing or wrong; the prior year's closing \
-balance sheet settles it."
-                    .to_string(),
-            ],
+            limits,
             ask_client: vec![
                 "Provide the balance sheet as at the start of the year (the prior year's closing)."
                     .to_string(),

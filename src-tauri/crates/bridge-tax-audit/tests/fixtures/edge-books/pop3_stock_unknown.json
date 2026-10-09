@@ -37,7 +37,7 @@
   }
  ],
  "vouchers": [],
- "opening_stock": "not taken: the trial balance does not start on the books' first day",
+ "opening_stock": "not taken: the read does not show the trial balance starting on the books' first day",
  "tests": [
   "trial_balance"
  ]

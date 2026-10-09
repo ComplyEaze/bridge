@@ -696,3 +696,101 @@ fn the_missing_control_refusal_names_the_control_batch() {
         "the refusal's value is the control's batch"
     );
 }
+
+/// An invoice reaches Tally through `post_import` only. The build refuses one
+/// that has no native route before it reads anything (posting off) and before
+/// it writes a file (a saved invoice `post_import` would refuse). No Sales build
+/// runs end to end before Sales is qualified, so both are pinned by position.
+#[test]
+fn an_invoice_without_a_native_post_route_is_refused_before_a_read_and_before_a_file() {
+    let source = include_str!("agent_import.rs");
+    let build = &source[source
+        .find("pub(super) async fn build_import_xml(")
+        .expect("the build")..];
+    let unqualified = build
+        .find("refuse_unqualified_types(&payload.vouchers")
+        .expect("the type check comes first");
+    let first_read = build
+        .find("self.qualified_import_profile().await")
+        .expect("the first read of Tally");
+    let off = build
+        .find("&& !self.settings.writes_enabled")
+        .expect("posting off refuses an invoice");
+    // Only an invoice: the guard is on the voucher type, in front of the setting.
+    let invoice_only = build[..off]
+        .rfind(".any(|voucher| voucher.voucher_type.is_invoice())")
+        .expect("and only for an invoice");
+    let refused = build[off..]
+        .find("INVOICE_POST_NOT_ENABLED")
+        .expect("by its own code");
+    assert!(unqualified < invoice_only && invoice_only < off && off + refused < first_read);
+
+    // The saved invoice is judged by the post's own admission and refused with
+    // the code the post would give, before the file is written.
+    let eligible = build
+        .find("post::admit_saved_voucher(")
+        .expect("the saved invoice is judged by the post's own admission");
+    let invoice_batch = build[..eligible]
+        .rfind("if holds_an_invoice(&line)")
+        .expect("for an invoice batch only");
+    let file = build
+        .find("persistence::persist_build(")
+        .expect("the file is written");
+    let refusal = build[eligible..]
+        .find("return Err(code.into())")
+        .expect("with the post's own code");
+    assert!(invoice_batch < eligible && eligible + refusal < file);
+
+    // The guidance of the saved invoice is the posting route only, whichever
+    // branch the other batch kinds would have taken.
+    let guidance = build
+        .find("let (mut warnings, next_step) = build_import_guidance(")
+        .expect("the shared guidance");
+    let invoice = build[guidance..]
+        .find("invoice_guidance(&mut warnings)")
+        .expect("replaced for an invoice batch");
+    let amendment = build[guidance..]
+        .find("let next_step = match &amendment")
+        .expect("before the amendment's own text");
+    assert!(invoice < amendment);
+}
+
+/// The guidance of a saved invoice names the posting route and never a hand
+/// import; it replaces the first warning the other batch kinds share.
+#[test]
+fn the_guidance_of_a_saved_invoice_names_the_posting_route_only() {
+    use super::super::super::{invoice_guidance, INVOICE_POST_ONLY_WARNING};
+    let mut warnings = json!(["generic", "second"]);
+    let next_step = invoice_guidance(&mut warnings);
+    assert_eq!(warnings[0], INVOICE_POST_ONLY_WARNING);
+    assert_eq!(warnings[1], "second");
+    assert!(next_step.contains("post_import"));
+    for text in [next_step, INVOICE_POST_ONLY_WARNING] {
+        assert!(
+            !text.contains("verify_import right after importing"),
+            "{text}"
+        );
+        assert!(!text.contains("Gateway of Tally"), "{text}");
+    }
+    assert!(INVOICE_POST_ONLY_WARNING.contains("Do not import the written file in Tally by hand"));
+}
+
+/// After a declined invoice is released, the texts send it again under the
+/// same number, and never also tell the person to enter it by hand.
+#[test]
+fn the_already_posted_texts_send_a_declined_invoice_again_under_its_number() {
+    for text in [
+        super::super::super::BUILD_TXN_ALREADY_POSTED_NEXT_STEP,
+        super::super::TXN_ALREADY_POSTED_NEXT_STEP,
+    ] {
+        assert!(text.contains("under a new bridge_txn_id and the SAME invoice number"));
+        assert!(text.contains("Never also tell the user to enter that invoice in Tally by hand"));
+        // The hand-entry advice stays, for any other voucher.
+        assert!(text.contains("For any other voucher: if Tally rejected that batch"));
+    }
+    // The post's text no longer forbids the one rebuild it now advises.
+    let post = super::super::TXN_ALREADY_POSTED_NEXT_STEP;
+    assert!(post.contains(
+        "Never rebuild a row to retry it, except an invoice released as described above."
+    ));
+}

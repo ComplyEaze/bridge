@@ -776,6 +776,19 @@ impl Server {
             let _admission_lock = self.lock_import_admission_shared()?;
             self.amendment_lineage_while_admitted(&payload)?;
         }
+        // An invoice reaches Tally only through post_import: a file imported by
+        // hand skips the stop, the duplicate checks, the reads on either side of
+        // the approval and the readback. With posting off, no invoice file is
+        // written. Judged after the refusals that need no read, and before the
+        // first read.
+        if payload
+            .vouchers
+            .iter()
+            .any(|voucher| voucher.voucher_type.is_invoice())
+            && !self.settings.writes_enabled
+        {
+            return Err(INVOICE_POST_NOT_ENABLED.to_string().into());
+        }
         let opening_profile = self.qualified_import_profile().await?;
         validate_import_dates_for_profile(&payload, &opening_profile).map_err(|code| {
             ToolFailure::from(code).with_prior_evidence(opening_profile.evidence.clone())
@@ -1210,6 +1223,18 @@ impl Server {
                 ),
                 on_account_approved: Some(on_account_approved),
             };
+            // An invoice that post_import would refuse writes no file either:
+            // it is refused here with the code post_import would give.
+            if holds_an_invoice(&line) {
+                if let Err(code) = post::admit_saved_voucher(
+                    &line,
+                    &self.settings.endpoint,
+                    post::PostScope::Vouchers,
+                    self.post_voucher_limit(post::PostScope::Vouchers),
+                ) {
+                    return Err(code.into());
+                }
+            }
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));
             if let Some(error) = persistence::persist_build(&imports, &line, xml.as_bytes(), || {
@@ -1257,6 +1282,11 @@ impl Server {
                 }),
                 line.vouchers.iter().any(|voucher| invoice::new_ref_party(voucher).is_some()),
             );
+            let next_step = if holds_an_invoice(&line) {
+                invoice_guidance(&mut warnings)
+            } else {
+                next_step
+            };
             let next_step = match &amendment {
                 Some(_) => {
                     if let Some(list) = warnings.as_array_mut() {
@@ -2590,7 +2620,24 @@ fn holds_an_invoice(line: &ImportLedgerLine) -> bool {
 /// Why no file was written for a row another batch already sent (#876), and what
 /// to do instead. It never offers a hand import of this row: that is the second
 /// post the refusal exists to stop.
-const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and the user enters its unposted rows in Tally), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. If Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again: ask the user to enter the voucher in Tally.";
+const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and the user enters its unposted rows in Tally), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) after a read that did not find its invoice, build the invoice again under a new bridge_txn_id and the SAME invoice number: ComplyEaze Bridge refuses the build while Tally's book holds that number in the financial year, and refuses the post, while an earlier batch with the same figures is still unverified, if Tally holds a voucher with those figures under any number. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again: ask the user to enter the voucher in Tally.";
+
+/// The code of the refusal that stops an invoice build while voucher posting
+/// is off (see `build_import_xml`); its text is in agent.rs.
+const INVOICE_POST_NOT_ENABLED: &str = "invoice_post_not_enabled";
+
+const INVOICE_POST_ONLY_WARNING: &str = "No import XML was sent to Tally. This invoice is posted by post_import, which needs a separate native approval, and in no other way. Do not import the written file in Tally by hand: a hand import skips the stop on an unverified invoice, the duplicate checks, the reads on either side of the approval and the readback of the invoice.";
+
+const INVOICE_POST_NEXT_STEP: &str = "Call post_import with this company_guid and batch_id; the local user must review and approve it before one posting attempt.";
+
+/// The guidance of a saved invoice batch: the posting route only, never a hand
+/// import. Replaces the first warning and the next step the batch kinds share.
+fn invoice_guidance(warnings: &mut Value) -> &'static str {
+    if let Some(first) = warnings.as_array_mut().and_then(|list| list.first_mut()) {
+        *first = json!(INVOICE_POST_ONLY_WARNING);
+    }
+    INVOICE_POST_NEXT_STEP
+}
 
 const AMENDMENT_NOT_POSTABLE: &str = "No import XML was sent to Tally. ComplyEaze Bridge does not post amendments (post_import refuses them), so import the written file by hand, promptly, then use verify_import; do not call post_import for this batch.";
 

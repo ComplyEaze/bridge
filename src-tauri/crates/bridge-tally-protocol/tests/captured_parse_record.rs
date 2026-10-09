@@ -1193,7 +1193,7 @@ const ROWS: &[Row] = &[
             ))
         },
     },
-    // Stock: src/native_stock_summary_tests.rs (SHAPE LAB and the empty book).
+    // Stock: src/native_stock_summary_tests.rs (SHAPE LAB, the empty book and the sale book).
     Row {
         fixture: "tests/fixtures/stock_items_shape_lab_fy_live.utf16le.xml",
         source: Source::Captured,
@@ -1236,6 +1236,23 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/stock_summary_report_empty_book_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_items_negative_sale_lab_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| {
+            typed(parse_native_stock_items(
+                text,
+                "7f3c9a10-5b2d-4e6a-9c41-0d2e8b6a1f37",
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_negative_sale_lab_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_stock_summary_report",
         parse: |_, text| typed(parse_native_stock_summary_report(text)),

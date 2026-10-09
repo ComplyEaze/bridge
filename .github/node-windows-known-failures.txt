@@ -11,15 +11,6 @@ scripts/check-fixture-byte-integrity.test.mjs > a git-ignored fixture directory 
 scripts/check-fixture-byte-integrity.test.mjs > a symlinked `fixtures` alias of a walked directory fails the gate
 scripts/check-fixture-byte-integrity.test.mjs > an image Git treats as binary does not make a fixture directory
 scripts/check-fixture-byte-integrity.test.mjs > an unregistered fixture directory fails the byte-integrity gate
-scripts/check-fixture-provenance.test.mjs > a JSON record documenting no other file is a fixture that needs its own row
-scripts/check-fixture-provenance.test.mjs > a bare-name row documents only the file beside its Markdown file
-scripts/check-fixture-provenance.test.mjs > a path named in prose does not document the fixture; a path row does
-scripts/check-fixture-provenance.test.mjs > a path row does not document another fixture with the same basename
-scripts/check-fixture-provenance.test.mjs > a path row naming a provenance record fails with its own message
-scripts/check-fixture-provenance.test.mjs > a path row resolving outside its fixture root fails with its own message
-scripts/check-fixture-provenance.test.mjs > a row naming a directory path where no fixture is fails rather than checking nothing
-scripts/check-fixture-provenance.test.mjs > a row naming its fixture with a directory is hash-checked against that file
-scripts/check-fixture-provenance.test.mjs > the exempt root keeps basename matching for its rows
 scripts/check-protocol-section-numbers.test.mjs > scripts\check-protocol-section-numbers.test.mjs
 scripts/check-tally-egress-boundary.test.mjs > a dependency's macro, a listed type and a listed path that resolves to nothing are counted
 scripts/check-tally-egress-boundary.test.mjs > a message about a listed path that is not located in clippy.toml is not counted

@@ -2554,7 +2554,7 @@ pub(super) fn admit_saved_voucher_integrity(
     }
     // A saved voucher of a type that is not qualified is never posted, however
     // it came to be saved: the same list the build refuses on.
-    super::refuse_unqualified_types(&line.vouchers, super::LIVE_QUALIFIED_VOUCHER_TYPES)?;
+    super::refuse_unqualified_types(&line.vouchers, super::qualified_voucher_types())?;
     totals(&line.vouchers)?;
     let xml = render_import_xml(&company.name, &line.vouchers, line.identity_batch_id());
     if sha256_hex(xml.as_bytes()) != line.sha256 {

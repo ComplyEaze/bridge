@@ -566,8 +566,8 @@ pub(super) fn count_vouchers(xml: &str) -> Result<usize, &'static str> {
 /// list. The shape was read once, on a synthetic lab company, from the same
 /// collection typed by hand and sent as UTF-8 (two units: the Default Tax Unit
 /// and one GST registration whose dated rows carry the state, the
-/// registration type and whether it is inactive); an answer to this request's
-/// own bytes is not yet captured.
+/// registration type and whether it is inactive). This request, sent in UTF-16,
+/// was answered on 9 Oct 2026 with the same two rows (the `pilot-lab` fixtures).
 pub(in crate::agent) fn render_company_registration_request(company: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Tax Units</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Tax Units\" ISMODIFY=\"No\"><TYPE>TaxUnit</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",

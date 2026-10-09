@@ -1,0 +1,10 @@
+src-tauri/Cargo.lock
+src-tauri/crates/bridge-bank-statement/src/pdf.rs
+src-tauri/crates/bridge-tally-core/src/lib.rs
+src-tauri/crates/bridge-tally-primitives/Cargo.toml
+src-tauri/crates/bridge-tally-primitives/src/lib.rs
+src-tauri/src/agent.rs
+src-tauri/src/agent_bank_statement.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_import.rs
+reviewer: lamemustafa

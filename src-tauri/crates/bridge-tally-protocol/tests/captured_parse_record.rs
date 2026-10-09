@@ -2299,6 +2299,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_REPLAY,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml",
         PILOT_LAB_REPLAY,
     ),

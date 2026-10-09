@@ -702,6 +702,315 @@ pub(super) fn parse_company_registration(
     })
 }
 
+// ---- The ledger rates read (#1342, W7, 10 Oct 2026) ----
+
+/// The ledger listing the tax check reads: the listing the build already reads
+/// for each ledger's group, duty head and GSTIN, with the four fields that
+/// hold a ledger's GST rate and rounding (`GSTDETAILS.LIST`,
+/// `RATEOFTAXCALCULATION`, `ROUNDINGMETHOD`, `ROUNDINGLIMIT`) added and
+/// nothing else changed. Sent in UTF-16 on a licensed TallyPrime 7.1 Silver
+/// synthetic company on 10 Oct 2026, it was answered with the fields (the
+/// `pilot-lab` fixtures). `window` is the financial year's start and the
+/// invoice date, as the request that was measured carried them (a ledger's
+/// rate rows came back whole; whether the window changes them was not tried).
+/// `None` when a date is not eight digits.
+pub(in crate::agent) fn render_ledger_rates_request(
+    company: &str,
+    window: (&str, &str),
+) -> Option<String> {
+    let digits = |date: &str| date.len() == 8 && date.bytes().all(|byte| byte.is_ascii_digit());
+    if !digits(window.0) || !digits(window.1) {
+        return None;
+    }
+    Some(format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        company = xml_escape(company),
+        from = window.0,
+        to = window.1,
+    ))
+}
+
+/// One element of an answer with its attributes, text and children, kept
+/// whole so a field that is present but empty stays different from one that is
+/// absent (`rows` drops empty leaves; the rate rows depend on the difference).
+#[derive(Debug, Default)]
+struct Node {
+    name: String,
+    attributes: BTreeMap<String, String>,
+    text: String,
+    children: Vec<Node>,
+}
+
+impl Node {
+    /// The text of the one child named `name`: `Ok(None)` when absent, an
+    /// error when repeated. Whitespace and the control characters Tally
+    /// writes before some values (`&#4; Any`) are not part of the value.
+    fn text_of(&self, name: &str) -> Result<Option<String>, &'static str> {
+        let mut found = self.children.iter().filter(|child| child.name == name);
+        let first = found.next().map(|child| clean(&child.text));
+        if found.next().is_some() {
+            return Err("invoice_read_field_repeated");
+        }
+        Ok(first)
+    }
+
+    fn all<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a Node> + 'a {
+        self.children.iter().filter(move |child| child.name == name)
+    }
+}
+
+/// A value as Tally means it: the numeric reference to a control character it
+/// writes before some values (`&#4; Any`), which `mark_forbidden_numeric_references`
+/// turns into the replacement character and `#4;`, and the whitespace around
+/// it, are not part of the value.
+fn clean(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('\u{fffd}') {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + '\u{fffd}'.len_utf8()..];
+        let digits = after
+            .strip_prefix('#')
+            .map(|tail| tail.bytes().take_while(u8::is_ascii_digit).count());
+        match digits {
+            Some(count) if count > 0 && after[1 + count..].starts_with(';') => {
+                rest = &after[1 + count + 1..];
+            }
+            _ => {
+                out.push('\u{fffd}');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out.trim_matches(|c: char| c.is_whitespace() || c.is_control())
+        .to_string()
+}
+
+/// The answer as a tree, under the same envelope rules as `rows`: a success
+/// status, a collection that came back, numeric references to control
+/// characters marked first.
+fn parse_tree(xml: &str) -> Result<Node, &'static str> {
+    let xml = bridge_tally_protocol::mark_forbidden_numeric_references(xml);
+    let mut reader = quick_xml::Reader::from_str(&xml);
+    let mut stack: Vec<Node> = vec![Node::default()];
+    loop {
+        match reader.read_event().map_err(|_| "invoice_read_malformed")? {
+            Event::Start(start) => {
+                let mut node = Node {
+                    name: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
+                    ..Node::default()
+                };
+                for attribute in start.attributes().with_checks(true) {
+                    let attribute = attribute.map_err(|_| "invoice_read_malformed")?;
+                    let value = attribute
+                        .decoded_and_normalized_value(
+                            quick_xml::XmlVersion::Implicit1_0,
+                            reader.decoder(),
+                        )
+                        .map_err(|_| "invoice_read_malformed")?;
+                    node.attributes.insert(
+                        String::from_utf8_lossy(attribute.key.as_ref()).into_owned(),
+                        value.into_owned(),
+                    );
+                }
+                stack.push(node);
+            }
+            Event::Empty(empty) => {
+                let node = Node {
+                    name: String::from_utf8_lossy(empty.name().as_ref()).into_owned(),
+                    ..Node::default()
+                };
+                stack
+                    .last_mut()
+                    .ok_or("invoice_read_malformed")?
+                    .children
+                    .push(node);
+            }
+            Event::Text(chunk) => {
+                let text = chunk.decode().map_err(|_| "invoice_read_malformed")?;
+                stack
+                    .last_mut()
+                    .ok_or("invoice_read_malformed")?
+                    .text
+                    .push_str(&text);
+            }
+            Event::GeneralRef(reference) => {
+                let name = reference.decode().map_err(|_| "invoice_read_malformed")?;
+                let text = entity(&name).ok_or("invoice_read_malformed")?;
+                stack
+                    .last_mut()
+                    .ok_or("invoice_read_malformed")?
+                    .text
+                    .push_str(&text);
+            }
+            Event::End(_) => {
+                let node = stack.pop().ok_or("invoice_read_malformed")?;
+                stack
+                    .last_mut()
+                    .ok_or("invoice_read_malformed")?
+                    .children
+                    .push(node);
+            }
+            Event::Eof => break,
+            _ => {}
+        }
+    }
+    let [root] = <[Node; 1]>::try_from(stack).map_err(|_| "invoice_read_malformed")?;
+    let [envelope] = <[Node; 1]>::try_from(root.children).map_err(|_| "invoice_read_malformed")?;
+    if envelope.name != "ENVELOPE" {
+        return Err("invoice_read_malformed");
+    }
+    let status = envelope
+        .all("HEADER")
+        .next()
+        .and_then(|header| header.text_of("STATUS").ok().flatten());
+    if status.as_deref() != Some("1") {
+        return Err("invoice_read_status_not_success");
+    }
+    Ok(envelope)
+}
+
+/// A ledger's rate for one head in one state-wise row: the head's name, how
+/// Tally values it, and the rate when the row carries one.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct HeadRate {
+    pub(super) head: String,
+    pub(super) valuation: Option<String>,
+    pub(super) rate: Option<String>,
+}
+
+/// One state-wise block of a dated GST row.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct StateRates {
+    pub(super) state: Option<String>,
+    pub(super) heads: Vec<HeadRate>,
+}
+
+/// One dated `GSTDETAILS.LIST` row of a ledger.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct GstRow {
+    pub(super) applicable_from: Option<String>,
+    pub(super) taxability: Option<String>,
+    pub(super) source: Option<String>,
+    pub(super) states: Vec<StateRates>,
+    /// The row carries an element or a value the lab's rows did not (a child
+    /// of the row, of a state-wise block or of a head's rate that is not in
+    /// the measured set, or a slab-rate list that is not empty).
+    pub(super) unmeasured: bool,
+}
+
+/// What the rate listing says of one ledger. Each field is the text Tally
+/// returned, or `None` when the element was absent: an absent field, an empty
+/// one and a zero are three different answers.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(in crate::agent::agent_import) struct LedgerRateRow {
+    pub(super) gst_rows: Vec<GstRow>,
+    pub(super) rate_of_tax_calculation: Option<String>,
+    pub(super) rounding_method: Option<String>,
+    pub(super) rounding_limit: Option<String>,
+}
+
+/// The elements the lab's GST rows carried (10 Oct 2026, fourteen ledgers),
+/// at each level of a row; anything else marks the row unmeasured.
+const GST_ROW_CHILDREN: &[&str] = &[
+    "APPLICABLEFROM",
+    "GSTINELIGIBLEITC",
+    "SRCOFGSTDETAILS",
+    "STATEWISEDETAILS.LIST",
+    "TAXABILITY",
+];
+const STATE_BLOCK_CHILDREN: &[&str] = &["GSTSLABRATES.LIST", "RATEDETAILS.LIST", "STATENAME"];
+const HEAD_RATE_CHILDREN: &[&str] = &["GSTRATE", "GSTRATEDUTYHEAD", "GSTRATEVALUATIONTYPE"];
+
+/// The rate listing by ledger name, for the ledgers an invoice names. Every
+/// row of the answer must carry the verified company's GUID (the
+/// `BRIDGECOMPANYGUID` compute); the rows of the named ledgers are read in
+/// full, and a name two of them claim refuses the answer. A row of any other
+/// ledger is not read, so one unrelated ledger cannot fail an invoice.
+pub(super) fn parse_ledger_rates(
+    xml: &str,
+    company_guid: &str,
+    wanted: &[&str],
+) -> Result<BTreeMap<String, LedgerRateRow>, &'static str> {
+    let envelope = parse_tree(xml)?;
+    let body = envelope
+        .all("BODY")
+        .next()
+        .and_then(|body| body.all("DATA").next())
+        .ok_or("invoice_read_collection_absent")?;
+    let collection = body
+        .all("COLLECTION")
+        .next()
+        .ok_or("invoice_read_collection_absent")?;
+    let mut out = BTreeMap::new();
+    for ledger in collection.all("LEDGER") {
+        let bound = ledger.text_of("BRIDGECOMPANYGUID");
+        if !bound.is_ok_and(|guid| guid.is_some_and(|guid| guid.eq_ignore_ascii_case(company_guid)))
+        {
+            return Err("invoice_ledger_rates_company_mismatch");
+        }
+        let Some(name) = ledger.attributes.get("NAME").cloned() else {
+            continue;
+        };
+        if !wanted.contains(&name.as_str()) {
+            continue;
+        }
+        let mut gst_rows = Vec::new();
+        for details in ledger.all("GSTDETAILS.LIST") {
+            let mut unmeasured = details
+                .children
+                .iter()
+                .any(|child| !GST_ROW_CHILDREN.contains(&child.name.as_str()));
+            let mut states = Vec::new();
+            for state in details.all("STATEWISEDETAILS.LIST") {
+                unmeasured |= state
+                    .children
+                    .iter()
+                    .any(|child| !STATE_BLOCK_CHILDREN.contains(&child.name.as_str()));
+                unmeasured |= state
+                    .all("GSTSLABRATES.LIST")
+                    .any(|slabs| !slabs.children.is_empty() || !clean(&slabs.text).is_empty());
+                let mut heads = Vec::new();
+                for detail in state.all("RATEDETAILS.LIST") {
+                    unmeasured |= detail
+                        .children
+                        .iter()
+                        .any(|child| !HEAD_RATE_CHILDREN.contains(&child.name.as_str()));
+                    heads.push(HeadRate {
+                        head: detail
+                            .text_of("GSTRATEDUTYHEAD")?
+                            .ok_or("invoice_ledger_rates_head_unnamed")?,
+                        valuation: detail.text_of("GSTRATEVALUATIONTYPE")?,
+                        rate: detail.text_of("GSTRATE")?,
+                    });
+                }
+                states.push(StateRates {
+                    state: state.text_of("STATENAME")?,
+                    heads,
+                });
+            }
+            gst_rows.push(GstRow {
+                applicable_from: details.text_of("APPLICABLEFROM")?,
+                taxability: details.text_of("TAXABILITY")?,
+                source: details.text_of("SRCOFGSTDETAILS")?,
+                states,
+                unmeasured,
+            });
+        }
+        let row = LedgerRateRow {
+            gst_rows,
+            rate_of_tax_calculation: ledger.text_of("RATEOFTAXCALCULATION")?,
+            rounding_method: ledger.text_of("ROUNDINGMETHOD")?,
+            rounding_limit: ledger.text_of("ROUNDINGLIMIT")?,
+        };
+        if out.insert(name, row).is_some() {
+            return Err("invoice_ledger_rates_name_repeated");
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 #[path = "agent_import_invoice_wire_tests.rs"]
 mod tests;

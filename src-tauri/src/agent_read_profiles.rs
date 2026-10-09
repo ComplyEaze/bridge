@@ -390,6 +390,16 @@ pub(super) fn invoice_readback_read(
         .map(ReadRequest)
 }
 
+/// The ledger listing with each ledger's GST rate and rounding, for the
+/// tax check of an invoice: its window is the invoice's financial year start
+/// and the invoice date.
+pub(super) fn invoice_ledger_rates_read(
+    company: &str,
+    window: (&str, &str),
+) -> Option<ReadRequest> {
+    agent_import::invoice::render_ledger_rates_request(company, window).map(ReadRequest)
+}
+
 /// The company's GST registrations, for an invoice build (rows bound to the
 /// company by GUID).
 pub(super) fn invoice_company_registration_read(company: &str) -> ReadRequest {

@@ -715,3 +715,266 @@ fn the_captured_read_backs_carry_every_field_of_a_posted_invoice() {
     );
     assert_eq!(keyed.legs.len(), 4);
 }
+
+/// The synthetic company's GUID in the lab's answers.
+const LAB_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+
+const RATES_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml");
+
+/// The request the lab answered on 10 Oct 2026 is, character for character,
+/// the one the code renders (the file starts with a byte order mark).
+#[test]
+fn the_ledger_rates_request_is_the_one_the_lab_answered() {
+    let sent = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.request.utf16le.xml"));
+    let rendered =
+        render_ledger_rates_request("BRIDGE PILOT LAB", ("20260401", "20260801")).unwrap();
+    assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
+    // A window that is not eight digits renders nothing.
+    for bad in ["2026-04-01", "2026040", "2026040a", ""] {
+        assert!(render_ledger_rates_request("X", (bad, "20260801")).is_none());
+        assert!(render_ledger_rates_request("X", ("20260401", bad)).is_none());
+    }
+    // A company name is escaped into the request.
+    assert!(
+        render_ledger_rates_request("A & B", ("20260401", "20260801"))
+            .unwrap()
+            .contains("<SVCURRENTCOMPANY>A &amp; B</SVCURRENTCOMPANY>")
+    );
+}
+
+/// The lab's answer, read at the edge: each sales ledger's one dated row with
+/// its all-states block, the tax ledgers' own rate and rounding, and what an
+/// absent field is (an element that was not returned, never an empty string).
+#[test]
+fn the_captured_rate_listing_is_read_with_every_field_in_its_place() {
+    let named = [
+        "BRIDGE Svc 998313 5%",
+        "BRIDGE CGST 2.5%",
+        "BRIDGE Output CGST XML",
+    ];
+    let rates = parse_ledger_rates(&rehearsal(RATES_ANSWER), LAB_GUID, &named).unwrap();
+    assert_eq!(rates.len(), 3, "only the ledgers asked for are read");
+    let svc = &rates["BRIDGE Svc 998313 5%"];
+    assert_eq!(svc.rate_of_tax_calculation.as_deref(), Some("0"));
+    assert_eq!(svc.rounding_method, None, "the element is absent");
+    assert_eq!(svc.rounding_limit.as_deref(), Some("0"));
+    let [row] = svc.gst_rows.as_slice() else {
+        panic!("one dated row: {svc:?}")
+    };
+    assert_eq!(row.applicable_from.as_deref(), Some("20260401"));
+    assert_eq!(row.taxability.as_deref(), Some("Taxable"));
+    assert_eq!(row.source.as_deref(), Some("Specify Details Here"));
+    let [block] = row.states.as_slice() else {
+        panic!("one block: {row:?}")
+    };
+    assert_eq!(
+        block.state.as_deref(),
+        Some("Any"),
+        "the control character is not part of it"
+    );
+    let heads = block
+        .heads
+        .iter()
+        .map(|h| (h.head.as_str(), h.valuation.as_deref(), h.rate.as_deref()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        heads,
+        vec![
+            ("CGST", Some("Based on Value"), Some("2.50")),
+            ("SGST/UTGST", Some("Based on Value"), Some("2.50")),
+            ("IGST", Some("Based on Value"), Some("5")),
+            ("Cess", Some("Not Applicable"), None),
+            ("State Cess", Some("Based on Value"), None),
+        ]
+    );
+    // An on-screen tax ledger: its own rate, and Tally's own spelling of no rounding.
+    let tax = &rates["BRIDGE CGST 2.5%"];
+    assert_eq!(tax.rate_of_tax_calculation.as_deref(), Some("2.50"));
+    assert_eq!(tax.rounding_method.as_deref(), Some("Not Applicable"));
+    assert_eq!(tax.rounding_limit.as_deref(), Some("0"));
+    assert_eq!(
+        tax.gst_rows[0].source.as_deref(),
+        Some("As per Company/Group")
+    );
+    // The ledger made by import has no rounding field and one GST row with no field.
+    let imported = &rates["BRIDGE Output CGST XML"];
+    assert_eq!(imported.rounding_method, None);
+    let [empty] = imported.gst_rows.as_slice() else {
+        panic!("one empty row: {imported:?}")
+    };
+    assert_eq!(
+        (&empty.applicable_from, &empty.taxability, &empty.source),
+        (&None, &None, &None),
+        "a row with no field is not a row with an empty string"
+    );
+}
+
+#[test]
+fn a_rate_listing_that_is_not_this_companys_or_not_whole_is_refused() {
+    let xml = rehearsal(RATES_ANSWER);
+    let named = ["BRIDGE Svc 998313 5%"];
+    // Another company's answer.
+    assert_eq!(
+        parse_ledger_rates(&xml, "00000000-0000-4000-8000-000000000001", &named),
+        Err("invoice_ledger_rates_company_mismatch")
+    );
+    // One row of another company, the last one: every row is bound, not the first.
+    let last = xml.rfind(LAB_GUID).unwrap();
+    let mut foreign = xml.clone();
+    foreign.replace_range(
+        last..last + LAB_GUID.len(),
+        "00000000-0000-4000-8000-000000000001",
+    );
+    assert_eq!(
+        parse_ledger_rates(&foreign, LAB_GUID, &named),
+        Err("invoice_ledger_rates_company_mismatch")
+    );
+    // A ledger asked for, named twice.
+    let first = xml.find("<LEDGER NAME=\"Cash\"").unwrap();
+    let end = xml[first..].find("</LEDGER>").unwrap() + first + "</LEDGER>".len();
+    let twice = format!("{}{}{}", &xml[..end], &xml[first..end], &xml[end..]);
+    assert_eq!(
+        parse_ledger_rates(&twice, LAB_GUID, &["Cash"]),
+        Err("invoice_ledger_rates_name_repeated")
+    );
+    // The same duplicate in a ledger the invoice does not name is not read.
+    assert!(parse_ledger_rates(&twice, LAB_GUID, &named).is_ok());
+    // Tally's error answer, a truncated one, and one with no collection.
+    assert_eq!(
+        parse_ledger_rates(
+            &xml.replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>"),
+            LAB_GUID,
+            &named
+        ),
+        Err("invoice_read_status_not_success")
+    );
+    assert_eq!(
+        parse_ledger_rates(&xml[..xml.len() / 2], LAB_GUID, &named),
+        Err("invoice_read_malformed")
+    );
+    assert_eq!(
+        parse_ledger_rates(
+            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY></BODY></ENVELOPE>",
+            LAB_GUID,
+            &named
+        ),
+        Err("invoice_read_collection_absent")
+    );
+}
+
+/// One ledger row around `inner`, bound to the lab company.
+fn ledger_answer(name: &str, inner: &str) -> String {
+    format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+         <LEDGER NAME=\"{name}\"><BRIDGECOMPANYGUID>{LAB_GUID}</BRIDGECOMPANYGUID>{inner}</LEDGER>\
+         </COLLECTION></DATA></BODY></ENVELOPE>"
+    )
+}
+
+/// What a row of the listing says that the lab's rows did not, and what a
+/// ledger the invoice does not name can say without failing it.
+#[test]
+fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_read() {
+    let row = |extra_row: &str, extra_state: &str, extra_head: &str, slabs: &str| {
+        format!(
+            "<GSTDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM><TAXABILITY>Taxable</TAXABILITY>\
+             <SRCOFGSTDETAILS>Specify Details Here</SRCOFGSTDETAILS>{extra_row}<STATEWISEDETAILS.LIST>\
+             <STATENAME>Any</STATENAME>{extra_state}<RATEDETAILS.LIST><GSTRATEDUTYHEAD>CGST</GSTRATEDUTYHEAD>\
+             <GSTRATEVALUATIONTYPE>Based on Value</GSTRATEVALUATIONTYPE><GSTRATE>2.50</GSTRATE>{extra_head}\
+             </RATEDETAILS.LIST>{slabs}</STATEWISEDETAILS.LIST></GSTDETAILS.LIST>"
+        )
+    };
+    let unmeasured = |inner: String| {
+        let rates = parse_ledger_rates(&ledger_answer("L", &inner), LAB_GUID, &["L"]).unwrap();
+        rates["L"].gst_rows[0].unmeasured
+    };
+    assert!(!unmeasured(row(
+        "",
+        "",
+        "",
+        "<GSTSLABRATES.LIST></GSTSLABRATES.LIST>"
+    )));
+    assert!(unmeasured(row(
+        "<ISREVERSECHARGEAPPLICABLE>Yes</ISREVERSECHARGEAPPLICABLE>",
+        "",
+        "",
+        ""
+    )));
+    assert!(unmeasured(row("", "<ISMRPBASED>Yes</ISMRPBASED>", "", "")));
+    assert!(unmeasured(row(
+        "",
+        "",
+        "<GSTRATEPERUNIT>3</GSTRATEPERUNIT>",
+        ""
+    )));
+    assert!(unmeasured(row(
+        "",
+        "",
+        "",
+        "<GSTSLABRATES.LIST><SLABFROM>1000</SLABFROM></GSTSLABRATES.LIST>"
+    )));
+    assert!(unmeasured(row(
+        "",
+        "",
+        "",
+        "<GSTSLABRATES.LIST>1000</GSTSLABRATES.LIST>"
+    )));
+    // An element that is present and empty is not an absent one.
+    let present = parse_ledger_rates(
+        &ledger_answer(
+            "L",
+            "<ROUNDINGMETHOD></ROUNDINGMETHOD><ROUNDINGLIMIT>0</ROUNDINGLIMIT>",
+        ),
+        LAB_GUID,
+        &["L"],
+    )
+    .unwrap();
+    assert_eq!(present["L"].rounding_method.as_deref(), Some(""));
+    assert_eq!(present["L"].rate_of_tax_calculation, None);
+    // A ledger name with an entity decodes like the other reads' names.
+    let named = parse_ledger_rates(&ledger_answer("A &amp; B", ""), LAB_GUID, &["A & B"]).unwrap();
+    assert!(named.contains_key("A & B"));
+    // A row of a ledger nobody named may be malformed in every way the parse
+    // refuses for a named one: it is not read.
+    let broken = format!(
+        "<LEDGER NAME=\"Other\"><BRIDGECOMPANYGUID>{LAB_GUID}</BRIDGECOMPANYGUID>\
+         <GSTDETAILS.LIST><APPLICABLEFROM>1</APPLICABLEFROM><APPLICABLEFROM>2</APPLICABLEFROM>\
+         <STATEWISEDETAILS.LIST><RATEDETAILS.LIST></RATEDETAILS.LIST></STATEWISEDETAILS.LIST>\
+         </GSTDETAILS.LIST></LEDGER><LEDGER/>"
+    );
+    let answer = ledger_answer("L", "").replace("</COLLECTION>", &format!("{broken}</COLLECTION>"));
+    let wanted = parse_ledger_rates(&answer, LAB_GUID, &["L"]);
+    assert_eq!(
+        wanted,
+        Err("invoice_ledger_rates_company_mismatch"),
+        "a bare <LEDGER/> carries no company"
+    );
+    let answer = ledger_answer("L", "").replace(
+        "</COLLECTION>",
+        &format!("{}</COLLECTION>", broken.replace("<LEDGER/>", "")),
+    );
+    assert!(parse_ledger_rates(&answer, LAB_GUID, &["L"]).is_ok());
+    // The same row, asked for, is refused for what is wrong with it (a head
+    // with no name; an element twice is refused under its own code).
+    assert_eq!(
+        parse_ledger_rates(&answer, LAB_GUID, &["Other"]),
+        Err("invoice_ledger_rates_head_unnamed")
+    );
+    let twice = ledger_answer(
+        "L",
+        "<GSTDETAILS.LIST><APPLICABLEFROM>1</APPLICABLEFROM><APPLICABLEFROM>2</APPLICABLEFROM></GSTDETAILS.LIST>",
+    );
+    assert_eq!(
+        parse_ledger_rates(&twice, LAB_GUID, &["L"]),
+        Err("invoice_read_field_repeated")
+    );
+    let no_name = ledger_answer(
+        "L",
+        "<GSTDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM><STATEWISEDETAILS.LIST>\
+         <RATEDETAILS.LIST><GSTRATE>5</GSTRATE></RATEDETAILS.LIST></STATEWISEDETAILS.LIST></GSTDETAILS.LIST>",
+    );
+    assert_eq!(
+        parse_ledger_rates(&no_name, LAB_GUID, &["L"]),
+        Err("invoice_ledger_rates_head_unnamed")
+    );
+}

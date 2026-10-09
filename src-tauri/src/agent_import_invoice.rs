@@ -23,7 +23,7 @@ mod wire;
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
     render_company_registration_request, render_invoice_number_request,
-    render_invoice_readback_request, render_voucher_types_request,
+    render_invoice_readback_request, render_ledger_rates_request, render_voucher_types_request,
 };
 
 /// What an invoice voucher carries besides its entries.
@@ -115,6 +115,9 @@ pub(super) struct LedgerFacts {
     pub(super) registration_type: Option<String>,
     /// `None` when the bill-wise read did not return this ledger.
     pub(super) bill_wise: Option<bool>,
+    /// What the rate listing says of this ledger; `None` when it did not
+    /// return the ledger.
+    pub(super) rates: Option<wire::LedgerRateRow>,
 }
 
 impl LedgerFacts {
@@ -367,39 +370,167 @@ fn ledger_count_refusal(ledgers: Option<u64>, mark: u64) -> Option<InvoiceRefusa
 /// stands under the entries.
 const MAX_INVOICE_ENTRIES: usize = 6;
 
-/// The GST slab rates an invoice's tax may be, in percent.
-const SLAB_RATES: &[i128] = &[5, 12, 18, 28, 40];
+/// The IGST rates GST has, in thousandths of a percent: the slab list the check
+/// admitted before it read ledgers (5, 12, 18, 28 and 40 percent). A ledger at
+/// any other rate (a mistyped one, or 3 or 0.25 percent) is refused, though the
+/// invoice and the ledger agree: the lab measured 5 percent and one exact 18
+/// percent bill only, so the list bounds which rates are worked out and says
+/// nothing of how Tally treats the rest.
+const SLAB_IGST_MILLI: &[i128] = &[5_000, 12_000, 18_000, 28_000, 40_000];
 
-/// What a tax leg may differ from taxable x rate / 2 by, in paise: a few
-/// paise of per-line rounding on a multi-line bill, never a rupee.
-const TAX_LEG_TOLERANCE_PAISE: i128 = 5;
+/// The most sales lines an invoice may carry. Tax was measured on one and two
+/// lines (the lab, 10 Oct 2026); a third waits for a measured three-line bill.
+const MAX_SALES_LINES: usize = 2;
 
-/// The two tax legs of an intra-state invoice, in paise. They are equal, or
-/// differ by one paisa: a bill whose total tax is odd cannot split evenly, and
-/// the return reports the odd paisa on one head. Built only by `new`, so a
-/// pair that differs by more is not a value of this type.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct TaxLegs {
-    cgst: i128,
-    state: i128,
+/// A rate in thousandths of a percent: at most three decimals, as Tally writes
+/// a rate (`"2.50"`, `"5"`, after the text is cleaned). `None` for anything
+/// else, a zero or a negative.
+fn rate_milli(text: &str) -> Option<i128> {
+    let (whole, fraction) = text.split_once('.').unwrap_or((text, ""));
+    if whole.is_empty()
+        || fraction.len() > 3
+        || !whole.bytes().all(|byte| byte.is_ascii_digit())
+        || !fraction.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let fraction = format!("{fraction:0<3}");
+    let milli = whole
+        .parse::<i128>()
+        .ok()?
+        .checked_mul(1000)?
+        .checked_add(fraction.parse::<i128>().ok()?)?;
+    (milli > 0).then_some(milli)
 }
 
-impl TaxLegs {
-    fn new(cgst: i128, state: i128) -> Option<Self> {
-        (cgst.abs_diff(state) <= 1).then_some(Self { cgst, state })
+/// The state tax rate of a sales ledger in force on `as_of` (`YYYYMMDD`), in
+/// thousandths of a percent, from the rows the rate listing returned. Only
+/// what the lab measured is read: one dated row, in force, ledger-specified
+/// and taxable, made of nothing but the elements the lab's rows carried, one
+/// all-states block that gives CGST, SGST/UTGST and IGST rates valued on value
+/// (the state heads equal, IGST twice one of them) and no cess. Each other
+/// shape is its own refusal, never a guess.
+fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'static str> {
+    let [gst] = row.gst_rows.as_slice() else {
+        return Err(match row.gst_rows.len() {
+            0 => "invoice_sales_ledger_rate_unknown",
+            _ => "invoice_sales_ledger_rate_history_unmeasured",
+        });
+    };
+    if !gst.applicable_from.as_deref().is_some_and(|from| {
+        from.len() == 8 && from.bytes().all(|byte| byte.is_ascii_digit()) && from <= as_of
+    }) {
+        return Err("invoice_sales_ledger_rate_not_in_force");
     }
+    if gst.unmeasured {
+        return Err("invoice_sales_ledger_rate_shape_unmeasured");
+    }
+    if gst.taxability.as_deref() != Some("Taxable") {
+        return Err("invoice_sales_ledger_not_taxable");
+    }
+    if gst.source.as_deref() != Some("Specify Details Here") {
+        return Err("invoice_sales_ledger_rate_not_ledger_specified");
+    }
+    let [block] = gst.states.as_slice() else {
+        return Err("invoice_sales_ledger_rate_state_wise_unmeasured");
+    };
+    if block.state.as_deref() != Some("Any") {
+        return Err("invoice_sales_ledger_rate_state_wise_unmeasured");
+    }
+    let unreadable = "invoice_sales_ledger_rate_heads_unreadable";
+    let mut cgst = None;
+    let mut state = None;
+    let mut igst = None;
+    for head in &block.heads {
+        match head.head.as_str() {
+            "CGST" | "SGST/UTGST" | "IGST" => {
+                if head.valuation.as_deref() != Some("Based on Value") {
+                    return Err(unreadable);
+                }
+                let milli = head
+                    .rate
+                    .as_deref()
+                    .and_then(rate_milli)
+                    .ok_or(unreadable)?;
+                let slot = match head.head.as_str() {
+                    "CGST" => &mut cgst,
+                    "SGST/UTGST" => &mut state,
+                    _ => &mut igst,
+                };
+                if slot.replace(milli).is_some() {
+                    return Err(unreadable);
+                }
+            }
+            // No cess at all, as the lab's rows read: Cess "Not Applicable"
+            // and State Cess "Based on Value", neither with a rate. A head
+            // with a rate, or valued any other way, is a tax this build does
+            // not work out.
+            "Cess"
+                if head.rate.is_none() && head.valuation.as_deref() == Some("Not Applicable") => {}
+            "State Cess"
+                if head.rate.is_none() && head.valuation.as_deref() == Some("Based on Value") => {}
+            "Cess" | "State Cess" => return Err("invoice_cess_rate_not_supported"),
+            _ => return Err(unreadable),
+        }
+    }
+    let (Some(cgst), Some(state), Some(igst)) = (cgst, state, igst) else {
+        return Err(unreadable);
+    };
+    if cgst != state {
+        return Err("invoice_sales_ledger_rate_heads_unequal");
+    }
+    if cgst.checked_mul(2) != Some(igst) {
+        return Err("invoice_sales_ledger_rate_igst_not_twice_state");
+    }
+    if !SLAB_IGST_MILLI.contains(&igst) {
+        return Err("invoice_sales_ledger_rate_not_a_slab");
+    }
+    Ok(cgst)
+}
 
-    /// Whether EACH leg is half the tax at `rate` percent of `taxable`, to
-    /// within `TAX_LEG_TOLERANCE_PAISE`. Checked arithmetic: an amount too
-    /// large to multiply matches no rate.
-    fn is_half_of(&self, taxable: i128, rate: i128) -> bool {
-        [self.cgst, self.state].into_iter().all(|leg| {
-            leg.checked_mul(200)
-                .zip(taxable.checked_mul(rate))
-                .and_then(|(left, right)| left.checked_sub(right))
-                .is_some_and(|difference| difference.abs() <= TAX_LEG_TOLERANCE_PAISE * 200)
-        })
+/// What a tax ledger must say for the invoice to be checked against its rate:
+/// its own rate of tax is the one the sales ledgers give, and it rounds
+/// nothing (the measured ledgers read "Not Applicable" and 0). A ledger that
+/// reads anything else, or nothing, was not measured.
+fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'static str> {
+    let own = row.rate_of_tax_calculation.as_deref().and_then(rate_milli);
+    if own != Some(half_milli) {
+        return Some("invoice_tax_ledger_rate_mismatch");
     }
+    if row.rounding_method.as_deref() != Some("Not Applicable")
+        || row.rounding_limit.as_deref() != Some("0")
+    {
+        return Some("invoice_tax_ledger_rounding_unsupported");
+    }
+    None
+}
+
+/// The tax Tally's GSTR-1 expects on the invoice for each state head: the sum
+/// over the sales lines of the line's amount at the head's rate, rounded
+/// half-up to the paisa, line by line (the lab, 10 Oct 2026: sixteen vouchers,
+/// "included" exactly when both heads equal it). An error code when a figure
+/// does not fit, and when a line's tax is not a whole paisa at a rate other
+/// than 2.5 percent: the lab measured the rounding of inexact figures only at
+/// 2.5 percent (the other rates were exact), so elsewhere only exact lines are
+/// admitted.
+fn expected_tax_paise(lines: &[i128], half_milli: i128) -> Result<i128, &'static str> {
+    let mut total = 0_i128;
+    for line in lines {
+        let scaled = line
+            .checked_mul(half_milli)
+            .ok_or("invoice_amount_invalid")?;
+        if scaled % 100_000 != 0 && half_milli != 2_500 {
+            return Err("invoice_tax_rounding_unmeasured");
+        }
+        let tax = scaled.checked_add(50_000).ok_or("invoice_amount_invalid")? / 100_000;
+        total = total.checked_add(tax).ok_or("invoice_amount_invalid")?;
+    }
+    Ok(total)
+}
+
+/// A paise figure as Tally writes it: `25.03`.
+fn paise_text(paise: i128) -> String {
+    format!("{}.{:02}", paise / 100, paise % 100)
 }
 
 /// The alphabet of an invoice number, as GST rule 46(b) allows it: at most 16
@@ -524,6 +655,7 @@ pub(super) fn classify_sales_invoice(
     voucher: &ImportVoucher,
     facts: &BTreeMap<String, LedgerFacts>,
     company_state: &str,
+    as_of: &str,
 ) -> Result<InvoiceRoles, Vec<InvoiceRefusal>> {
     let Some(detail) = voucher.invoice.as_ref() else {
         return Err(vec![refuse("invoice_detail_required")]);
@@ -687,32 +819,86 @@ pub(super) fn classify_sales_invoice(
         state_index.expect("checked"),
     );
     let amount = |index: usize| paise(&voucher.entries[index].amount);
-    // The taxable value is the sum of the sales legs, all at the one tax pair's rate.
-    let taxable = sales.iter().try_fold(0_i128, |sum, index| {
-        amount(*index).and_then(|leg| sum.checked_add(leg))
-    });
-    let (Some(party_amount), Some(taxable), Some(cgst_amount), Some(state_amount)) =
-        (amount(party), taxable, amount(cgst), amount(state_tax))
-    else {
-        return Err(vec![refuse("invoice_amount_invalid")]);
-    };
-    let Some(legs) = TaxLegs::new(cgst_amount, state_amount) else {
-        return Err(vec![refuse("invoice_cgst_and_state_tax_differ")]);
-    };
-    let Some(base) = taxable
-        .checked_add(legs.cgst)
-        .and_then(|sum| sum.checked_add(legs.state))
-    else {
-        return Err(vec![refuse("invoice_amount_invalid")]);
-    };
-    // Each leg is half the tax at one slab rate, to within a few paise: a
-    // 10.00 sale carrying 0.02 of tax is not 5 percent.
-    if !SLAB_RATES
+    let lines = sales
         .iter()
-        .any(|rate| legs.is_half_of(taxable, *rate))
-    {
-        return Err(vec![refuse("invoice_tax_matches_no_slab_rate")]);
+        .map(|index| amount(*index))
+        .collect::<Option<Vec<_>>>();
+    let (Some(party_amount), Some(lines), Some(cgst_amount), Some(state_amount)) =
+        (amount(party), lines, amount(cgst), amount(state_tax))
+    else {
+        return Err(vec![refuse("invoice_amount_invalid")]);
+    };
+    let Some(taxable) = lines
+        .iter()
+        .try_fold(0_i128, |sum, line| sum.checked_add(*line))
+    else {
+        return Err(vec![refuse("invoice_amount_invalid")]);
+    };
+    // The tax Tally's GSTR-1 expects is worked out per sales line from the
+    // sales ledger's own rate, never from the tax typed on the invoice (the
+    // lab, 10 Oct 2026). Every doubt about the rate is a refusal.
+    let mut tax_refusals = Vec::new();
+    if sales.len() > MAX_SALES_LINES {
+        tax_refusals.push(refuse_value(
+            "invoice_too_many_sales_lines",
+            format!("{} sales lines, at most {MAX_SALES_LINES}", sales.len()),
+        ));
     }
+    let mut rates = std::collections::BTreeSet::new();
+    for index in &sales {
+        let name = &voucher.entries[*index].ledger;
+        match facts.get(name).and_then(|fact| fact.rates.as_ref()) {
+            None => tax_refusals.push(refuse_ledger("invoice_sales_ledger_rate_unknown", name)),
+            Some(row) => match sales_rate_milli(row, as_of) {
+                Ok(milli) => {
+                    rates.insert(milli);
+                }
+                Err(code) => tax_refusals.push(refuse_ledger(code, name)),
+            },
+        }
+    }
+    if !tax_refusals.is_empty() {
+        return Err(tax_refusals);
+    }
+    let mut rates = rates.into_iter();
+    let (Some(half_milli), None) = (rates.next(), rates.next()) else {
+        return Err(vec![refuse("invoice_sales_ledgers_rates_differ")]);
+    };
+    for index in [cgst, state_tax] {
+        let name = &voucher.entries[index].ledger;
+        let code = match facts.get(name).and_then(|fact| fact.rates.as_ref()) {
+            None => Some("invoice_tax_ledger_rate_mismatch"),
+            Some(row) => tax_ledger_refusal(row, half_milli),
+        };
+        if let Some(code) = code {
+            tax_refusals.push(refuse_ledger(code, name));
+        }
+    }
+    if !tax_refusals.is_empty() {
+        return Err(tax_refusals);
+    }
+    let expected = expected_tax_paise(&lines, half_milli).map_err(|code| vec![refuse(code)])?;
+    for (label, entered) in [("CGST", cgst_amount), ("State tax", state_amount)] {
+        if entered != expected {
+            tax_refusals.push(refuse_value(
+                "invoice_tax_head_not_expected",
+                format!(
+                    "{label} {} expected {}",
+                    paise_text(entered),
+                    paise_text(expected)
+                ),
+            ));
+        }
+    }
+    if !tax_refusals.is_empty() {
+        return Err(tax_refusals);
+    }
+    let Some(base) = taxable
+        .checked_add(cgst_amount)
+        .and_then(|sum| sum.checked_add(state_amount))
+    else {
+        return Err(vec![refuse("invoice_amount_invalid")]);
+    };
     let round = match round_off {
         None => 0,
         Some(index) => {
@@ -1232,7 +1418,8 @@ impl super::super::Server {
     /// and record what was observed on the voucher. The reads: the company's
     /// marks (and its ledger count when the master mark is high), the ledger
     /// compliance listing (reserved group ancestry, duty head, the GSTIN in
-    /// force on the invoice date), the voucher types (the named type, its
+    /// force on the invoice date), the same listing with each ledger's GST
+    /// rate and rounding (the tax is worked out from it), the voucher types (the named type, its
     /// class and its series-level numbering), the vouchers carrying the number
     /// and the company's GST registration in force on the invoice date. The
     /// party's bill-wise flag comes from the
@@ -1325,6 +1512,25 @@ impl super::super::Server {
         );
         let index =
             bridge_tally_protocol::group_ancestry::GroupIndex::build(listing.groups.clone());
+        // 1b. Each ledger's GST rate and rounding, from the same listing with
+        // four fields added (W7, 10 Oct 2026): the tax is worked out from the
+        // sales ledger's own rate, so the rate is read, never inferred.
+        let rates_window =
+            financial_year_window(&as_of).ok_or_else(|| failed("invoice_date_invalid"))?;
+        let request = super::super::invoice_ledger_rates_read(
+            company_name,
+            (&rates_window.0, as_of.as_str()),
+        )
+        .ok_or_else(|| failed("invoice_date_invalid"))?;
+        let (xml, read) = self.post_read(identity, request).await?;
+        evidence = super::super::combine_evidence(evidence, read);
+        let wanted = voucher
+            .entries
+            .iter()
+            .map(|entry| entry.ledger.as_str())
+            .collect::<Vec<_>>();
+        let rates =
+            wire::parse_ledger_rates(&xml, identity.company_guid(), &wanted).map_err(failed)?;
         let mut facts = BTreeMap::new();
         for entry in &voucher.entries {
             let matching = listing
@@ -1360,6 +1566,7 @@ impl super::super::Server {
                     gstin,
                     registration_type,
                     bill_wise: None,
+                    rates: rates.get(&entry.ledger).cloned(),
                 },
             );
         }
@@ -1456,7 +1663,7 @@ impl super::super::Server {
             })?
             .state;
 
-        let roles = classify_sales_invoice(voucher, &facts, &company_state)
+        let roles = classify_sales_invoice(voucher, &facts, &company_state, &as_of)
             .map_err(InvoiceAdmission::Refused)?;
         let party = &voucher.entries[roles.party].ledger;
         let observed = observe(&facts[party].gstin, resolved.guid, bill_wise, company_state);

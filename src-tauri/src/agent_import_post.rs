@@ -2761,10 +2761,11 @@ fn review_text(
     marks.seal(line, preview)
 }
 
-/// What the invoice window says was checked: the ledgers' own GST rates are
-/// not read, only that the tax amounts are a slab rate's half of the taxable value.
+/// What the invoice window says was checked: each tax head against the tax
+/// worked out per sales line at the sales ledger's own rate. It is a line of
+/// the dialog, so it is no longer than the one it replaced (the window's cap).
 const INVOICE_CHECKED_LINE: &str =
-    "Checked: customer, Sales Accounts ledgers, CGST and state tax by head. Ledger rates not read.";
+    "Checked: customer, Sales Accounts ledgers, CGST and state tax per line at the ledger's rate.";
 
 /// The approval text of one Sales invoice: what a person must see to say yes to
 /// a GST document. The party with its GSTIN and registration, the place of

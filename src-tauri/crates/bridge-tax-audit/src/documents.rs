@@ -52,12 +52,31 @@ pub struct TisRow {
     pub accepted_paise: i64,
 }
 
-/// Every TRACES document row a run was given. Empty is "none supplied".
+/// Every TRACES document a run was given, each `None` when its file was not loaded and its rows
+/// (possibly none) when it was: the reference's pack lists a loaded document as examined, rows or
+/// none (#1281).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TracesDocuments {
-    pub form26as: Vec<Form26asRow>,
-    pub ais: Vec<AisRow>,
-    pub tis: Vec<TisRow>,
+    pub form26as: Option<Vec<Form26asRow>>,
+    pub ais: Option<Vec<AisRow>>,
+    pub tis: Option<Vec<TisRow>>,
+}
+
+impl TracesDocuments {
+    /// The Form 26AS rows; none when it was not loaded.
+    pub fn form26as_rows(&self) -> &[Form26asRow] {
+        self.form26as.as_deref().unwrap_or_default()
+    }
+
+    /// The AIS rows; none when it was not loaded.
+    pub fn ais_rows(&self) -> &[AisRow] {
+        self.ais.as_deref().unwrap_or_default()
+    }
+
+    /// The TIS rows; none when it was not loaded.
+    pub fn tis_rows(&self) -> &[TisRow] {
+        self.tis.as_deref().unwrap_or_default()
+    }
 }
 
 /// A bank statement, as the reference's `adapters/bank_documents.py` reads one extraction: the
@@ -282,16 +301,18 @@ fn iso_date(v: &Value, key: &str, what: &str) -> Result<TallyDate> {
         .ok_or_else(|| bad(&format!("{what}.{key} {s:?} is not YYYY-MM-DD")))
 }
 
-fn rows<'a>(v: &'a Value, key: &str) -> Result<&'a [Value]> {
+/// A document's rows, each read by `row`: `None` when `key` is absent or null (the file was not
+/// loaded), its rows (possibly none) when it is a list.
+fn rows<T>(v: &Value, key: &str, row: impl Fn(&Value) -> Result<T>) -> Result<Option<Vec<T>>> {
     match &v[key] {
-        Value::Null => Ok(&[]),
-        Value::Array(a) => Ok(a),
+        Value::Null => Ok(Some(Vec::new())),
+        Value::Array(a) => a.iter().map(row).collect::<Result<_>>().map(Some),
         _ => Err(bad(&format!("{key} is not a list"))),
     }
 }
 
 /// The JSON `parity/python_golden.py --emit-traces-documents` writes: `form26as`, `ais` and `tis`
-/// lists (each optional, empty when absent).
+/// lists, each absent or null when its file was not loaded.
 pub fn traces_documents_from_json(v: &Value) -> Result<TracesDocuments> {
     traces_documents(v).map_err(document("traces documents"))
 }
@@ -300,51 +321,42 @@ fn traces_documents(v: &Value) -> Result<TracesDocuments> {
     if !v.is_object() {
         return Err(bad("not an object"));
     }
-    let form26as = rows(v, "form26as")?
-        .iter()
-        .map(|r| {
-            Ok(Form26asRow {
-                doc: text(r, "doc", "form26as")?,
-                row: int(r, "row", "form26as")?,
-                part: text(r, "part", "form26as")?,
-                deductor_tan: text(r, "deductor_tan", "form26as")?,
-                section: text(r, "section", "form26as")?,
-                txn_date: iso_date(r, "txn_date", "form26as")?,
-                amount_paise: int(r, "amount_paise", "form26as")?,
-                tax_paise: int(r, "tax_paise", "form26as")?,
-            })
+    let form26as = rows(v, "form26as", |r| {
+        Ok(Form26asRow {
+            doc: text(r, "doc", "form26as")?,
+            row: int(r, "row", "form26as")?,
+            part: text(r, "part", "form26as")?,
+            deductor_tan: text(r, "deductor_tan", "form26as")?,
+            section: text(r, "section", "form26as")?,
+            txn_date: iso_date(r, "txn_date", "form26as")?,
+            amount_paise: int(r, "amount_paise", "form26as")?,
+            tax_paise: int(r, "tax_paise", "form26as")?,
         })
-        .collect::<Result<_>>()?;
-    let ais = rows(v, "ais")?
-        .iter()
-        .map(|r| {
-            Ok(AisRow {
-                doc: text(r, "doc", "ais")?,
-                row: int(r, "row", "ais")?,
-                category: text(r, "category", "ais")?,
-                source_name: text(r, "source_name", "ais")?,
-                source_id: text(r, "source_id", "ais")?,
-                txn_date: match &r["txn_date"] {
-                    Value::Null => None,
-                    _ => Some(iso_date(r, "txn_date", "ais")?),
-                },
-                amount_paise: int(r, "amount_paise", "ais")?,
-            })
+    })?;
+    let ais = rows(v, "ais", |r| {
+        Ok(AisRow {
+            doc: text(r, "doc", "ais")?,
+            row: int(r, "row", "ais")?,
+            category: text(r, "category", "ais")?,
+            source_name: text(r, "source_name", "ais")?,
+            source_id: text(r, "source_id", "ais")?,
+            txn_date: match &r["txn_date"] {
+                Value::Null => None,
+                _ => Some(iso_date(r, "txn_date", "ais")?),
+            },
+            amount_paise: int(r, "amount_paise", "ais")?,
         })
-        .collect::<Result<_>>()?;
-    let tis = rows(v, "tis")?
-        .iter()
-        .map(|r| {
-            Ok(TisRow {
-                doc: text(r, "doc", "tis")?,
-                row: int(r, "row", "tis")?,
-                category: text(r, "category", "tis")?,
-                reported_paise: int(r, "reported_paise", "tis")?,
-                processed_paise: int(r, "processed_paise", "tis")?,
-                accepted_paise: int(r, "accepted_paise", "tis")?,
-            })
+    })?;
+    let tis = rows(v, "tis", |r| {
+        Ok(TisRow {
+            doc: text(r, "doc", "tis")?,
+            row: int(r, "row", "tis")?,
+            category: text(r, "category", "tis")?,
+            reported_paise: int(r, "reported_paise", "tis")?,
+            processed_paise: int(r, "processed_paise", "tis")?,
+            accepted_paise: int(r, "accepted_paise", "tis")?,
         })
-        .collect::<Result<_>>()?;
+    })?;
     Ok(TracesDocuments { form26as, ais, tis })
 }
 
@@ -465,9 +477,9 @@ mod tests {
                      "processed_paise": 2, "accepted_paise": 3}]
         }))
         .unwrap();
-        assert_eq!(d.form26as[0].txn_date.as_str(), "20250630");
-        assert_eq!(d.ais[0].txn_date, None);
-        assert_eq!(d.tis[0].accepted_paise, 3);
+        assert_eq!(d.form26as_rows()[0].txn_date.as_str(), "20250630");
+        assert_eq!(d.ais_rows()[0].txn_date, None);
+        assert_eq!(d.tis_rows()[0].accepted_paise, 3);
         assert_eq!(
             traces_documents_from_json(&json!({})).unwrap(),
             TracesDocuments::default()
@@ -493,6 +505,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_traces_document_not_loaded_is_none_and_one_loaded_with_no_rows_is_empty() {
+        let none = TracesDocuments {
+            form26as: None,
+            ais: None,
+            tis: None,
+        };
+        assert_eq!(traces_documents_from_json(&json!({})).unwrap(), none);
+        assert_eq!(
+            traces_documents_from_json(&json!({"form26as": null, "ais": null, "tis": null}))
+                .unwrap(),
+            none
+        );
+        let d = traces_documents_from_json(&json!({"form26as": [], "tis": []})).unwrap();
+        assert_eq!(
+            d,
+            TracesDocuments {
+                form26as: Some(Vec::new()),
+                ais: None,
+                tis: Some(Vec::new()),
+            }
+        );
+        assert!(d.ais_rows().is_empty());
+    }
     #[test]
     fn a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse() {
         let row = json!({"doc": "bank:x:statement", "row": 0, "account_ref": "XX12", "txn_date":

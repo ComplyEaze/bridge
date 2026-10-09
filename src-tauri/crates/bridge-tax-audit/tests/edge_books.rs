@@ -1179,7 +1179,7 @@ fn check(name: &str) {
                     threshold_paise: None,
                     bank_statement: statement.as_ref(),
                     s194n_narration_terms: &terms,
-                    ais_rows: &docs.ais,
+                    ais_rows: docs.ais_rows(),
                     s194n_recipient_type: recipient,
                     round_off_ledgers: &round_off,
                     counterparty_type_by_ledger: &types,
@@ -1232,8 +1232,10 @@ fn check(name: &str) {
             "twentysixas_receipts" => {
                 let docs = traces_documents_from_json(&s).unwrap();
                 let aliases = tds_26as_config(&s).deductor_aliases;
-                let r = twentysixas_receipts::run(&book, &rules, &docs.form26as, &aliases).unwrap();
-                let c = twentysixas_receipts::check_invariants(&book, &docs.form26as, &r).unwrap();
+                let r = twentysixas_receipts::run(&book, &rules, docs.form26as_rows(), &aliases)
+                    .unwrap();
+                let c = twentysixas_receipts::check_invariants(&book, docs.form26as_rows(), &r)
+                    .unwrap();
                 (r, c)
             }
             "tds_tcs_26as" => {
@@ -1242,13 +1244,13 @@ fn check(name: &str) {
                     &book,
                     &rules,
                     &period(&s),
-                    &docs.form26as,
-                    &docs.ais,
-                    &docs.tis,
+                    docs.form26as_rows(),
+                    docs.ais_rows(),
+                    docs.tis_rows(),
                     &tds_26as_config(&s),
                 )
                 .unwrap();
-                let c = tds_tcs_26as::check_invariants(&book, &docs.form26as, &r).unwrap();
+                let c = tds_tcs_26as::check_invariants(&book, docs.form26as_rows(), &r).unwrap();
                 (r, c)
             }
             other => panic!("{name}: no edge dispatch for {other} (EDGE_TESTS: {EDGE_TESTS:?})"),
@@ -1492,8 +1494,12 @@ fn the_26as_invariants_catch_a_row_of_the_wrong_part() {
     let (book, rules) = (build(&s), crate::rules(&s));
     let docs = traces_documents_from_json(&s).unwrap();
     let aliases = tds_26as_config(&s).deductor_aliases;
-    let mut r = twentysixas_receipts::run(&book, &rules, &docs.form26as, &aliases).unwrap();
-    let part_vi = docs.form26as.iter().find(|a| a.part == "VI").unwrap();
+    let mut r = twentysixas_receipts::run(&book, &rules, docs.form26as_rows(), &aliases).unwrap();
+    let part_vi = docs
+        .form26as_rows()
+        .iter()
+        .find(|a| a.part == "VI")
+        .unwrap();
     let vi_id = format!("{}#{}", part_vi.doc, part_vi.row);
     let supply = r
         .figures
@@ -1506,7 +1512,7 @@ fn the_26as_invariants_catch_a_row_of_the_wrong_part() {
         .find(|e| e.kind == "document_row")
         .unwrap();
     doc.id = vi_id.clone();
-    let v = twentysixas_receipts::check_invariants(&book, &docs.form26as, &r).unwrap();
+    let v = twentysixas_receipts::check_invariants(&book, docs.form26as_rows(), &r).unwrap();
     assert!(
         v.iter()
             .any(|m| m.starts_with("TR-2:") && m.contains("Part VI row")),
@@ -1521,16 +1527,22 @@ fn the_26as_invariants_catch_a_row_of_the_wrong_part() {
         &book,
         &rules,
         &period(&s),
-        &docs.form26as,
-        &docs.ais,
-        &docs.tis,
+        docs.form26as_rows(),
+        docs.ais_rows(),
+        docs.tis_rows(),
         &cfg,
     )
     .unwrap();
-    assert!(tds_tcs_26as::check_invariants(&book, &docs.form26as, &r)
-        .unwrap()
-        .is_empty());
-    let part_vi = docs.form26as.iter().find(|a| a.part == "VI").unwrap();
+    assert!(
+        tds_tcs_26as::check_invariants(&book, docs.form26as_rows(), &r)
+            .unwrap()
+            .is_empty()
+    );
+    let part_vi = docs
+        .form26as_rows()
+        .iter()
+        .find(|a| a.part == "VI")
+        .unwrap();
     let pair = r
         .figures
         .iter_mut()
@@ -1542,7 +1554,7 @@ fn the_26as_invariants_catch_a_row_of_the_wrong_part() {
         .find(|e| e.kind == "document_row")
         .unwrap();
     doc.id = format!("{}#{}", part_vi.doc, part_vi.row);
-    let v = tds_tcs_26as::check_invariants(&book, &docs.form26as, &r).unwrap();
+    let v = tds_tcs_26as::check_invariants(&book, docs.form26as_rows(), &r).unwrap();
     assert!(
         v.iter()
             .any(|m| m.starts_with("TT-4:") && m.contains("(kind tds) matches a 26AS part-VI row")),
@@ -1577,9 +1589,10 @@ fn each_26as_invariant_fires_on_its_own_tampering() {
     let (book, rules) = (build(&s), crate::rules(&s));
     let docs = traces_documents_from_json(&s).unwrap();
     let aliases = tds_26as_config(&s).deductor_aliases;
-    let clean = twentysixas_receipts::run(&book, &rules, &docs.form26as, &aliases).unwrap();
-    let check =
-        |r: &TestResult| twentysixas_receipts::check_invariants(&book, &docs.form26as, r).unwrap();
+    let clean = twentysixas_receipts::run(&book, &rules, docs.form26as_rows(), &aliases).unwrap();
+    let check = |r: &TestResult| {
+        twentysixas_receipts::check_invariants(&book, docs.form26as_rows(), r).unwrap()
+    };
     let base = check(&clean);
     assert!(
         !base.is_empty()
@@ -1663,13 +1676,14 @@ fn each_26as_invariant_fires_on_its_own_tampering() {
         &book,
         &rules,
         &period(&s),
-        &docs.form26as,
-        &docs.ais,
-        &docs.tis,
+        docs.form26as_rows(),
+        docs.ais_rows(),
+        docs.tis_rows(),
         &tds_26as_config(&s),
     )
     .unwrap();
-    let check = |r: &TestResult| tds_tcs_26as::check_invariants(&book, &docs.form26as, r).unwrap();
+    let check =
+        |r: &TestResult| tds_tcs_26as::check_invariants(&book, docs.form26as_rows(), r).unwrap();
     assert!(check(&clean).is_empty());
     for (name, needle) in [
         ("twentysixas_agg_count", "!= twentysixas_agg_count"),
@@ -1705,16 +1719,16 @@ fn a_repeated_tis_category_is_refused() {
     let s = spec("tds26as_matching");
     let (book, rules) = (build(&s), crate::rules(&s));
     let mut docs = traces_documents_from_json(&s).unwrap();
-    let mut again = docs.tis[0].clone();
+    let mut again = docs.tis_rows()[0].clone();
     again.row = 99;
-    docs.tis.push(again);
+    docs.tis.as_mut().unwrap().push(again);
     let Err(err) = tds_tcs_26as::run(
         &book,
         &rules,
         &period(&s),
-        &docs.form26as,
-        &docs.ais,
-        &docs.tis,
+        docs.form26as_rows(),
+        docs.ais_rows(),
+        docs.tis_rows(),
         &tds_26as_config(&s),
     ) else {
         panic!("a repeated TIS category is refused");

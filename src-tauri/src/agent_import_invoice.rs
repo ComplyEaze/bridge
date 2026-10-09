@@ -22,8 +22,8 @@ mod wire;
 
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
-    render_company_state_request, render_invoice_number_request, render_invoice_readback_request,
-    render_voucher_types_request,
+    render_company_registration_request, render_invoice_number_request,
+    render_invoice_readback_request, render_voucher_types_request,
 };
 
 /// What an invoice voucher carries besides its entries.
@@ -767,7 +767,8 @@ impl super::super::Server {
     /// unused: a refusal there comes back under its own code), and what the
     /// build recorded must be unchanged (`import_invoice_masters_changed`): the
     /// party's GSTIN, state, registration and bill-wise flag, the type's GUID
-    /// and the company's state. Run before the approval
+    /// and the company's state (its registration's, ADR 0004 slice 1). Run
+    /// before the approval
     /// dialog and again, after it is answered, before the post is dispatched,
     /// because a dialog can stay open and a book can change under it.
     pub(super) async fn recheck_sales_invoice(
@@ -1233,7 +1234,8 @@ impl super::super::Server {
     /// compliance listing (reserved group ancestry, duty head, the GSTIN in
     /// force on the invoice date), the voucher types (the named type, its
     /// class and its series-level numbering), the vouchers carrying the number
-    /// and the company's state. The party's bill-wise flag comes from the
+    /// and the company's GST registration in force on the invoice date. The
+    /// party's bill-wise flag comes from the
     /// catalogue the caller already read. Each answer is bound to the verified
     /// company.
     pub(super) async fn admit_sales_invoice(
@@ -1438,16 +1440,21 @@ impl super::super::Server {
             }
         };
 
-        // 4. The company's state.
+        // 4. The company's own GST registration in force on the invoice date
+        // (ADR 0004, slice 1); its state is the supplier's state.
         let (xml, read) = self
             .post_read(
                 identity,
-                super::super::invoice_company_state_read(company_name),
+                super::super::invoice_company_registration_read(company_name),
             )
             .await?;
         evidence = super::super::combine_evidence(evidence, read);
-        let company_state =
-            wire::parse_company_state(&xml, identity.company_guid()).map_err(failed)?;
+        let company_state = wire::parse_company_registration(&xml, identity.company_guid(), &as_of)
+            .map_err(|outcome| match outcome {
+                wire::RegistrationOutcome::Refused(code) => refused(refuse(code)),
+                wire::RegistrationOutcome::Failed(code) => failed(code),
+            })?
+            .state;
 
         let roles = classify_sales_invoice(voucher, &facts, &company_state)
             .map_err(InvoiceAdmission::Refused)?;

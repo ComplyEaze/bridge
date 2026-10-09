@@ -2,7 +2,7 @@
 //!
 //! Each answer is parsed at the edge into a value that cannot be wrong later:
 //! a voucher type with its series-level numbering, a ledger's bill-wise flag,
-//! the company's state. Nothing here guesses: a missing element, a repeated
+//! the company's GST registration. Nothing here guesses: a missing element, a repeated
 //! one, or a name two rows claim is an error, never a default.
 //!
 //! What each read was measured to return (TallyPrime 7.1 Silver, lab, 6 Oct
@@ -11,10 +11,12 @@
 //! type's reserved name as an attribute, its PARENT, its GUID, a top-level
 //! NUMBERINGMETHOD and, inside `VOUCHERNUMBERSERIES.LIST`, the series-level
 //! one that decides what an import's supplied number does. A `Ledger` row
-//! returns `ISBILLWISEON` as Yes or No. The company-state read was measured
-//! the same day on the synthetic lab company (one row a loaded company, the
-//! row chosen by GUID carried its STATENAME); an answer that does not carry a
-//! known state name fails the build (`invoice_company_state_unreadable`).
+//! returns `ISBILLWISEON` as Yes or No. The tax-unit collection was read once
+//! on a second synthetic lab company (TallyPrime 7.1 Silver, 9 Oct 2026; typed
+//! by hand, sent as UTF-8, before any voucher was keyed): the
+//! Default Tax Unit and one GST registration, each GUID the company's GUID
+//! with a suffix, the registration's dated rows under
+//! `GSTREGISTRATIONDETAILS.LIST`.
 
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use quick_xml::events::Event;
@@ -560,34 +562,144 @@ pub(super) fn count_vouchers(xml: &str) -> Result<usize, &'static str> {
     Ok(rows(xml, "VOUCHER")?.len())
 }
 
-/// The company's own state: a `Company` collection with a FETCH list of NAME,
-/// GUID and STATENAME (measured 6 Oct 2026 on the lab: one row for each loaded
-/// company, each with its GUID, and STATENAME on the rows that have a state).
-/// A `Company` collection returns every loaded company whatever
-/// SVCURRENTCOMPANY says, so the row is chosen by GUID, never by position.
-pub(in crate::agent) fn render_company_state_request(company: &str) -> String {
+/// The company's own GST registrations: a `TaxUnit` collection with no field
+/// list. The shape was read once, on a synthetic lab company, from the same
+/// collection typed by hand and sent as UTF-8 (two units: the Default Tax Unit
+/// and one GST registration whose dated rows carry the state, the
+/// registration type and whether it is inactive); an answer to this request's
+/// own bytes is not yet captured.
+pub(in crate::agent) fn render_company_registration_request(company: &str) -> String {
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Company</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Company\" ISMODIFY=\"No\"><TYPE>Company</TYPE><FETCH>NAME, GUID, STATENAME</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Tax Units</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Tax Units\" ISMODIFY=\"No\"><TYPE>TaxUnit</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company)
     )
 }
 
-pub(super) fn parse_company_state(xml: &str, company_guid: &str) -> Result<String, &'static str> {
-    let mut found = None;
-    for row in rows(xml, "COMPANY")? {
-        let guid = row.one("GUID")?.ok_or("invoice_company_row_without_guid")?;
-        if guid.eq_ignore_ascii_case(company_guid) {
-            if found.is_some() {
-                return Err("invoice_company_row_repeated");
+/// The registration an invoice is issued under: the one GST unit in force on
+/// the invoice date.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct CompanyRegistration {
+    pub(super) gstin: String,
+    /// The state of the registration's dated row in force: the supplier's
+    /// state for the place-of-supply rule.
+    pub(super) state: String,
+}
+
+/// Why a tax-unit answer gives no registration: the book does not hold one
+/// this build can issue under (a refusal), or the answer itself cannot be
+/// read (a failed read).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RegistrationOutcome {
+    Refused(&'static str),
+    Failed(&'static str),
+}
+
+/// The company's GST registration in force on `as_of` (`YYYYMMDD`), from the
+/// tax-unit answer. A GST unit is a row whose `TAXTYPE` attribute, `USEDFOR`,
+/// `GSTREGNUMBER` or dated `GSTREGISTRATIONDETAILS.LIST` says so, and all of
+/// them must; its dated row in force is the latest one on or before `as_of`
+/// (document order is not assumed to be date order). Exactly one unit may be
+/// in force, its row not inactive and Regular, with a valid GSTIN of the
+/// row's state, equal to the unit's `TAXREGISTRATION`. Nothing is defaulted: a missing field refuses, and the
+/// unit-level type, state and dates are never read (empty on a registered
+/// unit). A row whose GUID is not the company's refuses the whole answer, so a
+/// unit is never dropped from the count; a row with no GUID, and an answer with
+/// no unit at all, not even the default one, are failed reads.
+pub(super) fn parse_company_registration(
+    xml: &str,
+    company_guid: &str,
+    as_of: &str,
+) -> Result<CompanyRegistration, RegistrationOutcome> {
+    use RegistrationOutcome::{Failed, Refused};
+    let units = rows(xml, "TAXUNIT").map_err(Failed)?;
+    if units.is_empty() {
+        return Err(Failed("invoice_company_registration_unread"));
+    }
+    let prefix = format!("{}-", company_guid.to_ascii_lowercase());
+    let mut found = 0;
+    let mut inactive = false;
+    let mut in_force = Vec::new();
+    for unit in &units {
+        let guid = unit
+            .one("GUID")
+            .map_err(Failed)?
+            .ok_or(Failed("invoice_tax_unit_without_guid"))?;
+        if !guid.to_ascii_lowercase().starts_with(&prefix) {
+            return Err(Refused("invoice_company_registration_unbound"));
+        }
+        let gstin = unit.one("GSTREGNUMBER").map_err(Failed)?;
+        let dated = unit
+            .lists
+            .iter()
+            .filter(|(name, row)| name == "GSTREGISTRATIONDETAILS.LIST" && !row.fields.is_empty())
+            .map(|(_, row)| row)
+            .collect::<Vec<_>>();
+        let markers = [
+            unit.attributes.get("TAXTYPE").map(String::as_str) == Some("GST"),
+            unit.one("USEDFOR").map_err(Failed)? == Some("GST"),
+            gstin.is_some(),
+            !dated.is_empty(),
+        ];
+        if !markers.contains(&true) {
+            continue;
+        }
+        found += 1;
+        if markers.contains(&false) {
+            return Err(Refused("invoice_company_registration_inconsistent"));
+        }
+        let mut rows_by_date = Vec::new();
+        for row in dated {
+            let fields = (
+                row.one("FROMDATE").map_err(Failed)?,
+                row.one("STATE").map_err(Failed)?,
+                row.one("REGISTRATIONTYPE").map_err(Failed)?,
+                row.one("ISINACTIVE").map_err(Failed)?,
+            );
+            let (Some(from), Some(state), Some(kind), Some(flag @ ("Yes" | "No"))) = fields else {
+                return Err(Refused("invoice_company_registration_incomplete"));
+            };
+            if bridge_tally_core::TallyDate::parse(from).is_err() || !super::is_state_name(state) {
+                return Err(Refused("invoice_company_registration_incomplete"));
             }
-            found = Some(row.one("STATENAME")?.map(str::to_string));
+            rows_by_date.push((from, state, kind, flag == "Yes"));
+        }
+        rows_by_date.sort_unstable();
+        if rows_by_date.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+            return Err(Refused("invoice_company_registration_inconsistent"));
+        }
+        match rows_by_date.iter().rev().find(|row| row.0 <= as_of) {
+            None => {}
+            Some(&(_, _, _, true)) => inactive = true,
+            Some(&(_, state, kind, false)) => in_force.push((unit, gstin, state, kind)),
         }
     }
-    match found {
-        Some(Some(state)) if super::is_state_name(&state) => Ok(state),
-        Some(_) => Err("invoice_company_state_unreadable"),
-        None => Err("invoice_company_row_missing"),
+    let (unit, gstin, state, kind) = match in_force.as_slice() {
+        [one] => *one,
+        [] if found == 0 => return Err(Refused("invoice_company_registration_absent")),
+        [] if inactive => return Err(Refused("invoice_company_registration_inactive")),
+        [] => return Err(Refused("invoice_company_registration_not_yet_in_force")),
+        _ => return Err(Refused("invoice_company_registration_ambiguous")),
+    };
+    if kind != "Regular" {
+        return Err(Refused("invoice_company_registration_not_regular"));
     }
+    let gstin = gstin.unwrap_or_default();
+    // A GSTIN is held once per unit and is not dated, so after a change an
+    // earlier invoice would be issued under the new one.
+    let consistent = unit.one("GSTOLDREGNUMBER").map_err(Failed)?.is_none()
+        && unit
+            .attributes
+            .get("TAXREGISTRATION")
+            .is_some_and(|attribute| attribute == gstin)
+        && super::gstin_valid(gstin)
+        && super::gstin_state(gstin) == Some(state);
+    if !consistent {
+        return Err(Refused("invoice_company_registration_inconsistent"));
+    }
+    Ok(CompanyRegistration {
+        gstin: gstin.to_string(),
+        state: state.to_string(),
+    })
 }
 
 #[cfg(test)]

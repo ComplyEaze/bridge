@@ -6,10 +6,9 @@
 //! from one read of the disposable GST lab book (the `register-e2e` set; its
 //! PROVENANCE table is beside the fixtures). The voucher types and the number
 //! read's answers are Tally's own bytes from the Sales rehearsal on the same
-//! book (the `sales-rehearsal` set, 7 Oct 2026). Two things are not Tally's
-//! bytes and say so: the company's state (HAND-WRITTEN below: the capture of
-//! that read names every company loaded in that Tally) and the bill-wise
-//! catalogue row. The ledger listing predates the rehearsal's two customers,
+//! book (the `sales-rehearsal` set, 7 Oct 2026). Two things are not this
+//! book's bytes and say so: the company's tax units (another synthetic book's
+//! capture, RE-LABELLED below) and the bill-wise catalogue row (HAND-WRITTEN). The ledger listing predates the rehearsal's two customers,
 //! so no case here is admitted.
 use super::*;
 
@@ -18,7 +17,8 @@ const LAB: &str = "BRIDGE GST RECON LAB";
 
 /// What one admission sends, in order: e company list, s status probe, m
 /// marks, b book extent, c currencies, L the compliance listing, P the paired
-/// listing, g groups, T voucher types, N the number read, C the company state.
+/// listing, g groups, T voucher types, N the number read, C the company's tax
+/// units.
 /// The marks read; the ledger listing (its currency read inside two extents,
 /// then its masters inside two more); then the three reads an invoice adds.
 const ADMISSION_ORDER: &str = concat!(
@@ -58,13 +58,14 @@ fn voucher_types() -> String {
     rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-voucher-types.utf16le.xml"))
 }
 
-/// HAND-WRITTEN: one row for the company, chosen by GUID, with its state.
-fn company_state() -> String {
-    format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
-         <COMPANY NAME=\"{LAB}\"><GUID>{LAB_GUID}</GUID><STATENAME>Rajasthan</STATENAME></COMPANY>\
-         </COLLECTION></DATA></BODY></ENVELOPE>"
-    )
+/// RE-LABELLED: the pilot lab's captured tax units (one Regular registration
+/// in Rajasthan), every GUID moved to this book's company and the
+/// registration's date moved a year back to cover this book's invoices; this
+/// book's own were not captured.
+fn company_registration() -> String {
+    include_str!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-typed-request.utf8.xml")
+        .replace("6b43e498-430c-4d5c-bfef-d32e2ab93c85", LAB_GUID)
+        .replace("<FROMDATE>20260401</FROMDATE>", "<FROMDATE>20250401</FROMDATE>")
 }
 
 fn plan(letter: char) -> ScenarioPlan {
@@ -83,7 +84,7 @@ fn plan(letter: char) -> ScenarioPlan {
         'g' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-groups.utf16le.xml")),
         'T' => voucher_types(),
         'N' => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml")),
-        'C' => company_state(),
+        'C' => company_registration(),
         other => panic!("unknown kind {other}"),
     };
     ScenarioPlan::new(Fixture::SyntheticXml(body))
@@ -269,7 +270,7 @@ async fn admit(
 
 /// The whole of one admission: 6 requests for the marks, 40 for the ledger
 /// listing, and 6 each for the voucher types, the number read and the
-/// company's state, in that order. Each case stops where its answer decides
+/// company's tax units, in that order. Each case stops where its answer decides
 /// it, which the request count shows; none is admitted, because the lab book
 /// as captured holds no customer an invoice can go to (its unregistered
 /// customers carry no registration entry, and its registered ones hold their
@@ -294,7 +295,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
             ("invoice_party_registration_type_not_reported", flat_field),
             64,
         ),
-        // A number in use stops before the company's state is read.
+        // A number in use stops before the company's tax units are read.
         (
             unregistered,
             "Sales Manual",
@@ -328,6 +329,108 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
         assert_eq!(sent, requests, "{party} under {filed}");
         assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
     }
+}
+
+/// The company's registration is the admission's last read: a registration
+/// the build cannot issue under is a refusal under its own code, and an answer
+/// with no tax unit at all is a failed read, never "no registration". Both
+/// come after every other read (64 requests) and record no observation.
+#[tokio::test]
+async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_unread_one_fails() {
+    let units = company_registration();
+    let first = units.find("<TAXUNIT NAME=").unwrap();
+    let end = units.rfind("</TAXUNIT>").unwrap() + "</TAXUNIT>".len();
+    for (answer, outcome) in [
+        (
+            units.replacen(
+                "<REGISTRATIONTYPE>Regular",
+                "<REGISTRATIONTYPE>Composition",
+                1,
+            ),
+            ("invoice_company_registration_not_regular", ""),
+        ),
+        (
+            format!("{}{}", &units[..first], &units[end..]),
+            ("FAILED", "invoice_company_registration_unread"),
+        ),
+    ] {
+        let lab = lab(ADMISSION_ORDER
+            .chars()
+            .map(|letter| match letter {
+                'C' => ScenarioPlan::new(Fixture::SyntheticXml(answer.clone()))
+                    .with_encoding(WireEncoding::Utf16LeNoBom)
+                    .with_framing(ResponseFraming::ContentLength),
+                letter => plan(letter),
+            })
+            .collect());
+        let party = "Counter Sales - Unregistered";
+        let mut voucher = invoice_to(party, "Sales Manual", false);
+        let result = lab
+            .server
+            .admit_sales_invoice(
+                &lab.identity,
+                &lab.company,
+                &mut voucher,
+                &catalogue(&[(party, false)]),
+            )
+            .await;
+        let seen = match result {
+            Err(invoice::InvoiceAdmission::Refused(refusals)) => refusals
+                .into_iter()
+                .map(|refusal| {
+                    (
+                        refusal.code,
+                        refusal.detail == invoice::RefusalDetail::Nothing,
+                    )
+                })
+                .collect::<Vec<_>>(),
+            Err(invoice::InvoiceAdmission::Failed(failure)) => {
+                assert_eq!(failure.code, outcome.1);
+                vec![("FAILED", true)]
+            }
+            Ok(_) => panic!("admitted"),
+        };
+        assert_eq!(seen, vec![(outcome.0, true)]);
+        assert_eq!(sent(lab.simulator), 64);
+        assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
+    }
+}
+
+/// The registration's state is the supplier's state that classification
+/// compares the place of supply with: a registration in Haryana (its GSTIN of
+/// that state) refuses an invoice supplied in Rajasthan.
+#[tokio::test]
+async fn the_registrations_state_is_the_supplier_state_the_place_of_supply_is_checked_against() {
+    let units = company_registration()
+        .replace("08ZZZZZ0000Z1ZQ", "06ZZZZZ0000Z1ZU")
+        .replacen("<STATE>Rajasthan</STATE>", "<STATE>Haryana</STATE>", 1);
+    let lab = lab(ADMISSION_ORDER
+        .chars()
+        .map(|letter| match letter {
+            'C' => ScenarioPlan::new(Fixture::SyntheticXml(units.clone()))
+                .with_encoding(WireEncoding::Utf16LeNoBom)
+                .with_framing(ResponseFraming::ContentLength),
+            letter => plan(letter),
+        })
+        .collect());
+    let party = "Counter Sales - Unregistered";
+    let mut voucher = invoice_to(party, "Sales Manual", false);
+    let Err(invoice::InvoiceAdmission::Refused(refusals)) = lab
+        .server
+        .admit_sales_invoice(
+            &lab.identity,
+            &lab.company,
+            &mut voucher,
+            &catalogue(&[(party, false)]),
+        )
+        .await
+    else {
+        panic!("not refused");
+    };
+    assert!(refusals
+        .iter()
+        .any(|refusal| refusal.code == "invoice_place_of_supply_not_company_state"));
+    assert_eq!(sent(lab.simulator), 64);
 }
 
 /// A posted invoice's read-back, on the same captured book: the marks are read

@@ -1415,9 +1415,31 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "import_invoice_masters_changed" => Some(
             "Since this invoice was built, what Tally says about it has changed: the \
              customer's GSTIN, state, registration type or bill-wise setting, the voucher \
-             type, or the company's state. Nothing was posted. Build the invoice again, so it \
+             type, or the state of the company's GST registration. Nothing was posted. Build the invoice again, so it \
              is checked against the book as it is now, and show the user the new approval \
              text.",
+        ),
+        "invoice_company_registration_absent"
+        | "invoice_company_registration_not_yet_in_force"
+        | "invoice_company_registration_inactive"
+        | "invoice_company_registration_ambiguous"
+        | "invoice_company_registration_not_regular"
+        | "invoice_company_registration_incomplete"
+        | "invoice_company_registration_inconsistent"
+        | "invoice_company_registration_unbound" => Some(
+            "The company's own GST registration in Tally does not let ComplyEaze Bridge \
+             issue a tax invoice on this date: it needs exactly one GST registration in force \
+             on the invoice date, of type Regular and not inactive, whose GSTIN is valid and \
+             belongs to the registration's state. The code names which of these failed. \
+             Nothing was written. Ask the user to check the company's GST registration \
+             details in Tally, and the date they apply from, then build again. Do not change \
+             the invoice's date or figures to get past this.",
+        ),
+        "invoice_company_registration_unread" | "invoice_tax_unit_without_guid" => Some(
+            "Tally's answer about the company's GST registrations could not be read: it \
+             listed no tax unit at all, or a unit without its identifier. Nothing was \
+             written. Check that the company is still open in Tally, then build again; if it \
+             repeats, report it rather than retrying.",
         ),
         "invoice_party_registration_type_not_reported" => Some(
             "Tally's ledger for this customer does not say what kind of GST registration it \

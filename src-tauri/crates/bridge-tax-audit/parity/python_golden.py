@@ -122,6 +122,20 @@ def _related_parties_cl23(c):
     return related_parties_cl23, related_parties_cl23.run(c.eng, c.rules, related_parties_config(c.cfg))
 
 
+def _clause44(c):
+    from tae.audit_tests import clause44
+    from tae.config import (clause44_money_category_by_ledger, depreciation_config, gst_registration_type_by_ledger,
+                            role_ledger_set, tax_ledgers_by_head)
+    # As tae/pack.py reads them: tax_ledgers, round_off_ledgers and the depreciation table before any test, then the
+    # three clause44 keys.
+    tax_ledgers = tax_ledgers_by_head(c.cfg)
+    round_off_ledgers = role_ledger_set(c.cfg, "round_off_ledgers")
+    dep_expense_ledgers = depreciation_config(c.cfg)[2]
+    return clause44, clause44.run(
+        c.eng, c.rules, dep_expense_ledgers, gst_registration_type_by_ledger(c.cfg), tax_ledgers,
+        role_ledger_set(c.cfg, "no_supplier_expense_ledgers"), round_off_ledgers,
+        clause44_money_category_by_ledger(c.cfg))
+
 def _specified_persons_40a2b(c):
     from types import SimpleNamespace
     from tae.audit_tests import related_parties_cl23, specified_persons_40a2b
@@ -312,6 +326,16 @@ def _loans_interest(c):
         turnover_is_placeholder=turnover_is_placeholder(c.cfg))
 
 
+def _narration_payees(c):
+    from tae.audit_tests import narration_payees
+    from tae.config import tds_config
+    configured = frozenset(c.cfg.get("roles", {}).get("narration_payee_ledgers", []))
+    added = narration_payees.unnamed_194c_ledgers(c.eng.book, _tds_payees(c)[1], tds_config(c.cfg)[0])
+    module = SimpleNamespace(TEST_ID=narration_payees.TEST_ID, check_invariants=lambda eng, result:
+                             narration_payees.check_invariants(eng, result, c.bank, configured | added))
+    return module, narration_payees.run(c.eng, c.rules, c.bank, configured, added_ledgers=added)
+
+
 def _partners_40b_194t(c):
     from tae.audit_tests import partners_40b_194t
     from tae.config import partners_config, tds_payable_ledgers
@@ -430,6 +454,11 @@ def _bank_reconciliation(c):
         bank_charge_narration_terms=bank_charge_narration_terms(c.cfg))
 
 
+def _knock_off_candidates(c):
+    from tae.audit_tests import knock_off_candidates
+    return knock_off_candidates, knock_off_candidates.run(
+        c.eng, c.rules, tuple(c.cfg.get("party_identity", {}).get("party_groups", ())))
+
 def _high_value_register(c):
     """As tae/pack.py calls it, on every engagement: the bank statement and the AIS rows are both
     optional here, as there (none and no rows without their flags). The counterparty types are the
@@ -471,6 +500,10 @@ def _stock(c):
     return module, stock.run(c.eng, {"version": c.rules.version}, items, opening, closing,
                              read_format.company_isintegrated(c.cfg, c.path.parent))
 
+def _questionnaire_cl13(c):
+    from tae.audit_tests import questionnaire_cl13
+    return questionnaire_cl13, questionnaire_cl13.run(c.eng, c.rules, _stock(c)[1])
+
 def _party_monthly(c):
     from tae.audit_tests import party_monthly
     # As tae/pack.py calls it: the cash and bank ledgers, and the module's own top-parties cut.
@@ -490,16 +523,20 @@ RUNNERS = {
     "cash_book_integrity": _cash_book_integrity,
     "cash_payments_40a3": _cash_payments_40a3,
     "clause21a_candidates": _clause21a_candidates,
+    "clause44": _clause44,
     "counter_cheques_40a3": _counter_cheques_40a3,
     "creditor_ageing_43bh": _creditor_ageing_43bh,
     "depreciation": _depreciation,
     "entity_269st_gap": _entity_269st_gap,
     "financial_statements": _financial_statements,
     "high_value_register": _high_value_register,
+    "knock_off_candidates": _knock_off_candidates,
     "ledger_scrutiny": _ledger_scrutiny,
     "loans_interest": _loans_interest,
+    "narration_payees": _narration_payees,
     "partners_40b_194t": _partners_40b_194t,
     "party_monthly": _party_monthly,
+    "questionnaire_cl13": _questionnaire_cl13,
     "read_scope": _read_scope,
     "related_parties_cl23": _related_parties_cl23,
     "specified_persons_40a2b": _specified_persons_40a2b,

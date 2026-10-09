@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -582,6 +582,19 @@ test("a sidecar's hash checks the fixture beside it, not one of the same name el
       `| \`cap.utf16le.xml\` | ${other.length} | \`${createHash("sha256").update(other).digest("hex")}\` |\n`,
     );
     assert.match(runGate(root), /2 captured-fixture hash\(es\) verified/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// The gate prints and compares repository paths in `/` form on every OS (#1471). Where `/` is the separator
+// a backslash is an ordinary file-name character and stays one: only the OS separator is converted.
+test("a backslash in a file name is kept where it is not the path separator", { skip: sep === "\\" }, async () => {
+  const root = await makeTree();
+  try {
+    await writeFile(join(root, "scripts/fixtures/odd\\name.xml"), "<x/>\n");
+    const output = runGateExpectingFailure(root);
+    assert.match(output, /scripts\/fixtures\/odd\\name\.xml: no hash row under/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

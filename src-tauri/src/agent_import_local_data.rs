@@ -117,7 +117,10 @@ const ENTRY_CAP: usize = 100_000;
 fn import_class(name: &str) -> &'static str {
     if name.ends_with(".xml") {
         "import_files"
-    } else if name.ends_with(".proof.json") || name.ends_with(".proof.md") {
+    } else if name.ends_with(".proof.json")
+        || name.ends_with(".proof.md")
+        || ((name.ends_with(".json") || name.ends_with(".md")) && name.contains(".proof."))
+    {
         "proofs"
     } else if name.ends_with(".approval_lapse.json") {
         "approval_notes"
@@ -126,12 +129,25 @@ fn import_class(name: &str) -> &'static str {
         || name.ends_with(".masters_ack.json")
         || name.ends_with(".batch_step_doubt.json")
         || name.ends_with(".batch_step_ack.json")
+        || name.ends_with(".masters_verdict.json")
         || name.ends_with(".baseline.json")
+        || is_baseline_addition(name)
     {
         "review_records"
     } else {
         "other"
     }
+}
+
+/// `<batch>.baseline.<n>.json`, one addition to a build's baseline (#911).
+fn is_baseline_addition(name: &str) -> bool {
+    name.strip_suffix(".json")
+        .and_then(|stem| stem.rsplit_once('.'))
+        .is_some_and(|(stem, index)| {
+            stem.ends_with(".baseline")
+                && !index.is_empty()
+                && index.bytes().all(|byte| byte.is_ascii_digit())
+        })
 }
 
 type ClassOf = fn(&str) -> &'static str;
@@ -389,7 +405,10 @@ pub(super) fn to_json(
             "sent_or_found_posted": settlement.sent_or_found,
             "not_settled": settlement.unsettled,
             "not_settled_no_response": settlement.unsettled_no_response,
-            "not_settled_not_verified": settlement.unsettled - settlement.unsettled_no_response,
+            "not_settled_binding_refused": settlement.unsettled_binding_refused,
+            "not_settled_not_verified": settlement.unsettled
+                - settlement.unsettled_no_response
+                - settlement.unsettled_binding_refused,
             "no_dispatch_never_verified": settlement.no_dispatch_never_verified,
         }),
     };

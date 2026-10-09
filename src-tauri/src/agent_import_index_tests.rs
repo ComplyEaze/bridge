@@ -10,10 +10,10 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
         .remove(0);
     template.voucher_type = Some("Journal".into());
     template.voucher_number = None;
-    let date = template.date.as_deref().unwrap();
+    let date = template.date.as_str();
     let expected = ImportVoucher {
         bridge_txn_id: String::new(),
-        date: format!("{}-{}-{}", &date[..4], &date[4..6], &date[6..]),
+        date: stored_date(date),
         voucher_type: VoucherType::Journal,
         narration: None,
         reference: None,
@@ -53,8 +53,8 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
             .iter()
             .map(|row| row.bridge_txn_id.clone())
             .collect(),
-        date_from: date.into(),
-        date_to: date.into(),
+        date_from: stored_date(date),
+        date_to: stored_date(date),
         sha256: "synthetic".into(),
         built_at: now(),
         status: "built".into(),

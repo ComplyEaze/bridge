@@ -476,8 +476,11 @@ const PROBE_PINS = {
     ["src-tauri/clippy.toml", "std::process::Commnad::new", 1],
   ],
 };
-// The capture's clippy.toml is an absolute path outside this repository, as cargo prints it.
-const probe = () => readFileSync(probeFile, "utf8").replaceAll("/work/probe2/main/clippy.toml", `${root}/src-tauri/clippy.toml`);
+// The capture's clippy.toml is an absolute path outside this repository, as cargo prints it. A path
+// goes into the capture's JSON escaped, since on Windows `root` holds backslashes (#1471).
+const inJson = (text) => JSON.stringify(text).slice(1, -1);
+const probeToml = inJson(`${root}/src-tauri/clippy.toml`);
+const probe = () => readFileSync(probeFile, "utf8").replaceAll("/work/probe2/main/clippy.toml", probeToml);
 
 test("a dependency's macro, a listed type and a listed path that resolves to nothing are counted", () => {
   const result = census(probe(), "macOS", PROBE_PINS);
@@ -493,7 +496,7 @@ test("a dependency's macro, a listed type and a listed path that resolves to not
 test("a verbatim Windows path and a repeated unresolved-path message count as one row", () => {
   // CI printed clippy.toml's path on Windows as //?/D:/a/... (a \\?\ verbatim path); this is that shape on this root.
   const verbatimPath = `\\\\?\\${(root + "/src-tauri/clippy.toml").replaceAll("/", "\\")}`;
-  const verbatim = probe().replaceAll(`${root}/src-tauri/clippy.toml`, JSON.stringify(verbatimPath).slice(1, -1));
+  const verbatim = probe().replaceAll(probeToml, inJson(verbatimPath));
   assert.ok(verbatim.includes("?"), "the path was rewritten");
   const result = census(verbatim, "macOS", PROBE_PINS);
   assert.equal(result.status, 0, result.stderr);
@@ -506,7 +509,7 @@ test("a verbatim Windows path and a repeated unresolved-path message count as on
 });
 
 test("a message about a listed path that is not located in clippy.toml is not counted", () => {
-  const elsewhere = probe().replaceAll(`${root}/src-tauri/clippy.toml`, `${root}/src-tauri/src/lib.rs`);
+  const elsewhere = probe().replaceAll(probeToml, inJson(`${root}/src-tauri/src/lib.rs`));
   assert.notEqual(elsewhere, probe(), "the capture places the message in clippy.toml");
   const result = census(elsewhere, "macOS", { macOS: PROBE_PINS.macOS.slice(0, 2) });
   assert.equal(result.status, 0, result.stderr);

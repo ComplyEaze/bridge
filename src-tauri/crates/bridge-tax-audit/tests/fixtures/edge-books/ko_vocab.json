@@ -1,0 +1,1059 @@
+{
+ "comment": "Vocabulary and characters, one rule per voucher. Every v voucher pays rent from Bank A. v01 to v28 write each of the 55 words that never count as part of a name, two per narration (one on the last), before and after Lambda Traders, in the order of the README's list: it stays plain; v29 to v37 put ZED and Lambda Traders on either side of one separator each (- / , ; | : ( ) and backslash): plain; v38 to v42 join ZED to Lambda Traders with a full stop, &, #, _ and an apostrophe, none a separator: inside; v43 writes LAMBDA-TRADERS ZED: the word after the name shares the part of its last word, so it is inside; v44 writes the sharp s, which case-folds to ss and finds Strasse Works; v45 writes GROSS MART, which finds the party Groß Mart; v46 writes the fi ligature, which case-folds to fi and finds Fine Foods; v47 writes the Kelvin sign, which case-folds to k and finds Kilo Works; v48 writes a dotted capital I, which decomposes to I and a combining dot; the dot after the letter is dropped, so Iota Works is found; v49 has a zero line on Sales, which its booked-to list leaves out; v50 has Lambda Traders inside and plain, and Beta Stores inside only: only Beta Stores' part is shown; v51 names a decomposed and a composed party: they are listed in the order of the names as the book writes them, the decomposed one first.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_vocab-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_vocab-001"
+  },
+  {
+   "name": "Beta Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_vocab-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-ko_vocab-cap-2"
+  },
+  {
+   "name": "Fine Foods",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_vocab-004"
+  },
+  {
+   "name": "Groß Mart",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_vocab-005"
+  },
+  {
+   "name": "Iota Works",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_vocab-006"
+  },
+  {
+   "name": "Kilo Works",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_vocab-007"
+  },
+  {
+   "name": "Lambda Traders",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_vocab-008"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_vocab-009"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-ko_vocab-010"
+  },
+  {
+   "name": "Strasse Works",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_vocab-011"
+  },
+  {
+   "name": "Zéro Mart",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_vocab-zero-mart"
+  },
+  {
+   "name": "Zéro Bazaar",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_vocab-013"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 5100000,
+   "closing": 44900000
+  },
+  {
+   "ledger": "Beta Stores",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Fine Foods",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Groß Mart",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Iota Works",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Kilo Works",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Lambda Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 5100000,
+   "credit": 0,
+   "closing": 5100000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Strasse Works",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Zéro Mart",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Zéro Bazaar",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "v01",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "to Lambda Traders from",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v02",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "by Lambda Traders for",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v03",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "narration": "paid Lambda Traders pay",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v04",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "narration": "payment Lambda Traders pymt",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v05",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "narration": "neft Lambda Traders rtgs",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v06",
+   "date": "2025-05-13",
+   "base_type": "Payment",
+   "narration": "imps Lambda Traders upi",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v07",
+   "date": "2025-05-15",
+   "base_type": "Payment",
+   "narration": "ref Lambda Traders cr",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v08",
+   "date": "2025-05-17",
+   "base_type": "Payment",
+   "narration": "dr Lambda Traders towards",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v09",
+   "date": "2025-05-19",
+   "base_type": "Payment",
+   "narration": "being Lambda Traders via",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v10",
+   "date": "2025-05-21",
+   "base_type": "Payment",
+   "narration": "and Lambda Traders of",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v11",
+   "date": "2025-05-23",
+   "base_type": "Payment",
+   "narration": "the Lambda Traders in",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v12",
+   "date": "2025-05-25",
+   "base_type": "Payment",
+   "narration": "on Lambda Traders at",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v13",
+   "date": "2025-05-27",
+   "base_type": "Payment",
+   "narration": "with Lambda Traders mr",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v14",
+   "date": "2025-05-29",
+   "base_type": "Payment",
+   "narration": "mrs Lambda Traders ms",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v15",
+   "date": "2025-05-31",
+   "base_type": "Payment",
+   "narration": "inb Lambda Traders transfer",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v16",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "narration": "trf Lambda Traders chq",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v17",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "narration": "cheque Lambda Traders cash",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v18",
+   "date": "2025-06-06",
+   "base_type": "Payment",
+   "narration": "deposit Lambda Traders withdrawal",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v19",
+   "date": "2025-06-08",
+   "base_type": "Payment",
+   "narration": "settled Lambda Traders adjustment",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v20",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "narration": "bill Lambda Traders gr",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v21",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "narration": "inv Lambda Traders invoice",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v22",
+   "date": "2025-06-14",
+   "base_type": "Payment",
+   "narration": "against Lambda Traders pvt",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v23",
+   "date": "2025-06-16",
+   "base_type": "Payment",
+   "narration": "ltd Lambda Traders limited",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v24",
+   "date": "2025-06-18",
+   "base_type": "Payment",
+   "narration": "llp Lambda Traders private",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v25",
+   "date": "2025-06-20",
+   "base_type": "Payment",
+   "narration": "rs Lambda Traders inr",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v26",
+   "date": "2025-06-22",
+   "base_type": "Payment",
+   "narration": "amt Lambda Traders amount",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v27",
+   "date": "2025-06-24",
+   "base_type": "Payment",
+   "narration": "no Lambda Traders a",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v28",
+   "date": "2025-06-26",
+   "base_type": "Payment",
+   "narration": "an Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v29",
+   "date": "2025-06-28",
+   "base_type": "Payment",
+   "narration": "ZED-Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v30",
+   "date": "2025-06-30",
+   "base_type": "Payment",
+   "narration": "ZED/Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v31",
+   "date": "2025-07-02",
+   "base_type": "Payment",
+   "narration": "ZED,Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v32",
+   "date": "2025-07-04",
+   "base_type": "Payment",
+   "narration": "ZED;Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v33",
+   "date": "2025-07-06",
+   "base_type": "Payment",
+   "narration": "ZED|Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v34",
+   "date": "2025-07-08",
+   "base_type": "Payment",
+   "narration": "ZED:Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v35",
+   "date": "2025-07-10",
+   "base_type": "Payment",
+   "narration": "ZED(Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v36",
+   "date": "2025-07-12",
+   "base_type": "Payment",
+   "narration": "ZED)Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v37",
+   "date": "2025-07-14",
+   "base_type": "Payment",
+   "narration": "ZED\\Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v38",
+   "date": "2025-07-16",
+   "base_type": "Payment",
+   "narration": "ZED.Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v39",
+   "date": "2025-07-18",
+   "base_type": "Payment",
+   "narration": "ZED&Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v40",
+   "date": "2025-07-20",
+   "base_type": "Payment",
+   "narration": "ZED#Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v41",
+   "date": "2025-07-22",
+   "base_type": "Payment",
+   "narration": "ZED_Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v42",
+   "date": "2025-07-24",
+   "base_type": "Payment",
+   "narration": "ZED'Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v43",
+   "date": "2025-07-26",
+   "base_type": "Payment",
+   "narration": "LAMBDA-TRADERS ZED",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v44",
+   "date": "2025-07-28",
+   "base_type": "Payment",
+   "narration": "STRAßE WORKS",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v45",
+   "date": "2025-07-30",
+   "base_type": "Payment",
+   "narration": "GROSS MART",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v46",
+   "date": "2025-08-01",
+   "base_type": "Payment",
+   "narration": "ﬁne Foods",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v47",
+   "date": "2025-08-03",
+   "base_type": "Payment",
+   "narration": "KILO WORKS",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v48",
+   "date": "2025-08-05",
+   "base_type": "Payment",
+   "narration": "PAID İOTA WORKS",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v49",
+   "date": "2025-08-07",
+   "base_type": "Payment",
+   "narration": "for Alpha Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Sales",
+     0
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v50",
+   "date": "2025-08-09",
+   "base_type": "Payment",
+   "narration": "ZED LAMBDA TRADERS, paid Lambda Traders, ZED BETA STORES",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "v51",
+   "date": "2025-08-11",
+   "base_type": "Payment",
+   "narration": "ZÉRO MART and ZÉRO BAZAAR",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ]
+}

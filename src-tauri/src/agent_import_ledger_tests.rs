@@ -12,8 +12,8 @@ fn batch() -> ImportLedgerLine {
         company_guid: GUID.into(),
         company: None,
         txn_ids: vec!["txn-001".into()],
-        date_from: "20260901".into(),
-        date_to: "20260901".into(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "a".repeat(64),
         built_at: now(),
         status: "built".into(),
@@ -22,7 +22,7 @@ fn batch() -> ImportLedgerLine {
             value: Some(10),
             master_value: Some(10),
         },
-        vouchers: vec![payload().vouchers.remove(0)],
+        vouchers: vec![admitted_payload().vouchers.remove(0)],
     }
 }
 
@@ -118,8 +118,10 @@ fn repeated_verification_appends_only_compact_status_and_preserves_batch_bytes()
         .collect::<Vec<_>>();
     assert_eq!(added.len(), 25);
     for line in added {
+        // Bounded whatever the payload: the record and the name of the
+        // proof it makes current (#911).
         assert!(
-            line.len() < 300,
+            line.len() < 400,
             "verification status must not scale with payload"
         );
         let value: Value = serde_json::from_str(line).unwrap();
@@ -237,14 +239,8 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
             .unwrap();
         let paths = [
             directory.path().join("agent-import-ledger.jsonl"),
-            directory
-                .path()
-                .join("imports")
-                .join(format!("{}.proof.json", original.batch_id)),
-            directory
-                .path()
-                .join("imports")
-                .join(format!("{}.proof.md", original.batch_id)),
+            newer.current_proof_paths(&original.batch_id)[0].clone(),
+            newer.current_proof_paths(&original.batch_id)[1].clone(),
         ];
         let before = paths
             .iter()
@@ -272,7 +268,15 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
         assert!(!directory.path().join("imports/.proof-publication").exists());
         if identical_status {
             let journal = fs::read_to_string(&paths[0]).unwrap();
-            let lines = journal.lines().collect::<Vec<_>>();
+            // Each record names its own proof; apart from that they are the same.
+            let lines = journal
+                .lines()
+                .map(|line| {
+                    let mut record: Value = serde_json::from_str(line).unwrap();
+                    record.as_object_mut().unwrap().remove("proof");
+                    record
+                })
+                .collect::<Vec<_>>();
             assert_eq!(
                 lines[lines.len() - 1],
                 lines[lines.len() - 2],
@@ -310,7 +314,8 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
         older
             .persist_import_verification(&stale_proof, &retry.batch, retry_status, retry.generation)
             .unwrap();
-        // The file is the retry's proof, carrying the status the ledger records.
+        // The current proof is the retry's, carrying the status the ledger
+        // records; the newer one it follows is still on disk.
         let recorded = older
             .latest_import_snapshot(&original.batch_id)
             .unwrap()
@@ -321,9 +326,13 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
         let mut expected = stale_proof.clone();
         expected["verification_status"] = json!(recorded);
         assert_eq!(
-            serde_json::from_slice::<Value>(&fs::read(&paths[1]).unwrap()).unwrap(),
+            serde_json::from_slice::<Value>(
+                &fs::read(&older.current_proof_paths(&original.batch_id)[0]).unwrap()
+            )
+            .unwrap(),
             expected
         );
+        assert_eq!(fs::read(&paths[1]).unwrap(), before[1]);
     }
 }
 
@@ -462,6 +471,10 @@ fn a_verdict_after_the_response_reads_back_and_sets_no_status() {
         assert_eq!(snapshots[0].batch.status, "response_received");
         let settled = ledger::settlement(std::io::Cursor::new(text.as_bytes())).unwrap();
         assert_eq!(settled.unsettled, 1, "a verdict is not a verification");
+        // A refused binding is its own class of unsettled batch (#1039).
+        let refused = matches!(verdict, ledger::PostSpanVerdict::Refused(_));
+        assert_eq!(settled.unsettled_binding_refused, usize::from(refused));
+        assert_eq!(settled.unsettled_no_response, 0);
     }
 }
 
@@ -563,6 +576,57 @@ fn a_pre_post_mark_belongs_only_to_a_native_intent() {
     let marked_response = lines.iter().map(record).collect::<String>();
     assert_eq!(
         ledger::parse_snapshots(&marked_response).err(),
+        Some("import_ledger_invalid".to_string())
+    );
+}
+
+/// A saved proof is named only by a verification record, and the batch's
+/// latest verification record decides which proof is current: one an older
+/// build wrote, with no name, makes its single legacy file current (#911).
+#[test]
+fn a_proof_is_named_only_by_a_verification_record_and_the_latest_decides() {
+    let line = batch();
+    let mut lines = posted_journal(&line)
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    let text = |lines: &[Value]| lines.iter().map(record).collect::<String>();
+    let current = |lines: &[Value]| {
+        ledger::parse_snapshots(&text(lines)).unwrap()[0]
+            .current_proof
+            .clone()
+    };
+    assert_eq!(current(&lines), ledger::CurrentProof::Legacy);
+    let name = ledger::ProofName::of(b"proof", chrono::Utc::now());
+    let saved = serde_json::to_value(ledger::StatusRecord::verified(&line, name.clone())).unwrap();
+    lines.push(saved.clone());
+    assert_eq!(current(&lines), ledger::CurrentProof::Saved(name.clone()));
+    let mut older = saved.clone();
+    older.as_object_mut().unwrap().remove("proof");
+    lines.push(older);
+    assert_eq!(current(&lines), ledger::CurrentProof::Legacy);
+    lines.push(saved.clone());
+    assert_eq!(current(&lines), ledger::CurrentProof::Saved(name.clone()));
+    // A record of another kind after it names no proof and changes nothing.
+    let mut before_the_post = lines[..1].to_vec();
+    before_the_post.push(saved.clone());
+    before_the_post.extend(lines[1..3].iter().cloned());
+    assert_eq!(
+        current(&before_the_post),
+        ledger::CurrentProof::Saved(name.clone())
+    );
+    // On any other record the name refuses the journal, as does a malformed one.
+    let mut misplaced = lines.clone();
+    misplaced[2]["proof"] = json!(String::from(name));
+    assert_eq!(
+        ledger::parse_snapshots(&text(&misplaced)).err(),
+        Some("import_ledger_invalid".to_string())
+    );
+    let mut malformed = lines;
+    let last = malformed.len() - 1;
+    malformed[last]["proof"] = json!("../batch.proof.json");
+    assert_eq!(
+        ledger::parse_snapshots(&text(&malformed)).err(),
         Some("import_ledger_invalid".to_string())
     );
 }
@@ -676,4 +740,45 @@ fn a_guid_bound_by_another_batch_is_recorded_as_a_refusal() {
         recorded,
         ledger::PostSpanVerdict::Refused("span_identity_reused".into())
     );
+}
+
+/// A stored date that is not `YYYYMMDD` refuses the whole journal, as any
+/// other malformed record does, for the import tools and the local data
+/// report alike. No release has written one: every build stored the
+/// normalised date (#1307).
+#[test]
+fn a_stored_date_that_is_not_yyyymmdd_refuses_the_journal() {
+    let mut line = batch();
+    line.company = Some(ImportCompanyTuple {
+        name: "Synthetic Accounts".into(),
+        guid: GUID.into(),
+        company_number: "1".into(),
+        books_from: stored_date("20260401"),
+    });
+    let stored = serde_json::to_value(&line).unwrap();
+    let text = format!("{stored}\n");
+    assert_eq!(ledger::parse_snapshots(&text).unwrap().len(), 1);
+    assert!(ledger::settlement(text.as_bytes()).is_ok());
+    for pointer in [
+        "/date_from",
+        "/date_to",
+        "/vouchers/0/date",
+        "/company/books_from",
+    ] {
+        for date in ["2026-09-01", "20260931", ""] {
+            let mut edited = stored.clone();
+            *edited.pointer_mut(pointer).unwrap() = json!(date);
+            let text = format!("{edited}\n");
+            assert_eq!(
+                ledger::parse_snapshots(&text).err(),
+                Some("import_ledger_invalid".to_string()),
+                "{pointer} {date:?}"
+            );
+            assert_eq!(
+                ledger::settlement(text.as_bytes()).err(),
+                Some("import_ledger_invalid".to_string()),
+                "{pointer} {date:?}"
+            );
+        }
+    }
 }

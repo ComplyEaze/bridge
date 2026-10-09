@@ -1,0 +1,11 @@
+# fixture: tests/fixtures/company_features_shape_lab_live.utf16le.xml
+# parser: parse_company_features(BRIDGE SHAPE LAB)
+# source: captured
+Ok(NativeCompanyFeatures {
+    cost_centres: No,
+    gst: Yes,
+    batch_wise: Yes,
+    base_currency: Reported(
+        "₹",
+    ),
+})

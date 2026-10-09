@@ -4,10 +4,10 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { FIXTURE_ROOTS } from "./fixture-roots.mjs";
+import { FIXTURE_ROOTS, fixtureSignal } from "./fixture-roots.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 
@@ -176,4 +176,11 @@ test("neither fixture gate carries its own list of roots", () => {
       assert.ok(!source.includes(`"${fixtureRoot}"`), `${gate} names ${fixtureRoot} itself`);
     }
   }
+});
+
+// A directory's name is its last component split on the OS separator (#1471): `\` on Windows, where
+// `a\fixtures` was once read whole; where the separator is `/`, a backslash stays part of the name.
+test("a directory is named by its last path component, on the OS separator only", () => {
+  assert.equal(fixtureSignal(join("a", "fixtures"), []), "named fixture(s)");
+  if (sep === "/") assert.equal(fixtureSignal("a/b\\fixtures", []), null);
 });

@@ -619,6 +619,14 @@ licensed or standard TallyPrime.
 > voucher-type replacement were observed on a Payment only. See TALLY_PROTOCOL_REFERENCE §9.3 for
 > the row-by-row table and what remains unmeasured.
 
+> **Scoped addition, 2026-10-09 (PARTIAL):** an unchanged re-import was seen again, on TallyPrime
+> Release 7.1 Silver on Windows 10, for a file Bridge built (two Receipts and four Payments) and a
+> person imported through Tally's Import screen. The six vouchers were altered in place: same GUIDs,
+> MasterIDs and numbers, AlterIDs advanced, six vouchers afterwards. On the re-import Tally's screen
+> showed only "Import successful", with no counters. The export's `REMOTEID` attribute is the voucher's own GUID
+> there too, and the file's id survives only in the narration tag. Which field Tally matched on is not
+> established. See TALLY_PROTOCOL_REFERENCE §9.3.
+
 ### 3.3b Master-name matching: directional alternatives, otherwise exact
 
 **VERIFIED 2026-07-30**, against a ledger named `BRIDGE-PROBE-LEDGER-A` and one named

@@ -1,0 +1,183 @@
+{
+ "comment": "loans_interest, bridge#1259 item 3, a firm: a voucher posting to Loan Q against only Loan P's interest ledger is a possible misposted interest entry even beside a nil line on Suspense, and the misposted-interest check does not name Suspense as a stray ledger. Interest P is declared shared, so its debit is a published figure and LOAN-3 stays quiet.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_misposted-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_misposted-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_nil_line_misposted-002"
+  },
+  {
+   "name": "Suspense",
+   "chain": [
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_misposted-003"
+  },
+  {
+   "name": "Loan P",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_line_misposted-004"
+  },
+  {
+   "name": "Loan Q",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_line_misposted-005"
+  },
+  {
+   "name": "Interest P",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_nil_line_misposted-006"
+  },
+  {
+   "name": "Interest Q",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_nil_line_misposted-007"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Interest P",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Interest Q",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Loan P",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -5000000
+  },
+  {
+   "ledger": "Loan Q",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 500000,
+   "closing": -5500000
+  },
+  {
+   "ledger": "Suspense",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "x01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest P",
+     500000
+    ],
+    [
+     "Loan Q",
+     -500000
+    ],
+    [
+     "Suspense",
+     0
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan P": {
+   "lender": "Invented P Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest P"
+  },
+  "Loan Q": {
+   "lender": "Invented Q Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Q"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ],
+ "shared_interest_ledgers": [
+  "Interest P"
+ ]
+}

@@ -98,6 +98,11 @@
         {
           "kind": "voucher",
           "id": "edge-cc-dup",
+          "label": "Purchase DUP-FIRST on 2026-03-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-cc-dup",
           "label": "Purchase DUP-SECOND on 2026-03-06"
         }
       ]
@@ -118,6 +123,11 @@
           "kind": "voucher",
           "id": "edge-ca-201",
           "label": "Purchase edge-ca-201 on 2026-02-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-cc-dup",
+          "label": "Purchase DUP-FIRST on 2026-03-05"
         },
         {
           "kind": "voucher",
@@ -146,6 +156,11 @@
         {
           "kind": "voucher",
           "id": "edge-cc-dup",
+          "label": "Purchase DUP-FIRST on 2026-03-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-cc-dup",
           "label": "Purchase DUP-SECOND on 2026-03-06"
         }
       ]
@@ -166,6 +181,11 @@
           "kind": "voucher",
           "id": "edge-ca-201",
           "label": "Purchase edge-ca-201 on 2026-02-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-cc-dup",
+          "label": "Purchase DUP-FIRST on 2026-03-05"
         },
         {
           "kind": "voucher",
@@ -271,6 +291,11 @@
         {
           "kind": "voucher",
           "id": "edge-cc-dup",
+          "label": "Purchase DUP-FIRST on 2026-03-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-cc-dup",
           "label": "Purchase DUP-SECOND on 2026-03-06"
         }
       ],
@@ -320,6 +345,11 @@
           "kind": "voucher",
           "id": "edge-ca-201",
           "label": "Purchase edge-ca-201 on 2026-02-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-cc-dup",
+          "label": "Purchase DUP-FIRST on 2026-03-05"
         },
         {
           "kind": "voucher",

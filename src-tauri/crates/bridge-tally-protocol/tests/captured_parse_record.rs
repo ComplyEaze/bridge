@@ -22,6 +22,7 @@ use std::path::{Path, PathBuf};
 
 use bridge_tally_primitives::TallyDate;
 use bridge_tally_protocol::native_cash_flow::{parse_native_cash_flow, WholeMonthWindow};
+use bridge_tally_protocol::native_company_features::{parse_company_features, ExpectedCompany};
 use bridge_tally_protocol::native_funds_flow::parse_native_funds_flow;
 use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
 use bridge_tally_protocol::native_negative_stock::parse_native_negative_stock;
@@ -42,6 +43,7 @@ use bridge_tally_protocol::native_stock_summary::{
 use bridge_tally_protocol::native_trial_balance::{
     parse_native_trial_balance, parse_native_trial_balance_with_currency,
 };
+use bridge_tally_protocol::native_voucher_type_numbering::parse_voucher_type_numbering;
 use bridge_tally_protocol::outstandings_shared::{
     parse_company_book_extent, parse_company_book_extent_v2, parse_company_ledger_count,
     CompanyBookExtent, CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
@@ -254,6 +256,18 @@ fn funds_flow(text: &str, from: &str, to: &str) -> String {
     let window = WholeMonthWindow::new(DateBoundaryProfile::ModeAgnostic, date(from), date(to))
         .expect("a whole-month window copied from a test");
     typed(parse_native_funds_flow(text, &window))
+}
+
+fn company_features(text: &str, guid: &str, name: &str, number: &str) -> String {
+    typed(parse_company_features(
+        text,
+        &ExpectedCompany {
+            guid,
+            name,
+            number,
+            books_from: "20250401",
+        },
+    ))
 }
 
 const FOREX_GUID: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
@@ -1117,6 +1131,19 @@ const ROWS: &[Row] = &[
         parser: "parse_native_funds_flow(20250401..20260331)",
         parse: |_, text| funds_flow(text, "20250401", "20260331"),
     },
+    // Company settings and currency symbol: src/native_company_features_tests.rs.
+    Row {
+        fixture: "tests/fixtures/company_features_shape_lab_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_features(BRIDGE SHAPE LAB)",
+        parse: |_, text| company_features(text, SHAPE_GUID, "BRIDGE SHAPE LAB", "100021"),
+    },
+    Row {
+        fixture: "tests/fixtures/company_features_corpus_forex_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_features(BRIDGE CORPUS FOREX)",
+        parse: |_, text| company_features(text, FOREX_GUID, "BRIDGE CORPUS FOREX", "100011"),
+    },
     // Native masters: src/native_masters_tests.rs (SHAPE LAB and READS LAB);
     // src/agent_voucher_type_class_tests.rs for READS LAB's voucher types, read by production
     // (src/agent_vouchers.rs) as a voucher-type collection.
@@ -1125,6 +1152,13 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_masters(VoucherTypes)",
         parse: |_, text| masters(NativeMasterKind::VoucherTypes, text, SHAPE_GUID),
+    },
+    // Series-level numbering: src/native_voucher_type_numbering_tests.rs (a Windows synthetic book).
+    Row {
+        fixture: "tests/fixtures/voucher_type_numbering_series_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_voucher_type_numbering",
+        parse: |_, text| typed(parse_voucher_type_numbering(text)),
     },
     Row {
         fixture: "tests/fixtures/masters_godowns_shape_lab_live.utf16le.xml",

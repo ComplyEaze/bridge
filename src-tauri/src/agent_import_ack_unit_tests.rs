@@ -268,6 +268,56 @@ fn each_fingerprinted_field_changed_alone_changes_the_fingerprint() {
     assert_eq!(voucher_fingerprint(&alter), original);
 }
 
+/// The read's dates are parsed where it is admitted: a row whose date is
+/// absent or not a Tally date, or whose effective date is not one, is no
+/// `ReadVoucher` (#1425).
+#[test]
+fn a_read_voucher_holds_only_valid_dates() {
+    for (pointer, value) in [
+        ("/date", Value::Null),
+        ("/date", json!("2026-09-07")),
+        ("/date", json!("20260931")),
+        ("/effective_date", json!("")),
+        ("/effective_date", json!("20260931")),
+    ] {
+        let mut bad = row_json(2, "Paid");
+        *bad.pointer_mut(pointer).unwrap() = value.clone();
+        assert!(
+            serde_json::from_value::<ReadVoucher>(bad).is_err(),
+            "{pointer} {value}"
+        );
+    }
+    let mut absent = row_json(2, "Paid");
+    absent.as_object_mut().unwrap().remove("date");
+    assert!(serde_json::from_value::<ReadVoucher>(absent).is_err());
+    let mut no_effective = row_json(2, "Paid");
+    no_effective
+        .as_object_mut()
+        .unwrap()
+        .remove("effective_date");
+    let read: ReadVoucher = serde_json::from_value(no_effective).unwrap();
+    assert_eq!(read.date.as_str(), "20260907");
+    assert_eq!(read.effective_date, None);
+}
+
+/// A recorded review is bound to these exact digests: a change to how the read
+/// holds a field, such as its dates (#1425), must not change the bytes hashed,
+/// or every review on file would read as stale.
+#[test]
+fn the_fingerprint_of_a_read_voucher_is_unchanged() {
+    assert_eq!(
+        voucher_fingerprint(&row(2, "Paid")),
+        "bd42a82bc3c2cf8bdc5e238f72be946b8831d854e469e768d5c00eb05ecaba4e"
+    );
+    let mut dated = row_json(2, "Paid");
+    *dated.pointer_mut("/effective_date").unwrap() = json!("20260907");
+    let dated: ReadVoucher = serde_json::from_value(dated).unwrap();
+    assert_eq!(
+        voucher_fingerprint(&dated),
+        "6e3f9e74fdce028e34f79fb3c586e9cc619e7a836024d77b4d3b20bf7d32a8bf"
+    );
+}
+
 /// A posted line, as `post_import` saves one: its marker is what
 /// `admit_review` finds the voucher by.
 fn posted_line() -> ImportLedgerLine {
@@ -1183,4 +1233,33 @@ fn a_masters_record_past_the_record_bound_is_unreadable() {
     );
     std::fs::write(&path, padded(ledger::MAX_RECORD_BYTES + 1)).unwrap();
     assert_eq!(read_masters_record_raw(&path), Err(()));
+}
+
+/// A finished masters verdict, in its own file beside the pending mark the
+/// post left, outranks that mark, for the review as for the verdict (#911).
+#[test]
+fn a_masters_verdict_file_outranks_the_pending_mark_beside_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let write = |name: &str, bytes: &[u8]| {
+        fs::write(imports.join(format!("{BATCH}.{name}")), bytes).unwrap()
+    };
+    write("masters_check.json", br#"{"state":"check_pending"}"#);
+    assert_eq!(read_masters_records(imports, BATCH), MastersRecord::Pending);
+    write("masters_verdict.json", br#"{"state":"unchanged"}"#);
+    assert_eq!(read_masters_records(imports, BATCH), MastersRecord::NoDoubt);
+    write(
+        "masters_verdict.json",
+        br#"{"state":"posted_under_changed_masters","ledgers":["Cash"],"doubt_record":"unavailable"}"#,
+    );
+    assert_eq!(
+        read_masters_records(imports, BATCH),
+        MastersRecord::DoubtRecordUnavailable
+    );
+    // A verdict file that cannot be read is unreadable, never the mark.
+    write("masters_verdict.json", b"{");
+    assert_eq!(
+        read_masters_records(imports, BATCH),
+        MastersRecord::Unreadable
+    );
 }

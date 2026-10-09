@@ -298,7 +298,7 @@ fn parse_voucher_rows(
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let tag = event.name().as_ref().to_ascii_uppercase();
                 if scope.voucher_scalar() || (scope.collection() && tag != "VOUCHER") {
                     return Err("agent_read_protocol_invalid".into());
                 }
@@ -307,15 +307,12 @@ fn parse_voucher_rows(
                     for attribute in event.attributes() {
                         let attribute =
                             attribute.map_err(|_| "agent_read_protocol_invalid".to_string())?;
-                        if attribute.key.as_ref().eq_ignore_ascii_case(b"REMOTEID") {
+                        if attribute.key.as_ref().eq_ignore_ascii_case("REMOTEID") {
                             claim_agent_scalar(&mut row, "REMOTEID")?;
                             row.insert(
                                 "REMOTEID".into(),
                                 attribute
-                                    .decoded_and_normalized_value(
-                                        quick_xml::XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )
+                                    .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                                     .map_err(|_| "agent_read_protocol_invalid".to_string())?
                                     .into_owned(),
                             );
@@ -359,10 +356,7 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::CData(text)) => {
-                let value = text
-                    .decode()
-                    .map_err(|_| "agent_read_protocol_invalid".to_string())?
-                    .into_owned();
+                let value = text.to_string();
                 if let Some(row) = allocation
                     .as_mut()
                     .filter(|_| scope.bill_allocation_field())
@@ -387,7 +381,7 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 if scope.bill_allocation() {
                     if let Some(allocation_row) = allocation.take().filter(|row| !row.is_empty()) {
                         // Tally emits an amount-only container for a ledger entry with no
@@ -692,7 +686,7 @@ fn parse_voucher_rows(
                 current_tag.clear();
             }
             Ok(quick_xml::events::Event::Empty(event)) => {
-                let name = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let name = event.name().as_ref().to_ascii_uppercase();
                 if scope.voucher_scalar() {
                     return Err("agent_read_protocol_invalid".into());
                 }
@@ -793,10 +787,7 @@ pub(super) fn mark_agent_xml(xml: &str) -> std::borrow::Cow<'_, str> {
 }
 
 pub(super) fn decoded_agent_text(text: quick_xml::events::BytesText<'_>) -> Result<String, String> {
-    let decoded = text
-        .decode()
-        .map_err(|_| "agent_read_protocol_invalid".to_string())?;
-    quick_xml::escape::unescape(&decoded)
+    quick_xml::escape::unescape(&text)
         .map(|value| value.into_owned())
         .map_err(|_| "agent_read_protocol_invalid".to_string())
 }
@@ -804,10 +795,7 @@ pub(super) fn decoded_agent_text(text: quick_xml::events::BytesText<'_>) -> Resu
 pub(super) fn decoded_agent_reference(
     reference: quick_xml::events::BytesRef<'_>,
 ) -> Result<String, String> {
-    let reference = reference
-        .decode()
-        .map_err(|_| "agent_read_protocol_invalid".to_string())?;
-    quick_xml::escape::unescape(&format!("&{reference};"))
+    quick_xml::escape::unescape(&format!("&{};", &*reference))
         .map(|value| value.into_owned())
         .map_err(|_| "agent_read_protocol_invalid".to_string())
 }

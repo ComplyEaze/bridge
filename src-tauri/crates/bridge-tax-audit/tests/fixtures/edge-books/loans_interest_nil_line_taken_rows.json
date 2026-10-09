@@ -1,0 +1,190 @@
+{
+ "comment": "loans_interest, bridge#1259 item 3, a firm: a nil line is no posting in a loan row's counter ledgers or mode. Loan Bank: a loan taken by bank beside a nil cash line stays a bank loan. Loan Counter: a repayment by bank and a loan taken by bank a day apart, of one amount and one narration with a bank reference, each beside a nil line on Suspense, are a bank debit and its return: the rows' counter ledgers do not name Suspense.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_taken_rows-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_taken_rows-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_nil_line_taken_rows-002"
+  },
+  {
+   "name": "Suspense",
+   "chain": [
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_taken_rows-003"
+  },
+  {
+   "name": "Loan Bank",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_line_taken_rows-004"
+  },
+  {
+   "name": "Loan Counter",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_line_taken_rows-005"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 3000000,
+   "credit": 1000000,
+   "closing": 2000000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Loan Bank",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 2000000,
+   "closing": -7000000
+  },
+  {
+   "ledger": "Loan Counter",
+   "opening": -5000000,
+   "debit": 1000000,
+   "credit": 1000000,
+   "closing": -5000000
+  },
+  {
+   "ledger": "Suspense",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "k01",
+   "date": "2025-06-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     2000000
+    ],
+    [
+     "Loan Bank",
+     -2000000
+    ],
+    [
+     "Cash",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "k02",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan Counter",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ],
+    [
+     "Suspense",
+     0
+    ]
+   ],
+   "narration": "ACH DR 100000 EMI"
+  },
+  {
+   "guid": "k03",
+   "date": "2025-06-13",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     1000000
+    ],
+    [
+     "Loan Counter",
+     -1000000
+    ],
+    [
+     "Suspense",
+     0
+    ]
+   ],
+   "narration": "ACH DR 100000 EMI"
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan Bank": {
+   "lender": "Invented Bank Lender",
+   "lender_type": "person"
+  },
+  "Loan Counter": {
+   "lender": "Invented Counter Lender",
+   "lender_type": "person"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

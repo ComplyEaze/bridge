@@ -45,6 +45,11 @@
         {
           "kind": "voucher",
           "id": "edge-sdd-dup",
+          "label": "Journal DUP-FIRST on 2025-08-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sdd-dup",
           "label": "Journal DUP-SECOND on 2025-09-30"
         }
       ]
@@ -116,6 +121,11 @@
         {
           "kind": "voucher",
           "id": "edge-sdd-dup",
+          "label": "Journal DUP-FIRST on 2025-08-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sdd-dup",
           "label": "Journal DUP-SECOND on 2025-09-30"
         }
       ]
@@ -159,6 +169,11 @@
         {
           "kind": "voucher",
           "id": "edge-sdd-dup",
+          "label": "Journal DUP-FIRST on 2025-08-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sdd-dup",
           "label": "Journal DUP-SECOND on 2025-09-30"
         }
       ]
@@ -198,6 +213,11 @@
           "kind": "voucher",
           "id": "edge-sdd-004",
           "label": "Payment edge-sdd-004 on 2025-07-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sdd-dup",
+          "label": "Journal DUP-FIRST on 2025-08-31"
         },
         {
           "kind": "voucher",
@@ -273,6 +293,11 @@
         {
           "kind": "voucher",
           "id": "edge-sdd-dup",
+          "label": "Journal DUP-FIRST on 2025-08-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sdd-dup",
           "label": "Journal DUP-SECOND on 2025-09-30"
         }
       ]
@@ -316,6 +341,11 @@
         {
           "kind": "voucher",
           "id": "edge-sdd-dup",
+          "label": "Journal DUP-FIRST on 2025-08-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sdd-dup",
           "label": "Journal DUP-SECOND on 2025-09-30"
         }
       ]
@@ -353,6 +383,11 @@
           "kind": "voucher",
           "id": "edge-sdd-004",
           "label": "Payment edge-sdd-004 on 2025-07-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sdd-dup",
+          "label": "Journal DUP-FIRST on 2025-08-31"
         },
         {
           "kind": "voucher",

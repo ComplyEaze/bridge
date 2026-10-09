@@ -20,7 +20,7 @@
 // `-text` is caught by the two signals above.
 
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 export const FIXTURE_ROOTS = [
   "src-tauri/crates/bridge-bank-statement/tests/fixtures",
@@ -42,7 +42,7 @@ const PROVENANCE_NOTE = /(^|\.|_)PROVENANCE\.md$/;
 
 // Why `directory` (holding `files`) is a fixture directory, or null.
 export function fixtureSignal(directory, files) {
-  const name = directory.split("/").pop();
+  const name = basename(directory);
   if (name === "fixture" || name === "fixtures") return "named fixture(s)";
   if (files.some((file) => PROVENANCE_NOTE.test(file))) return "holds a provenance note";
   for (const file of files) {

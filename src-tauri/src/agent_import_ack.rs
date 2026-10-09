@@ -254,7 +254,14 @@ fn read_masters_records(imports: &Path, batch_id: &str) -> MastersRecord {
         // A doubt file holds only that verdict, naming each of its ledgers;
         // anything else is not one this build can bind to.
         Some(_) => MastersRecord::Unreadable,
-        None => match read_masters_record_raw(&masters_check_path(imports, batch_id)) {
+        // A finished verdict outranks the pending mark the post left beside
+        // it, as it does for `read_masters_check` (#911).
+        None => match read_masters_record_raw(&masters_verdict_path(imports, batch_id)).and_then(
+            |verdict| match verdict {
+                Some(verdict) => Ok(Some(verdict)),
+                None => read_masters_record_raw(&masters_check_path(imports, batch_id)),
+            },
+        ) {
             Err(()) => MastersRecord::Unreadable,
             Ok(Some((_, check))) if check["state"] == MASTERS_CHECK_PENDING => {
                 MastersRecord::Pending
@@ -531,7 +538,7 @@ fn render_review_text(
         .chain(row.narration.as_deref())
         .chain(row.voucher_number.as_deref())
         .chain(row.voucher_type.as_deref())
-        .chain(row.date.as_deref());
+        .chain(std::iter::once(row.date.as_str()));
     if text_read
         .clone()
         .any(post::has_unsafe_review_layout_character)
@@ -568,7 +575,7 @@ fn render_review_text(
         "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\nNarration:\n  {}\n{entries}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
         row.voucher_type.as_deref().unwrap_or("voucher"),
         quoted(company_name),
-        shown(&row.date),
+        quoted(row.date.as_str()),
         shown(&row.voucher_number),
         row.alter_id.map(|id| id.to_string()).unwrap_or_else(|| "(none)".into()),
         shown(&narration),
@@ -600,7 +607,7 @@ fn batch_review_preview(
             row.entries
                 .iter()
                 .flat_map(|entry| [entry.ledger.as_str(), entry.amount.as_str()])
-                .chain(row.date.as_deref())
+                .chain(std::iter::once(row.date.as_str()))
                 .chain(row.voucher_type.as_deref())
         }));
     if text_read
@@ -633,7 +640,7 @@ fn batch_review_preview(
         };
         summed.map_err(|_| "ack_readback_not_matched".to_string())?;
     }
-    let dates = rows.iter().filter_map(|row| row.date.as_deref());
+    let dates = rows.iter().map(|row| row.date.as_str());
     let alter_ids = rows.iter().filter_map(|row| row.alter_id);
     let mut text = vec![format!(
         "Record that you reviewed {} vouchers in {}",
@@ -785,33 +792,18 @@ impl RecordedReview {
     }
 }
 
-/// Place `bytes` at `path` only if nothing is there: staged, synced, then
-/// hard-linked, which fails when the name exists. Taking the approval by value
-/// means no record can be written without one.
+/// Place `bytes` at `path` only if nothing is there (see
+/// [`persistence::write_record_once`]). Taking the approval by value means no
+/// record can be written without one.
 fn write_record_once(
     path: &Path,
     bytes: &[u8],
     _approval: ReviewAcknowledged,
 ) -> Result<(), String> {
-    let staged = path.with_extension(format!("{}.next", Uuid::new_v4()));
-    write_private(&staged, bytes)?;
-    let linked = fs::hard_link(&staged, path);
-    let _ = fs::remove_file(&staged);
-    match linked {
-        Ok(()) => {
-            // Make the new name durable; a record lost to a power failure
-            // would read as absent, never as someone else's.
-            #[cfg(unix)]
-            if let Some(directory) = path.parent() {
-                let _ = fs::File::open(directory).and_then(|directory| directory.sync_all());
-            }
-            Ok(())
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            Err("ack_already_recorded".into())
-        }
-        Err(_) => Err("import_file_write_failed".into()),
-    }
+    persistence::write_record_once(path, bytes).map_err(|refused| match refused {
+        persistence::RecordOnce::Exists => "ack_already_recorded".into(),
+        persistence::RecordOnce::Failed => "import_file_write_failed".into(),
+    })
 }
 
 /// `operator_review` for a readback of a doubted batch: whether a recorded

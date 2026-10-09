@@ -1757,17 +1757,17 @@ fn the_description_places_the_party_before_the_tag_a_hand_import_adds() {
 
 #[tokio::test]
 #[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
-async fn an_icici_statement_parses_from_the_callers_balances_with_an_empty_password_file() {
+async fn a_bob_statement_parses_from_the_callers_balances_with_an_empty_password_file() {
     assert!(env::var_os("BRIDGE_PDFIUM_LIBRARY").is_some());
     let directory = tempfile::tempdir().unwrap();
     // a downloaded statement opens without a password: the password file is empty
-    let (statement, password_file) = statement_files(directory.path(), "icici-synthetic.pdf", "");
+    let (statement, password_file) = statement_files(directory.path(), "bob-synthetic.pdf", "");
     let server = server(directory.path(), true, Redaction::None);
     let args = json!({
         "statement_path": statement.to_str().unwrap(),
         "password_file": password_file.to_str().unwrap(),
-        "bank": "icici",
-        "account_label": "ICICI CA 12399999999456",
+        "bank": "bob",
+        "account_label": "BOB CA 12399999999456",
         "opening_balance": "10,000.00",
         "closing_balance": "-16,141.16",
         "bank_ledger": "Synthetic Bank Ledger",
@@ -1793,7 +1793,7 @@ async fn an_icici_statement_parses_from_the_callers_balances_with_an_empty_passw
 
     // the label must carry the whole number: a tail cannot bind a masked one
     let mut tail = args.clone();
-    tail["account_label"] = json!("ICICI CA xx0456");
+    tail["account_label"] = json!("BOB CA xx0456");
     assert_eq!(
         error_code(&server.call_tool("parse_bank_statement", tail).await),
         Some("statement_unbindable_account")

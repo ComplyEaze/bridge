@@ -18,19 +18,19 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
-- `parse_bank_statement` reads ICICI Bank statements (`bank: "icici"`; Part of #1457). The layout was measured on two
-  real downloaded statements (held privately) and the profile follows what was seen there:
-  the statement prints neither an opening nor a closing balance nor totals, so both balances come from you, and
-  every page must print `Page N of M` and every page after the first must start with a row. It prints the account
+- `parse_bank_statement` reads Bank of Baroda statements in one measured layout (`bank: "bob"`; Part of #1457). The layout was measured on
+  two real statements, held privately, and the profile follows what was seen there:
+  the statements print neither an opening nor a closing balance nor totals, so both balances come from you, and
+  every page must print `Page N of M` and every page after the first must start with a row. They print the account
   number masked (first and last three digits clear), so `account_label` must carry the whole number; only those six
   digits are compared, the masked middle cannot be. With no printed totals those balances and the footers are the
-  only checks on which rows were read: missing rows whose amounts net to zero would not be seen. It prints the newest row first; the rows are read oldest first and
-  numbered that way. The bank cuts a narration at about 50 characters, so a name can end mid-word. A party is named
+  only checks on which rows were read: missing rows whose amounts net to zero would not be seen. They print the newest row first; the rows are read oldest first and
+  numbered that way. The measured statements cut a narration at about 50 characters, so a name can end mid-word. A party is named
   only where the shape settles it: a UPI row names its VPA (when the VPA is whole), NEFT and RTGS rows name what
-  follows the UTR (not when a line was broken at the cell edge inside the narration), and bank charges and a cash deposit are recognised by their wording; a loan recovery is named as printed, loan number included, so two loans are two parties. Two payers whose names agree up to the bank's cut read as one party. IMPS,
+  follows the UTR (not when a line was broken at the cell edge inside the narration), and bank charges and a cash deposit are recognised by their wording; a loan recovery is named as printed, loan number included, so two loans are two parties. Two payers whose names agree up to the cut read as one party. IMPS,
   mobile-banking and internet-banking rows, interest and every other wording go to suspense. A statement that
   opens without a password needs `password_file` to be an empty file (on a Mac it must be owned by you with no group or other permission bits; on Windows it must be owned by you or Administrators, and no one but you, SYSTEM and Administrators may read or change it). Not measured: other
-  ICICI account types, statements printed oldest first, other wordings, and a statement downloaded another way.
+  account types and branches, statements printed oldest first, other wordings, and a statement downloaded another way.
 
 **Changed**
 

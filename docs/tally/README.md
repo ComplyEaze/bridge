@@ -83,9 +83,9 @@ capability from assumption, and a completed request from a verified snapshot.
   real run should be compared row by row against `pdftotext`. `MOBFT` transfers go to suspense,
   because the observed shape does not say which field names the counterparty.
 
-  It also reads **ICICI Bank** statements (`bank: "icici"`). That layout is a column table like
-  HDFC's, with these differences, each measured on two real downloaded statements
-  (held privately, read through PDFium; the rules are described by shape and geometry only): the column header is printed on page 1 only; a row's amount sits on
+  It also reads **Bank of Baroda** statements in one measured layout (`bank: "bob"`). That layout is a column table like
+  HDFC's, with these differences, each measured on two real statements, held privately
+  (read through PDFium; the rules are described by shape and geometry only): the column header is printed on page 1 only; a row's amount sits on
   its own visual line, up to 12 points below its date; the newest row is printed first, so the
   rows are reversed before the balance replay and numbered oldest first; the balance carries a
   glued `Cr` or `Dr` marker (`Dr` is overdrawn, read as negative); and the statement prints no
@@ -96,7 +96,7 @@ capability from assumption, and a completed request from a verified snapshot.
   cannot be, and whether the mask keeps the number's real length is unverified, so its length is
   not checked). With no printed totals, the two balances and the page footers are the only checks
   on which rows were read, and missing rows whose amounts net to zero would not be seen. A later page must start with a row (the table continues at the top of each later page);
-  a page that opens with anything else is refused as `unexpected_line_in_table`. The bank cuts
+  a page that opens with anything else is refused as `unexpected_line_in_table`. The measured statements cut
   a narration at about 50 characters; a name can end mid-word, the same payer is cut at the
   same place, and two payers whose names agree up to the cut are one party here. A party is named for `UPI/<ref>/<time>/UPI/<VPA>/...` (the VPA, when a slash
   follows it), `NEFT-<UTR>-<name>` and `RTGS-<UTR>-<name>` (everything after the UTR), and
@@ -107,7 +107,7 @@ capability from assumption, and a completed request from a verified snapshot.
   the masked number as printed, so the same statement gives the same ids whatever label digits
   were typed. IMPS, `MBK`,
   `EBANK`, interest, disbursement, `BY <name>`, cheque-clearing rows and every other wording
-  go to suspense. Not measured: other account types, a statement printed
+  go to suspense. Not measured: other account types and branches, a statement printed
   oldest first (refused as `rows_not_newest_first` when the dates show it; a statement whose
   rows all share one date is caught by the balance replay instead), other wordings, and statements fetched another
   way.

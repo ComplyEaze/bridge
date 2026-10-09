@@ -71,7 +71,7 @@ fn cells_of(line: &Line, bank: Bank) -> Cells {
 /// Statement rows, in printed order (`parse_pages`).
 ///
 /// Page anchors, column bounds, row-start detection, multi-line row assembly
-/// and the wrap heuristic, reachable without a PDF. For ICICI these are the printed
+/// and the wrap heuristic, reachable without a PDF. For Bank of Baroda these are the printed
 /// rows, newest first, each balance still carrying its glued `Cr`/`Dr` marker: read a
 /// statement through [`parse_statement`], which orders and signs them.
 pub fn parse_pages(pages: &[Page], bank: Bank) -> Vec<Row> {
@@ -178,15 +178,15 @@ pub fn parse_pages(pages: &[Page], bank: Bank) -> Vec<Row> {
 /// Statement rows for any layout, or the refusal a single-line table raises.
 ///
 /// A column layout cannot tell a stray line from a wrapped cell, so it has no
-/// refusals of its own here beyond the rules ICICI adds (a footer on every page, a
+/// refusals of its own here beyond the rules Bank of Baroda adds (a footer on every page, a
 /// row at the top of every later page, dates, value dates and balance markers a
 /// layout can produce, and newest-first order); the balance replay is its proof.
 pub fn parse_statement(pages: &[Page], bank: Bank) -> Result<Vec<Row>, Refusal> {
     match bank.layout() {
-        Layout::Columns if bank == Bank::Icici => {
+        Layout::Columns if bank == Bank::Bob => {
             require_page_footers(pages, bank)?;
             require_later_pages_start_with_a_row(pages, bank)?;
-            Bank::icici_rows(parse_pages(pages, bank))
+            Bank::bob_rows(parse_pages(pages, bank))
         }
         Layout::Columns => Ok(parse_pages(pages, bank)),
         Layout::SingleLine => parse_single_line_pages(pages, bank),
@@ -381,8 +381,8 @@ pub fn require_account_match(
             ),
         ));
     }
-    if bank == Bank::Icici {
-        return icici_account_match(pages, &digits);
+    if bank == Bank::Bob {
+        return bob_account_match(pages, &digits);
     }
     let runs = account_number_runs(pages, bank);
     if runs.is_empty() {
@@ -408,7 +408,7 @@ pub fn require_account_match(
     }
 }
 
-/// ICICI prints its own account number masked (`ddd` + `XXXXXXXX` + `ddd`, 14
+/// The measured statements print their own account number masked (`ddd` + `XXXXXXXX` + `ddd`, 14
 /// characters, in the page-1 header block above the table), so a tail cannot bind
 /// it: the supplied digits must begin with the clear leading digits, end with the
 /// clear trailing ones and carry more digits than those, so a tail is refused. Only
@@ -416,13 +416,13 @@ pub fn require_account_match(
 /// length is not known (whether the mask keeps it is unverified), so the length is not
 /// checked either. Returns the masked number as printed. Masked numbers further down are
 /// a narration's counterparty, not this account, and are never read.
-fn icici_account_match(pages: &[Page], digits: &str) -> Result<String, Refusal> {
+fn bob_account_match(pages: &[Page], digits: &str) -> Result<String, Refusal> {
     static MASKED: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"^([0-9]+)[Xx*]+([0-9]+)$").unwrap());
     let mut printed: BTreeSet<String> = BTreeSet::new();
     for page in pages {
         let page_lines = lines(page);
-        let Some(top) = table_top(&page_lines, Bank::Icici) else {
+        let Some(top) = table_top(&page_lines, Bank::Bob) else {
             continue;
         };
         for line in page_lines.iter().filter(|line| line.y < top) {
@@ -439,7 +439,7 @@ fn icici_account_match(pages: &[Page], digits: &str) -> Result<String, Refusal> 
         return Err(if printed.is_empty() {
             Refusal::new(
                 "no_account_number_line",
-                "no masked account number was found above the table's column header row; the header row itself may be missing, the layout may have changed, or this is not an ICICI statement",
+                "no masked account number was found above the table's column header row; the header row itself may be missing, the layout may have changed, or this is not a Bank of Baroda statement in the measured layout",
             )
         } else {
             Refusal::new(
@@ -455,7 +455,7 @@ fn icici_account_match(pages: &[Page], digits: &str) -> Result<String, Refusal> 
         return Err(Refusal::new(
             "unbindable_account",
             format!(
-                "an ICICI statement prints its account number masked (only its first {} and last {} digits clear); the account label must carry the whole number",
+                "a Bank of Baroda statement, as measured, prints its account number masked (only its first {} and last {} digits clear); the account label must carry the whole number",
                 found[1].len(),
                 found[2].len()
             ),

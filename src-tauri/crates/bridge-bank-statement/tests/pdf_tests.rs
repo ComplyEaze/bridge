@@ -392,10 +392,10 @@ fn a_logo_and_a_watermark_do_not_change_the_words_that_are_read() {
 
 #[test]
 #[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
-fn an_icici_statement_reads_newest_first_with_each_amount_on_its_own_line() {
-    let bank = Bank::Icici;
+fn a_bob_statement_reads_newest_first_with_each_amount_on_its_own_line() {
+    let bank = Bank::Bob;
     // opened with the empty user password, as a downloaded statement is
-    let pages = extract_pages(pdfium(), &pdf("icici-synthetic.pdf"), "").unwrap();
+    let pages = extract_pages(pdfium(), &pdf("bob-synthetic.pdf"), "").unwrap();
     assert_eq!(pages.len(), 2);
     let rows = parse_statement(&pages, bank).unwrap();
     assert_eq!(rows.len(), 14);
@@ -446,7 +446,7 @@ fn an_icici_statement_reads_newest_first_with_each_amount_on_its_own_line() {
         ]
     );
     assert_eq!(
-        require_account_match(&pages, bank, "ICICI CA 12399999999456").unwrap(),
+        require_account_match(&pages, bank, "BOB CA 12399999999456").unwrap(),
         "123XXXXXXXX456"
     );
     // opening 10,000.00 Cr; the statement prints neither it nor a closing balance

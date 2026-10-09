@@ -131,7 +131,7 @@ pub fn parse_day_month_year_hyphenated(text: &str) -> Option<Date> {
     )
 }
 
-/// `DD/MM/YYYY`, ICICI Bank's form. It has no Python reference, so it is
+/// `DD/MM/YYYY`, the form on the measured Bank of Baroda statements. It has no Python reference, so it is
 /// strict rather than strptime-shaped: two-digit day and month, four-digit
 /// year, nothing left over.
 pub fn parse_day_month_year_slashed(text: &str) -> Option<Date> {

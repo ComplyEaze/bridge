@@ -58,7 +58,7 @@ fn import_boundary_rejects_malformed_accounting_scalars_in_captured_vouchers() {
         ),
         (
             "DATE",
-            format!(">{}</DATE>", baseline.rows[0].date.as_deref().unwrap()),
+            format!(">{}</DATE>", baseline.rows[0].date.as_str()),
             ">20260230</DATE>".to_string(),
             "import_verification_export_invalid",
         ),
@@ -93,7 +93,7 @@ fn import_verification_carries_the_captured_effective_date() {
         .rows;
     let effective: Vec<Option<&str>> = rows
         .iter()
-        .map(|row| row.effective_date.as_deref())
+        .map(|row| row.effective_date.as_ref().map(|date| date.as_str()))
         .collect();
     assert_eq!(effective, [Some("20260801"), Some("20260801"), None]);
     let invalid = captured_vouchers().replacen(

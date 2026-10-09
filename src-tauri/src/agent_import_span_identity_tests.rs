@@ -448,7 +448,7 @@ fn content_that_differs_from_what_was_sent_refuses_at_its_position() {
         .iter_mut()
         .find(|row| row.alter_id == Some(1804))
         .unwrap();
-    ninth.effective_date = Some("20260711".into());
+    ninth.effective_date = Some(bridge_tally_core::TallyDate::parse("20260711").unwrap());
     assert_eq!(
         refusal(bind(
             &span,

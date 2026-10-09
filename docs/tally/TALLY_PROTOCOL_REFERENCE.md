@@ -222,6 +222,15 @@ base revision.
 <a id="96-actioncancel-by-remoteid-creates-a-new-voucher--it-does-not-cancel--trap"></a>
 
 [9.6 `ACTION="Cancel"` by `REMOTEID` creates a new voucher — it does not cancel — **TRAP**](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#96-actioncancel-by-remoteid-creates-a-new-voucher--it-does-not-cancel--trap)
+<a id="917-tallys-gstr-1-flag-expects-a-sales-invoices-tax-per-sales-line-rounded-half-up-and-flags-a-figure-that-differs-from-it"></a>
+
+[9.17 Tally's GSTR-1 flag expects a Sales invoice's tax per sales line, rounded half-up, and flags a figure that differs from it](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#917-tallys-gstr-1-flag-expects-a-sales-invoices-tax-per-sales-line-rounded-half-up-and-flags-a-figure-that-differs-from-it)
+<a id="918-a-zero-value-sales-voucher-is-refused-unless-its-voucher-type-allows-zero-valued-transactions"></a>
+
+[9.18 A zero-value Sales voucher is refused unless its voucher type allows zero-valued transactions](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#918-a-zero-value-sales-voucher-is-refused-unless-its-voucher-type-allows-zero-valued-transactions)
+<a id="919-a-keyed-purchase-invoice-as-the-voucher-export-reads-it"></a>
+
+[9.19 A keyed Purchase invoice, as the voucher export reads it](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#919-a-keyed-purchase-invoice-as-the-voucher-export-reads-it)
 <a id="914-a-remoteid-upsert-re-states-the-voucher-cancel-optional-delete-and-recreate"></a>
 
 [9.14 A `REMOTEID` upsert re-states the voucher: cancel, optional, delete and recreate](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#914-a-remoteid-upsert-re-states-the-voucher-cancel-optional-delete-and-recreate)

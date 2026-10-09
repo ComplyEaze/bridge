@@ -1,10 +1,18 @@
 {
- "comment": "POP-3 (#1486): the trial balance does not start on the books' first day, so the stock items' opening values are not taken; POP-3 reports the ledger sum and says why the stock is unknown.",
+ "comment": "cash_book_integrity (#1497): the ledger openings sum to minus the opening stock, which no ledger holds. With the stock added nothing remains, so no opening difference is reported.",
  "groups": {
   "Capital Account": null,
+  "Cash-in-Hand": null,
   "Fixed Assets": null
  },
  "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand"
+   ],
+   "guid": "edge-cash"
+  },
   {
    "name": "Owner Capital",
    "chain": [
@@ -22,6 +30,13 @@
  ],
  "tb": [
   {
+   "ledger": "Cash",
+   "opening": 50000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 50000
+  },
+  {
    "ledger": "Owner Capital",
    "opening": -1000000,
    "debit": 0,
@@ -37,8 +52,13 @@
   }
  ],
  "vouchers": [],
- "opening_stock": "not taken: the read does not show the trial balance starting on the books' first day",
+ "cash": [
+  "Cash"
+ ],
+ "bank": [],
+ "own_account_terms": [],
+ "opening_stock": 800000,
  "tests": [
-  "trial_balance"
+  "cash_book_integrity"
  ]
 }

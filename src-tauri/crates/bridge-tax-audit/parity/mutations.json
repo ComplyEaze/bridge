@@ -13598,5 +13598,69 @@
   "file": "src/book.rs",
   "from": "    if tb_from.is_none() || tb_from != books_from {",
   "to": "    if tb_from != books_from {"
+ },
+ {
+  "id": "OS-14",
+  "by": "author",
+  "what": "cash_book_integrity.rs: opening stock is subtracted from the ledger sum instead of added",
+  "file": "src/cash_book_integrity.rs",
+  "from": "            let rest = add(diff, stock)?;\n",
+  "to": "            let rest = diff.checked_sub(stock).ok_or_else(overflow)?;\n"
+ },
+ {
+  "id": "OS-15",
+  "by": "author",
+  "what": "cash_book_integrity.rs: a zero opening stock adds the stock figures",
+  "file": "src/cash_book_integrity.rs",
+  "from": "        OpeningStock::Valued(stock) if stock != 0 => {\n",
+  "to": "        OpeningStock::Valued(stock) => {\n"
+ },
+ {
+  "id": "OS-16",
+  "by": "author",
+  "what": "cash_book_integrity.rs: the finding is raised on the ledger sum, not on what remains after opening stock",
+  "file": "src/cash_book_integrity.rs",
+  "from": "    if remainder != 0 {\n",
+  "to": "    if diff != 0 {\n"
+ },
+ {
+  "id": "OS-17",
+  "by": "author",
+  "what": "cash_book_integrity.rs: an unknown opening stock is not named in the finding's limits",
+  "file": "src/cash_book_integrity.rs",
+  "from": "            limits.push(format!(\n",
+  "to": "            drop(format!(\n"
+ },
+ {
+  "id": "OS-18",
+  "by": "author",
+  "what": "cash_book_integrity.rs: the remainder figure carries the ledger sum",
+  "file": "src/cash_book_integrity.rs",
+  "from": "                Value::Int(rest),\n",
+  "to": "                Value::Int(diff),\n"
+ },
+ {
+  "id": "OS-19",
+  "by": "author",
+  "what": "cash_book_integrity.rs: the finding's difference fact points at the ledger sum, not the remainder",
+  "file": "src/cash_book_integrity.rs",
+  "from": "                (\"difference\".to_string(), f_rest),\n",
+  "to": "                (\"difference\".to_string(), f_diff.clone()),\n"
+ },
+ {
+  "id": "OS-20",
+  "by": "author",
+  "what": "cash_book_integrity.rs: the opening stock figure carries the stock with its sign reversed",
+  "file": "src/cash_book_integrity.rs",
+  "from": "                Value::Int(stock),\n",
+  "to": "                Value::Int(-stock),\n"
+ },
+ {
+  "id": "OS-21",
+  "by": "author",
+  "what": "invariants.rs: POP-3 with no stock term reports a ledger sum of exactly one rupee",
+  "file": "src/invariants.rs",
+  "from": "            (sum.abs() > TIE_TOLERANCE_PAISE).then(|| format!(\"TB {key} sums to {sum} paise\"))\n",
+  "to": "            (sum.abs() >= TIE_TOLERANCE_PAISE).then(|| format!(\"TB {key} sums to {sum} paise\"))\n"
  }
 ]

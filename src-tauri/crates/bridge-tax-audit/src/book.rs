@@ -250,8 +250,9 @@ pub enum OpeningStock {
 pub enum OpeningStockUnknown {
     /// The read has no stock-items part.
     NotRead,
-    /// The trial balance does not start on the books' first day (or the read does not record
-    /// that day). A dated opening Stock Summary is not taken in its place (#1486).
+    /// The trial balance does not start on the books' first day, or the read records no
+    /// trial-balance window or no first day. A dated opening Stock Summary is not taken in its
+    /// place (#1486).
     NotAtBooksStart,
     /// The stock-items part did not parse; `stock` refuses on it with the typed error.
     Unreadable,
@@ -262,7 +263,7 @@ impl OpeningStockUnknown {
         match self {
             Self::NotRead => "not read",
             Self::NotAtBooksStart => {
-                "not taken: the trial balance does not start on the books' first day"
+                "not taken: the read does not show the trial balance starting on the books' first day"
             }
             Self::Unreadable => "unreadable",
         }

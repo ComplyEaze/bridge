@@ -2764,7 +2764,7 @@ fn review_text(
 /// What the invoice window says was checked: the ledgers' own GST rates are
 /// not read, only that the tax amounts are a slab rate's half of the taxable value.
 const INVOICE_CHECKED_LINE: &str =
-    "Checked: customer, Sales Accounts ledgers, CGST and state tax by head. Ledger rates not read.";
+    "Checked: customer, Sales Accounts ledgers, CGST and state tax per line at the ledger's rate.";
 
 /// The approval text of one Sales invoice: what a person must see to say yes to
 /// a GST document. The party with its GSTIN and registration, the place of

@@ -18,6 +18,20 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `stock_summary` now returns an item's closing quantity, `closing.quantity` with its `amount` and `unit`, where
+  Tally's own plain Stock Summary has exactly one line with the item's name and shows the same quantity, unit
+  and amount; every other item says why none is returned (`none_sent`, `unread`, `inside_stock_group`,
+  `report_has_no_line`, `report_name_not_unique`, `report_differs`) (part of #1233). An item inside a stock group
+  returns none: in the captures, the report listed only what sits directly under the root (one capture holds
+  only groups, the other only items under the root; none holds both). Checked against two real captures of one
+  synthetic book taken after a sale of an item that had no stock: Tally kept it as `-5 Nos` with no value, in the
+  item rows and in the report alike, and the parser and the tool's tests read it. Then run through the tool on a
+  live Tally by an outside contributor, on a new synthetic book built to the same list (TallyPrime 7.1 Silver):
+  the answer equalled Tally's own Stock Summary for 31 March 2026 on every point, the closing quantity and unit
+  of both items, the empty value of the negative one, and the book's stock-item count (2 of 2). Not measured: a
+  book whose report lists a group and an item under the root side by side, an item inside a stock group, a
+  compound unit, other dates, other releases, macOS, and a group that carries an item's name.
+
 - `company_features` reads three settings that a company's record in Tally holds today (cost centres, GST
   and batch-wise stock) and its currency symbol (part of #1231). Each setting is yes, no or
   not reported, and says what it rests on: each of the three was compared with Tally's own

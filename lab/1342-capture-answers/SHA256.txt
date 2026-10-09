@@ -196,3 +196,91 @@ c202abc592bca9d6de25729c060e80bdf0398b623c2653e17225e78ec1acf951  87882  workord
 #
 # Screens: workorder/screens/ (Tally window only)
 bc576007252f76eaa4e322ca90fb8fbc10037276d682448f25c3d19c3b312684  105068  workorder/screens/w5-import-exceptions-missing-ledger.png
+#
+# Requests used for W1-W3 (lab/1342-capture-requests/workorder @ 5cc927e5; c-ledgers, d-vouchers and r02 as before)
+2fffc3e0e2fb2fc7ff87948f5282531a55bf896994dfb7d79994fd611451ec72  1184  w1-duty-ledger-xml.xml
+90905d2dd500aa5c186e7ca7589ca3f9188d2b71426a9f805c7f59580b14face  585  c-ledgers.xml
+9e2f23b3ab9d8e01b1f3878c2075de32af19aef30a1dd910df04a7457949ff68  712  d-vouchers.xml
+9254eb917891156cf3889b6a2eb4c1a8da56fdb04728dc97b3c8d906d560627c  1822  w-window-0802.xml
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  976  r02-marks.xml
+77a401f6862c175e4c4899d6da074b37e7dfeafff0b9216e6961fe2407811f11  3624  w3-zero-accounting.xml
+7e7d1cda8f36304f7bbe3082896872f3deb0bc1294fe10f92454d8868579ee3f  3630  w3-zero-invoice.xml
+2aba079f1c11e04c41e277c1ecc117d894a043d04dae36aa6f55237f0145463a  3592  w3-zero-code.xml
+421427bcc56a1f97b0b39329fa8cf767cc038d6c94f80b9144ec1037bec49528  3624  w3-zero-type-default.xml
+325f57767b698f193e8dfba9f00a4c8a07ca695273d7b9a8bdd2d7828faea1a9  3624  w3-zero-type-yes.xml
+f90acd5e7bebe8c052555a8bf3e94da94497a48bc8885997d1de7047a1795366  4168  w3-valid-after-refused.xml
+# W1-W3 answers (10 Oct 2026, BRIDGE PILOT LAB, after backup TDBK1800_100033_5.001)
+1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010  538  workorder/aw1-duty-ledger-xml.xml  <- w1-duty-ledger-xml.xml (curl exit 0, HTTP 200, 0.224155 s)
+19b28d1b18183bea529f520e0ce9251ee2655e6b58302a8b47562695a42a91b7  133  workorder/aw1-duty-ledger-xml.xml.headers.txt
+f4910330bfb81faa95cde9b95c7e650e8b78c1016d7c4676fbd04b2fcd906544  151359  workorder/ledgers-w1.xml  <- c-ledgers.xml (curl exit 0, HTTP 200, 0.025422 s)
+66f28bd087959f4cf8242d28b08f8576b85bb7f71907eba32265da537ed680c1  134  workorder/ledgers-w1.xml.headers.txt
+b9545d4006674a13de7ddeae57e7d79cda904f94af5e0189aa54d3a8966d1c6f  465581  workorder/vouchers-w1.xml  <- d-vouchers.xml (curl exit 0, HTTP 200, 0.137907 s)
+bdea99ed01eac31ace261878876a962912cb67a7aa8b13004466a6803e2a7924  134  workorder/vouchers-w1.xml.headers.txt
+b9f9c34e7428011002ea77e044d0bde7b59f4d968d296e6c8956e357a7341e39  42518  workorder/aw-window-0802-w1.xml  <- w-window-0802.xml (curl exit 0, HTTP 200, 0.045514 s)
+9569c40694d193c05180d34665712e8f7c4c7aeb15749f7910a1519abe1a0d66  135  workorder/aw-window-0802-w1.xml.headers.txt
+74afd08558ae4738c2cf0bfa5796f0e012596a62d6a61dd7f33247b2ee2175b7  3406  workorder/aw2-marks-before.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003561 s)
+938ea753a09d60fe3c527c7c4be7fd9790058699a026b1bebd43c1d177a83688  134  workorder/aw2-marks-before.xml.headers.txt
+b9545d4006674a13de7ddeae57e7d79cda904f94af5e0189aa54d3a8966d1c6f  465581  workorder/vouchers-w2-before.xml  <- d-vouchers.xml (curl exit 0, HTTP 200, 0.084165 s)
+bdea99ed01eac31ace261878876a962912cb67a7aa8b13004466a6803e2a7924  134  workorder/vouchers-w2-before.xml.headers.txt
+b9f9c34e7428011002ea77e044d0bde7b59f4d968d296e6c8956e357a7341e39  42518  workorder/aw2-window-before.xml  <- w-window-0802.xml (curl exit 0, HTTP 200, 0.049865 s)
+9569c40694d193c05180d34665712e8f7c4c7aeb15749f7910a1519abe1a0d66  135  workorder/aw2-window-before.xml.headers.txt
+19d13c65f98f23aa6ddf8fa28c45cfc5e94314b30a5736ef54e4156585e4c51c  42518  workorder/aw2-window-diag.xml  <- w-window-0802.xml (curl exit 0, HTTP 200, 0.046818 s) [extra, not in the list]
+9569c40694d193c05180d34665712e8f7c4c7aeb15749f7910a1519abe1a0d66  135  workorder/aw2-window-diag.xml.headers.txt
+45aa724695569c49e0e82695e297f6bd1a5ed54c9f17da53e8d7a8d9ea3cdb41  3406  workorder/aw2-marks-after.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003899 s)
+938ea753a09d60fe3c527c7c4be7fd9790058699a026b1bebd43c1d177a83688  134  workorder/aw2-marks-after.xml.headers.txt
+c6c81941fb329229c3d9e10981ff099e601b64e2a7dac4ea446b61df3c696ea5  465592  workorder/vouchers-w2-after.xml  <- d-vouchers.xml (curl exit 0, HTTP 200, 0.096810 s)
+0969fd4f76cc837591574d74dfbbdb9923512f88bdf9571132362f5372a7e149  134  workorder/vouchers-w2-after.xml.headers.txt
+19d13c65f98f23aa6ddf8fa28c45cfc5e94314b30a5736ef54e4156585e4c51c  42518  workorder/aw2-window-after.xml  <- w-window-0802.xml (curl exit 0, HTTP 200, 0.041319 s)
+9569c40694d193c05180d34665712e8f7c4c7aeb15749f7910a1519abe1a0d66  135  workorder/aw2-window-after.xml.headers.txt
+45aa724695569c49e0e82695e297f6bd1a5ed54c9f17da53e8d7a8d9ea3cdb41  3406  workorder/aw3-marks-0.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003574 s)
+938ea753a09d60fe3c527c7c4be7fd9790058699a026b1bebd43c1d177a83688  134  workorder/aw3-marks-0.xml.headers.txt
+09a713e2674c7016c2cb10f194f6e0fc7f6bf9dee3b523f4f6bbf1b07ea0f874  538  workorder/aw3-zero-accounting.xml  <- w3-zero-accounting.xml (curl exit 0, HTTP 200, 0.306631 s)
+19b28d1b18183bea529f520e0ce9251ee2655e6b58302a8b47562695a42a91b7  133  workorder/aw3-zero-accounting.xml.headers.txt
+b221ec8d818c9e4809ef3343aec45216f052b1e9f45c0ca683f35aaaab3881a4  3406  workorder/aw3-marks-1.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003178 s)
+938ea753a09d60fe3c527c7c4be7fd9790058699a026b1bebd43c1d177a83688  134  workorder/aw3-marks-1.xml.headers.txt
+09a713e2674c7016c2cb10f194f6e0fc7f6bf9dee3b523f4f6bbf1b07ea0f874  538  workorder/aw3-zero-invoice.xml  <- w3-zero-invoice.xml (curl exit 0, HTTP 200, 0.734422 s)
+19b28d1b18183bea529f520e0ce9251ee2655e6b58302a8b47562695a42a91b7  133  workorder/aw3-zero-invoice.xml.headers.txt
+09a713e2674c7016c2cb10f194f6e0fc7f6bf9dee3b523f4f6bbf1b07ea0f874  538  workorder/aw3-zero-code.xml  <- w3-zero-code.xml (curl exit 0, HTTP 200, 0.238785 s)
+19b28d1b18183bea529f520e0ce9251ee2655e6b58302a8b47562695a42a91b7  133  workorder/aw3-zero-code.xml.headers.txt
+99c7f4c265d622916268cd527af45b449d190004a6b9c515f3eec34c1ce6bdde  3406  workorder/aw3-marks-2.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.004494 s)
+938ea753a09d60fe3c527c7c4be7fd9790058699a026b1bebd43c1d177a83688  134  workorder/aw3-marks-2.xml.headers.txt
+09a713e2674c7016c2cb10f194f6e0fc7f6bf9dee3b523f4f6bbf1b07ea0f874  538  workorder/aw3-zero-type-default.xml  <- w3-zero-type-default.xml (curl exit 0, HTTP 200, 0.270108 s)
+19b28d1b18183bea529f520e0ce9251ee2655e6b58302a8b47562695a42a91b7  133  workorder/aw3-zero-type-default.xml.headers.txt
+60f1e9936428b8111da79638421ac3264fdde2053f8d326780c46edfe1657e25  540  workorder/aw3-zero-type-yes.xml  <- w3-zero-type-yes.xml (curl exit 0, HTTP 200, 0.469341 s)
+2a0eba722d654c2b2fa59d71608c67e3849d25c56207357fa06b0239977a4670  133  workorder/aw3-zero-type-yes.xml.headers.txt
+625dbd504517182079a11465f796efab7fc9b4db90b40f4dcd655d641ae60c5c  3406  workorder/aw3-marks-types.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003219 s)
+938ea753a09d60fe3c527c7c4be7fd9790058699a026b1bebd43c1d177a83688  134  workorder/aw3-marks-types.xml.headers.txt
+64bad93a51aede4c69dffa8059737491c2f4ea8c0631f1b64751b9cd4c550c4c  540  workorder/aw3-valid-after-refused.xml  <- w3-valid-after-refused.xml (curl exit 0, HTTP 200, 0.448770 s)
+2a0eba722d654c2b2fa59d71608c67e3849d25c56207357fa06b0239977a4670  133  workorder/aw3-valid-after-refused.xml.headers.txt
+34e218a7ec1df2af4abf0cd132ad050f0961db5c113054986149cfd698d109dc  3406  workorder/aw3-marks-3.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003208 s)
+938ea753a09d60fe3c527c7c4be7fd9790058699a026b1bebd43c1d177a83688  134  workorder/aw3-marks-3.xml.headers.txt
+01cea41de977c9ee2b5b2404549ae2474fe95ac0bb4c7b9687284da459726637  493903  workorder/vouchers-w3.xml  <- d-vouchers.xml (curl exit 0, HTTP 200, 0.089604 s)
+95ef01018fd0c2744e246ff455131df49940089e126e13e91457411c259587eb  134  workorder/vouchers-w3.xml.headers.txt
+986ee3fd9f529d5fd442dc490ede7b613c5ab17bc1573fd32a24180dd472ab78  54408  workorder/aw3-window-0802-extra.xml  <- w-window-0802.xml (curl exit 0, HTTP 200, 0.044506 s) [extra, not in the list]
+fa469dbb773ae52c11cb1f210575b8c54153b69e3ca0531ea03198731b14ba95  135  workorder/aw3-window-0802-extra.xml.headers.txt
+# W1-W3 screenshots (cropped to Tally's window)
+1b4d0394e70812152e51ff6cbcbce336d72bc5b990a3b34148d6b18395f46b2a  396864  workorder/screens/w1-f11-features.png
+47a413c2599faa84dfe03adee56fb3f701756f76bfcd57b07f4300bc2c13e155  482320  workorder/screens/w1-goto-gst.png
+477d4055887243ca4b22396cd20304d4c474cfc3127aa4b2052d71a7a069f29e  295763  workorder/screens/w1-gst-rate-other-details.png
+ae0337e6a7e86dcbc3d70cbf820d4ef47ded0da161159e20cf0bd957f1cd54e5  420557  workorder/screens/w1-gstr1-summary.png
+550b2adf60870ea1a2e7970646048a3704e51a4a00df738e8546c8189bb68322  403499  workorder/screens/w1-gstr1-uncertain.png
+85e68da15bb2ebdf681aad8512b4036a9432a50523fe4f30c7f580c4accdcabb  141872  workorder/screens/w1-taxanalysis-0012.png
+1e61b3b1ef3cb63281dca8bcf55f3bedd911a98957d7654a4e5c906b09d1fd76  179798  workorder/screens/w1-taxanalysis-0013.png
+1114455f4b00b6b831dc8458ffc959190c8e8bb7fc08e3c52486262c48400d5c  195744  workorder/screens/w1-taxanalysis-0014.png
+055b71294f1512f478741c6623e9fa2a91ac267cb24ab940090c8aba18f85d96  170170  workorder/screens/w1-voucher-0012.png
+f1b7a0634c744d5344ca275065076677f7713132e82183b423ba9e8c7158c067  174465  workorder/screens/w1-voucher-0013.png
+63bf6d73cc6c03cdf5bbfae7cbe840a825ec8432b9daaad8674e7904980f1f3f  170353  workorder/screens/w1-voucher-0014.png
+886903f4b5cfeed5a3c3890251b1d211df716b90626117c2038720d935c9a68d  170294  workorder/screens/w1-voucher-0015.png
+d4a0de3daf5b719c47f6901e8713dad2e66baacde402c64673fea054e3b6afac  176107  workorder/screens/w1-voucher-0016.png
+e577697b4b4bce465d3259f15f045aee6bb1f1f57fb9bceec44f56bb6376deec  416376  workorder/screens/w2-gstr1-included-list.png
+be2d21202cacabdc193bd960be409204437ad631692a05da8be18565e6da0b13  420357  workorder/screens/w2-gstr1-summary-reopened.png
+f5ac457c4773a1dd6e53609b42446678753921f5ddd1da039305a27a4ed24abb  431610  workorder/screens/w2-uncertain-0016-gone.png
+550b2adf60870ea1a2e7970646048a3704e51a4a00df738e8546c8189bb68322  403499  workorder/screens/w2-uncertain-attempt1-a.png
+b5c4cf8227b466ca0aff6b9c70a30ad14fd1b6b0799a0db679596c5d4689c27c  502465  workorder/screens/w2-uncertain-attempt1-b.png
+c3100df973ebb98a7aaaa1e0c6162896530a3691692a452afe5e700ffa5683bd  113298  workorder/screens/w3-0018-zero-keyed-error.png
+82dfe5bb3ec669668cd49bca651fc563e224d3125904ef8a7c4685e61ec840e4  190048  workorder/screens/w3-document-summary-after.png
+a941fb905d18a6e99e0ec4b9a29391ffc4e9743d263ddd3e22159ad871ff0461  188063  workorder/screens/w3-document-summary-before.png
+dbe56b80c752e672e1937a29575e2d084dbcaade21f9a93714c4c6ddc791df3f  161573  workorder/screens/w3-exception-reports-list.png
+7436820914d9fd87be0ddea36da244b952faf5432d6529519e7135a3cdab12ce  320208  workorder/screens/w3-voucher-type-bridge-sales.png
+e72656023ec4cf30624b2e0403db47ce8d271e4974f3cfb11b09b5395a685046  320203  workorder/screens/w3-voucher-type-z0.png
+87ba1598cdc4c31cef4ceecc4e2b27e91a403e534e9cb0918f0a0641a0ddee2c  327409  workorder/screens/w3-voucher-type-z1.png

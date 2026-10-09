@@ -1,4 +1,4 @@
-//! The ICICI Bank layout: columns, one visual line per amount, the newest row first.
+//! The Bank of Baroda layout: columns, one visual line per amount, the newest row first.
 //!
 //! There is no Python reference for this profile. Its geometry and shapes were
 //! measured on two real statements, held privately; every line here is synthetic, laid out at the measured
@@ -122,7 +122,7 @@ fn table_header(words: &mut Vec<Word>) {
 }
 
 /// A page: the page-1 header block when `header` is given, the rows, and a footer.
-fn icici_page(header: Option<&[&str]>, rows: &[Printed], footer: Option<&str>) -> Page {
+fn bob_page(header: Option<&[&str]>, rows: &[Printed], footer: Option<&str>) -> Page {
     let mut words = Vec::new();
     let mut top = 68.0;
     if let Some(tokens) = header {
@@ -180,20 +180,20 @@ const FOOTER_TWO: &str = "09/10/2026 10:30 SYNTH-ID/00000 Page 2 of 2";
 
 fn pages() -> Vec<Page> {
     vec![
-        icici_page(Some(MASKED), &[SMS, LOAN, ACME], Some(FOOTER_ONE)),
-        icici_page(None, &[UPI, CASH], Some(FOOTER_TWO)),
+        bob_page(Some(MASKED), &[SMS, LOAN, ACME], Some(FOOTER_ONE)),
+        bob_page(None, &[UPI, CASH], Some(FOOTER_TWO)),
     ]
 }
 
 fn rows() -> Vec<Row> {
-    parse_statement(&pages(), Bank::Icici).unwrap()
+    parse_statement(&pages(), Bank::Bob).unwrap()
 }
 
 #[test]
-fn the_bank_is_named_icici() {
-    assert_eq!(Bank::from_name("icici"), Some(Bank::Icici));
-    assert_eq!(Bank::Icici.name(), "icici");
-    assert!(!Bank::Icici.prints_totals());
+fn the_bank_is_named_bob() {
+    assert_eq!(Bank::from_name("bob"), Some(Bank::Bob));
+    assert_eq!(Bank::Bob.name(), "bob");
+    assert!(!Bank::Bob.prints_totals());
 }
 
 #[test]
@@ -270,12 +270,12 @@ fn rows_read_oldest_first_with_signed_balances_and_the_amount_on_its_own_line() 
 fn a_cheque_number_stays_out_of_the_narration_and_the_amounts() {
     let mut cheque = SMS;
     cheque.cheque = "000417";
-    let page = icici_page(
+    let page = bob_page(
         Some(MASKED),
         &[cheque],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
     );
-    let rows = parse_statement(&[page], Bank::Icici).unwrap();
+    let rows = parse_statement(&[page], Bank::Bob).unwrap();
     assert_eq!(rows[0].get("chq"), "000417");
     assert_eq!(rows[0].get("narr"), "SMS Charges for AUG 26");
     assert_eq!(rows[0].get("dr"), "11.80");
@@ -290,12 +290,12 @@ fn a_narration_word_that_reaches_the_cell_edge_stays_in_the_narration() {
         narration: &["PAYMENT ADVICE 0000000000000000000000000000000 123"],
         ..SMS
     };
-    let page = icici_page(
+    let page = bob_page(
         Some(MASKED),
         &[edge],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
     );
-    let rows = parse_statement(&[page], Bank::Icici).unwrap();
+    let rows = parse_statement(&[page], Bank::Bob).unwrap();
     assert_eq!(
         rows[0].get("narr"),
         "PAYMENT ADVICE 0000000000000000000000000000000 123"
@@ -322,10 +322,10 @@ fn a_narration_that_says_page_n_of_m_is_not_a_footer() {
     };
     page_words.dy = 6.0;
     let pages = vec![
-        icici_page(Some(MASKED), &[page_words, LOAN], Some(FOOTER_ONE)),
-        icici_page(None, &[ACME], Some(FOOTER_TWO)),
+        bob_page(Some(MASKED), &[page_words, LOAN], Some(FOOTER_ONE)),
+        bob_page(None, &[ACME], Some(FOOTER_TWO)),
     ];
-    let rows = parse_statement(&pages, Bank::Icici).unwrap();
+    let rows = parse_statement(&pages, Bank::Bob).unwrap();
     assert_eq!(rows.len(), 3);
     assert_eq!(rows[2].get("narr"), "INVOICE 7 Page 1 of 2");
 }
@@ -340,23 +340,21 @@ fn a_later_page_must_start_with_a_row() {
         // a banner at the left margin
         (15.0, "STATEMENT CONTINUED"),
     ] {
-        let mut first = icici_page(Some(MASKED), &[SMS, LOAN, carried_row()], Some(FOOTER_ONE));
+        let mut first = bob_page(Some(MASKED), &[SMS, LOAN, carried_row()], Some(FOOTER_ONE));
         first.retain(|word| word.text != "INDUSTRIES-EAST");
-        let mut second = icici_page(None, &[UPI, CASH], Some(FOOTER_TWO));
+        let mut second = bob_page(None, &[UPI, CASH], Some(FOOTER_TWO));
         put(&mut second, stray.0, 60.0, stray.1);
         let refusal = refuses(
-            parse_statement(&[first, second], Bank::Icici),
+            parse_statement(&[first, second], Bank::Bob),
             "unexpected_line_in_table",
         );
         assert_eq!(refusal.row, None);
     }
     // the same statement without the stray line is read
-    let first = icici_page(Some(MASKED), &[SMS, LOAN, ACME], Some(FOOTER_ONE));
-    let second = icici_page(None, &[UPI, CASH], Some(FOOTER_TWO));
+    let first = bob_page(Some(MASKED), &[SMS, LOAN, ACME], Some(FOOTER_ONE));
+    let second = bob_page(None, &[UPI, CASH], Some(FOOTER_TWO));
     assert_eq!(
-        parse_statement(&[first, second], Bank::Icici)
-            .unwrap()
-            .len(),
+        parse_statement(&[first, second], Bank::Bob).unwrap().len(),
         5
     );
 }
@@ -370,13 +368,13 @@ fn carried_row() -> Printed {
 
 #[test]
 fn every_page_must_print_its_own_footer() {
-    assert_eq!(parse_statement(&pages(), Bank::Icici).unwrap().len(), 5);
+    assert_eq!(parse_statement(&pages(), Bank::Bob).unwrap().len(), 5);
 
     // page 2 without a footer
     let mut no_footer = pages();
-    no_footer[1] = icici_page(None, &[UPI, CASH], None);
+    no_footer[1] = bob_page(None, &[UPI, CASH], None);
     refuses(
-        parse_statement(&no_footer, Bank::Icici),
+        parse_statement(&no_footer, Bank::Bob),
         "page_sequence_unproven",
     );
 
@@ -384,7 +382,7 @@ fn every_page_must_print_its_own_footer() {
     let mut missing = pages();
     missing.remove(1);
     refuses(
-        parse_statement(&missing, Bank::Icici),
+        parse_statement(&missing, Bank::Bob),
         "page_sequence_unproven",
     );
 
@@ -392,41 +390,35 @@ fn every_page_must_print_its_own_footer() {
     let mut swapped = pages();
     swapped.swap(0, 1);
     refuses(
-        parse_statement(&swapped, Bank::Icici),
+        parse_statement(&swapped, Bank::Bob),
         "page_sequence_unproven",
     );
 
     // a footer that counts the wrong number of pages
     let mut wrong_count = pages();
-    wrong_count[1] = icici_page(
+    wrong_count[1] = bob_page(
         None,
         &[UPI, CASH],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 2 of 3"),
     );
     refuses(
-        parse_statement(&wrong_count, Bank::Icici),
+        parse_statement(&wrong_count, Bank::Bob),
         "page_sequence_unproven",
     );
 
     // a line that is only "Page 2 of 2" is not the footer
     let mut bare = pages();
-    bare[1] = icici_page(None, &[UPI, CASH], Some("Page 2 of 2"));
-    refuses(
-        parse_statement(&bare, Bank::Icici),
-        "page_sequence_unproven",
-    );
+    bare[1] = bob_page(None, &[UPI, CASH], Some("Page 2 of 2"));
+    refuses(parse_statement(&bare, Bank::Bob), "page_sequence_unproven");
 }
 
 #[test]
 fn rows_printed_oldest_first_are_refused() {
     let pages = vec![
-        icici_page(Some(MASKED), &[CASH, UPI, ACME], Some(FOOTER_ONE)),
-        icici_page(None, &[LOAN, SMS], Some(FOOTER_TWO)),
+        bob_page(Some(MASKED), &[CASH, UPI, ACME], Some(FOOTER_ONE)),
+        bob_page(None, &[LOAN, SMS], Some(FOOTER_TWO)),
     ];
-    let refusal = refuses(
-        parse_statement(&pages, Bank::Icici),
-        "rows_not_newest_first",
-    );
+    let refusal = refuses(parse_statement(&pages, Bank::Bob), "rows_not_newest_first");
     // numbered in the reversed (oldest first) order: the second of five
     assert_eq!(refusal.row, Some(2));
     // rows of the same day are not out of order
@@ -447,12 +439,12 @@ fn a_balance_must_be_an_amount_with_its_marker() {
             balance: bad,
             ..CASH
         };
-        let page = icici_page(
+        let page = bob_page(
             Some(MASKED),
             &[row],
             Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
         );
-        let refusal = refuses(parse_statement(&[page], Bank::Icici), "malformed_balance");
+        let refusal = refuses(parse_statement(&[page], Bank::Bob), "malformed_balance");
         assert_eq!(refusal.row, Some(1), "{bad:?}");
     }
     // a zero balance marked Dr is zero, not negative zero
@@ -460,12 +452,12 @@ fn a_balance_must_be_an_amount_with_its_marker() {
         balance: "0.00Dr",
         ..CASH
     };
-    let page = icici_page(
+    let page = bob_page(
         Some(MASKED),
         &[zero],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
     );
-    let rows = parse_statement(&[page], Bank::Icici).unwrap();
+    let rows = parse_statement(&[page], Bank::Bob).unwrap();
     assert_eq!(rows[0].get("bal"), "0.00");
 }
 
@@ -475,12 +467,12 @@ fn a_date_cell_that_is_not_a_date_is_refused() {
         date: "31/02/2026",
         ..CASH
     };
-    let page = icici_page(
+    let page = bob_page(
         Some(MASKED),
         &[row],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
     );
-    let refusal = refuses(parse_statement(&[page], Bank::Icici), "unparseable_date");
+    let refusal = refuses(parse_statement(&[page], Bank::Bob), "unparseable_date");
     assert_eq!(refusal.row, Some(1));
 }
 
@@ -489,12 +481,12 @@ fn a_page_one_without_the_column_header_reads_no_rows_from_it() {
     // the table's start is the header: without it nothing is read and no later page is taken
     // for the table either; the statement is refused, never read in part
     let mut no_header = pages();
-    no_header[0] = icici_page(None, &[SMS, LOAN, ACME], Some(FOOTER_ONE));
-    assert!(parse_statement(&no_header, Bank::Icici).unwrap().is_empty());
+    no_header[0] = bob_page(None, &[SMS, LOAN, ACME], Some(FOOTER_ONE));
+    assert!(parse_statement(&no_header, Bank::Bob).unwrap().is_empty());
     // the header block is there but the column header's words are not: still no table
     let mut no_anchor = pages();
     no_anchor[0].retain(|word| !["TRAN", "VALUE", "NARRATION"].contains(&word.text.as_str()));
-    assert!(parse_statement(&no_anchor, Bank::Icici).unwrap().is_empty());
+    assert!(parse_statement(&no_anchor, Bank::Bob).unwrap().is_empty());
     let mapping = no_mapping();
     let controls = Controls::parse_optional("10,000.00", "-11,635.26", None, None).unwrap();
     // no table means no header block above it either, so the account cannot be bound
@@ -508,14 +500,14 @@ fn a_page_one_without_the_column_header_reads_no_rows_from_it() {
 fn a_line_above_the_column_header_is_never_a_row() {
     // a header-block line with a date in each date column would be a row if the table
     // started anywhere but below its column header
-    let mut page = icici_page(
+    let mut page = bob_page(
         Some(MASKED),
         &[SMS, LOAN],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
     );
     put(&mut page, 15.0, 200.0, "01/08/2026");
     put(&mut page, 87.0, 200.0, "31/08/2026");
-    assert_eq!(parse_statement(&[page], Bank::Icici).unwrap().len(), 2);
+    assert_eq!(parse_statement(&[page], Bank::Bob).unwrap().len(), 2);
 }
 
 #[test]
@@ -529,25 +521,25 @@ fn an_amount_eleven_points_below_a_three_line_narration_stays_on_its_row() {
         ..SMS
     };
     charges.dy = 11.0;
-    let page = icici_page(
+    let page = bob_page(
         Some(MASKED),
         &[charges, LOAN],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
     );
-    let rows = parse_statement(&[page], Bank::Icici).unwrap();
+    let rows = parse_statement(&[page], Bank::Bob).unwrap();
     assert_eq!(rows[1].get("dr"), "11.80");
     assert_eq!(
         rows[1].get("narr"),
         "CHARGES FOR :IMPS/P2A/600000000003/XXXXXXXX 0000 0001"
     );
-    assert_eq!(Bank::Icici.party(&rows[1]), BANK_CHARGES);
+    assert_eq!(Bank::Bob.party(&rows[1]), BANK_CHARGES);
     assert_eq!(rows[0].get("dr"), "30000.00");
 }
 
 #[test]
 fn a_statement_whose_rows_share_one_date_printed_oldest_first_fails_the_replay() {
     // the dates cannot show the order, so the balance replay is what refuses it
-    let page = icici_page(
+    let page = bob_page(
         Some(MASKED),
         &[CASH, UPI],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
@@ -566,28 +558,28 @@ fn a_row_needs_both_dates_and_a_stray_date_does_not_start_one() {
     let footer = "09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1";
     // a date alone in the transaction date column joins the row above it, which then
     // has no date a layout can produce: refused, not read as a row of its own
-    let mut stray = icici_page(Some(MASKED), &[SMS, LOAN], Some(footer));
+    let mut stray = bob_page(Some(MASKED), &[SMS, LOAN], Some(footer));
     put(&mut stray, 15.0, 400.0, "05/08/2026");
-    let stray_rows = parse_statement(&[stray], Bank::Icici);
+    let stray_rows = parse_statement(&[stray], Bank::Bob);
     refuses(stray_rows, "unparseable_date");
 
     // a date alone in the value date column joins that cell and starts nothing: the row
     // above it now has no value date a layout can produce
-    let mut value_only = icici_page(Some(MASKED), &[SMS, LOAN], Some(footer));
+    let mut value_only = bob_page(Some(MASKED), &[SMS, LOAN], Some(footer));
     put(&mut value_only, 87.0, 400.0, "05/08/2026");
     let refusal = refuses(
-        parse_statement(&[value_only], Bank::Icici),
+        parse_statement(&[value_only], Bank::Bob),
         "unparseable_value_date",
     );
     assert_eq!(refusal.row, Some(1));
 }
 
 fn party_of(narration: &str) -> String {
-    Bank::Icici.party(&row(&[("narr", narration), ("narr_spaced", narration)]))
+    Bank::Bob.party(&row(&[("narr", narration), ("narr_spaced", narration)]))
 }
 
 #[test]
-fn an_icici_party_is_named_only_where_the_shape_settles_it() {
+fn a_bob_party_is_named_only_where_the_shape_settles_it() {
     // UPI: the VPA, when a slash follows it
     assert_eq!(
         party_of("UPI/600000000001/10:15:30/UPI/nw@okzz/ZZZZ BANK"),
@@ -640,12 +632,12 @@ fn a_neft_name_broken_at_the_cell_edge_is_not_named() {
         narration: &["NEFT-ZZZZZ00000000001-ACME INDUSTRIES-EAST-WESTERN", "LTD"],
         ..ACME
     };
-    let page = icici_page(
+    let page = bob_page(
         Some(MASKED),
         &[cut],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
     );
-    let cut_rows = parse_statement(&[page], Bank::Icici).unwrap();
+    let cut_rows = parse_statement(&[page], Bank::Bob).unwrap();
     assert_eq!(
         cut_rows[0].get("narr"),
         "NEFT-ZZZZZ00000000001-ACME INDUSTRIES-EAST-WESTERNLTD"
@@ -654,16 +646,16 @@ fn a_neft_name_broken_at_the_cell_edge_is_not_named() {
         cut_rows[0].get("narr_spaced"),
         "NEFT-ZZZZZ00000000001-ACME INDUSTRIES-EAST-WESTERN LTD"
     );
-    assert_eq!(Bank::Icici.party(&cut_rows[0]), UNRESOLVED);
+    assert_eq!(Bank::Bob.party(&cut_rows[0]), UNRESOLVED);
     // the same wrap in a UPI narration is whole again: a VPA holds no space
     assert_eq!(
-        Bank::Icici.party(&rows()[1]),
+        Bank::Bob.party(&rows()[1]),
         "northwind.traders.synthetic@okzzzzzz"
     );
 }
 
 #[test]
-fn an_icici_narration_that_does_not_settle_a_party_goes_to_suspense() {
+fn a_bob_narration_that_does_not_settle_a_party_goes_to_suspense() {
     for unsettled in [
         // a VPA that ends the text may have lost its handle to the bank's cut
         "UPI/600000000005/09:09:09/UPI/cutoff@ok",
@@ -702,9 +694,9 @@ fn an_icici_narration_that_does_not_settle_a_party_goes_to_suspense() {
 }
 
 #[test]
-fn an_icici_reference_is_the_bank_reference_the_narration_carries() {
+fn a_bob_reference_is_the_bank_reference_the_narration_carries() {
     let reference = |narration: &str, cheque: &str| {
-        Bank::Icici.reference(&row(&[("narr", narration), ("chq", cheque)]))
+        Bank::Bob.reference(&row(&[("narr", narration), ("chq", cheque)]))
     };
     let pair = |mode: &str, value: &str| (mode.to_string(), value.to_string());
     assert_eq!(
@@ -739,30 +731,30 @@ fn an_icici_reference_is_the_bank_reference_the_narration_carries() {
 
 #[test]
 fn only_the_masked_number_above_the_table_binds_on_its_clear_digits() {
-    let bound = |label: &str| require_account_match(&pages(), Bank::Icici, label);
-    assert_eq!(bound("ICICI CA 12399999999456").unwrap(), "123XXXXXXXX456");
+    let bound = |label: &str| require_account_match(&pages(), Bank::Bob, label);
+    assert_eq!(bound("BOB CA 12399999999456").unwrap(), "123XXXXXXXX456");
     // the real length is not known (the mask may or may not keep it): a shorter or a longer
     // number that begins and ends with the clear digits is accepted, and nothing in the
     // middle is compared
-    assert_eq!(bound("ICICI CA 123999999456").unwrap(), "123XXXXXXXX456");
+    assert_eq!(bound("BOB CA 123999999456").unwrap(), "123XXXXXXXX456");
     assert_eq!(
-        bound("ICICI CA 1230000000000000456").unwrap(),
+        bound("BOB CA 1230000000000000456").unwrap(),
         "123XXXXXXXX456"
     );
     // the clear digits must agree: the first three and the last three
-    refuses(bound("ICICI CA 12499999999456"), "account_not_in_statement");
-    refuses(bound("ICICI CA 12399999999457"), "account_not_in_statement");
+    refuses(bound("BOB CA 12499999999456"), "account_not_in_statement");
+    refuses(bound("BOB CA 12399999999457"), "account_not_in_statement");
     // a tail cannot bind a number whose middle is masked
-    refuses(bound("ICICI CA xx0456"), "unbindable_account");
+    refuses(bound("BOB CA xx0456"), "unbindable_account");
     // the clear digits alone are not a number: something must stand where the mask is
-    refuses(bound("ICICI CA 123456"), "unbindable_account");
-    refuses(bound("ICICI CA 1234567"), "account_not_in_statement");
-    assert_eq!(bound("ICICI CA 1237456").unwrap(), "123XXXXXXXX456");
-    refuses(bound("ICICI CA 456"), "unbindable_account");
+    refuses(bound("BOB CA 123456"), "unbindable_account");
+    refuses(bound("BOB CA 1234567"), "account_not_in_statement");
+    assert_eq!(bound("BOB CA 1237456").unwrap(), "123XXXXXXXX456");
+    refuses(bound("BOB CA 456"), "unbindable_account");
 
     // a masked number inside a narration is the counterparty's, and is not read
     let mut narrated = pages();
-    narrated[0] = icici_page(
+    narrated[0] = bob_page(
         Some(MASKED),
         &[
             Printed {
@@ -775,38 +767,38 @@ fn only_the_masked_number_above_the_table_binds_on_its_clear_digits() {
         Some(FOOTER_ONE),
     );
     assert_eq!(
-        require_account_match(&narrated, Bank::Icici, "ICICI CA 12399999999456").unwrap(),
+        require_account_match(&narrated, Bank::Bob, "BOB CA 12399999999456").unwrap(),
         "123XXXXXXXX456"
     );
 
     // two different masked numbers in the header block: ambiguous
-    let two = vec![icici_page(
+    let two = vec![bob_page(
         Some(&["123XXXXXXXX456", "123XXXXXXXX457"]),
         &[SMS],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
     )];
     refuses(
-        require_account_match(&two, Bank::Icici, "ICICI CA 12399999999456"),
+        require_account_match(&two, Bank::Bob, "BOB CA 12399999999456"),
         "ambiguous_account_match",
     );
     // the same number printed three times is one number
-    let thrice = vec![icici_page(
+    let thrice = vec![bob_page(
         Some(&["123XXXXXXXX456", "123XXXXXXXX456", "123XXXXXXXX456"]),
         &[SMS],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
     )];
     assert_eq!(
-        require_account_match(&thrice, Bank::Icici, "ICICI CA 12399999999456").unwrap(),
+        require_account_match(&thrice, Bank::Bob, "BOB CA 12399999999456").unwrap(),
         "123XXXXXXXX456"
     );
     // none at all
-    let none = vec![icici_page(
+    let none = vec![bob_page(
         Some(&[]),
         &[SMS],
         Some("09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 1"),
     )];
     refuses(
-        require_account_match(&none, Bank::Icici, "ICICI CA 12399999999456"),
+        require_account_match(&none, Bank::Bob, "BOB CA 12399999999456"),
         "no_account_number_line",
     );
 }
@@ -833,10 +825,10 @@ fn slashed_dates_are_strict() {
 
 fn request<'a>(controls: &'a Controls, mapping: &'a Mapping) -> StatementRequest<'a> {
     StatementRequest {
-        bank: Bank::Icici,
-        account_label: "ICICI CA 12399999999456",
+        bank: Bank::Bob,
+        account_label: "BOB CA 12399999999456",
         controls,
-        bank_ledger: "ICICI Bank",
+        bank_ledger: "Bob Bank",
         suspense_ledger: "Suspense",
         mapping,
         cash_answers: CashAnswers::none(),
@@ -850,7 +842,7 @@ fn no_mapping() -> Mapping {
 }
 
 #[test]
-fn an_icici_statement_proves_itself_from_the_callers_opening_and_closing_balances() {
+fn a_bob_statement_proves_itself_from_the_callers_opening_and_closing_balances() {
     let mapping = no_mapping();
     let controls = Controls::parse_optional("10,000.00", "-11,635.26", None, None).unwrap();
     let parsed = prepare(&pages(), &request(&controls, &mapping)).unwrap();

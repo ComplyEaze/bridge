@@ -10,10 +10,10 @@
 //! text layer of one real statement, described by shape only (68 single-line
 //! rows): see [`Layout::SingleLine`] and `ubi_party`.
 //!
-//! `Icici` (ICICI Bank) has no Python reference either. Its rules come from two
+//! `Bob` (Bank of Baroda) has no Python reference either. Its rules come from two
 //! real statements read through PDFium (held privately), described by shape and
 //! geometry only: see
-//! [`Bank::icici_rows`] for what is peculiar to it (newest row first, a
+//! [`Bank::bob_rows`] for what is peculiar to it (newest row first, a
 //! `Cr`/`Dr` marker glued to the balance, no printed totals, and a column header
 //! on the first page only).
 
@@ -31,7 +31,7 @@ pub enum Bank {
     Sbi,
     Hdfc,
     Ubi,
-    Icici,
+    Bob,
 }
 
 /// How a layout's rows are read off the page.
@@ -86,7 +86,7 @@ impl Bank {
             "sbi" => Some(Self::Sbi),
             "hdfc" => Some(Self::Hdfc),
             "ubi" => Some(Self::Ubi),
-            "icici" => Some(Self::Icici),
+            "bob" => Some(Self::Bob),
             _ => None,
         }
     }
@@ -96,24 +96,24 @@ impl Bank {
             Self::Sbi => "sbi",
             Self::Hdfc => "hdfc",
             Self::Ubi => "ubi",
-            Self::Icici => "icici",
+            Self::Bob => "bob",
         }
     }
 
     pub fn layout(self) -> Layout {
         match self {
-            Self::Sbi | Self::Hdfc | Self::Icici => Layout::Columns,
+            Self::Sbi | Self::Hdfc | Self::Bob => Layout::Columns,
             Self::Ubi => Layout::SingleLine,
         }
     }
 
     /// Whether the statement prints debit and credit totals an operator can
-    /// supply as controls. Union Bank and ICICI print neither totals nor an
+    /// supply as controls. Union Bank and the measured Bank of Baroda statements print neither totals nor an
     /// opening or closing line.
     pub fn prints_totals(self) -> bool {
         match self {
             Self::Sbi | Self::Hdfc => true,
-            Self::Ubi | Self::Icici => false,
+            Self::Ubi | Self::Bob => false,
         }
     }
 
@@ -147,7 +147,7 @@ impl Bank {
             // date 87-137 on every row; narration words start at 148 and end by 360;
             // cheque-zone words lie in 362-469; withdrawals end at 543, deposits at 662
             // and the balance at 787 (it starts no earlier than 718).
-            Self::Icici => &[
+            Self::Bob => &[
                 (0.0, 75.0, "date"),
                 (75.0, 145.0, "vdt"),
                 (145.0, 361.0, "narr"),
@@ -166,7 +166,7 @@ impl Bank {
             (Self::Sbi, "ref") => Some(299.0),
             (Self::Hdfc, "narr") => Some(240.0),
             // the right edge of the narration cell: narration words end at 359.5, none past 360
-            (Self::Icici, "narr") => Some(360.0),
+            (Self::Bob, "narr") => Some(360.0),
             _ => None,
         }
     }
@@ -174,8 +174,8 @@ impl Bank {
     /// Columns only ever populated on the row carrying the date.
     pub fn row_scoped(self) -> &'static [&'static str] {
         match self {
-            // ICICI prints a row's amount on its own visual line, up to 12pt below the date
-            Self::Sbi | Self::Ubi | Self::Icici => &[],
+            // On the measured statements a row's amount sits on its own visual line, up to 12pt below the date
+            Self::Sbi | Self::Ubi | Self::Bob => &[],
             Self::Hdfc => &["ref", "vdt", "dr", "cr", "bal"],
         }
     }
@@ -183,8 +183,8 @@ impl Bank {
     /// A line carrying every token of any group ends the current page's table.
     pub fn bottom_anchors(self) -> Anchors {
         match self {
-            // ICICI's table ends at its footer line: see [`Bank::column_footer`]
-            Self::Sbi | Self::Ubi | Self::Icici => &[],
+            // On the measured statements the table ends at its footer line: see [`Bank::column_footer`]
+            Self::Sbi | Self::Ubi | Self::Bob => &[],
             Self::Hdfc => &[&["HDFC", "BANK", "LIMITED"], &["STATEMENT", "SUMMARY"]],
         }
     }
@@ -192,7 +192,7 @@ impl Bank {
     /// ... and these end the statement entirely; later pages are not read.
     pub fn end_anchors(self) -> Anchors {
         match self {
-            Self::Sbi | Self::Ubi | Self::Icici => &[],
+            Self::Sbi | Self::Ubi | Self::Bob => &[],
             Self::Hdfc => &[&["STATEMENT", "SUMMARY"]],
         }
     }
@@ -210,7 +210,7 @@ impl Bank {
             // the column header is repeated on every page
             Self::Ubi => &[UBI_HEADER],
             // the column header is printed on page 1 only: see [`Bank::header_once`]
-            Self::Icici => &[&["TRAN", "VALUE", "NARRATION"]],
+            Self::Bob => &[&["TRAN", "VALUE", "NARRATION"]],
         }
     }
 
@@ -218,7 +218,7 @@ impl Bank {
     /// then starts at the top of every later page, once an earlier page has
     /// shown the header.
     pub fn header_once(self) -> bool {
-        matches!(self, Self::Icici)
+        matches!(self, Self::Bob)
     }
 
     /// The label printed beside the account number. Only that line binds.
@@ -229,8 +229,8 @@ impl Bank {
             Self::Hdfc => &[&["Account", "No"]],
             // a masked "<label> No" line and a CIF ID line also print digits
             Self::Ubi => &[&["Account", "Number"]],
-            // ICICI prints the number masked: see [`crate::parse::require_account_match`]
-            Self::Icici => &[],
+            // The measured statements print the account number masked: see [`crate::parse::require_account_match`]
+            Self::Bob => &[],
         }
     }
 
@@ -251,7 +251,7 @@ impl Bank {
                 "Credit",
                 "Balance",
             ],
-            Self::Hdfc | Self::Ubi | Self::Icici => &[],
+            Self::Hdfc | Self::Ubi | Self::Bob => &[],
         }
     }
 
@@ -270,7 +270,7 @@ impl Bank {
             r"^\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$"
         );
         pattern!(HDFC_DATE, r"^\d{2}/\d{2}/\d{2}$");
-        pattern!(ICICI_DATE, r"^\d{2}/\d{2}/\d{4}$");
+        pattern!(BOB_DATE, r"^\d{2}/\d{2}/\d{4}$");
         let cell: &[Word] = cells.get(DATE).map_or(&[], Vec::as_slice);
         match self {
             // SBI prints "1 Aug" then "2026" beneath it: the date cell is two words
@@ -285,10 +285,10 @@ impl Bank {
             Self::Hdfc => cell.len() == 1 && HDFC_DATE.is_match(&cell[0].text),
             Self::Ubi => false,
             // a row opens with its transaction date and its value date, one word each
-            Self::Icici => {
+            Self::Bob => {
                 let one_date = |column: &str| {
                     let cell: &[Word] = cells.get(column).map_or(&[], Vec::as_slice);
-                    cell.len() == 1 && ICICI_DATE.is_match(&cell[0].text)
+                    cell.len() == 1 && BOB_DATE.is_match(&cell[0].text)
                 };
                 one_date(DATE) && one_date("vdt")
             }
@@ -301,7 +301,7 @@ impl Bank {
             Self::Sbi => date::parse_day_month_name_year(&remove_space(text)),
             Self::Hdfc => date::parse_day_month_short_year(text),
             Self::Ubi => date::parse_day_month_year_hyphenated(text),
-            Self::Icici => date::parse_day_month_year_slashed(text),
+            Self::Bob => date::parse_day_month_year_slashed(text),
         }
     }
 
@@ -311,7 +311,7 @@ impl Bank {
             Self::Sbi => "%d%b%Y",
             Self::Hdfc => "%d/%m/%y",
             Self::Ubi => "%d-%m-%Y",
-            Self::Icici => "%d/%m/%Y",
+            Self::Bob => "%d/%m/%Y",
         }
     }
 
@@ -320,7 +320,7 @@ impl Bank {
             Self::Sbi => named_or_unnamed(sbi_party(row)),
             Self::Hdfc => hdfc_party(row),
             Self::Ubi => ubi_party(row),
-            Self::Icici => icici_party(row),
+            Self::Bob => bob_party(row),
         }
     }
 
@@ -329,7 +329,7 @@ impl Bank {
             Self::Sbi => sbi_reference(row),
             Self::Hdfc => hdfc_reference(row),
             Self::Ubi => ubi_reference(row),
-            Self::Icici => icici_reference(row),
+            Self::Bob => bob_reference(row),
         }
     }
 }
@@ -792,26 +792,26 @@ fn ubi_reference(row: &Row) -> (String, String) {
 }
 
 impl Bank {
-    /// `(N, M)` from the footer line of a column layout that prints one: ICICI's is
+    /// `(N, M)` from the footer line of a column layout that prints one: the measured Bank of Baroda statements' is
     /// `<dd/mm/yyyy> <hh:mm> <word> Page N of M`, on every page, below the table. `None`
     /// for any other line and for every other layout, so a transaction's narration cannot
     /// pass for a footer (it would have to open with a date and a time).
     pub fn column_footer(self, words: &[&str]) -> Option<(usize, usize)> {
         pattern!(
-            ICICI_FOOTER,
+            BOB_FOOTER,
             r"^[0-9]{2}/[0-9]{2}/[0-9]{4} [0-9]{2}:[0-9]{2} \S+ Page ([0-9]+) of ([0-9]+)$"
         );
         match self {
-            Self::Icici => {
+            Self::Bob => {
                 let text = words.join(" ");
-                let found = ICICI_FOOTER.captures(&text)?;
+                let found = BOB_FOOTER.captures(&text)?;
                 Some((found[1].parse().ok()?, found[2].parse().ok()?))
             }
             _ => None,
         }
     }
 
-    /// ICICI's rows as the replay needs them: oldest first, each balance a signed number.
+    /// The Bank of Baroda rows as the replay needs them: oldest first, each balance a signed number.
     ///
     /// The statement prints its newest row first, each balance followed by a glued `Cr`
     /// or `Dr` marker (a `Dr` balance is overdrawn), and no
@@ -819,24 +819,24 @@ impl Bank {
     /// way is refused, not reversed twice: the replay would break on it anyway, and a
     /// loud refusal that names the cause is kinder than a chain failure. Numbers in any
     /// refusal are positions in the reversed (oldest first) order.
-    pub fn icici_rows(rows: Vec<Row>) -> Result<Vec<Row>, Refusal> {
+    pub fn bob_rows(rows: Vec<Row>) -> Result<Vec<Row>, Refusal> {
         pattern!(MARKED_BALANCE, r"^([0-9]+(?:\.[0-9]{1,2})?)(Cr|Dr)$");
         let mut rows = rows;
         rows.reverse();
         let mut previous: Option<Date> = None;
         for (index, row) in rows.iter_mut().enumerate() {
             let number = index + 1;
-            let Some(printed) = Self::Icici.parse_date(strip(row.get(DATE))) else {
+            let Some(printed) = Self::Bob.parse_date(strip(row.get(DATE))) else {
                 return Err(Refusal::at_row(
                     "unparseable_date",
                     number,
                     format!(
                         "row {number}: the date cell is not a date this layout can produce ({}); the columns have shifted or the extraction is corrupt",
-                        Self::Icici.date_format()
+                        Self::Bob.date_format()
                     ),
                 ));
             };
-            if Self::Icici.parse_date(strip(row.get("vdt"))).is_none() {
+            if Self::Bob.parse_date(strip(row.get("vdt"))).is_none() {
                 return Err(Refusal::at_row(
                     "unparseable_value_date",
                     number,
@@ -876,7 +876,7 @@ impl Bank {
     }
 }
 
-/// ICICI narrations, by prefix, as observed on two statements. The bank prints at most
+/// Bank of Baroda narrations, by prefix, as observed on the two measured statements. They print at most
 /// about 50 characters of a narration, so a name can end mid-word (the same payer is cut at
 /// the same place every time, since the prefix before it has a fixed width). A rule names a
 /// counterparty only where the shape settles it:
@@ -894,7 +894,7 @@ impl Bank {
 /// Not named, so they reach suspense: `IMPS` (no counterparty field is settled), `MBK` (the
 /// last field may be the payer's own remark), `EBANK`, `BY <name>`, interest, disbursement
 /// and every other wording.
-fn icici_party(row: &Row) -> String {
+fn bob_party(row: &Row) -> String {
     pattern!(
         UPI,
         r"^UPI/[0-9]{12}/[0-9]{2}:[0-9]{2}:[0-9]{2}/UPI/([A-Za-z0-9._-]+@[A-Za-z0-9]+)/"
@@ -939,7 +939,7 @@ fn icici_party(row: &Row) -> String {
     UNRESOLVED.to_string()
 }
 
-fn icici_reference(row: &Row) -> (String, String) {
+fn bob_reference(row: &Row) -> (String, String) {
     pattern!(UPI, r"^UPI/([0-9]{12})/");
     pattern!(IMPS, r"^IMPS/[A-Z0-9]{3}/([0-9]{12})/");
     pattern!(MBK, r"^MBK/([0-9]{12})/");

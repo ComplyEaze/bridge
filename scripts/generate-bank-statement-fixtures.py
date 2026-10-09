@@ -8,7 +8,7 @@ calibrated on (column bounds, anchors, the stacked SBI date), which is already
 public in that module. The Union Bank statement carries only the row *shapes*
 recorded in the `Bank::Ubi` profile; its x positions are invented, because
 that profile reads each row as one line of text and has no column bounds.
-The ICICI statement carries the measured geometry of two real statements
+The Bank of Baroda statement carries the measured geometry of two real statements
 (column positions and shapes only, no values) in its own section below.
 
 Standard library only, and deterministic: the same script writes the same
@@ -405,7 +405,7 @@ UBI_PAGE_2 = (
 
 
 # --------------------------------------------------------------------------- #
-# ICICI-like statement                                                         #
+# Bank of Baroda-like statement                                                       #
 # --------------------------------------------------------------------------- #
 # The geometry is measured (two real statements read through PDFium): the
 # transaction date spans x 15-65 and the value date 87-137 on every row, the
@@ -418,8 +418,8 @@ UBI_PAGE_2 = (
 # fixture's two wrapped ones are longer, because Courier is wider than the
 # bank's font.
 
-ICICI_DATE_X, ICICI_VALUE_X, ICICI_NARRATION_X = 15.0, 87.0, 149.5
-ICICI_WRAP = 359.5   # a 50-character fragment ends here
+BOB_DATE_X, BOB_VALUE_X, BOB_NARRATION_X = 15.0, 87.0, 149.5
+BOB_WRAP = 359.5   # a 50-character fragment ends here
 
 
 def indian(amount_paise):
@@ -434,10 +434,10 @@ def indian(amount_paise):
     return ",".join(groups + [tail]) + f".{paise:02d}"
 
 
-def icici_row(top, date, narration, side, amount, balance, amount_dy=0, cheque=None):
+def bob_row(top, date, narration, side, amount, balance, amount_dy=0, cheque=None):
     """`narration` is a list of printed fragments; `balance` is signed paise."""
-    cells = [(ICICI_DATE_X, date), (ICICI_VALUE_X, date),
-             (ICICI_NARRATION_X, narration[0]),
+    cells = [(BOB_DATE_X, date), (BOB_VALUE_X, date),
+             (BOB_NARRATION_X, narration[0]),
              right_aligned(787.14, indian(abs(balance)) + ("Cr" if balance >= 0 else "Dr"))]
     if cheque:
         cells.append((415.5, cheque))
@@ -448,17 +448,17 @@ def icici_row(top, date, narration, side, amount, balance, amount_dy=0, cheque=N
     else:
         cells.append(right_aligned(edge, indian(amount)))
     for index, fragment in enumerate(narration[1:], start=1):
-        lines.append((top + 11 * index, [(ICICI_NARRATION_X, fragment)]))
+        lines.append((top + 11 * index, [(BOB_NARRATION_X, fragment)]))
     return lines
 
 
-def icici_footer(number, count):
+def bob_footer(number, count):
     return [(1165, [(10, f"09/10/2026 10:30 SYNTH-ID/00000 Page {number} of {count}")]),
             (1185, [(10, "*This is computer-generated statement.No signature is required.")])]
 
 
 # oldest first: (date, narration fragments, side, amount in paise, amount_dy, cheque)
-ICICI_ROWS = [
+BOB_ROWS = [
     ("03/08/2026", ["BY CASH"], "cr", 75050, 0, None),
     ("03/08/2026", ["UPI/600000000001/10:15:30/UPI/nw@okzz/ZZZZ BANK"], "cr", 150000, 0, None),
     ("03/08/2026", ["UPI/600000000002/11:20:45/UPI/northwind.traders.sy",
@@ -477,23 +477,23 @@ ICICI_ROWS = [
     ("08/08/2026", ["EBANK:WIB/0000000001/order payment"], "dr", 100000, 0, None),
     ("10/08/2026", ["NEFT-ZZZZZ00000000003-BLUE RIVER CO"], "cr", 6000000, 0, None),
 ]
-ICICI_OPENING = 1000000   # paise: 10,000.00 Cr
+BOB_OPENING = 1000000   # paise: 10,000.00 Cr
 
 
-def icici_statement():
+def bob_statement():
     """Printed lines, newest first, and the balance after each row."""
-    balance, built = ICICI_OPENING, []
-    for date, narration, side, amount, dy, cheque in ICICI_ROWS:
+    balance, built = BOB_OPENING, []
+    for date, narration, side, amount, dy, cheque in BOB_ROWS:
         balance += amount if side == "cr" else -amount
         built.append((date, narration, side, amount, balance, dy, cheque))
     return list(reversed(built)), balance
 
 
-ICICI_PRINTED, ICICI_CLOSING = icici_statement()
-ICICI_PAGE_BREAK = 9   # rows on page 1; the rest start page 2 with no header
+BOB_PRINTED, BOB_CLOSING = bob_statement()
+BOB_PAGE_BREAK = 9   # rows on page 1; the rest start page 2 with no header
 
 
-def icici_pages():
+def bob_pages():
     header = [
         (71, [(10, "Your Account Statement as on 09/10/2026"), (640, "123XXXXXXXX456")]),
         (90, [(10, "SYNTHETIC STATEMENT - NOT A REAL ACCOUNT")]),
@@ -507,13 +507,13 @@ def icici_pages():
     ]
     pages = []
     for number, (chunk, top, lead) in enumerate(
-            [(ICICI_PRINTED[:ICICI_PAGE_BREAK], 342, header),
-             (ICICI_PRINTED[ICICI_PAGE_BREAK:], 68, [])], start=1):
+            [(BOB_PRINTED[:BOB_PAGE_BREAK], 342, header),
+             (BOB_PRINTED[BOB_PAGE_BREAK:], 68, [])], start=1):
         lines = list(lead)
         for date, narration, side, amount, balance, dy, cheque in chunk:
-            lines += icici_row(top, date, narration, side, amount, balance, dy, cheque)
+            lines += bob_row(top, date, narration, side, amount, balance, dy, cheque)
             top += 18 + 11 * (len(narration) - 1)
-        lines += icici_footer(number, 2)
+        lines += bob_footer(number, 2)
         pages.append(tuple(lines))
     return pages
 
@@ -544,10 +544,10 @@ FIXTURES = {
         pages=[UBI_PAGE_1, UBI_PAGE_2], width=595, height=842,
         user="synthetic-user-7788", owner="synthetic-owner-unused-c", seed="ubi"),
     # owner-password encryption only (the user password is empty, as on a downloaded
-    # ICICI statement); one visual line per amount, newest row first, no printed totals
-    "icici-synthetic.pdf": dict(
-        pages=icici_pages(), width=842, height=1200,
-        user="", owner="synthetic-owner-unused-h", seed="icici"),
+    # Bank of Baroda statement); one visual line per amount, newest row first, no printed totals
+    "bob-synthetic.pdf": dict(
+        pages=bob_pages(), width=842, height=1200,
+        user="", owner="synthetic-owner-unused-h", seed="bob"),
     # No text at all: a statement re-scanned by a phone app is one image per page
     "scan-image-only.pdf": dict(
         pages=[Drawn(full_page_image(638, 842), image=True)] * 2, width=638, height=842,

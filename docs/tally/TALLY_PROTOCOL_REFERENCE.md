@@ -174,6 +174,9 @@ base revision.
 <a id="93-voucher-idempotency-depends-on-remoteid--this-sections-title-used-to-say-the-opposite"></a>
 
 [9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#93-voucher-idempotency-depends-on-remoteid--this-sections-title-used-to-say-the-opposite)
+<a id="93a-a-refused-import-leaves-its-remoteid-behind-the-corrected-send-answers-altered1-while-creating"></a>
+
+[9.3a A refused import leaves its `REMOTEID` behind: the corrected send answers `ALTERED=1` while creating](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#93a-a-refused-import-leaves-its-remoteid-behind-the-corrected-send-answers-altered1-while-creating)
 <a id="94-master-re-create-is-a-silent-alter"></a>
 
 [9.4 Master re-create is a silent Alter](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94-master-re-create-is-a-silent-alter)

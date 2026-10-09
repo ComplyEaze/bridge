@@ -65,3 +65,12 @@ d9c68e392727164c6768e9b71c05548541a0c92269ca5f514b4f562dc05ee7fb  261691  fixed2
 5c45afd738c0b2b135cbd2012cf6825225144d7b23b9c0bc3779f5a076803551  426245  fixed2/screens/gstr1-2-uncertain-unfiltered.png
 5e2fe4fa11009b3978d2f5cce0f83b855c31f40649682f7d09cfa625f09acd8a  171585  fixed2/screens/gstr1-3-b2c-small-by-rate.png
 2134ee4806b85bff20a5e8a68221bbda7657e62f0459d79fee14e1b1978415d9  356845  fixed2/screens/gstr1-4-hsn-sac-table12.png
+#
+# Answers: fixed3/ (after BP/26-27/0011 was keyed with Tally-filled tax, 9 Oct 2026)
+46eb08355062fff2933eddaae9eed3802465ddd63bb2ce6c16719fe690c06d28  78994  fixed3/a15-verification-window-fixed3.xml  <- r15-verification-window.xml (HTTP 200, 0.042127 s)
+7fc5faf62b41f996836f310c27aa01855fc8b650fe0f163fb167773253126278  289879  fixed3/vouchers-fixed3.xml  <- d-vouchers.xml (HTTP 200, 0.069533 s)
+#
+# Screens: fixed3/screens/ (Tally window only, not cropped)
+192f17ed4c6282008407041f6789e0abd462632864ded403512bf87331bd2c95  412746  fixed3/screens/gstr1-1-summary.png
+6c4aa4c547d24629d88a959a314acdcda5e00100f55ddee2cc638d7e9d3f7a97  396505  fixed3/screens/gstr1-2-uncertain-unfiltered.png
+4253e0b94adc077914b126518bbcf67a0a72123d327a9441d4f3d9a48fe31ce5  170108  fixed3/screens/gstr1-3-b2c-small-by-rate.png

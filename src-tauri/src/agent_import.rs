@@ -281,6 +281,24 @@ const LIVE_QUALIFIED_VOUCHER_TYPES: &[VoucherType] = &[
     VoucherType::Contra,
 ];
 
+#[cfg(test)]
+tokio::task_local! {
+    /// Test-only: the voucher types a run treats as qualified, in place of the
+    /// live list. It lets a test run a type that is not live yet through the
+    /// build, the post and the verification; no tool call can set it.
+    pub(super) static TEST_QUALIFIED_VOUCHER_TYPES: &'static [VoucherType];
+}
+
+/// The voucher types the build, the post and the verification accept. Always
+/// the live list outside a test.
+fn qualified_voucher_types() -> &'static [VoucherType] {
+    #[cfg(test)]
+    if let Ok(types) = TEST_QUALIFIED_VOUCHER_TYPES.try_with(|types| *types) {
+        return types;
+    }
+    LIVE_QUALIFIED_VOUCHER_TYPES
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 enum EntrySide {
     Dr,
@@ -761,7 +779,7 @@ impl Server {
         let mut payload = parse_payload(args)?;
         // First of all: a type that is not qualified is refused as that, not
         // for whichever of its fields a later check would stop at.
-        refuse_unqualified_types(&payload.vouchers, LIVE_QUALIFIED_VOUCHER_TYPES)?;
+        refuse_unqualified_types(&payload.vouchers, qualified_voucher_types())?;
         invoice::refuse_supplied_observed(&payload.vouchers)?;
         validate_payload(&payload)?;
         // After the whole of `validate_payload`: in a batch with several
@@ -1611,7 +1629,7 @@ impl Server {
             if let Some((invoice_voucher, matched)) = verification::invoice_readback_due(
                 &mut result,
                 &line.vouchers,
-                LIVE_QUALIFIED_VOUCHER_TYPES,
+                qualified_voucher_types(),
             ) {
                 let (mut differences, alter_id, guid, evidence) = self
                     .read_back_sales_invoice(&identity, &company, invoice_voucher)

@@ -202,12 +202,12 @@
     {
       "invariant": "POP-3",
       "subject": "closing_paise",
-      "detail": "TB closing_paise sums to -850000 paise; opening stock not taken: the trial balance does not start on the books' first day"
+      "detail": "TB closing_paise sums to -850000 paise; opening stock not taken: the read does not show the trial balance starting on the books' first day"
     },
     {
       "invariant": "POP-3",
       "subject": "opening_paise",
-      "detail": "TB opening_paise sums to -850000 paise; opening stock not taken: the trial balance does not start on the books' first day"
+      "detail": "TB opening_paise sums to -850000 paise; opening stock not taken: the read does not show the trial balance starting on the books' first day"
     }
   ],
   "result_invariants_evaluated": [

@@ -1,0 +1,44 @@
+{
+ "comment": "POP-3 (#1486): the ledger openings sum to minus the opening stock, which no ledger holds; with the stock added the trial balance ties, so POP-3 reports nothing.",
+ "groups": {
+  "Capital Account": null,
+  "Fixed Assets": null
+ },
+ "ledgers": [
+  {
+   "name": "Owner Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-owner-capital"
+  },
+  {
+   "name": "Shop Fittings",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-shop-fittings"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Owner Capital",
+   "opening": -950000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -950000
+  },
+  {
+   "ledger": "Shop Fittings",
+   "opening": 150000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 150000
+  }
+ ],
+ "vouchers": [],
+ "opening_stock": 800000,
+ "tests": [
+  "trial_balance"
+ ]
+}

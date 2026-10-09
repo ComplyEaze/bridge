@@ -1847,6 +1847,16 @@ carriages it owned in the year."
     Ok(())
 }
 
+/// The hash in a payee row's id under one nature (`<prefix>_<hash>`): the first 8 hex digits of
+/// the SHA-1 of `<prefix>:` and the entity's ledger tag. `narration_payees` finds this test's
+/// finding for unnamed 194C payees by it.
+pub(crate) fn row_hash(book: &Book, prefix: &str, entity: &str) -> Result<String> {
+    Ok(hash8(&format!(
+        "{prefix}:{}",
+        stable_ledger_tag(book, entity)?
+    )))
+}
+
 /// Run the test. `entity_type` is `[client].entity_type`; `cfg` is `[tds]`/`[tds_payees]`, bound;
 /// `inputs` is what the reference's pack passes from the other tables.
 #[allow(clippy::too_many_lines)]
@@ -2346,7 +2356,7 @@ whose {nature}{cat_note} test trips (single sum/aggregate for \
         let mut ordered: Vec<(&str, &Summary)> = over.into_iter().collect();
         ordered.sort_by_key(|(e, _)| hash8(e));
         for (entity, s) in ordered {
-            let h = hash8(&format!("{prefix}:{}", stable_ledger_tag(book, entity)?));
+            let h = row_hash(book, prefix, entity)?;
             let rid = format!("{prefix}_{h}");
             let evidence = voucher_refs(s.vouchers.values().copied());
             // Two over-limit entities with one tag repeat this figure id: the reference raises

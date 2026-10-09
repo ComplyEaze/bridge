@@ -1,0 +1,10 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md
+scripts/ledger-entries-ui.test.mjs
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_movement.rs
+src-tauri/src/agent_presence.rs
+src-tauri/src/agent_register.rs
+src-tauri/src/agent_tests.rs
+src-tauri/src/agent_vouchers.rs
+reviewer: lamemustafa

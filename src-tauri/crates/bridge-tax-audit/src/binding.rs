@@ -1583,6 +1583,29 @@ mod tests {
             .is_empty());
     }
 
+    /// `roles.narration_payee_ledgers` binds where the reference's `LEDGER_PATHS` puts it, after
+    /// `book_keeping_quality`'s lists and `roles.no_supplier_expense_ledgers`: with an unknown name
+    /// there and at one of those, the refusal names that other location first.
+    #[test]
+    fn narration_payee_ledgers_bind_after_no_supplier_expense_ledgers() {
+        let b = book("Cash-in-Hand", "", None);
+        for other in [
+            "roles.payment_channel_debtors",
+            "roles.no_supplier_expense_ledgers",
+        ] {
+            let key = other.trim_start_matches("roles.");
+            let e = engagement(&format!(
+                "narration_payee_ledgers = [\"Nowhere B\"]\n{key} = [\"Nowhere A\"]\n"
+            ));
+            let err = e.bind(&b).unwrap_err();
+            assert!(
+                matches!(&err, AuditError::Refused { code: BIND_NAME_UNKNOWN, detail }
+                    if detail.split_once(':').map(|(location, _)| location) == Some(other)),
+                "{err:?}"
+            );
+        }
+    }
+
     /// `narration_payees_on` runs the TDS payee test first, refusing without its two inputs as
     /// `tds_payees_on` does, reads the bound list, and reads the 194C ledger whose payee that
     /// test could not name too.

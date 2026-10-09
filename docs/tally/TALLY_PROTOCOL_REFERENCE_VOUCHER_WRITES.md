@@ -568,13 +568,15 @@ the official sample shapes verbatim** — the §9.5/§9.6 failures may be a requ
 on our side rather than an Edit Log restriction. This is the cheapest next step on the write
 path and it should be taken before the Phase 4 licensed-Tally gate.
 
-### 9.17 Tally works out a Sales invoice's tax per sales line, rounded half-up, and flags any other figure
+### 9.17 Tally's GSTR-1 flag expects a Sales invoice's tax per sales line, rounded half-up, and flags a figure that differs from it
 
 **PARTIAL, and narrow: one synthetic company, licensed TallyPrime 7.1 Silver (the earlier rounds on that
 lab record the release and licence; these answers do not show them), CGST plus state tax within the
 company's own state, 5% services lines (one 18% goods line on a bill whose figures are exact), the invoice
-view, one book, one run per voucher. The "Tax entered" column for 0001 to 0009 and 0011 comes from the
-instructions of the earlier rounds, not from these answers.** Sixteen Sales vouchers were read back in one full voucher export;
+view, one book, one run per voucher. A "line" is a sales-ledger line in an Accounting Invoice
+(`VCHENTRYMODE`), with no stock items; the buyer is Unregistered/Consumer and the state Rajasthan on every
+voucher. The "Tax entered" column comes from the sitting's own record of how each voucher was made, not
+from these answers: the export cannot show who filled a figure.** Sixteen Sales vouchers were read back in one full voucher export;
 Tally's own GSTR-1 flag is in that export (`VCHGSTSTATUSISINCLUDED`, `VCHGSTSTATUSISUNCERTAIN`,
 `VCHGSTSTATUSISEXCLUDED`) and was checked against the uncertain list on Tally's screen, which named the
 same six vouchers with the reason "Mismatch between Expected Tax Amount and Modified Tax Amount in
@@ -601,17 +603,19 @@ for each of the two heads.
 | 0016 | 100.20 + 100.20 | 5.01 / 5.01 | **5.02** | 5.01 | **uncertain** | typed, the per-bill figure |
 
 - **VERIFIED (this book): for all sixteen vouchers, Tally's flag is "included" exactly when both heads equal
-  the per-line figure, and "uncertain" otherwise.** The per-bill figure disagrees with Tally on four
+  the per-line figure, and "uncertain" otherwise.** Every flagged voucher was 0.01 off the per-line figure
+  on at least one head; nothing larger was seen. The per-bill figure disagrees with Tally on four
   included vouchers (0012 to 0015) and agrees with the one it flagged (0016).
-- **VERIFIED: the rounding is half-up per line.** `0013`'s lines are 2.505 each: Tally filled 5.02, where
-  half-even would give 5.00. `0014`'s 2.515 gave 5.04.
-- **VERIFIED: per line, not per ledger or per bill.** `0015` carries one ledger on two lines and Tally
-  filled 5.02 (a ledger total would give 5.01).
-- **VERIFIED: a difference of one paisa is flagged.** `0016` differs from the per-line figure by one
+- **VERIFIED (this book, positive amounts, 2.5% heads): the rounding is half-up per line.** `0013`'s lines
+  are 2.505 each and Tally's figure is 5.02 (half-even would give 5.00); `0011`'s 25.025 gave 25.03
+  (half-even 25.02). `0014`'s 2.515 does not discriminate: half-even gives the same.
+- **VERIFIED (this book): per line, not per ledger or per bill.** `0015` carries one ledger on two lines
+  and Tally's figure is 5.02 (a ledger total would give 5.01).
+- **VERIFIED (this book): a difference of one paisa is flagged.** `0016` differs from the per-line figure by one
   paisa; `0002`, `0003` and `0008` carry heads that differ from each other by one paisa and are flagged.
   No tolerance showed: the four on-screen tax ledgers read `ROUNDINGMETHOD` Not Applicable and
-  `ROUNDINGLIMIT` 0 (the one tax ledger created by import reads None and 0, and is on none of these
-  vouchers), and the two company screens read show no setting that ignores a difference.
+  `ROUNDINGLIMIT` 0 (the one tax ledger created by import reads an empty `ROUNDINGMETHOD` and 0, and is on none of
+  these vouchers), and the two company screens read, which show no setting that ignores a difference.
 - **A round off line does not decide the flag** (`0004`, `0010` are included with one).
 - **VERIFIED (this book): Accept As Is on `0016` alters the voucher and overrides the flag; it does not
   change an amount.** Before: uncertain, `ISGSTOVERRIDDEN` No. After: included, `ISGSTOVERRIDDEN` Yes,
@@ -621,8 +625,8 @@ for each of the two heads.
   either head, admits vouchers this table shows Tally flags (the `0002` and `0016` kinds). Whether and how to
   change a given check is a separate decision.
 - **Not measured:** inter-state tax, cess, inventory or discount lines, a registered buyer, a rate other than
-  5% with a tie, more than one rate with a tie, an invoice with its GST rate taken from the sales ledger
-  rather than typed, Gold. Do not read the rule beyond what the table covers.
+  5% with a tie, more than one rate with a tie, a sales ledger whose GST rate disagrees with the tax posted
+  (the rate sits on the sales ledger; the vouchers carry no rate element), Gold. Do not read the rule beyond what the table covers.
 
 Evidence: the answers (`workorder/vouchers-w1.xml`, `vouchers-w2-before.xml`, `vouchers-w2-after.xml`,
 `aw2-marks-*.xml`, `ledgers-w1.xml`) are held on the repository's `lab/1342-capture-answers` branch at
@@ -650,7 +654,10 @@ Bridge's code.** The voucher type setting is "Allow zero-valued transactions".
 - **Not measured:** the GSTR-1 flag of the zero voucher (the voucher type was not in the export); a zero
   invoice in the invoice view under the setting Yes; a zero line beside a non-zero one; Gold.
 
-Evidence: `workorder/aw3-*.xml`, `vouchers-w3.xml`, `aw3-window-0802-extra.xml` and the screens
+Evidence: the requests (`w3-zero-accounting.xml`, `w3-zero-invoice.xml`, `w3-zero-code.xml`,
+`w3-zero-type-default.xml`, `w3-zero-type-yes.xml`, `w3-valid-after-refused.xml`) are on
+`lab/1342-capture-requests` at `5cc927e5` under `workorder/`; the answers `workorder/aw3-*.xml`,
+`vouchers-w3.xml`, `aw3-window-0802-extra.xml` and the screens
 `w3-0018-zero-keyed-error`, `w3-voucher-type-z0`, `w3-voucher-type-z1`, `w3-document-summary-before` and
 `w3-document-summary-after` on the same branch and commit.
 

@@ -222,9 +222,9 @@ base revision.
 <a id="96-actioncancel-by-remoteid-creates-a-new-voucher--it-does-not-cancel--trap"></a>
 
 [9.6 `ACTION="Cancel"` by `REMOTEID` creates a new voucher — it does not cancel — **TRAP**](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#96-actioncancel-by-remoteid-creates-a-new-voucher--it-does-not-cancel--trap)
-<a id="917-tally-works-out-a-sales-invoices-tax-per-sales-line-rounded-half-up-and-flags-any-other-figure"></a>
+<a id="917-tallys-gstr-1-flag-expects-a-sales-invoices-tax-per-sales-line-rounded-half-up-and-flags-a-figure-that-differs-from-it"></a>
 
-[9.17 Tally works out a Sales invoice's tax per sales line, rounded half-up, and flags any other figure](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#917-tally-works-out-a-sales-invoices-tax-per-sales-line-rounded-half-up-and-flags-any-other-figure)
+[9.17 Tally's GSTR-1 flag expects a Sales invoice's tax per sales line, rounded half-up, and flags a figure that differs from it](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#917-tallys-gstr-1-flag-expects-a-sales-invoices-tax-per-sales-line-rounded-half-up-and-flags-a-figure-that-differs-from-it)
 <a id="918-a-zero-value-sales-voucher-is-refused-unless-its-voucher-type-allows-zero-valued-transactions"></a>
 
 [9.18 A zero-value Sales voucher is refused unless its voucher type allows zero-valued transactions](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#918-a-zero-value-sales-voucher-is-refused-unless-its-voucher-type-allows-zero-valued-transactions)

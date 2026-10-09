@@ -1570,8 +1570,15 @@ that turns that on.
    Journal, the desktop posting) flow below instead of importing the file manually.
 5. Call `verify_import` with the company GUID and batch ID. It reads the date
    window back, compares the exact signed ledger entries, reports missing or
-   divergent rows and duplicates, writes `.proof.json` and `.proof.md`, and
-   appends the verification status to the local import ledger. It compares the
+   divergent rows and duplicates, adds a proof pair
+   (`<batch>.proof.<time saved>.<SHA-256>.json` and `.md`) beside every earlier
+   one, and appends the verification status, which names that pair current, to
+   the local import ledger. No file is replaced: the journal decides which pair
+   is current. The SHA-256 in the name is the JSON's, and only the JSON is read
+   back and checked against it; the `.md` is a copy for people to read, and
+   ComplyEaze Bridge never reads it back. Every pair is kept until you delete
+   it; nothing in ComplyEaze Bridge deletes one. A batch last verified by an earlier build keeps its
+   single `<batch>.proof.json`, which no longer changes. It compares the
    date, voucher type and entries; it does **not** compare `EFFECTIVEDATE` or
    `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see
    the limits noted in reference §9.13.
@@ -1939,7 +1946,11 @@ wrote itself. Since bridge#579, each native dispatch intent records the
 REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post attempted
 with 0.4.2 or later, the dispatch intent also records the pre-POST voucher mark and
 the journal a binding record, which a connector older than 0.4.2 refuses: do not
-downgrade after posting with it. A downgrade before that first post leaves the
+downgrade after posting with it. From the first verification with the build that
+added `<batch>.proof.<time saved>.<SHA-256>.json` (#911), each verification's status
+record names the proof it saved, which an older connector refuses too: do not
+downgrade after verifying with it. A downgrade before the first post or
+verification with that build leaves the
 journal readable, and versions 0.3.0 to 0.4.2 then refuse to post a batch this
 version built (`import_batch_predates_ledger_binding`, nothing posted): they
 cannot make the cash-in-hand and bill-wise checks it was built with. Their
@@ -2534,13 +2545,29 @@ preparation receipt fails, the recovery JSON-RPC error contains
 `error.data.batch_id`. Retain it and use `verify_import` or inspect the local import
 ledger; do not blindly rebuild or import another batch. If stdout itself fails,
 the recovery ID may not reach the client; the generated XML and import ledger
-remain available for local recovery. Proof JSON,
-Markdown, and ledger status are published under one admission lock. Handled
-publication failures restore the prior proof pair and ledger state. Builds create
+remain available for local recovery. A verification writes its proof JSON and
+Markdown under new names, then appends the ledger status that names them current,
+under one admission lock; it replaces and removes no earlier file, so a failure
+before the append leaves the earlier proof current. Builds create
 the journal first, write and sync staged XML, then expose the importable filename. An interrupted
-publication or failed rollback leaves a recovery journal and blocks further import
-admission until the local files and ledger are reconciled. Preserve the journal,
-its backups, and generated XML; do not delete it merely to retry. This is explicit
+build, or a status append whose outcome is unknown because its rollback failed,
+leaves a recovery journal and blocks further import
+admission until the local files and ledger are reconciled. A verification
+stopped around its journal append leaves `imports/.proof-publication`. Compare
+the status record in its `update.json` with the journal's last line, as JSON
+(the file is indented, the line is not):
+
+- the same record: the append finished, and its proof is current;
+- an earlier, whole record: the append never began, and the earlier proof is
+  current;
+- a torn last line: the append stopped part-way. Keep a copy of the journal,
+  then remove only that partial line;
+- no `update.json`: the stop came before the record was written, and the
+  journal is as it was.
+
+Then remove the folder. Proof files that no journal record names are left
+over from the stopped verification; nothing reads them. Preserve the journal
+and generated XML; do not delete it merely to retry. This is explicit
 recovery after a partial file transaction, not a power-loss atomicity guarantee.
 
 Prepared receipts count the bounded master-validation and loaded-company rows. Unknown tool

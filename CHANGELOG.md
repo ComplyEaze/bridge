@@ -63,6 +63,18 @@ These changes are in source and not yet in a published build.
   in one request, or divided without a count, is read twice as before. `ledger_movement` still reads its
   window twice. The request counts come from test doubles, not from a live Tally.
 
+- **Verifying a batch no longer replaces its saved proof, so the host need not ask before each
+  read-back.** Each `verify_import`, and each of the two verifications `acknowledge_post_review`
+  runs, now saves its proof as a new pair of files, `<batch>.proof.<time saved>.<SHA-256>.json`
+  and `.md`, beside every earlier pair, and the status it adds to the import journal names which
+  pair is current. The finished masters check and the first verified ALTERIDs go to files of their
+  own, written once. Nothing these two tools find in the folder is replaced or deleted, so they are
+  now marked as writes that are not destructive. The folder therefore grows with every
+  verification; nothing deletes old proofs. A batch last verified by an earlier build keeps its
+  single `<batch>.proof.json`, which no longer changes. After the first verification with this
+  build, a connector older than it refuses the import journal (a downgrade was already refused after
+  the first native post), so keep this version for recovery (#911).
+
 ## [0.5.1] - 2026-10-09
 
 ### In plain words: ComplyEaze Bridge 0.5.1, since 0.5.0 (9 Oct 2026)

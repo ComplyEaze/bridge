@@ -1762,7 +1762,7 @@ impl Server {
             update,
             &json,
             markdown.as_bytes(),
-            || self.append_import_record_while_admitted(&ledger::StatusRecord::from(update)),
+            |record| self.append_import_record_while_admitted(record),
             |_| Ok(()),
         )?;
         // The first verified ALTERID of each voucher, for a later amendment to
@@ -2184,18 +2184,21 @@ impl Server {
         Ok((mark, evidence))
     }
 
-    /// The proof the last verification of `batch_id` persisted, read whole.
-    /// The batch must be one the import journal records, and the file is
-    /// named exactly as `publish_proofs` names it, from the recorded id, so
-    /// a caller's argument never becomes a path on its own.
+    /// The proof the journal names current for `batch_id`, read whole. The
+    /// batch must be one the import journal records, and the file is named
+    /// exactly as `publish_proofs` names it, from the recorded id and the
+    /// recorded proof name, so a caller's argument never becomes a path on
+    /// its own. A saved proof must hash to the digest its name records.
     fn read_persisted_proof(&self, batch_id: &str) -> Result<Vec<u8>, String> {
         const MAX_PERSISTED_PROOF_BYTES: usize = 32 * 1024 * 1024;
-        let recorded = self
+        let snapshot = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?
-            .batch
-            .batch_id;
-        let path = self.imports_dir()?.join(format!("{recorded}.proof.json"));
+            .ok_or_else(|| "import_batch_not_found".to_string())?;
+        let recorded = &snapshot.batch.batch_id;
+        let path = self.imports_dir()?.join(match &snapshot.current_proof {
+            ledger::CurrentProof::Saved(name) => name.json_file(recorded),
+            ledger::CurrentProof::Legacy => format!("{recorded}.proof.json"),
+        });
         let file = super::local_file::open_local_file(&path, false)
             .map_err(|_| "verification_proof_missing".to_string())?;
         let mut bytes = Vec::new();
@@ -2207,7 +2210,48 @@ impl Server {
         if bytes.len() > MAX_PERSISTED_PROOF_BYTES {
             return Err("verification_proof_too_large".into());
         }
+        if let ledger::CurrentProof::Saved(name) = &snapshot.current_proof {
+            if sha256_hex(&bytes) != name.sha256() {
+                return Err("verification_proof_altered".into());
+            }
+        }
         Ok(bytes)
+    }
+
+    /// The JSON and Markdown files of the proof the journal names current.
+    #[cfg(test)]
+    pub(super) fn current_proof_paths(&self, batch_id: &str) -> [PathBuf; 2] {
+        let snapshot = self.latest_import_snapshot(batch_id).unwrap().unwrap();
+        let imports = self.imports_dir().unwrap();
+        match &snapshot.current_proof {
+            ledger::CurrentProof::Saved(name) => [
+                imports.join(name.json_file(batch_id)),
+                imports.join(name.markdown_file(batch_id)),
+            ],
+            ledger::CurrentProof::Legacy => [
+                imports.join(format!("{batch_id}.proof.json")),
+                imports.join(format!("{batch_id}.proof.md")),
+            ],
+        }
+    }
+
+    /// Save `json` as the batch's current proof, as a verification would.
+    #[cfg(test)]
+    pub(super) fn save_current_proof(&self, batch_id: &str, json: &[u8]) {
+        let _admission = self.lock_import_admission().unwrap();
+        let snapshot = self
+            .import_snapshot_while_admitted(Some(batch_id))
+            .unwrap()
+            .unwrap();
+        persistence::publish_proofs(
+            &self.imports_dir().unwrap(),
+            &snapshot.batch,
+            json,
+            b"",
+            |record| self.append_import_record_while_admitted(record),
+            |_| Ok(()),
+        )
+        .unwrap();
     }
 
     /// The XML file Bridge persisted when it built `batch_id`, read whole. The
@@ -3962,16 +4006,23 @@ fn now() -> String {
 /// The state of a masters check that has not finished (#239).
 pub(super) const MASTERS_CHECK_PENDING: &str = "check_pending";
 
-// The masters-check pair (`*.masters_check.json`, `*.masters_doubt.json`)
-// holds a post's durable doubts: the masters verdict (#239) and, for a batch
-// of more than one voucher, the batch step verdict (`batch_step`), whose own
-// doubt is kept in `*.batch_step_doubt.json`. Neither verdict overwrites or
-// masks the other. The names stay as they were, so older records still read;
-// a record with no `batch_step` has no step verdict, which is right for a
+// The masters-check records hold a post's durable doubts: the masters verdict
+// (#239) and, for a batch of more than one voucher, the batch step verdict
+// (`batch_step`), whose own doubt is kept in `*.batch_step_doubt.json`. The
+// post marks both pending in `*.masters_check.json`; a finished masters
+// verdict goes to `*.masters_verdict.json` and an observed one to
+// `*.masters_doubt.json`, each written once and never replaced, so a
+// verification only adds files (#911). Neither verdict overwrites or masks
+// the other. The names stay as they were, so older records still read; a
+// record with no `batch_step` has no step verdict, which is right for a
 // one-voucher post.
 
 fn masters_check_path(imports: &Path, batch_id: &str) -> PathBuf {
     imports.join(format!("{batch_id}.masters_check.json"))
+}
+
+fn masters_verdict_path(imports: &Path, batch_id: &str) -> PathBuf {
+    imports.join(format!("{batch_id}.masters_verdict.json"))
 }
 
 fn masters_doubt_path(imports: &Path, batch_id: &str) -> PathBuf {
@@ -3982,13 +4033,25 @@ fn batch_step_doubt_path(imports: &Path, batch_id: &str) -> PathBuf {
     imports.join(format!("{batch_id}.batch_step_doubt.json"))
 }
 
-/// Write an observed doubt to its own file. When that fails, the verdict that
-/// goes into the check record says so (`doubt_record: unavailable`, #722):
-/// it still holds the doubt, and it says in-band why no review can find it.
-/// The readers decide from the file's absence, not from this mark, so a file
-/// lost later is refused the same way.
+/// Write an observed doubt to its own file, once: a doubt of the same kind
+/// already there is the first one observed and stays (#911). When the write
+/// fails, or the name holds anything else, the verdict that goes into the
+/// check record says so (`doubt_record: unavailable`, #722): it still holds
+/// the doubt, and it says in-band why no review can find it. The readers
+/// decide from the file's absence, not from this mark, so a file lost later
+/// is refused the same way.
 fn record_doubt(path: &Path, verdict: &mut Value) {
-    if write_masters_record(path, verdict).is_err() {
+    let written = serde_json::to_vec_pretty(verdict)
+        .map_err(|_| persistence::RecordOnce::Failed)
+        .and_then(|bytes| persistence::write_record_once(path, &bytes));
+    let recorded = match written {
+        Ok(()) => true,
+        Err(persistence::RecordOnce::Exists) => {
+            read_masters_record(path).is_some_and(|kept| kept["state"] == verdict["state"])
+        }
+        Err(persistence::RecordOnce::Failed) => false,
+    };
+    if !recorded {
         verdict["doubt_record"] = json!("unavailable");
     }
 }
@@ -3996,17 +4059,21 @@ fn record_doubt(path: &Path, verdict: &mut Value) {
 /// The durable checks recorded for this batch: the masters verdict (#239),
 /// with the batch step verdict beside it as `batch_step` when the post was a
 /// batch. An observed doubt of either kind is kept in a file of its own that
-/// nothing removes or replaces, and it overrides that kind's verdict in the
-/// check record. Absent only for a batch dispatched before these records
-/// existed.
+/// nothing removes or replaces, and it overrides that kind's verdict; a
+/// finished masters verdict overrides the pending mark in the check record,
+/// which keeps the step. Absent only for a batch dispatched before these
+/// records existed.
 fn read_masters_check(imports: &Path, batch_id: &str) -> Option<Value> {
     let check = read_masters_record(&masters_check_path(imports, batch_id));
-    let mut masters =
-        read_masters_record(&masters_doubt_path(imports, batch_id)).or_else(|| check.clone())?;
+    let verdict = read_masters_record(&masters_verdict_path(imports, batch_id));
+    let mut masters = read_masters_record(&masters_doubt_path(imports, batch_id))
+        .or_else(|| verdict.clone())
+        .or_else(|| check.clone())?;
     let step = read_masters_record(&batch_step_doubt_path(imports, batch_id)).or_else(|| {
         check
             .as_ref()
             .and_then(|check| check.get("batch_step").cloned())
+            .or_else(|| verdict.as_ref()?.get("batch_step").cloned())
     });
     if let (Some(step), Some(fields)) = (step, masters.as_object_mut()) {
         fields.insert("batch_step".into(), step);
@@ -4156,24 +4223,35 @@ impl Server {
         }
         // The batch step verdict beside it is kept, never overwritten; for a
         // batch whose step verdict cannot be read, it stays pending (doubt).
-        let path = masters_check_path(&imports, batch_id);
-        let step = read_masters_record(&path)
+        let step = read_masters_record(&masters_check_path(&imports, batch_id))
             .and_then(|check| check.get("batch_step").cloned())
             .or_else(|| batch.then(|| json!({"state": MASTERS_CHECK_PENDING})));
         if let (Some(step), Some(fields)) = (step, verdict.as_object_mut()) {
             fields.insert("batch_step".into(), step);
         }
-        let _ = write_masters_record(&path, &verdict);
+        // Written once beside the pending mark, which stays: a verdict
+        // already there was the first and stays too.
+        if let Ok(bytes) = serde_json::to_vec_pretty(&verdict) {
+            let _ =
+                persistence::write_record_once(&masters_verdict_path(&imports, batch_id), &bytes);
+        }
         read_masters_check(&imports, batch_id).unwrap_or(pending)
     }
 }
 
+/// The whole baseline an older build wrote, and replaced as it grew.
 fn verified_baseline_path(imports: &Path, batch_id: &str) -> PathBuf {
     imports.join(format!("{batch_id}.baseline.json"))
 }
 
+/// The `index`th addition to a build's baseline, written once (#911).
+fn verified_baseline_addition_path(imports: &Path, batch_id: &str, index: usize) -> PathBuf {
+    imports.join(format!("{batch_id}.baseline.{index}.json"))
+}
+
 /// A build's verified baseline, or `None` when it has none or it cannot be
 /// read. Either way an amendment of that build refuses.
+#[cfg(test)]
 fn read_verified_baseline(imports: &Path, batch_id: &str) -> Option<amend::VerifiedBaseline> {
     read_verified_baseline_for(imports, batch_id, 1)
 }
@@ -4195,35 +4273,68 @@ fn read_verified_baseline_for(
             return None;
         }
     }
-    let mut file =
-        super::local_file::open_local_file(&verified_baseline_path(imports, batch_id), false)
-            .ok()?;
-    let bytes = read_capped_record(&mut file)?;
-    serde_json::from_slice(&bytes).ok()
+    read_baseline_files(imports, batch_id).ok()?.0
+}
+
+/// A build's baseline files merged, with the index the next addition takes:
+/// the whole baseline an older build wrote, then each addition from 1 until
+/// the first absent one. `None` when there are none. Refused when any of
+/// them cannot be read, or when an addition repeats a voucher already
+/// recorded: nothing then proves which value came first.
+fn read_baseline_files(
+    imports: &Path,
+    batch_id: &str,
+) -> Result<(Option<amend::VerifiedBaseline>, usize), ()> {
+    let read = |path: &Path| -> Result<Option<amend::VerifiedBaseline>, ()> {
+        let mut file = match super::local_file::open_local_file(path, false) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => return Err(()),
+        };
+        let bytes = read_capped_record(&mut file).ok_or(())?;
+        serde_json::from_slice(&bytes).map(Some).map_err(|_| ())
+    };
+    let mut merged = read(&verified_baseline_path(imports, batch_id))?;
+    let mut index = 1;
+    while let Some(addition) = read(&verified_baseline_addition_path(imports, batch_id, index))? {
+        let baseline = merged.get_or_insert_with(amend::VerifiedBaseline::default);
+        for (txn_id, alter_id) in addition.vouchers {
+            if baseline.vouchers.insert(txn_id, alter_id).is_some() {
+                return Err(());
+            }
+        }
+        index += 1;
+    }
+    Ok((merged, index))
 }
 
 /// Record each voucher's first verified ALTERID; a voucher already recorded
-/// keeps its value. Called under the import admission lock.
+/// keeps its value. The vouchers this verification adds go to a file of their
+/// own, written once, so no earlier file changes (#911). Called under the
+/// import admission lock.
 fn record_verified_baseline(imports: &Path, batch_id: &str, proof: &Value) -> Result<(), String> {
-    let path = verified_baseline_path(imports, batch_id);
-    let mut baseline = if path.exists() {
-        // An unreadable baseline is never rewritten: nothing proves which
-        // values were first, so amendments of this build stay refused.
-        read_verified_baseline(imports, batch_id)
-            .ok_or_else(|| "verified_baseline_unreadable".to_string())?
-    } else {
-        amend::VerifiedBaseline::default()
-    };
-    if amend::record_first_verified(&mut baseline, proof) {
-        let bytes = serde_json::to_vec_pretty(&baseline)
-            .map_err(|_| "verified_baseline_serialization_failed".to_string())?;
-        // Staged and renamed, so a failed write leaves the previous file whole
-        // rather than a truncated one that would refuse every amendment.
-        let staged = imports.join(format!("{batch_id}.baseline.json.next"));
-        write_private(&staged, &bytes)?;
-        fs::rename(&staged, &path).map_err(|_| "verified_baseline_publish_failed".to_string())?;
+    // An unreadable baseline is never added to: nothing proves which values
+    // were first, so amendments of this build stay refused.
+    let (recorded, next) = read_baseline_files(imports, batch_id)
+        .map_err(|()| "verified_baseline_unreadable".to_string())?;
+    let recorded = recorded.unwrap_or_default();
+    let mut baseline = recorded.clone();
+    if !amend::record_first_verified(&mut baseline, proof) {
+        return Ok(());
     }
-    Ok(())
+    baseline
+        .vouchers
+        .retain(|txn_id, _| !recorded.vouchers.contains_key(txn_id));
+    let bytes = serde_json::to_vec_pretty(&baseline)
+        .map_err(|_| "verified_baseline_serialization_failed".to_string())?;
+    // Placed whole or not at all, so a failed write leaves the earlier files
+    // as they were rather than a truncated one that would refuse every
+    // amendment.
+    persistence::write_record_once(
+        &verified_baseline_addition_path(imports, batch_id, next),
+        &bytes,
+    )
+    .map_err(|_| "verified_baseline_publish_failed".to_string())
 }
 
 fn verified_baselines(imports: &Path, lineage: &amend::Lineage) -> amend::VerifiedBaselines {

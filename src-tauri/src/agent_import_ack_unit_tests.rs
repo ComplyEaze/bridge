@@ -1234,3 +1234,32 @@ fn a_masters_record_past_the_record_bound_is_unreadable() {
     std::fs::write(&path, padded(ledger::MAX_RECORD_BYTES + 1)).unwrap();
     assert_eq!(read_masters_record_raw(&path), Err(()));
 }
+
+/// A finished masters verdict, in its own file beside the pending mark the
+/// post left, outranks that mark, for the review as for the verdict (#911).
+#[test]
+fn a_masters_verdict_file_outranks_the_pending_mark_beside_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let write = |name: &str, bytes: &[u8]| {
+        fs::write(imports.join(format!("{BATCH}.{name}")), bytes).unwrap()
+    };
+    write("masters_check.json", br#"{"state":"check_pending"}"#);
+    assert_eq!(read_masters_records(imports, BATCH), MastersRecord::Pending);
+    write("masters_verdict.json", br#"{"state":"unchanged"}"#);
+    assert_eq!(read_masters_records(imports, BATCH), MastersRecord::NoDoubt);
+    write(
+        "masters_verdict.json",
+        br#"{"state":"posted_under_changed_masters","ledgers":["Cash"],"doubt_record":"unavailable"}"#,
+    );
+    assert_eq!(
+        read_masters_records(imports, BATCH),
+        MastersRecord::DoubtRecordUnavailable
+    );
+    // A verdict file that cannot be read is unreadable, never the mark.
+    write("masters_verdict.json", b"{");
+    assert_eq!(
+        read_masters_records(imports, BATCH),
+        MastersRecord::Unreadable
+    );
+}

@@ -310,7 +310,8 @@ the log. It names no file path unless you ask on the command line, and covers
 this folder only, not files kept by the desktop app.
 
 There is no size limit, expiry or deletion command: the files grow until you
-delete them. You can delete them by hand when Claude Desktop is not running. Do
+delete them. Each verification of a batch adds a new pair of proof files and
+keeps the earlier ones, so `imports/` grows with every verification. You can delete them by hand when Claude Desktop is not running. Do
 not delete the import journal (`agent-import-ledger.jsonl`) or `imports/` while
 any batch in them has been posted or is waiting to be verified: they are the
 record ComplyEaze Bridge uses to reconcile a post, and without them

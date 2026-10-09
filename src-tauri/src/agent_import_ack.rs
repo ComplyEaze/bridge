@@ -254,7 +254,14 @@ fn read_masters_records(imports: &Path, batch_id: &str) -> MastersRecord {
         // A doubt file holds only that verdict, naming each of its ledgers;
         // anything else is not one this build can bind to.
         Some(_) => MastersRecord::Unreadable,
-        None => match read_masters_record_raw(&masters_check_path(imports, batch_id)) {
+        // A finished verdict outranks the pending mark the post left beside
+        // it, as it does for `read_masters_check` (#911).
+        None => match read_masters_record_raw(&masters_verdict_path(imports, batch_id)).and_then(
+            |verdict| match verdict {
+                Some(verdict) => Ok(Some(verdict)),
+                None => read_masters_record_raw(&masters_check_path(imports, batch_id)),
+            },
+        ) {
             Err(()) => MastersRecord::Unreadable,
             Ok(Some((_, check))) if check["state"] == MASTERS_CHECK_PENDING => {
                 MastersRecord::Pending
@@ -785,33 +792,18 @@ impl RecordedReview {
     }
 }
 
-/// Place `bytes` at `path` only if nothing is there: staged, synced, then
-/// hard-linked, which fails when the name exists. Taking the approval by value
-/// means no record can be written without one.
+/// Place `bytes` at `path` only if nothing is there (see
+/// [`persistence::write_record_once`]). Taking the approval by value means no
+/// record can be written without one.
 fn write_record_once(
     path: &Path,
     bytes: &[u8],
     _approval: ReviewAcknowledged,
 ) -> Result<(), String> {
-    let staged = path.with_extension(format!("{}.next", Uuid::new_v4()));
-    write_private(&staged, bytes)?;
-    let linked = fs::hard_link(&staged, path);
-    let _ = fs::remove_file(&staged);
-    match linked {
-        Ok(()) => {
-            // Make the new name durable; a record lost to a power failure
-            // would read as absent, never as someone else's.
-            #[cfg(unix)]
-            if let Some(directory) = path.parent() {
-                let _ = fs::File::open(directory).and_then(|directory| directory.sync_all());
-            }
-            Ok(())
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            Err("ack_already_recorded".into())
-        }
-        Err(_) => Err("import_file_write_failed".into()),
-    }
+    persistence::write_record_once(path, bytes).map_err(|refused| match refused {
+        persistence::RecordOnce::Exists => "ack_already_recorded".into(),
+        persistence::RecordOnce::Failed => "import_file_write_failed".into(),
+    })
 }
 
 /// `operator_review` for a readback of a doubted batch: whether a recorded

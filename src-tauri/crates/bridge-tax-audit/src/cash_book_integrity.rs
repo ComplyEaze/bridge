@@ -296,8 +296,8 @@ the stock items, not on any ledger, so the ledgers' Trial Balance openings leave
         }
         OpeningStock::Unknown(why) => {
             limits.push(format!(
-                "Opening stock is held on the stock items, not on a ledger, and was not taken \
-({}), so this difference may include it.",
+                "Opening stock is held on the stock items, not on a ledger, and was {}; part of \
+this difference may be opening stock.",
                 why.as_str()
             ));
             diff
@@ -839,8 +839,8 @@ first day",
                 format!("{:?}", vec![&ledger_sum(-1_000_000)])
             );
             let limit = format!(
-                "Opening stock is held on the stock items, not on a ledger, and was not taken \
-({text}), so this difference may include it."
+                "Opening stock is held on the stock items, not on a ledger, and was {text}; part \
+of this difference may be opening stock."
             );
             assert_eq!(
                 opening_finding(&r),

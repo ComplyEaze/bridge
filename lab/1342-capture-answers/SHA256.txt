@@ -100,3 +100,47 @@ c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38  934  r16-tax-u
 # Answers: fixed3/ steps 12-13 (a separate sitting after step 11, same book state)
 1b2b3f87525686652a2aae14fce7c8b7f255de2fd2e4189d6a275de88191b8aa  22304  fixed3/a16-tax-units-fixed3.xml  <- r16-tax-units.xml (HTTP 200, 0.006069 s)
 482338999d511de8a4cc409ff5b7cba6dbeb8d314b67d30609a0c60403499073  5684  fixed3/a17-tax-units-fields-fixed3.xml  <- r17-tax-units-fields.xml (HTTP 200, 0.004144 s)
+#
+# Requests for the invoice round (lab/1342-capture-requests/post-round @ 82e0f675; d-vouchers.xml is the first round's request D)
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  976  r02-marks.xml
+eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49  1094  r03-book-extent.xml
+dc03b35f075e638acf6ca0a1a8503311ee501c5ee6f739e31d4240c4d22bf5f7  2072  r12-invoice-readback.xml
+28a47c26a29fa799856c112b71e19076946d4c0f85a6dcc65f5cdafe0e1e1bd0  2106  r13-ledger-catalogue-v2.xml
+b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e  4754  r14-invoice-post.xml
+a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7  1822  r15-verification-window.xml
+#
+# Answers: post/ (steps 1-5, 7 [the one write], 8-13, then final), each with its header block
+aa419ce1f6b133fd054a483b39cd1c435b90f845e1fefaae882c2acdacc54cda  3836  post/a03-book-extent-pre.xml  <- r03-book-extent.xml (curl exit 0, HTTP 200, 0.005553 s)
+a491ff6a7ad3255ce54ca451de1f0f36e2c19b8ecc1437d6a53d89094adfc10a  134  post/a03-book-extent-pre.xml.headers.txt
+0ed443c9d8c9b120d8877df14cd68a8ea1b6c0ddd9fd09ef0aab0836542e5298  16404  post/a13-ledger-catalogue-v2-pre.xml  <- r13-ledger-catalogue-v2.xml (curl exit 0, HTTP 200, 0.009439 s)
+0272fcbd6e27f3eaa66bbf21f575ff404b6204689c8825ccef2ef17f1866e5f9  135  post/a13-ledger-catalogue-v2-pre.xml.headers.txt
+065283db8505f3603afaa8f26ed8d8e645fa8e6187fef903c6f77b1080ff906b  78994  post/a15-verification-window-pre.xml  <- r15-verification-window.xml (curl exit 0, HTTP 200, 0.043596 s)
+09c8768a56c0dea6a663e4309371c8fd732e2dd2961b4567f73aa0a5726a8ff8  135  post/a15-verification-window-pre.xml.headers.txt
+947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974  3022  post/a12-invoice-readback-pre.xml  <- r12-invoice-readback.xml (curl exit 0, HTTP 200, 0.030586 s)
+d8476b58186ccb6d4894910d74b76776d7ab0cd2d05a93c789aa5bc7a0957bcf  134  post/a12-invoice-readback-pre.xml.headers.txt
+449097451bbce612c7deff74d2847fdf71ea428bbcfb50f84462d14e49623ee8  3394  post/a02-marks-pre.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003437 s)
+a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0  134  post/a02-marks-pre.xml.headers.txt
+d31196cba2febb9fcf525439058b85b62a69bec2479562b21dd6155c29c9b76b  540  post/a14-invoice-post.xml  <- r14-invoice-post.xml (curl exit 0, HTTP 200, 0.449468 s)
+2a0eba722d654c2b2fa59d71608c67e3849d25c56207357fa06b0239977a4670  133  post/a14-invoice-post.xml.headers.txt
+5836730f49e712ad3cd68d5a2cf1cb8981fe06b63b049f4489c882de5014b057  3396  post/a02-marks-post.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003655 s)
+db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  post/a02-marks-post.xml.headers.txt
+fca770204c1f78ab3776011a027506437adc278701210b4cb47d7d3d5bf83272  87878  post/a15-verification-window-post.xml  <- r15-verification-window.xml (curl exit 0, HTTP 200, 0.042491 s)
+6bdc9a2215b5833baf731b8fe912d77c9350f3271655052d5045ce86f9e65488  135  post/a15-verification-window-post.xml.headers.txt
+8bb2b0000841f2469f34c19bbb3f872dc63790af70062d469877e81609f0f0fa  93812  post/a12-invoice-readback-post.xml  <- r12-invoice-readback.xml (curl exit 0, HTTP 200, 0.048769 s)
+a11d212d92348c1851336c0f79f0d34a5e236fe355d8fbcd8c1d0465cce41e26  135  post/a12-invoice-readback-post.xml.headers.txt
+2b1c7e492501b21944d07f3a0b8e80c3b1bc40cde650153a52cd31221e2936d7  3838  post/a03-book-extent-post.xml  <- r03-book-extent.xml (curl exit 0, HTTP 200, 0.003461 s)
+3fab1e70b527f1312f3afcc0e80a431c221beffbba6a6e9d3f8c9b4fca9afe6b  134  post/a03-book-extent-post.xml.headers.txt
+fe97566638b798fa0b1f838a4bdcbf52e839c266667c47225e2a6736e56753a8  16406  post/a13-ledger-catalogue-v2-post.xml  <- r13-ledger-catalogue-v2.xml (curl exit 0, HTTP 200, 0.008921 s)
+00e436c1916444337bf9e0ffd81b0b1ed92912a469657114385bf4119df50fe0  135  post/a13-ledger-catalogue-v2-post.xml.headers.txt
+5900b10dfea252ca843aa41e20447a6e1c729269f934f0850566891481b31120  320031  post/vouchers-post.xml  <- d-vouchers.xml (curl exit 0, HTTP 200, 0.068996 s)
+c0caf521efe3faf4bd8b6380f900f59a952ad1dfff6a832257c003c1511fa492  134  post/vouchers-post.xml.headers.txt
+5836730f49e712ad3cd68d5a2cf1cb8981fe06b63b049f4489c882de5014b057  3396  post/a02-marks-final.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003441 s)
+db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  post/a02-marks-final.xml.headers.txt
+fca770204c1f78ab3776011a027506437adc278701210b4cb47d7d3d5bf83272  87878  post/a15-verification-window-final.xml  <- r15-verification-window.xml (curl exit 0, HTTP 200, 0.047638 s)
+6bdc9a2215b5833baf731b8fe912d77c9350f3271655052d5045ce86f9e65488  135  post/a15-verification-window-final.xml.headers.txt
+#
+# Screens: post/screens/ (Tally window only)
+a61ab0bbc06bf2c9e1b42d91e5a6c04f40e750b1d929e800fa6cfafb4592613f  425614  post/screens/gstr1-1-summary.png
+dc9004daf24fe16b386700bcacd35fe9b9399d8c81889d5540a06d77a0a3618a  400910  post/screens/gstr1-2-uncertain-unfiltered.png
+24d6b686e6b3e196851fa0f759e6e3f4c7c69e72109a771c08392a4708e2c65b  161928  post/screens/gstr1-3-b2c-small-by-rate.png
+46517640675df2eea2fd091512f0a6ab10d24b0e0a1fb836f1a95171ad6bbbc3  196039  post/screens/voucher-0010.png

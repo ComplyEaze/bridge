@@ -3213,8 +3213,9 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
 
 /// A narration or reference holding a layout or format character leaves the
 /// batch's totals and one line in place of the voucher lines (#1063). The
-/// batch is never refused for it, nothing is stripped, and the line does not
-/// echo the text.
+/// preview never refuses for it, nothing is stripped, and the line does not
+/// echo the text. (A native post refuses a narration holding a character that
+/// draws nothing before the dialog: `refuse_rewritten_narration`.)
 #[test]
 fn an_unsafe_narration_or_reference_leaves_the_totals_and_says_so() {
     for (narration, reference) in [

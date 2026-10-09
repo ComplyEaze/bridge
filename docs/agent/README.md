@@ -1869,7 +1869,10 @@ binding compares narration byte for byte. A narration holding the one sequence
 the agent readers are known to rewrite (a literal U+FFFD followed by `#`, digits
 and `;`) is refused when the batch is built (`voucher_text_invalid`), and
 `post_import` refuses a batch saved before that check in the same way, before
-any request; it is still admitted for review and reconciliation. Other text,
+any request; it is still admitted for review and reconciliation. So is a
+narration holding a character that draws nothing (Unicode
+Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the prepended
+concatenation marks). Other text,
 such as Devanagari or the rupee sign, is admitted, and whether it reads back
 byte for byte is not yet measured: a narration that reads back changed refuses
 that post's binding for good.

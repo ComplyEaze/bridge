@@ -29,6 +29,41 @@ fn words_break_at_space_gap_and_baseline_but_not_between_adjacent_glyphs() {
     assert!((words[0].y0 - 14.5).abs() < 1e-9);
 }
 
+/// A character with no advance, where a format character usually sits.
+fn unspaced(character: char, at: f64, bottom: f64) -> Option<Glyph> {
+    Some(Glyph {
+        character,
+        left: at,
+        right: at,
+        top: bottom - 5.5,
+        bottom,
+        size: 7.0,
+    })
+}
+
+#[test]
+fn a_character_that_draws_nothing_is_not_read_and_the_word_goes_on() {
+    let words = assemble_words([
+        glyph('A', 10.0, 20.0),
+        unspaced('\u{202E}', 14.2, 20.0),
+        glyph('B', 14.2, 20.0),
+        glyph(' ', 18.4, 20.0),
+        glyph('C', 22.6, 20.0),
+        unspaced('\u{200D}', 26.8, 20.0),
+        glyph('D', 26.8, 20.0),
+    ]);
+    let texts: Vec<&str> = words.iter().map(|word| word.text.as_str()).collect();
+    // The override is dropped; the joiner, which Indic spellings need, is kept.
+    assert_eq!(texts, ["AB", "C\u{200D}D"]);
+}
+
+#[test]
+fn a_soft_hyphen_reads_as_the_hyphen_it_prints() {
+    assert_eq!(printed_character(Some('\u{ad}')), '-');
+    assert_eq!(printed_character(Some('\u{2}')), '-');
+    assert_eq!(printed_character(Some('\u{202E}')), '\u{202E}');
+}
+
 fn word(text: &str) -> Word {
     Word::new(10.0, 10.0, 30.0, 19.0, text)
 }

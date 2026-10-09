@@ -48,6 +48,13 @@ These changes are in source and not yet in a published build.
   the rule). Importing its file again for a statement already imported is expected to rewrite those vouchers'
   narrations in the book: their keys do not depend on the narration the script writes. A same-key re-import has been measured over
   the gateway; through Tally's own Import menu, which is how this script's file is imported, only an unchanged re-import of a file the app built has been seen, on one Windows computer (#1413).
+- A character that draws nothing (Unicode Default_Ignorable_Code_Point or Format, except ZWJ,
+  ZWNJ and the prepended concatenation marks) is not read from a bank-statement PDF, and a soft
+  hyphen is read as the hyphen it prints. A narration holding
+  such a character is refused as `voucher_text_invalid` when a batch is built, and before a native
+  post of a batch saved earlier; the reference is not checked. A statement that held one gets new
+  `bridge_txn_id` labels, so a batch built from it by an earlier build does not line up with a new
+  run's `amends_batch_id`.
 - `verify_import` no longer reads its window a second time when the first read was divided, every part was
   checked against a count of the window that names each voucher, and the company's marks were unchanged when
   read again after the last part (#1241). That is a window of more than about 170 vouchers in a book whose

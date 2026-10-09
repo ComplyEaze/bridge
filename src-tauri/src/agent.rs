@@ -1201,10 +1201,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              readers rewrite exactly that sequence before parsing, so a voucher number \
              carrying it could never be confirmed as posted, and a native post of a narration \
              carrying it could never be bound to the voucher it created, so never confirmed \
-             either. Remove that sequence from the voucher number or narration and build the \
-             batch again with build_import_xml: a saved batch cannot be changed, and \
-             post_import refuses one saved with such a narration. The reference may carry it \
-             freely.",
+             either. A narration is also refused when it holds a character that draws nothing \
+             (Unicode Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the \
+             prepended concatenation marks). Remove that sequence or character from the \
+             voucher number or narration and build the batch again with build_import_xml (for \
+             proposals from an earlier parse_bank_statement, run parse_bank_statement again \
+             first): a saved batch cannot be changed, and post_import refuses one saved with \
+             such a narration. The reference may carry either freely.",
         ),
         // Same shared-code shape as voucher_text_invalid, for a ledger name
         // instead of the voucher number.

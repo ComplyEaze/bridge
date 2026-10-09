@@ -444,6 +444,7 @@ dependencies = [
 name = "bridge-tally-primitives"
 version = "0.1.0"
 dependencies = [
+ "icu_properties",
  "proptest",
  "serde",
  "thiserror 2.0.21",

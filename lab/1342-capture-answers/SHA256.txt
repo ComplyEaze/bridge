@@ -297,3 +297,32 @@ e07317f28359f0e822916e7d036a65f94e4d55ce5ccce8f80fd98d17192fe575  269299  workor
 2758ec1f1b72cc3a5436e0cb9dbc60b189a92d1dd5d57ebcf617130eb24576b3  198973  workorder/screens/w4-purchase-2-saved.png
 ee07300550eb7ba0a82ca9e20c4dbab34f3d728f790059ce5c071a16bf3f919e  170397  workorder/screens/w4-supplier-outstandings.png
 1ec52177f6afa337f1954936fa0ba7bd4b22c3d28905408d040747c208342140  283342  workorder/screens/w4-voucher-type-purchase.png
+#
+# W6 and W7 part A (10 Oct 2026, after backup TDBK1800_100033_6.001; requests at bb26baae)
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  976  r02-marks.xml
+ab01192ccb7b0fcca3a7a8bd14ec7171db43a7acf2fe6a104da63906e3720b9a  1822  w6-window-0915.xml
+ec04dcd470e32a65c37bf6cd45f9d119c9f72882afdce5a526a466aab7355ba6  4888  w6-same-ledger-two-lines.xml
+9e2f23b3ab9d8e01b1f3878c2075de32af19aef30a1dd910df04a7457949ff68  712  d-vouchers.xml
+2e728e002305cbaa33c73bd36507ca8d6ab62c5dea5497b02204a07636385d88  1876  w7-ledgers-rates.xml
+60f303bd8a4f363b14264da4c70f9594810b57d80c15f194892a1bacd21159d3  2400  w7-readback-status.xml
+bc6eed15c3c2eea726e3496b6b4bceb09d51cc4c98260750031b87c43ee80452  3394  workorder/aw6-marks-before.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003903 s)
+a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0  134  workorder/aw6-marks-before.xml.headers.txt
+947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974  3022  workorder/aw6-window-before.xml  <- w6-window-0915.xml (curl exit 0, HTTP 200, 0.003679 s)
+d8476b58186ccb6d4894910d74b76776d7ab0cd2d05a93c789aa5bc7a0957bcf  134  workorder/aw6-window-before.xml.headers.txt
+249796b9208176f65cca0c3258e0d9415b9b5cb488f3623b457a894d779ac3e1  540  workorder/aw6-import.xml  <- w6-same-ledger-two-lines.xml (curl exit 0, HTTP 200, 0.569727 s)
+2a0eba722d654c2b2fa59d71608c67e3849d25c56207357fa06b0239977a4670  133  workorder/aw6-import.xml.headers.txt
+b2d8d9e586c30634a73dc2c9d9ab7586af9029464341863e18a3ea23fb9e1f1b  3396  workorder/aw6-marks-after.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003550 s)
+db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  workorder/aw6-marks-after.xml.headers.txt
+1ba02311b551dd94a57f9f3ef7131f4d6220eab31492debd2d8139367b52e6ec  11068  workorder/aw6-window-after.xml  <- w6-window-0915.xml (curl exit 0, HTTP 200, 0.037973 s)
+91d943b5aa4e0927e3661a4df7fec77ea623479b3a523a9ae40ca1a500f3e9ad  135  workorder/aw6-window-after.xml.headers.txt
+717613d5e270523e52b54b06307a381c034ad2659bb199c7117ca9d3fd5654ab  493898  workorder/vouchers-w6.xml  <- d-vouchers.xml (curl exit 0, HTTP 200, 0.100842 s)
+c758c499f02c7423c29f2f857f6afcf65e10669666e3d6ccc2cc38f8a076ff47  134  workorder/vouchers-w6.xml.headers.txt
+597f2b11728c39d6643ced43682b89143fce29481a803ad5f23433ee896c9847  51434  workorder/aw7-ledgers-rates.xml  <- w7-ledgers-rates.xml (curl exit 0, HTTP 200, 0.012314 s)
+5e165dd1bb4489cdcb849b0f9cfa09ee477be569f909afde395edef5251e9017  135  workorder/aw7-ledgers-rates.xml.headers.txt
+ebc84c460da6123c329ff36ce2b74e13f55f8024efa33d7b2ddec7c318996cb8  234936  workorder/aw7-readback-status.xml  <- w7-readback-status.xml (curl exit 0, HTTP 200, 0.049362 s)
+7c8597b6fc7e3befb348feb03f4ada81f4011558d3946b4c43f860ef64c45d22  136  workorder/aw7-readback-status.xml.headers.txt
+# W6 screenshots
+f530b9fbe828f590567342be67082265ebd84f0eb8fc80d477211b02a40578f9  149579  workorder/screens/w6-gstr1-sep-included-list.png
+aaadc0d93e385f55525b0c0a73ee718bb5a4bef6665d0943e6e45aad0dd69159  407497  workorder/screens/w6-gstr1-sep-summary.png
+927ee558177f82a4034f75532ba35189680e03f7cb10939f9690a56a438b6b78  181330  workorder/screens/w6-taxanalysis-0020.png
+e9f8b48e7724b0723d193e1ae8c7903492217f2c4502e571a82fa4d8f755b8cf  257979  workorder/screens/w6-voucher-0020.png

@@ -212,7 +212,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   reopening without ticking the box, installing over a release older than 0.4.2,
   a fresh install, and Windows.
 - A package for 0.5.1 on a Mac, on 8 October 2026. What was run: a package built on that Mac from the Terms-setting
-  change (#1436), with only its version set to 0.5.1; not a published file and not the CI package. The maintainer
+  change (#1436), with only its version set to 0.5.1; not a published file and not the CI package. The contributor
   installed it in Claude Desktop 2.26454.2 on macOS 26.6.2 with Tally not running and posting off: as a fresh install; over 0.4.2 (switched
   on with its Terms accepted; left off and then switched on); over 0.5.0 as an update
   leaves it and with the Terms ticked; and after 0.4.2 was removed. Claude Desktop started the program as soon as
@@ -226,9 +226,9 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   build of commit `d744d25a` (an earlier commit than the published file; later commits reworded some tool texts and the notes): a fresh install; an update from 0.4.2 and from 0.5.0 (as an update leaves it, and with
   the Terms ticked); a user-level `BRIDGE_TERMS_ACCEPTED` set to true; the company list; one bank-statement import
   file of six vouchers, built under 0.5.0 and under this build and compared, and this build's file imported by hand and read back (the verification found
-  all six, the narrations were read back, and an August trial balance agreed with Tally's own screen; a first build into the empty
-  company was refused as `empty_book_first_import`, so the test company's ledgers and one 1 April voucher were entered in Tally outside
-  ComplyEaze Bridge first, and that voucher is in the trial balance); an unchanged
+  all six, the narrations were read back, and an August trial balance agreed with Tally's own screen; a first build under 0.5.0 into the
+  company, which then held ledgers but no voucher, was refused as `empty_book_first_import`, so one more ledger and one 1 April voucher were
+  imported into Tally outside ComplyEaze Bridge first, and that voucher is in the trial balance); an unchanged
   re-import of that file (matched to the six vouchers, none added); and a switched-off extension through two updates (it stayed off, with no tool and no error in the chat; switching it on was enough).
   Then steps 1 and 2 again on the CI build of the merged commit `b91038a9`, and step 1 on the published 0.5.1 file
   (checked against its `.sha256` file and its build attestation), with Tally closed. The published 0.5.0 file over

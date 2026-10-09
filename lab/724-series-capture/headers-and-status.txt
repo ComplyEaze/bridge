@@ -1,0 +1,28 @@
+# Response headers of the series-level read (POST, 9 Oct 2026), as received by curl -D: 135 bytes, SHA-256 fc08d9a5a107902be042ea8331c464f74a499ca324ced5a01fdd4d30ddb9993e. The 135 bytes follow verbatim (CRLF line ends).
+HTTP/1.1 200 OK
+Unicode: Yes
+CONTENT-TYPE: text/xml; charset=utf-16
+RESPSTATUS: 1
+CONNECTION: KEEP-ALIVE
+CONTENT-LENGTH: 81966
+
+
+# GET /status before the read: headers 130 bytes, SHA-256 103743ec081980e5be713e310cf850a1997b40d82ce213812df437627d5d9827; body 51 bytes, SHA-256 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800. Headers then body follow verbatim.
+HTTP/1.1 200 OK
+Unicode: No
+CONTENT-TYPE: text/xml; charset=utf-8
+RESPSTATUS: 1
+CONNECTION: KEEP-ALIVE
+CONTENT-LENGTH: 51
+
+<RESPONSE>TallyPrime Server is Running</RESPONSE>
+
+# GET /status after the read: headers 130 bytes, SHA-256 103743ec081980e5be713e310cf850a1997b40d82ce213812df437627d5d9827; body 51 bytes, SHA-256 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800. Headers then body follow verbatim.
+HTTP/1.1 200 OK
+Unicode: No
+CONTENT-TYPE: text/xml; charset=utf-8
+RESPSTATUS: 1
+CONNECTION: KEEP-ALIVE
+CONTENT-LENGTH: 51
+
+<RESPONSE>TallyPrime Server is Running</RESPONSE>

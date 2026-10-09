@@ -1,0 +1,44 @@
+{
+ "comment": "POP-3 (#1486): the trial balance does not start on the books' first day, so the stock items' opening values are not taken; POP-3 reports the ledger sum and says why the stock is unknown.",
+ "groups": {
+  "Capital Account": null,
+  "Fixed Assets": null
+ },
+ "ledgers": [
+  {
+   "name": "Owner Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-owner-capital"
+  },
+  {
+   "name": "Shop Fittings",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-shop-fittings"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Owner Capital",
+   "opening": -1000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -1000000
+  },
+  {
+   "ledger": "Shop Fittings",
+   "opening": 150000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 150000
+  }
+ ],
+ "vouchers": [],
+ "opening_stock": "not taken: the trial balance does not start on the books' first day",
+ "tests": [
+  "trial_balance"
+ ]
+}

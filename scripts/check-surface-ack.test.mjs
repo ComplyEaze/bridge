@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { ACK_DIR, MAX_REASON, SURFACE_PATH, checkAck, parseAck, parseNameStatus, parsePins, historicPaths, withdrawnPins } from "./check-surface-ack.mjs";
 
@@ -266,7 +267,7 @@ test("name-status -z parsing keeps both names of renames and refuses truncated r
 
 // ---- the CLI against a real temporary git repository ----
 
-const script = new URL("./check-surface-ack.mjs", import.meta.url).pathname;
+const script = fileURLToPath(new URL("./check-surface-ack.mjs", import.meta.url));
 const tmpDirs = [];
 test.after(() => tmpDirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
@@ -711,11 +712,30 @@ test("history check: a removed-pin line for a pin that was never withdrawn is st
   assert.match(out.stdout, /"removed-pin:" names path\(s\) that were not removed: zzz\.txt/);
 });
 
-test("history check: a shallow clone fails closed", () => {
-  const { r, tip } = ownPinLost({ unionList: true });
+function shallowClone(r, env = {}) {
   const clone = mkdtempSync(join(tmpdir(), "surface-ack-shallow-"));
   tmpDirs.push(clone);
-  execFileSync("git", ["clone", "-q", "--depth", "2", `file://${r.dir}`, clone, "--branch", "merge-own"], { encoding: "utf8" });
+  execFileSync("git", ["-c", "core.hooksPath=/dev/null", "clone", "-q", "--depth", "2", `file://${r.dir}`, clone, "--branch", "merge-own"], { encoding: "utf8", env: { ...process.env, ...env } });
+  return clone;
+}
+
+test("history check: a shallow clone fails closed", () => {
+  const { r, tip } = ownPinLost({ unionList: true });
+  const out = cli(shallowClone(r), ["--mode", "pull_request"], { PR_NUMBER: "7", PR_HEAD_SHA: tip });
+  assert.equal(out.status, 1, out.stdout);
+  assert.match(out.stdout, /shallow clone/);
+});
+
+// A host's Git template is copied into the clone, and either of these hooks failing fails a clone
+// that runs them, before the history check is reached (#1468).
+test("history check: a shallow clone fails closed even when the host's Git template has failing hooks", () => {
+  const { r, tip } = ownPinLost({ unionList: true });
+  const template = mkdtempSync(join(tmpdir(), "surface-ack-template-"));
+  tmpDirs.push(template);
+  mkdirSync(join(template, "hooks"));
+  for (const hook of ["reference-transaction", "post-checkout"]) writeFileSync(join(template, "hooks", hook), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+  const clone = shallowClone(r, { GIT_TEMPLATE_DIR: template });
+  assert.ok(existsSync(join(clone, ".git", "hooks", "post-checkout")), "the template reached the clone, so its hooks were there to run");
   const out = cli(clone, ["--mode", "pull_request"], { PR_NUMBER: "7", PR_HEAD_SHA: tip });
   assert.equal(out.status, 1, out.stdout);
   assert.match(out.stdout, /shallow clone/);

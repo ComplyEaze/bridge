@@ -41,6 +41,7 @@ use bridge_tally_protocol::native_stock_summary::{
 use bridge_tally_protocol::native_trial_balance::{
     parse_native_trial_balance, parse_native_trial_balance_with_currency,
 };
+use bridge_tally_protocol::native_voucher_type_numbering::parse_voucher_type_numbering;
 use bridge_tally_protocol::outstandings_shared::{
     parse_company_book_extent, parse_company_book_extent_v2, parse_company_ledger_count,
     CompanyBookExtent, CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
@@ -1129,6 +1130,13 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_masters(VoucherTypes)",
         parse: |_, text| masters(NativeMasterKind::VoucherTypes, text, SHAPE_GUID),
+    },
+    // Series-level numbering: src/native_voucher_type_numbering_tests.rs (a Windows synthetic book).
+    Row {
+        fixture: "tests/fixtures/voucher_type_numbering_series_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_voucher_type_numbering",
+        parse: |_, text| typed(parse_voucher_type_numbering(text)),
     },
     Row {
         fixture: "tests/fixtures/masters_godowns_shape_lab_live.utf16le.xml",

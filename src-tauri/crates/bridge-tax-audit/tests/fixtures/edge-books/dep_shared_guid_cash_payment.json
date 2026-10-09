@@ -1,0 +1,323 @@
+{
+ "comment": "depreciation, a purchase on credit and the same-day cash payment to its supplier that share a GUID (#1243): one GUID on the purchase of Machine A and on the payment; two blank GUIDs on the purchase of Machine B (put to use for fewer than 180 days) and its payment; one GUID on the purchase of Machine C and on a cash payment the next day (not the same day: not flagged); the purchase of Machine D paid the same day by two cash payments, one sharing its GUID and one with a GUID of its own (the cash shown is both). The same-day search skips the voucher itself, never every voucher holding its GUID.",
+ "groups": {
+  "Fixed Assets": null,
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Capital Account": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-dep_shared_guid_cash_payment-000"
+  },
+  {
+   "name": "Machine A",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_shared_guid_cash_payment-001"
+  },
+  {
+   "name": "Machine B",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_shared_guid_cash_payment-002"
+  },
+  {
+   "name": "Machine C",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_shared_guid_cash_payment-003"
+  },
+  {
+   "name": "Machine D",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_shared_guid_cash_payment-004"
+  },
+  {
+   "name": "Supplier P",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-dep_shared_guid_cash_payment-005"
+  },
+  {
+   "name": "Supplier Q",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-dep_shared_guid_cash_payment-006"
+  },
+  {
+   "name": "Supplier R",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-dep_shared_guid_cash_payment-007"
+  },
+  {
+   "name": "Supplier S",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-dep_shared_guid_cash_payment-008"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-dep_shared_guid_cash_payment-009"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 7215634,
+   "debit": 0,
+   "credit": 6971904,
+   "closing": 243730
+  },
+  {
+   "ledger": "Machine A",
+   "opening": 310427,
+   "debit": 1800451,
+   "credit": 0,
+   "closing": 2110878
+  },
+  {
+   "ledger": "Machine B",
+   "opening": 0,
+   "debit": 1350229,
+   "credit": 0,
+   "closing": 1350229
+  },
+  {
+   "ledger": "Machine C",
+   "opening": 0,
+   "debit": 1420611,
+   "credit": 0,
+   "closing": 1420611
+  },
+  {
+   "ledger": "Machine D",
+   "opening": 92115,
+   "debit": 2400613,
+   "credit": 0,
+   "closing": 2492728
+  },
+  {
+   "ledger": "Supplier P",
+   "opening": 0,
+   "debit": 1800451,
+   "credit": 1800451,
+   "closing": 0
+  },
+  {
+   "ledger": "Supplier Q",
+   "opening": 0,
+   "debit": 1350229,
+   "credit": 1350229,
+   "closing": 0
+  },
+  {
+   "ledger": "Supplier R",
+   "opening": 0,
+   "debit": 1420611,
+   "credit": 1420611,
+   "closing": 0
+  },
+  {
+   "ledger": "Supplier S",
+   "opening": 0,
+   "debit": 2400613,
+   "credit": 2400613,
+   "closing": 0
+  },
+  {
+   "ledger": "Capital",
+   "opening": -7618176,
+   "debit": 0,
+   "credit": 0,
+   "closing": -7618176
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "dep-p-1",
+   "date": "2025-06-18",
+   "base_type": "Purchase",
+   "number": "P1",
+   "lines": [
+    [
+     "Machine A",
+     1800451
+    ],
+    [
+     "Supplier P",
+     -1800451
+    ]
+   ]
+  },
+  {
+   "guid": "dep-p-1",
+   "date": "2025-06-18",
+   "base_type": "Payment",
+   "number": "Y1",
+   "lines": [
+    [
+     "Supplier P",
+     1800451
+    ],
+    [
+     "Cash",
+     -1800451
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-11-12",
+   "base_type": "Purchase",
+   "number": "P2",
+   "lines": [
+    [
+     "Machine B",
+     1350229
+    ],
+    [
+     "Supplier Q",
+     -1350229
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-11-12",
+   "base_type": "Payment",
+   "number": "Y2",
+   "lines": [
+    [
+     "Supplier Q",
+     1350229
+    ],
+    [
+     "Cash",
+     -1350229
+    ]
+   ]
+  },
+  {
+   "guid": "dep-p-2",
+   "date": "2025-07-03",
+   "base_type": "Purchase",
+   "number": "P3",
+   "lines": [
+    [
+     "Machine C",
+     1420611
+    ],
+    [
+     "Supplier R",
+     -1420611
+    ]
+   ]
+  },
+  {
+   "guid": "dep-p-2",
+   "date": "2025-07-04",
+   "base_type": "Payment",
+   "number": "Y3",
+   "lines": [
+    [
+     "Supplier R",
+     1420611
+    ],
+    [
+     "Cash",
+     -1420611
+    ]
+   ]
+  },
+  {
+   "guid": "dep-p-3",
+   "date": "2025-08-21",
+   "base_type": "Purchase",
+   "number": "P4",
+   "lines": [
+    [
+     "Machine D",
+     2400613
+    ],
+    [
+     "Supplier S",
+     -2400613
+    ]
+   ]
+  },
+  {
+   "guid": "dep-p-3",
+   "date": "2025-08-21",
+   "base_type": "Payment",
+   "number": "Y4",
+   "lines": [
+    [
+     "Supplier S",
+     1100307
+    ],
+    [
+     "Cash",
+     -1100307
+    ]
+   ]
+  },
+  {
+   "guid": "dep-p-4",
+   "date": "2025-08-21",
+   "base_type": "Payment",
+   "number": "Y5",
+   "lines": [
+    [
+     "Supplier S",
+     1300306
+    ],
+    [
+     "Cash",
+     -1300306
+    ]
+   ]
+  }
+ ],
+ "depreciation": {
+  "block_by_ledger": {
+   "Machine A": "plant_machinery_15",
+   "Machine B": "plant_machinery_15",
+   "Machine C": "plant_machinery_15",
+   "Machine D": "plant_machinery_15"
+  },
+  "opening_wdv_paise": {
+   "plant_machinery_15": 2104733
+  },
+  "dep_expense_ledgers": []
+ },
+ "tests": [
+  "depreciation"
+ ]
+}

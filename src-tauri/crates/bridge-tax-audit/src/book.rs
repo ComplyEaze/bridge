@@ -156,6 +156,9 @@ pub struct Voucher {
     /// the stated exception, as in the reference: it attributes a TDS/TCS claim and a
     /// capitalisation fact to this party.
     pub party_field: String,
+    /// PARTYGSTIN, Python-stripped as the reference's adapter reads it; empty when absent. The
+    /// GSTIN recorded on the transaction itself, which `clause44` takes before the party ledger's.
+    pub party_gstin: String,
     /// MASTERID as text, Python-stripped, `None` when absent or empty -- the reference model's
     /// `str | None`. Never parsed here: a test that needs a number parses it by its own rule.
     pub masterid: Option<String>,
@@ -180,6 +183,7 @@ impl Default for Voucher {
             lines: Vec::new(),
             narration: String::new(),
             party_field: String::new(),
+            party_gstin: String::new(),
             masterid: None,
             inventory: Vec::new(),
         }
@@ -219,6 +223,77 @@ pub struct Book {
     /// Whether the read carries the books' currency settings. No read does yet, so this is
     /// `false` for a book built from one (`read_scope` says so).
     pub currency_read: bool,
+    /// The opening stock a ledger-wise trial balance leaves out (POP-3), read once here.
+    pub opening_stock: OpeningStock,
+}
+
+/// Opening stock as of the trial balance's first day. Tally holds it on the stock items, never
+/// on a ledger, so a ledger-wise trial balance of a book with integrated inventory sums to minus
+/// this amount plus any difference in opening balances.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum OpeningStock {
+    /// Not a read, or the company does not keep inventory integrated with its accounts.
+    #[default]
+    NotApplicable,
+    /// The stock items' opening values in paise, debit positive. Taken only when the trial
+    /// balance starts on the books' first day. On one real read whose ledger masters followed a
+    /// later current period, the items' opening values still equalled Tally's own opening stock
+    /// for the audited year [partial: one book; that read's year began on the books' first day,
+    /// so whether the values follow the request's window or the books' first day is not
+    /// separated]. An item with no opening value counts as zero.
+    Valued(i64),
+    /// Integrated inventory, but the amount is not known; see [`OpeningStockUnknown`].
+    Unknown(OpeningStockUnknown),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpeningStockUnknown {
+    /// The read has no stock-items part.
+    NotRead,
+    /// The trial balance does not start on the books' first day (or the read does not record
+    /// that day). A dated opening Stock Summary is not taken in its place (#1486).
+    NotAtBooksStart,
+    /// The stock-items part did not parse; `stock` refuses on it with the typed error.
+    Unreadable,
+}
+
+impl OpeningStockUnknown {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotRead => "not read",
+            Self::NotAtBooksStart => {
+                "not taken: the trial balance does not start on the books' first day"
+            }
+            Self::Unreadable => "unreadable",
+        }
+    }
+}
+
+/// [`OpeningStock`] from a read's integration flag, stock-items part and trial-balance window.
+fn opening_stock(
+    is_integrated: Option<bool>,
+    items: Option<&Part>,
+    tb_from: Option<&TallyDate>,
+    books_from: Option<&TallyDate>,
+) -> OpeningStock {
+    if is_integrated != Some(true) {
+        return OpeningStock::NotApplicable;
+    }
+    let Some(items) = items else {
+        return OpeningStock::Unknown(OpeningStockUnknown::NotRead);
+    };
+    if tb_from.is_none() || tb_from != books_from {
+        return OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart);
+    }
+    match crate::stock_read::stock_item_masters(items) {
+        Ok(masters) => OpeningStock::Valued(
+            masters
+                .values()
+                .map(|m| m.opening_value_paise.unwrap_or(0))
+                .sum(),
+        ),
+        Err(_) => OpeningStock::Unknown(OpeningStockUnknown::Unreadable),
+    }
 }
 
 impl Book {
@@ -943,6 +1018,7 @@ fn load_vouchers(
             lines,
             narration: v.child_text("NARRATION").to_string(),
             party_field: v.child_text("PARTYLEDGERNAME").to_string(),
+            party_gstin: v.child_text("PARTYGSTIN").to_string(),
             masterid: (!masterid.is_empty()).then(|| masterid.to_string()),
             inventory,
         });
@@ -1085,6 +1161,14 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
             ));
         }
     }
+    let is_integrated = company_is_integrated(&company);
+    let items = read.one("stock_items");
+    let opening_stock = opening_stock(
+        is_integrated,
+        items,
+        tp.window.as_ref().map(|w| &w.from),
+        read.books_from.as_ref(),
+    );
     Ok(Book {
         company_name: company_name.to_string(),
         company_guid: guid.to_string(),
@@ -1096,10 +1180,11 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
         tb,
         currency_read: false,
         stock: Some(StockReadParts {
-            items: read.one("stock_items").cloned(),
+            items: items.cloned(),
             summaries: read.of_kind("stock_summary").cloned().collect(),
-            is_integrated: company_is_integrated(&company),
+            is_integrated,
         }),
+        opening_stock,
     })
 }
 
@@ -1836,5 +1921,73 @@ mod tests {
         let vs = vouchers(&["a\u{0}00000001", "a"]);
         let pop: Vec<&Voucher> = vs.iter().collect();
         assert_eq!(voucher_keys(&pop).unwrap().len(), 2);
+    }
+
+    fn stock_items_part(body: &str) -> Part {
+        Part {
+            id: "stock-items".to_string(),
+            kind: "stock_items".to_string(),
+            name: "stock-items.xml".to_string(),
+            window: None,
+            as_of: None,
+            rows: None,
+            alter_id_max: None,
+            scope: None,
+            stored_name: "stock-items.xml".to_string(),
+            response_sha256: String::new(),
+            content: format!(
+                "<ENVELOPE><BODY><DATA><COLLECTION>{body}</COLLECTION></DATA></BODY></ENVELOPE>"
+            )
+            .into_bytes(),
+        }
+    }
+
+    /// #1486: the opening stock POP-3 adds is the stock items' opening values, debit positive,
+    /// only for integrated inventory whose trial balance starts on the books' first day; every
+    /// other case says why it is not known, or that it does not apply.
+    #[test]
+    fn opening_stock_is_taken_only_for_a_trial_balance_from_the_books_first_day() {
+        let from = TallyDate::parse("20250401").unwrap();
+        let later = TallyDate::parse("20250501").unwrap();
+        let items = stock_items_part(
+            "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>-900.00</OPENINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"Latch\"><OPENINGVALUE>-100.50</OPENINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"Hook\"></STOCKITEM>",
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&items), Some(&from), Some(&from)),
+            OpeningStock::Valued(100_050)
+        );
+        assert_eq!(
+            opening_stock(Some(false), Some(&items), Some(&from), Some(&from)),
+            OpeningStock::NotApplicable
+        );
+        assert_eq!(
+            opening_stock(None, Some(&items), Some(&from), Some(&from)),
+            OpeningStock::NotApplicable
+        );
+        assert_eq!(
+            opening_stock(Some(true), None, Some(&from), Some(&from)),
+            OpeningStock::Unknown(OpeningStockUnknown::NotRead)
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&items), Some(&later), Some(&from)),
+            OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart)
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&items), Some(&from), None),
+            OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart)
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&items), None, None),
+            OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart)
+        );
+        let broken = stock_items_part(
+            "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>nine</OPENINGVALUE></STOCKITEM>",
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&broken), Some(&from), Some(&from)),
+            OpeningStock::Unknown(OpeningStockUnknown::Unreadable)
+        );
     }
 }

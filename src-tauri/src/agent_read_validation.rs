@@ -13,7 +13,7 @@ pub(super) fn validate_agent_envelope(xml: &str) -> Result<(), String> {
     loop {
         match reader.read_event() {
             Ok(Event::Start(tag) | Event::Empty(tag)) => {
-                if [b"LINEERROR".as_slice(), b"ERROR", b"RESPONSE"]
+                if ["LINEERROR", "ERROR", "RESPONSE"]
                     .iter()
                     .any(|name| tag.name().as_ref().eq_ignore_ascii_case(name))
                 {

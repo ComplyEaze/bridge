@@ -338,6 +338,12 @@ async fn a_closed_port_is_refused_as_unreachable_and_names_the_endpoint() {
             format!("http://127.0.0.1:{port}"),
             "{tool}"
         );
+        // The next step reaches the assistant with the refusal (#1458).
+        assert_eq!(
+            error["remediation"],
+            unanswered_remediation("endpoint_unreachable").unwrap(),
+            "{tool}"
+        );
         let evidence = &response["structuredContent"]["evidence"];
         assert_eq!(
             evidence["response_sha256"],
@@ -470,7 +476,14 @@ async fn a_request_held_back_after_repeated_failures_names_the_endpoint() {
         let error = refusal(&response);
         assert_eq!(error["code"], "company_collection_invalid");
         assert_eq!(error["endpoint"], format!("http://127.0.0.1:{port}"));
-        causes.push(error["cause"].as_str().unwrap().to_string());
+        let cause = error["cause"].as_str().unwrap().to_string();
+        // Each refusal names the step for its own cause (#1458).
+        assert_eq!(
+            error["remediation"],
+            unanswered_remediation(&cause).unwrap(),
+            "{cause}"
+        );
+        causes.push(cause);
     }
     // The first call's retries open the circuit; the next two are held back.
     assert_eq!(
@@ -506,6 +519,49 @@ fn an_unanswered_code_is_not_repeated_as_its_cause_and_keeps_the_endpoint() {
     let error = error_of(both);
     assert_eq!(error["cause"], "native_report_pair_changed");
     assert_eq!(error["endpoint"], "http://127.0.0.1:9");
+}
+
+/// The two next steps, word for word: the wiring tests compare a refusal with the function's own
+/// output, so a reword (to "retry", say) would pass them. These sentences say not to repeat the
+/// request by itself, and what the hold-back did and did not send (#1458).
+#[test]
+fn the_two_unanswered_next_steps_read_exactly() {
+    assert_eq!(
+        unanswered_remediation("endpoint_unreachable"),
+        Some(
+            "Tell the user to confirm Tally is running with the XML server enabled on the port named in this error. Do not repeat the request until they have."
+        )
+    );
+    assert_eq!(
+        unanswered_remediation("endpoint_circuit_cooldown"),
+        Some(
+            "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated."
+        )
+    );
+}
+
+/// The unanswered next step is consulted last: a code that has its own step keeps
+/// it, and an operation code with none takes the unanswered reason's (#1458).
+#[test]
+fn a_codes_own_next_step_wins_over_the_unanswered_reasons() {
+    let (server, _directory) = server_at(9, 200_000);
+    let error_of = |code: &str| {
+        let mut failure = ToolFailure::from(code.to_string());
+        failure.unanswered = Some(Unanswered("endpoint_unreachable"));
+        let response =
+            server.finish_tool_response("vouchers", &json!({}), Utc::now(), Err(failure));
+        response.value["structuredContent"]["result"]["error"].clone()
+    };
+    let own = error_of("tally_endpoint_busy");
+    assert_eq!(
+        own["remediation"],
+        refusal_remediation("tally_endpoint_busy").unwrap()
+    );
+    let none = error_of("agent_runtime_read_failed");
+    assert_eq!(
+        none["remediation"],
+        unanswered_remediation("endpoint_unreachable").unwrap()
+    );
 }
 
 /// #697: a send the endpoint's wire gate held back is refused by its own code,
@@ -698,5 +754,25 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
                 "{name}: limit names the size bound: {limit:?}"
             );
         }
+    }
+}
+
+/// Only the two reasons a person meets first carry a next step; the rest of the
+/// unanswered reasons name none (#1458).
+#[test]
+fn only_the_unreachable_and_hold_back_reasons_name_a_next_step() {
+    assert!(unanswered_remediation("endpoint_unreachable").is_some());
+    assert!(unanswered_remediation("endpoint_circuit_cooldown").is_some());
+    for reason in [
+        "request_deadline_exceeded",
+        "request_failed",
+        "http_status_failure",
+        "endpoint_queue_deadline_exceeded",
+        "endpoint_half_open_probe_in_flight",
+        "endpoint_session_capacity_reached",
+        "endpoint_invalid",
+        "response_content_type_unsupported",
+    ] {
+        assert_eq!(unanswered_remediation(reason), None, "{reason}");
     }
 }

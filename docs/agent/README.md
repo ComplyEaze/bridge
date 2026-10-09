@@ -122,9 +122,12 @@ and other special files it did not count, folders it could not list (named, not
 read as empty), and the import journal's state: batches, batches sent or found
 posted, how many of those are not settled (with no recorded response, or with a
 response but a latest status that is not `posted_verified`: a post Tally
-rejected stays not settled), batches with no recorded dispatch that were never
-found posted (`no_dispatch_never_verified`: this includes a batch imported by
-hand whose verification is incomplete, which may well be in Tally, so no
+rejected stays not settled; `not_settled_binding_refused` counts the native
+posts whose binding to their own vouchers was refused, all of which stay not
+settled for good, a post Tally rejected in part or whole among them; it
+overlaps neither `not_settled_no_response` nor `not_settled_not_verified`),
+batches with no recorded dispatch that were never found posted
+(`no_dispatch_never_verified`: this includes a batch imported by hand whose verification is incomplete, which may well be in Tally, so no
 deletion may rest on it), and interrupted-write folders that Bridge must recover
 before it builds or reads. A journal it could not read is reported as
 `journal_unreadable` (could not be opened), `journal_read_failed` or
@@ -154,11 +157,13 @@ uses a particular setting or that a tool is qualified for every runtime. Each
 call returns compact JSON with the
 company identity where scoped, a read timestamp, request/response commitments,
 byte count, completeness reason, and truncation state. A refused call returns
-`result.error` with `code`, which names what failed, and `message`. Where a runtime
+`result.error` with `code`, which names what failed, and `message` (`agent_response_too_large`
+puts `error` directly in `structuredContent`, with no `result`). Where a runtime
 refusal has a typed, data-free reason, the error also carries `cause`, which names why
 (for example `company_base_currency_undetermined` beside `party_ledger_master_read_failed`).
 A read whose two paired halves differ, because the book changed while Bridge was reading it,
-carries `native_report_pair_changed`. A voucher-window part that is not admitted
+carries `native_report_pair_changed` or a cause specific to that read (for example
+`masters_collection_changed` or `party_ledger_balance_changed`). A voucher-window part that is not admitted
 (`voucher_window_part_not_admitted`) names why, and a census disagreement also carries
 `counts`, the rows the part `returned` against the rows the census `counted`.
 A compliance ledger read (`ledger_masters fields=compliance`) whose company's master-alteration
@@ -218,14 +223,19 @@ these books.
 When Bridge got no response it could read, the `cause` names why and the error also carries
 `endpoint`, the configured origin that was tried (#629). The causes are:
 - `endpoint_invalid`: the configured endpoint failed validation. The `endpoint` field then appears only
-  if a valid origin can still be formed from the configuration.
+  if a valid origin can still be formed from the configuration. `bridge_mcp` checks the host
+  at startup and stops with `host_setting_invalid` (a bad port stops with `port_setting_invalid`), so its tool
+  calls do not meet this one.
 - `endpoint_unreachable`: the connection was not accepted.
 - `request_failed` or `request_deadline_exceeded`: the request failed before any response, or its
-  deadline passed.
+  deadline passed (also while the body was being read). On a read whose code would be the
+  generic `agent_runtime_read_failed`, `request_deadline_exceeded` is the `code` itself.
 - `http_status_failure`, `response_content_type_unsupported` or
   `response_content_encoding_unsupported`: the responder was rejected on its HTTP status or headers
   before any body was read.
-- An `endpoint_…` runtime code: Bridge held the request back and sent nothing.
+- An `endpoint_…` runtime code: Bridge held the request back and sent nothing. So do
+  `tally_endpoint_busy` (with `retry_after_s`) and `tally_endpoint_lock_unavailable`, which
+  come back as the `code` itself.
 
 A wrong or reset port therefore reads as an endpoint problem, not as a Tally data problem. A
 failed read without `endpoint` either received a response whose body then failed to read, decode,
@@ -240,10 +250,15 @@ field beside `remediation`: for `argument_invalid:from`, `argument_invalid:to` o
 relative date itself and state the dates it used, or to take the GUID from `list_companies` rather
 than a company's name. Both are attached only to a refusal made before anything was read from
 Tally: `company_guid_invalid` also comes back after a read when Tally itself lists a company whose
-GUID is malformed, and then it carries neither. Other argument refusals carry no `expected`.
+GUID is malformed, and then it carries neither. Other argument refusals carry no `expected`. A date that fits the pattern but is not a real day,
+such as `2026-02-30`, is `invalid_date`; it gets the same date guidance in `remediation`.
 
-Like `remediation`, `expected`, `cause`, `counts`, `size` and `endpoint` are omitted when
-`BRIDGE_AGENT_MAX_BYTES` is below 4,096, so that the code always fits. Before a tool response is written, Bridge appends a
+Like `remediation`, `expected`, `cause`, `counts`, `size`, `endpoint`, `ledger`, `bill_row`,
+`partial_reason` (and `partial_reasons`), `reads`, `unsupported_parent_ledgers`, `candidates_listing`,
+`candidates_reason`, `candidates_total`, `candidates_total_is_lower_bound`, `candidates_truncated`,
+`candidates`, `requested` and `window` are omitted when
+`BRIDGE_AGENT_MAX_BYTES` is below 4,096, so that the code always fits. A refusal's list of
+candidate ledgers needs at least 16,384, so it can be absent above 4,096 too. Before a tool response is written, Bridge appends a
 `response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`. It holds
 hashes, counts and field paths, and one set of values: for a response that carries an error, its
 `error` keeps the code, the cause when it is a code, and a voucher window's timings (requested
@@ -393,7 +408,8 @@ than the mark, an AlterID above it, a repeated AlterID or an oversize response
 refuses the whole read as `masters_bound_premise_violated`, unless the closing
 extent shows the book moved, which is reported instead
 (`masters_extent_changed`). A response Bridge cannot read refuses at once with
-a `masters_*` cause, without waiting for the closing extent. A `voucher_types`
+a `masters_*` cause (for `groups`, the group reader's, such as `group_xml_malformed`),
+without waiting for the closing extent. A `voucher_types`
 answer with no rows refuses as `masters_voucher_types_empty`, because every
 company has predefined voucher types, and a `cost_categories` answer with no rows as
 `masters_cost_categories_empty`; the other kinds may answer with none.
@@ -428,8 +444,8 @@ statement under AS 3. The window must be whole months: `from` the 1st of a month
 (a month name, with no year) can be placed in its year. Otherwise the call is
 refused before any trial balance or report request, after the status and company reads (`cash_flow_window_not_month_start`,
 `cash_flow_window_not_month_end`, `cash_flow_window_too_many_months`; a window starting
-before the book is `trial_balance_before_books`; a reversed window is `invalid_date_range`).
-Education mode (`trial_balance_education_unqualified`) and a book with several currency
+before the book is `trial_balance_before_books`). A reversed window is refused first, as
+`invalid_date_range`, before any request. Education mode (`trial_balance_education_unqualified`) and a book with several currency
 masters (`company_base_currency_undetermined`) are refused before any Cash Flow request, as
 for the statements.
 
@@ -487,9 +503,10 @@ answer: on licensed 7.1 an unknown name is answered in band (`STATUS` 0 with a
 `cash_flow_empty_envelope` and `cash_flow_months_unexpected`. A change between the
 two paired Cash Flow reads is `native_cash_flow_changed`.
 
-The refusals above reach the caller as an `isError` result whose `error.code` is
+The read failures just above reach the caller as an `isError` result whose `error.code` is
 `cash_flow_read_failed` and whose `error.cause` is the code named (the window codes
-are the `error.code` itself).
+are the `error.code` itself). The three `not_established` reasons are not errors:
+each is the `result.reason` of a result that is returned.
 
 The tool was run against Tally on two synthetic books on licensed TallyPrime 7.1 (2026-10-07,
 one call at a time through a recording relay): on five windows the net total tied to the trial
@@ -548,9 +565,11 @@ the closing stock value per stock item, with the total of those values checked
 against Tally's own Stock Summary, and whether inventory is integrated with the
 accounts. `as_of` must be a 31 March (a
 financial-year end), the only date measured for stock, and not before the book's
-start or after today. Any other date is refused as
+start or after today. A date that is not a 31 March is refused as
 `stock_summary_as_of_not_measured` before any request, and retrying the same date
-refuses again. The only period measured is the period ending 31 March 2026
+refuses again. A 31 March before the book's start or after today is refused as
+`stock_summary_as_of_before_books` or `stock_summary_as_of_in_future`, after the
+status, company and extent reads. The only period measured is the period ending 31 March 2026
 (FY 2025-26); other years' 31 March share its request shape but not its
 measurement, so they are admitted but unmeasured. The period is the financial year containing `as_of`, from 1 April,
 or the book's start if that is later.
@@ -718,7 +737,7 @@ too (#692).
   - Tally's own Balance Sheet for the window, read in the same bracket, ties
     line for line to the derived one (`balance_sheet_gate`). A line that
     differs, a Tally line with an amount nothing derived matches, or a derived
-    line Tally does not show, refuses every result as
+    line with an amount that Tally does not show, refuses every result as
     `tally_balance_sheet_differs`, with those lines named;
   - the Profit & Loss A/c ledger is returned in the Trial Balance.
 - **Reasons** a result is `not_established`: `unclassified_ledger_carries_an_amount`,
@@ -760,7 +779,7 @@ too (#692).
     That allowance was observed once, on one book. The heading is compared
     even when it reads zero or empty, as any line is: over a non-zero cost of
     sales it refuses, and over a zero one it ties (#1070).
-  - An Opening or Closing Stock line refuses.
+  - An Opening or Closing Stock line that carries an amount refuses.
 
 ### Ledger-movement opening decision
 
@@ -1215,10 +1234,12 @@ the vouchers that satisfy every criterion given.
   against the absolute value of every ledger entry of a voucher, so it finds an
   invoice total and a tax line alike (checked live on an invoice-mode Purchase: 900.25 found its CGST and State Tax lines; an invoice total was not searched, nor an item invoice with stock lines). Each item carries `matched.amount_entries`,
   the positions in its `amounts` that equalled the amount.
-- A blank or over-long term, a narration phrase under three characters and an
+- A term of spaces only, a narration phrase under three characters and an
   amount that is not a plain positive decimal are refused before the window is read (the identity read has already happened)
-  (`search_criterion_empty`, `search_criterion_too_long`,
-  `search_narration_too_short`, `search_amount_invalid`).
+  (`search_criterion_empty`, `search_narration_too_short`,
+  `search_amount_invalid`). An empty term, or one over 256 characters, is refused
+  first by the argument check as `argument_invalid:<name>`, so a tool call does not
+  reach `search_criterion_too_long`.
 - The search runs last, after the window is labelled and after the ledger and
   type selectors, so a zero from a `complete` window is a checked zero. A voucher
   withheld for a foreign-currency amount has no amounts to compare: an `amount`
@@ -1241,7 +1262,7 @@ each other.
   `ledger_movement` reports it), `credit`, `net` (debit plus credit) and
   `voucher_refs`: up to five vouchers by date, type, number and GUID, with
   `voucher_refs_complete` saying whether that is all of them. `vouchers` with the
-  same arguments without `summarise_by`, narrowed to the bucket, lists the rest: for a month bucket narrow `from` and `to`; for a ledger bucket pass that ledger when the call carries none; for a type bucket pass `voucher_class` (a superset when a class has child types) or the type's GUID (a type name that is also a class is refused as `voucher_type_ambiguous`).
+  same arguments without `summarise_by`, narrowed to the bucket, lists the rest: for a month bucket narrow `from` and `to`; for a ledger bucket pass that ledger when the call carries none; for a type bucket pass `voucher_class` (a superset when a class has child types) or the type's GUID (a type name is refused as `voucher_type_ambiguous` when the types with that name differ from the class of that name, or from the types whose reserved name it is).
 - A debit is an entry with a negative amount and a credit one with a positive
   amount, the rule `ledger_movement` uses (the same function); `ISDEEMEDPOSITIVE`
   decides only a zero amount, which adds nothing to either side but still counts
@@ -1461,8 +1482,8 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   party were already there.)
 - Like every other scalar the parser reads, a repeated `BILLDATE` or
   `BILLCREDITPERIOD` inside one allocation, or a child element inside either,
-  refuses the read as a protocol error (`agent_read_protocol_invalid`). So does a
-  malformed `BILLDATE`. Both reach every reader that shares the voucher parser,
+  refuses the read as a protocol error (`agent_read_protocol_invalid`). A
+  malformed `BILLDATE` refuses as `bill_allocation_date_invalid`. Both reach every reader that shares the voucher parser,
   not only `vouchers`: `changes` (where a refusal holds the checkpoint),
   `voucher_presence`, the empty-window corroboration read and the desktop voucher
   screen. Write-side verification is not affected, because its fetch names no
@@ -1578,16 +1599,24 @@ that turns that on.
    when the ledger is in the book but its group does not lead to a reserved
    group, and `suspense_ledger_not_in_book`. A file that names neither ledger is
    not held to either rule.
-   The refusal also applies when amending a batch that was built against a
-   Cash-in-Hand bank ledger: the ledger must be changed first.
+   The refusal also applies when amending with a proposals file for a Cash-in-Hand
+   bank ledger: the ledger must be changed first. An amendment given as inline
+   `vouchers` names no statement ledgers, so this check does not run.
 4. In Tally, with the intended company open, use **Gateway of Tally → Import →
    Vouchers** to import the file. Bridge does not dispatch this manual step.
    Alternatively, use the separately approved MCP voucher posting (or, for a
    Journal, the desktop posting) flow below instead of importing the file manually.
 5. Call `verify_import` with the company GUID and batch ID. It reads the date
    window back, compares the exact signed ledger entries, reports missing or
-   divergent rows and duplicates, writes `.proof.json` and `.proof.md`, and
-   appends the verification status to the local import ledger. It compares the
+   divergent rows and duplicates, adds a proof pair
+   (`<batch>.proof.<time saved>.<SHA-256>.json` and `.md`) beside every earlier
+   one, and appends the verification status, which names that pair current, to
+   the local import ledger. No file is replaced: the journal decides which pair
+   is current. The SHA-256 in the name is the JSON's, and only the JSON is read
+   back and checked against it; the `.md` is a copy for people to read, and
+   ComplyEaze Bridge never reads it back. Every pair is kept until you delete
+   it; nothing in ComplyEaze Bridge deletes one. A batch last verified by an earlier build keeps its
+   single `<batch>.proof.json`, which no longer changes. It compares the
    date, voucher type and entries; it does **not** compare `EFFECTIVEDATE` or
    `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see
    the limits noted in reference §9.13.
@@ -1731,7 +1760,9 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    rows of one amount are not split across batches. The list and step are
    withheld on a very small response budget, and the same refusal inside the
    queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
-   with `post_queue_read_failed`, with a `cause` where one is known; nothing is sent, and
+   with `post_queue_read_failed`, with a `cause` where one is known (a read the endpoint's
+   gate held back keeps its own code, `tally_endpoint_busy` or `tally_endpoint_lock_unavailable`,
+   and a withdrawn call is `request_cancelled`); nothing is sent, and
    the post can be re-run. Checked under the admission lock as the attempt is
    about to be recorded, a batch no longer in the journal, already attempted,
    changed since approval, or whose REMOTEID the journal already records refuses
@@ -1883,7 +1914,10 @@ binding compares narration byte for byte. A narration holding the one sequence
 the agent readers are known to rewrite (a literal U+FFFD followed by `#`, digits
 and `;`) is refused when the batch is built (`voucher_text_invalid`), and
 `post_import` refuses a batch saved before that check in the same way, before
-any request; it is still admitted for review and reconciliation. Other text,
+any request; it is still admitted for review and reconciliation. So is a
+narration holding a character that draws nothing (Unicode
+Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the prepended
+concatenation marks). Other text,
 such as Devanagari or the rupee sign, is admitted, and whether it reads back
 byte for byte is not yet measured: a narration that reads back changed refuses
 that post's binding for good.
@@ -1908,7 +1942,11 @@ whose vouchers are then matched by content only. Such a batch stays
 `reconciliation_required`: the person checks its vouchers in Tally, and
 `acknowledge_post_review` does not apply to it, because it records a review only
 of a doubt beside vouchers that read back verified (closing such a batch inside
-Bridge is bridge#1039). `voucher_presence` cannot identify a native post's
+Bridge is bridge#1039). Its `post_span_binding.summary` says when the book holds,
+for each voucher it sent or for some, a voucher with the same date, voucher type
+and ledger entries that is neither cancelled nor optional, and that ComplyEaze
+Bridge cannot tell whether that voucher is this post's; `local_data_report` counts it under `not_settled_binding_refused`.
+`voucher_presence` cannot identify a native post's
 vouchers, because they carry no marker: one edited or re-dated in Tally can read
 `absent` there. Check a natively posted batch with `verify_import`, which finds
 its vouchers by the GUIDs its post created once its binding is made (and
@@ -1946,7 +1984,11 @@ wrote itself. Since bridge#579, each native dispatch intent records the
 REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post attempted
 with 0.4.2 or later, the dispatch intent also records the pre-POST voucher mark and
 the journal a binding record, which a connector older than 0.4.2 refuses: do not
-downgrade after posting with it. A downgrade before that first post leaves the
+downgrade after posting with it. From the first verification with the build that
+added `<batch>.proof.<time saved>.<SHA-256>.json` (#911), each verification's status
+record names the proof it saved, which an older connector refuses too: do not
+downgrade after verifying with it. A downgrade before the first post or
+verification with that build leaves the
 journal readable, and versions 0.3.0 to 0.4.2 then refuse to post a batch this
 version built (`import_batch_predates_ledger_binding`, nothing posted): they
 cannot make the cash-in-hand and bill-wise checks it was built with. Their
@@ -2055,8 +2097,9 @@ exact `partial_reason`. A Bills report row whose dates Bridge cannot read refuse
 read (leaving a bill out would change the totals) with its `cause` (a typed code
 for the rule that failed), a `bill_row` (`report`, `receivable` or `payable`, and
 the 1-based `row` in the order Tally sent them: never the bill's party, reference
-or date) and a next step. A refusal that is not about one row (an amount, the
-shape of the report, the book window) has a `cause` and no `bill_row`. A due date
+or date) and a next step. An amount in a row that cannot be read names that row
+too. A refusal that is not about one row (the shape of the report, the book
+window) has a `cause` and no `bill_row`. A due date
 printed with a four-digit year of 2100 or later is read as written; no other form
 is added (protocol reference section 12a.3, one observation). `ledger_movement` returns literal-window voucher
 movement with exact decimal `opening`, `debit`, `credit`, `closing`, parent,
@@ -2237,7 +2280,9 @@ Per tool:
   2. the company read;
   3. the window read's marks and census, data parts and closing marks;
   4. the corroborating window's data parts and closing marks (no marks read:
-     it replays the first window's);
+     it replays the first window's), unless the first window was divided, every
+     part was admitted against a census that names each voucher's GUID, and its
+     closing marks equal its opening marks: that read is not repeated (#1241);
   5. a scoped read of the company's marks (if the batch was posted natively
      and its voucher mark before the post was recorded, `current_voucher_mark`);
   6. the closing probe (if any voucher was not found);
@@ -2247,7 +2292,9 @@ Per tool:
 
   `evidence.mode_opening` is the opening probe and `mode_closing` the closing
   one (or null). `company` is the company read. `voucher_read` is the first
-  window's data parts only, and `voucher_read_corroboration` the second's.
+  window's data parts only, and `voucher_read_corroboration` the second's, or
+  `{"state": "not_sent", "reason": "counted_and_bracketed_read"}` when no second
+  read was made.
   No named key covers the marks or census requests, which is what the lab
   capture in #726 showed. A later page read with `proof_sha256` sends no
   request: its request digest hashes
@@ -2335,7 +2382,8 @@ scoped access refuses them before any company report is read.
 
 Port zero and ports above 65535 are rejected at startup.
 Unknown arguments, wrong selector types, and invalid enums are rejected before
-any Tally request. Checkpoint numeric strings are no longer accepted at the tool
+any Tally request, and so is a missing required argument (`<name>_required`, for
+example `company_guid_required`). Checkpoint numeric strings are no longer accepted at the tool
 boundary. `changed_since` is unavailable; existing clients must stop calling it.
 
 `validate_masters` accepts 1–100 nonblank names, each at most 1024 characters.
@@ -2345,7 +2393,8 @@ name; `candidate_count`, `candidate_count_is_lower_bound` and
 flag means "at least N" even when no candidates are listed. Import
 planning allows 1000 vouchers but at most 100 distinct ledger names per batch.
 Repeated uses of a ledger do not consume additional distinct-name slots.
-Voucher-type and ledger selectors share the 1024-character bound; ledger
+Voucher-type name and ledger selectors share the 1024-character bound
+(`voucher_type_guid` is bounded at 128); ledger
 lookup keys are computed once before scanning live names.
 
 Voucher `offset`, `limit`, ledger and voucher-type selectors apply after the
@@ -2362,8 +2411,8 @@ large. The connector does not automatically retry or subdivide such a failure.
 Byte-limited pages retain forward progress or return `agent_response_too_large`;
 they never advertise the same offset after removing every row. Outstandings
 trims both collections to a shared page width because they share an input offset.
-Active vouchers without observed accounting entries are refused before movement
-filtering; cancelled and optional vouchers remain excluded from movement totals.
+Active vouchers with no accounting entry (a Stock Journal) are left out of movement
+like cancelled and optional ones; an entry row with only some of its fields is refused.
 Movement corroborates the complete opening-ledger snapshot after voucher reads
 and rejects unknown entry names before selecting a ledger. Caller-specified
 opening dates require a freshly observed supported product/mode and a valid native
@@ -2372,7 +2421,7 @@ grant admission.
 
 Top-party ranking uses `gross_exposure`, with billed and unallocated receivable
 and payable fields kept separate. `totals.scope` is `open_bills_only`.
-`open_bills_total` counts every open bill in the requested direction (the bills `totals` and
+`open_bills_total` counts every open bill in the requested direction (`direction`, default `both`; the bills `totals` and
 `ageing_buckets` cover; on a partial read, the base-currency ledgers' bills only, beside those figures) and `open_bills_shown` counts the bills on the page returned. A page cut by
 the response size keeps `limit` unchanged and restates `open_bills_shown`, so a page shorter than the
 total is read from `open_bills_shown` and `next_offset`, never from `limit`.
@@ -2534,13 +2583,29 @@ preparation receipt fails, the recovery JSON-RPC error contains
 `error.data.batch_id`. Retain it and use `verify_import` or inspect the local import
 ledger; do not blindly rebuild or import another batch. If stdout itself fails,
 the recovery ID may not reach the client; the generated XML and import ledger
-remain available for local recovery. Proof JSON,
-Markdown, and ledger status are published under one admission lock. Handled
-publication failures restore the prior proof pair and ledger state. Builds create
+remain available for local recovery. A verification writes its proof JSON and
+Markdown under new names, then appends the ledger status that names them current,
+under one admission lock; it replaces and removes no earlier file, so a failure
+before the append leaves the earlier proof current. Builds create
 the journal first, write and sync staged XML, then expose the importable filename. An interrupted
-publication or failed rollback leaves a recovery journal and blocks further import
-admission until the local files and ledger are reconciled. Preserve the journal,
-its backups, and generated XML; do not delete it merely to retry. This is explicit
+build, or a status append whose outcome is unknown because its rollback failed,
+leaves a recovery journal and blocks further import
+admission until the local files and ledger are reconciled. A verification
+stopped around its journal append leaves `imports/.proof-publication`. Compare
+the status record in its `update.json` with the journal's last line, as JSON
+(the file is indented, the line is not):
+
+- the same record: the append finished, and its proof is current;
+- an earlier, whole record: the append never began, and the earlier proof is
+  current;
+- a torn last line: the append stopped part-way. Keep a copy of the journal,
+  then remove only that partial line;
+- no `update.json`: the stop came before the record was written, and the
+  journal is as it was.
+
+Then remove the folder. Proof files that no journal record names are left
+over from the stopped verification; nothing reads them. Preserve the journal
+and generated XML; do not delete it merely to retry. This is explicit
 recovery after a partial file transaction, not a power-loss atomicity guarantee.
 
 Prepared receipts count the bounded master-validation and loaded-company rows. Unknown tool
@@ -2568,7 +2633,7 @@ non-posting amounts are not presented without that state. Movement repeats the
 voucher source after its final opening snapshot and refuses changes to either
 source before calculating balances. This establishes stability across repeated
 observations, not an atomic Tally snapshot.
-Each active voucher must also have nonempty entries whose signed amounts sum
+Each active voucher that has entries must have signed amounts that sum
 exactly to zero before movement arithmetic or ledger selection. An unequal
 projection returns `voucher_entries_unbalanced`, retaining source evidence.
 This necessary check cannot detect an omitted subset that itself balances.

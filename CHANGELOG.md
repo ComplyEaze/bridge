@@ -7,16 +7,16 @@ All notable changes to ComplyEaze Bridge are documented here. The project follow
 
 Published builds are MCPB packages that are not yet code-signed (tags
 `mcp-preview-*` and, from 0.4.0, `mcp-v*`): so far
-`mcp-preview-0.2.0`, `mcp-preview-0.3.0`, `mcp-v0.4.0`, `mcp-v0.4.1`, `mcp-v0.4.2` and `mcp-v0.5.0`. The
+`mcp-preview-0.2.0`, `mcp-preview-0.3.0`, `mcp-v0.4.0`, `mcp-v0.4.1`, `mcp-v0.4.2`, `mcp-v0.5.0` and `mcp-v0.5.1`. The
 number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-### In plain words: the next build, since 0.5.0
+### In plain words: the next build, since 0.5.1
 
 These changes are in source and not yet in a published build.
 
-**New**
+**Added**
 
 - `company_features` reads three settings that a company's record in Tally holds today (cost centres, GST
   and batch-wise stock) and its currency symbol (part of #1231). Each setting is yes, no or
@@ -26,11 +26,168 @@ These changes are in source and not yet in a published build.
   currency is a symbol, not a currency code. Measured on three synthetic books of one TallyPrime 7.1 Silver;
   a setting changed inside a sitting, Education mode and other releases are not measured.
 
-**Fixed**
+- `parse_bank_statement` reads Bank of Baroda statements in one measured layout (`bank: "bob"`; Part of #1457). The layout was measured on
+  two real statements, held privately, and the profile follows what was seen there:
+  the statements print neither an opening nor a closing balance nor totals, so both balances come from you, and
+  every page must print `Page N of M` and every page after the first must start with a row. They print the account
+  number masked (first and last three digits clear), so `account_label` must carry the whole number; only those six
+  digits are compared, the masked middle cannot be. With no printed totals those balances and the footers are the
+  only checks on which rows were read: missing rows whose amounts net to zero would not be seen. They print the newest row first; the rows are read oldest first and
+  numbered that way. The measured statements cut a narration at about 50 characters, so a name can end mid-word. A party is named
+  only where the shape settles it: a UPI row names its VPA (when the VPA is whole), NEFT and RTGS rows name what
+  follows the UTR (not when a line was broken at the cell edge inside the narration), and bank charges and a cash deposit are recognised by their wording; a loan recovery is named as printed, loan number included, so two loans are two parties. Two payers whose names agree up to the cut read as one party. IMPS,
+  mobile-banking and internet-banking rows, interest and every other wording go to suspense. A statement that
+  opens without a password needs `password_file` to be an empty file (on a Mac it must be owned by you with no group or other permission bits; on Windows it must be owned by you or Administrators, and no one but you, SYSTEM and Administrators may read or change it). Not measured: other
+  account types and branches, statements printed oldest first, other wordings, and a statement downloaded another way.
 
+**Changed**
+
+- On Windows, `parse_bank_statement` now refuses a password file owned by neither you nor
+  Administrators, or that anyone but you, SYSTEM and Administrators can read or change
+  (`statement_password_file_permissions`), as a Mac already refuses one that other users can read.
+  The refusal says how to make the file private: make a new copy in a folder of your own and
+  delete the original, because moving a file keeps who can read it. A password file on a drive
+  that keeps no access list, such as a FAT or exFAT stick, is expected to be refused as well;
+  that is not yet measured.
+- The hand-import script `scripts/bank_statement_import.py` (not part of the downloaded package, #1430) now writes the same
+  `| Statement party: <name>` segment under the same rules as the app, and
+  refuses a run whose narration holds a control character or the reserved marker, or runs past 2,000 characters, as
+  `narration_not_admissible`, as the app does (`party_not_admissible` when the party's own segment is what breaks
+  the rule). Importing its file again for a statement already imported is expected to rewrite those vouchers'
+  narrations in the book: their keys do not depend on the narration the script writes. A same-key re-import has been measured over
+  the gateway; through Tally's own Import menu, which is how this script's file is imported, only an unchanged re-import of a file the app built has been seen, on one Windows computer (#1413).
+- A character that draws nothing (Unicode Default_Ignorable_Code_Point or Format, except ZWJ,
+  ZWNJ and the prepended concatenation marks) is not read from a bank-statement PDF, and a soft
+  hyphen is read as the hyphen it prints. A narration holding
+  such a character is refused as `voucher_text_invalid` when a batch is built, and before a native
+  post of a batch saved earlier; the reference is not checked. A statement that held one gets new
+  `bridge_txn_id` labels, so a batch built from it by an earlier build does not line up with a new
+  run's `amends_batch_id`.
+- `verify_import` no longer reads its window a second time when the first read was divided, every part was
+  checked against a count of the window that names each voucher, and the company's marks were unchanged when
+  read again after the last part (#1241). That is a window of more than about 170 vouchers in a book whose
+  voucher mark is above about 170; it holds every voucher of the book in those dates, not only the batch's. The proof's `voucher_read_corroboration` then
+  reads `{"state": "not_sent", "reason": "counted_and_bracketed_read"}` instead of a second read. A window read
+  in one request, or divided without a count, is read twice as before. `ledger_movement` still reads its
+  window twice. The request counts come from test doubles, not from a live Tally.
+
+- **Verifying a batch no longer replaces its saved proof, so the host need not ask before each
+  read-back.** Each `verify_import`, and each of the two verifications `acknowledge_post_review`
+  runs, now saves its proof as a new pair of files, `<batch>.proof.<time saved>.<SHA-256>.json`
+  and `.md`, beside every earlier pair, and the status it adds to the import journal names which
+  pair is current. The finished masters check and the first verified ALTERIDs go to files of their
+  own, written once. Nothing these two tools find in the folder is replaced or deleted, so they are
+  now marked as writes that are not destructive. The folder therefore grows with every
+  verification; nothing deletes old proofs. A batch last verified by an earlier build keeps its
+  single `<batch>.proof.json`, which no longer changes. After the first verification with this
+  build, a connector older than it refuses the import journal (a downgrade was already refused after
+  the first native post), so keep this version for recovery (#911).
+
+## [0.5.1] - 2026-10-09
+
+### In plain words: ComplyEaze Bridge 0.5.1, since 0.5.0 (9 Oct 2026)
+
+These changes are in ComplyEaze Bridge 0.5.1. Each line names the pull
+requests it comes from, except where it names an issue.
+
+**Should I upgrade?**
+
+- **If you updated from 0.4.2 to 0.5.0 and Claude Desktop did not start
+  ComplyEaze Bridge: yes.** 0.5.0 marked the Terms of Use setting as required.
+  On one Mac, after an update from 0.4.2, 0.5.0 was not started and Claude
+  Desktop showed "Unable to connect to extension server". 0.5.1 no longer marks
+  the setting required. After installing 0.5.1, turn on the Terms setting in
+  the extension's settings, then quit and reopen Claude Desktop. Until the
+  setting is on, every tool answers `terms_not_accepted` and names the
+  setting; nothing is read from Tally. What we saw: a package built from the
+  Terms-setting change (#1436) on one Mac (only its version set to 0.5.1),
+  installed over 0.4.2 and over 0.5.0, was started by Claude Desktop (in one run
+  only after Claude Desktop was quit and reopened), and with the setting off the
+  tools the assistant called gave that answer. On one Windows 10 computer with Claude Desktop 2.26454.2
+  from the Microsoft Store, the published 0.5.0 file over 0.4.2 was not started
+  (no ComplyEaze Bridge tool in the chat and no error), and the build our
+  checks made for this release (commit d744d25a, not the published file) was
+  started after a fresh install, after an
+  update from 0.4.2 and after an update from 0.5.0 that was switched on (as the
+  update leaves it, and with the Terms ticked); with the Terms off the tools the
+  assistant called gave that answer, and with them on the Tally check ran. Not tried: the published 0.5.1 file, and a release
+  older than 0.4.2 (#1413).
+- **If 0.5.0 already starts for you:** the other changes below are the reason
+  to update, if any.
+- **If you use the bank-statement tool and build vouchers for mapped ledgers:**
+  such a voucher now carries the statement's party at the end of its narration
+  text (see "What you can do now" below). Vouchers already imported keep their
+  narration, but amending a batch built before this change rewrites the
+  narrations of that batch's vouchers in the book (#1430).
+- **After updating, if the assistant does not find ComplyEaze Bridge, check that it is switched on in Settings, Extensions.** On one Windows computer, an update kept the extension's switch as it was: an extension switched off before the update was still off after it, and the assistant showed no ComplyEaze Bridge tools and no error. Switching it on brought the tools back there, and they then answered `terms_not_accepted` until the Terms setting was on (#1413).
+- **If you use ComplyEaze Bridge on Windows:** the build of this release made by our checks was tried on one Windows 10 computer, with TallyPrime 7.1 (Silver) and a company made for the test; see "Known limits" below for what was and was not tried.
+- **How:** ComplyEaze Bridge does not update itself. Follow the
+  [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
+  (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
+  Desktop, Settings, Extensions, install the new file (on one Mac a new
+  install opened no settings window: open Settings, Extensions, ComplyEaze
+  Bridge yourself); (3) keep ComplyEaze Bridge's data folder; (4) check that
+  the extension shows 0.5.1, turn on the Terms setting if it is not on, and
+  check that "Allow voucher posting" is as you want it; (5) quit Claude
+  Desktop completely and reopen it.
+
+**What you can do now**
+
+- No new tool.
+- A voucher built from a bank statement for a mapped ledger now carries `| Statement party: <name>`, the
+  counterparty the statement printed, at the end of its narration text (#1430). A file you import by hand adds
+  ComplyEaze Bridge's `[BRIDGE:...]` tag after it. A line sent to suspense and a
+  cash line are written as before. A party that contains `|` or a control character, that carries the reserved marker, or that makes the narration longer than 2,000
+  characters now refuses the statement run (`party_not_admissible`); `skip` that party or map it to the suspense
+  ledger. A label the parser gives a line by its wording (bank charges, a card fee, an instalment) is not written as a party. Vouchers already imported keep their narration,
+  but amending a batch built before this change rewrites the narrations of that batch's vouchers in the book.
+  The name is part of the narration, so `mask_parties` does not shorten it and `drop_narration` removes it.
+
+**Safer or fixed**
+
+- **An update now starts ComplyEaze Bridge before the Terms are turned on, and
+  its tools say why they refuse.** The Terms of Use setting is no longer
+  marked required and still starts off. Claude Desktop now starts ComplyEaze
+  Bridge, and until you turn the setting on every tool answers
+  `terms_not_accepted`, naming the setting. That the app starts and the tools the
+  assistant called answered was seen on one Mac with a package built from the Terms-setting change
+  (#1436), and on one Windows computer with the build of this release (#1413).
+  The setting no longer shows "(required)" beside its title, and its description
+  now begins "Tick to use ComplyEaze Bridge: it refuses every tool call until you
+  accept the Terms of Use." A test checks that wording, and it was seen in
+  Claude Desktop on that Windows computer.
 - The schema of every paged read no longer names a default `limit` of 500. When `limit` is left out
   the server uses its configured row limit (500 unless it is configured otherwise), as the tools' own
   text already said; the schema said 500 even when the row limit was lower or higher (#1148).
+- A State Bank of India statement line whose UPI, NEFT, RTGS or transfer text prints an empty name
+  field now names its party as `UNNAMED`, as the IMPS reader already did. Before, the party was empty and
+  the suspense line's narration named no one. `UNNAMED` cannot be mapped to a ledger, so the line still goes to the suspense ledger (#1429).
+- The import journal (`agent-import-ledger.jsonl`) is now read with each of its dates as a checked
+  date. A record holding a date that is not `YYYYMMDD` refuses the whole journal
+  (`import_ledger_invalid`): building, posting, verifying and reconciling every batch, and the
+  desktop journal screen, stop until the record is put right, and the local data report shows the
+  journal as not read. The current code writes only that form, so only a record edited by hand is
+  expected to hold such a date, and the stored bytes do not change (#1307).
+- The PDF library is loaded from the folder that holds the program (#1422).
+
+**Known limits**
+
+- Windows was tried on one computer (Windows 10, Claude Desktop 2.26454.2 from
+  the Microsoft Store, TallyPrime 7.1 Silver, a company made for the test), with
+  the build our checks made for this release at commit d744d25a. The published
+  0.5.1 file was not tried, and nothing was tried on other Windows versions or
+  other Tally editions (#1413).
+- On that computer, a bank-statement import file built for six vouchers was
+  imported by hand into Tally and read back: the verification found all six, and
+  a voucher posted to a mapped ledger showed its narration with
+  `| Statement party: <name>` before the `[BRIDGE:...]` tag. An unchanged
+  re-import of the same file was matched to the six vouchers already there and
+  added none. A changed re-import was not tried (#1430).
+- On one Windows computer where Claude Desktop was installed from the Microsoft Store, the folder shown for a built import file did not exist: the file was under the user's AppData\Local\Packages\Claude_<id>\LocalCache\Local\Bridge\agent\imports folder. If Tally's Import screen does not find the file at the path shown, look there. Seen with 0.5.0 as well (#1459).
+- The library that reads Tally's replies was updated (#1198). Its output for
+  the saved replies in our test record is unchanged. The Windows runs above used
+  it for a company list, the read-back of six vouchers and an August trial
+  balance on a small company; it was not run against a large book.
 
 ## [0.5.0] - 2026-10-08
 

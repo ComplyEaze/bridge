@@ -238,11 +238,16 @@ def resolve_environment(manifest):
                               "BRIDGE_AGENT_REDACTION", "BRIDGE_AGENT_ENABLE_IMPORT",
                               "BRIDGE_AGENT_ENABLE_WRITES"},
             "unexpected_environment_mapping")
-    # The Terms of Use are accepted by the user, never by default: the setting is required and
-    # off, and the server refuses every tool until it is on (see agent_terms.rs).
+    # No setting may be required. Claude Desktop builds no launch command while a required setting
+    # has no stored value, and an update that renames the Terms setting leaves it with none, so
+    # the server would never start to refuse (bridge#1413).
+    require(all(option.get("required") is not True for option in manifest["user_config"].values()),
+            "required_setting_blocks_launch")
+    # The Terms of Use are accepted by the user, never by default: the setting is off, and the
+    # server refuses every tool until it is on (see agent_terms.rs).
     terms = manifest["user_config"].get("accept_terms_2026_10_1", {})
-    require(terms.get("type") == "boolean" and terms.get("required") is True
-            and terms.get("default") is False, "terms_setting_must_be_required_and_off")
+    require(terms.get("type") == "boolean" and terms.get("default") is False,
+            "terms_setting_must_be_boolean_and_off")
     require(mappings["BRIDGE_TERMS_ACCEPTED"] == "${user_config.accept_terms_2026_10_1}",
             "terms_environment_mapping_mismatch")
     require(mappings["BRIDGE_AGENT_ENABLE_IMPORT"] == "true", "import_environment_mapping_mismatch")

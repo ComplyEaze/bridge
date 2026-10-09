@@ -883,9 +883,6 @@
       "path": "src/ErrorBoundary.tsx"
     },
     {
-      "path": "src/GstScreen.tsx"
-    },
-    {
       "path": "src/JournalPostingScreen.tsx"
     },
     {

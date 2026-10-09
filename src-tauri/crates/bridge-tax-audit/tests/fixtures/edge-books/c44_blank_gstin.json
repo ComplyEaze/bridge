@@ -1,0 +1,333 @@
+{
+ "comment": "clause44: a voucher's PARTYGSTIN that is blank once stripped (spaces, a tab, a no-break space) falls back to the party ledger's GSTIN: a registered creditor with no tax line is 'exempt or non-GST' and with a tax line 'other than composition', a composition creditor is composition, a creditor with no GSTIN stays unregistered, a party named on no ledger master is unregistered; a populated PARTYGSTIN is still read as before, and a zero-width space is not blank. Every GSTIN is invented (fourteenth character Y).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Fixed Assets": null,
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Direct Incomes": null,
+  "Indirect Incomes": null,
+  "Carriage Inward": "Direct Expenses",
+  "Office Costs": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-c44_blank_gstin-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_blank_gstin-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_blank_gstin-002"
+  },
+  {
+   "name": "Input CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_blank_gstin-003"
+  },
+  {
+   "name": "Input SGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_blank_gstin-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c44_blank_gstin-005"
+  },
+  {
+   "name": "Office Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_blank_gstin-006"
+  },
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_blank_gstin-007",
+   "gstin": "27ALPHA1111A1Y1"
+  },
+  {
+   "name": "Beta Composition Co",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_blank_gstin-008",
+   "gstin": "27BETAC2222B1Y2"
+  },
+  {
+   "name": "Gamma Works",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_blank_gstin-009",
+   "gstin": ""
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 126044,
+   "closing": -126044
+  },
+  {
+   "ledger": "Input CGST",
+   "opening": 0,
+   "debit": 67096,
+   "credit": 0,
+   "closing": 67096
+  },
+  {
+   "ledger": "Input SGST",
+   "opening": 0,
+   "debit": 9747,
+   "credit": 0,
+   "closing": 9747
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Office Expenses",
+   "opening": 0,
+   "debit": 789351,
+   "credit": 0,
+   "closing": 789351
+  },
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 456596,
+   "closing": -456596
+  },
+  {
+   "ledger": "Beta Composition Co",
+   "opening": 0,
+   "debit": 0,
+   "credit": 129654,
+   "closing": -129654
+  },
+  {
+   "ledger": "Gamma Works",
+   "opening": 0,
+   "debit": 0,
+   "credit": 153900,
+   "closing": -153900
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "g01",
+   "date": "2025-05-02",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Office Expenses",
+     118615
+    ],
+    [
+     "Alpha Traders",
+     -118615
+    ]
+   ],
+   "number": "P-1",
+   "party_gstin": "   "
+  },
+  {
+   "guid": "g02",
+   "date": "2025-05-03",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Office Expenses",
+     82641
+    ],
+    [
+     "Input CGST",
+     67096
+    ],
+    [
+     "Input SGST",
+     9747
+    ],
+    [
+     "Alpha Traders",
+     -159484
+    ]
+   ],
+   "number": "P-2",
+   "party_gstin": "\t "
+  },
+  {
+   "guid": "g03",
+   "date": "2025-05-04",
+   "base_type": "Purchase",
+   "party": "Beta Composition Co",
+   "lines": [
+    [
+     "Office Expenses",
+     129654
+    ],
+    [
+     "Beta Composition Co",
+     -129654
+    ]
+   ],
+   "number": "P-3",
+   "party_gstin": " "
+  },
+  {
+   "guid": "g04",
+   "date": "2025-05-05",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Office Expenses",
+     67320
+    ],
+    [
+     "Gamma Works",
+     -67320
+    ]
+   ],
+   "number": "P-4",
+   "party_gstin": "  "
+  },
+  {
+   "guid": "g05",
+   "date": "2025-05-06",
+   "base_type": "Purchase",
+   "party": "Walk-in Vendor",
+   "lines": [
+    [
+     "Office Expenses",
+     126044
+    ],
+    [
+     "Cash",
+     -126044
+    ]
+   ],
+   "number": "P-5",
+   "party_gstin": "   "
+  },
+  {
+   "guid": "g06",
+   "date": "2025-05-07",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Office Expenses",
+     86580
+    ],
+    [
+     "Gamma Works",
+     -86580
+    ]
+   ],
+   "number": "P-6",
+   "party_gstin": " 27gamma5555g1y5 "
+  },
+  {
+   "guid": "g07",
+   "date": "2025-05-08",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Office Expenses",
+     178497
+    ],
+    [
+     "Alpha Traders",
+     -178497
+    ]
+   ],
+   "number": "P-7",
+   "party_gstin": "​"
+  }
+ ],
+ "clause44": {
+  "tax_ledgers": {
+   "cgst": [
+    "Input CGST"
+   ],
+   "sgst": [
+    "Input SGST"
+   ]
+  },
+  "round_off_ledgers": [],
+  "registration_type_by_ledger": {
+   "Beta Composition Co": "Composition"
+  }
+ },
+ "tests": [
+  "clause44"
+ ],
+ "cash": [],
+ "bank": []
+}

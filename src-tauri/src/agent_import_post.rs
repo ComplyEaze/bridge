@@ -750,17 +750,10 @@ impl Server {
             let voucher_dates = line
                 .vouchers
                 .iter()
-                .map(|voucher| bridge_tally_core::TallyDate::parse(voucher.date.clone()))
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|_| "voucher_date_invalid".to_string())?;
+                .map(|voucher| voucher.date.clone())
+                .collect::<Vec<_>>();
             let native = native_post_request(&line, remote_ids)?;
             let xml = native.xml.clone();
-            // The stored window is parsed here, where it enters a request,
-            // as the window read parses its own (#861).
-            let verification_date = |date: &str| {
-                bridge_tally_core::TallyDate::parse(date)
-                    .map_err(|_| "invalid_date_range".to_string())
-            };
             let verification_request = crate::tally::agent_read_request::AgentReadRequest::parse(
                 render_import_verification_read(
                     &line
@@ -768,8 +761,8 @@ impl Server {
                         .as_ref()
                         .ok_or_else(|| "import_post_company_missing".to_string())?
                         .name,
-                    &verification_date(&line.date_from)?,
-                    &verification_date(&line.date_to)?,
+                    &line.date_from,
+                    &line.date_to,
                 ),
             )
             .map_err(|error| error.to_string())?;
@@ -1375,8 +1368,9 @@ impl Server {
                     &mut accumulated,
                 )
                 .await;
-            // The verdict replaces the pending record before the readback, so no
-            // later reconcile, which compares by name, can clear a doubt (#239).
+            // The verdict is recorded, beside the pending mark, before the readback,
+            // so no later reconcile, which compares by name, can clear a doubt
+            // (#239, #911).
             let masters_after_post = self.record_masters_verdict_for(
                 batch_id,
                 masters_after_post,
@@ -1950,8 +1944,13 @@ fn recheck_import_admission(
     }
     let observed = parse_import_vouchers(first, company_guid).map_err(anyhow::Error::msg)?;
     let corroboration = parse_import_vouchers(second, company_guid).map_err(anyhow::Error::msg)?;
-    corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)
-        .map_err(anyhow::Error::msg)?;
+    corroborate_verification_window(
+        &observed,
+        &corroboration,
+        line.date_from.as_str(),
+        line.date_to.as_str(),
+    )
+    .map_err(anyhow::Error::msg)?;
     let result = verify_batch(line, &observed, Attribution::Tag).map_err(anyhow::Error::msg)?;
     require_absent_verification_result(&result, line.vouchers.len()).map_err(|code| match code
         .as_str()
@@ -2410,7 +2409,7 @@ pub(super) fn admit_saved_voucher_integrity(
         vouchers: line.vouchers.clone(),
         amends_batch_id: None,
     };
-    validate_payload(&payload)?;
+    validate_payload(payload)?;
     totals(&line.vouchers)?;
     let xml = render_import_xml(&company.name, &line.vouchers, line.identity_batch_id());
     if sha256_hex(xml.as_bytes()) != line.sha256 {
@@ -2579,8 +2578,8 @@ fn review_text(
     // after every line ComplyEaze Bridge writes itself, the footer included.
     // The date line says where they are.
     let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}  {VOUCHER_TEXT_CUE}\n\n{}\n{legend}\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
-        voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from,
-        voucher.date, voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
+        voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from.as_str(),
+        voucher.date.as_str(), voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
         entries, debit.as_str(), credit.as_str(), line.batch_id);
     let preview = std::iter::once(preview)
         .chain(footer.iter().cloned())
@@ -2805,7 +2804,7 @@ fn voucher_review_lines(
         lines.push(format!(
             "{} {}  {}  {ledger}  {narration}",
             voucher.voucher_type.as_str(),
-            voucher.date,
+            voucher.date.as_str(),
             value.as_str(),
         ));
     }
@@ -2873,11 +2872,9 @@ fn batch_review_text(
             }
         }
     }
-    let dates = line.vouchers.iter().map(|voucher| voucher.date.as_str());
-    let (first, last) = (
-        dates.clone().min().unwrap_or_default(),
-        dates.max().unwrap_or_default(),
-    );
+    let (first, last) = date_window(line.vouchers.iter().map(|voucher| &voucher.date))
+        .ok_or("voucher_count_invalid")?;
+    let (first, last) = (first.as_str(), last.as_str());
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let marks = OnAccountMarks::of(line);
     let head = vec![
@@ -2889,7 +2886,8 @@ fn batch_review_text(
         format!("Company GUID: {}", company.guid),
         format!(
             "Company number: {}  Books from: {}",
-            company.company_number, company.books_from
+            company.company_number,
+            company.books_from.as_str()
         ),
         format!("Tally: {origin}"),
         format!(

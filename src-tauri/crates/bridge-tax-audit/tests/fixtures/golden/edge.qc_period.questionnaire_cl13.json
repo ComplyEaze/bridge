@@ -1,0 +1,194 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "questionnaire_cl13",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "edda6aa426132591",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). Every question below is a placeholder for the CA's own answer; the books-derived figures cited are hints, never answers.",
+  "figures": [
+    {
+      "id": "questionnaire_cl13.answer_change_in_method",
+      "value": "not answered",
+      "unit": "text",
+      "definition_sha256_16": "0960f45de977ded8",
+      "definition_text": "CA's recorded answer to the Clause 13 question 'change_in_method'. The books cannot supply this; it stays unanswered until the CA's own review records it.",
+      "evidence": []
+    },
+    {
+      "id": "questionnaire_cl13.answer_closing_stock_valuation",
+      "value": "not answered",
+      "unit": "text",
+      "definition_sha256_16": "2ab554b87d142c17",
+      "definition_text": "CA's recorded answer to the Clause 13 question 'closing_stock_valuation'. The books cannot supply this; it stays unanswered until the CA's own review records it.",
+      "evidence": []
+    },
+    {
+      "id": "questionnaire_cl13.answer_icds_deviation",
+      "value": "not answered",
+      "unit": "text",
+      "definition_sha256_16": "b5bcad67039dda45",
+      "definition_text": "CA's recorded answer to the Clause 13 question 'icds_deviation'. The books cannot supply this; it stays unanswered until the CA's own review records it.",
+      "evidence": []
+    },
+    {
+      "id": "questionnaire_cl13.answer_method_of_accounting",
+      "value": "not answered",
+      "unit": "text",
+      "definition_sha256_16": "ed7e50f9699cdb9f",
+      "definition_text": "CA's recorded answer to the Clause 13 question 'method_of_accounting'. The books cannot supply this; it stays unanswered until the CA's own review records it.",
+      "evidence": []
+    },
+    {
+      "id": "questionnaire_cl13.hint_accrual_journal_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "45b290134789ab2b",
+      "definition_text": "Population Journal vouchers dated the last day of the books period, with at least one line under a Direct Expenses or Indirect Expenses ledger -- a hint that accrual entries were passed at year end, never proof of the method of accounting.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "qc-period-p01",
+          "label": "Journal JV-1 on 2025-12-31"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "questionnaire_cl13/change_in_method",
+      "clauses": [
+        "3CD-13(c)",
+        "3CD-13(d)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "answer",
+          "figure_id": "questionnaire_cl13.answer_change_in_method"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "3a2a5615e79649e1",
+      "title_text": "State whether there has been any change in the method of accounting employed compared with the immediately preceding previous year and, if so, state the effect of the change on profit.",
+      "limits_sha256_16": "448502378b294c16",
+      "limits_text": [
+        "The books alone cannot answer this question; any figure cited above is a hint drawn from the books, never an answer, and is not a substitute for the client's own confirmation."
+      ],
+      "ask_client_sha256_16": "0dc1379ef7c3612e",
+      "ask_client_text": [
+        "The immediately preceding year's financial statements or tax audit report, for comparison.",
+        "The client's own note on any change in accounting method, with its computed effect on profit."
+      ]
+    },
+    {
+      "id": "questionnaire_cl13/closing_stock_valuation",
+      "clauses": [
+        "3CD-13(f)",
+        "3CD-14(a)",
+        "3CD-14(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "answer",
+          "figure_id": "questionnaire_cl13.answer_closing_stock_valuation"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "d69f3e1ff1256541",
+      "title_text": "State the method of valuation of closing stock used (see the linked Clause 14 figures) and whether that method has changed from the method employed in the immediately preceding previous year.",
+      "limits_sha256_16": "448502378b294c16",
+      "limits_text": [
+        "The books alone cannot answer this question; any figure cited above is a hint drawn from the books, never an answer, and is not a substitute for the client's own confirmation."
+      ],
+      "ask_client_sha256_16": "84b23be729748461",
+      "ask_client_text": [
+        "A signed statement from the client of the stock valuation method (cost, net realisable value, or the lower of cost and net realisable value, and the cost formula used).",
+        "Where the method changed, the client's own note on its effect on profit."
+      ]
+    },
+    {
+      "id": "questionnaire_cl13/icds_deviation",
+      "clauses": [
+        "3CD-13(e)",
+        "3CD-13(f)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "answer",
+          "figure_id": "questionnaire_cl13.answer_icds_deviation"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "2efdc9f6cf64da6d",
+      "title_text": "State whether the profit computation complies with each notified Income Computation and Disclosure Standard, and list any deviation together with its effect on profit.",
+      "limits_sha256_16": "448502378b294c16",
+      "limits_text": [
+        "The books alone cannot answer this question; any figure cited above is a hint drawn from the books, never an answer, and is not a substitute for the client's own confirmation."
+      ],
+      "ask_client_sha256_16": "3ac5e9f5f0a0b034",
+      "ask_client_text": [
+        "The client's own ICDS-wise disclosure statement.",
+        "A computation reconciling accounting profit to the ICDS-adjusted profit for each deviation stated."
+      ]
+    },
+    {
+      "id": "questionnaire_cl13/method_of_accounting",
+      "clauses": [
+        "3CD-13(a)",
+        "3CD-13(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "answer",
+          "figure_id": "questionnaire_cl13.answer_method_of_accounting"
+        },
+        {
+          "name": "hint_accrual_journal_count",
+          "figure_id": "questionnaire_cl13.hint_accrual_journal_count"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "qc-period-p01",
+          "label": "Journal JV-1 on 2025-12-31"
+        }
+      ],
+      "title_sha256_16": "85762e78c0faf6a7",
+      "title_text": "State the method of accounting employed during the previous year (mercantile, cash or hybrid) and confirm it matches the basis of accounting disclosed in the financial statements.",
+      "limits_sha256_16": "448502378b294c16",
+      "limits_text": [
+        "The books alone cannot answer this question; any figure cited above is a hint drawn from the books, never an answer, and is not a substitute for the client's own confirmation."
+      ],
+      "ask_client_sha256_16": "8f0c36db0baf6a02",
+      "ask_client_text": [
+        "Signed confirmation from the client of the method of accounting employed.",
+        "The financial statements' own accounting-policy note on the basis of accounting."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "questionnaire_cl13.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

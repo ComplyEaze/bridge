@@ -586,6 +586,29 @@ def test_account_identity_comes_from_the_statement(m):
 # numeric parsing                                                              #
 # --------------------------------------------------------------------------- #
 
+def test_an_sbi_name_field_that_prints_empty_is_unnamed_not_an_empty_party(m):
+    """The UPI, NEFT, RTGS and transfer shapes returned an empty party when the
+    name field was empty, blank or only hyphens (IMPS already returned UNNAMED).
+    An empty party matches no mapping row, so the suspense line named no one."""
+    sbi = m.SBI()
+    for narr, ref in (
+        ("TO TRANSFER-UPI/DR/5//ZZBK", ""),
+        ("TO TRANSFER-UPI/DR/5/ /ZZBK", ""),
+        ("TO TRANSFER-UPI/DR/5/-/ZZBK", ""),
+        ("TO TRANSFER-UPI/DR/5/", ""),
+        ("TO TRANSFER-NEFT*ZZBK0001*ZZ1**", ""),
+        ("NEFT*ZZBK0001*ZZ1*-", ""),
+        ("RTGS UTR NO: ZZBKR1234- ", ""),
+        ("TO TRANSFER-PAYMENT", "TRANSFER TO 123  / 456"),
+        ("TO TRANSFER-PAYMENT", "CT0 TRANSFER FROM 123   /"),
+    ):
+        row = {"narr": narr, "narr_spaced": narr, "ref": ref, "ref_spaced": ref}
+        assert sbi.party(row) == "UNNAMED", (narr, ref)
+    named = {"narr": "TO TRANSFER-UPI/DR/5/ACME EXPORTS/ZZBK", "ref": ""}
+    named["narr_spaced"], named["ref_spaced"] = named["narr"], ""
+    assert sbi.party(named) == "ACME EXPORTS"
+
+
 def test_hyphenated_counterparties_survive_every_narration_shape(m):
     """Every HDFC narration field is hyphen-delimited, so a counterparty called
     ACME-INDUSTRIES occupies two fields. Cutting at the first hyphen either
@@ -943,6 +966,93 @@ def test_a_row_landing_in_suspense_is_flagged_loosely_and_named_exactly(m):
     assert manifest[0]["suspense"] == "YES"
     assert "reallocate from A-B" in manifest[0]["narration"], manifest[0]["narration"]
     assert manifest[0]["dr_ledger"] == "A-B"
+
+
+def test_a_mapped_row_names_the_statement_party_after_the_date(m):
+    """The narration shape the app writes: ` | Statement party: <name>` on a
+    voucher posted to a mapped ledger, nothing on a suspense line, which already
+    names its party where the ledger would be."""
+    bank = m.HDFC()
+    rows = [{"date": "01/08/26", "narr": "UPI-ALPHA-9@x-ABCD0001-111111111111-P",
+             "ref": "1", "dr": "10.00", "cr": "", "bal": "990.00"},
+            {"date": "02/08/26", "narr": "UPI-GHOST-9@x-ABCD0001-222222222222-P",
+             "ref": "2", "dr": "20.00", "cr": "", "bal": "970.00"},
+            {"date": "03/08/26", "narr": "UPI-OWN ACCT-9@x-ABCD0001-333333333333-P",
+             "ref": "3", "dr": "", "cr": "30.00", "bal": "1000.00"}]
+    mapping = {m._key("ALPHA"): ("Alpha Ledger", "auto"),
+               m._key("OWN ACCT"): ("Other Bank", "contra")}
+    _, manifest = m.build(rows, bank, "Co", "Bank", "SUSPENSE ACC", mapping, "ACC")
+    assert manifest[0]["narration"] == (
+        "UPI 111111111111 to Alpha Ledger | ACC | 01-Aug-2026 | Statement party: ALPHA")
+    assert manifest[1]["narration"] == (
+        "UPI 222222222222 to GHOST | ACC | 02-Aug-2026 "
+        "| UNIDENTIFIED - reallocate from SUSPENSE ACC")
+    # a Contra to a mapped ledger names its party as the app does
+    assert manifest[2]["narration"] == (
+        "UPI 333333333333 from Other Bank | ACC | 03-Aug-2026 | Statement party: OWN ACCT")
+
+
+def test_a_label_the_parser_gives_is_not_written_as_the_statement_party(m):
+    not_counterparties = sorted(m.PARSER_SENTINELS | m.PARSER_CATEGORIES) + [
+        "", m.CASH_WITHDRAWAL, "Atm Cash  Withdrawal"]
+    for not_a_counterparty in not_counterparties:
+        assert m._statement_payee(not_a_counterparty, 2) is None, not_a_counterparty
+    assert m.PARSER_CATEGORIES == {"EMI", "DEBIT CARD FEE", "BANK CHARGES"}
+    assert m.CASH_WITHDRAWAL == "ATM CASH WITHDRAWAL"
+    # the label the SBI reader gives an ATM withdrawal is the one excluded
+    atm = m.SBI().party({"narr_spaced": "ATM WDL 0001 SOMEWHERE", "ref_spaced": ""})
+    assert m._statement_payee(atm, 2) is None
+    # the category labels are compared exactly, as the app does
+    assert m._statement_payee("Bank Charges", 2) == "Bank Charges"
+    assert m._statement_party_segment("RAVI KUMAR", "n", 2) == \
+        " | Statement party: RAVI KUMAR"
+
+
+def test_a_narration_the_app_would_refuse_refuses_the_run(m):
+    refuses(m, "party_not_admissible", m._statement_payee, "A|B", 4)
+    # the C0 range at its ends (\x00 and \x1f), DEL, and the C1 range at its ends
+    # (\x80 and \x9f), and a C0 character `_squash` does not fold (\x1b)
+    for party in ("A\x00B", "A\x07B", "A\x1bB", "A\x1fB", "A\x7fB", "A\x80B", "A\x85B",
+                  "A\x9fB", "X [BRIDGE:1] Y", "X [Bridge:1] Y"):
+        refuses(m, "party_not_admissible", m._statement_party_segment, party, "n", 4)
+    # the limit is on the whole narration, measured with the segment
+    segment = " | Statement party: P"
+    base = "n" * (m.MAX_NARRATION_CHARS - len(segment))
+    assert m._statement_party_segment("P", base, 4) == segment
+    refuses(m, "party_not_admissible", m._statement_party_segment, "P", base + "n", 4)
+
+    bank = m.HDFC()
+    def row(name):
+        return [{"date": "01/08/26", "narr": f"UPI-{name}-9@x-ABCD0001-111111111111-P",
+                 "ref": "1", "dr": "10.00", "cr": "", "bal": "990.00"}]
+    mapped = {m._key("ALPHA"): ("Alpha Ledger", "auto")}
+    # a narration over the limit before any segment is the narration's refusal,
+    # not the party's, as in the app
+    refuses(m, "narration_not_admissible", m.build, row("ALPHA"), bank, "Co", "Bank",
+            "SUSP", mapped, "T" * m.MAX_NARRATION_CHARS, account="001234")
+    # a party holding | is refused before the narration is checked, as in the app
+    refuses(m, "party_not_admissible", m.build, row("A|B"), bank, "Co", "Bank",
+            "SUSP", {m._key("A|B"): ("Alpha Ledger", "auto")}, "AC\x07C",
+            account="001234")
+    # a party holding | is not refused where no segment is written: sent to
+    # suspense, or skipped
+    _, manifest = m.build(row("A|B"), bank, "Co", "Bank", "SUSP", {}, "ACC")
+    assert manifest[0]["suspense"] == "YES"
+    _, manifest = m.build(row("A|B"), bank, "Co", "Bank", "SUSP",
+                          {m._key("A|B"): ("", "skip")}, "ACC")
+    assert manifest[0]["voucher_type"] == "SKIPPED"
+    # the reserved marker in a party sent to suspense is refused too: it is written
+    # where the ledger would be
+    refuses(m, "narration_not_admissible", m.build, row("X [BRIDGE:1] Y"), bank, "Co",
+            "Bank", "SUSP", {}, "ACC")
+    # a long party that the segment takes past the limit; sent to suspense instead,
+    # it is written once, where the ledger would be, and fits
+    long_party = "P" * (m.MAX_NARRATION_CHARS - 80)
+    refuses(m, "party_not_admissible", m.build, row(long_party), bank, "Co", "Bank",
+            "SUSP", {m._key(long_party): ("A Ledger With A Longer Name", "auto")}, "ACC")
+    _, manifest = m.build(row(long_party), bank, "Co", "Bank", "SUSP", {}, "ACC")
+    assert manifest[0]["suspense"] == "YES"
+    assert len(manifest[0]["narration"]) <= m.MAX_NARRATION_CHARS
 
 
 def test_remoteid_is_derived_from_the_transaction(m):

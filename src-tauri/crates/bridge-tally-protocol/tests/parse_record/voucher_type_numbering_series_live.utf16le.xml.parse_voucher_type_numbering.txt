@@ -1,0 +1,173 @@
+# fixture: tests/fixtures/voucher_type_numbering_series_live.utf16le.xml
+# parser: parse_voucher_type_numbering
+# source: captured
+Ok([
+    VoucherTypeNumberingRow {
+        name: "Attendance",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Contra",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Credit Note",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Debit Note",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Delivery Note",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Job Work In Order",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Job Work Out Order",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Journal",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Material In",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Material Out",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Memorandum",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Payment",
+        numbering: Observed {
+            method: Manual,
+            duplicates: Prevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Payroll",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Physical Stock",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Purchase",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Purchase Order",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Receipt",
+        numbering: Observed {
+            method: Manual,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Receipt Note",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Rejections In",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Rejections Out",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Reversing Journal",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Sales",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Sales Order",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+    VoucherTypeNumberingRow {
+        name: "Stock Journal",
+        numbering: Observed {
+            method: Automatic,
+            duplicates: NotPrevented,
+        },
+    },
+])

@@ -509,3 +509,18 @@ test("the changelog template names the address the deploy writes it to as its ca
   assert.equal(html.match(/<link rel="canonical" href="([^"]*)" \/>/g)?.length, 1, "changelog.template.html: exactly one canonical link");
   assert.match(html, /<link rel="canonical" href="https:\/\/bridge\.complyeaze\.com\/changelog\.html" \/>/, "changelog.template.html: its canonical address is not changelog.html");
 });
+
+// One verb for the Terms setting (#1458): the extension's own description says to tick it, so no page
+// may say to turn it on or switch it on. Two shapes are caught: the verb before the setting ("turn on the
+// Terms setting", "switch on “I accept ...”") and the verb after it ("“I accept ...” switched on",
+// "the Terms setting turned on"). It does not catch a sentence that names the setting by a pronoun alone.
+// The HTTP gateway and posting keep "turn on". The raw HTML is read so the structured-data copy of an
+// answer is checked too.
+test("no page tells a visitor to turn on or switch on the Terms setting", () => {
+  const before = /(?:turn(?:ed)?|switch(?:ed)?) on\s+(?:the\s+)?(?:\*\*|“|&ldquo;|")?(?:I accept|Terms)/i;
+  const after = /(?:Terms(?: of Use)?(?: setting)?|accept the ComplyEaze Bridge Terms of Use)(?:(?!\.\s)[^<]){0,45}?\b(?:switched on|turned on|turn it on|switch it on)\b/i;
+  for (const name of pages) {
+    assert.doesNotMatch(read(name), before, name);
+    assert.doesNotMatch(read(name), after, name);
+  }
+});

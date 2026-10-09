@@ -279,7 +279,12 @@ request is predicted over a budget well below the cap.
    AlterID-limited parts reads only up to the first read's ceilings: a voucher posted in the window
    between the two reads takes an AlterID above them, both reads miss it, and their responses match
    byte for byte. A replay of a divided read without a witness is refused as
-   `voucher_window_replay_unwitnessed`.
+   `voucher_window_replay_unwitnessed`. The import-verification read is not replayed at all when it
+   was divided, every part was admitted against a census naming each voucher's GUID, and the marks
+   read after its last part equal the marks it opened on (#1241): each part is already a paired
+   read that matched the census voucher for voucher, and each create, alter, cancel, re-date and
+   delete moved a mark every time it was measured (§11c.5; §11c.4 lists what was not tested), so the
+   replay could only observe a later state. A window read whole, or divided with no census, is still replayed.
 9. **A caller that must send the undivided request itself decides on what was measured.** The
    pre-post check inside the import dispatch lease sends the whole verification window as one
    request. Before approval it is admitted on the `verify_import` read of the same window that runs
@@ -303,6 +308,19 @@ request is predicted over a budget well below the cap.
   inventory-heavy book with a mark of about 250,000 (31 census spans): a one-day `vouchers` call took
   34 s (7.5 s before the rectify) and a one-month `ledger_movement` 105 s (53 s before). The MCP
   host's own timeout is not measured.
+- **The import-verification read's second read is skipped for a divided, counted, bracketed read
+  (#1241).** That rests on the marks moving for every change that could alter what a window
+  returns, which §11c.5 measured for gateway writes and the screen actions listed there, once each;
+  changes made in the Edit Log SKU, in Education, by synchronisation, or by another connector on a
+  multi-user book were not tested. A change that altered a voucher's export without moving either
+  mark, made between two parts, would be caught by the census (a part holds the counted
+  AlterIDs and GUIDs) only if it also changed the voucher's AlterID or GUID. **Confidence: PARTIAL**:
+  the request counts are from scripted doubles through the tool call; no live Tally was read, and the
+  saving in seconds was not measured here (the issue (#1241) states 93.4 s to verify a 4,972-voucher
+  window against 48.8 s for its build read).
+  `ledger_movement` keeps its second read: it compares two ledger catalogues taken either side of
+  the voucher read, and skipping the replay would leave the second catalogue outside the marks
+  bracket.
 - **An abandoned call is not cancelled mid-read.** For every tool but `post_import`, the stdio server
   awaits a tool call to completion before reading its input again, so a host's cancellation or
   closed input is seen only afterwards, and the read dispatches its remaining (bounded) requests.
@@ -1542,7 +1560,7 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 - **The setting is not "no centres".** `CostCentre` on `BRIDGE SHAPE LAB` (setting No) still returned two centres (`Assembly`, `Trading`; `PARENT` the reserved root, `CATEGORY` `Business Line`, `GUID`, `MASTERID`, `ALTERID`, and the computed `BRIDGECOMPANYGUID`) and `CostCategory` two categories (`Business Line`: `ALLOCATEREVENUE` Yes, `ALLOCATENONREVENUE` No, `AFFECTSSTOCK` No; `Primary Cost Category`: Yes, Yes, No). `BRIDGE CORPUS FOREX`, with none defined, answered `STATUS` 1 and one present, empty `COLLECTION` carrying `MSTDEPTYPE` 32. The Company collection (a `$GUID` filter) answered `ISCOSTCENTRESON` No, equal to the screen, on both books (recorded). So a No setting plus an empty list does not say whether the feature is off or no centre is defined, and a No setting alone must not refuse a cost-centre read. The `COLLECTION` element carried `MSTDEPTYPE` 32 on every cost-centre answer and 16 on every cost-category answer; Bridge requires it, so an empty answer that was not resolved to the type is not read as "none".
 - **The same shapes with the setting at Yes (a third synthetic book, captured in a separate sitting; its `ISCOSTCENTRESON` read Yes, equal to the owner's screen, as reported at capture).** PARTIAL (committed bytes, one book, captured in a separate sitting, whose own status read recorded TallyPrime 7.1, licence Silver, Education mode off; that status answer is not committed): `CostCentre` returned three centres: two at the top level (`PARENT` the reserved root) and one whose `PARENT` is the name of another centre (a child), every `CATEGORY` the default `Primary Cost Category`, each row with a `LANGUAGENAME.LIST` that holds only the centre's own name (no alias beyond it was seen); `CostCategory` returned the one predefined `Primary Cost Category` (`ALLOCATEREVENUE` Yes, `ALLOCATENONREVENUE` Yes, `AFFECTSSTOCK` No). On these two books the answers carry the same field set and markers as the No book's (apart from `LANGUAGEID` 1033 inside each cost centre's `LANGUAGENAME.LIST` on the Yes book), with one book each. The fixtures are scrubbed (company GUID prefix and the lab names replaced; structure untouched). Not measured: centres nested more than one level, a centre with an alias beyond its own name, a screen-keyed allocation. The predefined `Primary Cost Category` was present in the two books whose categories were captured (one at No, one at Yes); the categories of the book with no centre defined were not captured, so "it always exists" is UNVERIFIED and is only the reason an empty category list is refused.
 - **An imported allocation is stored although the setting is No (recorded).** The one-day `vouchers` read of the Journal `SHAPELAB-C9-costcentre` (2025-06-05, written by an import) returned, in Tally's raw voucher export and under one `ALLLEDGERENTRIES.LIST`, `CATEGORYALLOCATIONS.LIST` with `CATEGORY` `Business Line`, `ISDEEMEDPOSITIVE` Yes and two `COSTCENTREALLOCATIONS.LIST` (`NAME` `Trading`, `AMOUNT` -600.00; `NAME` `Assembly`, `AMOUNT` -400.00; empty `ACTUALQTY` and `BILLEDQTY`; `PAYHEADSORTORDER` and `EMPLOYEESORTORDER` 0), adding up to -1000.00, the amount of the ledger entry they sit under. Bridge's own `vouchers` output does not carry these allocations. How a screen-keyed allocation looks was not captured.
-- **The Company collection answers the F11 flags (recorded)** `ISACCOUNTINGON, ISINVENTORYON, ISINTEGRATED, ISBILLWISEON, ISALLBILLWISEON, ISCOSTCENTRESON, ISBATCHWISEON, ISPAYROLLON, ISTDSON, ISJOBCOSTINGON, ISTCSON, ISGSTON, ISGSTCLASSIFON, ISEDITLOGON, ISCOSTTRACKINGON, ISISOCURRENCYAPPLICABLE, ISTRACKVOUCHERSON` with `CompanyNumber`, `ALTVCHID`, `ALTMSTID`, `LASTVOUCHERDATE` and `CURRENCYNAME` written as the symbol. Only `ISCOSTCENTRESON` was compared with a screen on those books (the other two settings later, below). `ISISOCURRENCYAPPLICABLE` read No on both of the owner's books although `BRIDGE SHAPE LAB` has currency masters: it is not the multi-currency signal.
+- **The Company collection answers the F11 flags (recorded)** `ISACCOUNTINGON, ISINVENTORYON, ISINTEGRATED, ISBILLWISEON, ISALLBILLWISEON, ISCOSTCENTRESON, ISBATCHWISEON, ISPAYROLLON, ISTDSON, ISJOBCOSTINGON, ISTCSON, ISGSTON, ISGSTCLASSIFON, ISEDITLOGON, ISCOSTTRACKINGON, ISISOCURRENCYAPPLICABLE, ISTRACKVOUCHERSON` with `CompanyNumber`, `ALTVCHID`, `ALTMSTID`, `LASTVOUCHERDATE` and `CURRENCYNAME` written as the symbol. Only `ISCOSTCENTRESON` was compared with a screen on those books (the other two settings later, below). `ISISOCURRENCYAPPLICABLE` read No on both of the maintainers' books although `BRIDGE SHAPE LAB` has currency masters: it is not the multi-currency signal.
 - **Bank allocations stayed empty (recorded):** every `BANKALLOCATIONS.LIST` container of the books read (2 on `BRIDGE AMEND LAB`, 94 on `BRIDGE SHAPE LAB` in a June window) was empty, so a reconciled entry's wire form is still unseen.
 - **Not measured:** a screen-keyed allocation, a reconciled bank entry, a larger book, any release other than this one.
 

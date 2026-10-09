@@ -521,6 +521,30 @@ fn an_unanswered_code_is_not_repeated_as_its_cause_and_keeps_the_endpoint() {
     assert_eq!(error["endpoint"], "http://127.0.0.1:9");
 }
 
+/// The unanswered next step is consulted last: a code that has its own step keeps
+/// it, and an operation code with none takes the unanswered reason's (#1458).
+#[test]
+fn a_codes_own_next_step_wins_over_the_unanswered_reasons() {
+    let (server, _directory) = server_at(9, 200_000);
+    let error_of = |code: &str| {
+        let mut failure = ToolFailure::from(code.to_string());
+        failure.unanswered = Some(Unanswered("endpoint_unreachable"));
+        let response =
+            server.finish_tool_response("vouchers", &json!({}), Utc::now(), Err(failure));
+        response.value["structuredContent"]["result"]["error"].clone()
+    };
+    let own = error_of("tally_endpoint_busy");
+    assert_eq!(
+        own["remediation"],
+        refusal_remediation("tally_endpoint_busy").unwrap()
+    );
+    let none = error_of("agent_runtime_read_failed");
+    assert_eq!(
+        none["remediation"],
+        unanswered_remediation("endpoint_unreachable").unwrap()
+    );
+}
+
 /// #697: a send the endpoint's wire gate held back is refused by its own code,
 /// with a retry hint and the step to take, and nothing reaches the port
 /// (nothing listens on it here).

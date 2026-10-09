@@ -818,13 +818,45 @@ disagree.
 ## Rollback
 
 1. Mark the affected GitHub release as withdrawn and remove unsafe downloadable
-   artifacts without moving or reusing its tag.
-2. Publish a security advisory when coordinated disclosure is required.
-3. Revert or rectify the source change through a pull request with migration
-   compatibility notes.
-4. Cut a new patch version; never replace an already published artifact under
-   the same version or checksum.
-5. Preserve release notes explaining impact, upgrade/rollback steps, and the
-   last known-good version without including customer data.
+   artifacts without moving or reusing its tag. Remove every unsafe artifact: a
+   bundle left on the release stays downloadable from GitHub. Removing one
+   platform's bundle and its `.sha256` is enough for the live list to stop
+   offering the release on the install page (step 2 covers the snapshot),
+   because the page offers a release only while both platforms have a bundle
+   and a checksum. Delete the release or make it a draft only when the entry
+   itself must leave the list. Renaming it or changing its pre-release flag does
+   not change whether the page offers it: the page tells builds apart by tag
+   and assets.
+2. Redeploy the install page and read it back. The page is static and joins
+   two lists (`site/release-catalog.mjs`): the live GitHub list, and the
+   snapshot written by the last deploy (`site/releases.json`), with the live
+   entry winning for each tag. Until the redeploy, two things follow.
+   - A tag that is only in the snapshot stays. A deleted or drafted release
+     leaves the live list, so the Download button can still offer it, and
+     Releases shows it as Latest, with links to artifacts that no longer exist,
+     when it is the newest installable tag.
+   - A visitor whose browser gets no answer from GitHub (for example after its
+     unauthenticated rate limit) sees the snapshot only, with the page's notice,
+     so even a kept release whose artifacts were removed is still offered from
+     the old snapshot.
 
-<!-- Merge-queue canary, 30 Sep 2026: this comment tests the queue and can be removed. -->
+   A new deploy writes a snapshot without the release, or without a complete
+   asset set. Dispatch "Deploy Bridge install page" with the owner's yes. A
+   deploy also publishes any `site/` change already merged and renders the
+   changelog and legal pages again, so that text goes live too; read the run's
+   "Site text changed since the last deploy" summary afterwards, as under "MCPB
+   previews and the install page" (it does not compare the generated pages).
+   Then fetch `releases.json` from the deployed site, with a query string so a
+   cache does not answer, and check that the withdrawn tag is absent or present
+   with no complete asset set; open Download and Releases once to see the
+   merged list. If the withdrawn release was the only installable one, the
+   deploy stops at its check for at least one installable release and the old
+   page stays: cut the replacement first (step 5), whose publication redeploys
+   the page, or say plainly that the page cannot be updated.
+3. Publish a security advisory when coordinated disclosure is required.
+4. Revert or rectify the source change through a pull request with migration
+   compatibility notes.
+5. Cut a new patch version; never replace an already published artifact under
+   the same version or checksum.
+6. Preserve release notes explaining impact, upgrade/rollback steps, and the
+   last known-good version without including customer data.

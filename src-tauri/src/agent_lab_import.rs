@@ -353,9 +353,10 @@ impl MasterKind {
     }
 
     /// The book fields the post-Create read-back compares
-    /// ([`readback_mismatches`]), each only when the book gives it. Nothing
-    /// else is checked; in particular not a ledger's opening bills
-    /// (bridge#1500).
+    /// ([`readback_mismatches`]). A ledger's `opening_balance` is compared as
+    /// `0.00` when the book omits it; every other field only when the book
+    /// gives it. Nothing else is checked; in particular not a ledger's opening
+    /// bills (bridge#1500).
     fn created_compared(self) -> &'static [&'static str] {
         match self {
             Self::Unit => &["decimal_places"],
@@ -367,7 +368,9 @@ impl MasterKind {
 
     /// The book fields compared before a master already in the target counts
     /// as `already_present_verified`, or after a reconcile Alter as
-    /// `altered_verified` ([`already_present_verified_mismatches`]).
+    /// `altered_verified` ([`already_present_verified_mismatches`]). A
+    /// ledger's `is_billwise_on` is compared as `No` when the book omits it,
+    /// and `tax_type` only when the renderer would send it.
     fn present_compared(self) -> &'static [&'static str] {
         match self {
             Self::Ledger => &[

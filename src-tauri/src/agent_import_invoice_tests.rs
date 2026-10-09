@@ -1984,6 +1984,21 @@ fn each_doubt_about_a_sales_ledgers_rate_has_its_own_code() {
         with(&|r| r.gst_rows[0].states[0].heads[4].rate = Some("1".into())),
         Err("invoice_cess_rate_not_supported")
     );
+    // A rate GST has no slab for: the ledger and the invoice may agree, and it is refused.
+    for (state, igst) in [
+        ("1.5", "3"),
+        ("12.5", "25"),
+        ("0.125", "0.25"),
+        ("250", "500"),
+    ] {
+        let mut row = sales_rates(state, igst);
+        row.gst_rows[0].states[0].heads[0].rate = Some(state.into());
+        assert_eq!(
+            sales_rate_milli(&row, AS_OF),
+            Err("invoice_sales_ledger_rate_not_a_slab"),
+            "{igst}"
+        );
+    }
     // State Cess is admitted only as the lab's rows read it: on value, with no rate.
     assert_eq!(
         with(&|r| r.gst_rows[0].states[0].heads[4].valuation = Some("Based on Quantity".into())),

@@ -370,6 +370,14 @@ fn ledger_count_refusal(ledgers: Option<u64>, mark: u64) -> Option<InvoiceRefusa
 /// stands under the entries.
 const MAX_INVOICE_ENTRIES: usize = 6;
 
+/// The IGST rates GST has, in thousandths of a percent: the slab list the check
+/// admitted before it read ledgers (5, 12, 18, 28 and 40 percent). A ledger at
+/// any other rate (a mistyped one, or 3 or 0.25 percent) is refused, though the
+/// invoice and the ledger agree: the lab measured 5 percent and one exact 18
+/// percent bill only, so the list bounds which rates are worked out and says
+/// nothing of how Tally treats the rest.
+const SLAB_IGST_MILLI: &[i128] = &[5_000, 12_000, 18_000, 28_000, 40_000];
+
 /// The most sales lines an invoice may carry. Tax was measured on one and two
 /// lines (the lab, 10 Oct 2026); a third waits for a measured three-line bill.
 const MAX_SALES_LINES: usize = 2;
@@ -473,6 +481,9 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
     }
     if cgst.checked_mul(2) != Some(igst) {
         return Err("invoice_sales_ledger_rate_igst_not_twice_state");
+    }
+    if !SLAB_IGST_MILLI.contains(&igst) {
+        return Err("invoice_sales_ledger_rate_not_a_slab");
     }
     Ok(cgst)
 }

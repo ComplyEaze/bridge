@@ -954,6 +954,27 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
         &format!("{}</COLLECTION>", broken.replace("<LEDGER/>", "")),
     );
     assert!(parse_ledger_rates(&answer, LAB_GUID, &["L"]).is_ok());
-    // The same row, asked for, is refused.
-    assert!(parse_ledger_rates(&answer, LAB_GUID, &["Other"]).is_err());
+    // The same row, asked for, is refused for what is wrong with it (a head
+    // with no name; an element twice is refused under its own code).
+    assert_eq!(
+        parse_ledger_rates(&answer, LAB_GUID, &["Other"]),
+        Err("invoice_ledger_rates_head_unnamed")
+    );
+    let twice = ledger_answer(
+        "L",
+        "<GSTDETAILS.LIST><APPLICABLEFROM>1</APPLICABLEFROM><APPLICABLEFROM>2</APPLICABLEFROM></GSTDETAILS.LIST>",
+    );
+    assert_eq!(
+        parse_ledger_rates(&twice, LAB_GUID, &["L"]),
+        Err("invoice_read_field_repeated")
+    );
+    let no_name = ledger_answer(
+        "L",
+        "<GSTDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM><STATEWISEDETAILS.LIST>\
+         <RATEDETAILS.LIST><GSTRATE>5</GSTRATE></RATEDETAILS.LIST></STATEWISEDETAILS.LIST></GSTDETAILS.LIST>",
+    );
+    assert_eq!(
+        parse_ledger_rates(&no_name, LAB_GUID, &["L"]),
+        Err("invoice_ledger_rates_head_unnamed")
+    );
 }

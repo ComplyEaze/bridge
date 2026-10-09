@@ -2455,6 +2455,18 @@ impl Server {
             .is_some())
     }
 
+    /// Every sent, unverified invoice batch of this company that stops it or
+    /// stands as its number control after a release (`ledger::invoice_holds`).
+    pub(super) fn import_invoice_holds_while_admitted(
+        &self,
+        company_guid: &str,
+    ) -> Result<BTreeMap<String, ledger::InvoiceHold>, String> {
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::invoice_holds(reader, company_guid),
+            None => Ok(BTreeMap::new()),
+        }
+    }
+
     /// Every batch that stops this company, in id order.
     pub(super) fn import_invoice_stops_while_admitted(
         &self,

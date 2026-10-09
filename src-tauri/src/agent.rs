@@ -1324,10 +1324,22 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "invoice_number_control_missing" => Some(
             "Before trusting that this invoice number is not in use, ComplyEaze Bridge read for an \
              earlier invoice it posted in this company and verified, and Tally did not return \
-             it, so the read cannot be trusted here and the build is refused. Run verify_import \
-             on the batch that posted that invoice. If Tally still shows the invoice, stop and \
-             tell the user the number check does not work on this book; do not post this \
-             invoice through ComplyEaze Bridge.",
+             it, so the read cannot be trusted here and the build is refused. The detail names \
+             that invoice's batch. Run verify_import on it. If it then stops the company, or \
+             it was released earlier, tell the user to check the invoice in Tally and call \
+             acknowledge_post_review with that batch_id and doubt invoice_stop: if a fresh read \
+             shows the invoice gone (deleted or re-dated in Tally, or the books restored), a \
+             native dialog asks the user, and nothing but their answer stops that invoice \
+             being the check. If the read still shows the invoice, or verify_import reads it \
+             posted and verified, Tally holds it and the number check does not work on this \
+             book: stop, tell the user, and do not post this invoice through ComplyEaze \
+             Bridge."),
+        "ack_stop_release_stands" => Some(
+            "This batch was released earlier after a read that found its invoice, and a fresh \
+             read does not show the invoice gone (or could not be made for a cause no wait \
+             cures), so nothing was asked or recorded. If the user says the invoice is not in \
+             Tally while the read still shows it, trust neither: do not post invoices for this \
+             company through ComplyEaze Bridge, and tell the user.",
         ),
         "invoice_company_stopped" => Some(
             "An earlier invoice of this company was sent to Tally and is not verified posted, so \

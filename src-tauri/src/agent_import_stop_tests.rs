@@ -100,6 +100,16 @@ async fn release(server: &Server, args: Value, scripted: ScriptedApproval) -> Va
         .await
 }
 
+/// The release records the import journal holds, as written.
+fn releases(server: &Server) -> Vec<String> {
+    let _lock = server.lock_import_admission_shared().unwrap();
+    let reader = server.import_journal_while_admitted().unwrap().unwrap();
+    std::io::BufRead::lines(reader)
+        .map(Result::unwrap)
+        .filter(|line| line.contains("\"release_invoice_found\""))
+        .collect()
+}
+
 fn result(response: &Value) -> &Value {
     &response["structuredContent"]["result"]
 }
@@ -167,7 +177,7 @@ async fn a_release_needs_the_person_and_survives_a_restart() {
     let shown = &approval.reviews()[0];
     assert!(shown.contains("RELEASES THE INVOICE STOP"), "{shown}");
     assert!(shown.contains(&line.batch_id), "{shown}");
-    assert!(shown.contains("not found in Tally"), "{shown}");
+    assert!(shown.contains("not in Tally's book"), "{shown}");
     assert!(approval.previews().is_empty(), "not a post dialog");
     assert_eq!(stop(&server), None);
     // What the read found is journaled: nothing found, so the invoice is no
@@ -203,9 +213,18 @@ fn a_release_records_absent_only_for_states_that_mean_absent() {
         json!({"vouchers": statuses.iter().map(|status| json!({"status": status})).collect::<Vec<_>>(),
             "duplicates": []})
     };
-    for absent in ["not_found", "tally_reported_not_created"] {
+    // A native post that is gone can never read `not_found`: it reads one of
+    // the two states a verification gives a posted voucher the window does not
+    // hold, and a release must be able to record that as absent.
+    for absent in [
+        "not_found",
+        "tally_reported_not_created",
+        "bound_not_in_window",
+        "book_rolled_back",
+    ] {
         assert!(!Seen::of(&result(&[absent])).found(), "{absent}");
     }
+    assert!(!Seen::of(&result(&["bound_not_in_window", "not_found"])).found());
     for present in [
         "posted_verified",
         "posted_divergent",
@@ -213,10 +232,8 @@ fn a_release_records_absent_only_for_states_that_mean_absent() {
         "matching_content_observed",
         "not_attributable",
         "duplicate_fingerprint",
-        "bound_not_in_window",
         "cancelled_with_effective_copy",
         "sent_not_attributed",
-        "book_rolled_back",
         "a_state_not_yet_invented",
     ] {
         assert!(Seen::of(&result(&[present])).found(), "{present}");
@@ -273,7 +290,12 @@ fn the_release_dialog_does_not_show_text_that_could_mislead() {
     let directory = tempfile::tempdir().unwrap();
     let server = server_without_tally(directory.path());
     let line = saved(&server, "Sales");
-    let preview = release_preview(&line, "Acme\u{202e}Ltd\nPaid", &Seen::NotFound);
+    let preview = release_preview(
+        &line,
+        "Acme\u{202e}Ltd\nPaid",
+        &Seen::NotFound,
+        ledger::InvoiceHold::Stopping,
+    );
     assert!(preview.contains("Acme?Ltd?Paid"), "{preview}");
     assert!(!preview.contains('\u{202e}'));
     assert!(preview.contains(&line.batch_id));
@@ -460,6 +482,7 @@ async fn a_release_is_not_refused_for_a_failure_waiting_cannot_cure() {
             .import_invoice_number_control(GUID, ("20260401", "20270331"))
             .unwrap(),
         ledger::NumberControl::Known {
+            batch_id: line.batch_id.clone(),
             number: "BP/26-27/0010".to_string(),
             date: "20260907".to_string()
         }
@@ -536,8 +559,140 @@ async fn a_release_after_a_native_post_that_reads_not_attributed_records_found()
             .import_invoice_number_control(GUID, ("20260401", "20270331"))
             .unwrap(),
         ledger::NumberControl::Known {
+            batch_id: line.batch_id.clone(),
             number: "BP/26-27/0010".to_string(),
             date: "20260907".to_string()
         }
+    );
+}
+
+/// A batch released as found is still the number control, and the control read
+/// cannot find an invoice that is gone. Released again, it is dropped from the
+/// control only when a fresh read shows the invoice gone, the dialog says what
+/// that changes, and the record is the existing release record.
+#[tokio::test]
+async fn a_batch_released_as_found_is_dropped_once_a_read_shows_it_gone() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_simulator, server) = server_reading(directory.path(), 2);
+    let line = saved(&server, "Sales");
+    dispatched(&server, &line);
+    {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::stop_release(&line, true))
+            .unwrap();
+    }
+    // Released as found: it stops nothing and is the control.
+    assert_eq!(stop(&server), None);
+    let control = |server: &Server| {
+        server
+            .import_invoice_number_control(GUID, ("20260401", "20270331"))
+            .unwrap()
+    };
+    assert_eq!(
+        control(&server),
+        ledger::NumberControl::Known {
+            batch_id: line.batch_id.clone(),
+            number: "BP/26-27/0010".to_string(),
+            date: "20260907".to_string()
+        }
+    );
+    let approval = ScriptedApproval::approving();
+    let response = release(&server, args(&line), approval.clone()).await;
+    assert_eq!(result(&response)["state"], "control_dropped", "{response}");
+    assert_eq!(result(&response)["invoice_found_at_release"], false);
+    let shown = &approval.reviews()[0];
+    assert!(shown.contains("STOPS USING AN INVOICE"), "{shown}");
+    assert!(shown.contains("first invoice"), "{shown}");
+    assert_eq!(control(&server), ledger::NumberControl::NeverSent);
+    // Once dropped it is neither a stop nor a control, and is not released
+    // a third time.
+    let approval = ScriptedApproval::approving();
+    let response = release(&server, args(&line), approval.clone()).await;
+    assert_eq!(result(&response)["error"]["code"], "ack_stop_not_held");
+    assert!(approval.reviews().is_empty());
+}
+
+/// A release made as found stands when a fresh read still does not show the
+/// invoice gone: nothing is asked, nothing is written.
+#[tokio::test]
+async fn a_release_as_found_stands_while_the_read_does_not_show_the_invoice_gone() {
+    let directory = tempfile::tempdir().unwrap();
+    let plans = posted_readback()
+        .into_iter()
+        .chain(probe())
+        // The profile is probed once per server: the second read has no opening probe.
+        .chain(posted_readback().into_iter().skip(probe().len()))
+        .chain(probe())
+        .collect();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let line = saved(&server, "Sales");
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
+                &line,
+                &native,
+                Some(8),
+            ))
+            .unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::response(
+                &line,
+                ledger::DispatchResponse {
+                    request_sha256: native.request_sha256.clone(),
+                    ..super::super::tests::dispatch_response("success", 1, 0)
+                },
+            ))
+            .unwrap();
+    }
+    let approval = ScriptedApproval::approving();
+    let first = release(&server, args(&line), approval.clone()).await;
+    assert_eq!(result(&first)["state"], "stop_released", "{first}");
+    assert_eq!(result(&first)["invoice_found_at_release"], true);
+    let releases_before = releases(&server);
+    assert_eq!(
+        releases_before.len(),
+        1,
+        "the first release is on the journal"
+    );
+    let second_approval = ScriptedApproval::approving();
+    let second = release(&server, args(&line), second_approval.clone()).await;
+    assert_eq!(
+        result(&second)["error"]["code"],
+        "ack_stop_release_stands",
+        "{second}"
+    );
+    assert!(second_approval.reviews().is_empty(), "no dialog: {second}");
+    // A read that does not show the invoice gone, or that fails for a cause no
+    // wait cures, leaves the release as it stands and records no release (the
+    // read itself still saves its verification, as any read of a batch does).
+    assert_eq!(releases(&server), releases_before, "no release: {second}");
+    assert!(matches!(
+        server
+            .import_invoice_number_control(GUID, ("20260401", "20270331"))
+            .unwrap(),
+        ledger::NumberControl::Known { .. }
+    ));
+}
+
+/// The refusal for a control the number read did not find names the control's
+/// batch, which is what a person releases. No Sales build runs end to end
+/// before Sales is qualified, so this pins the value where it is built.
+#[test]
+fn the_missing_control_refusal_names_the_control_batch() {
+    // Whitespace folded, so a reformat of the call does not break the pin.
+    let source = include_str!("agent_import_invoice.rs")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let known = source
+        .find("super::ledger::NumberControl::Known { batch_id,")
+        .expect("the control the admission reads against, with its batch taken");
+    assert!(
+        source[known..].contains("\"invoice_number_control_missing\", &batch_id"),
+        "the refusal's value is the control's batch"
     );
 }

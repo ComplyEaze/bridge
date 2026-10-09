@@ -1411,6 +1411,7 @@ impl super::super::Server {
             .map_err(|_| failed("invoice_number_control_unreadable"))?;
         let _absence = match control {
             super::ledger::NumberControl::Known {
+                batch_id,
                 number: known,
                 date,
             } => {
@@ -1424,7 +1425,7 @@ impl super::super::Server {
                 if !wire::control_row_found(&xml, &known, &date).map_err(failed)? {
                     return Err(refused(refuse_value(
                         "invoice_number_control_missing",
-                        &known,
+                        &batch_id,
                     )));
                 }
                 NumberAbsence::Controlled

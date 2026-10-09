@@ -4575,6 +4575,13 @@ async fn a_native_posts_alter_id_delta_is_measured_from_the_mark_before_its_post
     assert_eq!(result["pre_import_mark"]["value"], 8, "{posted}");
 }
 
+/// The rows of a `verify_import` page as the release's own readback sees them,
+/// before the page splits the verified rows off. It carries the unverified rows
+/// only, which is all of them for the one-voucher batches it is used on.
+fn unpaged(page: &Value) -> Value {
+    json!({"vouchers": page["unverified_vouchers"], "duplicates": page["duplicates"]})
+}
+
 /// A bound voucher a later window does not hold is `bound_not_in_window`,
 /// never `not_found`, and the batch is not verified.
 #[tokio::test]
@@ -4588,6 +4595,12 @@ async fn a_bound_voucher_missing_from_a_later_window_is_never_read_as_absent() {
     let result = &verified[0]["structuredContent"]["result"];
     assert_eq!(result["counts"]["bound_not_in_window"], 1, "{result}");
     assert_eq!(result["counts"]["not_found"], 0, "{result}");
+    // A release of an invoice batch reads this very result: a deleted or
+    // re-dated native post is the way a vanished control is dropped.
+    assert!(
+        !super::super::stop::Seen::of(&unpaged(result)).found(),
+        "a release reads it as absent: {result}"
+    );
     assert_eq!(
         result["unverified_vouchers"][0]["status"], "bound_not_in_window",
         "{result}"
@@ -4636,6 +4649,10 @@ async fn a_book_rolled_back_below_the_post_reads_as_rolled_back_never_absent() {
         "{result}"
     );
     assert_eq!(result["counts"]["not_found"], 0, "{result}");
+    assert!(
+        !super::super::stop::Seen::of(&unpaged(result)).found(),
+        "a release reads it as absent: {result}"
+    );
     assert_eq!(result["counts"]["book_rolled_back"], 1, "{result}");
     assert_eq!(
         result["unverified_vouchers"][0]["status"], "book_rolled_back",

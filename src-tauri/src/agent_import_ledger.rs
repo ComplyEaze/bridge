@@ -685,9 +685,14 @@ pub(super) fn unsettled_invoice_twin(
 /// alongside it, or why there is none.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum NumberControl {
-    /// The newest invoice of a batch whose LATEST status is `posted_verified`,
-    /// preferring one dated inside `year`: its number and its date.
-    Known { number: String, date: String },
+    /// The newest invoice of a batch whose LATEST status is `posted_verified`
+    /// (or that a person released after a read that found it), preferring one
+    /// dated inside `year`: its batch, its number and its date.
+    Known {
+        batch_id: String,
+        number: String,
+        date: String,
+    },
     /// No batch of this company holding an invoice was ever sent to Tally.
     NeverSent,
     /// One was sent and none is verified posted now (an answer lost, a post
@@ -763,8 +768,11 @@ pub(super) fn invoice_number_control(
     let known = invoices
         .iter()
         .filter(|(id, _)| verified.contains(*id) || released.get(*id) == Some(&true))
-        .flat_map(|(_, (order, held))| held.iter().map(move |invoice| (*order, invoice)))
-        .max_by_key(|(order, (date, _))| {
+        .flat_map(|(id, (order, held))| {
+            held.iter()
+                .map(move |invoice| (id.as_str(), *order, invoice))
+        })
+        .max_by_key(|(_, order, (date, _))| {
             (
                 date.as_str() >= from && date.as_str() <= to,
                 date.clone(),
@@ -772,7 +780,8 @@ pub(super) fn invoice_number_control(
             )
         });
     Ok(match known {
-        Some((_, (date, number))) => NumberControl::Known {
+        Some((batch_id, _, (date, number))) => NumberControl::Known {
+            batch_id: batch_id.to_string(),
             number: number.clone(),
             date: date.clone(),
         },
@@ -786,26 +795,39 @@ pub(super) fn invoice_number_control(
     })
 }
 
-/// The ids of the batches of this company that stop every further Sales post
-/// (slice 4, ADR 0004), in id order: each one holding an invoice that was sent to Tally (it has a
-/// dispatch intent), whose LATEST status is not `posted_verified`, and that no
-/// person has released since it last read verified.
+/// How a sent, unverified invoice batch of one company stands (slice 4, ADR
+/// 0004).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::agent) enum InvoiceHold {
+    /// No person has released it: it stops every further Sales post.
+    Stopping,
+    /// A person released it after a read that found its invoice, so it is
+    /// still the number control; it stops nothing, and a person can release it
+    /// again once a read shows the invoice gone.
+    ReleasedAsFound,
+}
+
+/// The batches of this company that are sent invoice batches whose LATEST
+/// status is not `posted_verified`, by how they stand: each one holding an
+/// invoice that was sent to Tally (it has a dispatch intent), and either not
+/// released or released after a read that found its invoice.
 ///
 /// It reads what the journal holds and fails closed: a batch counts when ANY of
 /// its vouchers is an invoice, whether or not its number or date can be read.
 /// A batch that was only built, or whose approval a person declined, was never
-/// sent and does not stop anything; a lost answer, a post Tally declined and a
+/// sent and does not stand; a lost answer, a post Tally declined and a
 /// readback that does not match all do. A later `posted_verified` lifts the
-/// stop by itself and voids a release made before it, so a divergence found
-/// after that is a new stop.
-pub(super) fn invoice_stops(
+/// hold by itself and voids a release made before it, so a divergence found
+/// after that is a new stop. The last release of a batch is the one that
+/// stands.
+pub(super) fn invoice_holds(
     reader: impl BufRead,
     company_guid: &str,
-) -> Result<Vec<String>, String> {
+) -> Result<BTreeMap<String, InvoiceHold>, String> {
     let mut holds_invoice: BTreeSet<String> = BTreeSet::new();
     let mut sent = BTreeSet::new();
     let mut verified = BTreeSet::new();
-    let mut released = BTreeSet::new();
+    let mut released: BTreeMap<String, bool> = BTreeMap::new();
     scan_records(reader, |record, _| match record {
         Record::Batch(batch) => {
             if batch.company_guid.eq_ignore_ascii_case(company_guid)
@@ -825,12 +847,12 @@ pub(super) fn invoice_stops(
             }
         }
         Record::Status(update) => {
-            match update.record_type {
-                StatusKind::DispatchIntent => {
+            match (&update.record_type, update.release_invoice_found) {
+                (StatusKind::DispatchIntent, _) => {
                     sent.insert(update.batch_id.clone());
                 }
-                StatusKind::StopRelease => {
-                    released.insert(update.batch_id.clone());
+                (StatusKind::StopRelease, Some(found)) => {
+                    released.insert(update.batch_id.clone(), found);
                 }
                 _ => {}
             }
@@ -846,7 +868,24 @@ pub(super) fn invoice_stops(
     })?;
     Ok(holds_invoice
         .into_iter()
-        .filter(|id| sent.contains(id) && !verified.contains(id) && !released.contains(id))
+        .filter(|id| sent.contains(id) && !verified.contains(id))
+        .filter_map(|id| match released.get(&id) {
+            None => Some((id, InvoiceHold::Stopping)),
+            Some(true) => Some((id, InvoiceHold::ReleasedAsFound)),
+            Some(false) => None,
+        })
+        .collect())
+}
+
+/// The ids of the batches of this company that stop every further Sales post
+/// (`InvoiceHold::Stopping`), in id order.
+pub(super) fn invoice_stops(
+    reader: impl BufRead,
+    company_guid: &str,
+) -> Result<Vec<String>, String> {
+    Ok(invoice_holds(reader, company_guid)?
+        .into_iter()
+        .filter_map(|(id, hold)| (hold == InvoiceHold::Stopping).then_some(id))
         .collect())
 }
 

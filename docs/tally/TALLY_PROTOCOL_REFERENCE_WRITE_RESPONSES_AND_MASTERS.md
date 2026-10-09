@@ -196,9 +196,35 @@ baseline (§0), not on a licensed instance, and not by client key on these vouch
 read "usable as a key" into it.
 
 **Scope: one Silver 7.1 Journal readback. PARTIAL.** Whether another voucher type, request shape or
-Tally version preserves the client value is **UNVERIFIED**. Do not generalise this into a rule that
+Tally version preserves the client value is **UNVERIFIED** beyond what the 2026-10-09 paragraph below
+records: on Windows Silver 7.1 a person-imported Receipt and Payment also read back the voucher's own
+GUID. Do not generalise this into a rule that
 the attribute is never useful — on a release that did preserve it, that rule would discard real
 identity evidence. Check what your own readback returns before relying on it either way.
+
+**Added 2026-10-09: a file Bridge built and a person imported, on Windows (issue #1413, steps 9 and 11). PARTIAL.**
+TallyPrime Release 7.1 Silver on Windows 10 (22H2, build 19045), a synthetic company, six vouchers (two
+Receipts and four Payments) from a file Bridge built, imported by a person through Tally's Import screen,
+not over the gateway. The vouchers were read back over the gateway by narration.
+
+- **VERIFIED, six of six: the `REMOTEID` attribute in the export is the voucher's own GUID
+  (`<TALLY-COMPANY-GUID>-<MASTER-ID>`), not the id in the file.** The response has no separate `REMOTEID`
+  element. The file's id survives only in the `[BRIDGE:<FILE-VOUCHER-ID>]` narration tag (on the two
+  vouchers whose narration Tally's screen showed, the tag equals that voucher's `REMOTEID` in the file;
+  on all six, the narration, tag included, was compared with the file and matched). This is the field
+  relationship of the capture above, now also seen for Receipt and Payment vouchers imported through
+  Tally's Import screen.
+- **VERIFIED by readback: an unchanged re-import of the same file (its SHA-256 checked just before) still
+  upserted.** Six AlterIDs advanced (2 to 7 became 8 to 13), the voucher mark moved by six, no GUID,
+  MasterID or voucher number was new, the company still held six vouchers, and date, type, every entry
+  and the narration matched the file again.
+- **PARTIAL: no counters.** On the re-import, Tally's screen showed only "Import successful", with no
+  created, altered, ignored or error counts (the first import's screen was not captured), so this is a count-and-readback result without the captured response that the
+  qualification paragraph below asks for before a voucher type is recorded as qualified. It does not qualify Payment or
+  Receipt on that standard.
+- **NOT established:** which field Tally matched on (the `REMOTEID` the file sent, or something that
+  coincides with it in this file: nothing was varied), and a re-import with changed content on this
+  path. Tally's own counters for either import were not measured.
 
 **Do not replace attribution with a content fingerprint.** The obvious substitute — confirm the
 voucher by date, ledger entries and amount — is not an attribution key: a company holding a
@@ -214,7 +240,8 @@ working, and why Bridge's verifier is built on the narration tag rather than on 
 **§9.8's scope limit still applies to all of the above.** The exact-file repeat was measured on the
 licensed **Journal** path; §9.8 says explicitly that it does not establish other request shapes,
 other voucher types, or universal `REMOTEID` semantics. Treat upsert-on-repeat as verified for
-Journal and **UNVERIFIED elsewhere**.
+Journal and **UNVERIFIED elsewhere** (for Payment and Receipt see the 2026-10-09 paragraph above: PARTIAL, readback
+only, no counters, not a qualification).
 
 **Qualifying another voucher type takes a captured response, not a count.** A repeat that was
 rejected, or whose transport failed before Tally processed it, also leaves the voucher count at
@@ -259,7 +286,9 @@ and master ID), and only then record the type as qualified.
 > itself a hazard: an upsert will silently turn a Payment into a Receipt. Bridge's amendment path
 > (`src-tauri/src/agent_import_amend.rs`) relies on the replacement and refuses type changes.
 >
-> **Still not measured:** a file imported through Tally's own Import menu rather than the gateway;
+> **Still not measured:** a changed payload imported through Tally's own Import menu rather than the
+> gateway, and Tally's counters for any Import-menu import (only an unchanged re-import of a Bridge-built
+> file on Windows Silver 7.1 is recorded above, PARTIAL: no counters);
 > Education or any other release (Gold is measured for a same-`REMOTEID` upsert of Payment, Receipt and
 > Contra in §9.14); bill allocations, inventory or tax entries; a voucher that
 > is cancelled or optional; and an alteration made in Tally's UI between the two imports. The

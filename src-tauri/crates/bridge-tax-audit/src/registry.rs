@@ -98,6 +98,13 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::clause21a_candidates_on(e, b, r),
     },
     PortedTest {
+        id: "clause44",
+        // Every column's and reason's count and amount, the total, and the three overlays' pairs:
+        // 27 on any book.
+        min_figures: 27,
+        run_on: |e, b, r, _| crate::clause44_on(e, b, r),
+    },
+    PortedTest {
         id: "counter_cheques_40a3",
         // `configured_terms_count`, the six totals and counts, and one total per excluded role:
         // twelve with no term configured, as the reference's own pack runs a client without one.
@@ -155,6 +162,12 @@ pub const PORTED: &[PortedTest] = &[
         // Five figures on any book, six more per configured loan: fewer than eleven is a vacuous run.
         min_figures: 11,
         run_on: |e, b, r, _| crate::loans_interest_on(e, b, r),
+    },
+    PortedTest {
+        id: "narration_payees",
+        // The fifteen fixed figures, on every book.
+        min_figures: 15,
+        run_on: |e, b, r, _| crate::narration_payees_on(e, b, r),
     },
     PortedTest {
         id: "partners_40b_194t",

@@ -1,11 +1,13 @@
 //! Bind an [`Engagement`]'s ledger and group names to the Book by Tally identity, or refuse.
 //!
 //! An engagement config names ledgers and groups by display text: `[roles].cash_groups`,
-//! `[roles].round_off_ledgers`, `[tds].nature_by_ledger`'s and `[tds].payee_aliases`' keys,
+//! `[roles].round_off_ledgers`, `[roles].narration_payee_ledgers`, `[tds].nature_by_ledger`'s and `[tds].payee_aliases`' keys,
 //! `[tds_payees].s194j_category_by_ledger`'s keys, `[loans.loan_ledgers]`'s keys, each loan's
 //! `interest_ledger` and `[loans].shared_interest_ledgers`,
 //! `[depreciation].block_by_ledger`'s keys, `[depreciation].dep_expense_ledgers`,
 //! `[partners.*].interest_ledger`, every list under `[related_parties.*].ledgers_by_nature`,
+//! `[roles].no_supplier_expense_ledgers`, `[roles.gst_registration_type_by_ledger]`'s and
+//! `[clause44].money_category_by_ledger`'s keys,
 //! `[tds_tcs_26as]`'s three ledger lists and its
 //! `deductor_aliases` values (the keys are TANs),
 //! `[statutory_dues]`'s `salary_expense_ledgers` and `nature_by_ledger` keys,
@@ -617,6 +619,12 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
 
     let round_off_ledgers =
         lbinder.bind_list(&engagement.round_off_ledgers, "roles.round_off_ledgers")?;
+    // `narration_payees`' list, read from the raw config so that a value that is not a list of
+    // names refuses here, as the reference's binding refuses it.
+    let narration_payee_ledgers = lbinder.bind_list(
+        &list_at(&engagement.raw_cfg, &["roles", "narration_payee_ledgers"])?,
+        "roles.narration_payee_ledgers",
+    )?;
 
     // `book_keeping_quality`'s name locations, in the reference's `LEDGER_PATHS` order (after
     // `round_off_ledgers`, before `[tds]`): the three lists, then every `tax_ledgers` head.
@@ -646,6 +654,16 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
             *slot = Some(lbinder.bind_list(&names_at(value, &location)?, &location)?);
         }
     }
+    // `[roles].no_supplier_expense_ledgers` (`clause44`), after `writeoff_discount_ledgers`, as
+    // in the reference's `LEDGER_PATHS`. `None` when absent: the test then refuses.
+    let no_supplier_expense_ledgers = match roles.and_then(|r| r.get("no_supplier_expense_ledgers"))
+    {
+        None => None,
+        Some(value) => {
+            let location = "roles.no_supplier_expense_ledgers";
+            Some(lbinder.bind_list(&names_at(value, location)?, location)?)
+        }
+    };
     // `[roles].bank_reconciliation_ledger`, a single name, binds before `tax_ledgers`, as in the
     // reference's `LEDGER_PATHS`.
     let bank_reconciliation_ledger = match roles.and_then(|r| r.get("bank_reconciliation_ledger")) {
@@ -676,6 +694,17 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
             ),
         });
     }
+    // `clause44`'s two maps bind their keys around `[roles].counterparty_type_by_ledger`'s, as in
+    // the reference's `LEDGER_PATHS`: the registration types after `tax_ledgers`, the money
+    // categories after the counterparty types. Each value is left as written.
+    let registration_type_by_ledger = bind_table_keys(
+        &mut lbinder,
+        table_at(
+            &engagement.raw_cfg,
+            &["roles", "gst_registration_type_by_ledger"],
+        )?,
+        "roles.gst_registration_type_by_ledger",
+    )?;
     // `[roles].counterparty_type_by_ledger`'s keys bind after `tax_ledgers`, as in the reference's
     // `LEDGER_PATHS`; each value is a counterparty type, not a ledger, and is left as written.
     let counterparty_type_by_ledger = bind_table_keys(
@@ -685,6 +714,14 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
             &["roles", "counterparty_type_by_ledger"],
         )?,
         "roles.counterparty_type_by_ledger",
+    )?;
+    let money_category_by_ledger = bind_table_keys(
+        &mut lbinder,
+        table_at(
+            &engagement.raw_cfg,
+            &["clause44", "money_category_by_ledger"],
+        )?,
+        "clause44.money_category_by_ledger",
     )?;
 
     // `[tds]` and `[tds_payees]` bind before `[loans]` and `[depreciation]`, as they come before
@@ -1069,6 +1106,7 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         cash_groups,
         bank_groups,
         round_off_ledgers,
+        narration_payee_ledgers,
         bank_reconciliation_ledger,
         counterparty_type_by_ledger,
         loan_ledgers_configured,
@@ -1084,6 +1122,11 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         tds,
         tds_tcs_26as,
         book_keeping_quality,
+        clause44: crate::Clause44Config {
+            no_supplier_expense_ledgers,
+            registration_type_by_ledger,
+            money_category_by_ledger,
+        },
         party_identity,
         party_groups,
         party_identity_not_a_table,
@@ -1501,6 +1544,135 @@ mod tests {
         let b = book("Cash-in-Hand", "", None);
         let err = e.bind(&b).unwrap_err();
         assert_eq!(err.code(), Some(BIND_ID_MALFORMED));
+    }
+
+    /// `narration_payees`' list is bound as a list of ledger names: an unknown name and a value
+    /// that is not a list refuse naming the location, and a label in `[ledger_ids]` is rewritten
+    /// with the list's order and repeats kept, and counts as used.
+    #[test]
+    fn narration_payee_ledgers_are_bound_as_a_list_of_ledger_names() {
+        let mut b = book("Cash-in-Hand", "", None);
+        let e = engagement("narration_payee_ledgers = [\"Wages\"]\n");
+        let err = e.bind(&b).unwrap_err();
+        assert_eq!(err.code(), Some(BIND_NAME_UNKNOWN));
+        assert!(format!("{err}").contains("roles.narration_payee_ledgers"));
+        let e = engagement("narration_payee_ledgers = \"Wages\"\n");
+        let err = e.bind(&b).unwrap_err();
+        assert_eq!(err.code(), Some(BIND_ID_MALFORMED));
+        assert!(format!("{err}").contains("roles.narration_payee_ledgers"));
+
+        b.ledgers.insert(
+            "Wages Paid".to_string(),
+            ledger("Wages Paid", "Direct Expenses", G_OTHER, None),
+        );
+        let e = engagement(&format!(
+            "narration_payee_ledgers = [\"Wages\", \"Sales\", \"Wages\"]\n\
+             [ledger_ids]\n\"Wages\" = {G_OTHER:?}\n"
+        ));
+        let (bound, report) = e.bind(&b).unwrap();
+        assert_eq!(
+            bound.narration_payee_ledgers,
+            ["Wages Paid", "Sales", "Wages Paid"].map(String::from)
+        );
+        assert_eq!(report.drifts.len(), 1);
+        assert!(engagement("")
+            .bind(&book("Cash-in-Hand", "", None))
+            .unwrap()
+            .0
+            .narration_payee_ledgers
+            .is_empty());
+    }
+
+    /// `narration_payees_on` runs the TDS payee test first, refusing without its two inputs as
+    /// `tds_payees_on` does, reads the bound list, and reads the 194C ledger whose payee that
+    /// test could not name too.
+    #[test]
+    fn narration_payees_on_reads_the_bound_list_and_the_added_ledgers() {
+        let rules = crate::rules::Rules::vendored().unwrap();
+        let mut b = book("Cash-in-Hand", "", None);
+        for (name, group, guid) in [
+            ("Bank A", "Bank Accounts", ""),
+            ("Wages Paid", "Direct Expenses", G_OTHER),
+            ("Cartage", "Direct Expenses", ""),
+        ] {
+            b.ledgers
+                .insert(name.to_string(), ledger(name, group, guid, None));
+        }
+        b.group_masters
+            .insert("Bank Accounts".to_string(), group_master("", None));
+        let paid = |guid: &str, ledger: &str, amount: i64, narration: &str| Voucher {
+            guid: guid.to_string(),
+            date: TallyDate::parse("20250510").unwrap(),
+            vtype: "Payment".to_string(),
+            base_type: "Payment".to_string(),
+            number: guid.to_string(),
+            status: VoucherStatus::Regular,
+            narration: narration.to_string(),
+            lines: vec![
+                LedgerLine {
+                    ledger: ledger.to_string(),
+                    amount_paise: amount,
+                },
+                LedgerLine {
+                    ledger: "Bank A".to_string(),
+                    amount_paise: -amount,
+                },
+            ],
+            ..Default::default()
+        };
+        b.vouchers
+            .push(paid("w1", "Wages Paid", 4_000, "UPI-ALPHA-WAGES"));
+        b.vouchers
+            .push(paid("c1", "Cartage", 3_500_000, "UPI-BETA-CARTAGE"));
+        let toml = |client: &str, tds: &str| {
+            format!(
+                "[client]\nlabel = \"Test\"\nassessment_year = \"2026-27\"\n{client}\
+                 [period]\nstart = \"2025-04-01\"\nend = \"2026-03-31\"\n\
+                 [snapshot]\nformat = \"tally-read-v1\"\npath = \"unused\"\n\
+                 [roles]\ncash_groups = [\"Cash-in-Hand\"]\nbank_groups = [\"Bank Accounts\"]\n\
+                 narration_payee_ledgers = [\"Wages\"]\n\
+                 [ledger_ids]\n\"Wages\" = {G_OTHER:?}\n{tds}"
+            )
+        };
+        let on = |text: String| {
+            let e = Engagement::from_toml(&text, Path::new(".")).unwrap();
+            crate::narration_payees_on(&e, &b, &rules)
+        };
+        let firm = "entity_type = \"firm\"\n";
+        let tds = "[tds]\nnature_by_ledger = { \"Cartage\" = \"194C\" }\npayee_aliases = {}\n";
+        let dump = on(toml(firm, tds)).unwrap();
+        let value = |name: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == format!("narration_payees.{name}"))
+                .map(|f| f["value"].clone())
+        };
+        assert_eq!(
+            (
+                value("configured_ledgers_count"),
+                value("added_ledgers_count"),
+                value("payees_count"),
+                value("resolved_total"),
+            ),
+            (
+                Some(1.into()),
+                Some(1.into()),
+                Some(2.into()),
+                Some(3_504_000.into())
+            )
+        );
+        for (text, want) in [
+            (toml("", tds), "narration_payees needs [client].entity_type"),
+            (toml(firm, ""), "narration_payees needs a [tds] table"),
+        ] {
+            let err = on(text).unwrap_err();
+            assert!(
+                matches!(&err, AuditError::Config(m) if m == want),
+                "{err:?}"
+            );
+        }
     }
 
     // ---- BIND-ID-UNUSED ----
@@ -2290,6 +2462,106 @@ deductor_aliases = 5\n"
         assert_eq!(
             bound.related_parties.persons["Person A"]["ledgers_by_nature"]["commission"],
             toml::Value::Array(vec!["Person A Salary".into()])
+        );
+    }
+
+    #[test]
+    fn clause44_ledgers_are_bound_and_follow_a_rename_by_identity() {
+        // Each location refuses an unknown name, naming itself; a label renamed since the config
+        // was written binds to the ledger's current name, each map value kept as written; a list
+        // location that is not a list of names refuses.
+        let b = book_with_interest_ledger("Rent Paid", G_ROUNDOFF, None);
+        for (extra, location) in [
+            (
+                "no_supplier_expense_ledgers = [\"Rent\"]\n",
+                "roles.no_supplier_expense_ledgers",
+            ),
+            (
+                "gst_registration_type_by_ledger = { \"Rent\" = \"Composition\" }\n",
+                "roles.gst_registration_type_by_ledger",
+            ),
+            (
+                "\n[clause44]\nmoney_category_by_ledger = { \"Rent\" = \"bank_charges\" }\n",
+                "clause44.money_category_by_ledger",
+            ),
+        ] {
+            let err = engagement(extra).bind(&b).unwrap_err();
+            assert_eq!(err.code(), Some(BIND_NAME_UNKNOWN), "{extra}");
+            assert!(format!("{err}").contains(location), "{err}");
+        }
+        let renamed = engagement(&format!(
+            "no_supplier_expense_ledgers = [\"Old Rent\"]\n\
+             gst_registration_type_by_ledger = {{ \"Old Rent\" = \"Composition\" }}\n\
+             \n[ledger_ids]\n\"Old Rent\" = {G_ROUNDOFF:?}\n\
+             \n[clause44]\nmoney_category_by_ledger = {{ \"Old Rent\" = \"bank_charges\" }}\n"
+        ));
+        let (bound, _) = renamed.bind(&b).unwrap();
+        assert_eq!(
+            bound.clause44.no_supplier_expense_ledgers,
+            Some(vec!["Rent Paid".to_string()])
+        );
+        assert_eq!(
+            bound.clause44.registration_type_by_ledger,
+            BTreeMap::from([("Rent Paid".to_string(), toml::Value::from("Composition"))])
+        );
+        assert_eq!(
+            bound.clause44.money_category_by_ledger,
+            BTreeMap::from([("Rent Paid".to_string(), toml::Value::from("bank_charges"))])
+        );
+        let malformed = engagement("no_supplier_expense_ledgers = \"Rent Paid\"\n");
+        assert_eq!(
+            malformed.bind(&b).unwrap_err().code(),
+            Some(BIND_ID_MALFORMED)
+        );
+    }
+
+    /// With an unknown name at every `[roles]` location from `writeoff_discount_ledgers` on, each
+    /// refusal names the location the reference's `LEDGER_PATHS` reaches first.
+    #[test]
+    fn clause44_locations_refuse_in_the_references_order() {
+        let b = book_with_interest_ledger("Rent Paid", G_ROUNDOFF, None);
+        let mut locations = vec![
+            (
+                "writeoff_discount_ledgers = [\"X\"]",
+                "roles.writeoff_discount_ledgers",
+            ),
+            (
+                "no_supplier_expense_ledgers = [\"X\"]",
+                "roles.no_supplier_expense_ledgers",
+            ),
+            (
+                "bank_reconciliation_ledger = \"X\"",
+                "roles.bank_reconciliation_ledger",
+            ),
+            ("tax_ledgers = { igst = [\"X\"] }", "roles.tax_ledgers.igst"),
+            (
+                "gst_registration_type_by_ledger = { \"X\" = \"Regular\" }",
+                "roles.gst_registration_type_by_ledger",
+            ),
+            (
+                "counterparty_type_by_ledger = { \"X\" = \"bank\" }",
+                "roles.counterparty_type_by_ledger",
+            ),
+        ];
+        let money = "\n[clause44]\nmoney_category_by_ledger = { \"X\" = \"bank_charges\" }\n";
+        while !locations.is_empty() {
+            let roles: Vec<&str> = locations.iter().map(|(line, _)| *line).collect();
+            let err = engagement(&format!("{}\n{money}", roles.join("\n")))
+                .bind(&b)
+                .unwrap_err();
+            assert_eq!(err.code(), Some(BIND_NAME_UNKNOWN));
+            let want = locations[0].1;
+            assert!(
+                format!("{err}").contains(&format!("{want}:")),
+                "{want}: {err}"
+            );
+            locations.remove(0);
+        }
+        let err = engagement(money).bind(&b).unwrap_err();
+        assert_eq!(err.code(), Some(BIND_NAME_UNKNOWN));
+        assert!(
+            format!("{err}").contains("clause44.money_category_by_ledger"),
+            "{err}"
         );
     }
 

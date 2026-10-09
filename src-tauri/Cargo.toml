@@ -1,6 +1,6 @@
 [package]
 name = "bridge"
-version = "0.5.0"
+version = "0.5.1"
 description = "ComplyEaze Bridge lets an AI assistant read from, and write to, the TallyPrime running on your own computer."
 authors = ["AXAL"]
 license = "Apache-2.0"

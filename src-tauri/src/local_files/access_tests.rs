@@ -131,26 +131,61 @@ fn deny_entries_are_ignored_and_any_other_kind_refuses() {
 
 #[cfg(windows)]
 mod on_windows {
-    use super::super::windows::{descriptor, owner_of, read_entries, with_user_sid};
+    use super::super::windows::{
+        owner_of, read_entries, user_sddl, with_user_sid, Descriptor, List,
+    };
     use super::super::*;
+    use std::ffi::OsStr;
     use std::fs::{self, File};
+    use std::os::windows::ffi::OsStrExt;
     use std::path::{Path, PathBuf};
+    use std::ptr::null_mut;
     use windows_sys::Win32::Foundation::LocalFree;
-    use windows_sys::Win32::Security::Authorization::ConvertSecurityDescriptorToStringSecurityDescriptorW;
-    use windows_sys::Win32::Security::{DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION};
+    use windows_sys::Win32::Security::Authorization::{
+        ConvertSecurityDescriptorToStringSecurityDescriptorW,
+        ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+    };
+    use windows_sys::Win32::Security::{
+        SetFileSecurityW, DACL_SECURITY_INFORMATION, OBJECT_SECURITY_INFORMATION,
+        OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
+    };
+
+    fn wide(text: &OsStr) -> Vec<u16> {
+        text.encode_wide().chain([0]).collect()
+    }
+
+    /// Give the file the owner or access list `sddl` names; `part` says which.
+    fn set_security(path: &Path, sddl: &str, part: OBJECT_SECURITY_INFORMATION) {
+        let mut descriptor: PSECURITY_DESCRIPTOR = null_mut();
+        // SAFETY: the string ends in NUL; descriptor is writable.
+        let converted = unsafe {
+            ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                wide(sddl.as_ref()).as_ptr(),
+                SDDL_REVISION_1,
+                &mut descriptor,
+                null_mut(),
+            )
+        };
+        assert_ne!(converted, 0, "{sddl}: {}", std::io::Error::last_os_error());
+        // SAFETY: the path ends in NUL; the descriptor is the one just built.
+        let set = unsafe { SetFileSecurityW(wide(path.as_os_str()).as_ptr(), part, descriptor) };
+        let error = std::io::Error::last_os_error();
+        // SAFETY: allocated with LocalAlloc by the conversion above.
+        unsafe { LocalFree(descriptor) };
+        assert_ne!(set, 0, "{}: {sddl}: {error}", path.display());
+    }
 
     /// The file's owner and access list as SDDL, printed so each run records the
     /// runner's real state rather than this test's assumption about it.
     fn sddl(path: &Path) -> String {
-        let file = File::open(path).unwrap();
-        let (held, _, _) = descriptor(&file).unwrap();
-        let mut text = std::ptr::null_mut();
+        let held = Descriptor::of(&File::open(path).unwrap()).unwrap();
+        let mut text = null_mut();
         let mut length = 0u32;
         // SAFETY: the descriptor is live; both out pointers are writable.
         let converted = unsafe {
             ConvertSecurityDescriptorToStringSecurityDescriptorW(
-                held.0,
-                1,
+                held.raw(),
+                SDDL_REVISION_1,
                 OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
                 &mut text,
                 &mut length,
@@ -214,8 +249,52 @@ mod on_windows {
         for (word, chunk) in words.iter_mut().zip(bytes.chunks_exact(4)) {
             *word = u32::from_le_bytes(chunk.try_into().unwrap());
         }
-        let list = words.as_mut_ptr().cast();
-        let read = with_user_sid(|user| read_entries(list, user)).unwrap();
+        let read = with_user_sid(|user| read_entries(List::in_words(&mut words), user)).unwrap();
+        assert_eq!(
+            read.map(|_| ()).map_err(|error| error.kind()),
+            Err(std::io::ErrorKind::InvalidData)
+        );
+    }
+
+    /// An entry whose header runs past its list's size is never read, though the
+    /// size it claims would end within the list. Built by hand, as no file holds one.
+    #[test]
+    fn an_entry_whose_header_runs_past_its_list_is_not_read() {
+        // ACL header: revision 2, size 10, one entry. Then a deny entry whose
+        // header ends at byte 12 and claims a size of 2, so an end of byte 10.
+        let mut words = [0u32; 16];
+        let bytes: [u8; 12] = [
+            2, 0, 10, 0, 1, 0, 0, 0, // ACL: revision, sbz1, size 10, count 1, sbz2
+            1, 0, 2, 0, // ACE header: deny, no flags, size 2
+        ];
+        for (word, chunk) in words.iter_mut().zip(bytes.chunks_exact(4)) {
+            *word = u32::from_le_bytes(chunk.try_into().unwrap());
+        }
+        let read = with_user_sid(|user| read_entries(List::in_words(&mut words), user)).unwrap();
+        assert_eq!(
+            read.map(|_| ()).map_err(|error| error.kind()),
+            Err(std::io::ErrorKind::InvalidData)
+        );
+    }
+
+    /// An allow entry that ends past its list's size is never read, though its
+    /// SID fits the entry. Built by hand, as no file holds one.
+    #[test]
+    fn an_entry_that_ends_past_its_list_is_not_read() {
+        // ACL header: revision 2, size 20, one entry. Then one allow entry of 20
+        // bytes (header, mask, and Everyone's 12-byte SID), which ends at byte 28.
+        let mut words = [0u32; 16];
+        let bytes: [u8; 28] = [
+            2, 0, 20, 0, 1, 0, 0, 0, // ACL: revision, sbz1, size 20, count 1, sbz2
+            0, 0, 20, 0, // ACE header: allow, no flags, size 20
+            0x01, 0, 0, 0, // mask: FILE_READ_DATA
+            1, 1, 0, 0, 0, 0, 0, 1, // SID S-1-1-0: revision, one sub-authority, authority 1
+            0, 0, 0, 0, // its sub-authority 0
+        ];
+        for (word, chunk) in words.iter_mut().zip(bytes.chunks_exact(4)) {
+            *word = u32::from_le_bytes(chunk.try_into().unwrap());
+        }
+        let read = with_user_sid(|user| read_entries(List::in_words(&mut words), user)).unwrap();
         assert_eq!(
             read.map(|_| ()).map_err(|error| error.kind()),
             Err(std::io::ErrorKind::InvalidData)
@@ -230,6 +309,53 @@ mod on_windows {
         sddl(&path);
         let file = File::open(&path).unwrap();
         assert_eq!(private_to_this_user(&file).unwrap(), Ok(()));
+        // An elevated run makes Administrators the owner, so the file is given
+        // to this user too, and that owner is checked as well.
+        set_security(
+            &path,
+            &format!("O:{}", user_sddl().unwrap()),
+            OWNER_SECURITY_INFORMATION,
+        );
+        sddl(&path);
+        let file = File::open(&path).unwrap();
+        assert_eq!(owner_of(&file).unwrap(), Principal::ThisUser);
+        assert_eq!(private_to_this_user(&file).unwrap(), Ok(()));
+    }
+
+    /// The check on a file this test saves in its temp folder and then gives
+    /// the access list `list` (SDDL), its owner left as it was created.
+    fn judged_with_list(list: &str) -> Result<(), NotPrivate> {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("password.txt");
+        fs::write(&path, b"x").unwrap();
+        set_security(&path, list, DACL_SECURITY_INFORMATION);
+        sddl(&path);
+        private_to_this_user(&File::open(&path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn a_file_with_no_access_list_is_refused_on_windows() {
+        assert_eq!(
+            judged_with_list("D:NO_ACCESS_CONTROL"),
+            Err(NotPrivate::NoAccessList)
+        );
+    }
+
+    /// A deny entry, read from a real list, is passed over. (A list of deny
+    /// entries alone cannot be opened at all, as opening asks for SYNCHRONIZE,
+    /// which nothing would grant; so this one also lets this user in.)
+    #[test]
+    fn a_file_whose_list_denies_another_principal_is_private_on_windows() {
+        let list = format!("D:P(D;;FA;;;AN)(A;;FA;;;{})", user_sddl().unwrap());
+        assert_eq!(judged_with_list(&list), Ok(()));
+    }
+
+    #[test]
+    fn a_file_everyone_may_read_is_shared_on_windows() {
+        assert_eq!(
+            judged_with_list("D:P(A;;FA;;;BA)(A;;FR;;;WD)"),
+            Err(NotPrivate::Shared)
+        );
     }
 
     /// ProgramData lets Users create folders, and a file created in one inherits
@@ -257,8 +383,8 @@ mod on_windows {
         );
     }
 
-    /// A system file owned by neither this user nor Administrators, picked at
-    /// run time; the test fails, naming each candidate's owner, if none is.
+    /// A system file owned by neither this user nor Administrators (SYSTEM, say),
+    /// picked at run time; the test fails, naming each candidate's owner, if none is.
     #[test]
     fn a_file_another_principal_owns_is_refused_for_its_owner() {
         let root = PathBuf::from(std::env::var_os("SystemRoot").expect("SystemRoot is set"));
@@ -274,11 +400,11 @@ mod on_windows {
             };
             let owner = owner_of(&file).unwrap();
             seen.push(format!("{}: {owner:?} {}", path.display(), sddl(path)));
-            if owner == Principal::Other {
+            if !matches!(owner, Principal::ThisUser | Principal::Administrators) {
                 assert_eq!(private_to_this_user(&file).unwrap(), Err(NotPrivate::Owner));
                 return;
             }
         }
-        panic!("no candidate is owned by another principal: {seen:?}");
+        panic!("each candidate is owned by this user or Administrators: {seen:?}");
     }
 }

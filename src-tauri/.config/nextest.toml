@@ -13,9 +13,9 @@
 [profile.default]
 slow-timeout = { period = "60s", terminate-after = 6 }
 
-# The Windows password-file access tests print each file's owner and access list as SDDL,
-# so a passing run still records the runner's real state (its owner and access lists), not
-# only a failing one.
+# The Windows access tests that open a file print its owner and access list as SDDL, so a
+# passing run still records the runner's real state (its owner and access lists), not only a
+# failing one.
 [[profile.default.overrides]]
-filter = 'test(/access::tests::on_windows::/) | test(/a_password_file_other_users_can_read_is_refused_on_windows$/)'
+filter = 'test(/access::tests::on_windows::/)'
 success-output = "immediate"

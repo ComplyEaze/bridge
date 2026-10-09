@@ -894,6 +894,10 @@ pub(super) struct GstRow {
     pub(super) taxability: Option<String>,
     pub(super) source: Option<String>,
     pub(super) states: Vec<StateRates>,
+    /// The row carries an element or a value the lab's rows did not (a child
+    /// of the row, of a state-wise block or of a head's rate that is not in
+    /// the measured set, or a slab-rate list that is not empty).
+    pub(super) unmeasured: bool,
 }
 
 /// What the rate listing says of one ledger. Each field is the text Tally
@@ -907,12 +911,27 @@ pub(in crate::agent::agent_import) struct LedgerRateRow {
     pub(super) rounding_limit: Option<String>,
 }
 
-/// The rate listing by ledger name. Every row must carry the verified
-/// company's GUID (the `BRIDGECOMPANYGUID` compute) and a name no other row
-/// claims; an answer that does not is refused whole.
+/// The elements the lab's GST rows carried (10 Oct 2026, fourteen ledgers),
+/// at each level of a row; anything else marks the row unmeasured.
+const GST_ROW_CHILDREN: &[&str] = &[
+    "APPLICABLEFROM",
+    "GSTINELIGIBLEITC",
+    "SRCOFGSTDETAILS",
+    "STATEWISEDETAILS.LIST",
+    "TAXABILITY",
+];
+const STATE_BLOCK_CHILDREN: &[&str] = &["GSTSLABRATES.LIST", "RATEDETAILS.LIST", "STATENAME"];
+const HEAD_RATE_CHILDREN: &[&str] = &["GSTRATE", "GSTRATEDUTYHEAD", "GSTRATEVALUATIONTYPE"];
+
+/// The rate listing by ledger name, for the ledgers an invoice names. Every
+/// row of the answer must carry the verified company's GUID (the
+/// `BRIDGECOMPANYGUID` compute); the rows of the named ledgers are read in
+/// full, and a name two of them claim refuses the answer. A row of any other
+/// ledger is not read, so one unrelated ledger cannot fail an invoice.
 pub(super) fn parse_ledger_rates(
     xml: &str,
     company_guid: &str,
+    wanted: &[&str],
 ) -> Result<BTreeMap<String, LedgerRateRow>, &'static str> {
     let envelope = parse_tree(xml)?;
     let body = envelope
@@ -926,21 +945,38 @@ pub(super) fn parse_ledger_rates(
         .ok_or("invoice_read_collection_absent")?;
     let mut out = BTreeMap::new();
     for ledger in collection.all("LEDGER") {
-        let name = ledger
-            .attributes
-            .get("NAME")
-            .cloned()
-            .ok_or("invoice_ledger_rates_row_unnamed")?;
-        let bound = ledger.text_of("BRIDGECOMPANYGUID")?;
-        if !bound.is_some_and(|guid| guid.eq_ignore_ascii_case(company_guid)) {
+        let bound = ledger.text_of("BRIDGECOMPANYGUID");
+        if !bound.is_ok_and(|guid| guid.is_some_and(|guid| guid.eq_ignore_ascii_case(company_guid)))
+        {
             return Err("invoice_ledger_rates_company_mismatch");
+        }
+        let Some(name) = ledger.attributes.get("NAME").cloned() else {
+            continue;
+        };
+        if !wanted.contains(&name.as_str()) {
+            continue;
         }
         let mut gst_rows = Vec::new();
         for details in ledger.all("GSTDETAILS.LIST") {
+            let mut unmeasured = details
+                .children
+                .iter()
+                .any(|child| !GST_ROW_CHILDREN.contains(&child.name.as_str()));
             let mut states = Vec::new();
             for state in details.all("STATEWISEDETAILS.LIST") {
+                unmeasured |= state
+                    .children
+                    .iter()
+                    .any(|child| !STATE_BLOCK_CHILDREN.contains(&child.name.as_str()));
+                unmeasured |= state
+                    .all("GSTSLABRATES.LIST")
+                    .any(|slabs| !slabs.children.is_empty() || !clean(&slabs.text).is_empty());
                 let mut heads = Vec::new();
                 for detail in state.all("RATEDETAILS.LIST") {
+                    unmeasured |= detail
+                        .children
+                        .iter()
+                        .any(|child| !HEAD_RATE_CHILDREN.contains(&child.name.as_str()));
                     heads.push(HeadRate {
                         head: detail
                             .text_of("GSTRATEDUTYHEAD")?
@@ -959,6 +995,7 @@ pub(super) fn parse_ledger_rates(
                 taxability: details.text_of("TAXABILITY")?,
                 source: details.text_of("SRCOFGSTDETAILS")?,
                 states,
+                unmeasured,
             });
         }
         let row = LedgerRateRow {

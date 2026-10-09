@@ -386,6 +386,8 @@ fn named_or_unnamed(party: String) -> String {
     }
 }
 
+/// Kept apart on purpose from the narration reader of `bridge-tax-audit`'s `narration_payees`,
+/// which reads a Tally voucher's narration by its spec pack's README section 3 (#1428).
 fn sbi_party(row: &Row) -> String {
     pattern!(TRANSFER_TO, r"^TRANSFER TO \d+\s+(.+?)\s*/\s*\d+$");
     pattern!(
@@ -567,6 +569,8 @@ fn prefix_through_hyphen(narration: &str) -> Option<usize> {
         .map(|(offset, _)| offset + 1)
 }
 
+/// Kept apart on purpose from the narration reader of `bridge-tax-audit`'s `narration_payees`,
+/// which reads a Tally voucher's narration by its spec pack's README section 3 (#1428).
 fn hdfc_party(row: &Row) -> String {
     pattern!(IMPS, r"^IMPS-\d+-");
     pattern!(MASKED_ACCOUNT, r"^[Xx]{4,}\d*$");

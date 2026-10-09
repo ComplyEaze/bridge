@@ -90,7 +90,8 @@ fn vendored_blocks_are_verbatim(source: &str) -> bool {
 /// actually reads (`roles.cash_groups`, `roles.bank_groups`, `roles.creditor_groups`, a legacy
 /// `roles.trade_creditors_source`'s names, `roles.round_off_ledgers`,
 /// `roles.payment_channel_debtors`, `roles.gst_payment_ledgers`, `roles.writeoff_discount_ledgers`,
-/// every `roles.tax_ledgers` head,
+/// `roles.no_supplier_expense_ledgers`, every `roles.tax_ledgers` head,
+/// `roles.gst_registration_type_by_ledger`'s and `clause44.money_category_by_ledger`'s keys,
 /// `tds.nature_by_ledger`'s and `tds.payee_aliases`' keys, `tds_payees.s194j_category_by_ledger`'s
 /// keys, `loans.loan_ledgers`'s keys, each loan's `interest_ledger`, `loans.shared_interest_ledgers`,
 /// `depreciation.block_by_ledger`'s keys,
@@ -125,10 +126,17 @@ fn narrow_identity_tables(cfg: &mut toml::Table, base: &Path) -> Result<(), Stri
             "payment_channel_debtors",
             "gst_payment_ledgers",
             "writeoff_discount_ledgers",
+            "no_supplier_expense_ledgers",
         ] {
             if let Some(v) = roles.get(key) {
                 ledger_labels.extend(strs(v));
             }
+        }
+        if let Some(t) = roles
+            .get("gst_registration_type_by_ledger")
+            .and_then(toml::Value::as_table)
+        {
+            ledger_labels.extend(t.keys().cloned());
         }
         if let Some(heads) = roles.get("tax_ledgers").and_then(toml::Value::as_table) {
             for v in heads.values() {
@@ -141,6 +149,14 @@ fn narrow_identity_tables(cfg: &mut toml::Table, base: &Path) -> Result<(), Stri
         )
         .map_err(|e| e.to_string())?;
         ledger_labels.extend(legacy.unwrap_or_default());
+    }
+    if let Some(t) = cfg
+        .get("clause44")
+        .and_then(toml::Value::as_table)
+        .and_then(|t| t.get("money_category_by_ledger"))
+        .and_then(toml::Value::as_table)
+    {
+        ledger_labels.extend(t.keys().cloned());
     }
     if let Some(sd) = cfg.get("statutory_dues").and_then(toml::Value::as_table) {
         if let Some(t) = sd.get("nature_by_ledger").and_then(toml::Value::as_table) {

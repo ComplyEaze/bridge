@@ -509,3 +509,11 @@ test("the changelog template names the address the deploy writes it to as its ca
   assert.equal(html.match(/<link rel="canonical" href="([^"]*)" \/>/g)?.length, 1, "changelog.template.html: exactly one canonical link");
   assert.match(html, /<link rel="canonical" href="https:\/\/bridge\.complyeaze\.com\/changelog\.html" \/>/, "changelog.template.html: its canonical address is not changelog.html");
 });
+
+// One verb for the Terms setting (#1458): the extension's own description says to tick it, so no page
+// may say to turn it on or switch it on. The HTTP gateway and posting keep "turn on"; the pattern is
+// scoped to the Terms setting. The raw HTML is read so the structured-data copy of an answer is checked too.
+test("no page tells a visitor to turn on or switch on the Terms setting", () => {
+  const turnOn = /(?:turn(?:ed)?|switch(?:ed)?) on\s+(?:the\s+)?(?:\*\*|“|&ldquo;|")?(?:I accept|Terms)/i;
+  for (const name of pages) assert.doesNotMatch(read(name), turnOn, name);
+});

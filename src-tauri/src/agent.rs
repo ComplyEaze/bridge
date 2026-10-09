@@ -847,7 +847,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "terms_not_accepted" => Some(
             "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
              them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
-             extension settings and turn on \"I accept the ComplyEaze Bridge Terms of Use\" \
+             extension settings and tick \"I accept the ComplyEaze Bridge Terms of Use\" \
              there, then quit Claude completely and reopen it so ComplyEaze Bridge starts again. Nothing \
              was read from Tally.",
         ),

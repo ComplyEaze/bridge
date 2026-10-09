@@ -81,6 +81,12 @@ async fn every_tool_refuses_until_the_terms_are_accepted_and_sends_nothing_to_ta
                 "{name}"
             );
             assert!(message.contains("Nothing was read from Tally"), "{name}");
+            // One verb for the setting, the one the extension's own description uses (#1458).
+            assert!(
+                message.contains("tick \"I accept the ComplyEaze Bridge Terms of Use\""),
+                "{name}: {message}"
+            );
+            assert!(!message.contains("turn on"), "{name}: {message}");
         }
         assert!(
             record_lines(directory.path()).is_empty(),

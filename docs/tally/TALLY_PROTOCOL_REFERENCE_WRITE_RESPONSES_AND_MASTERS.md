@@ -428,8 +428,14 @@ D). Only the contrast inside each pair (same id again, or a new id) is the obser
 - **Bridge's exact check stays as it is.** `is_clean_success_for` requires the counter it expects, so
   step 5 would read as not clean. That is a loud failure in the safe direction. Do not loosen it to
   accept `ALTERED=1` for a create.
+- **VERIFIED (this book): the same behaviour on a Sales voucher, in a second shape.** A zero-value Sales
+  voucher in the accounting view (id A) was refused (`EXCEPTIONS=1`, no `LINEERROR`, voucher mark
+  unchanged). A normal Sales invoice in the invoice view (100.00 plus 2.50 and 2.50), sent later under the
+  same id, answered `CREATED=0 ALTERED=1`, `LASTVCHID=22`, yet it did not exist before: the voucher mark
+  moved 29 to 30 and the voucher was found, `ALTERID` 30, included in GSTR-1. The two files differ in view,
+  amount and zero value, so this is still not a one-variable pair (see §9.18 for the zero-value refusal).
 - **Not measured:** Manual numbering, so a resend under the same number is not tested here; other
-  kinds of refusal than a missing ledger; Gold and Education; an invoice-view Sales voucher; a restart
+  kinds of refusal than a missing ledger and a zero value; Gold and Education; a restart
   between the two sends; whether the corrected send of step 5 is the same object a later
   readback by narration marker would find.
 

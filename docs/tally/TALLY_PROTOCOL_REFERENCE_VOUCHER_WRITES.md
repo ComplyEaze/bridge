@@ -568,6 +568,116 @@ the official sample shapes verbatim** — the §9.5/§9.6 failures may be a requ
 on our side rather than an Edit Log restriction. This is the cheapest next step on the write
 path and it should be taken before the Phase 4 licensed-Tally gate.
 
+### 9.17 Tally works out a Sales invoice's tax per sales line, rounded half-up, and flags any other figure
+
+**PARTIAL, and narrow: one synthetic company, licensed TallyPrime 7.1 Silver (the earlier rounds on that
+lab record the release and licence; these answers do not show them), CGST plus state tax within the
+company's own state, 5% services lines (one 18% goods line on a bill whose figures are exact), the invoice
+view, one book, one run per voucher. The "Tax entered" column for 0001 to 0009 and 0011 comes from the
+instructions of the earlier rounds, not from these answers.** Sixteen Sales vouchers were read back in one full voucher export;
+Tally's own GSTR-1 flag is in that export (`VCHGSTSTATUSISINCLUDED`, `VCHGSTSTATUSISUNCERTAIN`,
+`VCHGSTSTATUSISEXCLUDED`) and was checked against the uncertain list on Tally's screen, which named the
+same six vouchers with the reason "Mismatch between Expected Tax Amount and Modified Tax Amount in
+transaction". "Per line" is `half-up(line x rate / 2)` to two decimals for each sales line, summed per rate,
+for each of the two heads.
+
+| Voucher | Sales lines | CGST / SGST | Per line | Per bill | Tally flag | Tax entered |
+|---|---|---|---|---|---|---|
+| 0001 | 1000.00 | 25.00 / 25.00 | 25.00 | 25.00 | included | typed |
+| 0002 | 1001.00 | 25.03 / 25.02 | 25.03 | 25.03 | **uncertain** | typed |
+| 0003 | 1001.00 | 25.02 / 25.03 | 25.03 | 25.03 | **uncertain** | typed |
+| 0004 | 1001.00 | 25.03 / 25.03, round off -0.01 | 25.03 | 25.03 | included | typed |
+| 0005 | 1001.00 | 25.02 / 25.02, round off +0.01 | 25.03 | 25.03 | **uncertain** | typed |
+| 0006 | 1000.00 | 25.01 / 25.01 | 25.00 | 25.00 | **uncertain** | typed |
+| 0007 | 600.00 + 400.00 | 25.00 / 25.00 | 25.00 | 25.00 | included | typed |
+| 0008 | 601.00 + 400.00 | 25.03 / 25.02 | 25.03 | 25.03 | **uncertain** | typed |
+| 0009 | 600.00 at 5% + 700.00 at 18% | 15.00, 63.00 / 15.00, 63.00 | same | same | included | typed |
+| 0010 | 600.40 + 400.40 | 25.02 / 25.02, round off +0.16 | 25.02 | 25.02 | included | imported |
+| 0011 | 1001.00 | 25.03 / 25.03 | 25.03 | 25.03 | included | Tally filled |
+| 0012 | 100.10 + 100.10 | 5.00 / 5.00 | 5.00 | **5.01** | included | Tally filled |
+| 0013 | 100.20 + 100.20 | 5.02 / 5.02 | 5.02 | **5.01** | included | Tally filled |
+| 0014 | 100.60 + 100.60 | 5.04 / 5.04 | 5.04 | **5.03** | included | Tally filled |
+| 0015 | 100.20 + 100.20, the same ledger on two lines | 5.02 / 5.02 | 5.02 | **5.01** | included | Tally filled |
+| 0016 | 100.20 + 100.20 | 5.01 / 5.01 | **5.02** | 5.01 | **uncertain** | typed, the per-bill figure |
+
+- **VERIFIED (this book): for all sixteen vouchers, Tally's flag is "included" exactly when both heads equal
+  the per-line figure, and "uncertain" otherwise.** The per-bill figure disagrees with Tally on four
+  included vouchers (0012 to 0015) and agrees with the one it flagged (0016).
+- **VERIFIED: the rounding is half-up per line.** `0013`'s lines are 2.505 each: Tally filled 5.02, where
+  half-even would give 5.00. `0014`'s 2.515 gave 5.04.
+- **VERIFIED: per line, not per ledger or per bill.** `0015` carries one ledger on two lines and Tally
+  filled 5.02 (a ledger total would give 5.01).
+- **VERIFIED: a difference of one paisa is flagged.** `0016` differs from the per-line figure by one
+  paisa; `0002`, `0003` and `0008` carry heads that differ from each other by one paisa and are flagged.
+  No tolerance showed: the four on-screen tax ledgers read `ROUNDINGMETHOD` Not Applicable and
+  `ROUNDINGLIMIT` 0 (the one tax ledger created by import reads None and 0, and is on none of these
+  vouchers), and the two company screens read show no setting that ignores a difference.
+- **A round off line does not decide the flag** (`0004`, `0010` are included with one).
+- **VERIFIED (this book): Accept As Is on `0016` alters the voucher and overrides the flag; it does not
+  change an amount.** Before: uncertain, `ISGSTOVERRIDDEN` No. After: included, `ISGSTOVERRIDDEN` Yes,
+  `ISGSTOVRDNCRC` 0 to a number, `ALTERID` 27 to 28, `ALTVCHID` 27 to 28; every leg and amount unchanged.
+- **What follows for a check on an invoice's tax (a reading of this table, not a further measurement).** A
+  check that admits the per-bill figure, or two heads that differ by a paisa, or a figure one paisa from
+  either head, admits vouchers this table shows Tally flags (the `0002` and `0016` kinds). Whether and how to
+  change a given check is a separate decision.
+- **Not measured:** inter-state tax, cess, inventory or discount lines, a registered buyer, a rate other than
+  5% with a tie, more than one rate with a tie, an invoice with its GST rate taken from the sales ledger
+  rather than typed, Gold. Do not read the rule beyond what the table covers.
+
+Evidence: the answers (`workorder/vouchers-w1.xml`, `vouchers-w2-before.xml`, `vouchers-w2-after.xml`,
+`aw2-marks-*.xml`, `ledgers-w1.xml`) are held on the repository's `lab/1342-capture-answers` branch at
+`d78906775`, listed by SHA-256 in its `SHA256.txt`.
+
+### 9.18 A zero-value Sales voucher is refused unless its voucher type allows zero-valued transactions
+
+**PARTIAL: the same book, one run each, over the XML gateway with hand-built files and one file rendered by
+Bridge's code.** The voucher type setting is "Allow zero-valued transactions".
+
+- **VERIFIED (this book): all three zero-value Sales imports into `BRIDGE Sales` were refused.** The
+  accounting view, the invoice view and the one Bridge's code renders (three ids, each a single voucher
+  with a customer leg and one sales leg at 0.00) each answered `EXCEPTIONS=1`, `CREATED=0`, **with no
+  `LINEERROR`**, and the voucher mark did not move (28, 28, 28). A refusal with no `LINEERROR` and
+  `ERRORS=0` is the §9.2 trap in a new form.
+- **VERIFIED (this book): the setting decides.** A voucher type created with the setting at its default (No)
+  refused the same zero voucher the same way. A type created with it Yes answered `CREATED=1`
+  (`LASTVCHID` 21) and the voucher was found by the next read (accounting view, both legs 0.00).
+- **VERIFIED (screen, one try, accounting view): Tally's own data entry refused a zero line in `BRIDGE Sales`**
+  ("No Entries in Voucher!"); the invoice view was not tried.
+- **VERIFIED (screen): the GSTR-1 document summary lists a voucher type's zero voucher as an issued
+  document** (a line for the zero-value type, count 1). The counts for `BRIDGE Sales` fit "included
+  documents of a type": 11 before (16 numbered, five uncertain) and 12 after the normal invoice that
+  followed. That reading is an inference: the zero voucher's own GSTR-1 flag was not read.
+- **Not measured:** the GSTR-1 flag of the zero voucher (the voucher type was not in the export); a zero
+  invoice in the invoice view under the setting Yes; a zero line beside a non-zero one; Gold.
+
+Evidence: `workorder/aw3-*.xml`, `vouchers-w3.xml`, `aw3-window-0802-extra.xml` and the screens
+`w3-0018-zero-keyed-error`, `w3-voucher-type-z0`, `w3-voucher-type-z1`, `w3-document-summary-before` and
+`w3-document-summary-after` on the same branch and commit.
+
+### 9.19 A keyed Purchase invoice, as the voucher export reads it
+
+**PARTIAL: the same book, two Purchase invoices keyed by hand in invoice mode, one run.** This is the shape
+Tally stored, not a measurement of Bridge posting a Purchase.
+
+- **VERIFIED from the export:** type `Purchase`, numbered by Tally (1 and 2), the supplier's invoice number
+  `SUP/0001` dated 3-Aug-2026 on both (`REFERENCE`, `REFERENCEDATE`), the voucher dated 4-Aug-2026,
+  `ISINVOICE` Yes, entry mode Accounting Invoice, view Invoice Voucher View. The supplier leg reads
+  1050.00, `ISDEEMEDPOSITIVE` No (a credit); the purchase leg -1000.00 and the CGST and SGST legs -25.00
+  each, `ISDEEMEDPOSITIVE` Yes. The header carries the supplier's GSTIN, `STATENAME` and `PLACEOFSUPPLY`
+  Rajasthan, `GSTREGISTRATIONTYPE` Regular, the company as the buyer name and its GSTIN as the consignee's.
+- **VERIFIED: Tally saved the second invoice with the same supplier invoice number and date.** The screen read
+  was taken after the save, so whether a warning appeared before it is not recorded.
+- **VERIFIED (screen): the bill reference is `SUP/0001`, and the two invoices share it.** The supplier's
+  pending bills show one row, opening 1,050.00 Cr and pending 2,100.00 Cr. **NOT established through
+  a read:** the export's bill allocation carries only an amount, and why is not established.
+- **Both vouchers read uncertain in GSTR (`VCHGSTSTATUSISUNCERTAIN` Yes). The cause is UNVERIFIED:** a
+  duplicate supplier invoice number is unlikely to explain the first one (its `ALTERID` is 31 and the
+  second's 32, so it was not re-saved, but no read was taken between the two saves and the flag is
+  stored), and the supplier's GSTIN is of the synthetic family, which Tally may not accept as valid.
+- **Not measured:** a purchase imported over the gateway, any GSTR-2 view, a Purchase in the accounting-voucher view, Gold.
+
+Evidence: `workorder/purchases-w4.xml` and the screens `w4-*` on the same branch and commit.
+
 ### 9.14 A `REMOTEID` upsert re-states the voucher: cancel, optional, delete and recreate
 
 **Scope of every item below.** TallyPrime 7.1 Silver, licensed, not Education, on a synthetic

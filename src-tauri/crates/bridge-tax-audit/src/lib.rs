@@ -1856,9 +1856,14 @@ pub fn twentysixas_receipts_on(
 ) -> Result<serde_json::Value> {
     let (bound, _report) = engagement.bind(book)?;
     let cfg = tds_26as_config(&bound, twentysixas_receipts::TEST_ID)?;
-    let result =
-        twentysixas_receipts::run(book, rules, &documents.form26as, &cfg.deductor_aliases)?;
-    let module_check = twentysixas_receipts::check_invariants(book, &documents.form26as, &result)?;
+    let result = twentysixas_receipts::run(
+        book,
+        rules,
+        documents.form26as_rows(),
+        &cfg.deductor_aliases,
+    )?;
+    let module_check =
+        twentysixas_receipts::check_invariants(book, documents.form26as_rows(), &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
@@ -1876,12 +1881,12 @@ pub fn tds_tcs_26as_on(
         book,
         rules,
         &bound.period,
-        &documents.form26as,
-        &documents.ais,
-        &documents.tis,
+        documents.form26as_rows(),
+        documents.ais_rows(),
+        documents.tis_rows(),
         cfg,
     )?;
-    let module_check = tds_tcs_26as::check_invariants(book, &documents.form26as, &result)?;
+    let module_check = tds_tcs_26as::check_invariants(book, documents.form26as_rows(), &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 

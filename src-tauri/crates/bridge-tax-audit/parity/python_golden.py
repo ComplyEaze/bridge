@@ -368,9 +368,10 @@ def _traces_documents(c):
     if a.traces_documents:
         doc = json.loads(Path(a.traces_documents).read_text(encoding="utf-8"))
         day = lambda s: None if s is None else date.fromisoformat(s)
-        form26as = [Form26ASRow(**{**r, "txn_date": day(r["txn_date"])}) for r in doc.get("form26as", [])]
-        ais = [AisRow(**{**r, "txn_date": day(r["txn_date"])}) for r in doc.get("ais", [])]
-        tis = [TisRow(**r) for r in doc.get("tis", [])]
+        # An absent or null document was not loaded; the tests take it as no rows, as the pack does.
+        form26as = [Form26ASRow(**{**r, "txn_date": day(r["txn_date"])}) for r in doc.get("form26as") or []]
+        ais = [AisRow(**{**r, "txn_date": day(r["txn_date"])}) for r in doc.get("ais") or []]
+        tis = [TisRow(**r) for r in doc.get("tis") or []]
     elif a.emit_traces_documents:
         year = c.eng.assessment_year
         p26 = document_path(c.cfg, c.path.parent, "form26as")
@@ -379,8 +380,10 @@ def _traces_documents(c):
         ais = load_ais_json(p_ais, f"ais:{year}") if p_ais is not None else []
         p_tis = optional_document_path(c.cfg, c.path.parent, "tis")
         tis = load_tis_json(p_tis, f"tis:{year}") if p_tis is not None else []
-        out = {k: [{f: (v.isoformat() if isinstance(v, date) else v) for f, v in vars(r).items()} for r in rows]
-               for k, rows in (("form26as", form26as), ("ais", ais), ("tis", tis))}
+        # null for an optional file not given, so the crate tells "not loaded" from "no rows" (#1281).
+        out = {k: (None if path is None else
+                   [{f: (v.isoformat() if isinstance(v, date) else v) for f, v in vars(r).items()} for r in rows])
+               for k, path, rows in (("form26as", p26, form26as), ("ais", p_ais, ais), ("tis", p_tis, tis))}
         Path(a.emit_traces_documents).write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n",
                                                  encoding="utf-8")
     c.eng.form26as = form26as

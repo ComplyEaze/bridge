@@ -5108,7 +5108,7 @@
   "by": "author",
   "what": "the caller's AIS rows are not passed",
   "file": "src/registry.rs",
-  "from": "&c.traces.ais,\n            )",
+  "from": "c.traces.ais_rows(),\n            )",
   "to": "&[],\n            )"
  },
  {
@@ -8052,8 +8052,8 @@
   "by": "author",
   "what": "the registry does not pass the caller's refused-statement reason",
   "file": "src/registry.rs",
-  "from": "c.bank_statement_refused.as_deref(),\n                &c.traces.ais,",
-  "to": "None,\n                &c.traces.ais,"
+  "from": "c.bank_statement_refused.as_deref(),\n                c.traces.ais_rows(),",
+  "to": "None,\n                c.traces.ais_rows(),"
  },
  {
   "id": "CP-01",
@@ -9460,7 +9460,7 @@
   "by": "author",
   "what": "the registry runs books_examined with no documents whatever the caller loaded",
   "file": "src/registry.rs",
-  "from": "run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read),",
+  "from": "run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read()?),",
   "to": "run_on: |_, b, r, _| crate::books_examined_on(b, r, &Default::default()),"
  },
  {
@@ -13662,5 +13662,93 @@
   "file": "src/invariants.rs",
   "from": "            (sum.abs() > TIE_TOLERANCE_PAISE).then(|| format!(\"TB {key} sums to {sum} paise\"))\n",
   "to": "            (sum.abs() >= TIE_TOLERANCE_PAISE).then(|| format!(\"TB {key} sums to {sum} paise\"))\n"
+ },
+ {
+  "id": "BE-30",
+  "by": "author",
+  "what": "a bank statement both held and refused is read",
+  "file": "src/registry.rs",
+  "from": "if self.bank_statement.is_some() && self.bank_statement_refused.is_some() {",
+  "to": "if false && (self.bank_statement.is_some() && self.bank_statement_refused.is_some()) {"
+ },
+ {
+  "id": "BE-31",
+  "by": "author",
+  "what": "a refused bank statement is listed as examined",
+  "file": "src/registry.rs",
+  "from": "(DocumentRead::BankStatement, self.bank_statement.is_some()),",
+  "to": "(DocumentRead::BankStatement, self.bank_statement.is_some() || self.bank_statement_refused.is_some()),"
+ },
+ {
+  "id": "BE-32",
+  "by": "author",
+  "what": "GSTR-1 is listed on the GSTR-3B turnover, not its own",
+  "file": "src/registry.rs",
+  "from": "(DocumentRead::Gstr1, self.turnover_inputs.gstr1.is_some()),",
+  "to": "(DocumentRead::Gstr1, self.turnover_inputs.gstr3b.is_some()),"
+ },
+ {
+  "id": "BE-33",
+  "by": "author",
+  "what": "Form 26AS is listed only when it has rows",
+  "file": "src/registry.rs",
+  "from": "(DocumentRead::Form26as, self.traces.form26as.is_some()),",
+  "to": "(DocumentRead::Form26as, self.traces.form26as.as_ref().is_some_and(|r| !r.is_empty())),"
+ },
+ {
+  "id": "BE-34",
+  "by": "author",
+  "what": "AIS is listed on the AIS turnover alone",
+  "file": "src/registry.rs",
+  "from": "(DocumentRead::Ais, self.traces.ais.is_some()),",
+  "to": "(DocumentRead::Ais, self.traces.ais.is_some() || self.turnover_inputs.ais.is_some()),"
+ },
+ {
+  "id": "BE-35",
+  "by": "author",
+  "what": "TIS is listed only when it has rows",
+  "file": "src/registry.rs",
+  "from": "(DocumentRead::Tis, self.traces.tis.is_some()),",
+  "to": "(DocumentRead::Tis, self.traces.tis.as_ref().is_some_and(|r| !r.is_empty())),"
+ },
+ {
+  "id": "BE-36",
+  "by": "author",
+  "what": "a bank statement read is never listed",
+  "file": "src/registry.rs",
+  "from": "(DocumentRead::BankStatement, self.bank_statement.is_some()),",
+  "to": "(DocumentRead::BankStatement, false),"
+ },
+ {
+  "id": "BE-37",
+  "by": "author",
+  "what": "the caller's named documents are not listed",
+  "file": "src/registry.rs",
+  "from": ".chain(self.named_documents.iter().map(|d| d.document()))",
+  "to": ".chain(std::iter::empty())"
+ },
+ {
+  "id": "BE-38",
+  "by": "author",
+  "what": "a named GSTR-3B is listed as the GSTR-3B vs 2B workbook",
+  "file": "src/books_examined.rs",
+  "from": "Self::Gstr3b => DocumentRead::Gstr3b,",
+  "to": "Self::Gstr3b => DocumentRead::Gstr3bVs2b,"
+ },
+ {
+  "id": "BE-39",
+  "by": "author",
+  "what": "a TRACES document absent or null is read as loaded with no rows",
+  "file": "src/documents.rs",
+  "from": "        Value::Null => Ok(None),\n        Value::Array(a) => a.iter().map(row)",
+  "to": "        Value::Null => Ok(Some(Vec::new())),\n        Value::Array(a) => a.iter().map(row)"
+ },
+ {
+  "id": "BE-40",
+  "by": "author",
+  "what": "a TRACES document loaded with no rows is read as not loaded",
+  "file": "src/documents.rs",
+  "from": "        Value::Array(a) => a.iter().map(row).collect::<Result<_>>().map(Some),",
+  "to": "        Value::Array(a) if a.is_empty() => Ok(None),\n        Value::Array(a) => a.iter().map(row).collect::<Result<_>>().map(Some),"
  }
 ]

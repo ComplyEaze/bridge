@@ -9,9 +9,9 @@
 //! read, so one question asks the CA for both. It computes nothing.
 //!
 //! Not ported: the reference's `Finding` also has a `confirm` field (see `read_scope.rs`); this test sets none,
-//! so nothing is hidden from the canonical dump. The documents loaded are caller data: nothing here checks
-//! them against the documents a caller actually holds (bridge-tax-audit is not wired yet; whoever wires it
-//! derives the list from the loads, as the reference's pack does).
+//! so nothing is hidden from the canonical dump. `run` takes the documents' names, as the reference's
+//! `run` does; the registry lists them from the documents its caller holds, as the reference's pack does
+//! (`registry::CallerData::documents_read`).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -86,6 +86,33 @@ impl DocumentRead {
     /// The document with exactly this name, if the pack loads one.
     pub fn parse(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|d| d.name() == name)
+    }
+}
+
+/// A document the pack can load whose data no caller passes to this crate yet, so the caller
+/// names it. Every other document is listed from the data the caller holds
+/// (`registry::CallerData::documents_read`), so it has no variant here (#1281).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CallerNamedDocument {
+    Gstr2b,
+    /// The raw-export layout's P&L report file. With a Tally read the totals come from the read's
+    /// own report part, and the pack does not list it.
+    ProfitAndLossReport,
+    /// The pack never fills the GSTR-3B comparison turnover, so its file is not otherwise held.
+    Gstr3b,
+    Gstr3bVs2b,
+    DraftForm3cd,
+}
+
+impl CallerNamedDocument {
+    pub fn document(self) -> DocumentRead {
+        match self {
+            Self::Gstr2b => DocumentRead::Gstr2b,
+            Self::ProfitAndLossReport => DocumentRead::ProfitAndLossReport,
+            Self::Gstr3b => DocumentRead::Gstr3b,
+            Self::Gstr3bVs2b => DocumentRead::Gstr3bVs2b,
+            Self::DraftForm3cd => DocumentRead::DraftForm3cd,
+        }
     }
 }
 

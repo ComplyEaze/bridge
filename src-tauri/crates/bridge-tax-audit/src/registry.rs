@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 
 use crate::applicability_44ab::{ComparisonTurnover, TurnoverInputs};
 use crate::book::Book;
-use crate::books_examined::DocumentRead;
+use crate::books_examined::{CallerNamedDocument, DocumentRead};
 use crate::error::{AuditError, Result};
 use crate::financial_statements::ReportTotals;
 use crate::rules::Rules;
@@ -17,8 +17,8 @@ use crate::Engagement;
 
 /// Data a test takes from its caller rather than from the book: Tally's own Profit & Loss report
 /// totals (`financial_statements`), the comparison turnover (`applicability_44ab`) and the documents
-/// loaded with the read (`books_examined`). Empty is "none supplied", which each of those tests
-/// handles itself.
+/// loaded with the read (`books_examined`, through [`CallerData::documents_read`]). Empty is "none
+/// supplied", which each of those tests handles itself.
 #[derive(Debug, Clone, Default)]
 pub struct CallerData {
     pub report_totals: Option<ReportTotals>,
@@ -33,8 +33,36 @@ pub struct CallerData {
     /// gives its `refused` result; `high_value_register`'s s.194N coverage says so); `None` when
     /// none was supplied or it was read.
     pub bank_statement_refused: Option<String>,
-    /// The documents loaded with the read (`books_examined`).
-    pub documents_read: BTreeSet<DocumentRead>,
+    /// The documents loaded with the read whose data no field above holds (`books_examined`).
+    pub named_documents: BTreeSet<CallerNamedDocument>,
+}
+
+impl CallerData {
+    /// The documents loaded with the read, for `books_examined`, as the reference's pack lists them:
+    /// each document whose file was loaded, rows or none, in the pack's order (#1281). Form 26AS, AIS
+    /// and TIS when `traces` holds them, GSTR-1 when its comparison turnover is held (the pack takes
+    /// both from the one file), the bank statement when it was read (a refused one is not), and the
+    /// caller's `named_documents`. Refuses a bank statement both held and refused.
+    pub fn documents_read(&self) -> Result<BTreeSet<DocumentRead>> {
+        if self.bank_statement.is_some() && self.bank_statement_refused.is_some() {
+            return Err(AuditError::Config(format!(
+                "{}: a bank statement was supplied and also refused",
+                crate::books_examined::TEST_ID
+            )));
+        }
+        let held = [
+            (DocumentRead::Gstr1, self.turnover_inputs.gstr1.is_some()),
+            (DocumentRead::Form26as, self.traces.form26as.is_some()),
+            (DocumentRead::Ais, self.traces.ais.is_some()),
+            (DocumentRead::Tis, self.traces.tis.is_some()),
+            (DocumentRead::BankStatement, self.bank_statement.is_some()),
+        ];
+        Ok(held
+            .into_iter()
+            .filter_map(|(d, loaded)| loaded.then_some(d))
+            .chain(self.named_documents.iter().map(|d| d.document()))
+            .collect())
+    }
 }
 
 /// One ported test.
@@ -74,7 +102,7 @@ pub const PORTED: &[PortedTest] = &[
         id: "books_examined",
         // `books_maintained` and `books_examined`, on any book.
         min_figures: 2,
-        run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read),
+        run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read()?),
     },
     PortedTest {
         id: "cash_44ab",
@@ -142,7 +170,7 @@ pub const PORTED: &[PortedTest] = &[
                 r,
                 c.bank_statement.as_ref(),
                 c.bank_statement_refused.as_deref(),
-                &c.traces.ais,
+                c.traces.ais_rows(),
             )
         },
     },
@@ -386,6 +414,130 @@ mod tests {
         ] {
             assert!(report_totals_from_json(&bad).is_err(), "{bad}");
         }
+    }
+
+    /// A bank statement whose contents `documents_read` never looks at.
+    fn statement() -> crate::documents::BankStatementDoc {
+        let day = bridge_tally_primitives::TallyDate::parse("20250401").unwrap();
+        crate::documents::BankStatementDoc {
+            doc_id: "bank:x".to_string(),
+            source_sha256: String::new(),
+            account_ref: "XXXX1".to_string(),
+            bank: "Invented Bank".to_string(),
+            start: day.clone(),
+            end: day,
+            opening_balance_paise: 0,
+            closing_balance_paise: 0,
+            rows: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_refused_bank_statement_is_never_listed() {
+        use super::CallerData;
+        use crate::books_examined::DocumentRead;
+        let refused = CallerData {
+            bank_statement_refused: Some("no closing balance".to_string()),
+            ..Default::default()
+        };
+        assert!(refused.documents_read().unwrap().is_empty());
+        let read = CallerData {
+            bank_statement: Some(statement()),
+            ..Default::default()
+        };
+        assert_eq!(
+            read.documents_read()
+                .unwrap()
+                .into_iter()
+                .collect::<Vec<_>>(),
+            [DocumentRead::BankStatement]
+        );
+    }
+
+    #[test]
+    fn a_statement_both_held_and_refused_is_refused() {
+        use super::CallerData;
+        use crate::error::AuditError;
+        let both = CallerData {
+            bank_statement: Some(statement()),
+            bank_statement_refused: Some("no closing balance".to_string()),
+            ..Default::default()
+        };
+        assert!(matches!(both.documents_read(), Err(AuditError::Config(_))));
+    }
+
+    #[test]
+    fn each_document_is_listed_exactly_when_caller_data_holds_its_file() {
+        use super::CallerData;
+        use crate::applicability_44ab::ComparisonTurnover;
+        use crate::books_examined::{CallerNamedDocument as N, DocumentRead as D};
+        let turnover = || {
+            Some(ComparisonTurnover {
+                turnover_paise: 1,
+                coverage: "full".to_string(),
+            })
+        };
+        let listed = |c: &CallerData| c.documents_read().unwrap().into_iter().collect::<Vec<_>>();
+        assert!(listed(&CallerData::default()).is_empty());
+        // Each derived document alone: a TRACES file loaded with no rows is listed.
+        let mut c = CallerData::default();
+        c.traces.form26as = Some(Vec::new());
+        assert_eq!(listed(&c), [D::Form26as]);
+        let mut c = CallerData::default();
+        c.traces.ais = Some(Vec::new());
+        assert_eq!(listed(&c), [D::Ais]);
+        let mut c = CallerData::default();
+        c.traces.tis = Some(Vec::new());
+        assert_eq!(listed(&c), [D::Tis]);
+        let mut c = CallerData::default();
+        c.turnover_inputs.gstr1 = turnover();
+        assert_eq!(listed(&c), [D::Gstr1]);
+        // Data that is not a loaded file lists nothing: the pack never fills the GSTR-3B or AIS
+        // turnover, and the report totals come from the read.
+        let mut c = CallerData::default();
+        c.turnover_inputs.gstr3b = turnover();
+        c.turnover_inputs.ais = turnover();
+        c.turnover_inputs.books_turnover_paise = Some(1);
+        c.report_totals = Some(crate::financial_statements::ReportTotals {
+            net_profit_paise: 1,
+            closing_stock_paise: None,
+            source: None,
+        });
+        assert!(listed(&c).is_empty());
+        // Everything at once, in the pack's order whatever the order of the fields.
+        let mut all = CallerData {
+            traces: crate::documents::TracesDocuments {
+                form26as: Some(Vec::new()),
+                ais: Some(Vec::new()),
+                tis: Some(Vec::new()),
+            },
+            bank_statement: Some(statement()),
+            named_documents: [
+                N::DraftForm3cd,
+                N::Gstr3bVs2b,
+                N::Gstr3b,
+                N::ProfitAndLossReport,
+                N::Gstr2b,
+            ]
+            .into(),
+            ..c
+        };
+        all.turnover_inputs.gstr1 = turnover();
+        assert_eq!(
+            listed(&all),
+            [
+                D::Gstr2b,
+                D::Gstr1,
+                D::Form26as,
+                D::ProfitAndLossReport,
+                D::Ais,
+                D::Tis,
+                D::Gstr3b,
+                D::Gstr3bVs2b,
+                D::BankStatement,
+                D::DraftForm3cd,
+            ]
+        );
     }
 
     #[test]

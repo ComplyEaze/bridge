@@ -507,6 +507,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             sent_or_found: 7,
             unsettled: 4,
             unsettled_no_response: 2,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 1
         }
     );
@@ -517,6 +518,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             sent_or_found: 0,
             unsettled: 0,
             unsettled_no_response: 0,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 0
         }
     );

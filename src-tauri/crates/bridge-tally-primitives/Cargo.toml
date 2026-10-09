@@ -12,7 +12,7 @@ rust-version = "1.96"
 workspace = true
 
 [dependencies]
-icu_properties = "2.3"
+icu_properties = "2.2"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 

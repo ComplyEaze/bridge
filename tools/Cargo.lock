@@ -115,6 +115,7 @@ dependencies = [
 name = "bridge-tally-primitives"
 version = "0.1.0"
 dependencies = [
+ "icu_properties",
  "serde",
  "thiserror",
 ]

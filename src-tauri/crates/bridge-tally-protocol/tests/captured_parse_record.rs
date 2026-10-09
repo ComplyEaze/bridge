@@ -2218,6 +2218,14 @@ const SALES_REHEARSAL: &str = "answers of the GST Sales rehearsal (7 Oct 2026), 
      this crate reads: the app crate's invoice code parses them (src/agent_import_invoice_wire.rs), \
      and its tests (src/agent_import_invoice_wire_tests.rs, src/agent_import_invoice_admission_tests.rs) \
      pin what each parse returns; sales-rehearsal/PROVENANCE.md says what each file is";
+const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oct 2026), with no \
+     row here: the app crate's replay (src/agent_import_post_e2e_tests.rs, and for the tax units \
+     src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
+     feeds it through the build, the post and the read-back and pins what each parse returns; \
+     pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_EVIDENCE: &str = "an answer of the pilot lab's invoice round (9 Oct 2026) that no \
+     test reads: kept beside the answers the replay uses as the evidence for §9.16; \
+     pilot-lab/PROVENANCE.md says what it is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
@@ -2252,6 +2260,91 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-voucher-types.utf16le.xml",
         SALES_REHEARSAL,
+    ),
+    // The pilot lab invoice round answers, and the import request they came with.
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-request.utf16le.xml",
+        IMPORT_REQUEST,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml",
+        PILOT_LAB_EVIDENCE,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-marks-before-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-fields.utf16le.xml",
+        PILOT_LAB_EVIDENCE,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-typed-request.utf8.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-vouchers-after-post.utf8.xml",
+        PILOT_LAB_EVIDENCE,
     ),
     // Import request bodies named without `request`.
     ("tests/fixtures/agent/d3-batch-import.xml", IMPORT_REQUEST),

@@ -14,6 +14,7 @@ use bridge_tally_core::master_binding::{
     self, twin_fold_keys, BindingBasis, BindingStatus, Candidates, EntityBinding, MasterCatalog,
     MasterClass, SourceEntity,
 };
+use bridge_tally_core::text::draws_nothing;
 use bridge_tally_core::{ExactDecimal, TallyDate};
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
@@ -3176,15 +3177,15 @@ fn reads_back_as_other_text(value: &str) -> bool {
 /// back byte for byte (`agent_import_span_identity.rs`), so a narration that
 /// would read back rewritten is refused when the batch is built, and before a
 /// native POST of a batch saved before this check, rather than refusing that
-/// post's binding for good. `validate_payload` still admits such a saved batch
-/// for review and reconciliation. The reference is never compared, so it is
-/// not refused.
+/// post's binding for good. So is a narration holding a character that draws
+/// nothing ([`draws_nothing`]). `validate_payload` still admits such a saved
+/// batch for review and reconciliation. The reference is never compared, so it
+/// is not refused.
 fn refuse_rewritten_narration(vouchers: &[ImportVoucher]) -> Result<(), String> {
     if vouchers.iter().any(|voucher| {
-        voucher
-            .narration
-            .as_deref()
-            .is_some_and(reads_back_as_other_text)
+        voucher.narration.as_deref().is_some_and(|narration| {
+            reads_back_as_other_text(narration) || narration.chars().any(draws_nothing)
+        })
     }) {
         return Err("voucher_text_invalid".to_string());
     }

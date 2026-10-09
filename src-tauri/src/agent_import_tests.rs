@@ -2030,6 +2030,43 @@ fn text_that_would_read_back_changed_is_refused_before_posting() {
     }
 }
 
+/// A narration holding a character that draws nothing (`draws_nothing`) is
+/// refused when the batch is built and before a native POST, while a saved
+/// batch holding one is still admitted for review. The joiners Indic spellings
+/// need, and the reference, stay admitted.
+#[test]
+fn a_narration_holding_a_character_that_draws_nothing_is_refused_before_posting() {
+    let input = admitted_captured_payload();
+    for text in [
+        "Paid \u{202E}Primary",
+        "Paid \u{2066}Primary\u{2069}",
+        "Paid\u{200B}Primary",
+        "\u{FEFF}Paid Primary",
+        "Paid Primary\u{E0041}",
+    ] {
+        let mut changed = input.clone();
+        changed.vouchers[0].narration = Some(text.to_string());
+        assert_eq!(payload_verdict(&changed), Ok(()), "{text:?}");
+        assert_eq!(
+            refuse_rewritten_narration(&changed.vouchers),
+            Err("voucher_text_invalid".to_string()),
+            "{text:?}"
+        );
+        let mut changed = input.clone();
+        changed.vouchers[0].reference = Some(text.to_string());
+        assert_eq!(payload_verdict(&changed), Ok(()), "{text:?}");
+        assert_eq!(
+            refuse_rewritten_narration(&changed.vouchers),
+            Ok(()),
+            "{text:?}"
+        );
+    }
+    let mut changed = input.clone();
+    changed.vouchers[0].narration =
+        Some("\u{0915}\u{094D}\u{200D}\u{0937} \u{0930}\u{200C}".to_string());
+    assert_eq!(refuse_rewritten_narration(&changed.vouchers), Ok(()));
+}
+
 /// `reads_back_as_other_text` escapes the value with `quick_xml::escape::escape`
 /// before it marks references. quick-xml 0.42 also writes a carriage return as
 /// `&#13;` there, which 0.41 left raw (bridge#1198), so these answers were

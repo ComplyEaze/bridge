@@ -189,8 +189,13 @@ struct BookLedger {
     tax_type: Option<String>,
     #[serde(default)]
     gst_duty_head: Option<String>,
+    /// Read only so that a ledger carrying opening bills is refused
+    /// ([`refuse_unsendable_masters`]): Tally kept none of the bills this tool
+    /// once sent inside the ledger master (bridge#1500), and no shape for them
+    /// has been captured. Held as `IgnoredAny`, so no bill value can reach a
+    /// renderer.
     #[serde(default)]
-    opening_bill_allocations: Vec<BookBillAllocation>,
+    opening_bill_allocations: Vec<serde::de::IgnoredAny>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -344,6 +349,36 @@ impl MasterKind {
                 "NAME,PARENT,BASEUNITS,OPENINGBALANCE,OPENINGRATE,OPENINGVALUE,\
                 GSTAPPLICABLE,HSNCODE,GUID,MASTERID,ALTERID"
             }
+        }
+    }
+
+    /// The book fields the post-Create read-back compares
+    /// ([`readback_mismatches`]), each only when the book gives it. Nothing
+    /// else is checked; in particular not a ledger's opening bills
+    /// (bridge#1500).
+    fn created_compared(self) -> &'static [&'static str] {
+        match self {
+            Self::Unit => &["decimal_places"],
+            Self::Godown | Self::StockGroup | Self::Group => &["parent"],
+            Self::Ledger => &["parent", "opening_balance", "party_gstin"],
+            Self::StockItem => &["parent", "opening_qty"],
+        }
+    }
+
+    /// The book fields compared before a master already in the target counts
+    /// as `already_present_verified`, or after a reconcile Alter as
+    /// `altered_verified` ([`already_present_verified_mismatches`]).
+    fn present_compared(self) -> &'static [&'static str] {
+        match self {
+            Self::Ledger => &[
+                "parent",
+                "opening_balance",
+                "party_gstin",
+                "is_billwise_on",
+                "tax_type",
+                "gst_duty_head",
+            ],
+            other => other.created_compared(),
         }
     }
 
@@ -700,25 +735,9 @@ fn render_ledger_xml(l: &BookLedger) -> String {
         .as_deref()
         .map(|d| format!("<GSTDUTYHEAD>{}</GSTDUTYHEAD>", xml_escape(d)))
         .unwrap_or_default();
-    // Opening bill-wise allocations, when the source captured them, nested
-    // under the ledger master the same way an accounting voucher's
-    // BILLALLOCATIONS.LIST nests under its ledger entry (§9.4a family) --
-    // this specific master-level placement has no live capture in this
-    // repository and is UNVERIFIED for the gateway; see module doc.
-    let opening_bills = l
-        .opening_bill_allocations
-        .iter()
-        .map(|b| {
-            let name = b.name.clone().unwrap_or_default();
-            format!(
-                "<BILLALLOCATIONS.LIST><NAME>{}</NAME><BILLTYPE>{}</BILLTYPE><AMOUNT>{}</AMOUNT></BILLALLOCATIONS.LIST>",
-                xml_escape(&name), xml_escape(&b.bill_type), xml_escape(&b.amount)
-            )
-        })
-        .collect::<String>();
     format!(
         "<TALLYMESSAGE><LEDGER NAME=\"{name}\" ACTION=\"Create\"><NAME>{name}</NAME>\
-<PARENT>{parent}</PARENT>{billwise}{opening_balance}{gstin}{tax_type}{duty_head}{opening_bills}</LEDGER></TALLYMESSAGE>",
+<PARENT>{parent}</PARENT>{billwise}{opening_balance}{gstin}{tax_type}{duty_head}</LEDGER></TALLYMESSAGE>",
         parent = xml_escape(parent)
     )
 }
@@ -1002,11 +1021,81 @@ fn already_present_verified_mismatches(
 // lab_import_masters
 // ---------------------------------------------------------------------------
 
+/// A book this tool refuses before it reads or writes anything in Tally.
+#[derive(Debug, PartialEq, Eq)]
+enum LabMastersRefusal {
+    /// The ledgers that carry `opening_bill_allocations`. Sent inside the
+    /// ledger master, Tally kept none of them and the read-back, which does
+    /// not compare bills, passed (bridge#1500). No shape that Tally honours
+    /// has been captured.
+    OpeningBillsUnsupported { ledgers: Vec<String> },
+}
+
+impl LabMastersRefusal {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::OpeningBillsUnsupported { .. } => "lab_opening_bills_unsupported",
+        }
+    }
+
+    /// The precheck-log entries naming what was refused, in the
+    /// `Kind:Name:reason` form the reserved-root refusal already uses there.
+    fn logged_entries(&self) -> Vec<String> {
+        match self {
+            Self::OpeningBillsUnsupported { ledgers } => ledgers
+                .iter()
+                .map(|name| format!("Ledger:{name}:opening_bills"))
+                .collect(),
+        }
+    }
+}
+
+fn refuse_unsendable_masters(masters: &BookMasters) -> Result<(), LabMastersRefusal> {
+    let ledgers: Vec<String> = masters
+        .ledgers
+        .iter()
+        .filter(|l| !l.opening_bill_allocations.is_empty())
+        .map(|l| l.name.clone())
+        .collect();
+    if ledgers.is_empty() {
+        Ok(())
+    } else {
+        Err(LabMastersRefusal::OpeningBillsUnsupported { ledgers })
+    }
+}
+
+/// The fields each requested kind's read-backs compared, by the state a
+/// master can end in, so that `ok` is never read as covering more.
+fn compared_report(masters: &BookMasters) -> Value {
+    let mut report = serde_json::Map::new();
+    for kind in MasterKind::IMPORT_ORDER {
+        if kind.count(masters) == 0 {
+            continue;
+        }
+        let mut states = serde_json::Map::new();
+        states.insert("created".into(), json!(kind.created_compared()));
+        states.insert(
+            "already_present_verified".into(),
+            json!(kind.present_compared()),
+        );
+        if kind == MasterKind::Ledger {
+            states.insert("altered_verified".into(), json!(kind.present_compared()));
+        }
+        report.insert(kind.tally_type().into(), Value::Object(states));
+    }
+    Value::Object(report)
+}
+
 pub(in crate::agent) async fn lab_import_masters(
     server: &Server,
     args: &Value,
 ) -> Result<ToolOutcome, ToolFailure> {
     let masters: BookMasters = parse_book_value(args, "masters", "masters")?;
+    // Before the first request: a refused book costs Tally nothing.
+    if let Err(refusal) = refuse_unsendable_masters(&masters) {
+        persist_lab_precheck_collisions(server, &refusal.logged_entries());
+        return Err(ToolFailure::from(refusal.code().to_string()));
+    }
     let guid = required_string(args, "company_guid")?;
 
     let (_company, identity, mut evidence) = admit_lab_target(server).await?;
@@ -1425,6 +1514,7 @@ pub(in crate::agent) async fn lab_import_masters(
             "created": created_masters,
             "already_present_verified": already_present_verified,
             "altered_verified": altered_verified,
+            "compared": compared_report(&masters),
         }}),
         evidence,
         company_guid: Some(guid.to_string()),

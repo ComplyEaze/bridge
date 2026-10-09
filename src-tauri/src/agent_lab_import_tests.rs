@@ -2053,3 +2053,187 @@ fn a_correct_write_on_a_book_viewed_in_a_later_period_reads_back_as_written() {
     let row = find_readback_row(&rows, &item.name).expect("stock item read back");
     assert_eq!(diff_stock_item(&item, row), Vec::<String>::new());
 }
+
+// ---------------------------------------------------------------------------
+// Opening bills are refused before anything is sent (bridge#1500)
+// ---------------------------------------------------------------------------
+
+fn masters_with_opening_bills() -> BookMasters {
+    serde_json::from_value(json!({"ledgers": [
+        {"name": "Lab Party P1", "parent": "Sundry Debtors", "opening_balance": "-15000.00",
+         "is_billwise_on": true, "opening_bill_allocations": [
+            {"name": "OB-1", "bill_type": "New Ref", "amount": "-10000.00"},
+            {"bill_type": "On Account", "amount": "-5000.00"}]},
+        {"name": "Lab Bank", "parent": "Bank Accounts", "opening_balance": "-1000.00",
+         "opening_bill_allocations": []},
+        {"name": "Lab Party P2", "parent": "Sundry Creditors", "opening_balance": "700.00",
+         "is_billwise_on": true, "opening_bill_allocations": [
+            {"name": "OB-2", "bill_type": "New Ref", "amount": "700.00"}]}
+    ]}))
+    .unwrap()
+}
+
+#[test]
+fn a_ledger_with_opening_bills_is_refused_naming_every_such_ledger() {
+    assert_eq!(
+        refuse_unsendable_masters(&masters_with_opening_bills()),
+        Err(LabMastersRefusal::OpeningBillsUnsupported {
+            ledgers: vec!["Lab Party P1".into(), "Lab Party P2".into()],
+        })
+    );
+}
+
+#[test]
+fn a_book_without_opening_bills_is_not_refused() {
+    let mut masters = masters_with_opening_bills();
+    masters
+        .ledgers
+        .retain(|l| l.opening_bill_allocations.is_empty());
+    assert_eq!(masters.ledgers.len(), 1);
+    assert_eq!(refuse_unsendable_masters(&masters), Ok(()));
+    let absent: BookMasters =
+        serde_json::from_value(json!({"ledgers": [{"name": "Lab Cash"}]})).unwrap();
+    assert_eq!(refuse_unsendable_masters(&absent), Ok(()));
+}
+
+/// The refusal costs Tally nothing: a gateway double that counts every request
+/// it reads sees none. The same server then reaches the double with
+/// `tally_status`, so the zero is a measurement and not an unreachable double.
+#[tokio::test]
+async fn the_opening_bills_refusal_runs_before_the_first_request() {
+    use tally_protocol_simulator::{
+        Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+    let raw = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    );
+    let captured = String::from_utf16(
+        &raw.chunks_exact(2)
+            .map(|b| u16::from_le_bytes([b[0], b[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let simulator = SequenceSimulator::spawn(vec![
+        ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime)),
+        ScenarioPlan::new(Fixture::SyntheticXml(captured)).with_encoding(WireEncoding::Utf16Le),
+    ])
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let args = json!({
+        "masters": {"ledgers": [
+            {"name": "Lab Party P1", "parent": "Sundry Debtors", "opening_balance": "-15000.00",
+             "is_billwise_on": true, "opening_bill_allocations": [
+                {"name": "OB-1", "bill_type": "New Ref", "amount": "-10000.00"}]}
+        ]},
+        "company_guid": "61c6de69-1748-461c-ad3f-162cb949df9f",
+    });
+    let refusal = match lab_import_masters(&server, &args).await {
+        Ok(_) => panic!("a ledger with opening bills was not refused"),
+        Err(failure) => failure,
+    };
+    let expected = LabMastersRefusal::OpeningBillsUnsupported {
+        ledgers: vec!["Lab Party P1".into()],
+    };
+    assert_eq!(refusal.code, expected.code());
+    assert_eq!(simulator.received(), 0);
+    let log =
+        fs::read_to_string(directory.path().join("lab/lab-precheck-collisions.jsonl")).unwrap();
+    let records: Vec<Value> = log
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["collisions"], json!(expected.logged_entries()));
+    assert_eq!(
+        records[0]["collisions"],
+        json!(["Ledger:Lab Party P1:opening_bills"])
+    );
+
+    let status = server.call_tool("tally_status", json!({})).await;
+    assert_eq!(status["isError"], false, "{status}");
+    assert_eq!(simulator.finish().unwrap().len(), 2);
+}
+
+/// Every field a read-back says it compared is one whose difference it
+/// reports, so `compared` never claims more than the diff checks.
+#[test]
+fn each_ledger_field_listed_as_compared_is_a_field_the_read_back_reports() {
+    let book: BookLedger = serde_json::from_value(json!({
+        "name": "Lab Duty", "parent": "Duties & Taxes", "opening_balance": "-100.00",
+        "is_billwise_on": false, "party_gstin": "27ZZZZZ0000Z1Z5",
+        "tax_type": "GST", "gst_duty_head": "Central Tax"
+    }))
+    .unwrap();
+    let matching = row(&[
+        ("NAME", "Lab Duty"),
+        ("PARENT", "Duties & Taxes"),
+        ("OPENINGBALANCE", "-100.00"),
+        ("ISBILLWISEON", "No"),
+        ("PARTYGSTIN", "27ZZZZZ0000Z1Z5"),
+        ("TAXTYPE", "GST"),
+        ("GSTDUTYHEAD", "Central Tax"),
+    ]);
+    assert_eq!(
+        ledger_already_present_mismatches(&book, &matching),
+        Vec::<String>::new()
+    );
+    let column = |field: &str| match field {
+        "parent" => "PARENT",
+        "opening_balance" => "OPENINGBALANCE",
+        "party_gstin" => "PARTYGSTIN",
+        "is_billwise_on" => "ISBILLWISEON",
+        "tax_type" => "TAXTYPE",
+        "gst_duty_head" => "GSTDUTYHEAD",
+        other => panic!("no read-back column for {other}"),
+    };
+    let differing = |field: &str| {
+        let mut changed = matching.clone();
+        changed.insert(column(field).to_string(), "Different 999".to_string());
+        changed
+    };
+    for field in MasterKind::Ledger.created_compared() {
+        assert_eq!(diff_ledger(&book, &differing(field)).len(), 1, "{field}");
+    }
+    for field in MasterKind::Ledger.present_compared() {
+        assert_eq!(
+            ledger_already_present_mismatches(&book, &differing(field)).len(),
+            1,
+            "{field}"
+        );
+    }
+}
+
+#[test]
+fn the_compared_report_names_the_fields_of_each_requested_kind_only() {
+    let masters: BookMasters = serde_json::from_value(json!({
+        "units": [{"name": "Nos"}],
+        "ledgers": [{"name": "Lab Cash"}]
+    }))
+    .unwrap();
+    assert_eq!(
+        compared_report(&masters),
+        json!({
+            "Unit": {"created": ["decimal_places"], "already_present_verified": ["decimal_places"]},
+            "Ledger": {
+                "created": ["parent", "opening_balance", "party_gstin"],
+                "already_present_verified": ["parent", "opening_balance", "party_gstin",
+                    "is_billwise_on", "tax_type", "gst_duty_head"],
+                "altered_verified": ["parent", "opening_balance", "party_gstin",
+                    "is_billwise_on", "tax_type", "gst_duty_head"]
+            }
+        })
+    );
+}

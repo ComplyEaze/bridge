@@ -1387,16 +1387,18 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              not rebuild it as a Journal: a GST invoice entered as a Journal is not filed as \
              an invoice.",
         ),
-        // The refusals of an invoice post_import would refuse: the build gives
-        // the same code, and writes no file (an invoice has no other route).
-        "import_review_layout_text" | "import_review_format_text" => Some(
+        // The build of an invoice post_import would refuse for its approval
+        // text. These are the invoice build's own codes: the post's codes
+        // (`import_review_*`) also refuse a Journal, Payment, Receipt or
+        // Contra, whose advice is not this one.
+        "invoice_review_layout_text" | "invoice_review_format_text" => Some(
             "A name or text in this invoice (the company, a ledger, the customer, the narration \
              or the reference) holds a line break or a character the approval dialog cannot \
              show faithfully, so it cannot be approved or posted, and no file was written. \
              Ask the user to correct that text, then build the invoice again; do not offer to \
              import it by hand.",
         ),
-        "import_review_too_large" => Some(
+        "invoice_review_too_large" => Some(
             "The approval text for this invoice does not fit in one native dialog, so it \
              cannot be approved or posted, and no file was written. Ask the user to shorten \
              the narration or reference, then build the invoice again; do not offer to import \

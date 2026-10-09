@@ -1232,7 +1232,7 @@ impl Server {
                     post::PostScope::Vouchers,
                     self.post_voucher_limit(post::PostScope::Vouchers),
                 ) {
-                    return Err(code.into());
+                    return Err(invoice_route_refusal(code).into());
                 }
             }
             let imports = self.imports_dir()?;
@@ -2625,6 +2625,19 @@ const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothin
 /// The code of the refusal that stops an invoice build while voucher posting
 /// is off (see `build_import_xml`); its text is in agent.rs.
 const INVOICE_POST_NOT_ENABLED: &str = "invoice_post_not_enabled";
+
+/// The code an invoice build gives when `post_import` would refuse the saved
+/// invoice: the post's own code, except for the refusals of the approval text,
+/// which also refuse the other voucher types and so carry a code of their own
+/// here, with advice about an invoice.
+fn invoice_route_refusal(code: String) -> String {
+    match code.as_str() {
+        "import_review_layout_text" => "invoice_review_layout_text".to_string(),
+        "import_review_format_text" => "invoice_review_format_text".to_string(),
+        "import_review_too_large" => "invoice_review_too_large".to_string(),
+        _ => code,
+    }
+}
 
 const INVOICE_POST_ONLY_WARNING: &str = "No import XML was sent to Tally. This invoice is posted by post_import, which needs a separate native approval, and in no other way. Do not import the written file in Tally by hand: a hand import skips the stop on an unverified invoice, the duplicate checks, the reads on either side of the approval and the readback of the invoice.";
 

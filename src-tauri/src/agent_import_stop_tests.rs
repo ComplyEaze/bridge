@@ -737,7 +737,7 @@ fn an_invoice_without_a_native_post_route_is_refused_before_a_read_and_before_a_
         .find("persistence::persist_build(")
         .expect("the file is written");
     let refusal = build[eligible..]
-        .find("return Err(code.into())")
+        .find("return Err(invoice_route_refusal(code).into())")
         .expect("with the post's own code");
     assert!(invoice_batch < eligible && eligible + refusal < file);
 
@@ -793,4 +793,36 @@ fn the_already_posted_texts_send_a_declined_invoice_again_under_its_number() {
     assert!(post.contains(
         "Never rebuild a row to retry it, except an invoice released as described above."
     ));
+}
+
+/// The approval-text refusals of an invoice build carry the invoice's own
+/// codes, with advice about an invoice; the post's codes, which also refuse a
+/// Journal, Payment, Receipt or Contra, carry no invoice wording.
+#[test]
+fn the_approval_text_refusals_of_an_invoice_build_do_not_reach_other_vouchers() {
+    use super::super::super::invoice_route_refusal;
+    for (post_code, invoice_code) in [
+        ("import_review_layout_text", "invoice_review_layout_text"),
+        ("import_review_format_text", "invoice_review_format_text"),
+        ("import_review_too_large", "invoice_review_too_large"),
+    ] {
+        assert_eq!(invoice_route_refusal(post_code.to_string()), invoice_code);
+        let advice = crate::agent::refusal_remediation(invoice_code)
+            .unwrap_or_else(|| panic!("{invoice_code} has advice"));
+        assert!(advice.contains("invoice"), "{advice}");
+        assert!(advice.contains("no file was written"), "{advice}");
+        // What a Journal, Payment, Receipt or Contra post is refused with.
+        assert!(
+            crate::agent::refusal_remediation(post_code)
+                .is_none_or(|text| !text.contains("invoice")),
+            "{post_code}"
+        );
+    }
+    // Any other code passes through as the post's own.
+    for code in [
+        "import_post_requires_one_voucher",
+        "import_invoice_not_observed",
+    ] {
+        assert_eq!(invoice_route_refusal(code.to_string()), code);
+    }
 }

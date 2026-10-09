@@ -10,4 +10,3 @@ scripts/check-protocol-section-numbers.test.mjs > scripts\check-protocol-section
 scripts/generate-frontend-licenses.test.mjs > the committed file's `name version` tokens are exactly what the generator (re-run) produces
 scripts/playwright-install-step.test.mjs > the apt-based install runs only under a timeout that itself runs as root, around node run as root
 scripts/release-workflows.test.mjs > the site summary step is informational, permitted to read deployments, and shows what would go live
-scripts/site-pages.test.mjs > no file that ships carries an internal working label

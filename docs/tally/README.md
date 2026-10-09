@@ -83,7 +83,7 @@ capability from assumption, and a completed request from a verified snapshot.
   real run should be compared row by row against `pdftotext`. `MOBFT` transfers go to suspense,
   because the observed shape does not say which field names the counterparty.
 
-  It also reads **Bank of Baroda** statements in one measured layout (`bank: "bob"`). That layout is a column table like
+  It also reads **Bank of Baroda** statements in one measured layout (`bank: "bob"`). A statement is read as Bank of Baroda only if page 1's `IFSC Code:` line carries the bank's prefix (the statements print the bank's name only in an image); otherwise it is refused as `statement_bank_not_recognised`. That layout is a column table like
   HDFC's, with these differences, each measured on two real statements, held privately
   (read through PDFium; the rules are described by shape and geometry only): the column header is printed on page 1 only; a row's amount sits on
   its own visual line, up to 12 points below its date; the newest row is printed first, so the

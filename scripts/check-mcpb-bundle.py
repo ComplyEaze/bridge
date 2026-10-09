@@ -18,6 +18,7 @@ RESOURCES = ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt", "THIRD_PARTY_LICEN
 DEFAULT_TOOLS = {
     "balance_sheet",
     "cash_flow",
+    "company_features",
     "egress_log",
     "ledger_masters",
     "ledger_movement",

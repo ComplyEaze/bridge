@@ -54,7 +54,9 @@ test("a directory that is not a repository is exit 2, never 'none found'", () =>
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("a tracked file that cannot be read is exit 2, not a clean result", { skip: process.getuid?.() === 0 ? "root can read any file" : false }, () => {
+// Skipped where `chmod 000` does not stop a read: as root, and on Windows (#1471), as the byte-integrity test does.
+const unreadableSkip = process.getuid?.() === 0 ? "root can read any file" : process.platform === "win32" ? "chmod does not stop a read on Windows" : false;
+test("a tracked file that cannot be read is exit 2, not a clean result", { skip: unreadableSkip }, () => {
   const dir = repo({ "locked.txt": "<<<<<<< x\n", "fine.txt": "ok\n" });
   try {
     chmodSync(join(dir, "locked.txt"), 0o000);

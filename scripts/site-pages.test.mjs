@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { sep } from "node:path";
 import test from "node:test";
 
 const site = new URL("../site/", import.meta.url);
 const read = (name) => readFileSync(new URL(name, site), "utf8");
+// Every file under the site, by its path in `/` form: on Windows `readdirSync` returns `brand\lockup.svg` (#1471).
+const siteFiles = () => readdirSync(site, { recursive: true }).map((name) => name.split(sep).join("/"));
 // The deploy writes these from the tracked templates; a template is the page this test reads.
 const siteOrigin = "https://bridge.complyeaze.com/";
 const generated = new Set(["changelog.html", "privacy.html", "releases.json", "terms.html", "terms-2026-10.html"]);
@@ -93,7 +96,7 @@ test("stylesheets and scripts name only files the site ships, and no outside add
 });
 
 test("nothing on the site points at the roadmap or the comparison, which ship separately", () => {
-  for (const name of readdirSync(site, { recursive: true })) {
+  for (const name of siteFiles()) {
     if (!/\.(html|js|mjs|css)$/.test(name) || name.startsWith("vendor/") || generated.has(name)) continue;
     assert.doesNotMatch(read(name), /roadmap|compare\.html|\/compare\b|comparison/i, `${name} mentions the roadmap or the comparison`);
   }
@@ -132,7 +135,7 @@ test("no file that ships carries an internal working label", () => {
     /\bround[- ]?[0-9]/i, /\bv[0-9]m?\b(?!\.[0-9]|[0-9])/, /\bv[0-9]\//, /\bpages\//, /\bstyle\.css\b/, /\b[0-9]{1,2} (?:Sep|Oct)\b(?! 20)/,
     /privacy policy, section/i, /\bPrivacy and Terms\b/, /\b(?:TBT|perf) pass\b/i, /\bfinal (?:pass|review)\b/i,
   ];
-  const files = readdirSync(site, { recursive: true }).filter((name) => /\.(html|css|js|mjs|svg|md|txt|xml)$/.test(name) && !name.endsWith(".min.js") && !generated.has(name));
+  const files = siteFiles().filter((name) => /\.(html|css|js|mjs|svg|md|txt|xml)$/.test(name) && !name.endsWith(".min.js") && !generated.has(name));
   assert.ok(files.includes("scene.js") && files.includes("chrome.js") && files.includes("home.css") && files.includes("brand/lockup.svg"), "the check reads the scripts, stylesheets and artwork");
   for (const name of files) {
     // path data (d="M2.21 7 L4.99 7 …") is drawing commands, not words

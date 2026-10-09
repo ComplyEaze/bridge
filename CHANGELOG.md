@@ -18,6 +18,14 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `company_features` reads three settings that a company's record in Tally holds today (cost centres, GST
+  and batch-wise stock) and its currency symbol (part of #1231). Each setting is yes, no or
+  not reported, and says what it rests on: each of the three was compared with Tally's own
+  F11 screen on three synthetic books (nine values, all equal; not this company). A setting Tally did not send is never read as no, and an empty or odd one refuses the read. The
+  settings are the ones Tally holds today, not what the books contain or what they were during a year. The
+  currency is a symbol, not a currency code. Measured on three synthetic books of one TallyPrime 7.1 Silver;
+  a setting changed inside a sitting, Education mode and other releases are not measured.
+
 - `parse_bank_statement` reads Bank of Baroda statements in one measured layout (`bank: "bob"`; Part of #1457). The layout was measured on
   two real statements, held privately, and the profile follows what was seen there:
   the statements print neither an opening nor a closing balance nor totals, so both balances come from you, and
@@ -25,7 +33,7 @@ These changes are in source and not yet in a published build.
   number masked (first and last three digits clear), so `account_label` must carry the whole number; only those six
   digits are compared, the masked middle cannot be. With no printed totals those balances and the footers are the
   only checks on which rows were read: missing rows whose amounts net to zero would not be seen. They print the newest row first; the rows are read oldest first and
-  numbered that way. The measured statements cut a narration at about 50 characters, so a name can end mid-word. A party is named
+  numbered that way. A statement is read as Bank of Baroda only if page 1 prints an IFSC Code with the bank's prefix on its `IFSC Code:` line; otherwise it is refused as `statement_bank_not_recognised`. The measured statements cut a narration at about 50 characters, so a name can end mid-word. A party is named
   only where the shape settles it: a UPI row names its VPA (when the VPA is whole), NEFT and RTGS rows name what
   follows the UTR (not when a line was broken at the cell edge inside the narration), and bank charges and a cash deposit are recognised by their wording; a loan recovery is named as printed, loan number included, so two loans are two parties. Two payers whose names agree up to the cut read as one party. IMPS,
   mobile-banking and internet-banking rows, interest and every other wording go to suspense. A statement that

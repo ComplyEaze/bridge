@@ -184,6 +184,7 @@ pub fn parse_pages(pages: &[Page], bank: Bank) -> Vec<Row> {
 pub fn parse_statement(pages: &[Page], bank: Bank) -> Result<Vec<Row>, Refusal> {
     match bank.layout() {
         Layout::Columns if bank == Bank::Bob => {
+            require_bank_identity(pages)?;
             require_page_footers(pages, bank)?;
             require_later_pages_start_with_a_row(pages, bank)?;
             Bank::bob_rows(parse_pages(pages, bank))
@@ -257,6 +258,70 @@ fn parse_single_line_pages(pages: &[Page], bank: Bank) -> Result<Vec<Row>, Refus
         }
     }
     Ok(rows)
+}
+
+/// The first four letters of the IFSC that page 1 of a Bank of Baroda statement prints.
+const BOB_IFSC_PREFIX: &str = "BARB";
+
+/// A statement is read as Bank of Baroda only if page 1 says so in the one place the
+/// measured statements do: a single visual line holding the word `IFSC` followed by
+/// the word `Code:`, whose next word is an 11-character IFSC (four capital letters,
+/// a zero, six capital letters or digits) that begins with the bank's prefix; the prefix is
+/// compared as capitals, so lower case never matches. The
+/// measured statements print the bank's name only in an image, so the text layer has
+/// nothing else to read; the same four letters inside a narration are a counterparty's
+/// bank and are never looked at. The check is by label and position: page 1 only, and only
+/// the lines above the table's column header row (as the masked account number is read), so a
+/// row that prints those words is neither identity nor a second line; a
+/// missing, repeated, malformed or other-bank code refuses the whole run, and the
+/// refusal never carries the code.
+fn require_bank_identity(pages: &[Page]) -> Result<(), Refusal> {
+    let refuse = |why: &'static str| {
+        Refusal::new(
+            "bank_not_recognised",
+            format!(
+                "page 1 of this statement does not carry the Bank of Baroda IFSC Code ({why}); this reader is measured on one Bank of Baroda layout only, so check the bank chosen"
+            ),
+        )
+    };
+    let first = pages
+        .first()
+        .ok_or_else(|| refuse("the statement has no page"))?;
+    let page_lines = lines(first);
+    let top = table_top(&page_lines, Bank::Bob)
+        .ok_or_else(|| refuse("the table's column header row was not found"))?;
+    let mut found = Vec::new();
+    for line in page_lines.iter().filter(|line| line.y < top) {
+        for (at, words) in line.words.windows(2).enumerate() {
+            if words[0].text == "IFSC" && words[1].text == "Code:" {
+                found.push(line.words.get(at + 2).map(|word| word.text.clone()));
+            }
+        }
+    }
+    let [value] = found.as_slice() else {
+        return Err(refuse(if found.is_empty() {
+            "no IFSC Code line"
+        } else {
+            "more than one IFSC Code"
+        }));
+    };
+    let value = value
+        .as_deref()
+        .ok_or_else(|| refuse("the IFSC Code has no value"))?;
+    let bytes = value.as_bytes();
+    // (the first four letters are checked against the bank's prefix below, capitals included)
+    let well_formed = bytes.len() == 11
+        && bytes[4] == b'0'
+        && bytes[5..]
+            .iter()
+            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit());
+    if !well_formed {
+        return Err(refuse("the IFSC Code is not an IFSC"));
+    }
+    if !value.starts_with(BOB_IFSC_PREFIX) {
+        return Err(refuse("the IFSC Code names another bank"));
+    }
+    Ok(())
 }
 
 fn page_sequence_unproven(index: usize, count: usize) -> Refusal {

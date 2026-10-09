@@ -43,6 +43,8 @@ use company::*;
 mod cash_flow;
 #[path = "agent_changes.rs"]
 mod changes;
+#[path = "agent_company_features.rs"]
+mod company_features;
 #[path = "agent_headline.rs"]
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
@@ -795,6 +797,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(check.code());
         }
+        if let Some(features) = cause
+            .downcast_ref::<bridge_tally_protocol::native_company_features::NativeCompanyFeaturesError>()
+        {
+            return Some(features.code());
+        }
         if let Some(outstandings) =
             cause.downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
         {
@@ -1533,6 +1540,10 @@ impl ToolFailure {
             cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
         }) {
             error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
+        }) {
+            error.safe_code()
         } else if error.chain().any(|cause| {
             matches!(
                 cause.downcast_ref::<crate::tally::runtime::OpeningBoundaryObservationError>(),
@@ -2129,6 +2140,7 @@ impl Server {
             }
             "cash_flow" => self.cash_flow(args).await,
             "changed_since" => self.changed_since(args).await,
+            "company_features" => self.company_features(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
             "ledger_masters" => self.ledger_masters(args).await,
             "ledger_movement" => self.ledger_movement(args).await,

@@ -42,7 +42,8 @@ function runGateExpectingFailure(root) {
   try {
     runGate(root);
   } catch (error) {
-    return `${error.stdout ?? ""}${error.stderr ?? ""}`;
+    // The gate fails by an uncaught throw; on Windows Node prints that with CRLF line ends (#1471).
+    return `${error.stdout ?? ""}${error.stderr ?? ""}`.replaceAll("\r\n", "\n");
   }
   throw new Error("expected the gate to fail, but it passed");
 }

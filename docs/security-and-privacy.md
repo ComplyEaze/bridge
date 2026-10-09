@@ -166,6 +166,12 @@ or `1` is not asked.
       trial balance's also counts its rows.
   - Either setting also leaves out the text of an error Tally returned for a
     line. Any other value stops the extension from starting.
+  - **What the reads added since 0.5.0 send, under each setting.**
+    - The company settings read (`company_features`) sends the company name,
+      its identifier, company number and books-from date, the cost-centre, GST
+      and batch-wise settings as yes, no or not reported, and the currency
+      symbol. It holds no amounts and no narrations, and `mask_parties` has
+      nothing to shorten in it.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

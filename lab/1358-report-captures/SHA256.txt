@@ -1,0 +1,26 @@
+# lab/1358-report-captures: TallyPrime 7.1 Silver (licensed), Windows 10 22H2, 9 Oct 2026, window 20260401-20270331.
+# Funds Flow, Ratio Analysis, Negative Ledgers on synthetic "Bridge Lab Win 0.5.1"; Negative Stock on synthetic "BRIDGE NEGSTOCK LAB".
+# Requests: the committed builtin_*_request envelopes with SVCURRENTCOMPANY and the two dates changed, UTF-16LE+BOM, charset=utf-16.
+# Answers, headers (curl -D) and GET /status after each report are byte-exact as received. Voucher mark (ALTVCHID) before/after: 13/13 each on Bridge Lab Win 0.5.1, 1/1 on BRIDGE NEGSTOCK LAB.
+# The Negative Ledgers repeat (not included) was byte-identical: b838c49fe1d4a80876ba63f74e6c975e781deb201e7b455b4098545e05d16d5d
+# Format: sha256  bytes  path
+928f378538fc34f73b5afced3bd0db766b37250cdd890bb6e4fa7ebb4fa915a3  134  answer-funds-flow.headers.txt
+c92893a19bde5951e56141a8a2102edcda0f57e9ad817ff81c89e8266f2e778b  5628  answer-funds-flow.xml
+5992c69e339ed965d3411b7471cf0157cd26606e03f0cb6da71428bdbe593213  134  answer-negative-ledgers.headers.txt
+b838c49fe1d4a80876ba63f74e6c975e781deb201e7b455b4098545e05d16d5d  1018  answer-negative-ledgers.xml
+3626716d3a9efdd488488c09edab83fe1a1770fd5c90db41f5b2f4989e03d81e  133  answer-negative-stock.headers.txt
+5d79f50871e2eb35ec27b28c5b85e997d6b222ec3f210af70a20a29c6ae4a8e4  486  answer-negative-stock.xml
+47fab307edcdb1a0f23b772afd243eef19cf9507c9238ea896bcb2f04a5b9768  134  answer-ratio-analysis.headers.txt
+05b417f55657008d0bfbffb0a2c845428bb3c68783a47bb036d43de82ac45e7f  3444  answer-ratio-analysis.xml
+90ca62aeaf4387a60ce890676f731d49eefcc21c2fc03a4754c6696125d74720  760  request-funds-flow.xml
+301671dafe3802202b24515a62c90001658b86089c41cba48ce4098f9287ce68  772  request-negative-ledgers.xml
+2d7ef03645ef666c34def7ed61c77877f3afb5654ad0a848fafcda930dd0bb1b  766  request-negative-stock.xml
+3879d62a75e98f425f233be12d80f5ca7ce49dce2607452dd7abf6ab363f731a  768  request-ratio-analysis.xml
+103743ec081980e5be713e310cf850a1997b40d82ce213812df437627d5d9827  130  status-after-funds-flow.headers.txt
+655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  status-after-funds-flow.txt
+103743ec081980e5be713e310cf850a1997b40d82ce213812df437627d5d9827  130  status-after-negative-ledgers.headers.txt
+655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  status-after-negative-ledgers.txt
+103743ec081980e5be713e310cf850a1997b40d82ce213812df437627d5d9827  130  status-after-negative-stock.headers.txt
+655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  status-after-negative-stock.txt
+103743ec081980e5be713e310cf850a1997b40d82ce213812df437627d5d9827  130  status-after-ratio-analysis.headers.txt
+655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  status-after-ratio-analysis.txt

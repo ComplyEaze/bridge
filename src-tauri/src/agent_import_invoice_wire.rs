@@ -759,8 +759,31 @@ impl Node {
     }
 }
 
+/// A value as Tally means it: the numeric reference to a control character it
+/// writes before some values (`&#4; Any`), which `mark_forbidden_numeric_references`
+/// turns into the replacement character and `#4;`, and the whitespace around
+/// it, are not part of the value.
 fn clean(text: &str) -> String {
-    text.trim_matches(|c: char| c.is_whitespace() || c.is_control())
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('\u{fffd}') {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + '\u{fffd}'.len_utf8()..];
+        let digits = after
+            .strip_prefix('#')
+            .map(|tail| tail.bytes().take_while(u8::is_ascii_digit).count());
+        match digits {
+            Some(count) if count > 0 && after[1 + count..].starts_with(';') => {
+                rest = &after[1 + count + 1..];
+            }
+            _ => {
+                out.push('\u{fffd}');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out.trim_matches(|c: char| c.is_whitespace() || c.is_control())
         .to_string()
 }
 

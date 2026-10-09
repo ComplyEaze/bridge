@@ -1796,3 +1796,204 @@ fn without_a_control_only_an_empty_book_or_a_first_post_is_believed() {
         Err("invoice_number_control_unavailable")
     );
 }
+
+/// Every doubt about a sales ledger's rate is its own refusal, never a guess.
+#[test]
+fn each_doubt_about_a_sales_ledgers_rate_has_its_own_code() {
+    let with = |change: &dyn Fn(&mut wire::LedgerRateRow)| {
+        let mut row = sales_rates("2.5", "5");
+        change(&mut row);
+        sales_rate_milli(&row, AS_OF)
+    };
+    assert_eq!(with(&|_| {}), Ok(2_500));
+    assert_eq!(
+        with(&|r| r.gst_rows.clear()),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    assert_eq!(
+        with(&|r| {
+            let again = r.gst_rows[0].clone();
+            r.gst_rows.push(again)
+        }),
+        Err("invoice_sales_ledger_rate_history_unmeasured")
+    );
+    // A row that starts after the invoice date says nothing of that day.
+    assert_eq!(
+        with(&|r| r.gst_rows[0].applicable_from = Some("20260401".into())),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].applicable_from = None),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].taxability = Some("Exempt".into())),
+        Err("invoice_sales_ledger_not_taxable")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].taxability = None),
+        Err("invoice_sales_ledger_not_taxable")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].source = Some("As per Company/Group".into())),
+        Err("invoice_sales_ledger_rate_not_ledger_specified")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].state = Some("Rajasthan".into())),
+        Err("invoice_sales_ledger_rate_state_wise_unmeasured")
+    );
+    assert_eq!(
+        with(&|r| {
+            let again = r.gst_rows[0].states[0].clone();
+            r.gst_rows[0].states.push(again)
+        }),
+        Err("invoice_sales_ledger_rate_state_wise_unmeasured")
+    );
+    // A state head that is not the other, or an IGST that is not their sum.
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[1].rate = Some("3".into())),
+        Err("invoice_sales_ledger_rate_heads_unequal")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[2].rate = Some("6".into())),
+        Err("invoice_sales_ledger_rate_heads_unequal")
+    );
+    // A head with no rate, a rate that is not a number, a repeated head.
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[0].rate = None),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[0].rate = Some("2.5x".into())),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[0].rate = Some("2.5555".into())),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[0].rate = Some("0".into())),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[0].valuation = Some("Not Applicable".into())),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    assert_eq!(
+        with(&|r| {
+            let again = r.gst_rows[0].states[0].heads[0].clone();
+            r.gst_rows[0].states[0].heads.push(again)
+        }),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[1].head = "CGST".into()),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[0].head = "UTGST".into()),
+        Err("invoice_sales_ledger_rate_unknown")
+    );
+    // Cess: a rate on it, or a valuation other than Not Applicable, is not supported.
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[3].rate = Some("1".into())),
+        Err("invoice_cess_rate_not_supported")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[3].valuation = Some("Based on Value".into())),
+        Err("invoice_cess_rate_not_supported")
+    );
+    assert_eq!(
+        with(&|r| r.gst_rows[0].states[0].heads[4].rate = Some("1".into())),
+        Err("invoice_cess_rate_not_supported")
+    );
+    // Tally writes a rate with a leading space and a decimal tail: " 2.50" reads as 2.5.
+    let mut padded = sales_rates("2.50", "5");
+    padded.gst_rows[0].states[0].heads[0].rate = Some("2.50".into());
+    assert_eq!(sales_rate_milli(&padded, AS_OF), Ok(2_500));
+}
+
+#[test]
+fn a_tax_ledger_must_carry_the_rate_and_no_rounding() {
+    let check = |change: &dyn Fn(&mut wire::LedgerRateRow)| {
+        let mut row = tax_rates("2.50");
+        change(&mut row);
+        tax_ledger_refusal(&row, 2_500)
+    };
+    assert_eq!(check(&|_| {}), None);
+    assert_eq!(
+        check(&|r| r.rate_of_tax_calculation = Some("0".into())),
+        Some("invoice_tax_ledger_rate_mismatch")
+    );
+    assert_eq!(
+        check(&|r| r.rate_of_tax_calculation = None),
+        Some("invoice_tax_ledger_rate_mismatch")
+    );
+    assert_eq!(
+        check(&|r| r.rate_of_tax_calculation = Some("9".into())),
+        Some("invoice_tax_ledger_rate_mismatch")
+    );
+    assert_eq!(
+        check(&|r| r.rounding_method = None),
+        Some("invoice_tax_ledger_rounding_unsupported")
+    );
+    assert_eq!(
+        check(&|r| r.rounding_method = Some("Upward".into())),
+        Some("invoice_tax_ledger_rounding_unsupported")
+    );
+    assert_eq!(
+        check(&|r| r.rounding_limit = Some("1".into())),
+        Some("invoice_tax_ledger_rounding_unsupported")
+    );
+    assert_eq!(
+        check(&|r| r.rounding_limit = None),
+        Some("invoice_tax_ledger_rounding_unsupported")
+    );
+}
+
+/// The refusals of an invoice's tax that come from its ledgers, through the
+/// whole classification: each names the ledger it concerns.
+#[test]
+fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
+    let refused = |change: &dyn Fn(&mut BTreeMap<String, LedgerFacts>)| {
+        let mut facts = good_facts();
+        change(&mut facts);
+        classify_sales_invoice(&voucher(), &facts, RAJ, AS_OF).unwrap_err()
+    };
+    // The listing returned no row for the sales ledger.
+    assert_eq!(
+        refused(&|f| f.get_mut("Sales").unwrap().rates = None),
+        vec![refuse_ledger("invoice_sales_ledger_rate_unknown", "Sales")]
+    );
+    // A tax ledger that rounds, or whose own rate is not the sales ledger's.
+    assert_eq!(
+        refused(&|f| f.get_mut("Output SGST").unwrap().rates.as_mut().unwrap().rounding_limit =
+            Some("1".into())),
+        vec![refuse_ledger(
+            "invoice_tax_ledger_rounding_unsupported",
+            "Output SGST"
+        )]
+    );
+    assert_eq!(
+        refused(&|f| f.get_mut("Output CGST").unwrap().rates = None),
+        vec![refuse_ledger("invoice_tax_ledger_rate_mismatch", "Output CGST")]
+    );
+    assert_eq!(
+        refused(&|f| f.get_mut("Output CGST").unwrap().rates = Some(tax_rates("2.5"))),
+        vec![refuse_ledger("invoice_tax_ledger_rate_mismatch", "Output CGST")]
+    );
+    // Two sales ledgers at two rates: one tax pair cannot carry both.
+    let mut two = voucher();
+    two.entries.truncate(1);
+    two.entries.push(entry("Sales", "6000.00", EntrySide::Cr));
+    two.entries.push(entry("Sales B", "4000.00", EntrySide::Cr));
+    two.entries.push(entry("Output CGST", "600.00", EntrySide::Cr));
+    two.entries.push(entry("Output SGST", "600.00", EntrySide::Cr));
+    let mut facts = good_facts();
+    facts.extend(facts_for(&[("Sales B", &["Sales Accounts"], DutyHead::NotTax)]));
+    facts.get_mut("Sales B").unwrap().rates = Some(sales_rates("2.5", "5"));
+    assert_eq!(
+        classify_sales_invoice(&two, &facts, RAJ, AS_OF).unwrap_err(),
+        vec![refuse("invoice_sales_ledgers_rates_differ")]
+    );
+}

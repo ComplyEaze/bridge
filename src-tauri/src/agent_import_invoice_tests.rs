@@ -373,7 +373,11 @@ fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
         "both heads"
     );
     // A paisa off, either way, either head: refused (the lab flagged 0.01).
-    for (cgst, state) in [("600.01", "600.00"), ("600.00", "599.99"), ("600.01", "600.01")] {
+    for (cgst, state) in [
+        ("600.01", "600.00"),
+        ("600.00", "599.99"),
+        ("600.01", "600.01"),
+    ] {
         let mut v = voucher();
         v.entries[1].amount = "10000.03".to_string();
         v.entries[2].amount = cgst.to_string();
@@ -458,9 +462,8 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
     v.entries[0].amount = "11200.40".to_string();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
-    assert!(
-        codes(classify_sales_invoice(&v, &facts, RAJ, AS_OF)).contains(&"invoice_round_off_ledger_group")
-    );
+    assert!(codes(classify_sales_invoice(&v, &facts, RAJ, AS_OF))
+        .contains(&"invoice_round_off_ledger_group"));
 }
 
 fn observed() -> InvoiceObserved {
@@ -541,7 +544,12 @@ fn names_with_markup_characters_are_escaped_in_the_rendered_xml() {
 fn the_supply_must_be_made_in_the_company_state_and_an_unregistered_customer_is_admitted() {
     // The shape posted is CGST plus state tax: a supply made elsewhere is refused.
     assert_eq!(
-        codes(classify_sales_invoice(&voucher(), &good_facts(), "Haryana", AS_OF)),
+        codes(classify_sales_invoice(
+            &voucher(),
+            &good_facts(),
+            "Haryana",
+            AS_OF
+        )),
         vec!["invoice_place_of_supply_not_company_state"]
     );
     // An unregistered customer: an entry in force that names no GSTIN and
@@ -1454,16 +1462,47 @@ fn each_rate_is_admitted_on_the_ledgers_own_rate_and_no_other() {
 #[test]
 fn the_rule_admits_what_tallys_gstr_1_included_and_refuses_what_it_flagged() {
     // (lines, CGST, state tax, round off as signed credit, Tally included it)
-    let table: &[(&str, &[&str], &str, &str, &str, bool)] = &[
+    /// A voucher number, its sales lines, its CGST and state tax, its round off, and
+    /// whether Tally's GSTR-1 included it.
+    type LabVoucher = (
+        &'static str,
+        &'static [&'static str],
+        &'static str,
+        &'static str,
+        &'static str,
+        bool,
+    );
+    let table: &[LabVoucher] = &[
         ("0001", &["1000.00"], "25.00", "25.00", "0.00", true),
         ("0002", &["1001.00"], "25.03", "25.02", "0.00", false),
         ("0003", &["1001.00"], "25.02", "25.03", "0.00", false),
         ("0004", &["1001.00"], "25.03", "25.03", "-0.01", true),
         ("0005", &["1001.00"], "25.02", "25.02", "0.01", false),
         ("0006", &["1000.00"], "25.01", "25.01", "0.00", false),
-        ("0007", &["600.00", "400.00"], "25.00", "25.00", "0.00", true),
-        ("0008", &["601.00", "400.00"], "25.03", "25.02", "0.00", false),
-        ("0010", &["600.40", "400.40"], "25.02", "25.02", "0.16", true),
+        (
+            "0007",
+            &["600.00", "400.00"],
+            "25.00",
+            "25.00",
+            "0.00",
+            true,
+        ),
+        (
+            "0008",
+            &["601.00", "400.00"],
+            "25.03",
+            "25.02",
+            "0.00",
+            false,
+        ),
+        (
+            "0010",
+            &["600.40", "400.40"],
+            "25.02",
+            "25.02",
+            "0.16",
+            true,
+        ),
         ("0011", &["1001.00"], "25.03", "25.03", "0.00", true),
         ("0012", &["100.10", "100.10"], "5.00", "5.00", "0.00", true),
         ("0013", &["100.20", "100.20"], "5.02", "5.02", "0.00", true),
@@ -1500,7 +1539,8 @@ fn the_rule_admits_what_tallys_gstr_1_included_and_refuses_what_it_flagged() {
         let party = taxable + cents(cgst) + cents(state) + round;
         let mut v = voucher();
         v.entries.clear();
-        v.entries.push(entry("Customer A", &text(party), EntrySide::Dr));
+        v.entries
+            .push(entry("Customer A", &text(party), EntrySide::Dr));
         for (name, line) in ["Sales", "Sales B"].iter().zip(lines.iter()) {
             v.entries.push(entry(name, line, EntrySide::Cr));
         }
@@ -1508,9 +1548,12 @@ fn the_rule_admits_what_tallys_gstr_1_included_and_refuses_what_it_flagged() {
         v.entries.push(entry("Output SGST", state, EntrySide::Cr));
         if round != 0 {
             v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".to_string());
-            let side = if round > 0 { EntrySide::Cr } else { EntrySide::Dr };
-            v.entries
-                .push(entry("Round Off", &text(round.abs()), side));
+            let side = if round > 0 {
+                EntrySide::Cr
+            } else {
+                EntrySide::Dr
+            };
+            v.entries.push(entry("Round Off", &text(round.abs()), side));
         }
         let outcome = classify_sales_invoice(&v, &facts, RAJ, AS_OF_AUG);
         match (included, outcome) {
@@ -1740,13 +1783,17 @@ fn several_sales_legs_share_one_pair_of_tax_heads() {
     // caller, never sent), and a ledger that is no Sales Accounts ledger is no sales leg.
     let mut discount = split(&["6000.00", "4000.00"]);
     discount.entries[2].side = EntrySide::Dr;
-    assert!(codes(classify_sales_invoice(&discount, &facts(), RAJ, AS_OF))
-        .contains(&"invoice_sales_must_be_credit"));
+    assert!(
+        codes(classify_sales_invoice(&discount, &facts(), RAJ, AS_OF))
+            .contains(&"invoice_sales_must_be_credit")
+    );
     // No Sales Accounts ledger at all is refused under its own code.
     let mut none = voucher();
     none.entries.remove(1);
-    assert!(codes(classify_sales_invoice(&none, &good_facts(), RAJ, AS_OF))
-        .contains(&"invoice_needs_a_sales_ledger"));
+    assert!(
+        codes(classify_sales_invoice(&none, &good_facts(), RAJ, AS_OF))
+            .contains(&"invoice_needs_a_sales_ledger")
+    );
     // The window's cap on legs: a fourth sales leg, or a round off beside three,
     // is refused before any read.
     let mut four = split(&["4000.00", "3000.00", "2000.00"]);
@@ -1967,8 +2014,13 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
     );
     // A tax ledger that rounds, or whose own rate is not the sales ledger's.
     assert_eq!(
-        refused(&|f| f.get_mut("Output SGST").unwrap().rates.as_mut().unwrap().rounding_limit =
-            Some("1".into())),
+        refused(&|f| f
+            .get_mut("Output SGST")
+            .unwrap()
+            .rates
+            .as_mut()
+            .unwrap()
+            .rounding_limit = Some("1".into())),
         vec![refuse_ledger(
             "invoice_tax_ledger_rounding_unsupported",
             "Output SGST"
@@ -1976,21 +2028,33 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
     );
     assert_eq!(
         refused(&|f| f.get_mut("Output CGST").unwrap().rates = None),
-        vec![refuse_ledger("invoice_tax_ledger_rate_mismatch", "Output CGST")]
+        vec![refuse_ledger(
+            "invoice_tax_ledger_rate_mismatch",
+            "Output CGST"
+        )]
     );
     assert_eq!(
         refused(&|f| f.get_mut("Output CGST").unwrap().rates = Some(tax_rates("2.5"))),
-        vec![refuse_ledger("invoice_tax_ledger_rate_mismatch", "Output CGST")]
+        vec![refuse_ledger(
+            "invoice_tax_ledger_rate_mismatch",
+            "Output CGST"
+        )]
     );
     // Two sales ledgers at two rates: one tax pair cannot carry both.
     let mut two = voucher();
     two.entries.truncate(1);
     two.entries.push(entry("Sales", "6000.00", EntrySide::Cr));
     two.entries.push(entry("Sales B", "4000.00", EntrySide::Cr));
-    two.entries.push(entry("Output CGST", "600.00", EntrySide::Cr));
-    two.entries.push(entry("Output SGST", "600.00", EntrySide::Cr));
+    two.entries
+        .push(entry("Output CGST", "600.00", EntrySide::Cr));
+    two.entries
+        .push(entry("Output SGST", "600.00", EntrySide::Cr));
     let mut facts = good_facts();
-    facts.extend(facts_for(&[("Sales B", &["Sales Accounts"], DutyHead::NotTax)]));
+    facts.extend(facts_for(&[(
+        "Sales B",
+        &["Sales Accounts"],
+        DutyHead::NotTax,
+    )]));
     facts.get_mut("Sales B").unwrap().rates = Some(sales_rates("2.5", "5"));
     assert_eq!(
         classify_sales_invoice(&two, &facts, RAJ, AS_OF).unwrap_err(),

@@ -5606,7 +5606,10 @@ async fn a_cgst_line_six_paise_above_the_state_tax_line_is_refused_on_the_pilot_
     let result = &built.payload["result"];
     assert_eq!(result["reason"], "invoice_not_admitted", "{result}");
     // 600.40 and 400.40 at 2.5 percent a head, line by line: 15.01 + 10.01.
-    assert_eq!(result["refusals"][0]["code"], "invoice_tax_head_not_expected");
+    assert_eq!(
+        result["refusals"][0]["code"],
+        "invoice_tax_head_not_expected"
+    );
     assert_eq!(result["refusals"][0]["detail"], "CGST 25.08 expected 25.02");
     assert_eq!(result["refusals"].as_array().unwrap().len(), 1);
     assert_eq!(observed.len(), PILOT_ORDER.find("CsCse").unwrap() + 5);

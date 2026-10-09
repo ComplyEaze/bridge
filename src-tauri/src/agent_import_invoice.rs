@@ -452,7 +452,8 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
             }
             // No cess at all: a head with a rate, or valued any other way
             // than "Not Applicable", is a tax this build does not work out.
-            "Cess" if head.rate.is_none() && head.valuation.as_deref() == Some("Not Applicable") => {}
+            "Cess"
+                if head.rate.is_none() && head.valuation.as_deref() == Some("Not Applicable") => {}
             "State Cess" if head.rate.is_none() => {}
             "Cess" | "State Cess" => return Err("invoice_cess_rate_not_supported"),
             _ => return Err("invoice_sales_ledger_rate_unknown"),
@@ -461,7 +462,12 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
     let (Some(cgst), Some(state), Some(igst)) = (cgst, state, igst) else {
         return Err("invoice_sales_ledger_rate_unknown");
     };
-    if cgst != state || igst != cgst.checked_mul(2).ok_or("invoice_sales_ledger_rate_unknown")? {
+    if cgst != state
+        || igst
+            != cgst
+                .checked_mul(2)
+                .ok_or("invoice_sales_ledger_rate_unknown")?
+    {
         return Err("invoice_sales_ledger_rate_heads_unequal");
     }
     Ok(cgst)
@@ -499,10 +505,7 @@ fn expected_tax_paise(lines: &[i128], half_milli: i128) -> Result<i128, &'static
         if scaled % 100_000 == 50_000 && half_milli != 2_500 {
             return Err("invoice_tax_rounding_tie_unmeasured");
         }
-        let tax = scaled
-            .checked_add(50_000)
-            .ok_or("invoice_amount_invalid")?
-            / 100_000;
+        let tax = scaled.checked_add(50_000).ok_or("invoice_amount_invalid")? / 100_000;
         total = total.checked_add(tax).ok_or("invoice_amount_invalid")?;
     }
     Ok(total)

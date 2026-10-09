@@ -762,7 +762,11 @@ fn the_captured_rate_listing_is_read_with_every_field_in_its_place() {
     let [block] = row.states.as_slice() else {
         panic!("one block: {row:?}")
     };
-    assert_eq!(block.state.as_deref(), Some("Any"), "the control character is not part of it");
+    assert_eq!(
+        block.state.as_deref(),
+        Some("Any"),
+        "the control character is not part of it"
+    );
     let heads = block
         .heads
         .iter()
@@ -783,7 +787,10 @@ fn the_captured_rate_listing_is_read_with_every_field_in_its_place() {
     assert_eq!(tax.rate_of_tax_calculation.as_deref(), Some("2.50"));
     assert_eq!(tax.rounding_method.as_deref(), Some("Not Applicable"));
     assert_eq!(tax.rounding_limit.as_deref(), Some("0"));
-    assert_eq!(tax.gst_rows[0].source.as_deref(), Some("As per Company/Group"));
+    assert_eq!(
+        tax.gst_rows[0].source.as_deref(),
+        Some("As per Company/Group")
+    );
     // The ledger made by import has no rounding field and one GST row with no field.
     let imported = &rates["BRIDGE Output CGST XML"];
     assert_eq!(imported.rounding_method, None);
@@ -815,7 +822,10 @@ fn a_rate_listing_that_is_not_this_companys_or_not_whole_is_refused() {
     );
     // Tally's error answer, a truncated one, and one with no collection.
     assert_eq!(
-        parse_ledger_rates(&xml.replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>"), LAB_GUID),
+        parse_ledger_rates(
+            &xml.replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>"),
+            LAB_GUID
+        ),
         Err("invoice_read_status_not_success")
     );
     assert_eq!(

@@ -92,3 +92,11 @@ d6b15cfa27b93e7da75c1f59e7a265d178991e531c6aa7e9977fc7b5543c92b6  54280  fixed3/
 de940b6d6d1714cb3b6a8a2cf341b4c656318bfdd0de9dc81526ba6a30782844  264678  fixed3/a08-voucher-types-fixed3.xml  <- r08-voucher-types.xml (HTTP 200, 0.017155 s)
 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974  3022  fixed3/a09-number-new-invoice-fixed3.xml  <- r09-number-new-invoice.xml (HTTP 200, 0.029806 s)
 0b4abb57fbfc888ef9d3d84d9b8847b9cd6f27f9c1de4aff36e36045b213286b  3418  fixed3/a11-company-state-fixed3.xml  <- r11-company-state.xml (HTTP 200, 0.004128 s)
+#
+# Requests added for steps 12-13 (lab/1342-capture-requests @ 436a51fd, UTF-16LE+BOM, charset=utf-16)
+c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38  934  r16-tax-units.xml
+4664f11143486eff77907be39088dd9379a22788ad09056d42e075be2d7f45e2  1136  r17-tax-units-fields.xml
+#
+# Answers: fixed3/ steps 12-13 (a separate sitting after step 11, same book state)
+1b2b3f87525686652a2aae14fce7c8b7f255de2fd2e4189d6a275de88191b8aa  22304  fixed3/a16-tax-units-fixed3.xml  <- r16-tax-units.xml (HTTP 200, 0.006069 s)
+482338999d511de8a4cc409ff5b7cba6dbeb8d314b67d30609a0c60403499073  5684  fixed3/a17-tax-units-fields-fixed3.xml  <- r17-tax-units-fields.xml (HTTP 200, 0.004144 s)

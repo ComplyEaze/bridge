@@ -1386,7 +1386,7 @@ fn unanswered_remediation(reason: &str) -> Option<&'static str> {
             "Tell the user to confirm Tally is running with the XML server enabled on the port named in this error. Do not repeat the request until they have.",
         ),
         "endpoint_circuit_cooldown" => Some(
-            "ComplyEaze Bridge held this request back after repeated failures to reach Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated.",
+            "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated.",
         ),
         _ => None,
     }

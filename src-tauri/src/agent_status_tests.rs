@@ -521,6 +521,25 @@ fn an_unanswered_code_is_not_repeated_as_its_cause_and_keeps_the_endpoint() {
     assert_eq!(error["endpoint"], "http://127.0.0.1:9");
 }
 
+/// The two next steps, word for word: the wiring tests compare a refusal with the function's own
+/// output, so a reword (to "retry", say) would pass them. These sentences say not to repeat the
+/// request by itself, and what the hold-back did and did not send (#1458).
+#[test]
+fn the_two_unanswered_next_steps_read_exactly() {
+    assert_eq!(
+        unanswered_remediation("endpoint_unreachable"),
+        Some(
+            "Tell the user to confirm Tally is running with the XML server enabled on the port named in this error. Do not repeat the request until they have."
+        )
+    );
+    assert_eq!(
+        unanswered_remediation("endpoint_circuit_cooldown"),
+        Some(
+            "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated."
+        )
+    );
+}
+
 /// The unanswered next step is consulted last: a code that has its own step keeps
 /// it, and an operation code with none takes the unanswered reason's (#1458).
 #[test]

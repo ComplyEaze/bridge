@@ -5346,15 +5346,16 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
 // build and then the post asked in, as observed against a replay of those
 // answers; it is not an order read off the code. Legend: s status probe, e
 // company list, m/M marks before/after the import, b book extent, c currencies,
-// L compliance listing, P paired listing, g groups, T voucher types, N number
+// L compliance listing, Q the same listing with each ledger's GST rate and
+// rounding (10 Oct 2026), P paired listing, g groups, T voucher types, N number
 // read, k ledger catalogue, w/W the 1-Aug window before/after, C tax units, R
 // invoice read-back, Z Tally's answer to the import.
 const PILOT_ORDER: &str = concat!(
-    "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeT",
+    "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeT",
     "sTseeNsNseeCsCseemsmseekskseewswseseseesesemsmseewswseewswse",
-    "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeT",
+    "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeT",
     "sTseeNsNseeCsCseecscseseekskseemsmseebsbscscsbsbseseebsbsLsL",
-    "sPsPsgsgsbsbseseeTsTseeNsNseeCsCseseemekskseecscseseeewswsee",
+    "sPsPsgsgsbsbseseeQsQseeTsTseeNsNseeCsCseseemekskseecscseseeewswsee",
     "wswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
 );
 
@@ -5374,6 +5375,7 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'b' => "eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49", // r03-book-extent.xml
         'c' => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661", // r04-currencies.xml
         'L' => "c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386", // r05-ledgers-compliance.xml
+        'Q' => "2e728e002305cbaa33c73bd36507ca8d6ab62c5dea5497b02204a07636385d88", // w7-ledgers-rates.xml
         'P' => "71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f", // r06-ledgers-paired.xml
         'g' => "20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f", // r07-groups.xml
         'T' => "c351d6c62a09ce5173355f3998ef12746f01aba253ea8bdc42664b1b9766fb00", // r08-voucher-types.xml
@@ -5405,6 +5407,7 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml"),
         'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml"),
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
+        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml"),
         'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
@@ -5602,10 +5605,9 @@ async fn a_cgst_line_six_paise_above_the_state_tax_line_is_refused_on_the_pilot_
     let observed = sent(simulator);
     let result = &built.payload["result"];
     assert_eq!(result["reason"], "invoice_not_admitted", "{result}");
-    assert_eq!(
-        result["refusals"][0]["code"],
-        "invoice_cgst_and_state_tax_differ"
-    );
+    // 600.40 and 400.40 at 2.5 percent a head, line by line: 15.01 + 10.01.
+    assert_eq!(result["refusals"][0]["code"], "invoice_tax_head_not_expected");
+    assert_eq!(result["refusals"][0]["detail"], "CGST 25.08 expected 25.02");
     assert_eq!(result["refusals"].as_array().unwrap().len(), 1);
     assert_eq!(observed.len(), PILOT_ORDER.find("CsCse").unwrap() + 5);
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());

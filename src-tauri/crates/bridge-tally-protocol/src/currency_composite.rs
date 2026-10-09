@@ -1,6 +1,7 @@
 //! Tally's composite amount: a foreign-currency amount, its rate and the base
-//! amount, written into one field when a foreign amount is entered on a ledger
-//! whose own currency is the base.
+//! amount, written into one field where an amount is carried in a foreign
+//! currency: on a voucher's entries and bill allocations, and in a Trial Balance
+//! row of a ledger whose own currency is the foreign one (`$`).
 //!
 //! Captured forms (licensed TallyPrime 7.1, a synthetic several-currency book):
 //! `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` on a voucher's entries and bill
@@ -25,7 +26,9 @@
 //! captured rate is 84 or more), a foreign amount below one other than zero
 //! (the smallest captured is 40.00), a base symbol other than the rupee symbol
 //! (the book's own base is accepted whatever it is), and a zero composite that
-//! writes a zero rate (the captured zero has an empty rate).
+//! writes a zero rate (the captured zero has an empty rate). The base amount is
+//! also not tied to the foreign amount times the rate (see [`CurrencyComposite`]):
+//! any base value in the right symbol and sign is admitted.
 //!
 //! Strict by design: a composite cut short, doubled, or with a non-ASCII digit
 //! in an amount is not one, and falls through to the caller's own amount
@@ -216,8 +219,9 @@ pub enum CompositeRefusal {
     NotComposite,
     /// The base amount's symbol is not the book's base currency.
     BaseNotBookBase,
-    /// Anything but the captured spacing (` @ `, one space after each symbol,
-    /// two spaces before ` = `).
+    /// The rate is not followed by exactly two spaces before ` = ` (the captured
+    /// form). Other spacing mistakes (a missing ` @ ` or ` = `) are not a
+    /// composite at all and come out as `NotComposite`.
     Spacing,
     /// An amount without exactly two decimal places.
     AmountScale,

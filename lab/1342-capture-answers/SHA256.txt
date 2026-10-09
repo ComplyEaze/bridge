@@ -350,3 +350,10 @@ d69a3b2f83f49380900e32848fbf9f5aba6346daa82053ee310d5b289912c8d8  454999  workor
 e747a964009cecbd16de803266fa5f5bd3833567c99eb06d1ec3a12410bfcc43  308517  workorder/screens/w7b-ledger-998315.png
 a0268eb39ba72baab3a7aa9dee572a68ce9009c0c942bc9976249eb68bbdfef3  161458  workorder/screens/w7b-taxanalysis-0021.png
 9e039cbe42c3014424f75aa6c541fea032451f6a3e27b6180ac18db45637473e  181538  workorder/screens/w7b-voucher-0021.png
+#
+# W8 step 4 (request at 1e7317c5) and a marks read to confirm the company, 10 Oct 2026
+6c94de0ce12aec70c33fda1a59b759bd16bb5e44179756411fa254136c56cd65  1776  w8-status-narrow-window-sales-byname.xml
+3ba486fc1d41a46cbb3a14f1f5975edc6e01c969b8d06c3a4d5edf1353205bca  3396  workorder/aw8-marks-check.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003183 s) [extra, not in the list]
+db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  workorder/aw8-marks-check.xml.headers.txt
+504d9b06911e222b31d585a092e0192a0a263ede91b9fdc5173040438a1e1672  21030  workorder/aw8-status-narrow-window-sales-byname.xml  <- w8-status-narrow-window-sales-byname.xml (curl exit 0, HTTP 200, 0.034667 s)
+8c9e743c3e9c1308c034b41b6bda67541eb5a2f0a56720319e37ae56d8f38089  135  workorder/aw8-status-narrow-window-sales-byname.xml.headers.txt

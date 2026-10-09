@@ -1,0 +1,325 @@
+{
+ "comment": "A firm with three partners and one s.194H payee: 5 rows at one rate each, 4 findings. The payee's row comes first (p08, Ivy Agency, Rs 20,000.01 at 2%), then the partners' rows at 10%, in the order of their keys (juniper, kapok, laurel), which is not the order the partners table lists them in. Juniper, classified one-off by its key in the partners table: p01 (interest, Rs 15,000) is within the s.194T limit; p02 (salary, Rs 12,000) takes the total over it on 31 December, so p01 and p02 are one tranche dated 31 December; p03 (salary, Rs 9,000) is its own tranche on 31 March. Kapok, not classified: p04 credits interest of Rs 15,000 net of Rs 1,500 on TDS on Partners, a ledger classified as TDS payable, and is read gross; p05 debits the capital Rs 8,000 against the interest ledger, a reversal that lowers nothing and is in no tranche; p06 (salary, Rs 6,000) takes the gross total to Rs 21,000 on 15 January, so p04 and p06 are one tranche dated 15 January. Read net of the reversal, or net of the TDS, the total would stay within the limit. Laurel, classified foreseeable by its key: p07 (interest, Rs 20,000.01) is one tranche on 30 June.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Sales Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_partners-ledger-00b"
+  },
+  {
+   "name": "Interest to Partners",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_partners-ledger-01b"
+  },
+  {
+   "name": "Partner Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_partners-ledger-02b"
+  },
+  {
+   "name": "TDS on Partners",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "ti_partners-ledger-03b"
+  },
+  {
+   "name": "Ivy Agency",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_partners-ledger-04b"
+  },
+  {
+   "name": "Juniper Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_partners-ledger-05b"
+  },
+  {
+   "name": "Kapok Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_partners-ledger-06b"
+  },
+  {
+   "name": "Laurel Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_partners-ledger-07b"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_partners-ledger-08b"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Sales Commission",
+   "opening": 0,
+   "debit": 2000001,
+   "credit": 0,
+   "closing": 2000001
+  },
+  {
+   "ledger": "Interest to Partners",
+   "opening": 0,
+   "debit": 5000001,
+   "credit": 800000,
+   "closing": 4200001
+  },
+  {
+   "ledger": "Partner Salary",
+   "opening": 0,
+   "debit": 2700000,
+   "credit": 0,
+   "closing": 2700000
+  },
+  {
+   "ledger": "TDS on Partners",
+   "opening": 0,
+   "debit": 0,
+   "credit": 150000,
+   "closing": -150000
+  },
+  {
+   "ledger": "Ivy Agency",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2000001,
+   "closing": -2000001
+  },
+  {
+   "ledger": "Juniper Capital",
+   "opening": -40000000,
+   "debit": 0,
+   "credit": 3600000,
+   "closing": -43600000
+  },
+  {
+   "ledger": "Kapok Capital",
+   "opening": -30000000,
+   "debit": 800000,
+   "credit": 1950000,
+   "closing": -31150000
+  },
+  {
+   "ledger": "Laurel Capital",
+   "opening": -20000000,
+   "debit": 0,
+   "credit": 2000001,
+   "closing": -22000001
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 90000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 90000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-p01",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "number": "PJ/01",
+   "lines": [
+    [
+     "Interest to Partners",
+     1500000
+    ],
+    [
+     "Juniper Capital",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-p02",
+   "date": "2025-12-31",
+   "base_type": "Journal",
+   "number": "PJ/02",
+   "lines": [
+    [
+     "Partner Salary",
+     1200000
+    ],
+    [
+     "Juniper Capital",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-p03",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "PJ/03",
+   "lines": [
+    [
+     "Partner Salary",
+     900000
+    ],
+    [
+     "Juniper Capital",
+     -900000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-p04",
+   "date": "2025-10-15",
+   "base_type": "Journal",
+   "number": "PJ/04",
+   "lines": [
+    [
+     "Interest to Partners",
+     1500000
+    ],
+    [
+     "Kapok Capital",
+     -1350000
+    ],
+    [
+     "TDS on Partners",
+     -150000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-p05",
+   "date": "2025-11-15",
+   "base_type": "Journal",
+   "number": "PJ/05",
+   "lines": [
+    [
+     "Kapok Capital",
+     800000
+    ],
+    [
+     "Interest to Partners",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-p06",
+   "date": "2026-01-15",
+   "base_type": "Journal",
+   "number": "PJ/06",
+   "lines": [
+    [
+     "Partner Salary",
+     600000
+    ],
+    [
+     "Kapok Capital",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-p07",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "number": "PJ/07",
+   "lines": [
+    [
+     "Interest to Partners",
+     2000001
+    ],
+    [
+     "Laurel Capital",
+     -2000001
+    ]
+   ]
+  },
+  {
+   "guid": "ti-p08",
+   "date": "2025-05-19",
+   "base_type": "Journal",
+   "number": "CJ/08",
+   "lines": [
+    [
+     "Sales Commission",
+     2000001
+    ],
+    [
+     "Ivy Agency",
+     -2000001
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Sales Commission": "194H"
+ },
+ "tds_payable_ledgers": [
+  "TDS on Partners"
+ ],
+ "partners": {
+  "laurel": {
+   "capital_ledgers": [
+    "Laurel Capital"
+   ],
+   "interest_ledger": "Interest to Partners",
+   "remuneration_ledger": "Partner Salary"
+  },
+  "kapok": {
+   "capital_ledgers": [
+    "Kapok Capital"
+   ],
+   "interest_ledger": "Interest to Partners",
+   "remuneration_ledger": "Partner Salary"
+  },
+  "juniper": {
+   "capital_ledgers": [
+    "Juniper Capital"
+   ],
+   "interest_ledger": "Interest to Partners",
+   "remuneration_ledger": "Partner Salary"
+  }
+ },
+ "deed": {
+  "interest_rate_bp": 1200
+ },
+ "foreseeability": {
+  "juniper": "one_off",
+  "laurel": "foreseeable"
+ }
+}

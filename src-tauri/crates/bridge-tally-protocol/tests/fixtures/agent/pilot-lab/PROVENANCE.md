@@ -1,9 +1,9 @@
 # Pilot lab fixtures
 
 Answers Tally gave on 2026-10-09 on the synthetic company `BRIDGE PILOT LAB` (TallyPrime 7.1
-Silver, licensed mode), sent by an outside contributor from his own machine, one request at a
+Silver, licensed mode), sent by an outside contributor from a machine of their own, one request at a
 time, each answer written straight to a file with `curl.exe -o` and never piped. The company was
-the only one loaded. He published the answers on the branch `lab/1342-capture-answers` (commit
+the only one loaded. The contributor published the answers on the branch `lab/1342-capture-answers` (commit
 `4bceb5d0`) with a hash table; each file here is byte-equal to the file there and its SHA-256
 equals the one in that table.
 
@@ -38,7 +38,7 @@ The one-invoice round of #1342, sent by the same contributor on the same company
 | `pilot-lab-invoice-post-answer.utf16le.xml` | 540 | `d31196cba2febb9fcf525439058b85b62a69bec2479562b21dd6155c29c9b76b` | `post/a14-invoice-post.xml` | `r14-invoice-post.xml` (`b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e`) | Tally's answer to the import: CREATED 1, ERRORS 0, EXCEPTIONS 0 |
 | `pilot-lab-invoice-readback-before-post.utf16le.xml` | 3,022 | `947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974` | `post/a12-invoice-readback-pre.xml` | `r12-invoice-readback.xml` (`dc03b35f075e638acf6ca0a1a8503311ee501c5ee6f739e31d4240c4d22bf5f7`) | the read-back of `BP/26-27/0010` before the import: a complete envelope with a `COLLECTION` and no voucher |
 | `pilot-lab-tax-units-fields.utf16le.xml` | 5,684 | `482338999d511de8a4cc409ff5b7cba6dbeb8d314b67d30609a0c60403499073` | `a17-tax-units-fields-fixed3.xml` | `r17-tax-units-fields.xml` (`4664f11143486eff77907be39088dd9379a22788ad09056d42e075be2d7f45e2`) | the same two tax units, asked for with a field list; the fields it returns hold the same values as in the full answer above |
-| `pilot-lab-vouchers-after-post.utf8.xml` | 320,031 | `5900b10dfea252ca843aa41e20447a6e1c729269f934f0850566891481b31120` | `post/vouchers-post.xml` | the contributor's own voucher export request (`d-vouchers.xml` on his branch; his file, not committed here) | all eleven vouchers of the book after the import, as a native voucher read; UTF-8, as received; Tally's `&#4;` references as received |
+| `pilot-lab-vouchers-after-post.utf8.xml` | 320,031 | `5900b10dfea252ca843aa41e20447a6e1c729269f934f0850566891481b31120` | `post/vouchers-post.xml` | the contributor's own voucher export request (`d-vouchers.xml` on the contributor's branch; that file is not committed here) | all eleven vouchers of the book after the import, as a native voucher read; UTF-8, as received; Tally's `&#4;` references as received |
 | `pilot-lab-invoice-post-request.utf16le.xml` | 4,754 | `b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e` | `r14-invoice-post.xml` in `lab/1342-capture-requests/post-round` | rendered by `native_post_request` from the saved batch of the build; not a Tally answer | the request that created `BP/26-27/0010`: the invoice view, the walk-in ledger named seven times, 22 header fields, 6 legs |
 
 Not in these files: the screenshots, the earlier reads of the first and second rounds (`fixed2` and before), and the reads made after the screen work (the marks and the window were read again then and are byte-equal to the post-import reads above), which stay on the branch.

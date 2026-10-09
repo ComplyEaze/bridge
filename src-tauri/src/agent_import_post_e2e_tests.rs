@@ -5363,7 +5363,7 @@ const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 const PILOT_REQUEST_SHA256: &str =
     "b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e";
 /// The SHA-256 of the request the contributor sent for each kind of read in
-/// `PILOT_ORDER` (his published request list; the write is the file
+/// `PILOT_ORDER` (the contributor's published request list; the write is the file
 /// `pilot-lab-invoice-post-request`): the answer at a position is Tally's
 /// answer to that request and no other.
 fn pilot_request_sha256(letter: char) -> &'static str {

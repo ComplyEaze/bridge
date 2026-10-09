@@ -144,3 +144,55 @@ a61ab0bbc06bf2c9e1b42d91e5a6c04f40e750b1d929e800fa6cfafb4592613f  425614  post/s
 dc9004daf24fe16b386700bcacd35fe9b9399d8c81889d5540a06d77a0a3618a  400910  post/screens/gstr1-2-uncertain-unfiltered.png
 24d6b686e6b3e196851fa0f759e6e3f4c7c69e72109a771c08392a4708e2c65b  161928  post/screens/gstr1-3-b2c-small-by-rate.png
 46517640675df2eea2fd091512f0a6ab10d24b0e0a1fb836f1a95171ad6bbbc3  196039  post/screens/voucher-0010.png
+#
+# Requests used for W5 and the end read (lab/1342-capture-requests/workorder @ 5cc927e5; r02 and r15 as before)
+7d23354727555b95144cbd56e60bde0a6192100224edef674bd8b141a0d84acc  1822  w-window-0803.xml
+7e29d1cb7c23e77bfb797eaa206a3659376c92d46933a8ad47ebf748d37c5fcc  1992  w5-receipt-first.xml
+10f917d880ff44a92366125b3899c9b3c36dc3811b87c3a1c8780c829b7bdbb7  1992  w5-receipt-second.xml
+eff33d568f03e082567b248e4c6188a1b2af5cdfa38f4e95bc63d7501c5b4c36  2020  w5-receipt-refused.xml
+0f1a406342bb1ee35cec4f9a54467d2fc8529a9f1c879adb1a45c3fc5855712b  1992  w5-receipt-after-refused.xml
+8643ae8da6acbc435cf36f7cac06b8d999ad6e01527ce6d7357f9e846c8862e9  2020  w5-receipt-refused-control.xml
+469824dfb3215a03dc78ea20be7add1b5773616bd723106f129654066e6b683a  1992  w5-receipt-new-id.xml
+#
+# Answers: workorder/ (W5 steps 1-17, an extra marks check, then the end read), each with its header block
+a36e6e43961ffe12722b224ef53fa046835dccf3d9090cba3a5d52d315e91d36  3024  workorder/aw5-window-0.xml  <- w-window-0803.xml (curl exit 0, HTTP 200, 0.003920 s)
+1619a5b4998804b3ad99f61f066621c9b42718bb4d10768b1fc68c9e077bb606  134  workorder/aw5-window-0.xml.headers.txt
+03c8521283f016dec135a1e7bb77a426ef2194434055e2041ad1de34921b9428  540  workorder/aw5-receipt-first.xml  <- w5-receipt-first.xml (curl exit 0, HTTP 200, 0.331887 s)
+2a0eba722d654c2b2fa59d71608c67e3849d25c56207357fa06b0239977a4670  133  workorder/aw5-receipt-first.xml.headers.txt
+707d74fddd8cb674a598fcf4d9b0744e5e6d97ba6c35045bdc6641be4f6b901e  7950  workorder/aw5-window-1.xml  <- w-window-0803.xml (curl exit 0, HTTP 200, 0.049162 s)
+6db3c3b4f37c9bc6482b9759df69aa60b75b3375048ef8f0c11b4edd8ccaf695  134  workorder/aw5-window-1.xml.headers.txt
+0975a7b8f1f1700f86d459b536cd93d426cd64a64b30b4bfa7affea9e9b733a7  540  workorder/aw5-receipt-first-again.xml  <- w5-receipt-first.xml (curl exit 0, HTTP 200, 0.298571 s)
+2a0eba722d654c2b2fa59d71608c67e3849d25c56207357fa06b0239977a4670  133  workorder/aw5-receipt-first-again.xml.headers.txt
+9a00749dcca911c88bda349dfc3c68b1771a3711a5508d01a987bb0d1008da3c  7950  workorder/aw5-window-2.xml  <- w-window-0803.xml (curl exit 0, HTTP 200, 0.040900 s)
+6db3c3b4f37c9bc6482b9759df69aa60b75b3375048ef8f0c11b4edd8ccaf695  134  workorder/aw5-window-2.xml.headers.txt
+1deb519ca3dda0d39eb9c80b1154212f79d7aa0bfba1f018100dd0d6993de903  540  workorder/aw5-receipt-second.xml  <- w5-receipt-second.xml (curl exit 0, HTTP 200, 0.323362 s)
+2a0eba722d654c2b2fa59d71608c67e3849d25c56207357fa06b0239977a4670  133  workorder/aw5-receipt-second.xml.headers.txt
+552f9082272c26dba4aabfd59741f80c7c5c81e689d29295283d6efbc4774e99  12872  workorder/aw5-window-3.xml  <- w-window-0803.xml (curl exit 0, HTTP 200, 0.043492 s)
+2c707582ae4347206cab882be6f87da8addd5f318f11cd4921ff6909a92dbe40  135  workorder/aw5-window-3.xml.headers.txt
+d334facd0da39b69b3e8612f59cf4c1b09215551fbb8ff4da2307248f33165be  3396  workorder/aw5-marks-0.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003711 s)
+db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  workorder/aw5-marks-0.xml.headers.txt
+6425345b1f93036c458ce115164edb2d0cd126b51982b33d745f8327e02f1aef  702  workorder/aw5-receipt-refused.xml  <- w5-receipt-refused.xml (curl exit 0, HTTP 200, 0.223368 s)
+7cdd5a361df1ba50c62f6117fafdbc85dd743e0fe032118e66c4f9ddaa443d97  133  workorder/aw5-receipt-refused.xml.headers.txt
+6a979839854a8880468862a2e2cb31b63e575ce277b4d1f58dad93a80675e827  3396  workorder/aw5-marks-1.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003361 s)
+db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  workorder/aw5-marks-1.xml.headers.txt
+9f8b47d5656dc8a48452323b06ee217460e3d3f633b7e19cb423966c9ab8f16c  540  workorder/aw5-receipt-after-refused.xml  <- w5-receipt-after-refused.xml (curl exit 0, HTTP 200, 0.239317 s)
+2a0eba722d654c2b2fa59d71608c67e3849d25c56207357fa06b0239977a4670  133  workorder/aw5-receipt-after-refused.xml.headers.txt
+7a33f7a4379b5c23830dc20e143d4795d00258a109fd75aa2d2a19501d661766  3396  workorder/aw5-marks-2.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003354 s)
+db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  workorder/aw5-marks-2.xml.headers.txt
+8c3d54551863d0bb17f9f26780afd0f5e583d5f53576305fd1c236afbb67594d  17794  workorder/aw5-window-4.xml  <- w-window-0803.xml (curl exit 0, HTTP 200, 0.043312 s)
+24ace8643d676d88c9fb1ebaa79625cc76018d01249526227e166e8b41495c4b  135  workorder/aw5-window-4.xml.headers.txt
+6425345b1f93036c458ce115164edb2d0cd126b51982b33d745f8327e02f1aef  702  workorder/aw5-receipt-refused-control.xml  <- w5-receipt-refused-control.xml (curl exit 0, HTTP 200, 0.348579 s)
+7cdd5a361df1ba50c62f6117fafdbc85dd743e0fe032118e66c4f9ddaa443d97  133  workorder/aw5-receipt-refused-control.xml.headers.txt
+642f7395ee3cd7fa94e2037bbbbebfa52a33fb0f65303fa9cd65e845114a649d  3396  workorder/aw5-marks-3.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003449 s)
+db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  workorder/aw5-marks-3.xml.headers.txt
+a9a1034950f5c1bb9a6659a22d0a6ae487e7afabc058c0fd461735a340bd1085  540  workorder/aw5-receipt-new-id.xml  <- w5-receipt-new-id.xml (curl exit 0, HTTP 200, 0.378980 s)
+2a0eba722d654c2b2fa59d71608c67e3849d25c56207357fa06b0239977a4670  133  workorder/aw5-receipt-new-id.xml.headers.txt
+f37aade6ca02aa82dbb78be2b6e8caa74ecd517a715ef47dfcb5e93bfdf8ebfc  22722  workorder/aw5-window-5.xml  <- w-window-0803.xml (curl exit 0, HTTP 200, 0.062461 s)
+29c2762a3b8b8731a63de8cc5ce1470c350de538dd50b9996c6662527477551f  135  workorder/aw5-window-5.xml.headers.txt
+32c7817658a298a3a1aae36717343a9b2b400c82873920077e63924e7b6e8ce1  3400  workorder/aw-marks-end-extra.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003771 s)
+8e076c2656b984890ba781a57750231271db7ab714a63fc21190a342bff5b48f  134  workorder/aw-marks-end-extra.xml.headers.txt
+c202abc592bca9d6de25729c060e80bdf0398b623c2653e17225e78ec1acf951  87882  workorder/aw-window-0801-end.xml  <- r15-verification-window.xml (curl exit 0, HTTP 200, 0.049496 s)
+9f997c462643d18ecfebc829086847fd845b85c1fd1eacd03cd9e427da80450e  135  workorder/aw-window-0801-end.xml.headers.txt
+#
+# Screens: workorder/screens/ (Tally window only)
+bc576007252f76eaa4e322ca90fb8fbc10037276d682448f25c3d19c3b312684  105068  workorder/screens/w5-import-exceptions-missing-ledger.png

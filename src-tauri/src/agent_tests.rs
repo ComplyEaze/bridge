@@ -563,6 +563,21 @@ fn remediation_is_present_only_where_a_concrete_next_step_exists() {
     }
 }
 
+/// A password file someone else can read is refused with a step that fixes it
+/// on each platform: on Windows a new copy, because a move keeps who can read it.
+#[test]
+fn a_shared_password_file_says_how_to_make_it_private() {
+    let step = refusal_remediation("statement_password_file_permissions").expect("a next step");
+    for phrase in [
+        "did not read the password and parsed nothing",
+        "(chmod 600)",
+        "make a new copy of it in a folder of your own",
+        "moving it keeps who can read it",
+    ] {
+        assert!(step.contains(phrase), "{phrase}: {step}");
+    }
+}
+
 #[test]
 fn a_read_deadline_is_named_rather_than_collapsed_into_the_generic_failure() {
     use bridge_tally_transport::TallyTransportError;

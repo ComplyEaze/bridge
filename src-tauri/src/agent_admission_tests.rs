@@ -1053,6 +1053,16 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "post_import",
+            "No review can be recorded for a batch whose post_span_binding is refused: acknowledge_post_review refuses it",
+            "a refused binding is checked in Tally, never sent to a review that refuses it",
+        ),
+        (
+            "local_data_report",
+            "not_settled_binding_refused",
+            "a refused binding is a class of its own, not read as a fault",
+        ),
+        (
+            "post_import",
             "never change a row to get it past the check",
             "a row edited past the duplicate check posts a duplicate",
         ),

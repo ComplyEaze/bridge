@@ -74,7 +74,7 @@ fn book_row(line: &ImportLedgerLine) -> ReadVoucher {
         guid: Some(format!("{GUID}-00000005")),
         master_id: Some("5".into()),
         alter_id: Some(40),
-        date: Some(voucher.date.as_str().to_owned()),
+        date: bridge_tally_core::TallyDate::parse(voucher.date.as_str()).unwrap(),
         voucher_type: Some(voucher.voucher_type.as_str().into()),
         narration: Some(format!("[BRIDGE:{}]", line.attribution_tag(voucher))),
         voucher_number: Some("7".into()),
@@ -367,11 +367,12 @@ fn an_edited_missing_or_cancelled_voucher_refuses_the_amendment() {
     ));
     assert_eq!(reason(vec![renarrated]), "book_voucher_diverged");
     let mut redated = book_row(&original);
-    redated.date = Some("20260905".into());
+    redated.date = bridge_tally_core::TallyDate::parse("20260905").unwrap();
     assert_eq!(reason(vec![redated]), "book_voucher_diverged");
     // an edited effective date is a change the amendment would overwrite
     let mut effective_redated = book_row(&original);
-    effective_redated.effective_date = Some("20260905".into());
+    effective_redated.effective_date =
+        Some(bridge_tally_core::TallyDate::parse("20260905").unwrap());
     let refused = lineage
         .compare_and_swap(
             &proposal,
@@ -388,7 +389,7 @@ fn an_edited_missing_or_cancelled_voucher_refuses_the_amendment() {
     // one that came back unchanged is admitted without a caveat; one that did
     // not come back is admitted with it
     let mut effective_kept = book_row(&original);
-    effective_kept.effective_date = effective_kept.date.clone();
+    effective_kept.effective_date = Some(effective_kept.date.clone());
     let admitted = lineage
         .compare_and_swap(
             &proposal,

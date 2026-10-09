@@ -538,7 +538,7 @@ fn render_review_text(
         .chain(row.narration.as_deref())
         .chain(row.voucher_number.as_deref())
         .chain(row.voucher_type.as_deref())
-        .chain(row.date.as_deref());
+        .chain(std::iter::once(row.date.as_str()));
     if text_read
         .clone()
         .any(post::has_unsafe_review_layout_character)
@@ -575,7 +575,7 @@ fn render_review_text(
         "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\nNarration:\n  {}\n{entries}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
         row.voucher_type.as_deref().unwrap_or("voucher"),
         quoted(company_name),
-        shown(&row.date),
+        quoted(row.date.as_str()),
         shown(&row.voucher_number),
         row.alter_id.map(|id| id.to_string()).unwrap_or_else(|| "(none)".into()),
         shown(&narration),
@@ -607,7 +607,7 @@ fn batch_review_preview(
             row.entries
                 .iter()
                 .flat_map(|entry| [entry.ledger.as_str(), entry.amount.as_str()])
-                .chain(row.date.as_deref())
+                .chain(std::iter::once(row.date.as_str()))
                 .chain(row.voucher_type.as_deref())
         }));
     if text_read
@@ -640,7 +640,7 @@ fn batch_review_preview(
         };
         summed.map_err(|_| "ack_readback_not_matched".to_string())?;
     }
-    let dates = rows.iter().filter_map(|row| row.date.as_deref());
+    let dates = rows.iter().map(|row| row.date.as_str());
     let alter_ids = rows.iter().filter_map(|row| row.alter_id);
     let mut text = vec![format!(
         "Record that you reviewed {} vouchers in {}",

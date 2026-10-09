@@ -1374,7 +1374,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
             guid: Some("guid-bank".into()),
             master_id: Some("41".into()),
             alter_id: Some(63),
-            date: Some(voucher.date.as_str().to_owned()),
+            date: bridge_tally_core::TallyDate::parse(voucher.date.as_str()).unwrap(),
             voucher_type: Some(voucher_type.as_str().into()),
             narration: Some(format!("[BRIDGE:{}]", voucher.bridge_txn_id)),
             // Tally's own number, which Bridge never sent and must not compare.
@@ -1396,13 +1396,14 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
         );
         // Returned equal to DATE, as measured on 7.1 (§9.8 scoped correction).
         let mut returned = observed.clone();
-        returned[0].effective_date = returned[0].date.clone();
+        returned[0].effective_date = Some(returned[0].date.clone());
         let result = verify_observed_batch(&line, &returned).unwrap();
         assert_eq!(verification_status(&result, 1), "posted_verified");
         assert!(result["vouchers"][0].get("not_observed").is_none());
         // Returned and different: Tally rewrote it or someone edited it.
         let mut rewritten = observed.clone();
-        rewritten[0].effective_date = Some("20260902".into());
+        rewritten[0].effective_date =
+            Some(bridge_tally_core::TallyDate::parse("20260902").unwrap());
         let result = verify_observed_batch(&line, &rewritten).unwrap();
         assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
         assert_eq!(result["vouchers"][0]["diffs"], json!(["effective_date"]));
@@ -2403,7 +2404,7 @@ fn a_multi_entry_voucher_with_a_repeated_ledger_pairs_as_a_multiset() {
                 is_deemed_positive: positive.to_string(),
             })
             .collect(),
-        ..serde_json::from_value(json!({"amounts": []})).unwrap()
+        ..serde_json::from_value(json!({"date": "20260901", "amounts": []})).unwrap()
     };
     let separate = read(&[
         ("Amrut Beverages", "1000.00", "No"),

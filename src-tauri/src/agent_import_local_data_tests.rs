@@ -245,6 +245,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             sent_or_found: 1,
             unsettled: 1,
             unsettled_no_response: 1,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 0
         })
     );
@@ -256,9 +257,31 @@ fn the_journal_is_absent_unreadable_or_counted() {
             sent_or_found: 0,
             unsettled: 0,
             unsettled_no_response: 0,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 1
         })
     );
+}
+
+/// A batch whose binding was refused is counted in its own class, and in no
+/// other class of unsettled batch (#1039).
+#[test]
+fn a_refused_binding_is_its_own_class_of_unsettled_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), None);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 4,
+        sent_or_found: 4,
+        unsettled: 3,
+        unsettled_no_response: 1,
+        unsettled_binding_refused: 1,
+        no_dispatch_never_verified: 0,
+    });
+    let journal = &to_json(&report, SystemTime::now(), None)["journal"];
+    assert_eq!(journal["not_settled"], 3);
+    assert_eq!(journal["not_settled_no_response"], 1);
+    assert_eq!(journal["not_settled_binding_refused"], 1);
+    assert_eq!(journal["not_settled_not_verified"], 1);
 }
 
 /// Whether serialized JSON `text` holds `path`, written as it is and as JSON
@@ -354,6 +377,7 @@ async fn the_tool_reports_without_a_path_and_takes_no_arguments() {
     assert_eq!(result["journal"]["state"], "read");
     assert_eq!(result["journal"]["not_settled"], 1);
     assert_eq!(result["journal"]["not_settled_no_response"], 1);
+    assert_eq!(result["journal"]["not_settled_binding_refused"], 0);
     assert_eq!(result["journal"]["not_settled_not_verified"], 0);
     assert_eq!(result["journal"]["no_dispatch_never_verified"], 0);
     assert_eq!(result["app_files_outside_this_folder_covered"], false);

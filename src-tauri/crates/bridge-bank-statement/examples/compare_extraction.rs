@@ -65,7 +65,7 @@ fn arguments() -> Result<Arguments, String> {
         pdfium: take("pdfium")?.into(),
         pdf: take("pdf")?.into(),
         password_file: take("password-file")?.into(),
-        bank: Bank::from_name(&take("bank")?).ok_or("--bank must be sbi, hdfc or ubi")?,
+        bank: Bank::from_name(&take("bank")?).ok_or("--bank must be sbi, hdfc, ubi or icici")?,
         poppler_xml: take("poppler-xml")?.into(),
     })
 }

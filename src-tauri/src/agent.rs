@@ -847,7 +847,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "terms_not_accepted" => Some(
             "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
              them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
-             extension settings and turn on \"I accept the ComplyEaze Bridge Terms of Use\" \
+             extension settings and tick \"I accept the ComplyEaze Bridge Terms of Use\" \
              there, then quit Claude completely and reopen it so ComplyEaze Bridge starts again. Nothing \
              was read from Tally.",
         ),
@@ -857,6 +857,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              can be written; if the file is damaged, move it aside and ComplyEaze Bridge will record your \
              acceptance again. Then quit Claude completely and reopen it. Nothing was read from \
              Tally.",
+        ),
+        "statement_password_file_permissions" => Some(
+            "The password file is not private to you: someone else may be able to read or change \
+             it, so ComplyEaze Bridge did not read the password and parsed nothing. On a Mac, \
+             turn off the file's group and other permissions (chmod 600). On Windows, make a new \
+             copy of it in a folder of your own on this computer, then delete the original: moving \
+             it keeps who can read it. Then run the parse again.",
         ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
@@ -1375,6 +1382,23 @@ impl ArgumentRepair {
     }
 }
 
+/// The next step when no response answered a request (#1458): the two reasons a person meets
+/// first, Tally not running and the hold-back that follows repeated failures. It is consulted
+/// last, so a code's or a typed cause's own next step wins, and it is a function of its own,
+/// not arms of `refusal_remediation`, which is also asked with a code or a typed cause. The
+/// other unanswered reasons name no step yet.
+fn unanswered_remediation(reason: &str) -> Option<&'static str> {
+    match reason {
+        "endpoint_unreachable" => Some(
+            "Tell the user to confirm Tally is running with the XML server enabled on the port named in this error. Do not repeat the request until they have.",
+        ),
+        "endpoint_circuit_cooldown" => Some(
+            "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated.",
+        ),
+        _ => None,
+    }
+}
+
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -1767,6 +1791,9 @@ impl Server {
                 if let Some(remediation) = refusal_remediation(&code)
                     .or_else(|| repair.map(ArgumentRepair::remediation))
                     .or_else(|| remediation_for(&code, cause))
+                    .or_else(|| {
+                        unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
+                    })
                 {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);

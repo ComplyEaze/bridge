@@ -786,7 +786,7 @@ fn duplicate_detection_uses_stable_voucher_identity_independently_of_remote_id()
                 guid: use_guid.then(|| id.to_string()),
                 master_id: (!use_guid).then(|| id.to_string()),
                 alter_id: Some(11),
-                date: Some("20260901".into()),
+                date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
                 voucher_type: Some("Payment".into()),
                 narration: None,
                 voucher_number: None,
@@ -861,7 +861,7 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
         guid: Some("synthetic-guid-1".into()),
         master_id: None,
         alter_id: Some(11),
-        date: Some("20260901".into()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".into()),
         narration: Some("[BRIDGE:txn-001]".into()),
         voucher_number: None,
@@ -955,7 +955,7 @@ fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
             remote_id: Some("txn-001".to_string()),
             guid: Some("g-1".to_string()),
             alter_id: Some(12),
-            date: Some("20260901".to_string()),
+            date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
             voucher_type: Some("Payment".to_string()),
             narration: Some("[BRIDGE:txn-001]".to_string()),
             voucher_number: None,
@@ -980,7 +980,7 @@ fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
             remote_id: Some("other-id".to_string()),
             guid: Some("g-2".to_string()),
             alter_id: Some(13),
-            date: Some("20260901".to_string()),
+            date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
             voucher_type: Some("Payment".to_string()),
             narration: None,
             voucher_number: None,
@@ -1022,7 +1022,7 @@ fn verification_window_corroboration_rejects_each_unsafe_branch() {
         remote_id: None,
         guid: Some(guid.to_string()),
         alter_id: Some(alter_id),
-        date: Some(date.to_string()),
+        date: bridge_tally_core::TallyDate::parse(date).unwrap(),
         voucher_type: None,
         narration: None,
         voucher_number: None,
@@ -1162,7 +1162,7 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
         remote_id: Some("posted-1".to_string()),
         guid: Some("posted-guid".to_string()),
         alter_id: Some(11),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1188,7 +1188,7 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
         remote_id: Some("unrelated-duplicate".to_string()),
         guid: Some(guid.to_string()),
         alter_id: Some(3),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Journal".to_string()),
         narration: None,
         voucher_number: None,
@@ -1384,7 +1384,7 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
         remote_id: Some("posted-1".to_string()),
         guid: Some("posted-guid".to_string()),
         alter_id: Some(11),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1478,7 +1478,7 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
         remote_id: None,
         guid: Some("fingerprint-observed-guid".to_string()),
         alter_id: Some(alter_id),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: None,
         voucher_number: None,
@@ -1549,7 +1549,7 @@ fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
         remote_id: None,
         guid: Some("posted-guid".to_string()),
         alter_id: Some(11),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: None,
         voucher_number: None,
@@ -1614,7 +1614,7 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
         remote_id: None,
         guid: Some("posted-guid".to_string()),
         alter_id: Some(11),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1686,7 +1686,7 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
         remote_id: Some("posted-1".to_string()),
         guid: Some("posted-guid".to_string()),
         alter_id: Some(alter_id),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1754,7 +1754,7 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
         remote_id: Some("posted-1".to_string()),
         guid: Some("posted-guid".to_string()),
         alter_id: Some(alter_id),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1816,7 +1816,7 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
         remote_id: Some("posted-1".to_string()),
         guid: Some("posted-guid".to_string()),
         alter_id: Some(11),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1876,7 +1876,7 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
     cancelled.entries.clear();
     for (date, diffs) in [("20260901", json!([])), ("20260902", json!(["date"]))] {
         let mut redated = cancelled.clone();
-        redated.date = Some(date.to_string());
+        redated.date = bridge_tally_core::TallyDate::parse(date).unwrap();
         verification_window_identities(
             &ImportReadSource::admit(vec![redated.clone()]).unwrap(),
             line.date_from.as_str(),
@@ -2847,7 +2847,7 @@ fn a_copy_must_carry_the_cancelled_vouchers_own_content_left_unconsumed() {
                 }
             }
         },
-        &|row| row.date = Some("20260618".into()),
+        &|row| row.date = bridge_tally_core::TallyDate::parse("20260618").unwrap(),
     ];
     for change in changes {
         let mut rows = rows.clone();
@@ -3958,6 +3958,121 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
     }
 }
 
+/// #1241: the same cycle on a book large enough to be counted (a mark of 1,000):
+/// verify_import's window is counted by a census of its own, read whole, refused
+/// by Tally as too large, and read again as its two days, each admitted against
+/// that census; the marks read after the last day equal the ones it opened on.
+/// Such a read is not replayed: nothing follows the closing marks.
+fn verify_counted_split_plans() -> Vec<ScenarioPlan> {
+    let cycle = qualified_import_cycle_plans();
+    let (company, status) = (cycle[44].clone(), cycle[46].clone());
+    let counted = |plan: &ScenarioPlan| {
+        let mut plan = plan.clone();
+        let body = plan.fixture.body().into_owned();
+        assert!(body.contains("<ALTVCHID>10</ALTVCHID>"), "a marks answer");
+        plan.fixture = Fixture::SyntheticXml(
+            body.replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>1000</ALTVCHID>"),
+        );
+        plan
+    };
+    let premark = counted(&cycle[39]);
+    let readback = cycle[45].fixture.body().into_owned();
+    let first = readback.find("<VOUCHER ").unwrap();
+    let second = readback.rfind("<VOUCHER ").unwrap();
+    let end = readback.rfind("</COLLECTION>").unwrap();
+    let day = |voucher: &str| {
+        let mut plan = cycle[45].clone();
+        plan.fixture = Fixture::SyntheticXml(format!(
+            "{}{voucher}{}",
+            &readback[..first],
+            &readback[end..]
+        ));
+        plan
+    };
+    let (day_one, day_two) = (day(&readback[first..second]), day(&readback[second..end]));
+    let paired = |body: &ScenarioPlan| {
+        vec![
+            company.clone(),
+            body.clone(),
+            status.clone(),
+            body.clone(),
+            status.clone(),
+            company.clone(),
+        ]
+    };
+    let mut plans = cycle[..44].to_vec();
+    // verify_import's own marks read: the book is counted from here.
+    plans[39] = counted(&cycle[39]);
+    plans[41] = counted(&cycle[41]);
+    // The census of the window, then the whole window, refused as over the cap.
+    plans.extend(paired(&cycle[45]));
+    plans.push(company.clone());
+    plans.push(
+        cycle[45]
+            .clone()
+            .with_framing(ResponseFraming::DeclaredContentLength {
+                bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+            }),
+    );
+    for body in [&day_one, &day_two, &premark] {
+        plans.extend(paired(body));
+    }
+    plans
+}
+
+#[tokio::test]
+async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says_so() {
+    // 44 legs to open verify_import through its marks, the census (6), the
+    // whole window Tally refuses (2), the two days and the closing marks (18).
+    // A replay would add 18 more, which this plan does not script. (A read
+    // that had a part refused is never admitted for a post, as the test above
+    // pins, so this runs the verification alone.)
+    let simulator = SequenceSimulator::spawn(verify_counted_split_plans()).expect("simulator");
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let built = server
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
+        .await
+        .expect("build");
+    let batch_id = built.payload["result"]["batch_id"]
+        .as_str()
+        .expect("batch id")
+        .to_string();
+    let args = json!({"company_guid":CAPTURED_GUID, "batch_id": batch_id});
+    let proof = server.verify_import(&args).await.expect("verify");
+    assert_eq!(
+        proof.payload["result"]["counts"]["matching_content_observed"],
+        2
+    );
+    let persisted: Value = serde_json::from_slice(
+        &std::fs::read(
+            server
+                .imports_dir()
+                .expect("imports directory")
+                .join(format!("{batch_id}.proof.json")),
+        )
+        .expect("persisted proof"),
+    )
+    .expect("proof JSON");
+    assert_eq!(
+        persisted["evidence"]["voucher_read_corroboration"],
+        json!({"state": "not_sent", "reason": "counted_and_bracketed_read"})
+    );
+    assert_eq!(simulator.finish().expect("requests").len(), 44 + 6 + 2 + 18);
+}
+
 // bridge#626: a ledger whose stored name ends in CR LF. The catalogue carries
 // it verbatim; these pin that the build can now name it, by its exact bytes
 // only, and write it so an XML reader recovers those bytes.
@@ -4325,7 +4440,7 @@ fn divergent_verification() -> Value {
         guid: Some("synthetic-guid-1".into()),
         master_id: None,
         alter_id: Some(11),
-        date: Some("20260901".into()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".into()),
         narration: Some("[BRIDGE:txn-001]".into()),
         voucher_number: None,
@@ -4555,6 +4670,47 @@ fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_n
     assert_eq!(summary(&["sent_not_attributed"]), refused);
     assert_eq!(summary(&["posted_verified"]), refused);
     assert_eq!(summary(&[]), refused);
+}
+
+/// A refused binding whose vouchers the book matches by content says what the
+/// book holds, and never that the vouchers are this post's (#1039). Only a
+/// refused binding reads so.
+#[test]
+fn a_refused_binding_says_the_book_holds_vouchers_of_the_same_content() {
+    let every = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.";
+    let some = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.";
+    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+    // A row is its status, or a content match with whether it counts in the
+    // accounts.
+    let summary = |state: &str, rows: &[Value]| {
+        with_post_span_summary(json!({ "state": state }), &json!(rows))["summary"].clone()
+    };
+    let status = |status: &str| json!({ "status": status });
+    let matched = |effective: bool| json!({ "status": "matching_content_observed", "accounting_effective": effective });
+    assert_eq!(summary("refused", &[matched(true)]), every);
+    assert_eq!(summary("refused", &[matched(true), matched(true)]), every);
+    assert_eq!(
+        summary("refused", &[matched(true), status("sent_not_attributed")]),
+        some
+    );
+    assert_eq!(
+        summary("refused", &[matched(true), status("duplicate_fingerprint")]),
+        some
+    );
+    // A cancelled or optional match is not held in the accounts.
+    assert_eq!(summary("refused", &[matched(true), matched(false)]), some);
+    assert_eq!(summary("refused", &[matched(false)]), refused);
+    for other in [
+        "duplicate_fingerprint",
+        "not_attributable",
+        "sent_not_attributed",
+    ] {
+        assert_eq!(summary("refused", &[status(other)]), refused, "{other}");
+    }
+    for state in ["bound", "unsettled", "not_bound", "book_rolled_back"] {
+        let own = summary(state, &[]);
+        assert_eq!(summary(state, &[matched(true)]), own, "{state}");
+    }
 }
 
 #[test]

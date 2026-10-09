@@ -1375,6 +1375,23 @@ impl ArgumentRepair {
     }
 }
 
+/// The next step when no response answered a request (#1458): the two reasons a person meets
+/// first, Tally not running and the hold-back that follows repeated failures. It is consulted
+/// last, so a code's or a typed cause's own next step wins, and it is a function of its own,
+/// not arms of `refusal_remediation`, which is also asked with a code or a typed cause. The
+/// other unanswered reasons name no step yet.
+fn unanswered_remediation(reason: &str) -> Option<&'static str> {
+    match reason {
+        "endpoint_unreachable" => Some(
+            "Tell the user to confirm Tally is running with the XML server enabled on the port named in this error. Do not repeat the request until they have.",
+        ),
+        "endpoint_circuit_cooldown" => Some(
+            "ComplyEaze Bridge held this request back after repeated failures to reach Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated.",
+        ),
+        _ => None,
+    }
+}
+
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -1767,6 +1784,9 @@ impl Server {
                 if let Some(remediation) = refusal_remediation(&code)
                     .or_else(|| repair.map(ArgumentRepair::remediation))
                     .or_else(|| remediation_for(&code, cause))
+                    .or_else(|| {
+                        unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
+                    })
                 {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);

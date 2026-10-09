@@ -338,6 +338,12 @@ async fn a_closed_port_is_refused_as_unreachable_and_names_the_endpoint() {
             format!("http://127.0.0.1:{port}"),
             "{tool}"
         );
+        // The next step reaches the assistant with the refusal (#1458).
+        assert_eq!(
+            error["remediation"],
+            unanswered_remediation("endpoint_unreachable").unwrap(),
+            "{tool}"
+        );
         let evidence = &response["structuredContent"]["evidence"];
         assert_eq!(
             evidence["response_sha256"],
@@ -470,7 +476,14 @@ async fn a_request_held_back_after_repeated_failures_names_the_endpoint() {
         let error = refusal(&response);
         assert_eq!(error["code"], "company_collection_invalid");
         assert_eq!(error["endpoint"], format!("http://127.0.0.1:{port}"));
-        causes.push(error["cause"].as_str().unwrap().to_string());
+        let cause = error["cause"].as_str().unwrap().to_string();
+        // Each refusal names the step for its own cause (#1458).
+        assert_eq!(
+            error["remediation"],
+            unanswered_remediation(&cause).unwrap(),
+            "{cause}"
+        );
+        causes.push(cause);
     }
     // The first call's retries open the circuit; the next two are held back.
     assert_eq!(
@@ -698,5 +711,25 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
                 "{name}: limit names the size bound: {limit:?}"
             );
         }
+    }
+}
+
+/// Only the two reasons a person meets first carry a next step; the rest of the
+/// unanswered reasons name none (#1458).
+#[test]
+fn only_the_unreachable_and_hold_back_reasons_name_a_next_step() {
+    assert!(unanswered_remediation("endpoint_unreachable").is_some());
+    assert!(unanswered_remediation("endpoint_circuit_cooldown").is_some());
+    for reason in [
+        "request_deadline_exceeded",
+        "request_failed",
+        "http_status_failure",
+        "endpoint_queue_deadline_exceeded",
+        "endpoint_half_open_probe_in_flight",
+        "endpoint_session_capacity_reached",
+        "endpoint_invalid",
+        "response_content_type_unsupported",
+    ] {
+        assert_eq!(unanswered_remediation(reason), None, "{reason}");
     }
 }

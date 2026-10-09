@@ -3,6 +3,7 @@
 // test, and pass, fail or skip. Suites are dropped, and so is a test that failed only because a
 // subtest failed, so each failure is counted once, at the test that threw.
 // Use: node --test --test-reporter=./scripts/node-test-outcomes.mjs --test-reporter-destination=FILE ...
+
 // scripts/<name> whatever the host's separator or drive prefix is.
 export function repoFile(file) {
   return `scripts/${String(file).split(/[\\/]/).pop()}`;

@@ -10,10 +10,20 @@ import { fileURLToPath } from "node:url";
 export const EXIT = { ok: 0, newFailures: 1, untrusted: 2 };
 const LIST_CAP = 50;
 
-export const failureKey = (outcome) => `${outcome.file} > ${outcome.names.join(" > ")}`;
+// One line per test: a line break in a test name is written out so the key stays on one line.
+export const failureKey = (outcome) => `${outcome.file} > ${outcome.names.join(" > ")}`.replace(/\r?\n/g, "\\n");
 
+const OUTCOMES = new Set(["pass", "fail", "skip"]);
+
+// Throws on a line that is not JSON or not shaped like the reporter's lines.
 export function parseOutcomes(text) {
-  return text.split("\n").filter((line) => line.trim() !== "").map((line) => JSON.parse(line));
+  return text.split("\n").filter((line) => line.trim() !== "").map((line) => {
+    const outcome = JSON.parse(line);
+    if (typeof outcome.file !== "string" || !Array.isArray(outcome.names) || !outcome.names.every((name) => typeof name === "string") || !OUTCOMES.has(outcome.outcome)) {
+      throw new Error("outcome line has an unexpected shape");
+    }
+    return outcome;
+  });
 }
 
 export function parseBaseline(text) {
@@ -70,6 +80,7 @@ export function summary(result, host) {
   const lines = ["## Node suite on Windows (informational; not a required check, bridge#1471)", ""];
   if (host) lines.push(host, "");
   if (result.reason === "outcomes_missing") lines.push("**No outcomes were written. This run cannot be trusted.**");
+  else if (result.reason === "outcomes_malformed") lines.push("**The outcomes file could not be read. This run cannot be trusted.**");
   else if (result.reason === "file_set_differs") {
     lines.push("**The test files that reported differ from `scripts/*.test.mjs`. This run cannot be trusted.**");
     if (result.missing.length) lines.push(`- did not report: ${result.missing.join(", ")}`);
@@ -106,20 +117,22 @@ function main(argv) {
   for (let i = 0; i < argv.length; i += 2) args.set(argv[i], argv[i + 1]);
   const outcomesPath = args.get("--outcomes");
   const baselinePath = args.get("--baseline");
-  const nodeExit = Number(args.get("--node-exit"));
+  const rawExit = args.get("--node-exit") ?? "";
+  const nodeExit = /^[0-9]+$/.test(rawExit) ? Number(rawExit) : Number.NaN;
   if (!outcomesPath || !baselinePath || !Number.isInteger(nodeExit)) {
     console.error("usage: check-node-windows-outcomes.mjs --outcomes FILE --baseline FILE --node-exit N [--summary FILE]");
     return EXIT.untrusted;
   }
   const testFiles = readdirSync(new URL(".", import.meta.url)).filter((name) => name.endsWith(".test.mjs")).map((name) => `scripts/${name}`);
   let outcomes = [];
+  let malformed = false;
   try {
     outcomes = existsSync(outcomesPath) ? parseOutcomes(readFileSync(outcomesPath, "utf8")) : [];
   } catch {
-    outcomes = [];
+    malformed = true;
   }
   const baseline = existsSync(baselinePath) ? parseBaseline(readFileSync(baselinePath, "utf8")) : [];
-  const result = compare({ outcomes, baseline, testFiles, nodeExit });
+  const result = malformed ? { code: EXIT.untrusted, reason: "outcomes_malformed", newFailures: [], fixed: [], table: [] } : compare({ outcomes, baseline, testFiles, nodeExit });
   const text = summary(result, args.get("--host"));
   process.stdout.write(text);
   if (args.get("--summary")) appendFileSync(args.get("--summary"), text);

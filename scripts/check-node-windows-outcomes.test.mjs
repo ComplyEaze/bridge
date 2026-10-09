@@ -4,7 +4,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { compare, EXIT, failureKey, parseBaseline, parseOutcomes, summary } from "./check-node-windows-outcomes.mjs";
 import { repoFile } from "./node-test-outcomes.mjs";
 
@@ -49,6 +49,10 @@ test("a run that cannot be trusted exits 2 with its own reason, never as a pass"
   assert.deepEqual([silent.code, silent.reason], [EXIT.untrusted, "exit_without_failure"]);
 });
 
+test("a line break in a test name does not split its key", () => {
+  assert.equal(failureKey(fail(files[0], "a\nb")), "scripts/a.test.mjs > a\\nb");
+});
+
 test("the baseline file ignores comments and blank lines", () => {
   assert.deepEqual(parseBaseline("# a header\n\nscripts/a.test.mjs > t\n  scripts/b.test.mjs > u  \n"), ["scripts/a.test.mjs > t", "scripts/b.test.mjs > u"]);
 });
@@ -78,7 +82,7 @@ test("the reporter writes one line per test, nested names, skips, and no suite o
     const out = path.join(dir, "outcomes.jsonl");
     // the test runner marks its children; a nested `node --test` must not inherit that mark
     const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
-    const result = spawnSync(process.execPath, ["--experimental-strip-types", "--test", `--test-reporter=${path.join(scripts, "node-test-outcomes.mjs")}`, `--test-reporter-destination=${out}`, path.join(dir, "probe.test.mjs")], { encoding: "utf8", env });
+    const result = spawnSync(process.execPath, ["--experimental-strip-types", "--test", `--test-reporter=${pathToFileURL(path.join(scripts, "node-test-outcomes.mjs")).href}`, `--test-reporter-destination=${out}`, path.join(dir, "probe.test.mjs")], { encoding: "utf8", env });
     assert.equal(result.status, 1, result.stderr);
     const lines = parseOutcomes(readFileSync(out, "utf8"));
     assert.deepEqual(lines, [
@@ -114,6 +118,19 @@ test("the command line exits 0, 1 and 2 for a known run, a new failure and a mis
     assert.equal(cli(["--outcomes", outcomes, "--baseline", baseline, "--node-exit", "1"]).status, EXIT.newFailures);
     assert.equal(cli(["--outcomes", path.join(dir, "absent.jsonl"), "--baseline", baseline, "--node-exit", "0"]).status, EXIT.untrusted);
     assert.equal(cli(["--outcomes", outcomes]).status, EXIT.untrusted);
+    // an unset or non-numeric node exit status is never read as 0
+    for (const bad of ["", "x", "-1", "1.5"]) {
+      assert.equal(cli(["--outcomes", outcomes, "--baseline", baseline, "--node-exit", bad]).status, EXIT.untrusted, bad);
+    }
+    // a line that is not a reporter line is its own untrusted reason, not "missing" and not a crash
+    writeFileSync(outcomes, '{"file":"scripts/a.test.mjs","outcome":"fail"}\n');
+    const malformed = cli(["--outcomes", outcomes, "--baseline", baseline, "--node-exit", "1"]);
+    assert.equal(malformed.status, EXIT.untrusted);
+    assert.match(malformed.stdout, /could not be read/);
+    // every test file reports and node exited 0, but one line has an outcome the reporter never writes
+    const weird = suite.map((file, index) => (index === 0 ? JSON.stringify({ file, names: ["t"], outcome: "weird" }) : JSON.stringify(pass(file, "t"))));
+    writeFileSync(outcomes, `${weird.join("\n")}\n`);
+    assert.equal(cli(["--outcomes", outcomes, "--baseline", baseline, "--node-exit", "0"]).status, EXIT.untrusted);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

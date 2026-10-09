@@ -287,8 +287,7 @@ fn require_bank_identity(pages: &[Page]) -> Result<(), Refusal> {
         .ok_or_else(|| refuse("the statement has no page"))?;
     let mut found = Vec::new();
     for line in lines(first) {
-        for pair in line.words.windows(2).enumerate() {
-            let (at, words) = pair;
+        for (at, words) in line.words.windows(2).enumerate() {
             if words[0].text == "IFSC" && words[1].text == "Code:" {
                 found.push(line.words.get(at + 2).map(|word| word.text.clone()));
             }

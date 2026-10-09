@@ -939,10 +939,29 @@ fn another_banks_code_malformed_codes_and_a_missing_value_refuse() {
         let pages = pages_with(|page| value_word(page).text = bad.to_string());
         identity_refusal(&pages);
     }
-    // The label and "Code:" with nothing after them.
-    let pages = pages_with(|page| page.retain(|word| word.text != IFSC_VALUE));
-    // (the right-hand label pair now follows "Code:", so it is read as the value and is no IFSC)
-    identity_refusal(&pages);
+    // "Code:" is the last word on its line: nothing follows it.
+    let pages = pages_with(|page| page.retain(|word| word.x0 <= 38.0 || word.y0 != 211.0));
+    let refusal = identity_refusal(&pages);
+    assert!(refusal.message.contains("no value"), "{refusal}");
+    // The value glued to the label, and a non-ASCII value of the right length.
+    identity_refusal(&pages_with(|page| {
+        page.iter_mut()
+            .find(|word| word.text == "Code:")
+            .unwrap()
+            .text = format!("Code:{IFSC_VALUE}");
+        page.retain(|word| word.text != IFSC_VALUE);
+    }));
+    identity_refusal(&pages_with(|page| {
+        value_word(page).text = "BARB0SYNT\u{e9}1".to_string()
+    }));
+}
+
+#[test]
+fn the_identity_is_checked_before_the_footers() {
+    // Page 1 names another bank and page 2 has no footer: the first refusal wins.
+    let mut both = pages_with(|page| value_word(page).text = "HDFC0SYNTH1".to_string());
+    both[1] = bob_page(None, &[UPI, CASH], None);
+    identity_refusal(&both);
 }
 
 #[test]

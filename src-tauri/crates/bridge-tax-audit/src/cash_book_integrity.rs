@@ -274,8 +274,9 @@ balance sheet settles it."
                 "opening_stock",
                 Value::Int(stock),
                 Unit::Paise,
-                "Opening stock: the stock items' opening values (Dr positive). Tally holds it on \
-the stock items, not on any ledger, so the ledgers' Trial Balance openings leave it out.",
+                "Opening stock on the stock items as at the Trial Balance's first day (Dr \
+positive). Tally holds it on no ledger, so the ledger openings sum to minus it plus any difference \
+in opening balances.",
                 Vec::new(),
             )?;
             let rest = add(diff, stock)?;
@@ -283,8 +284,8 @@ the stock items, not on any ledger, so the ledgers' Trial Balance openings leave
                 "opening_difference_after_stock",
                 Value::Int(rest),
                 Unit::Paise,
-                "Sum of every ledger's Trial Balance opening balance with the opening stock added \
-(Dr positive): the difference in opening balances once stock, which no ledger holds, is counted.",
+                "The ledger openings' sum plus the opening stock: the difference in opening \
+balances.",
                 Vec::new(),
             )?;
             facts = vec![
@@ -743,15 +744,15 @@ non-zero sum as 'Difference in opening balances'.",
                 &figure(
                     "opening_stock",
                     stock,
-                    "Opening stock: the stock items' opening values (Dr positive). Tally holds it \
-on the stock items, not on any ledger, so the ledgers' Trial Balance openings leave it out.",
+                    "Opening stock on the stock items as at the Trial Balance's first day (Dr \
+positive). Tally holds it on no ledger, so the ledger openings sum to minus it plus any difference \
+in opening balances.",
                 ),
                 &figure(
                     "opening_difference_after_stock",
                     sum + stock,
-                    "Sum of every ledger's Trial Balance opening balance with the opening stock \
-added (Dr positive): the difference in opening balances once stock, which no ledger holds, is \
-counted.",
+                    "The ledger openings' sum plus the opening stock: the difference in opening \
+balances.",
                 ),
             ]
         )

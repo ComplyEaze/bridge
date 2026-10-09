@@ -715,7 +715,7 @@ test("history check: a removed-pin line for a pin that was never withdrawn is st
 function shallowClone(r, env = {}) {
   const clone = mkdtempSync(join(tmpdir(), "surface-ack-shallow-"));
   tmpDirs.push(clone);
-  execFileSync("git", ["clone", "-q", "--depth", "2", `file://${r.dir}`, clone, "--branch", "merge-own"], { encoding: "utf8", env: { ...process.env, ...env } });
+  execFileSync("git", ["-c", "core.hooksPath=/dev/null", "clone", "-q", "--depth", "2", `file://${r.dir}`, clone, "--branch", "merge-own"], { encoding: "utf8", env: { ...process.env, ...env } });
   return clone;
 }
 

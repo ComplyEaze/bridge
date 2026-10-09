@@ -32,6 +32,13 @@ These changes are in source and not yet in a published build.
   the rule). Importing its file again for a statement already imported is expected to rewrite those vouchers'
   narrations in the book: their keys do not depend on the narration the script writes. A same-key re-import has been measured over
   the gateway; through Tally's own Import menu, which is how this script's file is imported, only an unchanged re-import of a file the app built has been seen, on one Windows computer (#1413).
+- `verify_import` no longer reads its window a second time when the first read was divided, every part was
+  checked against a count of the window that names each voucher, and the company's marks were unchanged when
+  read again after the last part (#1241). That is a window of more than about 170 vouchers in a book whose
+  voucher mark is above about 170; it holds every voucher of the book in those dates, not only the batch's. The proof's `voucher_read_corroboration` then
+  reads `{"state": "not_sent", "reason": "counted_and_bracketed_read"}` instead of a second read. A window read
+  in one request, or divided without a count, is read twice as before. `ledger_movement` still reads its
+  window twice. The request counts come from test doubles, not from a live Tally.
 
 ## [0.5.1] - 2026-10-09
 

@@ -1489,27 +1489,45 @@ impl Server {
             if let Some(closing) = observed_read.closing_evidence {
                 accumulated = combine_evidence(accumulated.clone(), closing);
             }
-            // The corroborating read replays the ranges the first one actually
-            // read, rather than planning again: it must observe the same parts.
-            let corroboration_read = self
-                .read_verification_window(
-                    &identity,
-                    &company.name,
-                    window,
-                    super::WindowPlanSource::replay_of(observed_read.reads, observed_read.witness),
-                )
-                .await?;
-            let (corroboration, corroboration_evidence) =
-                (corroboration_read.source, corroboration_read.evidence);
-            accumulated = combine_evidence(accumulated.clone(), corroboration_evidence.clone());
-            if let Some(closing) = corroboration_read.closing_evidence {
-                accumulated = combine_evidence(accumulated.clone(), closing);
-            }
             // The window may have been served in parts, so there is no single
             // response to hash. The evidence's own response digest already folds
             // every part that was read, which is the honest commitment here.
             let voucher_read_sha256 = observed_evidence.response_sha256.clone();
-            corroborate_verification_window(&observed, &corroboration, line.date_from.as_str(), line.date_to.as_str())?;
+            // A corroborating read replays the ranges the first one actually
+            // read, rather than planning again: it must observe the same parts.
+            // A divided read admitted against a census of every GUID and closed
+            // on the marks it opened on holds a `BracketedCount`, and is not
+            // replayed (#1241). The checks the replay ran on a read's own rows
+            // (each row's date in the window, a GUID and an AlterID) still run
+            // on it; they send nothing.
+            let corroboration_proof = match super::SecondRead::of(
+                observed_read.reads,
+                observed_read.witness,
+                observed_read.bracketed,
+            ) {
+                super::SecondRead::Replay(replay) => {
+                    let corroboration_read = self
+                        .read_verification_window(&identity, &company.name, window, replay)
+                        .await?;
+                    let (corroboration, corroboration_evidence) =
+                        (corroboration_read.source, corroboration_read.evidence);
+                    accumulated =
+                        combine_evidence(accumulated.clone(), corroboration_evidence.clone());
+                    if let Some(closing) = corroboration_read.closing_evidence {
+                        accumulated = combine_evidence(accumulated.clone(), closing);
+                    }
+                    corroborate_verification_window(&observed, &corroboration, line.date_from.as_str(), line.date_to.as_str())?;
+                    json!(corroboration_evidence)
+                }
+                super::SecondRead::Spared(_) => {
+                    verification_window_identities(
+                        &observed,
+                        line.date_from.as_str(),
+                        line.date_to.as_str(),
+                    )?;
+                    json!({"state": "not_sent", "reason": "counted_and_bracketed_read"})
+                }
+            };
             let span = match pre_post_voucher_mark {
                 Some(pre_post_voucher_mark) => {
                     let (current, mark_evidence) =
@@ -1607,7 +1625,7 @@ impl Server {
                 "counts": result["counts"], "vouchers": result["vouchers"], "duplicates": result["duplicates"],
                 "post_span_binding": with_post_span_summary(span.report, &result["vouchers"]),
                 "unrelated_duplicates_in_window": result["unrelated_duplicates_in_window"],
-                "evidence": {"mode_opening": opening_mode.evidence, "mode_closing": closing_mode_evidence, "company": identity_evidence, "voucher_read": observed_evidence, "voucher_read_corroboration": corroboration_evidence, "voucher_read_sha256": voucher_read_sha256}
+                "evidence": {"mode_opening": opening_mode.evidence, "mode_closing": closing_mode_evidence, "company": identity_evidence, "voucher_read": observed_evidence, "voucher_read_corroboration": corroboration_proof, "voucher_read_sha256": voucher_read_sha256}
             });
             // This call's own check, or the doubt recorded when this batch was
             // posted: a later readback, which compares by name, never clears it.
@@ -1933,6 +1951,7 @@ impl Server {
             closing_evidence: read.closing_evidence,
             reads: read.reads,
             witness: read.witness,
+            bracketed: read.bracketed,
             refused_a_part: read.refused_a_part,
         })
     }
@@ -3894,6 +3913,8 @@ struct VerificationWindowRead {
     reads: Vec<super::WindowPart>,
     /// What a corroborating replay of this read must carry.
     witness: Option<super::WindowWitness>,
+    /// Held when a corroborating second read would add nothing.
+    bracketed: Option<super::BracketedCount>,
     /// Tally refused one of this read's data requests as too large or timed out.
     refused_a_part: bool,
 }

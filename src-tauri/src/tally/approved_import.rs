@@ -818,9 +818,12 @@ pub(crate) mod test_seam {
 
     /// A stand-in for a dialog subprocess that writes `answer`, with
     /// `{NONCE}` replaced by the nonce it was sent, and exits with `exit_code`.
-    /// Its first act is to create `<stand-in>.ran`, which [`standin_input`]
-    /// reads, so a row can tell a refusal the stand-in produced from a spawn
-    /// that failed; before answering, it saves the input it read there.
+    /// Its first act is to create an empty `<stand-in>.ran`, and its last,
+    /// just before it exits, is to save there the input it read. Each row
+    /// checks that input with [`assert_ran_to_its_end`], so a refusal the
+    /// stand-in produced is told apart from a spawn that failed, and from a
+    /// stand-in that died after starting, whose non-zero exit would otherwise
+    /// read as a person's decline.
     ///
     /// Each call is a hard link to the built example, never a copy. A link
     /// opens no descriptor, so the test process never holds a writable one to
@@ -851,6 +854,16 @@ pub(crate) mod test_seam {
     /// started: see [`standin`].
     fn standin_input(standin: &std::path::Path) -> Option<String> {
         std::fs::read_to_string(beside(standin, ".ran")).ok()
+    }
+
+    /// The stand-in at `standin` ran to its end: it saved the input it was
+    /// sent, and the dialog child's own parser reads it as the parent's shape
+    /// for one voucher and `preview`.
+    fn assert_ran_to_its_end(standin: &std::path::Path, preview: &str, name: &str) {
+        let input = standin_input(standin).unwrap_or_default();
+        let (_, shown, text) = super::dialog_input(&input)
+            .unwrap_or_else(|| panic!("{name}: the stand-in did not run to its end"));
+        assert_eq!((shown, text), (ONE, preview), "{name}");
     }
 
     /// The control for [`standin_input`]. A stand-in that cannot start is
@@ -944,7 +957,7 @@ pub(crate) mod test_seam {
             let path = standin(directory.path(), exit_code, answer);
             let result = super::confirm_review_with(&path, ONE, "Review").await;
             assert_eq!(result, expected.map_err(str::to_string), "{name}");
-            assert!(standin_input(&path).is_some(), "{name}: the stand-in ran");
+            assert_ran_to_its_end(&path, "Review", name);
         }
         // The control: the token for this call's nonce is accepted.
         let echoes_token = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
@@ -952,7 +965,7 @@ pub(crate) mod test_seam {
             super::confirm_review_with(&echoes_token, ONE, "Review").await,
             Ok(())
         );
-        assert!(standin_input(&echoes_token).is_some());
+        assert_ran_to_its_end(&echoes_token, "Review", "the control");
     }
 
     /// The post dialog is answered only by the token echoing this call's
@@ -979,7 +992,7 @@ pub(crate) mod test_seam {
                 Err("import_approval_declined".to_string()),
                 "{name}"
             );
-            assert!(standin_input(&path).is_some(), "{name}: the stand-in ran");
+            assert_ran_to_its_end(&path, "Post", name);
         }
         for (name, answer) in [
             ("an executable ignoring the flag exits 0", ""),
@@ -1019,12 +1032,12 @@ pub(crate) mod test_seam {
                 Err("import_approval_unavailable".to_string()),
                 "{name}"
             );
-            assert!(standin_input(&path).is_some(), "{name}: the stand-in ran");
+            assert_ran_to_its_end(&path, "Post", name);
         }
         // The control: the token for this call's nonce, then a clean exit.
         let approves = standin(directory.path(), 0, "bridge-post-approved:{NONCE}\n");
         assert_eq!(super::confirm_with(&approves, ONE, "Post").await, Ok(()));
-        assert!(standin_input(&approves).is_some());
+        assert_ran_to_its_end(&approves, "Post", "the control");
     }
 
     /// Each call sends a nonce of its own: a stand-in that answers every call

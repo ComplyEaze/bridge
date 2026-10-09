@@ -1,0 +1,64 @@
+{
+ "comment": "cash_book_integrity (#1497): the company keeps integrated inventory but the read has no stock-items part. The finding reports the ledger sum as before and names the stock term that was not read.",
+ "groups": {
+  "Capital Account": null,
+  "Cash-in-Hand": null,
+  "Fixed Assets": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand"
+   ],
+   "guid": "edge-cash"
+  },
+  {
+   "name": "Owner Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-owner-capital"
+  },
+  {
+   "name": "Shop Fittings",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-shop-fittings"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 50000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 50000
+  },
+  {
+   "ledger": "Owner Capital",
+   "opening": -1200000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -1200000
+  },
+  {
+   "ledger": "Shop Fittings",
+   "opening": 150000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 150000
+  }
+ ],
+ "vouchers": [],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [],
+ "own_account_terms": [],
+ "opening_stock": "not read",
+ "tests": [
+  "cash_book_integrity"
+ ]
+}

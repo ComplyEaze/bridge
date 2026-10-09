@@ -221,7 +221,14 @@ fn parse_row(
                     skip_subtree(reader)?;
                 }
             }
-            Event::Empty(element) => refuse_error_element(&upper(element.name()))?,
+            Event::Empty(element) => {
+                let child = upper(element.name());
+                refuse_error_element(&child)?;
+                // A self-closed series list is still a series, with no method.
+                if child == b"VOUCHERNUMBERSERIES.LIST" {
+                    series.push(SeriesFields::default());
+                }
+            }
             Event::Text(text) => refuse_stray_text(&text)?,
             Event::CData(_) | Event::GeneralRef(_) => {
                 return Err(NativeMastersError::Malformed("masters_unexpected_text"))
@@ -293,7 +300,10 @@ fn classify(series: &[SeriesFields]) -> Result<VoucherTypeNumbering, NativeMaste
         return Ok(VoucherTypeNumbering::FieldInvalid("series_field_repeated"));
     }
     let method = match one.method.as_deref() {
-        None | Some("") => return Ok(VoucherTypeNumbering::FieldInvalid("series_method")),
+        None => return Ok(VoucherTypeNumbering::FieldInvalid("series_method")),
+        Some(blank) if blank.trim().is_empty() => {
+            return Ok(VoucherTypeNumbering::FieldInvalid("series_method"))
+        }
         Some("Automatic") => SeriesNumberingMethod::Automatic,
         Some("Manual") => SeriesNumberingMethod::Manual,
         Some("Automatic (Manual Override)") => SeriesNumberingMethod::AutomaticManualOverride,

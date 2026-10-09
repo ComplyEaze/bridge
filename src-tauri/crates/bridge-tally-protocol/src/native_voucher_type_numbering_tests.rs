@@ -190,6 +190,39 @@ fn a_second_series_or_none_is_not_read() {
 }
 
 #[test]
+fn a_self_closed_series_list_is_still_a_series() {
+    let series = payment_series();
+    // Only an empty list: one series, with no method.
+    let only_empty = edited(&series, "<VOUCHERNUMBERSERIES.LIST/>");
+    assert_eq!(
+        row(
+            &parse_voucher_type_numbering(&only_empty).unwrap(),
+            "Payment"
+        )
+        .numbering,
+        VoucherTypeNumbering::FieldInvalid("series_method")
+    );
+    // A real series and an empty one: two series.
+    let both = edited(&series, &format!("{series}<VOUCHERNUMBERSERIES.LIST/>"));
+    assert_eq!(
+        row(&parse_voucher_type_numbering(&both).unwrap(), "Payment").numbering,
+        VoucherTypeNumbering::SeriesCount(2)
+    );
+}
+
+#[test]
+fn a_whitespace_only_method_is_a_blank_method() {
+    let text = edited(
+        "<NUMBERINGMETHOD>Manual</NUMBERINGMETHOD>",
+        "<NUMBERINGMETHOD>  </NUMBERINGMETHOD>",
+    );
+    assert_eq!(
+        row(&parse_voucher_type_numbering(&text).unwrap(), "Payment").numbering,
+        VoucherTypeNumbering::FieldInvalid("series_method")
+    );
+}
+
+#[test]
 fn a_method_outside_the_measured_set_is_kept_raw_and_never_manual() {
     for (printed, expected) in [
         (

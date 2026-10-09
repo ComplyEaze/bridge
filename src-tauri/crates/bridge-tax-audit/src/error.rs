@@ -47,6 +47,17 @@ pub enum AuditError {
     /// the reference does), so a firm with none is not refused there.
     #[error("a voucher GUID holds a NUL character, so two vouchers would take one key")]
     VoucherKeysNotUnique,
+    /// A test's own invariant check stops where the reference's stops with an internal error,
+    /// after forming the message whose code and detail are carried here: `narration_payees`' NP-2
+    /// on a cited GUID whose last population voucher has no bank leg (its spec pack's README
+    /// section 13). `module` is the test id; `code` names the invariant, as `Refused` names its
+    /// rule, so a test asserts the code rather than the message.
+    #[error("{module}: {code}: {detail}")]
+    ModuleInvariant {
+        module: &'static str,
+        code: &'static str,
+        detail: String,
+    },
     #[error("{path}: {source}")]
     Io {
         path: String,

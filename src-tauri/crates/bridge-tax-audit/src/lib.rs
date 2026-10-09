@@ -54,6 +54,7 @@ pub mod knock_off_candidates;
 pub mod ledger_ids;
 pub mod ledger_scrutiny;
 pub mod loans_interest;
+pub mod narration_payees;
 pub mod partners_40b_194t;
 pub mod party_identity;
 pub mod party_monthly;
@@ -111,6 +112,10 @@ pub struct Engagement {
     pub cash_groups: Vec<String>,
     pub bank_groups: Vec<String>,
     pub round_off_ledgers: Vec<String>,
+    /// `narration_payees`-only: `[roles].narration_payee_ledgers` as bound, empty when absent.
+    /// [`binding::bind`] fills it, and refuses a value that is not a list of names
+    /// (`BIND-ID-MALFORMED`) or a name that matches no ledger.
+    pub narration_payee_ledgers: Vec<String>,
     pub loan_ledgers_configured: Vec<String>,
     /// `cash_book_integrity`-only: the optional `[roles].own_account_narration_terms`, the forms
     /// in which the bank prints the assessee's own other account on transfer lines (client data).
@@ -958,6 +963,7 @@ not YYYY-MM-DD"
                 Some(_) => strings(roles, "round_off_ledgers")?,
                 None => Vec::new(),
             },
+            narration_payee_ledgers: Vec::new(),
             own_account_narration_terms: roles.get("own_account_narration_terms").cloned(),
             counter_cheque_narration_terms: roles.get("counter_cheque_narration_terms").cloned(),
             bank_reconciliation_ledger: None,
@@ -1900,6 +1906,35 @@ pub fn tds_payees_on(
     let inputs = tds_payees_inputs(&bound)?;
     let result = tds_payees::run(book, rules, &entity_type, tds, &inputs)?;
     canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `narration_payees` on a book and return its canonical parity dump, with the module's own
+/// NP-1 to NP-7 check. The bank ledgers are those under the bound `bank_groups`; the listed ledgers
+/// are the bound `[roles].narration_payee_ledgers`. The TDS payee test runs first, as
+/// [`tds_payees_on`] runs it (so `[client].entity_type` and a `[tds]` table are required), and the
+/// 194C ledgers whose payees it could not name are read too.
+pub fn narration_payees_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let entity_type = engagement.entity_type.clone().ok_or_else(|| {
+        AuditError::Config("narration_payees needs [client].entity_type".to_string())
+    })?;
+    let (bound, _report) = engagement.bind(book)?;
+    let tds = bound
+        .tds
+        .as_ref()
+        .ok_or_else(|| AuditError::Config("narration_payees needs a [tds] table".to_string()))?;
+    let inputs = tds_payees_inputs(&bound)?;
+    let tds_result = tds_payees::run(book, rules, &entity_type, tds, &inputs)?;
+    let added = narration_payees::unnamed_194c_ledgers(book, &tds_result, &tds.nature_by_ledger)?;
+    let bank = book.ledgers_under_any(&bound.bank_groups);
+    let listed: BTreeSet<String> = bound.narration_payee_ledgers.iter().cloned().collect();
+    let result = narration_payees::run(book, rules, &bank, &listed, &added)?;
+    let read: BTreeSet<String> = listed.union(&added).cloned().collect();
+    let module_check = narration_payees::check_invariants(book, &result, &bank, &read)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
 /// The ledgers a bound engagement's `[statutory_dues].nature_by_ledger` classifies as

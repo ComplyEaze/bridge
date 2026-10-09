@@ -164,6 +164,12 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::loans_interest_on(e, b, r),
     },
     PortedTest {
+        id: "narration_payees",
+        // The fifteen fixed figures, on every book.
+        min_figures: 15,
+        run_on: |e, b, r, _| crate::narration_payees_on(e, b, r),
+    },
+    PortedTest {
         id: "partners_40b_194t",
         // `applicable` alone, on any book that is not a firm's or an LLP's.
         min_figures: 1,

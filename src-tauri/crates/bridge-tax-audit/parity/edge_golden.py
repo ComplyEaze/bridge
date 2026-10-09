@@ -85,7 +85,9 @@ a negative one from the end, which the Rust `usize` cannot express, so both side
 `depreciation`: `depreciation` (the client config's `[depreciation]` table: `block_by_ledger` ({ledger: block}),
 `opening_wdv_paise` ({block: integer paise}) and `dep_expense_ledgers` (a list of text), each required, as the
 reference's own `tae.config.depreciation_config` requires it, and `put_to_use_by_voucher` ({voucher GUID: ISO date},
-default none: the reference's pack passes none, but `run()` takes them).
+default none: the reference's pack passes none, but `run()` takes them); and for
+`narration_payees`: `narration_payee_ledgers` (a list of text, default []), `bank` (also passed to the
+module invariant) and the keys `tds_payees` reads, whose result gives the 194C ledgers it adds.
 """
 from __future__ import annotations
 
@@ -397,6 +399,16 @@ def main() -> int:
             client_state=tc.client_state(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg),
             deductor_activity=tc.deductor_activity(cfg), goods_carriage_ledgers=tc.tds_goods_carriage_ledgers(cfg))
 
+    def narration_payees_run():
+        from tae.audit_tests import narration_payees
+        configured = frozenset(typed(spec, "narration_payee_ledgers",
+                                     lambda x: isinstance(x, list) and all(isinstance(t, str) for t in x),
+                                     "a list of text", absent=[], nullable=False))
+        added = narration_payees.unnamed_194c_ledgers(book, tds_payees_run()[1], dict(spec.get("nature_by_ledger", {})))
+        module = SimpleNamespace(TEST_ID=narration_payees.TEST_ID, check_invariants=lambda e, res:
+                                 narration_payees.check_invariants(e, res, bank, configured | added))
+        return module, narration_payees.run(eng, rules, bank, configured, added_ledgers=added)
+
     def specified_persons_run():
         # As the pack's runner: related_parties_cl23 on the same table first, its result this test's input.
         rp = related_parties_config({"related_parties": spec.get("related_parties", {})})
@@ -451,6 +463,7 @@ def main() -> int:
         "knock_off_candidates": knock_off_candidates_run,
         "ledger_scrutiny": lambda: (ledger_scrutiny, ledger_scrutiny.run(eng, rules, cash)),
         "loans_interest": loans_interest_run,
+        "narration_payees": narration_payees_run,
         "partners_40b_194t": lambda: (partners_40b_194t, partners_40b_194t.run(
             eng, rules, {k: dict(v) for k, v in spec.get("partners", {}).items()}, spec.get("deed"),
             tds_ledgers=frozenset(spec.get("tds_payable_ledgers", [])))),

@@ -31,11 +31,11 @@ use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
     cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
     creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register,
-    knock_off_candidates, ledger_scrutiny, loans_interest, partners_40b_194t, party_identity,
-    party_monthly, questionnaire_cl13, read_scope, related_parties_cl23, specified_persons_40a2b,
-    stale_balances_41_1, statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as,
-    trial_balance, twentysixas_receipts, PartnersConfig, RelatedPartiesConfig, Tds26asConfig,
-    TdsConfig,
+    knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees, partners_40b_194t,
+    party_identity, party_monthly, questionnaire_cl13, read_scope, related_parties_cl23,
+    specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock, stock_read,
+    tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
+    RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -109,6 +109,31 @@ fn strs(v: &Value) -> Vec<String> {
     v.as_array()
         .map(|a| a.iter().map(|s| s.as_str().unwrap().to_string()).collect())
         .unwrap_or_default()
+}
+
+/// `narration_payees`' listed ledgers: the book's `narration_payee_ledgers`, `[]` when absent.
+/// Anything but a list of text is refused (the pack's README section 15), as the real pipeline's
+/// binding refuses it; `strs()` would not.
+fn narration_payee_ledgers(s: &Value) -> BTreeSet<String> {
+    typed(s, "narration_payee_ledgers", false, "a list of text", |v| {
+        v.as_array()?
+            .iter()
+            .map(|t| t.as_str().map(str::to_string))
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
+#[test]
+#[should_panic(expected = "narration_payee_ledgers must be a list of text, got \"Wages\"")]
+fn a_narration_payee_ledgers_value_that_is_not_a_list_is_refused() {
+    narration_payee_ledgers(&serde_json::json!({"narration_payee_ledgers": "Wages"}));
+}
+
+#[test]
+#[should_panic(expected = "narration_payee_ledgers must be a list of text, got [\"Wages\",1]")]
+fn a_narration_payee_ledgers_item_that_is_not_text_is_refused() {
+    narration_payee_ledgers(&serde_json::json!({"narration_payee_ledgers": ["Wages", 1]}));
 }
 
 fn date(iso: &str) -> TallyDate {
@@ -934,6 +959,25 @@ fn check(name: &str) {
                 assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
                 continue;
             }
+            "narration_payees" => {
+                // As `parity/edge_golden.py` runs it: the TDS payee test first, as its arm above
+                // runs it, and the 194C ledgers it could not name a payee for read too.
+                let entity_type = s["entity_type"].as_str().unwrap_or("individual");
+                let tds = tds_config(&s);
+                let tds_result =
+                    tds_payees::run(&book, &rules, entity_type, &tds, &tds_inputs(&s)).unwrap();
+                let added = narration_payees::unnamed_194c_ledgers(
+                    &book,
+                    &tds_result,
+                    &tds.nature_by_ledger,
+                )
+                .unwrap();
+                let listed = narration_payee_ledgers(&s);
+                let r = narration_payees::run(&book, &rules, &bank, &listed, &added).unwrap();
+                let read: BTreeSet<String> = listed.union(&added).cloned().collect();
+                let c = narration_payees::check_invariants(&book, &r, &bank, &read).unwrap();
+                (r, c)
+            }
             "loans_interest" => {
                 let entity_type = s["entity_type"].as_str().unwrap_or("individual");
                 let shared: BTreeSet<String> =
@@ -1197,7 +1241,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 29] = [
+const EDGE_TESTS: [&str; 30] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1214,6 +1258,7 @@ const EDGE_TESTS: [&str; 29] = [
     "knock_off_candidates",
     "ledger_scrutiny",
     "loans_interest",
+    "narration_payees",
     "partners_40b_194t",
     "party_monthly",
     "questionnaire_cl13",

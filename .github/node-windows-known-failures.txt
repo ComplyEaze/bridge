@@ -1,5 +1,44 @@
 # Tests of the Node suite (scripts/*.test.mjs) known to fail on windows-latest (bridge#1471).
 # One per line, as "<test file> > <test names from the file down to the test>", in the format the
 # job summary prints. A test that fails and is not listed here turns .github/workflows/node-windows.yml
-# red. Remove a line when its test passes. Captured from the first run of that workflow, not written
-# by hand. Empty now: the first run of this pull request is red by design and lists what to capture.
+# red. Remove a line when its test passes.
+# Captured, not written by hand, from run 37879714728 of that workflow
+# (https://github.com/ComplyEaze/bridge/actions/runs/37879714728) at commit 06b3211f97b0e6f2e13a9b69e7cfaf2a8631d8ce:
+# 37 failing tests of 618, on windows-latest (image windows-2025-vs2026, version 20260901.588), Node 24.21.0 (.node-version), run under Git Bash.
+scripts/check-conflict-markers.test.mjs > a tracked file that cannot be read is exit 2, not a clean result
+scripts/check-fixture-byte-integrity.test.mjs > a `source` JSON with no companion file does not make a fixture directory
+scripts/check-fixture-byte-integrity.test.mjs > a git-ignored fixture directory is outside the byte-integrity inventory
+scripts/check-fixture-byte-integrity.test.mjs > a symlinked `fixtures` alias of a walked directory fails the gate
+scripts/check-fixture-byte-integrity.test.mjs > an image Git treats as binary does not make a fixture directory
+scripts/check-fixture-byte-integrity.test.mjs > an unregistered fixture directory fails the byte-integrity gate
+scripts/check-fixture-provenance.test.mjs > a JSON record documenting no other file is a fixture that needs its own row
+scripts/check-fixture-provenance.test.mjs > a bare-name row documents only the file beside its Markdown file
+scripts/check-fixture-provenance.test.mjs > a path named in prose does not document the fixture; a path row does
+scripts/check-fixture-provenance.test.mjs > a path row does not document another fixture with the same basename
+scripts/check-fixture-provenance.test.mjs > a path row naming a provenance record fails with its own message
+scripts/check-fixture-provenance.test.mjs > a path row resolving outside its fixture root fails with its own message
+scripts/check-fixture-provenance.test.mjs > a row naming a directory path where no fixture is fails rather than checking nothing
+scripts/check-fixture-provenance.test.mjs > a row naming its fixture with a directory is hash-checked against that file
+scripts/check-fixture-provenance.test.mjs > the exempt root keeps basename matching for its rows
+scripts/check-protocol-section-numbers.test.mjs > scripts\check-protocol-section-numbers.test.mjs
+scripts/check-tally-egress-boundary.test.mjs > a dependency's macro, a listed type and a listed path that resolves to nothing are counted
+scripts/check-tally-egress-boundary.test.mjs > a message about a listed path that is not located in clippy.toml is not counted
+scripts/check-tally-egress-boundary.test.mjs > a verbatim Windows path and a repeated unresolved-path message count as one row
+scripts/check-tally-request-builder-hazards.test.mjs > a file named like a test but reached by an ordinary mod is still scanned
+scripts/check-tally-request-builder-hazards.test.mjs > a file production also declares is scanned, and what it declares, whatever test code declares it
+scripts/check-tally-request-builder-hazards.test.mjs > a file reached only through a test-only mod declaration is quarantined, and what it declares too
+scripts/check-tally-request-builder-hazards.test.mjs > a formula reference passes with any declared TYPE; an amount needs TYPE Amount
+scripts/check-tally-request-builder-hazards.test.mjs > a placeholder in an unquoted argument or a report name is reported as unresolved
+scripts/check-tally-request-builder-hazards.test.mjs > every untyped amount shape is reported, each by its FIELD
+scripts/check-tally-request-builder-hazards.test.mjs > the same shapes pass once each FIELD declares TYPE Amount
+scripts/check-unbounded-reads.test.mjs > a call split across lines is read as one call
+scripts/check-unbounded-reads.test.mjs > a take in a neighbouring statement, or beside the reader, does not bound it
+scripts/check-unbounded-reads.test.mjs > a take the reader is unwrapped from does not bound it
+scripts/check-unbounded-reads.test.mjs > an allowed file with no unbounded read left is a stale exception
+scripts/check-unbounded-reads.test.mjs > an allowed path with no file is a stale exception
+scripts/check-unbounded-reads.test.mjs > an exception with no reason is refused
+scripts/check-unbounded-reads.test.mjs > the qualified form without a take is reported
+scripts/generate-frontend-licenses.test.mjs > the committed file's `name version` tokens are exactly what the generator (re-run) produces
+scripts/playwright-install-step.test.mjs > the apt-based install runs only under a timeout that itself runs as root, around node run as root
+scripts/release-workflows.test.mjs > the site summary step is informational, permitted to read deployments, and shows what would go live
+scripts/site-pages.test.mjs > no file that ships carries an internal working label

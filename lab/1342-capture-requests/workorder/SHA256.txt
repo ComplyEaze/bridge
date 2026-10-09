@@ -14,3 +14,6 @@ f90acd5e7bebe8c052555a8bf3e94da94497a48bc8885997d1de7047a1795366  w3-valid-after
 8643ae8da6acbc435cf36f7cac06b8d999ad6e01527ce6d7357f9e846c8862e9  w5-receipt-refused-control.xml
 eff33d568f03e082567b248e4c6188a1b2af5cdfa38f4e95bc63d7501c5b4c36  w5-receipt-refused.xml
 10f917d880ff44a92366125b3899c9b3c36dc3811b87c3a1c8780c829b7bdbb7  w5-receipt-second.xml
+# W6 (one invoice, one sales ledger on two lines; steps in W6-README.md)
+ec04dcd470e32a65c37bf6cd45f9d119c9f72882afdce5a526a466aab7355ba6  w6-same-ledger-two-lines.xml
+ab01192ccb7b0fcca3a7a8bd14ec7171db43a7acf2fe6a104da63906e3720b9a  w6-window-0915.xml

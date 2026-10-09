@@ -1,0 +1,139 @@
+{
+ "comment": "A name two masters share stays in the index. Sigma Trading (a creditor) and SIGMA-TRADING (a debtor) have the same words in the same order, so the name is shared and bound to no master; a third party, Sigma, is a shorter name that lies inside it. s01 pays Beta Stores from Bank A and its narration names Sigma Trading: the shared name is found (and listed for none), so Sigma inside it is dropped as nested and s01 is not listed. s02 names only Sigma, so Sigma is found as a plain name and s02 is listed. A port that dropped the shared name from the index would list s01 for Sigma.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_shared-000"
+  },
+  {
+   "name": "Beta Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_shared-001"
+  },
+  {
+   "name": "SIGMA-TRADING",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_shared-002"
+  },
+  {
+   "name": "Sigma",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_shared-003"
+  },
+  {
+   "name": "Sigma Trading",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_shared-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 200000,
+   "closing": -200000
+  },
+  {
+   "ledger": "Beta Stores",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 0,
+   "closing": 200000
+  },
+  {
+   "ledger": "SIGMA-TRADING",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Sigma",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Sigma Trading",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "s01",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "narration": "Dues of Sigma Trading",
+   "lines": [
+    [
+     "Beta Stores",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "s02",
+   "date": "2025-06-05",
+   "base_type": "Payment",
+   "narration": "Dues of Sigma",
+   "lines": [
+    [
+     "Beta Stores",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ]
+}

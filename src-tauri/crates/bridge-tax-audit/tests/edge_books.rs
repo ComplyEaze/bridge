@@ -29,18 +29,50 @@ use bridge_tax_audit::rules::Rules;
 use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
-    cash_book_integrity, cash_payments_40a3, clause21a_candidates, counter_cheques_40a3,
-    creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register, ledger_scrutiny,
-    loans_interest, partners_40b_194t, party_identity, party_monthly, questionnaire_cl13,
-    read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
-    statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as, trial_balance,
-    twentysixas_receipts, PartnersConfig, RelatedPartiesConfig, Tds26asConfig, TdsConfig,
+    cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
+    creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register,
+    knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees, partners_40b_194t,
+    party_identity, party_monthly, questionnaire_cl13, read_scope, related_parties_cl23,
+    specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock, stock_read,
+    tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
+    RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
 fn spec(name: &str) -> Value {
     let path = common::fixtures().join(format!("edge-books/{name}.json"));
     serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+}
+
+/// `knock_off_candidates`' extra party groups: the book's `party_identity.party_groups`, `[]` when
+/// the table or the key is absent. Anything but a table there, or a list of text, is refused (the
+/// pack's README section 10), as the real pipeline's binding refuses it; `strs()` would not.
+fn party_groups(s: &Value) -> Vec<String> {
+    let table = typed(s, "party_identity", false, "a table", |v| {
+        v.is_object().then(|| v.clone())
+    });
+    table
+        .and_then(|t| {
+            typed(&t, "party_groups", false, "a list of text", |v| {
+                v.as_array()?
+                    .iter()
+                    .map(|g| g.as_str().map(str::to_string))
+                    .collect()
+            })
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+#[should_panic(expected = "party_groups must be a list of text, got \"Sundry Debtors\"")]
+fn a_party_groups_value_that_is_not_a_list_is_refused() {
+    party_groups(&serde_json::json!({"party_identity": {"party_groups": "Sundry Debtors"}}));
+}
+
+#[test]
+#[should_panic(expected = "party_groups must be a list of text, got [\"Sundry Debtors\",1]")]
+fn a_party_groups_item_that_is_not_text_is_refused() {
+    party_groups(&serde_json::json!({"party_identity": {"party_groups": ["Sundry Debtors", 1]}}));
 }
 
 /// The `party_identity` table of an edge book, as the engagement's TOML table would give it.
@@ -77,6 +109,31 @@ fn strs(v: &Value) -> Vec<String> {
     v.as_array()
         .map(|a| a.iter().map(|s| s.as_str().unwrap().to_string()).collect())
         .unwrap_or_default()
+}
+
+/// `narration_payees`' listed ledgers: the book's `narration_payee_ledgers`, `[]` when absent.
+/// Anything but a list of text is refused (the pack's README section 15), as the real pipeline's
+/// binding refuses it; `strs()` would not.
+fn narration_payee_ledgers(s: &Value) -> BTreeSet<String> {
+    typed(s, "narration_payee_ledgers", false, "a list of text", |v| {
+        v.as_array()?
+            .iter()
+            .map(|t| t.as_str().map(str::to_string))
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
+#[test]
+#[should_panic(expected = "narration_payee_ledgers must be a list of text, got \"Wages\"")]
+fn a_narration_payee_ledgers_value_that_is_not_a_list_is_refused() {
+    narration_payee_ledgers(&serde_json::json!({"narration_payee_ledgers": "Wages"}));
+}
+
+#[test]
+#[should_panic(expected = "narration_payee_ledgers must be a list of text, got [\"Wages\",1]")]
+fn a_narration_payee_ledgers_item_that_is_not_text_is_refused() {
+    narration_payee_ledgers(&serde_json::json!({"narration_payee_ledgers": ["Wages", 1]}));
 }
 
 fn date(iso: &str) -> TallyDate {
@@ -197,6 +254,10 @@ fn build(s: &Value) -> Book {
                     .collect(),
                 narration: text("narration", ""),
                 party_field: text("party", ""),
+                party_gstin: typed(v, "party_gstin", false, "text", |p| {
+                    p.as_str().map(str::to_string)
+                })
+                .unwrap_or_default(),
                 reference: typed(v, "reference", false, "text", |r| {
                     r.as_str().map(str::to_string)
                 })
@@ -505,6 +566,33 @@ fn tds_26as_config(s: &Value) -> Tds26asConfig {
     }
 }
 
+/// `clause44`'s inputs from the spec's `clause44` table, as `parity/edge_golden.py` passes them:
+/// every key optional and empty when absent, `tax_ledgers` every head's ledgers, and the two maps
+/// typed by the crate's own reader.
+fn clause44_inputs(s: &Value) -> clause44::Inputs {
+    let c = &s["clause44"];
+    let set = |k: &str| strs(&c[k]).into_iter().collect();
+    let map = |k: &str| -> BTreeMap<String, toml::Value> {
+        c[k].as_object()
+            .map(|m| m.iter().map(|(l, v)| (l.clone(), toml_of(v))).collect())
+            .unwrap_or_default()
+    };
+    clause44::Inputs {
+        dep_expense_ledgers: set("dep_expense_ledgers"),
+        tax_ledgers: c["tax_ledgers"]
+            .as_object()
+            .map(|heads| heads.values().flat_map(strs).collect())
+            .unwrap_or_default(),
+        no_supplier_expense_ledgers: set("no_supplier_expense_ledgers"),
+        round_off_ledgers: set("round_off_ledgers"),
+        ..clause44::Inputs::new(
+            &map("registration_type_by_ledger"),
+            &map("money_category_by_ledger"),
+        )
+        .unwrap()
+    }
+}
+
 /// `book_keeping_quality`'s inputs from the spec's `book_keeping_quality` table, as
 /// `parity/edge_golden.py` passes them: every key optional and empty when absent, `tax_ledgers`
 /// flattened to ledger -> head.
@@ -679,6 +767,11 @@ fn check(name: &str) {
                 )));
                 assert_eq!(order, want, "{name}: trial_balance row order");
                 let c = trial_balance::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "clause44" => {
+                let r = clause44::run(&book, &rules, &clause44_inputs(&s)).unwrap();
+                let c = clause44::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
             "related_parties_cl23" => {
@@ -866,6 +959,25 @@ fn check(name: &str) {
                 assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
                 continue;
             }
+            "narration_payees" => {
+                // As `parity/edge_golden.py` runs it: the TDS payee test first, as its arm above
+                // runs it, and the 194C ledgers it could not name a payee for read too.
+                let entity_type = s["entity_type"].as_str().unwrap_or("individual");
+                let tds = tds_config(&s);
+                let tds_result =
+                    tds_payees::run(&book, &rules, entity_type, &tds, &tds_inputs(&s)).unwrap();
+                let added = narration_payees::unnamed_194c_ledgers(
+                    &book,
+                    &tds_result,
+                    &tds.nature_by_ledger,
+                )
+                .unwrap();
+                let listed = narration_payee_ledgers(&s);
+                let r = narration_payees::run(&book, &rules, &bank, &listed, &added).unwrap();
+                let read: BTreeSet<String> = listed.union(&added).cloned().collect();
+                let c = narration_payees::check_invariants(&book, &r, &bank, &read).unwrap();
+                (r, c)
+            }
             "loans_interest" => {
                 let entity_type = s["entity_type"].as_str().unwrap_or("individual");
                 let shared: BTreeSet<String> =
@@ -981,6 +1093,15 @@ fn check(name: &str) {
                     }
                     Err(e) => panic!("{name}: the statement is malformed: {e}"),
                 }
+            }
+            "knock_off_candidates" => {
+                // No module check: the dump lists none (the pack's README section 6).
+                let r = knock_off_candidates::run(&book, &rules, &party_groups(&s)).unwrap();
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
             }
             "high_value_register" => {
                 // As `parity/edge_golden.py` runs it: the statement and the AIS rows optional, the
@@ -1120,7 +1241,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 27] = [
+const EDGE_TESTS: [&str; 30] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1128,13 +1249,16 @@ const EDGE_TESTS: [&str; 27] = [
     "cash_book_integrity",
     "cash_payments_40a3",
     "clause21a_candidates",
+    "clause44",
     "counter_cheques_40a3",
     "creditor_ageing_43bh",
     "depreciation",
     "entity_269st_gap",
     "high_value_register",
+    "knock_off_candidates",
     "ledger_scrutiny",
     "loans_interest",
+    "narration_payees",
     "partners_40b_194t",
     "party_monthly",
     "questionnaire_cl13",

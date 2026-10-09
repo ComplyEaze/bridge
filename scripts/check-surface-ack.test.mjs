@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { ACK_DIR, MAX_REASON, SURFACE_PATH, checkAck, parseAck, parseNameStatus, parsePins, historicPaths, withdrawnPins } from "./check-surface-ack.mjs";
 
@@ -266,7 +267,7 @@ test("name-status -z parsing keeps both names of renames and refuses truncated r
 
 // ---- the CLI against a real temporary git repository ----
 
-const script = new URL("./check-surface-ack.mjs", import.meta.url).pathname;
+const script = fileURLToPath(new URL("./check-surface-ack.mjs", import.meta.url));
 const tmpDirs = [];
 test.after(() => tmpDirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
 

@@ -755,15 +755,28 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // amounts and counts of ledgers, and no ledger name.
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut without_a_sample = vec!["acknowledge_post_review", "cash_flow", "local_data_report"];
+    // Read once: the catalogue keeps the lab tools only while BRIDGE_LAB_WRITES=1
+    // is set as it is built, and another test changes that variable, so the
+    // exemptions below must come from this same read (#1435).
+    let registered = super::catalog::registered_tool_definitions(true, true)
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|tool| tool["name"].as_str().expect("tool name").to_string())
+        .collect::<BTreeSet<_>>();
     // The lab-only tools, compiled in with the `lab-writes` feature, are not
     // sampled yet: `lab_read_inventory` returns party-bearing fields and the two
-    // import tools were not examined (#999).
+    // import tools were not examined (#999). Exempt those this read registered.
     #[cfg(feature = "lab-writes")]
-    without_a_sample.extend([
-        "lab_import_masters",
-        "lab_import_vouchers",
-        "lab_read_inventory",
-    ]);
+    without_a_sample.extend(
+        [
+            "lab_import_masters",
+            "lab_import_vouchers",
+            "lab_read_inventory",
+        ]
+        .into_iter()
+        .filter(|name| registered.contains(*name)),
+    );
     let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
     assert_eq!(
         sampled.len(),
@@ -786,12 +799,6 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         covered.iter().collect::<BTreeSet<_>>().len(),
         "a tool is both sampled and listed without a sample: {covered:?}"
     );
-    let registered = super::catalog::registered_tool_definitions(true, true)
-        .as_array()
-        .expect("tools")
-        .iter()
-        .map(|tool| tool["name"].as_str().expect("tool name").to_string())
-        .collect::<BTreeSet<_>>();
     let covered = covered
         .iter()
         .map(|tool| tool.to_string())

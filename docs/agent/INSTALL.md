@@ -23,13 +23,13 @@ notarized. Each archive has a same-named `.sha256` file and
 a small provenance record on its release so an organization can identify the
 downloaded bytes and source commit.
 
-## At a glance, release 0.5.0
+## At a glance, release 0.5.1
 
 - **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), and one ledger's movement.
 - **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, values only, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
 - **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags, and Tally's Funds Flow, Ratio Analysis and negative-balance reports.
 
-"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.5.0 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.5.1 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
 ## Before you install
 
@@ -66,10 +66,10 @@ actually on.
 4. Read the Terms of Use linked in the extension settings, then turn on **I
    accept the ComplyEaze Bridge Terms of Use**. Until you do, Bridge does
    not read from Tally, and from release 0.5.1 every Bridge tool answers that
-   the Terms of Use are not accepted and names this setting (seen on one Mac
-   with a test package; not yet checked on Windows). (In 0.5.0, after an update
-   from 0.4.2, Claude Desktop may not start Bridge, with an error that does not
-   mention the Terms; bridge#1413.)
+   the Terms of Use are not accepted and names this setting (the tools the assistant called
+   gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). (In 0.5.0, after an update
+   from 0.4.2, Claude Desktop may not start Bridge: on a Mac with an error that
+   does not mention the Terms, on one Windows computer with no error; bridge#1413.)
 5. Save the extension settings, then quit Claude Desktop completely and reopen
    it. (On that Mac Claude Desktop
    started Bridge as soon as the settings were saved and a new chat got an answer
@@ -114,11 +114,10 @@ port, Response redaction and the posting setting as they were (a posting
 setting that was on stayed on), the old Terms setting gone and no value for the
 new one (version 2026-10.1). With the published 0.5.0 file, on one Mac, the Tally
 port and Response redaction were kept and the Terms setting was dropped the same
-way (bridge#1413); not tried on Windows. So after updating, tick the Terms setting, check the posting setting, then
+way (bridge#1413). On one Windows computer, the published 0.5.0 file over 0.4.2 was not started either: the chat showed no Bridge tool and no error. So after updating, tick the Terms setting, check the posting setting, then
 quit and reopen Claude Desktop. Before the box is ticked, Claude Desktop may not
 start 0.5.0 at all; from 0.5.1 it starts Bridge, and every Bridge tool answers
-that the Terms of Use are not accepted (seen on one Mac with a test package; not
-yet checked on Windows; bridge#1413). Installing over a release older than 0.4.2 was not
+that the Terms of Use are not accepted (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release; bridge#1413). Installing over a release older than 0.4.2 was not
 tried: remove such a release first. If Settings,
 Extensions then lists two ComplyEaze Bridge entries (as happened when 0.4.2 was
 installed beside an older release), remove the older entry before you use

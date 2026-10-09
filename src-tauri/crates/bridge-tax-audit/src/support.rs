@@ -555,6 +555,24 @@ pub(crate) mod text_probe_tests {
             src.contains(&format!("Rust char tables, Unicode {a}.{b}.{c};")),
             "text_tables.rs was generated against other Unicode tables: rerun parity/text_semantics.py"
         );
+        // `unicode_tables.rs` depends on the normalisation library's tables, not the compiler's.
+        let src = include_str!("unicode_tables.rs");
+        let (a, b, c) = unicode_normalization::UNICODE_VERSION;
+        assert!(
+            src.contains(&format!(
+                "unicode-normalization tables, Unicode {a}.{b}.{c}; Python 3.13."
+            )) && src.contains(", Unicode 15.1.0."),
+            "unicode_tables.rs was generated against other tables: rerun parity/unicode_tables.py"
+        );
+        // The generator's own counts: a dropped or added range fails here.
+        assert_eq!(
+            (
+                crate::unicode_tables::LETTER_OR_NUMBER.len(),
+                crate::unicode_tables::MARK.len(),
+                crate::unicode_tables::LATE.len(),
+            ),
+            (748, 310, 22)
+        );
     }
 
     #[test]
@@ -678,7 +696,7 @@ mod tests {
         assert_eq!(
             unicode_normalization::UNICODE_VERSION,
             (17, 0, 0),
-            "NFC tables moved"
+            "NFC tables moved: regenerate with parity/unicode_tables.py"
         );
         for list in [&UPPER_UNCHANGED[..], &LOWER_UNCHANGED[..]] {
             assert!(list.windows(2).all(|w| w[0] < w[1]), "sorted and unique");

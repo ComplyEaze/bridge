@@ -17,3 +17,6 @@ eff33d568f03e082567b248e4c6188a1b2af5cdfa38f4e95bc63d7501c5b4c36  w5-receipt-ref
 # W6 (one invoice, one sales ledger on two lines; steps in W6-README.md)
 ec04dcd470e32a65c37bf6cd45f9d119c9f72882afdce5a526a466aab7355ba6  w6-same-ledger-two-lines.xml
 ab01192ccb7b0fcca3a7a8bd14ec7171db43a7acf2fe6a104da63906e3720b9a  w6-window-0915.xml
+# W7 (reads of the ledger rates and the GSTR-1 status, and an optional three-line invoice; steps in W7-README.md)
+2e728e002305cbaa33c73bd36507ca8d6ab62c5dea5497b02204a07636385d88  w7-ledgers-rates.xml
+60f303bd8a4f363b14264da4c70f9594810b57d80c15f194892a1bacd21159d3  w7-readback-status.xml

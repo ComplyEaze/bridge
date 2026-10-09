@@ -6,11 +6,6 @@
 # (https://github.com/ComplyEaze/bridge/actions/runs/37879714728) at commit 06b3211f97b0e6f2e13a9b69e7cfaf2a8631d8ce:
 # 37 failing tests of 618, on windows-latest (image windows-2025-vs2026, version 20260901.588), Node 24.21.0 (.node-version), run under Git Bash.
 scripts/check-conflict-markers.test.mjs > a tracked file that cannot be read is exit 2, not a clean result
-scripts/check-fixture-byte-integrity.test.mjs > a `source` JSON with no companion file does not make a fixture directory
-scripts/check-fixture-byte-integrity.test.mjs > a git-ignored fixture directory is outside the byte-integrity inventory
-scripts/check-fixture-byte-integrity.test.mjs > a symlinked `fixtures` alias of a walked directory fails the gate
-scripts/check-fixture-byte-integrity.test.mjs > an image Git treats as binary does not make a fixture directory
-scripts/check-fixture-byte-integrity.test.mjs > an unregistered fixture directory fails the byte-integrity gate
 scripts/check-protocol-section-numbers.test.mjs > scripts\check-protocol-section-numbers.test.mjs
 scripts/check-tally-egress-boundary.test.mjs > a dependency's macro, a listed type and a listed path that resolves to nothing are counted
 scripts/check-tally-egress-boundary.test.mjs > a message about a listed path that is not located in clippy.toml is not counted

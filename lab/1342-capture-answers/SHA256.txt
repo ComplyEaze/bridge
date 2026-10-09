@@ -1,0 +1,67 @@
+# lab/1342-capture-answers: TallyPrime 7.1 Silver (licensed), Windows 10 22H2, synthetic company BRIDGE PILOT LAB, 9 Oct 2026.
+# Answers are byte-exact as received (curl -o), never re-saved. Format: sha256  bytes  path  <- request (HTTP, seconds).
+#
+# Requests sent
+35c08451549e2899be68afaff280a78437f6da8bd4d84a4d3405d97c2fdc4109  469  a-company.xml  (text from the 8 Oct comment, UTF-8, Content-Type: text/xml)
+e5bbb2ab3e16838d8cb3a39c48d0d5683d5a8d565e099783af0c240d58d30081  426  b-taxunit.xml  (text from the 8 Oct comment, UTF-8, Content-Type: text/xml)
+90905d2dd500aa5c186e7ca7589ca3f9188d2b71426a9f805c7f59580b14face  585  c-ledgers.xml  (text from the 8 Oct comment, UTF-8, Content-Type: text/xml)
+9e2f23b3ab9d8e01b1f3878c2075de32af19aef30a1dd910df04a7457949ff68  712  d-vouchers.xml  (text from the 8 Oct comment, UTF-8, Content-Type: text/xml)
+9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8  2524  r01-company-extent.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  976  r02-marks.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49  1094  r03-book-extent.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661  966  r04-currencies.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f  1066  r07-groups.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+c351d6c62a09ce5173355f3998ef12746f01aba253ea8bdc42664b1b9766fb00  958  r08-voucher-types.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985  1682  r09-number-new-invoice.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6  1682  r10-number-control-k0.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+40f91b3fdb131279b413910c60f86a3b56989d8646def9bbe6b1fbdc97b6a68b  938  r11-company-state.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+28a47c26a29fa799856c112b71e19076946d4c0f85a6dcc65f5cdafe0e1e1bd0  2106  r13-ledger-catalogue-v2.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7  1822  r15-verification-window.xml  (lab/1342-capture-requests @ 47ffeccc, UTF-16LE+BOM, Content-Type: text/xml; charset=utf-16)
+#
+# Answers: as-keyed/
+655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  as-keyed/a00-status.txt  <- GET /status (HTTP 200, 0.001929 s)
+deffed61a93916a8c4f3f80fa363f8d13919b5ca3093cf1b2391fdbf28fd7b85  4012  as-keyed/a01-company-extent.xml  <- r01-company-extent.xml (HTTP 200, 0.004927 s)
+7e1aed43f84b8c065165aff7c67d01c9673264fa3bf827940bfc2079d73df411  3406  as-keyed/a02-marks.xml  <- r02-marks.xml (HTTP 200, 0.003968 s)
+c0197890b93cb44cfe7ca220e2afd92b82c6a74d08f776c14087f5018a76815b  3848  as-keyed/a03-book-extent.xml  <- r03-book-extent.xml (HTTP 200, 0.003145 s)
+6a54c3999028ba222bd4f7c1403e3a38c6a0966cb57718176fca3ff310f459e6  3412  as-keyed/a04-currencies.xml  <- r04-currencies.xml (HTTP 200, 0.003324 s)
+9396be6d65ed49d165346108a04196aed15403be913a7412a2cb816d1d60d371  54292  as-keyed/a07-groups.xml  <- r07-groups.xml (HTTP 200, 0.007095 s)
+24256024d584cdd6e202a877267b5f2366dfc8e517dd0271567ed481b54f5ed4  264690  as-keyed/a08-voucher-types.xml  <- r08-voucher-types.xml (HTTP 200, 0.016748 s)
+04303be447b643887b0596affe80710e2ea700dc3f580151532f8d9455503922  3034  as-keyed/a09-number-new-invoice.xml  <- r09-number-new-invoice.xml (HTTP 200, 0.028254 s)
+7e2350f28fca461895df325a0e6baafa4c73b67d8cffd8796ef280f05639068f  5612  as-keyed/a10-number-control-k0.xml  <- r10-number-control-k0.xml (HTTP 200, 0.027585 s)
+c83b6bf59e7ceeb10cd3b420d76934faf610ddad092b7444b5427a1677e9398d  3430  as-keyed/a11-company-state.xml  <- r11-company-state.xml (HTTP 200, 0.003128 s)
+adc39ee83830beec5d7f740fd873771030e3f74b0639f7347b7eca8a463df3d4  15196  as-keyed/a13-ledger-catalogue-v2.xml  <- r13-ledger-catalogue-v2.xml (HTTP 200, 0.009904 s)
+0eab5bc5ade4c9a734022b119841374bfaa2bb0fe43ea1c5b019c7bffa437036  70126  as-keyed/a15-verification-window.xml  <- r15-verification-window.xml (HTTP 200, 0.041996 s)
+88c806a8c6dc47685c5f5da017dd6582babe863fc66a3ea43182114e0604157c  16464  as-keyed/m0-company-after.xml  <- a-company.xml (HTTP 200, 0.004971 s)
+7bbee129743621ed3d7096c3f651c7a30d6b192265f0ad828637987c189e2d3d  16464  as-keyed/m0-company-before.xml  <- a-company.xml (HTTP 200, 0.007127 s)
+f66ed7c325edc01e6d5d627e6c3490b6f7c3edf573ddf670d936e0783cbb9e40  11152  as-keyed/m0-taxunit.xml  <- b-taxunit.xml (HTTP 200, 0.005487 s)
+7f05cbe079110cc8668c0945703735d78f3c6bc8208c8f15798782810aac3b02  17696  as-keyed/m7-walkin-after.xml  <- c-ledgers.xml (HTTP 200, 0.010268 s)
+56afb6b70ec9113e68c40a9d75cfc5d16aeb01aa4e660d79ae9675c94e0ec0d9  17682  as-keyed/m7-walkin-before.xml  <- c-ledgers.xml (HTTP 200, 0.010020 s)
+47f35edd31c260fa0711a7e24dca0208f1474d1257a8770da9f1b633fea1273f  261691  as-keyed/vouchers-fixed.xml  <- d-vouchers.xml (HTTP 200, 0.065072 s)
+d767bde792e0e55b0867d0db367dd6e962d8dbb5fb005d079a8980ebb94abb66  259864  as-keyed/vouchers.xml  <- d-vouchers.xml (HTTP 200, 0.068176 s)
+#
+# Screens: as-keyed/screens/ (Tally window only; see the PR comment for any crop)
+d8d33b183c9449c4895ee9a0c8acc65188e346a58ffe8ccdd774b69254c1a073  447018  as-keyed/screens/gstr1-1-summary.png
+1b7eb8da3cc028a2d321fae26bb694aed565603acd3f5cd1223581ff583b30b2  382019  as-keyed/screens/gstr1-2-uncertain-unfiltered.png
+865756312d88d837fe3a343b98c64e770f9b6f88654ded0acd61e2b5919b8553  134807  as-keyed/screens/gstr1-3-b2c-small-by-rate.png
+3e7884142aa95f336b733f1d517b631972d72c06d65c85cc0c287b964242afcc  337675  as-keyed/screens/gstr1-4-hsn-sac-table12.png
+#
+# Answers: fixed2/
+655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  fixed2/a00-status-fixed2.txt  <- GET /status (HTTP 200, 0.003319 s)
+ea2c3d05c01dab4b951530cf74b928d9001ae0cd79c8f9abf3463e4cbf1c801a  4012  fixed2/a01-company-extent-fixed2.xml  <- r01-company-extent.xml (HTTP 200, 0.003913 s)
+30b3237ee64cde0cb9524ab21440270f5f696e993f5e4ff1cbe5bb706ae3700f  3406  fixed2/a02-marks-fixed2.xml  <- r02-marks.xml (HTTP 200, 0.006691 s)
+a7bca61a7c723a275cccfd6d93b2a06f97cdd4b3c712315452ddadf99e2beade  3848  fixed2/a03-book-extent-fixed2.xml  <- r03-book-extent.xml (HTTP 200, 0.004316 s)
+35a1fb6d950fb61d97ecd5f4a0144a17f8f4d91a368babae94f1adf8ee026d8a  3412  fixed2/a04-currencies-fixed2.xml  <- r04-currencies.xml (HTTP 200, 0.003247 s)
+aae24fd825758c9799331051354b3c559dea539e1f34f99d0311477bd4d1af24  54292  fixed2/a07-groups-fixed2.xml  <- r07-groups.xml (HTTP 200, 0.009711 s)
+25f1bfa0ad4ab224d965e691c3bce0061c9e1d3453e1bb947136d17c0fd8b688  264690  fixed2/a08-voucher-types-fixed2.xml  <- r08-voucher-types.xml (HTTP 200, 0.028100 s)
+27b97f2ff1571867edb7051fba6c551e745f50b94e8ef29c6e53c7a5cf457ae7  3034  fixed2/a09-number-new-invoice-fixed2.xml  <- r09-number-new-invoice.xml (HTTP 200, 0.034178 s)
+e7a427b6392d3a7ada1d2427937400be8a574001d86ebaa24c713e3e2f317568  5612  fixed2/a10-number-control-k0-fixed2.xml  <- r10-number-control-k0.xml (HTTP 200, 0.031880 s)
+343d40b12f116e947e747ddb5542f758db7742961a7886b81bc702847480a72b  3430  fixed2/a11-company-state-fixed2.xml  <- r11-company-state.xml (HTTP 200, 0.016160 s)
+46d6a06e5d1a379b1a437f185388145f458ea5e10fc9c38a602893b9f8e24e1d  16416  fixed2/a13-ledger-catalogue-v2-fixed2.xml  <- r13-ledger-catalogue-v2.xml (HTTP 200, 0.012500 s)
+7d73cc9aed52511c9ce0c58f356928925c6afb1da5f7021918e5b4209800e755  72094  fixed2/a15-verification-window-fixed2.xml  <- r15-verification-window.xml (HTTP 200, 0.057105 s)
+d9c68e392727164c6768e9b71c05548541a0c92269ca5f514b4f562dc05ee7fb  261691  fixed2/vouchers-fixed2.xml  <- d-vouchers.xml (HTTP 200, 0.091458 s)
+#
+# Screens: fixed2/screens/ (Tally window only; see the PR comment for any crop)
+0ba2d2fdd192f0037c43148cf4f56096816c594e72a5b298cd0a9dca7bce68e9  433368  fixed2/screens/gstr1-1-summary.png
+5c45afd738c0b2b135cbd2012cf6825225144d7b23b9c0bc3779f5a076803551  426245  fixed2/screens/gstr1-2-uncertain-unfiltered.png
+5e2fe4fa11009b3978d2f5cce0f83b855c31f40649682f7d09cfa625f09acd8a  171585  fixed2/screens/gstr1-3-b2c-small-by-rate.png
+2134ee4806b85bff20a5e8a68221bbda7657e62f0459d79fee14e1b1978415d9  356845  fixed2/screens/gstr1-4-hsn-sac-table12.png

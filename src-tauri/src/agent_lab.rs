@@ -1003,6 +1003,39 @@ mod tests {
         }
     }
 
+    /// With the variable set, the catalogue registers each lab tool once. The
+    /// mask_parties test exempts only what registered (#1435), so this is the
+    /// one test that fails if they stop registering.
+    #[test]
+    fn the_lab_tools_register_when_lab_writes_is_set() {
+        let _guard = lock_env();
+        let previous = std::env::var_os("BRIDGE_LAB_WRITES");
+        std::env::set_var("BRIDGE_LAB_WRITES", "1");
+        let definitions = super::super::catalog::registered_tool_definitions(true, true);
+        // Restored before asserting, so a failure leaves the variable as found.
+        match previous {
+            Some(value) => std::env::set_var("BRIDGE_LAB_WRITES", value),
+            None => std::env::remove_var("BRIDGE_LAB_WRITES"),
+        }
+        let names = definitions
+            .as_array()
+            .expect("tools")
+            .iter()
+            .map(|tool| tool["name"].as_str().expect("tool name"))
+            .collect::<Vec<_>>();
+        for lab in [
+            "lab_import_masters",
+            "lab_import_vouchers",
+            "lab_read_inventory",
+        ] {
+            assert_eq!(
+                names.iter().filter(|name| **name == lab).count(),
+                1,
+                "{lab} is registered once when BRIDGE_LAB_WRITES=1"
+            );
+        }
+    }
+
     #[test]
     fn parses_units_from_a_synthetic_collection() {
         let rows = parse_lab_master_rows(&synthetic_unit_collection(), "Unit").unwrap();

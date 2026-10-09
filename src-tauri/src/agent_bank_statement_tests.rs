@@ -261,6 +261,39 @@ async fn a_password_file_others_can_read_is_refused() {
         error_code(&response),
         Some("statement_password_file_permissions")
     );
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["remediation"],
+        super::super::refusal_remediation("statement_password_file_permissions").unwrap()
+    );
+    assert!(!response.to_string().contains(PASSWORD));
+}
+
+/// ProgramData lets Users create folders, and a file in one inherits Users'
+/// read: the password file there is refused without the test changing any
+/// access list.
+#[cfg(windows)]
+#[tokio::test]
+async fn a_password_file_other_users_can_read_is_refused_on_windows() {
+    let directory = tempfile::tempdir().unwrap();
+    let shared = tempfile::Builder::new()
+        .prefix("complyeaze-bridge-password-test-")
+        .tempdir_in(env::var_os("ProgramData").expect("ProgramData is set"))
+        .unwrap();
+    let (statement, password_file) = statement_files(shared.path(), "hdfc-synthetic.pdf", PASSWORD);
+    let response = server(directory.path(), true, Redaction::None)
+        .call_tool(
+            "parse_bank_statement",
+            arguments(&statement, &password_file),
+        )
+        .await;
+    assert_eq!(
+        error_code(&response),
+        Some("statement_password_file_permissions")
+    );
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["remediation"],
+        super::super::refusal_remediation("statement_password_file_permissions").unwrap()
+    );
     assert!(!response.to_string().contains(PASSWORD));
 }
 

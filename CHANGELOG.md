@@ -18,6 +18,13 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- On Windows, `parse_bank_statement` now refuses a password file owned by neither you nor
+  Administrators, or that anyone but you, SYSTEM and Administrators can read or change
+  (`statement_password_file_permissions`), as a Mac already refuses one that other users can read.
+  The refusal says how to make the file private: make a new copy in a folder of your own and
+  delete the original, because moving a file keeps who can read it. A password file on a drive
+  that keeps no access list, such as a FAT or exFAT stick, is expected to be refused as well;
+  that is not yet measured.
 - The hand-import script `scripts/bank_statement_import.py` (not part of the downloaded package, #1430) now writes the same
   `| Statement party: <name>` segment under the same rules as the app, and
   refuses a run whose narration holds a control character or the reserved marker, or runs past 2,000 characters, as

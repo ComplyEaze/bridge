@@ -241,9 +241,11 @@ or `1` is not asked.
     colon and a slash or backslash is accepted.
   - *What still passes.* A drive letter mapped to a network share, a link or
     junction partway along a path, and on a Mac a mounted network volume.
-  - *What to do.* Keep statements and password files on a local disk. On
-    Windows the tool does not check who can read the password file, so restrict
-    its access yourself.
+  - *What to do.* Keep statements and password files on a local disk. From
+    the release after 0.5.1 the tool refuses, on Windows too, a password file
+    owned by neither you nor Administrators, or that anyone but you, SYSTEM
+    and Administrators can read or change; with 0.5.1 or earlier, restrict its
+    access yourself.
 
 **Not measured:** a network capture of the running extension on Windows or Mac.
 
@@ -363,8 +365,12 @@ listening port. It writes files only in its data folder and in the lock
 folder described in section 4. It also reads files named in a tool call (often
 by the assistant), such as a bank statement and its password file. From 0.4.1 it
 accepts such a path only when its text starts with a drive letter, a colon and a
-separator (Windows) or a single slash (a Mac) (section 3); on macOS it refuses a
-password file that other users can read. Its one extra process is a
+separator (Windows) or a single slash (a Mac) (section 3). It refuses a password
+file that someone else can read: on macOS one that is not yours or has any group
+or other permission set (it does not read macOS access-control lists), and, from
+the release after 0.5.1, on Windows one owned by neither you nor Administrators,
+or whose access list lets anyone but you, SYSTEM and Administrators read or
+change it. Its one extra process is a
 second copy of itself that shows the approval window.
 
 The approval window is a system dialog. On macOS it is titled "ComplyEaze Bridge

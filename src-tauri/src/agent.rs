@@ -858,6 +858,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              acceptance again. Then quit Claude completely and reopen it. Nothing was read from \
              Tally.",
         ),
+        "statement_password_file_permissions" => Some(
+            "The password file is not private to you: someone else may be able to read or change \
+             it, so ComplyEaze Bridge did not read the password and parsed nothing. On a Mac, \
+             turn off the file's group and other permissions (chmod 600). On Windows, make a new \
+             copy of it in a folder of your own on this computer, then delete the original: moving \
+             it keeps who can read it. Then run the parse again.",
+        ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
              mark and ComplyEaze Bridge has no \"before\" to attribute an import against. Record one \

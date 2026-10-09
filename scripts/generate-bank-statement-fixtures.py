@@ -499,6 +499,9 @@ def bob_pages():
         (90, [(10, "SYNTHETIC STATEMENT - NOT A REAL ACCOUNT")]),
         (102, [(10, "SYNTHETIC CUSTOMER NAME"), (640, "BRANCH ZZ01")]),
         (125, [(640, "123XXXXXXXX456")]),
+        # The identity line of the measured statements: the label, an invented code with the
+        # bank's prefix, and a right-hand label pair on the same visual line.
+        (211, [(10, "IFSC Code:"), (110, "BARB0SYNTH1"), (485, "Product"), (534, "Cur:"), (600, "IN")]),
         (268, [(10, "Statement of transactions in Current Account 123XXXXXXXX456 "
                     "in INR for the period 01/08/2026 - 31/08/2026")]),
         (324, [(10, "TRAN"), (41, "DATE"), (82, "VALUE"), (119, "DATE"),

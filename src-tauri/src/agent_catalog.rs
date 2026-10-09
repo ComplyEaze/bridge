@@ -348,6 +348,7 @@ impl ToolEffect {
             "build_import_xml" => Self::LocalWrite(BUILD_IMPORT_SENTENCE),
             "cash_flow" => Self::Read,
             "changed_since" => Self::Read,
+            "company_features" => Self::Read,
             "egress_log" => Self::Read,
             "ledger_masters" => Self::Read,
             "ledger_movement" => Self::Read,
@@ -397,6 +398,7 @@ pub(super) const REGISTERED_TOOL_NAMES: &[&str] = &[
     "build_import_xml",
     "cash_flow",
     "changed_since",
+    "company_features",
     "egress_log",
     "ledger_masters",
     "ledger_movement",
@@ -563,6 +565,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     "changed_since" => (
                         "Return snapshot-pinned AlterID voucher and master evidence. Continue a truncated scan with both returned AlterID cursors and snapshot values; deletion detection remains unsupported.",
                         json!({"type":"object","additionalProperties":false,"required":["company_guid"],"properties":{"company_guid":{"type":"string","minLength":1},"voucher_alter_id":{"type":"integer","minimum":0,"default":0},"master_alter_id":{"type":"integer","minimum":0,"default":0},"voucher_snapshot_alter_id":{"type":"integer","minimum":0},"master_snapshot_alter_id":{"type":"integer","minimum":0}}}),
+                    ),
+                    "company_features" => (
+                        "Return three settings Tally's company record holds today for one company: cost centres, GST and batch-wise stock (each yes, no or not_reported), and the company's currency symbol. They say nothing about what the books contain or what the settings were during a year: a cost-centre allocation can be stored while the setting reads No. Each of the three settings has been compared with Tally's own F11 screen, on three synthetic books and not on this company; a setting changed inside a sitting has not been measured. Each setting says what it rests on. The currency is the symbol Tally holds (for example the rupee sign), not an ISO code, and it does not say whether foreign currencies are used. A setting Tally did not send is not_reported, never no. Tally's other feature flags are fetched in the same request and are not returned. Nothing this tool returns changes what another tool reads or refuses. Take company_guid from list_companies. This reads the company record and the book extent twice and returns no ledger, voucher, amount or narration. A company in Education mode is refused. Never present a setting as a fact about the books or about a past period.",
+                        json!({"type":"object","additionalProperties":false,"required":["company_guid"],"properties":{"company_guid":{"type":"string","minLength":1}}}),
                     ),
                     "egress_log" => (
                         concat!(

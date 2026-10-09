@@ -703,6 +703,10 @@ pub(crate) enum PairedReadValidationError {
     NativeStatement,
     #[error("Tally's own Cash Flow changed between paired reads")]
     NativeCashFlow,
+    #[error("Tally's Company collection changed between paired reads")]
+    CompanyFeatures,
+    #[error("Tally company book changed during the company features read")]
+    CompanyFeaturesExtent,
     #[error("Tally company book changed during currency detection")]
     CurrencyExtent,
     #[error("Tally company changed between the currency read and the master read")]
@@ -734,6 +738,8 @@ impl PairedReadValidationError {
             Self::CompanyCurrencyName => "company_currency_name_changed",
             Self::NativeStatement => "native_statement_changed",
             Self::NativeCashFlow => "native_cash_flow_changed",
+            Self::CompanyFeatures => "company_features_changed",
+            Self::CompanyFeaturesExtent => "company_features_extent_changed",
             Self::CurrencyExtent => "currency_extent_changed",
             Self::CurrencyToMasterExtent => "currency_to_master_extent_changed",
             Self::MastersCollection => "masters_collection_changed",

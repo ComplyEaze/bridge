@@ -18,6 +18,14 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `company_features` reads three settings that a company's record in Tally holds today (cost centres, GST
+  and batch-wise stock) and its currency symbol (part of #1231). Each setting is yes, no or
+  not reported, and says what it rests on: each of the three was compared with Tally's own
+  F11 screen on three synthetic books (nine values, all equal; not this company). A setting Tally did not send is never read as no, and an empty or odd one refuses the read. The
+  settings are the ones Tally holds today, not what the books contain or what they were during a year. The
+  currency is a symbol, not a currency code. Measured on three synthetic books of one TallyPrime 7.1 Silver;
+  a setting changed inside a sitting, Education mode and other releases are not measured.
+
 - `parse_bank_statement` reads Bank of Baroda statements in one measured layout (`bank: "bob"`; Part of #1457). The layout was measured on
   two real statements, held privately, and the profile follows what was seen there:
   the statements print neither an opening nor a closing balance nor totals, so both balances come from you, and

@@ -88,6 +88,7 @@ The ordinary default tools, in name order:
 
 - `balance_sheet`
 - `cash_flow`
+- `company_features`
 - `egress_log`
 - `ledger_masters`
 - `ledger_movement`
@@ -110,7 +111,8 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `local_data_report` (also
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features` is in the source after
+release 0.5.0 and is not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -519,6 +521,42 @@ place of a difference; it is covered by tests only), what Tally's debit and cred
 include (each differed from the totals of the ledgers Tally counts as cash and bank by one common amount in size (the ledgers' columns larger in both) while the net tied; on one book that set includes a Bank OD A/c ledger), a contra, a window
 ending in February, a window crossing a financial year, optional or post-dated vouchers, a book with
 several currencies, and a large book with cash activity.
+
+### Company settings and currency symbol (`company_features`)
+
+`company_features` takes `company_guid` and nothing else. It reads the company's own record in Tally
+twice, with the book extent checked before and after, and returns three settings that its company record holds
+today (cost centres, GST and batch-wise stock) and the currency symbol. It returns no ledger, voucher, amount or narration. A company in Education mode is
+refused (`company_features_education_unqualified`), as for the stock summary.
+
+The result holds `settings` with `cost_centres`, `gst` and `batch_wise`. Each is `{"value": ..., "evidence": ...}`
+where `value` is `yes`, `no` or `not_reported`, and `evidence` says what it rests on:
+`compared_with_tally_screen_on_synthetic_books` (each of the three settings equalled Tally's F11 screen on three synthetic books, not on this company; a setting changed inside a sitting has not been measured). `not_reported` means Tally sent no such element, and its `evidence` is `not_reported_by_tally`; it is never
+read as `no`, and the result's `state` is then `partial`. An element that is present but empty, or says
+anything but `Yes` or `No`, refuses the read instead (`company_features_setting_invalid:cost_centres`,
+`:gst` or `:batch_wise`).
+
+`base_currency` is `{"state": "reported", "symbol": ..., "kind": "symbol_not_iso_code"}` or
+`{"state": "not_reported"}`. It is the symbol Tally holds (the rupee sign on the books captured). It is not an
+ISO code and it does not say whether foreign currencies are used: `ISISOCURRENCYAPPLICABLE` read No on a
+book that has currency masters, so it is not read.
+
+The headline leads with the three settings as "on", "off" or "not sent by Tally" and says they are the
+settings the company record holds today, not what the books contain or what they were during a year: a cost-centre allocation
+can be stored while the setting reads No (protocol reference §12a.17). Tally's other 14 feature flags are
+fetched in the same request and are not returned, because each has only ever read one value on the books
+captured. Nothing this tool returns changes what another tool reads or refuses; `stock_summary` reads its own
+inventory, integrated and batch-wise flags from its own request.
+
+The company is bound by the GUID filter and by the row's own name, company number and books-from date,
+which must equal the verified company's; a row for another company, or not exactly one row, refuses the
+read. These arrive as `company_features_read_failed` with a `cause`: `company_features_company_mismatch`,
+`company_features_not_one_row` and `company_features_guid_unsupported` (the GUID cannot be put in the filter),
+and also `company_features_response_invalid` (the answer is not the
+collection shape), `company_features_currency_invalid` (a symbol over 16 characters, or with a
+control character, a bidirectional override or isolate, a zero-width or other invisible format character, or a line or paragraph separator), `company_features_tally_reported_failure`, and the stability codes
+`company_features_changed` and `company_features_extent_changed`. Measured on three synthetic books of one
+TallyPrime 7.1 Silver (protocol reference §12a.18); the tool was run against those three books and equalled the F11 screen on all nine values.
 
 ### Stock Summary
 

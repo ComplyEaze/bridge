@@ -65,7 +65,14 @@ function runStep({ cacheHit, failDeps = 0, failDownload = 0 }) {
 }
 const deps = (calls) => calls.filter((call) => call.startsWith("node") && call.includes("install-deps"));
 const rootDeps = "node root=1 node_modules/@playwright/test/cli.js install-deps chromium webkit";
-const rootTimeout = `timeout root=1 --kill-after=10 600 ${join(stubDir, "node")} node_modules/@playwright/test/cli.js install-deps chromium webkit`;
+// The step passes `$(command -v node)`, bash's own spelling of the stand-in's path: under Git Bash on Windows that
+// is `/tmp/...`, not the `C:\...` that `join` gives (#1471). Elsewhere the two are the same path.
+const nodeLookup = spawnSync("bash", ["-c", "command -v node"], { encoding: "utf8", env: { PATH: `${stubDir}:${process.env.PATH}` } });
+assert.equal(nodeLookup.status, 0, `bash could not find the node stand-in: ${nodeLookup.stderr}`);
+const stubNode = nodeLookup.stdout.trim();
+assert.ok(stubNode, "bash printed no path for the node stand-in");
+if (process.platform !== "win32") assert.equal(stubNode, join(stubDir, "node"));
+const rootTimeout = `timeout root=1 --kill-after=10 600 ${stubNode} node_modules/@playwright/test/cli.js install-deps chromium webkit`;
 const downloads = (calls) => calls.filter((call) => call.startsWith("corepack") && call.includes("install chromium"));
 
 test("on a cache hit only the system dependencies are installed, with apt configured first", () => {

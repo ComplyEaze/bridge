@@ -68,7 +68,7 @@ meaning none supplied, and none supplied with the reader's reason when that read
 `[roles].counterparty_type_by_ledger`; default {}) and `s194n_recipient_type` (one of the module's two
 recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it); and
 for `cash_payments_40a3`: `loan_ledgers` and `round_off_ledgers` (default []); for `entity_269st_gap`: `party_identity` (the engagement's own
-[party_identity] table, default {}), `round_off_ledgers`, and per ledger `pan` and `gstin` (default ""); for `read_scope`: `currency_read` (default false); for `books_examined`: `documents_read` (the
+[party_identity] table, default {}), `round_off_ledgers`, and per ledger `pan` and `gstin` (default ""); for `read_scope`: `currency_read` (default false); for any test, `opening_stock` (POP-3's opening-stock term: integer paise, debit positive, or the reason it is unknown; absent meaning none applies); for `books_examined`: `documents_read` (the
 names of the documents the pack loaded, in its order: a list of text, default []); for `clause21a_candidates`:
 `clause21a_extra_terms` (the client's `[clause21a].extra_terms`, read by the reference's own reader; absent meaning
 none) and `partners` (as for `partners_40b_194t`; its interest and remuneration ledgers, as pack.py takes them); for `clause44`:
@@ -168,11 +168,20 @@ def main() -> int:
                 for v in spec["vouchers"]]
     tb = {t["ledger"]: TBRow(ledger=t["ledger"], opening_paise=t["opening"], debit_paise=t["debit"],
                              credit_paise=t["credit"], closing_paise=t["closing"]) for t in spec["tb"]}
+    # POP-3's opening-stock term (#1486), passed only when the book names it, so a reference from
+    # before that field still builds every other book.
+    extra = {}
+    if "opening_stock" in spec:
+        from tae.model import OPENING_STOCK_NOT_AT_BOOKS_START, OPENING_STOCK_NOT_READ, OPENING_STOCK_UNREADABLE
+        reasons = (OPENING_STOCK_NOT_READ, OPENING_STOCK_NOT_AT_BOOKS_START, OPENING_STOCK_UNREADABLE)
+        extra["opening_stock"] = typed(spec, "opening_stock",
+                                       lambda x: (isinstance(x, int) and not isinstance(x, bool)) or x in reasons,
+                                       "integer paise or a reason", nullable=False)
     book = Book(company_name="Invented edge book",
                 period=Period(date.fromisoformat(start), date.fromisoformat(end)), groups=groups,
                 ledgers=ledgers, vouchers=vouchers, tb=tb, company_guid="invented-edge-company",
                 currency_read=typed(spec, "currency_read", lambda x: isinstance(x, bool), "true or false",
-                                    absent=False, nullable=False))
+                                    absent=False, nullable=False), **extra)
     entity_type = spec.get("entity_type", "individual")
     eng = Engagement(entity_type, "2026-27", book)
     rules = load_rules("2026-27", entity_type)

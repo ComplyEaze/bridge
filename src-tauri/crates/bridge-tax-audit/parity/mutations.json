@@ -5492,7 +5492,7 @@
   "by": "author",
   "what": "the stock_items part is not kept",
   "file": "src/book.rs",
-  "from": "items: read.one(\"stock_items\").cloned(),",
+  "from": "items: items.cloned(),",
   "to": "items: None,"
  },
  {
@@ -13494,5 +13494,109 @@
   "file": "src/binding.rs",
   "from": "        lbinder.bind_list(&engagement.round_off_ledgers, \"roles.round_off_ledgers\")?;\n",
   "to": "        lbinder.bind_list(&engagement.round_off_ledgers, \"roles.round_off_ledgers\")?;\n    lbinder.bind_list(\n        &list_at(&engagement.raw_cfg, &[\"roles\", \"narration_payee_ledgers\"])?,\n        \"roles.narration_payee_ledgers\",\n    )?;\n"
+ },
+ {
+  "id": "OS-1",
+  "by": "author",
+  "what": "book.rs: an unknown integration flag read as integrated",
+  "file": "src/book.rs",
+  "from": "    if is_integrated != Some(true) {\n        return OpeningStock::NotApplicable;",
+  "to": "    if is_integrated == Some(false) {\n        return OpeningStock::NotApplicable;"
+ },
+ {
+  "id": "OS-2",
+  "by": "author",
+  "what": "book.rs: integrated inventory with no stock-items part read as not applicable",
+  "file": "src/book.rs",
+  "from": "        return OpeningStock::Unknown(OpeningStockUnknown::NotRead);",
+  "to": "        return OpeningStock::NotApplicable;"
+ },
+ {
+  "id": "OS-3",
+  "by": "author",
+  "what": "book.rs: a trial balance starting after the books' first day still takes the masters' opening values",
+  "file": "src/book.rs",
+  "from": "    if tb_from.is_none() || tb_from != books_from {",
+  "to": "    if tb_from.is_none() {"
+ },
+ {
+  "id": "OS-4",
+  "by": "author",
+  "what": "book.rs: an unreadable stock-items part read as no opening stock",
+  "file": "src/book.rs",
+  "from": "        Err(_) => OpeningStock::Unknown(OpeningStockUnknown::Unreadable),",
+  "to": "        Err(_) => OpeningStock::Valued(0),"
+ },
+ {
+  "id": "OS-5",
+  "by": "author",
+  "what": "book.rs: an item with no opening value counted as one paisa",
+  "file": "src/book.rs",
+  "from": "                .map(|m| m.opening_value_paise.unwrap_or(0))",
+  "to": "                .map(|m| m.opening_value_paise.unwrap_or(1))"
+ },
+ {
+  "id": "OS-6",
+  "by": "author",
+  "what": "invariants.rs: POP-3 subtracts opening stock instead of adding it",
+  "file": "src/invariants.rs",
+  "from": "            let difference = sum + stock;",
+  "to": "            let difference = sum - stock;"
+ },
+ {
+  "id": "OS-7",
+  "by": "author",
+  "what": "invariants.rs: POP-3 uses the new text for a zero stock term",
+  "file": "src/invariants.rs",
+  "from": "        OpeningStock::Valued(stock) if stock != 0 => {",
+  "to": "        OpeningStock::Valued(stock) => {"
+ },
+ {
+  "id": "OS-8",
+  "by": "author",
+  "what": "invariants.rs: POP-3 drops the reason an opening stock is unknown",
+  "file": "src/invariants.rs",
+  "from": "                \"TB {key} sums to {sum} paise; opening stock {}\",\n                why.as_str()",
+  "to": "                \"TB {key} sums to {sum} paise{}\",\n                \"\""
+ },
+ {
+  "id": "OS-9",
+  "by": "author",
+  "what": "book.rs: load_book passes no trial-balance window, so no read's opening stock is known",
+  "file": "src/book.rs",
+  "from": "        tp.window.as_ref().map(|w| &w.from),",
+  "to": "        None,"
+ },
+ {
+  "id": "OS-10",
+  "by": "author",
+  "what": "book.rs: load_book passes no books' first day, so no read's opening stock is known",
+  "file": "src/book.rs",
+  "from": "        read.books_from.as_ref(),\n",
+  "to": "        None,\n"
+ },
+ {
+  "id": "OS-11",
+  "by": "author",
+  "what": "invariants.rs: POP-3 reports a difference of exactly one rupee after opening stock",
+  "file": "src/invariants.rs",
+  "from": "            (difference.abs() > TIE_TOLERANCE_PAISE).then(|| {",
+  "to": "            (difference.abs() >= TIE_TOLERANCE_PAISE).then(|| {"
+ },
+ {
+  "id": "OS-12",
+  "by": "author",
+  "what": "invariants.rs: POP-3 reports a ledger sum of exactly one rupee when the opening stock is unknown",
+  "file": "src/invariants.rs",
+  "from": "        OpeningStock::Unknown(why) => (sum.abs() > TIE_TOLERANCE_PAISE).then(|| {",
+  "to": "        OpeningStock::Unknown(why) => (sum.abs() >= TIE_TOLERANCE_PAISE).then(|| {"
+ },
+ {
+  "id": "OS-13",
+  "by": "author",
+  "what": "book.rs: a read that records no trial-balance window takes the items' opening values",
+  "file": "src/book.rs",
+  "from": "    if tb_from.is_none() || tb_from != books_from {",
+  "to": "    if tb_from != books_from {"
  }
 ]

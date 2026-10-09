@@ -12708,8 +12708,8 @@
   "by": "author",
   "what": "clause44: the no-supplier ledgers are not bound",
   "file": "src/binding.rs",
-  "from": "            Some(lbinder.bind_list(&names_at(value, location)?, location)?)\n        }\n    };\n    // `[roles].bank_reconciliation_ledger`",
-  "to": "            Some(names_at(value, location)?)\n        }\n    };\n    // `[roles].bank_reconciliation_ledger`"
+  "from": "            Some(lbinder.bind_list(&names_at(value, location)?, location)?)\n        }\n    };\n    // `[roles].narration_payee_ledgers`",
+  "to": "            Some(names_at(value, location)?)\n        }\n    };\n    // `[roles].narration_payee_ledgers`"
  },
  {
   "id": "CL44-46",
@@ -13422,5 +13422,77 @@
   "file": "src/knock_off_candidates.rs",
   "from": "if v.base_type == CONTRA || lines()",
   "to": "if v.vtype == CONTRA || lines()"
+ },
+ {
+  "id": "NR-54",
+  "by": "author",
+  "what": "narration_payees: check: NP-1 does not compare resolved_total with the payee totals",
+  "file": "src/narration_payees.rs",
+  "from": "        if int_of(f) != sum {\n            out.push(format!(\n                \"NP-1: resolved_total",
+  "to": "        if false {\n            out.push(format!(\n                \"NP-1: resolved_total"
+ },
+ {
+  "id": "NR-55",
+  "by": "author",
+  "what": "narration_payees: check: NP-1 does not compare the unread and not-through-bank totals",
+  "file": "src/narration_payees.rs",
+  "from": "            if int_of(f) != fresh {",
+  "to": "            if false {"
+ },
+ {
+  "id": "NR-56",
+  "by": "author",
+  "what": "narration_payees: check: NP-1 does not compare a payee total with the fresh walk's",
+  "file": "src/narration_payees.rs",
+  "from": "            Some(&sum) if sum != int_of(f) => out.push(format!(",
+  "to": "            Some(&sum) if false && sum != int_of(f) => out.push(format!("
+ },
+ {
+  "id": "NR-57",
+  "by": "author",
+  "what": "narration_payees: check: NP-1 does not report a payee total the fresh walk does not find",
+  "file": "src/narration_payees.rs",
+  "from": "            None => out.push(format!(\n                \"NP-1: {} names a payee a fresh population walk does not find at all\",\n                f.id\n            )),",
+  "to": "            None => {}"
+ },
+ {
+  "id": "NR-58",
+  "by": "author",
+  "what": "narration_payees: check: NP-1 does not report a payee the fresh walk finds with no figure",
+  "file": "src/narration_payees.rs",
+  "from": "        if !figured.contains(*tag) {",
+  "to": "        if false {"
+ },
+ {
+  "id": "NR-59",
+  "by": "author",
+  "what": "narration_payees: walk: an unread payment's amount counted one paisa high",
+  "file": "src/narration_payees.rs",
+  "from": "w.unresolved_total = add(w.unresolved_total, amount)?;",
+  "to": "w.unresolved_total = add(w.unresolved_total, amount + 1)?;"
+ },
+ {
+  "id": "NR-60",
+  "by": "author",
+  "what": "narration_payees: walk: a row's total leaves out its first payment",
+  "file": "src/narration_payees.rs",
+  "from": "let total = total(payments.iter().map(|&i| &w.payments[i].amount))?;",
+  "to": "let total = total(payments.iter().skip(1).map(|&i| &w.payments[i].amount))?;"
+ },
+ {
+  "id": "NR-61",
+  "by": "author",
+  "what": "narration_payees: check: NP-2 still checks a cited voucher outside the population",
+  "file": "src/narration_payees.rs",
+  "from": "                        f.id, e.id\n                    ));\n                    continue;\n",
+  "to": "                        f.id, e.id\n                    ));\n"
+ },
+ {
+  "id": "NR-62",
+  "by": "author",
+  "what": "narration_payees: binding: roles.narration_payee_ledgers bound right after round_off_ledgers",
+  "file": "src/binding.rs",
+  "from": "        lbinder.bind_list(&engagement.round_off_ledgers, \"roles.round_off_ledgers\")?;\n",
+  "to": "        lbinder.bind_list(&engagement.round_off_ledgers, \"roles.round_off_ledgers\")?;\n    lbinder.bind_list(\n        &list_at(&engagement.raw_cfg, &[\"roles\", \"narration_payee_ledgers\"])?,\n        \"roles.narration_payee_ledgers\",\n    )?;\n"
  }
 ]

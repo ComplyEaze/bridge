@@ -63,7 +63,7 @@ actually on.
    Tally's gateway is configured for that port. This is not a Tally licence
    port. Changing it changes only where Bridge calls Tally, not Tally's own
    HTTP setting.
-4. Read the Terms of Use linked in the extension settings, then turn on **I
+4. Read the Terms of Use linked in the extension settings, then tick **I
    accept the ComplyEaze Bridge Terms of Use**. Until you do, Bridge does
    not read from Tally, and from release 0.5.1 every Bridge tool answers that
    the Terms of Use are not accepted and names this setting (the tools the assistant called

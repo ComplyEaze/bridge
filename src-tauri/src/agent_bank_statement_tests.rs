@@ -1744,6 +1744,17 @@ fn the_build_is_told_which_bank_and_suspense_ledgers_the_file_was_parsed_for() {
     assert!(inline.statement_ledgers.is_none());
 }
 
+/// The party segment ends the narration text and a file imported by hand adds
+/// the tag after it (`render_voucher_xml` writes `{text} [BRIDGE:{id}]`), so
+/// the description says "ends" of the text, not of the narration (#1458).
+#[test]
+fn the_description_places_the_party_before_the_tag_a_hand_import_adds() {
+    assert!(DESCRIPTION.contains(
+        "at the end of its narration text (a file imported by hand adds the `[BRIDGE:...]` tag after it;"
+    ));
+    assert!(!DESCRIPTION.contains("ends its narration with"));
+}
+
 #[tokio::test]
 #[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
 async fn an_icici_statement_parses_from_the_callers_balances_with_an_empty_password_file() {

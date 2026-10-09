@@ -1198,10 +1198,38 @@ pub fn check_invariants(
         .collect();
     let tag_of = |f: &Figure| f.id[format!("{TEST_ID}.payee_total_").len()..].to_string();
 
-    // NP-1: a fresh walk of the population.
+    // NP-1: the population walked again with NP-1's own accumulators, as the reference keeps
+    // its own; only which payee a payment joins is taken from the walk.
+    let (mut unresolved, mut not_through) = (0, 0);
+    let mut fresh: BTreeMap<&str, i64> = BTreeMap::new();
+    for (at, v) in pop.iter().enumerate() {
+        let amount = total(
+            v.lines
+                .iter()
+                .filter(|l| l.amount_paise > 0 && read.contains(&l.ledger))
+                .map(|l| &l.amount_paise),
+        )?;
+        if amount == 0 {
+            continue;
+        }
+        if !v
+            .lines
+            .iter()
+            .any(|l| l.amount_paise < 0 && bank.contains(&l.ledger))
+        {
+            not_through = add(not_through, amount)?;
+        } else if let Some(&i) = w.payment_at.get(&at) {
+            let sum = fresh
+                .entry(w.payees[w.payee_of[i]].tag.as_str())
+                .or_insert(0);
+            *sum = add(*sum, amount)?;
+        } else {
+            unresolved = add(unresolved, amount)?;
+        }
+    }
     for (name, fresh) in [
-        ("unresolved_bank_total", w.unresolved_total),
-        ("not_through_bank_total", w.not_through_total),
+        ("unresolved_bank_total", unresolved),
+        ("not_through_bank_total", not_through),
     ] {
         if let Some(f) = figure(name) {
             if int_of(f) != fresh {
@@ -1212,11 +1240,6 @@ pub fn check_invariants(
             }
         }
     }
-    let fresh: HashMap<&str, i64> = w
-        .rows
-        .iter()
-        .map(|row| (w.payees[row.payee].tag.as_str(), row.total))
-        .collect();
     let mut figured = BTreeSet::new();
     for f in &totals {
         let tag = tag_of(f);
@@ -1234,9 +1257,8 @@ pub fn check_invariants(
         }
         figured.insert(tag);
     }
-    for row in &w.rows {
-        let tag = &w.payees[row.payee].tag;
-        if !figured.contains(tag) {
+    for tag in fresh.keys() {
+        if !figured.contains(*tag) {
             out.push(format!(
                 "NP-1: a fresh population walk finds payee tag {tag} with no payee_total_{tag} figure"
             ));
@@ -1261,10 +1283,14 @@ pub fn check_invariants(
         let tag = tag_of(f);
         for e in f.evidence.iter().filter(|e| e.kind == "voucher") {
             match resolve(e).flatten() {
-                None => out.push(format!(
-                    "NP-2: {} evidence voucher {} is not in the books population",
-                    f.id, e.id
-                )),
+                None => {
+                    // Nothing more is checked for it, as the reference skips the rest.
+                    out.push(format!(
+                        "NP-2: {} evidence voucher {} is not in the books population",
+                        f.id, e.id
+                    ));
+                    continue;
+                }
                 Some(at) if !w.outgoing.contains(&at) => {
                     return Err(AuditError::ModuleInvariant {
                         module: TEST_ID,
@@ -1840,6 +1866,140 @@ mod tests {
             run_check(vec![journal, paid]).unwrap(),
             Vec::<String>::new()
         );
+    }
+
+    /// NP-1 (README section 8) walks the population again and compares: a result whose totals or
+    /// payee figures disagree with that walk is reported, each by its own message. The untouched
+    /// result is the control.
+    #[test]
+    fn np1_reports_each_total_and_payee_figure_a_fresh_walk_disagrees_with() {
+        let rules = Rules::vendored().unwrap();
+        let (bank, listed) = (set(&["Bank A"]), set(&["Wages"]));
+        let book = Book {
+            vouchers: vec![
+                voucher(
+                    "p1",
+                    "Payment",
+                    "UPI-ALPHA-WAGES",
+                    &[("Wages", 100), ("Bank A", -100)],
+                ),
+                voucher(
+                    "p2",
+                    "Payment",
+                    "UPI-BETA-WAGES",
+                    &[("Wages", 300), ("Bank A", -300)],
+                ),
+                voucher("p3", "Payment", "WAGES", &[("Wages", 50), ("Bank A", -50)]),
+                voucher("j1", "Journal", "", &[("Wages", 70), ("Creditor", -70)]),
+            ],
+            ..Book::default()
+        };
+        let r = run(&book, &rules, &bank, &listed, &BTreeSet::new()).unwrap();
+        let alpha = format!("{TEST_ID}.payee_total_{}", hash8("ALPHA"));
+        let check = |edit: &dyn Fn(&mut TestResult)| {
+            let mut tampered = r.clone();
+            edit(&mut tampered);
+            let mut out = check_invariants(&book, &tampered, &bank, &listed).unwrap();
+            out.sort();
+            out
+        };
+        let add_one = |name: String| {
+            move |t: &mut TestResult| {
+                let f = t.figures.iter_mut().find(|f| f.id == name).unwrap();
+                f.value = Value::Int(int_of(f) + 1);
+            }
+        };
+        let figure = |name: &str| format!("{TEST_ID}.{name}");
+
+        assert_eq!(check(&|_| {}), Vec::<String>::new());
+        assert_eq!(
+            check(&add_one(figure("resolved_total"))),
+            ["NP-1: resolved_total = 401 != sum of payee_total_* figures (400)"]
+        );
+        assert_eq!(
+            check(&add_one(figure("unresolved_bank_total"))),
+            ["NP-1: unresolved_bank_total = 51 but a fresh population walk finds 50"]
+        );
+        assert_eq!(
+            check(&add_one(figure("not_through_bank_total"))),
+            ["NP-1: not_through_bank_total = 71 but a fresh population walk finds 70"]
+        );
+        assert_eq!(
+            check(&add_one(alpha.clone())),
+            [
+                format!(
+                    "NP-1: {alpha} = 101 but a fresh population walk of the same payee finds 100"
+                ),
+                "NP-1: resolved_total = 400 != sum of payee_total_* figures (401)".to_string(),
+            ]
+        );
+        // ALPHA's total under a tag no payee has: the figure names no payee the walk finds, the
+        // walk finds ALPHA with no figure, and NP-2 reads the cited voucher as ALPHA's.
+        let stray = format!("{TEST_ID}.payee_total_00000000");
+        assert_eq!(
+            check(&|t: &mut TestResult| {
+                t.figures.iter_mut().find(|f| f.id == alpha).unwrap().id = stray.clone();
+            }),
+            [
+                format!(
+                    "NP-1: a fresh population walk finds payee tag {0} with no payee_total_{0} \
+                     figure",
+                    hash8("ALPHA")
+                ),
+                format!("NP-1: {stray} names a payee a fresh population walk does not find at all"),
+                format!(
+                    "NP-2: {stray} evidence voucher p1 narration names payee tag {}, not 00000000",
+                    hash8("ALPHA")
+                ),
+            ]
+        );
+    }
+
+    /// NP-2 (README section 8): a cited GUID with no population voucher is reported, and nothing
+    /// more is checked for it, as the reference skips the rest; so one cited under two tags
+    /// gives no NP-3 line. A result the test cannot make, built here by hand.
+    #[test]
+    fn np2_checks_nothing_more_for_a_cited_voucher_outside_the_population() {
+        let rules = Rules::vendored().unwrap();
+        let (bank, listed) = (set(&["Bank A"]), set(&["Wages"]));
+        let book = Book {
+            vouchers: vec![
+                voucher(
+                    "p1",
+                    "Payment",
+                    "UPI-ALPHA-WAGES",
+                    &[("Wages", 100), ("Bank A", -100)],
+                ),
+                voucher(
+                    "p2",
+                    "Payment",
+                    "UPI-BETA-WAGES",
+                    &[("Wages", 300), ("Bank A", -300)],
+                ),
+            ],
+            ..Book::default()
+        };
+        let mut r = run(&book, &rules, &bank, &listed, &BTreeSet::new()).unwrap();
+        let ids: Vec<String> = ["ALPHA", "BETA"]
+            .map(|name| format!("{TEST_ID}.payee_total_{}", hash8(name)))
+            .into();
+        for f in r.figures.iter_mut().filter(|f| ids.contains(&f.id)) {
+            f.evidence.push(EvidenceRef::with_label(
+                "voucher",
+                "zz",
+                "Payment 9 on 2025-05-02",
+            ));
+        }
+        let mut out = check_invariants(&book, &r, &bank, &listed).unwrap();
+        out.sort();
+        assert_eq!(out, {
+            let mut want: Vec<String> = ids
+                .iter()
+                .map(|id| format!("NP-2: {id} evidence voucher zz is not in the books population"))
+                .collect();
+            want.sort();
+            want
+        });
     }
 
     #[test]

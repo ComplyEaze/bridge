@@ -118,8 +118,9 @@ or `1` is not asked.
     their narration is refused under it. Apart from the error text noted below,
     it removes nothing else.
   - From the release that includes #1430, a voucher built from a bank statement
-    whose party is mapped to a ledger ends its narration with “Statement party:”
-    and the name as the statement prints it. A cash line the tool recognises, and
+    whose party is mapped to a ledger carries “Statement party:” and the name as
+    the statement prints it at the end of its narration text; a file you import by
+    hand adds the `[BRIDGE:...]` tag after it. A cash line the tool recognises, and
     a line it labels itself as bank charges, a card fee or an EMI, get no name; a
     line sent to suspense already carried the name. Vouchers already in Tally
     keep their narration until an amendment of their batch is imported.

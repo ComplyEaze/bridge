@@ -44,11 +44,23 @@ impl CallerData {
     /// both from the one file), the bank statement when it was read (a refused one is not), and the
     /// caller's `named_documents`. Refuses a bank statement both held and refused.
     pub fn documents_read(&self) -> Result<BTreeSet<DocumentRead>> {
-        Ok(self
-            .named_documents
-            .iter()
-            .map(|d| d.document())
-            .filter(|_| false)
+        if self.bank_statement.is_some() && self.bank_statement_refused.is_some() {
+            return Err(AuditError::Config(format!(
+                "{}: a bank statement was supplied and also refused",
+                crate::books_examined::TEST_ID
+            )));
+        }
+        let held = [
+            (DocumentRead::Gstr1, self.turnover_inputs.gstr1.is_some()),
+            (DocumentRead::Form26as, self.traces.form26as.is_some()),
+            (DocumentRead::Ais, self.traces.ais.is_some()),
+            (DocumentRead::Tis, self.traces.tis.is_some()),
+            (DocumentRead::BankStatement, self.bank_statement.is_some()),
+        ];
+        Ok(held
+            .into_iter()
+            .filter_map(|(d, loaded)| loaded.then_some(d))
+            .chain(self.named_documents.iter().map(|d| d.document()))
             .collect())
     }
 }

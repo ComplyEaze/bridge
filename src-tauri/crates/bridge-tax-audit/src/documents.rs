@@ -305,7 +305,7 @@ fn iso_date(v: &Value, key: &str, what: &str) -> Result<TallyDate> {
 /// loaded), its rows (possibly none) when it is a list.
 fn rows<T>(v: &Value, key: &str, row: impl Fn(&Value) -> Result<T>) -> Result<Option<Vec<T>>> {
     match &v[key] {
-        Value::Null => Ok(Some(Vec::new())),
+        Value::Null => Ok(None),
         Value::Array(a) => a.iter().map(row).collect::<Result<_>>().map(Some),
         _ => Err(bad(&format!("{key} is not a list"))),
     }

@@ -9,7 +9,8 @@ CI runs it with `--check`, so these bytes are that script's output and nothing
 else. Every name, account digit, reference and amount is invented. What is
 carried over from real statements is only the template geometry the SBI and
 HDFC profiles were calibrated on, which is already public in
-`scripts/bank_statement_import.py`.
+`scripts/bank_statement_import.py`, and, for ICICI, column positions and
+shapes measured on two real statements (no value from either).
 
 | Fixture | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -17,6 +18,7 @@ HDFC profiles were calibrated on, which is already public in
 | `sbi-owner-password-only.pdf` | 3,545 | `64bb53bf392ec9cc52aede9085390b29b7cac0ba7908d678ba933551414d14c0` |
 | `hdfc-rotated.pdf` | 2,921 | `655d670aa5513a6386d723611c61db19555196ea034e85e611846a8f6f904d21` |
 | `ubi-synthetic.pdf` | 3,413 | `6694b20b393c09b53cc7359226c69998adf90d9e731e1413fbfd310733d9098b` |
+| `icici-synthetic.pdf` | 5,632 | `d10c64f1a65ca7e4794ea368611334992a624bb8cc94db00df556d4a2373d097` |
 | `scan-image-only.pdf` | 1,481 | `ac3f526b32c6e7883e7cd665503f88af96b4c4117e07400ff0c4b5c66382bb6a` |
 | `print-to-pdf-vector-glyphs.pdf` | 21,643 | `08a3722a9e27975eb8547e0d11973f760fab7a2993554ccf8392923f7e54ade9` |
 | `scan-with-visible-stamp.pdf` | 1,256 | `ae4bc131732ad8808db287097ddaf363bbc1add12ba510e51f2413a66cbf5008` |
@@ -43,6 +45,20 @@ HDFC profiles were calibrated on, which is already public in
   also prints a masked account line and a CIF ID; only `Account Number` binds.
   The row *shapes* were described from one real statement without its values;
   the x positions are invented, since the profile reads rows as text.
+- `icici-synthetic.pdf` — two pages, empty user password and an owner password nobody is given, as a
+  downloaded ICICI statement opens: 14 rows, newest first, in the ICICI Bank layout. It stands for what
+  two real statements, held privately, showed, measured by a layout probe
+  through PDFium: the transaction date at x 15-65 and the value date at 87-137, narrations from x 149.5
+  wrapping at 359.5, withdrawals ending at 543, deposits at 662 and the balance (a glued `Cr`/`Dr`) at 787,
+  the column header on page 1 only, a masked account number (`123XXXXXXXX456`) printed three times above
+  the table, amounts on their own line 6 and 11 points below the date (0, about 6 and about 11.5 on the real files), a `<date> <time> <word> Page N of M`
+  footer and a disclaimer line on every page, and no opening or closing balance or totals. Every word,
+  amount, account digit and reference is invented, including each narration's wording; the shapes are
+  the ones the rules cover (a UPI row whose VPA is broken at the wrap edge and one cut before its bank word, a
+  NEFT name holding a hyphen, an RTGS name wrapped at a space, an IMPS row, charges, a loan recovery, a
+  cash deposit, a cheque number in the cheque column). **Limits:** Courier is wider than the bank's font, so
+  two narrations run past the 50 characters the bank allows, to exercise the wrap rule; nothing here was
+  captured from a real file; the balance crosses from `Cr` to `Dr` on one row, to exercise the signed-balance rule; the real statements are held privately and are not in this repository.
 - `scan-image-only.pdf` — two pages, user password `synthetic-user-4321`; each
   page is one 8x8 grey image scaled to the page and no text object. `pdftotext -bbox`
   reports no words (measured 2026-10-07).

@@ -5,8 +5,8 @@
 //! and the company's identity fields, and a test pins it byte-for-byte to the
 //! committed captures. Only three flags are read from the answer (cost
 //! centres, GST, batch-wise): they are the only ones that ever differed across
-//! the three books read, and only the cost-centre setting has been compared
-//! with Tally's own screen (on those synthetic books). The other flags stay in the request so that it is
+//! the books read, and each has been compared with Tally's own screen (on three
+//! synthetic books). The other flags stay in the request so that it is
 //! the captured one, and are skipped.
 //!
 //! A setting is what Tally's Company collection holds today. It says nothing

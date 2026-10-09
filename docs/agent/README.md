@@ -514,9 +514,7 @@ refused (`company_features_education_unqualified`), as for the stock summary.
 
 The result holds `settings` with `cost_centres`, `gst` and `batch_wise`. Each is `{"value": ..., "evidence": ...}`
 where `value` is `yes`, `no` or `not_reported`, and `evidence` says what it rests on:
-`compared_with_tally_screen_on_synthetic_books` (cost centres only: it equalled Tally's F11 screen on three synthetic books, not on this company),
-`differed_across_committed_books_not_compared_with_screen` (batch-wise: it read differently on the two committed books and has not been compared with the screen) or
-`differed_on_an_uncommitted_book_not_compared_with_screen` (GST: it differed only on a third book that is not committed, where it read Yes and then No in one sitting, and it has not been compared with the screen). `not_reported` means Tally sent no such element, and its `evidence` is `not_reported_by_tally`; it is never
+`compared_with_tally_screen_on_synthetic_books` (each of the three settings equalled Tally's F11 screen on three synthetic books, not on this company; a setting changed inside a sitting has not been measured). `not_reported` means Tally sent no such element, and its `evidence` is `not_reported_by_tally`; it is never
 read as `no`, and the result's `state` is then `partial`. An element that is present but empty, or says
 anything but `Yes` or `No`, refuses the read instead (`company_features_setting_invalid:cost_centres`,
 `:gst` or `:batch_wise`).
@@ -541,7 +539,7 @@ and also `company_features_response_invalid` (the answer is not the
 collection shape), `company_features_currency_invalid` (a symbol over 16 characters, or with a
 control character, a bidirectional override or isolate, a zero-width or other invisible format character, or a line or paragraph separator), `company_features_tally_reported_failure`, and the stability codes
 `company_features_changed` and `company_features_extent_changed`. Measured on three synthetic books of one
-TallyPrime 7.1 Silver (protocol reference §12a.18); this tool has not yet been run against Tally.
+TallyPrime 7.1 Silver (protocol reference §12a.18); the tool was run against those three books and equalled the F11 screen on all nine values.
 
 ### Stock Summary
 

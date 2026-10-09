@@ -635,7 +635,7 @@ impl CompanyFeaturesBasis {
             );
         }
         lead.push_str(
-            " They are not what the books contain or what they were during a year, and only the cost-centre setting has been compared with Tally's own screen, on synthetic books.",
+            " They are not what the books contain or what they were during a year, and each of the three has been compared with Tally's own screen, on synthetic books.",
         );
         match &self.currency {
             NativeCurrencySymbol::Reported(symbol) => lead.push_str(&format!(

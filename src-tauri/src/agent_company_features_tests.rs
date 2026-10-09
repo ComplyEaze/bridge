@@ -146,8 +146,8 @@ async fn a_read_returns_three_settings_each_saying_what_it_rests_on_and_the_symb
         result["settings"],
         json!({
             "cost_centres": {"value": "no", "evidence": "compared_with_tally_screen_on_synthetic_books"},
-            "gst": {"value": "yes", "evidence": "differed_on_an_uncommitted_book_not_compared_with_screen"},
-            "batch_wise": {"value": "yes", "evidence": "differed_across_committed_books_not_compared_with_screen"},
+            "gst": {"value": "yes", "evidence": "compared_with_tally_screen_on_synthetic_books"},
+            "batch_wise": {"value": "yes", "evidence": "compared_with_tally_screen_on_synthetic_books"},
         })
     );
     assert_eq!(
@@ -156,7 +156,7 @@ async fn a_read_returns_three_settings_each_saying_what_it_rests_on_and_the_symb
     );
     assert_eq!(
         lead(&response),
-        "The settings Tally's company record holds today for \u{201c}Bridge Ageing Lab\u{201d}: cost centres off, GST on, batch-wise stock on. They are not what the books contain or what they were during a year, and only the cost-centre setting has been compared with Tally's own screen, on synthetic books. The company's currency symbol is \u{20b9}: a symbol, not a currency code."
+        "The settings Tally's company record holds today for \u{201c}Bridge Ageing Lab\u{201d}: cost centres off, GST on, batch-wise stock on. They are not what the books contain or what they were during a year, and each of the three has been compared with Tally's own screen, on synthetic books. The company's currency symbol is \u{20b9}: a symbol, not a currency code."
     );
     let limitations = result["limitations"].as_array().expect("limitations");
     for needle in [

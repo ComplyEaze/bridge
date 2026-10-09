@@ -639,7 +639,7 @@ fn a_company_features_headline_says_today_not_the_books_and_what_was_compared() 
     assert!(basis.all_reported());
     assert_eq!(
         basis.headline(&company()).lead,
-        "The settings Tally's company record holds today for \u{201c}Synthetic Traders\u{201d}: cost centres off, GST on, batch-wise stock on. They are not what the books contain or what they were during a year, and only the cost-centre setting has been compared with Tally's own screen, on synthetic books. The company's currency symbol is \u{20b9}: a symbol, not a currency code."
+        "The settings Tally's company record holds today for \u{201c}Synthetic Traders\u{201d}: cost centres off, GST on, batch-wise stock on. They are not what the books contain or what they were during a year, and each of the three has been compared with Tally's own screen, on synthetic books. The company's currency symbol is \u{20b9}: a symbol, not a currency code."
     );
 }
 

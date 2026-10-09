@@ -20,12 +20,11 @@ These changes are in source and not yet in a published build.
 
 - `company_features` reads three settings that a company's record in Tally holds today (cost centres, GST
   and batch-wise stock) and its currency symbol (part of #1231). Each setting is yes, no or
-  not reported, and says what it rests on: only the cost-centre setting was compared with Tally's own
-  screen (three synthetic books, not this company); batch-wise stock differed across the two committed
-  books and GST differed only on a book that is not committed, and neither was compared. A setting Tally did not send is never read as no, and an empty or odd one refuses the read. The
+  not reported, and says what it rests on: each of the three was compared with Tally's own
+  F11 screen on three synthetic books (nine values, all equal; not this company). A setting Tally did not send is never read as no, and an empty or odd one refuses the read. The
   settings are the ones Tally holds today, not what the books contain or what they were during a year. The
   currency is a symbol, not a currency code. Measured on three synthetic books of one TallyPrime 7.1 Silver;
-  the tool has not been run against Tally, and Education mode and other releases are not measured.
+  a setting changed inside a sitting, Education mode and other releases are not measured.
 
 **Fixed**
 

@@ -6,11 +6,11 @@ Live captures of one Collection request (`BridgeCompanyFeaturesV1`, a `Company` 
 
 - **Host / gateway:** TallyPrime **Silver (licensed)**, 7.1, `education_mode=false`, `http://127.0.0.1:9001` (a lab instance).
 - **Date:** 2026-10-07, about 14:18 IST, attended, one request at a time.
-- **Books:** `BRIDGE SHAPE LAB` and `BRIDGE CORPUS FOREX`, synthetic lab companies (books from 2025-04-01). The company's setting screen (F11) was looked at by the owner for the Cost Centres setting only, on these two books and a third (not committed): it read No on both of these, equal to the captured `ISCOSTCENTRESON` (recorded, §12a.17). No other setting was compared with the screen.
+- **Books:** `BRIDGE SHAPE LAB` and `BRIDGE CORPUS FOREX`, synthetic lab companies (books from 2025-04-01). The company's setting screen (F11) was looked at by the owner for the Cost Centres setting on these two books and a third (not committed): it read No on both of these, equal to the captured `ISCOSTCENTRESON` (recorded, §12a.17). The three settings were later compared with the screen on three other synthetic books, through the built tool (§12a.18); that run is not a capture and commits no bytes.
 - **Sender:** a lab capture script, not `bridge_mcp`. It sent the exact request bytes tabled below (UTF-16LE with a BOM); a test asserts that `render_company_features_request` produces them.
 - **Encoding:** responses are **BOM-less UTF-16LE**, exactly as received. `.gitattributes` marks this tree `-text`.
 - **What the captures show:** one `COMPANY` row under `ENVELOPE/BODY/DATA/COLLECTION`, with the identity fields, `CURRENCYNAME` (the symbol, not an ISO code) and each flag as `<IS...ON TYPE="Logical">Yes|No</...>`. The `CMPINFO` block carries a bare `<COMPANY>0</COMPANY>` counter that is not a row. Across the two books `ISBATCHWISEON` differs (Yes, No); a third synthetic book (recorded, not committed) read `ISCOSTCENTRESON` Yes and `ISGSTON` No. The other 14 flags read the same on every book read.
-- **Not established:** that any flag other than `ISCOSTCENTRESON` follows its F11 setting (none was compared with the screen), Education mode, other releases, a book that has several companies sharing a GUID.
+- **Not established:** that any flag other than the three the tool returns follows its F11 setting (those three were compared with the screen, §12a.18), Education mode, other releases, a book that has several companies sharing a GUID.
 
 | file | bytes | sha256 | content |
 |---|---|---|---|

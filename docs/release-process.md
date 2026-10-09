@@ -841,7 +841,8 @@ disagree.
      the old snapshot.
 
    A new deploy writes a snapshot without the release, or without a complete
-   asset set. Dispatch "Deploy Bridge install page" with the owner's yes. A
+   asset set. Dispatch "Deploy Bridge install page" from master (a run on another
+   ref skips both jobs without saying so) with the owner's yes. A
    deploy also publishes any `site/` change already merged and renders the
    changelog and legal pages again, so that text goes live too; read the run's
    "Site text changed since the last deploy" summary afterwards, as under "MCPB
@@ -851,8 +852,9 @@ disagree.
    with no complete asset set; open Download and Releases once to see the
    merged list. If the withdrawn release was the only installable one, the
    deploy stops at its check for at least one installable release and the old
-   page stays: cut the replacement first (step 5), whose publication redeploys
-   the page, or say plainly that the page cannot be updated.
+   page stays: cut the replacement first (step 5). Its publication redeploys the
+   page when its run succeeds; if it fails, dispatch the deploy by hand. Or say
+   plainly that the page cannot be updated.
 3. Publish a security advisory when coordinated disclosure is required.
 4. Revert or rectify the source change through a pull request with migration
    compatibility notes.

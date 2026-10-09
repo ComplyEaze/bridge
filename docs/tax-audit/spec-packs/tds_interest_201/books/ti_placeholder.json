@@ -1,0 +1,148 @@
+{
+ "comment": "A firm whose configuration marks the previous-year turnover as a placeholder: 2 rows, 2 findings. tds_payees gives the status 'deductor', as for every firm. h01 credits Ivy Agency (s.194H) Rs 24,000: its row carries the flag that the deductor status is unresolved, and its finding the limit that says so, because the turnover is a placeholder. h02 credits the one partner interest of Rs 26,000: a partner's row never carries that flag, so its finding has no such limit.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Sales Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_placeholder-ledger-00c"
+  },
+  {
+   "name": "Interest to Partners",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_placeholder-ledger-01c"
+  },
+  {
+   "name": "Ivy Agency",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_placeholder-ledger-02c"
+  },
+  {
+   "name": "Juniper Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_placeholder-ledger-03c"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_placeholder-ledger-04c"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Sales Commission",
+   "opening": 0,
+   "debit": 2400000,
+   "credit": 0,
+   "closing": 2400000
+  },
+  {
+   "ledger": "Interest to Partners",
+   "opening": 0,
+   "debit": 2600000,
+   "credit": 0,
+   "closing": 2600000
+  },
+  {
+   "ledger": "Ivy Agency",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2400000,
+   "closing": -2400000
+  },
+  {
+   "ledger": "Juniper Capital",
+   "opening": -40000000,
+   "debit": 0,
+   "credit": 2600000,
+   "closing": -42600000
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 40000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 40000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-h01",
+   "date": "2025-07-14",
+   "base_type": "Journal",
+   "number": "CJ/01",
+   "lines": [
+    [
+     "Sales Commission",
+     2400000
+    ],
+    [
+     "Ivy Agency",
+     -2400000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-h02",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "number": "PJ/02",
+   "lines": [
+    [
+     "Interest to Partners",
+     2600000
+    ],
+    [
+     "Juniper Capital",
+     -2600000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Sales Commission": "194H"
+ },
+ "previous_year_turnover_paise": 80000000,
+ "previous_year_turnover_status": "placeholder",
+ "partners": {
+  "juniper": {
+   "capital_ledgers": [
+    "Juniper Capital"
+   ],
+   "interest_ledger": "Interest to Partners"
+  }
+ },
+ "deed": {
+  "interest_rate_bp": 1200
+ }
+}

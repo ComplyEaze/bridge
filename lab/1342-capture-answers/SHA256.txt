@@ -74,3 +74,21 @@ d9c68e392727164c6768e9b71c05548541a0c92269ca5f514b4f562dc05ee7fb  261691  fixed2
 192f17ed4c6282008407041f6789e0abd462632864ded403512bf87331bd2c95  412746  fixed3/screens/gstr1-1-summary.png
 6c4aa4c547d24629d88a959a314acdcda5e00100f55ddee2cc638d7e9d3f7a97  396505  fixed3/screens/gstr1-2-uncertain-unfiltered.png
 4253e0b94adc077914b126518bbcf67a0a72123d327a9441d4f3d9a48fe31ce5  170108  fixed3/screens/gstr1-3-b2c-small-by-rate.png
+#
+# Requests added for the third round (lab/1342-capture-requests @ c45463b1, UTF-16LE+BOM, charset=utf-16)
+c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386  1736  r05-ledgers-compliance.xml
+71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f  1284  r06-ledgers-paired.xml
+#
+# Answers: fixed3/ third round (reads only, after BP/26-27/0011), in the order sent
+655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  fixed3/a00-status-fixed3.txt  <- GET /status (HTTP 200, 0.002168 s)
+0cb23618073bc5eeddbc3441fd4f0da9e84c55699cd206b66d1410b304f8d147  4000  fixed3/a01-company-extent-fixed3.xml  <- r01-company-extent.xml (HTTP 200, 0.004277 s)
+449097451bbce612c7deff74d2847fdf71ea428bbcfb50f84462d14e49623ee8  3394  fixed3/a02-marks-fixed3.xml  <- r02-marks.xml (HTTP 200, 0.003398 s)
+aa419ce1f6b133fd054a483b39cd1c435b90f845e1fefaae882c2acdacc54cda  3836  fixed3/a03-book-extent-fixed3.xml  <- r03-book-extent.xml (HTTP 200, 0.003226 s)
+fe2dee55160e8af6d3a61264cb0c4daff70dbfa680212f4a90b39909b921bb96  3400  fixed3/a04-currencies-fixed3.xml  <- r04-currencies.xml (HTTP 200, 0.023602 s)
+0ed443c9d8c9b120d8877df14cd68a8ea1b6c0ddd9fd09ef0aab0836542e5298  16404  fixed3/a13-ledger-catalogue-v2-fixed3.xml  <- r13-ledger-catalogue-v2.xml (HTTP 200, 0.009677 s)
+8185d7e748518810ac5b8b09e05decec3c1f323372b1b8a491d8a734a2e2f9eb  24472  fixed3/a05-ledgers-compliance-fixed3.xml  <- r05-ledgers-compliance.xml (HTTP 200, 0.013457 s)
+faef4bd14d89ac104e5d2d879664c12a45c82a6a67dab24210ba14b3ed335283  16704  fixed3/a06-ledgers-paired-fixed3.xml  <- r06-ledgers-paired.xml (HTTP 200, 0.009033 s)
+d6b15cfa27b93e7da75c1f59e7a265d178991e531c6aa7e9977fc7b5543c92b6  54280  fixed3/a07-groups-fixed3.xml  <- r07-groups.xml (HTTP 200, 0.007223 s)
+de940b6d6d1714cb3b6a8a2cf341b4c656318bfdd0de9dc81526ba6a30782844  264678  fixed3/a08-voucher-types-fixed3.xml  <- r08-voucher-types.xml (HTTP 200, 0.017155 s)
+947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974  3022  fixed3/a09-number-new-invoice-fixed3.xml  <- r09-number-new-invoice.xml (HTTP 200, 0.029806 s)
+0b4abb57fbfc888ef9d3d84d9b8847b9cd6f27f9c1de4aff36e36045b213286b  3418  fixed3/a11-company-state-fixed3.xml  <- r11-company-state.xml (HTTP 200, 0.004128 s)

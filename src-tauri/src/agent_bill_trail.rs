@@ -872,11 +872,14 @@ impl Server {
         let (catalogue, mut evidence) = self
             .read_resolvable_ledgers(identity, &company.name)
             .await?;
-        let (resolved, party) = resolve_catalogue_ledger_or_refuse(
+        let (resolved, ledger) = resolve_catalogue_ledger_or_refuse(
             &catalogue,
             party_argument,
             self.settings.redaction,
         )?;
+        // The trail still matches the spelling the catalogue's row gives the
+        // party (#1262 widened only `vouchers`).
+        let party = ledger.row().to_string();
         let books_from = company
             .books_from
             .clone()
@@ -913,7 +916,7 @@ impl Server {
         let late = |failure: ToolFailure| with_evidence(failure, &evidence);
         let rows = read.rows;
         let vouchers_read = rows.len();
-        let rows = validate_then_filter_voucher_rows(rows, from.as_str(), as_of.as_str(), None)
+        let rows = validated_window_rows(rows, from.as_str(), as_of.as_str())
             .map_err(|code| late(ToolFailure::from(code)))?;
         let entries = entries_for_party(&rows, &party)
             .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;

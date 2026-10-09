@@ -583,7 +583,7 @@ pub(super) fn register_result(
 ) -> Result<RegisterResult, String> {
     // An undivided window read is admitted by its caller against the window: rows dated
     // outside it would otherwise be returned as register rows.
-    let rows = validate_then_filter_voucher_rows(rows, from, to, None)?;
+    let rows = validated_window_rows(rows, from, to)?;
     let page = classify_register(kind, index, &rows)?;
     let total = page.rows.len();
     let (items, truncated, next_offset) = paginate(page.rows, offset, limit);
@@ -706,7 +706,6 @@ impl Server {
                         &company.name,
                         &from,
                         &to,
-                        None,
                         Some(first.marks),
                     )
                     .await?;

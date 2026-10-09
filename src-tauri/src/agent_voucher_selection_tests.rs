@@ -1205,6 +1205,38 @@ async fn a_ledger_filter_reaches_a_ledger_by_its_stored_name_or_its_row_spelling
     }
 }
 
+/// #1262: the ledger list read after the window is compared with the first on both spellings of
+/// every ledger, so a stored name that changes between the two reads refuses. The second read is
+/// the captured catalogue edited here: this shows the comparison, not a change Tally was seen to
+/// make. Mutant killed: comparing the row spellings alone.
+#[tokio::test]
+async fn a_stored_name_that_changes_between_the_two_ledger_reads_refuses() {
+    let reads = std::cell::Cell::new(0);
+    let response = call_filtered_vouchers(
+        |catalogue| {
+            reads.set(reads.get() + 1);
+            // Legs 5 and 7 are the first read's pair, legs 29 and 31 the second's.
+            if reads.get() <= 2 {
+                return catalogue.to_string();
+            }
+            let edited = catalogue.replace(
+                "<NAME>Café Naïve Traders</NAME>",
+                "<NAME>Cafe Traders</NAME>",
+            );
+            assert_ne!(edited, catalogue);
+            edited
+        },
+        "Café Naïve Traders",
+    )
+    .await;
+    assert_eq!(reads.get(), 4);
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "ledger_snapshot_drifted"
+    );
+}
+
 // -- #1230: a summary over the selectors the tool already had --
 
 /// A summary of a window narrowed to one ledger adds only that ledger's entries by month, and

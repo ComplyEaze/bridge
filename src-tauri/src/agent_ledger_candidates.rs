@@ -12,7 +12,7 @@ use bridge_tally_core::master_binding::{
     self, BindingStatus, Candidates as Found, MasterCatalog, MasterClass, SourceEntity,
     MAX_CANDIDATES_PER_ENTITY,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// What a candidate list means. The first four are the core's own states;
 /// the last two are this call's: the redaction setting hid the names, or the
@@ -104,7 +104,7 @@ fn is_another_ledgers_masked_form(requested: &str, resolved: Option<&str>, names
 /// one (protocol reference 9.4h). The catalogue's GUID is the ledger's identity
 /// and stays in the protocol crate: two entries are two ledgers whatever they
 /// are called.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct CatalogueLedger {
     row: String,
     stored: Option<String>,
@@ -138,6 +138,72 @@ impl CatalogueLedger {
     }
 }
 
+/// The ledger a `vouchers` call selected, once every entry of its window has
+/// been bound to the catalogue read before it (#1262). Only
+/// [`bind_window_entries`] makes one, so a filter or a summary cannot compare
+/// with a spelling the window was not checked against. A voucher row may
+/// carry either of the ledger's spellings (protocol reference 9.4h); the
+/// ledger answers to each exactly, and to nothing else: no case fold.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct SelectedLedger(CatalogueLedger);
+
+impl SelectedLedger {
+    /// Whether an entry spelled so is this ledger's.
+    pub(super) fn carries(&self, spelling: &str) -> bool {
+        self.0.is_spelled(spelling)
+    }
+
+    /// The spelling the catalogue's row gives the ledger.
+    pub(super) fn row(&self) -> &str {
+        self.0.row()
+    }
+}
+
+/// A ledger bound to an empty window of a one-ledger catalogue: the selected
+/// ledger a test of a filter or a summary starts from.
+#[cfg(test)]
+pub(super) fn selected_ledger_for_tests(row: &str, stored: Option<&str>) -> SelectedLedger {
+    let ledger = CatalogueLedger::new(row, stored);
+    bind_window_entries(std::slice::from_ref(&ledger), &ledger, []).expect("an empty window binds")
+}
+
+/// Binds every entry of a window to the catalogue read before it, and gives
+/// the selected ledger back as the one thing a filter or a summary compares
+/// with (#1262). An entry spelled as no ledger of the catalogue is
+/// `ledger_snapshot_drifted`, as before either spelling was accepted. An entry
+/// spelled as the selected ledger and as another ledger cannot be told apart,
+/// and is `ledger_snapshot_drifted` with cause `row_spelling_of_two_ledgers`.
+/// A spelling only other ledgers share is not the selected ledger's whichever
+/// it is, and is let through.
+pub(super) fn bind_window_entries<'a>(
+    catalogue: &[CatalogueLedger],
+    selected: &CatalogueLedger,
+    entries: impl IntoIterator<Item = &'a str>,
+) -> Result<SelectedLedger, ToolFailure> {
+    // Each spelling: how many ledgers answer to it, and whether the selected
+    // ledger is one of them.
+    let mut owners = BTreeMap::<&str, (usize, bool)>::new();
+    for ledger in catalogue {
+        for spelling in ledger.spellings() {
+            let owner = owners.entry(spelling).or_default();
+            owner.0 += 1;
+            owner.1 |= ledger == selected;
+        }
+    }
+    for spelling in entries {
+        match owners.get(spelling) {
+            None => return Err("ledger_snapshot_drifted".to_string().into()),
+            Some((ledgers, true)) if *ledgers > 1 => {
+                let mut failure = ToolFailure::from("ledger_snapshot_drifted".to_string());
+                failure.cause = Some("row_spelling_of_two_ledgers");
+                return Err(failure);
+            }
+            Some(_) => {}
+        }
+    }
+    Ok(SelectedLedger(selected.clone()))
+}
+
 /// What to offer when a request cannot be settled between ledgers: their
 /// shown names, or their row spellings when two of them show the same name.
 fn names_to_choose_from(ledgers: &[&CatalogueLedger]) -> Vec<String> {
@@ -169,12 +235,12 @@ pub(super) fn ledger_match_json(found: &LedgerMatch, row: &str, redaction: Redac
 /// one ledger's row spelling or stored name reaches that ledger; one that is
 /// two ledgers' is ambiguous; any other request is resolved loosely over the
 /// shown names. The answer is the match, which shows the stored name, and the
-/// spelling the ledger's voucher rows carry, which is what a filter compares.
+/// ledger it reached.
 pub(super) fn resolve_catalogue_ledger_or_refuse(
     ledgers: &[CatalogueLedger],
     requested: &str,
     redaction: Redaction,
-) -> Result<(LedgerMatch, String), ToolFailure> {
+) -> Result<(LedgerMatch, CatalogueLedger), ToolFailure> {
     let names = ledgers
         .iter()
         .map(CatalogueLedger::display)
@@ -185,7 +251,7 @@ pub(super) fn resolve_catalogue_ledger_or_refuse(
         .collect::<Vec<_>>();
     let resolved = match reached.as_slice() {
         [one] => resolve_ledger_name(names.iter().copied(), one.display())
-            .map(|found| (found, one.row.clone())),
+            .map(|found| (found, (*one).clone())),
         // Not exactly any ledger's spelling: the case-and-spaces fold, over both
         // spellings of every ledger. More than one ledger answering to it, or to a
         // whitespace twin of it, asks, as before the own name was read.
@@ -213,7 +279,7 @@ pub(super) fn resolve_catalogue_ledger_or_refuse(
                             LedgerMatch::CaseOrSpacing {
                                 name: one.display().to_string(),
                             },
-                            one.row.clone(),
+                            (*one).clone(),
                         ))
                     } else {
                         Err(LedgerRefusal::Ambiguous(names_to_choose_from(&twins)))

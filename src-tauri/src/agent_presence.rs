@@ -125,8 +125,7 @@ impl Server {
             accumulate(&mut accumulated, read.all_evidence());
             let source_marks = read.witness.as_ref().map(|witness| witness.marks);
             let counted = read.counted();
-            let rows =
-                validate_then_filter_voucher_rows(read.rows, from.as_str(), to.as_str(), None)?;
+            let rows = validated_window_rows(read.rows, from.as_str(), to.as_str())?;
 
             // The window is independent evidence about which ledgers exist.
             // A row posting to an unlisted ledger proves the first catalogue
@@ -165,7 +164,6 @@ impl Server {
                         &company.name,
                         &from,
                         &to,
-                        None,
                         source_marks,
                     )
                     .await?;

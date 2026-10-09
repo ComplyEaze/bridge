@@ -42,6 +42,18 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- `vouchers` with `ledger` now accepts a voucher entry in either spelling of that ledger: the
+  name in its ledger list row, or its own name as Tally stores it (part of #1262). Before, an
+  entry carrying the own name made the call refuse with `ledger_snapshot_drifted` for any window
+  that held it. Only an exact spelling counts; no letter case is ignored. An entry spelled as
+  that ledger and as another ledger refuses with `ledger_snapshot_drifted`, cause
+  `row_spelling_of_two_ledgers`. Where the call reads the ledger list again after the window,
+  that read is now compared with the first on both spellings of every ledger; a `group` or
+  `primary_group` summary's second read is the group placements read, compared on the row
+  spellings as before. `ledger_movement` is unchanged until the second
+  part. Not measured yet: a voucher carrying the own name on a synthetic book (it has been seen
+  once, on a client's book); a lab capture is requested on #1262.
+
 - On Windows, `parse_bank_statement` now refuses a password file owned by neither you nor
   Administrators, or that anyone but you, SYSTEM and Administrators can read or change
   (`statement_password_file_permissions`), as a Mac already refuses one that other users can read.

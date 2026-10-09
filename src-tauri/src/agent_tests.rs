@@ -1214,9 +1214,28 @@ fn voucher_parsers_preserve_entity_adjacent_whitespace() {
 fn voucher_ledger_filter_drops_mixed_response_rows_that_do_not_match_live_spelling() {
     let xml = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><VOUCHER><GUID>voucher-keep</GUID><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><DATE>20260901</DATE><VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><VOUCHERNUMBER>keep</VOUCHERNUMBER><ALLLEDGERENTRIES.LIST><LEDGERNAME>R and D</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-10</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER><VOUCHER><GUID>voucher-drop</GUID><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><DATE>20260901</DATE><VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><VOUCHERNUMBER>drop</VOUCHERNUMBER><ALLLEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>10</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>";
     let rows = parse_agent_rows(xml, "voucher").expect("mixed voucher rows");
-    let rows = filter_voucher_rows_for_ledger(rows, "R and D");
+    let rows = filter_voucher_rows_for_ledger(rows, &selected_ledger_for_tests("R and D", None));
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["voucher_number"], "keep");
+}
+
+/// #1262: the filter keeps a row whose entry carries either spelling of the bound ledger, and
+/// only those. Mutant killed: the filter comparing with the row spelling alone.
+#[test]
+fn a_ledger_filter_keeps_a_row_in_either_spelling_of_the_bound_ledger() {
+    let rows = filter_voucher_rows_for_ledger(
+        vec![
+            json!({"voucher_number":"row","amounts":[{"ledger":"ROUND OFF"}]}),
+            json!({"voucher_number":"stored","amounts":[{"ledger":"Round Off"}]}),
+            json!({"voucher_number":"other","amounts":[{"ledger":"Cash"}]}),
+        ],
+        &selected_ledger_for_tests("ROUND OFF", Some("Round Off")),
+    );
+    let kept = rows
+        .iter()
+        .map(|row| row["voucher_number"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(kept, ["row", "stored"]);
 }
 
 #[test]
@@ -1228,20 +1247,20 @@ fn resolved_ledger_filter_keeps_only_the_exact_live_spelling() {
             json!({"voucher_number":"exact","amounts":[{"ledger":"AB"}]}),
             json!({"voucher_number":"near","amounts":[{"ledger":"A-B"}]}),
         ],
-        resolved.name(),
+        &selected_ledger_for_tests(resolved.name(), None),
     );
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["voucher_number"], "exact");
 }
 
 #[test]
-fn voucher_window_is_validated_before_the_ledger_selector() {
+fn a_voucher_window_with_a_row_outside_its_dates_is_refused() {
     let rows = vec![
         json!({"date":"20260901","amounts":[{"ledger":"AB"}]}),
         json!({"date":"20260915","amounts":[{"ledger":"A-B"}]}),
     ];
     assert_eq!(
-        validate_then_filter_voucher_rows(rows, "20260901", "20260902", Some("AB")),
+        validated_window_rows(rows, "20260901", "20260902"),
         Err("window_not_honoured".to_string())
     );
 }
@@ -1261,7 +1280,7 @@ fn client_side_ledger_filter_accepts_unquoted_tdl_ledger_names() {
         assert!(!request.contains(ledger), "ledger must not enter TDL");
         let rows = filter_voucher_rows_for_ledger(
             vec![json!({"amounts":[{"ledger": ledger}]})],
-            resolved.name(),
+            &selected_ledger_for_tests(resolved.name(), None),
         );
         assert_eq!(rows.len(), 1, "ledger remains selected after parsing");
     }

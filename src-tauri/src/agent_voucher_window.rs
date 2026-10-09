@@ -173,10 +173,10 @@ impl AlterIdSpan {
     }
 }
 
-/// A window date that reaches this layer as text from a read or a stored
-/// record, not from a tool argument (whose date [`normalized_date`] parses):
-/// parsed once, by the caller, and carried as a [`TallyDate`] into every
-/// request rendered from it (#861).
+/// A window date that reaches this layer as text read from the book, not from a
+/// tool argument (whose date [`normalized_date`] parses): parsed once, by its one
+/// caller, the bill trail's window start (`agent_bill_trail.rs`), and carried as
+/// a [`TallyDate`] into every request rendered from it (#861).
 pub(super) fn parse_window_date(value: &str) -> Result<TallyDate, ToolFailure> {
     TallyDate::parse(value).map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
 }
@@ -325,6 +325,45 @@ pub(super) struct CompanyMarks {
 pub(super) struct WindowWitness {
     pub(super) marks: CompanyMarks,
     pub(super) census: Option<WindowCensus>,
+}
+
+/// Proof that a window read made a corroborating second read of itself
+/// redundant (#1241): it was divided, every part was admitted against a census
+/// that names every voucher's GUID (so each part held exactly the counted
+/// vouchers, by AlterID and GUID), and the company's two marks read after the
+/// last part equal the marks it opened on. A change to the company between
+/// those two reads moves a mark (§11c.5), so the read is one snapshot of the
+/// window, and a replay could only observe a later state.
+///
+/// Only the paired agent reader earns one: a reader that seals single reads
+/// (the audit reader) does not, since a part that was not read twice is not
+/// already a stable observation.
+///
+/// The field is private and nothing outside [`read_voucher_window_with`] builds
+/// one, so a caller can skip the second read only by holding it.
+#[derive(Debug)]
+pub(super) struct BracketedCount(());
+
+/// What a window read's corroborating second read is: the replay of its
+/// parts, or nothing, when the read carries a [`BracketedCount`].
+pub(super) enum SecondRead {
+    Replay(WindowPlanSource),
+    Spared(BracketedCount),
+}
+
+impl SecondRead {
+    /// The one place that decides: a read that holds the token is spared its
+    /// replay, every other read replays exactly its own parts.
+    pub(super) fn of(
+        reads: Vec<WindowPart>,
+        witness: Option<WindowWitness>,
+        bracketed: Option<BracketedCount>,
+    ) -> Self {
+        match bracketed {
+            Some(bracketed) => Self::Spared(bracketed),
+            None => Self::Replay(WindowPlanSource::replay_of(reads, witness)),
+        }
+    }
 }
 
 /// A measured per-voucher cost may replace the shape's default, but never falls
@@ -886,6 +925,9 @@ pub(super) struct WindowReadOutcome<T> {
     /// What a replay of this read must carry. `None` only when no marks were
     /// read, which is the caller-counted source alone.
     pub(super) witness: Option<WindowWitness>,
+    /// Held when a corroborating second read would add nothing
+    /// ([`BracketedCount`]).
+    pub(super) bracketed: Option<BracketedCount>,
     /// Whether Tally refused a data request of this read as too large or timed
     /// out, and the read went on in smaller parts. The parts' sizes then say
     /// nothing about the request Tally refused.
@@ -1941,6 +1983,7 @@ where
     // reader that seals its reads: its record states the marks it read, so an
     // undivided window must also show they did not move.
     let mut closing = None;
+    let mut closed_on_opening_marks = false;
     if let (true, Some(opened)) = (is_divided(&reads) || reader.seals_its_reads(), opening) {
         let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
             .await
@@ -1953,7 +1996,16 @@ where
                 &closing,
             ));
         }
+        closed_on_opening_marks = true;
     }
+    // The only place a `BracketedCount` is made (#1241). A replay never earns
+    // one: it is itself the second read. A reader that does not seal closes
+    // only a divided read, so closing the marks is what says the read was divided.
+    let bracketed = (!replaying
+        && !reader.seals_its_reads()
+        && closed_on_opening_marks
+        && census.as_ref().is_some_and(WindowCensus::names_every_guid))
+    .then_some(BracketedCount(()));
     // Unreachable while every plan holds at least one part; kept total
     // rather than panicking on a future change to that.
     let evidence =
@@ -1965,6 +2017,7 @@ where
         closing_evidence: closing,
         reads,
         witness: opening.map(|marks| WindowWitness { marks, census }),
+        bracketed,
         refused_a_part,
         // Filled in by `read_voucher_window_with`, which owns the timer.
         timings: WindowReadTimings::new(from.clone(), to.clone()),

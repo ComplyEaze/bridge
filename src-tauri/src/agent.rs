@@ -43,6 +43,8 @@ use company::*;
 mod cash_flow;
 #[path = "agent_changes.rs"]
 mod changes;
+#[path = "agent_company_features.rs"]
+mod company_features;
 #[path = "agent_headline.rs"]
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
@@ -795,6 +797,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(check.code());
         }
+        if let Some(features) = cause
+            .downcast_ref::<bridge_tally_protocol::native_company_features::NativeCompanyFeaturesError>()
+        {
+            return Some(features.code());
+        }
         if let Some(outstandings) =
             cause.downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
         {
@@ -847,7 +854,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "terms_not_accepted" => Some(
             "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
              them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
-             extension settings and turn on \"I accept the ComplyEaze Bridge Terms of Use\" \
+             extension settings and tick \"I accept the ComplyEaze Bridge Terms of Use\" \
              there, then quit Claude completely and reopen it so ComplyEaze Bridge starts again. Nothing \
              was read from Tally.",
         ),
@@ -857,6 +864,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              can be written; if the file is damaged, move it aside and ComplyEaze Bridge will record your \
              acceptance again. Then quit Claude completely and reopen it. Nothing was read from \
              Tally.",
+        ),
+        "statement_password_file_permissions" => Some(
+            "The password file is not private to you: someone else may be able to read or change \
+             it, so ComplyEaze Bridge did not read the password and parsed nothing. On a Mac, \
+             turn off the file's group and other permissions (chmod 600). On Windows, make a new \
+             copy of it in a folder of your own on this computer, then delete the original: moving \
+             it keeps who can read it. Then run the parse again.",
         ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
@@ -1194,10 +1208,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              readers rewrite exactly that sequence before parsing, so a voucher number \
              carrying it could never be confirmed as posted, and a native post of a narration \
              carrying it could never be bound to the voucher it created, so never confirmed \
-             either. Remove that sequence from the voucher number or narration and build the \
-             batch again with build_import_xml: a saved batch cannot be changed, and \
-             post_import refuses one saved with such a narration. The reference may carry it \
-             freely.",
+             either. A narration is also refused when it holds a character that draws nothing \
+             (Unicode Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the \
+             prepended concatenation marks). Remove that sequence or character from the \
+             voucher number or narration and build the batch again with build_import_xml (for \
+             proposals from an earlier parse_bank_statement, run parse_bank_statement again \
+             first): a saved batch cannot be changed, and post_import refuses one saved with \
+             such a narration. The reference may carry either freely.",
         ),
         // Same shared-code shape as voucher_text_invalid, for a ledger name
         // instead of the voucher number.
@@ -1375,6 +1392,23 @@ impl ArgumentRepair {
     }
 }
 
+/// The next step when no response answered a request (#1458): the two reasons a person meets
+/// first, Tally not running and the hold-back that follows repeated failures. It is consulted
+/// last, so a code's or a typed cause's own next step wins, and it is a function of its own,
+/// not arms of `refusal_remediation`, which is also asked with a code or a typed cause. The
+/// other unanswered reasons name no step yet.
+fn unanswered_remediation(reason: &str) -> Option<&'static str> {
+    match reason {
+        "endpoint_unreachable" => Some(
+            "Tell the user to confirm Tally is running with the XML server enabled on the port named in this error. Do not repeat the request until they have.",
+        ),
+        "endpoint_circuit_cooldown" => Some(
+            "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated.",
+        ),
+        _ => None,
+    }
+}
+
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -1504,6 +1538,10 @@ impl ToolFailure {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
         }) {
             error.safe_code()
         } else if error.chain().any(|cause| {
@@ -1767,6 +1805,9 @@ impl Server {
                 if let Some(remediation) = refusal_remediation(&code)
                     .or_else(|| repair.map(ArgumentRepair::remediation))
                     .or_else(|| remediation_for(&code, cause))
+                    .or_else(|| {
+                        unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
+                    })
                 {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);
@@ -2099,6 +2140,7 @@ impl Server {
             }
             "cash_flow" => self.cash_flow(args).await,
             "changed_since" => self.changed_since(args).await,
+            "company_features" => self.company_features(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
             "ledger_masters" => self.ledger_masters(args).await,
             "ledger_movement" => self.ledger_movement(args).await,

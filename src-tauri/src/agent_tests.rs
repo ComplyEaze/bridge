@@ -563,6 +563,21 @@ fn remediation_is_present_only_where_a_concrete_next_step_exists() {
     }
 }
 
+/// A password file someone else can read is refused with a step that fixes it
+/// on each platform: on Windows a new copy, because a move keeps who can read it.
+#[test]
+fn a_shared_password_file_says_how_to_make_it_private() {
+    let step = refusal_remediation("statement_password_file_permissions").expect("a next step");
+    for phrase in [
+        "did not read the password and parsed nothing",
+        "(chmod 600)",
+        "make a new copy of it in a folder of your own",
+        "moving it keeps who can read it",
+    ] {
+        assert!(step.contains(phrase), "{phrase}: {step}");
+    }
+}
+
 #[test]
 fn a_read_deadline_is_named_rather_than_collapsed_into_the_generic_failure() {
     use bridge_tally_transport::TallyTransportError;
@@ -752,18 +767,37 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // deliberately. `acknowledge_post_review` writes one local record and its
     // module marks no party name; `local_data_report` returns only static
     // strings, counts, sizes and whole days; `cash_flow` returns only months,
-    // amounts and counts of ledgers, and no ledger name.
+    // amounts and counts of ledgers, and no ledger name; `company_features`
+    // returns only three settings, a currency symbol and the company's own name.
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
-    let mut without_a_sample = vec!["acknowledge_post_review", "cash_flow", "local_data_report"];
+    let mut without_a_sample = vec![
+        "acknowledge_post_review",
+        "cash_flow",
+        "company_features",
+        "local_data_report",
+    ];
+    // Read once: the catalogue keeps the lab tools only while BRIDGE_LAB_WRITES=1
+    // is set as it is built, and another test changes that variable, so the
+    // exemptions below must come from this same read (#1435).
+    let registered = super::catalog::registered_tool_definitions(true, true)
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|tool| tool["name"].as_str().expect("tool name").to_string())
+        .collect::<BTreeSet<_>>();
     // The lab-only tools, compiled in with the `lab-writes` feature, are not
     // sampled yet: `lab_read_inventory` returns party-bearing fields and the two
-    // import tools were not examined (#999).
+    // import tools were not examined (#999). Exempt those this read registered.
     #[cfg(feature = "lab-writes")]
-    without_a_sample.extend([
-        "lab_import_masters",
-        "lab_import_vouchers",
-        "lab_read_inventory",
-    ]);
+    without_a_sample.extend(
+        [
+            "lab_import_masters",
+            "lab_import_vouchers",
+            "lab_read_inventory",
+        ]
+        .into_iter()
+        .filter(|name| registered.contains(*name)),
+    );
     let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
     assert_eq!(
         sampled.len(),
@@ -786,12 +820,6 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         covered.iter().collect::<BTreeSet<_>>().len(),
         "a tool is both sampled and listed without a sample: {covered:?}"
     );
-    let registered = super::catalog::registered_tool_definitions(true, true)
-        .as_array()
-        .expect("tools")
-        .iter()
-        .map(|tool| tool["name"].as_str().expect("tool name").to_string())
-        .collect::<BTreeSet<_>>();
     let covered = covered
         .iter()
         .map(|tool| tool.to_string())

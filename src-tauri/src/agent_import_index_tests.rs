@@ -10,7 +10,7 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
         .remove(0);
     template.voucher_type = Some("Journal".into());
     template.voucher_number = None;
-    let date = template.date.as_deref().unwrap();
+    let date = template.date.as_str();
     let expected = ImportVoucher {
         bridge_txn_id: String::new(),
         date: stored_date(date),

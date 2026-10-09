@@ -88,6 +88,7 @@ The ordinary default tools, in name order:
 
 - `balance_sheet`
 - `cash_flow`
+- `company_features`
 - `egress_log`
 - `ledger_masters`
 - `ledger_movement`
@@ -110,7 +111,8 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `local_data_report` (also
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features` is in the source after
+release 0.5.0 and is not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -120,9 +122,12 @@ and other special files it did not count, folders it could not list (named, not
 read as empty), and the import journal's state: batches, batches sent or found
 posted, how many of those are not settled (with no recorded response, or with a
 response but a latest status that is not `posted_verified`: a post Tally
-rejected stays not settled), batches with no recorded dispatch that were never
-found posted (`no_dispatch_never_verified`: this includes a batch imported by
-hand whose verification is incomplete, which may well be in Tally, so no
+rejected stays not settled; `not_settled_binding_refused` counts the native
+posts whose binding to their own vouchers was refused, all of which stay not
+settled for good, a post Tally rejected in part or whole among them; it
+overlaps neither `not_settled_no_response` nor `not_settled_not_verified`),
+batches with no recorded dispatch that were never found posted
+(`no_dispatch_never_verified`: this includes a batch imported by hand whose verification is incomplete, which may well be in Tally, so no
 deletion may rest on it), and interrupted-write folders that Bridge must recover
 before it builds or reads. A journal it could not read is reported as
 `journal_unreadable` (could not be opened), `journal_read_failed` or
@@ -516,6 +521,42 @@ place of a difference; it is covered by tests only), what Tally's debit and cred
 include (each differed from the totals of the ledgers Tally counts as cash and bank by one common amount in size (the ledgers' columns larger in both) while the net tied; on one book that set includes a Bank OD A/c ledger), a contra, a window
 ending in February, a window crossing a financial year, optional or post-dated vouchers, a book with
 several currencies, and a large book with cash activity.
+
+### Company settings and currency symbol (`company_features`)
+
+`company_features` takes `company_guid` and nothing else. It reads the company's own record in Tally
+twice, with the book extent checked before and after, and returns three settings that its company record holds
+today (cost centres, GST and batch-wise stock) and the currency symbol. It returns no ledger, voucher, amount or narration. A company in Education mode is
+refused (`company_features_education_unqualified`), as for the stock summary.
+
+The result holds `settings` with `cost_centres`, `gst` and `batch_wise`. Each is `{"value": ..., "evidence": ...}`
+where `value` is `yes`, `no` or `not_reported`, and `evidence` says what it rests on:
+`compared_with_tally_screen_on_synthetic_books` (each of the three settings equalled Tally's F11 screen on three synthetic books, not on this company; a setting changed inside a sitting has not been measured). `not_reported` means Tally sent no such element, and its `evidence` is `not_reported_by_tally`; it is never
+read as `no`, and the result's `state` is then `partial`. An element that is present but empty, or says
+anything but `Yes` or `No`, refuses the read instead (`company_features_setting_invalid:cost_centres`,
+`:gst` or `:batch_wise`).
+
+`base_currency` is `{"state": "reported", "symbol": ..., "kind": "symbol_not_iso_code"}` or
+`{"state": "not_reported"}`. It is the symbol Tally holds (the rupee sign on the books captured). It is not an
+ISO code and it does not say whether foreign currencies are used: `ISISOCURRENCYAPPLICABLE` read No on a
+book that has currency masters, so it is not read.
+
+The headline leads with the three settings as "on", "off" or "not sent by Tally" and says they are the
+settings the company record holds today, not what the books contain or what they were during a year: a cost-centre allocation
+can be stored while the setting reads No (protocol reference §12a.17). Tally's other 14 feature flags are
+fetched in the same request and are not returned, because each has only ever read one value on the books
+captured. Nothing this tool returns changes what another tool reads or refuses; `stock_summary` reads its own
+inventory, integrated and batch-wise flags from its own request.
+
+The company is bound by the GUID filter and by the row's own name, company number and books-from date,
+which must equal the verified company's; a row for another company, or not exactly one row, refuses the
+read. These arrive as `company_features_read_failed` with a `cause`: `company_features_company_mismatch`,
+`company_features_not_one_row` and `company_features_guid_unsupported` (the GUID cannot be put in the filter),
+and also `company_features_response_invalid` (the answer is not the
+collection shape), `company_features_currency_invalid` (a symbol over 16 characters, or with a
+control character, a bidirectional override or isolate, a zero-width or other invisible format character, or a line or paragraph separator), `company_features_tally_reported_failure`, and the stability codes
+`company_features_changed` and `company_features_extent_changed`. Measured on three synthetic books of one
+TallyPrime 7.1 Silver (protocol reference §12a.18); the tool was run against those three books and equalled the F11 screen on all nine values.
 
 ### Stock Summary
 
@@ -1597,8 +1638,15 @@ that turns that on.
    Journal, the desktop posting) flow below instead of importing the file manually.
 5. Call `verify_import` with the company GUID and batch ID. It reads the date
    window back, compares the exact signed ledger entries, reports missing or
-   divergent rows and duplicates, writes `.proof.json` and `.proof.md`, and
-   appends the verification status to the local import ledger. It compares the
+   divergent rows and duplicates, adds a proof pair
+   (`<batch>.proof.<time saved>.<SHA-256>.json` and `.md`) beside every earlier
+   one, and appends the verification status, which names that pair current, to
+   the local import ledger. No file is replaced: the journal decides which pair
+   is current. The SHA-256 in the name is the JSON's, and only the JSON is read
+   back and checked against it; the `.md` is a copy for people to read, and
+   ComplyEaze Bridge never reads it back. Every pair is kept until you delete
+   it; nothing in ComplyEaze Bridge deletes one. A batch last verified by an earlier build keeps its
+   single `<batch>.proof.json`, which no longer changes. It compares the
    date, voucher type and entries; it does **not** compare `EFFECTIVEDATE` or
    `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see
    the limits noted in reference §9.13.
@@ -1896,7 +1944,10 @@ binding compares narration byte for byte. A narration holding the one sequence
 the agent readers are known to rewrite (a literal U+FFFD followed by `#`, digits
 and `;`) is refused when the batch is built (`voucher_text_invalid`), and
 `post_import` refuses a batch saved before that check in the same way, before
-any request; it is still admitted for review and reconciliation. Other text,
+any request; it is still admitted for review and reconciliation. So is a
+narration holding a character that draws nothing (Unicode
+Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the prepended
+concatenation marks). Other text,
 such as Devanagari or the rupee sign, is admitted, and whether it reads back
 byte for byte is not yet measured: a narration that reads back changed refuses
 that post's binding for good.
@@ -1921,7 +1972,11 @@ whose vouchers are then matched by content only. Such a batch stays
 `reconciliation_required`: the person checks its vouchers in Tally, and
 `acknowledge_post_review` does not apply to it, because it records a review only
 of a doubt beside vouchers that read back verified (closing such a batch inside
-Bridge is bridge#1039). `voucher_presence` cannot identify a native post's
+Bridge is bridge#1039). Its `post_span_binding.summary` says when the book holds,
+for each voucher it sent or for some, a voucher with the same date, voucher type
+and ledger entries that is neither cancelled nor optional, and that ComplyEaze
+Bridge cannot tell whether that voucher is this post's; `local_data_report` counts it under `not_settled_binding_refused`.
+`voucher_presence` cannot identify a native post's
 vouchers, because they carry no marker: one edited or re-dated in Tally can read
 `absent` there. Check a natively posted batch with `verify_import`, which finds
 its vouchers by the GUIDs its post created once its binding is made (and
@@ -1959,7 +2014,11 @@ wrote itself. Since bridge#579, each native dispatch intent records the
 REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post attempted
 with 0.4.2 or later, the dispatch intent also records the pre-POST voucher mark and
 the journal a binding record, which a connector older than 0.4.2 refuses: do not
-downgrade after posting with it. A downgrade before that first post leaves the
+downgrade after posting with it. From the first verification with the build that
+added `<batch>.proof.<time saved>.<SHA-256>.json` (#911), each verification's status
+record names the proof it saved, which an older connector refuses too: do not
+downgrade after verifying with it. A downgrade before the first post or
+verification with that build leaves the
 journal readable, and versions 0.3.0 to 0.4.2 then refuse to post a batch this
 version built (`import_batch_predates_ledger_binding`, nothing posted): they
 cannot make the cash-in-hand and bill-wise checks it was built with. Their
@@ -2251,7 +2310,9 @@ Per tool:
   2. the company read;
   3. the window read's marks and census, data parts and closing marks;
   4. the corroborating window's data parts and closing marks (no marks read:
-     it replays the first window's);
+     it replays the first window's), unless the first window was divided, every
+     part was admitted against a census that names each voucher's GUID, and its
+     closing marks equal its opening marks: that read is not repeated (#1241);
   5. a scoped read of the company's marks (if the batch was posted natively
      and its voucher mark before the post was recorded, `current_voucher_mark`);
   6. the closing probe (if any voucher was not found);
@@ -2261,7 +2322,9 @@ Per tool:
 
   `evidence.mode_opening` is the opening probe and `mode_closing` the closing
   one (or null). `company` is the company read. `voucher_read` is the first
-  window's data parts only, and `voucher_read_corroboration` the second's.
+  window's data parts only, and `voucher_read_corroboration` the second's, or
+  `{"state": "not_sent", "reason": "counted_and_bracketed_read"}` when no second
+  read was made.
   No named key covers the marks or census requests, which is what the lab
   capture in #726 showed. A later page read with `proof_sha256` sends no
   request: its request digest hashes
@@ -2550,13 +2613,29 @@ preparation receipt fails, the recovery JSON-RPC error contains
 `error.data.batch_id`. Retain it and use `verify_import` or inspect the local import
 ledger; do not blindly rebuild or import another batch. If stdout itself fails,
 the recovery ID may not reach the client; the generated XML and import ledger
-remain available for local recovery. Proof JSON,
-Markdown, and ledger status are published under one admission lock. Handled
-publication failures restore the prior proof pair and ledger state. Builds create
+remain available for local recovery. A verification writes its proof JSON and
+Markdown under new names, then appends the ledger status that names them current,
+under one admission lock; it replaces and removes no earlier file, so a failure
+before the append leaves the earlier proof current. Builds create
 the journal first, write and sync staged XML, then expose the importable filename. An interrupted
-publication or failed rollback leaves a recovery journal and blocks further import
-admission until the local files and ledger are reconciled. Preserve the journal,
-its backups, and generated XML; do not delete it merely to retry. This is explicit
+build, or a status append whose outcome is unknown because its rollback failed,
+leaves a recovery journal and blocks further import
+admission until the local files and ledger are reconciled. A verification
+stopped around its journal append leaves `imports/.proof-publication`. Compare
+the status record in its `update.json` with the journal's last line, as JSON
+(the file is indented, the line is not):
+
+- the same record: the append finished, and its proof is current;
+- an earlier, whole record: the append never began, and the earlier proof is
+  current;
+- a torn last line: the append stopped part-way. Keep a copy of the journal,
+  then remove only that partial line;
+- no `update.json`: the stop came before the record was written, and the
+  journal is as it was.
+
+Then remove the folder. Proof files that no journal record names are left
+over from the stopped verification; nothing reads them. Preserve the journal
+and generated XML; do not delete it merely to retry. This is explicit
 recovery after a partial file transaction, not a power-loss atomicity guarantee.
 
 Prepared receipts count the bounded master-validation and loaded-company rows. Unknown tool

@@ -1300,6 +1300,7 @@ mod tests {
             ledgers: BTreeMap::new(),
             stock: None,
             currency_read: false,
+            opening_stock: crate::book::OpeningStock::NotApplicable,
             vouchers: Vec::new(),
             tb: BTreeMap::new(),
         };
@@ -1360,6 +1361,7 @@ mod tests {
             ledgers: BTreeMap::new(),
             stock: None,
             currency_read: false,
+            opening_stock: crate::book::OpeningStock::NotApplicable,
             vouchers: vec![
                 voucher(
                     "g1",

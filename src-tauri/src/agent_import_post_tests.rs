@@ -3078,6 +3078,23 @@ fn a_batch_is_admitted_only_under_the_batch_limit() {
     );
 }
 
+/// The batch text's dates are the batch's earliest and latest, whatever order
+/// its vouchers are in: here the earliest is the last voucher.
+#[test]
+fn the_batch_dates_are_the_earliest_and_latest_whatever_the_voucher_order() {
+    let (mut line, endpoint) = batch_of_every_type();
+    line.vouchers.rotate_left(1);
+    assert_eq!(line.vouchers.last().unwrap().date.as_str(), "20260901");
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        preview
+            .lines()
+            .filter(|text| text.starts_with("Dates: "))
+            .collect::<Vec<_>>(),
+        ["Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them"]
+    );
+}
+
 /// The batch approval text: every ledger's totals and entry count, the types,
 /// the money Receipts and Payments move, and a line for Contras and Journals.
 #[test]
@@ -3196,8 +3213,9 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
 
 /// A narration or reference holding a layout or format character leaves the
 /// batch's totals and one line in place of the voucher lines (#1063). The
-/// batch is never refused for it, nothing is stripped, and the line does not
-/// echo the text.
+/// preview never refuses for it, nothing is stripped, and the line does not
+/// echo the text. (A native post refuses a narration holding a character that
+/// draws nothing before the dialog: `refuse_rewritten_narration`.)
 #[test]
 fn an_unsafe_narration_or_reference_leaves_the_totals_and_says_so() {
     for (narration, reference) in [

@@ -103,9 +103,10 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         problems.push("outside tests, carry_approval_scope must carry nothing".into());
     }
     // Every other way to run code off the calling task, counted (#725): none
-    // but the one dialog task above. The two `.spawn(` are processes, the
-    // dialog's child and a unit test's stand-in, and the bare word is counted
-    // too, as the cfg census is, so a form nobody listed is caught.
+    // but the one dialog task above. The one `.spawn(` is a process, the
+    // dialog's child (#702 removed the unit tests' `sh` writer), and the bare
+    // word is counted too, as the cfg census is, so a form nobody listed is
+    // caught.
     for (form, expected) in [
         ("tokio::task::spawn(", 0),
         ("task::spawn(", 0),
@@ -113,8 +114,8 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         ("spawn_local(", 0),
         ("JoinSet", 0),
         ("Handle::current()", 0),
-        (".spawn(", 2),
-        ("spawn", 10),
+        (".spawn(", 1),
+        ("spawn", 9),
     ] {
         if source.matches(form).count() != expected {
             problems.push(format!("expected {expected} of `{form}`"));
@@ -787,8 +788,8 @@ const REVIEW_ENTRY: &str = "pub fn run_review_confirmation() -> bool {
 /// own dialog, from the real stdin to the real stdout (#635, #687). The
 /// parent approves a post only on the post token, so pairing that token with
 /// the review dialog would let "I reviewed it" approve a post, and passing a
-/// dialog other than the real one would approve with nobody asked. No stub
-/// test could see either: a stub is a script, not this code. Each entry
+/// dialog other than the real one would approve with nobody asked. No
+/// stand-in test could see either: a stand-in is not this code. Each entry
 /// point's whole body is pinned, so a swapped body is caught too, and no
 /// other `answer_with_token(` call may appear in the file. A text gate cannot
 /// see a call that does not spell that out, such as one through a function
@@ -843,15 +844,15 @@ fn each_dialog_answers_with_its_own_token() {
 }
 
 /// Where a click becomes the answer (#687). No test can open a real window,
-/// and the parent's stub tests run only on unix. So the four native dialog
-/// functions, `confirm` and `confirm_review`, and the two functions that
-/// decide from the child's answer (`confirm_with`, `confirm_review_with`)
-/// are pinned here verbatim, with the button labels and the functions that
-/// word each title and the post button (#746). On Windows the post dialog's
-/// title is the only text that says what Yes does. The file's `cfg`
-/// attributes are counted as well: a platform or test split anywhere in it,
-/// such as a `#[cfg(windows)]` twin of a pinned function, must change this
-/// gate. This pins text, not the platform's behaviour.
+/// and the parent's tests replace the child with a stand-in (#702). So the
+/// four native dialog functions, `confirm` and `confirm_review`, and the two
+/// functions that decide from the child's answer (`confirm_with`,
+/// `confirm_review_with`) are pinned here verbatim, with the button labels
+/// and the functions that word each title and the post button (#746). On
+/// Windows the post dialog's title is the only text that says what Yes does.
+/// The file's `cfg` attributes are counted as well: a platform or test split
+/// anywhere in it, such as a `#[cfg(windows)]` twin of a pinned function,
+/// must change this gate. This pins text, not the platform's behaviour.
 const REVIEW_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     rfd::MessageDialog::new()
@@ -1069,10 +1070,11 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // non-test arm's identity function.
     ("#[cfg(test)]", 6),
     ("#[cfg(not(test))]", 4),
-    ("#[cfg(unix)]", 7),
+    // #702 ran the parent's seven unix-only test items on every platform.
+    ("#[cfg(unix)]", 0),
     ("#[cfg(windows)]", 6),
     ("#[cfg(not(windows))]", 7),
-    ("cfg", 31),
+    ("cfg", 24),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {

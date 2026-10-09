@@ -23,7 +23,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
         );
     let expected = ImportVoucher {
         bridge_txn_id: "mode-observed".into(),
-        date: stored_date(row.date.as_deref().unwrap()),
+        date: stored_date(row.date.as_str()),
         voucher_type: VoucherType::Journal,
         narration: None,
         reference: None,
@@ -161,8 +161,8 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             company_guid: CAPTURED_GUID.into(),
             company: Some(import_company_tuple(&company).unwrap()),
             txn_ids: vouchers.iter().map(|v| v.bridge_txn_id.clone()).collect(),
-            date_from: stored_date(row.date.as_deref().unwrap()),
-            date_to: stored_date(row.date.as_deref().unwrap()),
+            date_from: stored_date(row.date.as_str()),
+            date_to: stored_date(row.date.as_str()),
             sha256: "synthetic-history".into(),
             built_at: now(),
             status: "built".into(),
@@ -189,11 +189,8 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             .unwrap();
         let paths = [
             server.settings.data_dir.join("agent-import-ledger.jsonl"),
-            server
-                .imports_dir()
-                .unwrap()
-                .join("mode-history.proof.json"),
-            server.imports_dir().unwrap().join("mode-history.proof.md"),
+            server.current_proof_paths("mode-history")[0].clone(),
+            server.current_proof_paths("mode-history")[1].clone(),
         ];
         let before = paths
             .iter()

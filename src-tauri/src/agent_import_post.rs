@@ -1368,8 +1368,9 @@ impl Server {
                     &mut accumulated,
                 )
                 .await;
-            // The verdict replaces the pending record before the readback, so no
-            // later reconcile, which compares by name, can clear a doubt (#239).
+            // The verdict is recorded, beside the pending mark, before the readback,
+            // so no later reconcile, which compares by name, can clear a doubt
+            // (#239, #911).
             let masters_after_post = self.record_masters_verdict_for(
                 batch_id,
                 masters_after_post,
@@ -2871,11 +2872,9 @@ fn batch_review_text(
             }
         }
     }
-    let dates = line.vouchers.iter().map(|voucher| voucher.date.as_str());
-    let (first, last) = (
-        dates.clone().min().unwrap_or_default(),
-        dates.max().unwrap_or_default(),
-    );
+    let (first, last) = date_window(line.vouchers.iter().map(|voucher| &voucher.date))
+        .ok_or("voucher_count_invalid")?;
+    let (first, last) = (first.as_str(), last.as_str());
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let marks = OnAccountMarks::of(line);
     let head = vec![

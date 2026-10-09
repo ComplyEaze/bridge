@@ -306,9 +306,10 @@ or an owner decision to amend the requirement instead:
       refuses (`voucher_altered_since_verified`, or `voucher_never_verified` when no such build has
       a record). A voucher's `ALTERID` advances on every alteration (§9.3, measured over the
       gateway; an edit in Tally's own screens is not yet measured), so equality with any recorded
-      value means nothing has altered the voucher since that reading. The value is kept in a write-once
-      `<batch>.baseline.json` beside the proof, not in the journal, so an older binary still reads the
-      journal after a rollback. That catches an edit to any field made after the first verification,
+      value means nothing has altered the voucher since that reading. The values are kept beside the
+      proof, not in the journal: in `<batch>.baseline.json` as builds before #911 wrote it (rewritten
+      as it grew), and from #911 in one file per verification that adds a voucher,
+      `<batch>.baseline.<n>.json`, written once and never replaced. That catches an edit to any field made after the first verification,
       on the premise above. An edit made between the import and the first
       verification becomes part of the baseline and is not caught; every amendable batch was imported
       by hand, since a batch Bridge posted cannot be amended, so the build asks for a verify right
@@ -474,7 +475,7 @@ gate (owner, 21 September): what matters is a second writer, not the licence tie
    which every later `verify_import` or reconcile reads as a doubt. The first of those that finds
    the vouchers finishes the check, against the ledger identities recorded at build (#616), and
    records its verdict. An observed doubt is also written to a file of its own that nothing
-   removes and only another doubt replaces, and readers check it first, so no later verdict,
+   removes or replaces (since #911 it is written once, and a later doubt keeps the first), and readers check it first, so no later verdict,
    pending mark or race can clear it; the readback compares by name and cannot either. It stays even after a person
    corrects the voucher in Tally, and while a doubt or a pending check stands, the batch is no
    baseline for an amendment. Bridge has no way to clear it. Follow-up: an explicit operator
@@ -484,12 +485,16 @@ gate (owner, 21 September): what matters is a second writer, not the licence tie
    Residuals, stated rather than closed:
    - a pending check finished by a later readback, perhaps days later, lengthens the window in
      which a ledger swapped away and back goes unseen;
-   - the records are renamed into place but their directory is not synced, so a power loss can
-     lose a pending mark or a doubt file whose dispatch record survived, and the batch then reads
-     as its remaining record says, or as one dispatched before these records existed;
-   - an observed doubt whose own file cannot be written is kept only by the check record, where
-     a later verdict or a losing second post's pending mark can replace it; if neither can be
-     written, it is lost. Since #722 that verdict carries `doubt_record: unavailable`, and a
+   - the pending mark is renamed into place and its directory is not synced, so a power loss can
+     lose it, or a doubt file, whose dispatch record survived, and the batch then reads as its
+     remaining record says, or as one dispatched before these records existed. Since #911 a
+     finished verdict and a doubt are each written once to a file of their own
+     (`*.masters_verdict.json`, `*.masters_doubt.json`), never replaced, and their directory is
+     synced; one that exists but cannot be read reads as pending, which no later verdict can then
+     replace, so the batch stays in doubt;
+   - an observed doubt whose own file cannot be written is kept only by its verdict record (the
+     verdict file, or for a batch step the check record, which a losing second post's pending
+     mark can replace); if neither can be written, it is lost. Since #722 that verdict carries `doubt_record: unavailable`, and a
      doubt the check record holds without its own file, whether its write failed or the file
      was lost later, is refused for review (`ack_doubt_record_unavailable`) and reported as
      `operator_review` `doubt_record_unavailable`, rather than read as no doubt. A review
@@ -561,9 +566,9 @@ dialog has not yet been shown on Windows or macOS (UNVERIFIED).
 - the masters check finds no doubt;
 - the target's voucher mark moved by exactly CREATED (`post_location.target_voucher_step`).
 
-The step verdict is durable. It is recorded beside the masters verdict in the masters-check
-records, pending before the POST, and an observed mismatch is kept in its own file that nothing
-removes. So no later readback can lose it, and neither verdict masks the other. If that file
+The step verdict is durable. It is recorded in the check record beside the masters verdict,
+pending before the POST (the finished masters verdict has its own file since #911), and an
+observed mismatch is kept in its own file that nothing removes. So no later readback can lose it, and neither verdict masks the other. If that file
 cannot be written, the check record keeps the mismatch, marked `doubt_record: unavailable`
 (#722), as it keeps a masters doubt (the residuals of #239's window 3, "After the POST").
 A mismatch, or a verdict never recorded, reads `reconciliation_required` with
@@ -623,3 +628,37 @@ is accepted, and loud.
   intent: nothing recorded or sent, and the approval withdrawn.
 - **New readback statuses:** `bound_not_in_window` and `book_rolled_back`.
   Neither is ever absence.
+
+## Amendment — owner decision, 2026-10-08: the order of the GST Sales slices after the invoice core
+
+The owner approved this order on 8 Oct 2026: lab groundwork first, then each guard as a refusal inside the Sales build. Nothing below is built yet. It fixes the order of the work that follows the Sales invoice core (#1342, a draft at this change, with its own amendment "GST invoices, Sales first" and the owed list there and in its protocol-reference section), so that each slice's pull request can cite one place. A slice that is later dropped or reordered says so here with a dated note. Every safeguard of the earlier amendments applies to every slice, and no slice below switches Sales on. Where a slice names a decision still to be taken, that decision is made, and recorded, before the slice is built.
+
+**Where the guards go.** Each check below is to be a refusal inside the Sales build, so a build that would fail it is refused on every call. It is not a separate read tool, because a check a caller must remember to run does not guard a build that skips it (AGENTS.md P2, P7).
+
+**Before any slice: lab groundwork, no code.** None of the slices can be proven until these hold.
+
+- A synthetic lab company whose own GSTIN Tally accepts as valid. On the 7 Oct rehearsal's company, whose invented GSTIN carries another state's code, Tally's GSTR-1 counted all four vouchers as uncertain and gave the company's registration details as invalid or not specified; the cause was not isolated, and a status check proves nothing on such a company. Its GSTIN stays within the synthetic family that test fixtures may carry.
+- An unregistered buyer keyed by hand on screen, then read natively. This gives the fields Tally itself writes for such a buyer.
+- A Gold edition the lab can reach, so that the Sales slices are also measured on the edition a client's book may use. The 7 Oct Sales rehearsal ran on Silver; Sales on Gold rests on hand imports only. This is a measurement prerequisite, not a release gate: the concurrent-writers amendment keeps one policy for every edition.
+
+**Slice 1 — refuse an incomplete company registration.** The build is to read the company's own GST registration in force on the invoice date: GSTIN, registration type, state and applicable-from. It is to refuse a company whose registration is absent, starts after the invoice date, is not Regular, or any of whose fields Tally does not return. A missing field is refused, never read as Regular. More than one registration in force on the date is refused until how one is chosen is decided. This closes the owed item "the company's own registration on the invoice date is not read". Today the core reads only the company's state.
+
+**Slice 2 — GST status and the buyer block in the Sales read-back.** The read-back is to read each posted invoice's GST status (Tally's included and uncertain flags) and the buyer and consignee fields the build wrote. `posted_verified` is to be kept only when the invoice reads as included and not uncertain, and those fields equal what the build wrote. A status that reads uncertain, or that the read does not return ("not established"), keeps the invoice out of `posted_verified` and counts as GST-uncertain for slice 4. Equality with what the build wrote does not show the names are right: the build writes the ledger name, because the mailing name is not read, and that read stays owed in the core's list. The slice's lab evidence compares a posted invoice, field by field, with a hand-keyed invoice of the same shape on the same company. Not measured: whether the status fields come back in a field-listed read, or only in a native one.
+
+**Slice 3 — refuse a sales ledger whose GST details do not fit its leg.** The build is to read each sales ledger's GST rate, HSN/SAC and taxability as of the invoice date. It is to refuse a ledger that is not taxable, a ledger without an HSN/SAC, and a leg whose ledger rate differs from the slab the invoice's tax amounts imply. This closes the blended-bill item owed in the core's list. It is also to read the rate of each tax leg's duty ledger, where the book gives one, and refuse a tax leg whose ledger rate is not that slab's share for its head (how Tally states a duty ledger's rate is not yet measured): the core reads no duty ledger's rate either, so a bill at one rate posted to another rate's duty ledgers passes whenever its amounts fit a slab, and a bill with lines at two rates can pass on one pair of heads as a single blended rate. One decision comes first: what a sales ledger, or a duty ledger, with no rate of its own means.
+
+**Slice 4 — a stop latch per company, with a release.** A Sales batch for a company, keyed by the company's GUID, that ends `reconciliation_required`, `posted_divergent` or GST-uncertain (as slice 2 defines it) is to block every further Sales post for that company. The latch lives in the import journal, so it survives a restart. Its release is a person's recorded act, naming the batch, in a native dialog the model cannot answer. Today's acknowledgement step (`acknowledge_post_review`) is not that release: it admits only a review of a doubt beside vouchers that all read back verified, and it unblocks nothing. Slice 4 is to extend it, or add a release beside it, for every state that latches. The release owed in the core's list is to ship in this slice: the core's number control refuses a build, on a book whose voucher mark is not 0, for a company that has sent an invoice but holds none verified posted (`invoice_number_control_unavailable`), which never clears when Tally declined that invoice or it was deleted, so a latch shipped without the release would add a second lock with no key. Decided in the slice's pull request: whether a declined or lost-answer batch also sets the latch, and whether a later verification that reaches `posted_verified` lifts the latch by itself.
+
+**After slice 4 (listed for order only).** These come after slice 4: switching Sales on once the owed items of the core's list are done; several invoices per approval, after batch posting's own proof (#1090); invoices from a CSV file in a template ComplyEaze Bridge defines, through the proposals route, generalised beyond bank statements; and two rates on one invoice, after measurement.
+
+**Rejected while the order was drafted:**
+
+| Rejected | Why |
+| --- | --- |
+| A standalone readiness read tool | A check a caller can skip does not guard the build. |
+| Creating masters through the approval window | It would ship a second dispatch path into the release (AGENTS.md P8). |
+| An xlsx reader | It needs a new dependency, and the bank-statement crate already reads CSV. |
+| A reader for one billing layout | One layout is not a product shape. |
+| Rollback inside ComplyEaze Bridge | No compensating Tally operation is implemented and verified (Decision, above). |
+
+**Not measured.** None of this has been measured against Tally: the native shape of a company's GST registration, the native shape of a sales ledger's dated GST rows, the transport of the GST status fields, and where GSTR-1 places a posted invoice.

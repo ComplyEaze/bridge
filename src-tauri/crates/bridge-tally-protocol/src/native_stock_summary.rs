@@ -418,7 +418,7 @@ fn malformed_xml() -> NativeStockError {
 /// reads one row, up to and including its closing tag; when `max_row_units` is
 /// set, a row longer than that many UTF-16 units (opening to closing tag)
 /// refuses.
-fn read_collection<T>(
+pub(crate) fn read_collection<T>(
     response: &str,
     row_element: &[u8],
     max_row_units: Option<usize>,
@@ -569,7 +569,7 @@ const FLAG_FIELDS: [&str; 5] = [
 /// The `wanted` children of the row now open, by upper-case name, up to the
 /// row's closing tag. Aliases under `LANGUAGENAME.LIST` are counted per row and
 /// refused past the assumed bound; any other child is skipped.
-fn read_row_fields(
+pub(crate) fn read_row_fields(
     reader: &mut Reader<&[u8]>,
     row_element: &[u8],
     wanted: &[&'static str],

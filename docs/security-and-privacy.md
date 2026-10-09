@@ -56,13 +56,18 @@ Bridge tool can approve it. The server program also has a setting for posting 2
 to 50 vouchers of one saved batch after one approval; the published extension
 neither offers nor sets it, so it applies only if someone sets it by hand.
 
-Every tool refuses until the Terms of Use (version 2026-10.1 in 0.5.0) are
-accepted in the extension settings. Seen once, on one Mac, with a build of 0.5.0
-made by our checks (not the published file) installed over 0.4.2: the new setting
-had no value, and before it was ticked, and before any quit, Claude Desktop did
-not start the extension and a request failed with a 400 error that did not
-mention the Terms (section 4). A server started by hand with `BRIDGE_TERMS_ACCEPTED` set
-to `true` or `1` is not asked.
+Every tool refuses until the Terms of Use (version 2026-10.1 since 0.5.0) are
+accepted in the extension settings. In 0.5.0 the setting was marked required, and
+Claude Desktop does not start an extension while a required setting has no value.
+Seen on one Mac with 0.5.0 installed over 0.4.2, where the new setting had no
+value: a build made by our checks was not started before the tick or any quit,
+and a request failed with a 400 error; the published file, switched on, was not
+started either ("Unable to connect to extension server"). Neither error mentioned
+the Terms (section 4). From 0.5.1 the setting is not marked required, so Claude
+Desktop starts the extension and every tool answers `terms_not_accepted`, naming
+the setting (bridge#1413). That was seen on one Mac with a test package; it has
+not yet been checked on Windows. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to `true`
+or `1` is not asked.
 
 ## 2. Does anything leave my computer?
 
@@ -113,8 +118,9 @@ to `true` or `1` is not asked.
     their narration is refused under it. Apart from the error text noted below,
     it removes nothing else.
   - From the release that includes #1430, a voucher built from a bank statement
-    whose party is mapped to a ledger ends its narration with “Statement party:”
-    and the name as the statement prints it. A cash line the tool recognises, and
+    whose party is mapped to a ledger carries “Statement party:” and the name as
+    the statement prints it at the end of its narration text; a file you import by
+    hand adds the `[BRIDGE:...]` tag after it. A cash line the tool recognises, and
     a line it labels itself as bank charges, a card fee or an EMI, get no name; a
     line sent to suspense already carried the name. Vouchers already in Tally
     keep their narration until an amendment of their batch is imported.
@@ -160,6 +166,12 @@ to `true` or `1` is not asked.
       trial balance's also counts its rows.
   - Either setting also leaves out the text of an error Tally returned for a
     line. Any other value stops the extension from starting.
+  - **What the reads added since 0.5.0 send, under each setting.**
+    - The company settings read (`company_features`) sends the company name,
+      its identifier, company number and books-from date, the cost-centre, GST
+      and batch-wise settings as yes, no or not reported, and the currency
+      symbol. It holds no amounts and no narrations, and `mask_parties` has
+      nothing to shorten in it.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to
@@ -236,9 +248,11 @@ to `true` or `1` is not asked.
     colon and a slash or backslash is accepted.
   - *What still passes.* A drive letter mapped to a network share, a link or
     junction partway along a path, and on a Mac a mounted network volume.
-  - *What to do.* Keep statements and password files on a local disk. On
-    Windows the tool does not check who can read the password file, so restrict
-    its access yourself.
+  - *What to do.* Keep statements and password files on a local disk. From
+    the release after 0.5.1 the tool refuses, on Windows too, a password file
+    owned by neither you nor Administrators, or that anyone but you, SYSTEM
+    and Administrators can read or change; with 0.5.1 or earlier, restrict its
+    access yourself.
 
 **Not measured:** a network capture of the running extension on Windows or Mac.
 
@@ -260,8 +274,7 @@ to `true` or `1` is not asked.
 - **A terms record** (`terms-acceptance.jsonl`): the extension asks you to
   accept the ComplyEaze Bridge Terms of Use (version 2026-10.1) in its settings,
   and every tool refuses with `terms_not_accepted` until you do (section 1 says
-  what was seen once after an update: the extension was not started and a
-  request failed with a 400 error). When the server
+  what 0.5.0 did after an update and what changes in 0.5.1). When the server
   starts with the setting on, it appends a line with the terms version, the
   time, and that the acceptance came through the setting (once per version; two
   servers starting together can each add a line). If that line cannot be
@@ -303,7 +316,8 @@ the log. It names no file path unless you ask on the command line, and covers
 this folder only, not files kept by the desktop app.
 
 There is no size limit, expiry or deletion command: the files grow until you
-delete them. You can delete them by hand when Claude Desktop is not running. Do
+delete them. Each verification of a batch adds a new pair of proof files and
+keeps the earlier ones, so `imports/` grows with every verification. You can delete them by hand when Claude Desktop is not running. Do
 not delete the import journal (`agent-import-ledger.jsonl`) or `imports/` while
 any batch in them has been posted or is waiting to be verified: they are the
 record ComplyEaze Bridge uses to reconcile a post, and without them
@@ -359,8 +373,12 @@ listening port. It writes files only in its data folder and in the lock
 folder described in section 4. It also reads files named in a tool call (often
 by the assistant), such as a bank statement and its password file. From 0.4.1 it
 accepts such a path only when its text starts with a drive letter, a colon and a
-separator (Windows) or a single slash (a Mac) (section 3); on macOS it refuses a
-password file that other users can read. Its one extra process is a
+separator (Windows) or a single slash (a Mac) (section 3). It refuses a password
+file that someone else can read: on macOS one that is not yours or has any group
+or other permission set (it does not read macOS access-control lists), and, from
+the release after 0.5.1, on Windows one owned by neither you nor Administrators,
+or whose access list lets anyone but you, SYSTEM and Administrators read or
+change it. Its one extra process is a
 second copy of itself that shows the approval window.
 
 The approval window is a system dialog. On macOS it is titled "ComplyEaze Bridge

@@ -13,7 +13,7 @@ fn identical_batch() -> (ImportLedgerLine, Vec<ReadVoucher>) {
             guid: Some(format!("guid-{index}")),
             master_id: Some(index.to_string()),
             alter_id: Some(11 + index as u64),
-            date: Some(voucher.date.as_str().to_owned()),
+            date: bridge_tally_core::TallyDate::parse(voucher.date.as_str()).unwrap(),
             voucher_type: Some(voucher.voucher_type.as_str().into()),
             narration: Some(format!("[BRIDGE:{}]", voucher.bridge_txn_id)),
             voucher_number: None,

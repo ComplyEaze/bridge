@@ -130,3 +130,17 @@ pub fn parse_day_month_year_hyphenated(text: &str) -> Option<Date> {
         found[1].parse().ok()?,
     )
 }
+
+/// `DD/MM/YYYY`, ICICI Bank's form. It has no Python reference, so it is
+/// strict rather than strptime-shaped: two-digit day and month, four-digit
+/// year, nothing left over.
+pub fn parse_day_month_year_slashed(text: &str) -> Option<Date> {
+    static PATTERN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^([0-9]{2})/([0-9]{2})/([0-9]{4})$").unwrap());
+    let found = PATTERN.captures(text)?;
+    Date::new(
+        found[3].parse().ok()?,
+        found[2].parse().ok()?,
+        found[1].parse().ok()?,
+    )
+}

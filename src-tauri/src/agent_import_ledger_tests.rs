@@ -462,6 +462,10 @@ fn a_verdict_after_the_response_reads_back_and_sets_no_status() {
         assert_eq!(snapshots[0].batch.status, "response_received");
         let settled = ledger::settlement(std::io::Cursor::new(text.as_bytes())).unwrap();
         assert_eq!(settled.unsettled, 1, "a verdict is not a verification");
+        // A refused binding is its own class of unsettled batch (#1039).
+        let refused = matches!(verdict, ledger::PostSpanVerdict::Refused(_));
+        assert_eq!(settled.unsettled_binding_refused, usize::from(refused));
+        assert_eq!(settled.unsettled_no_response, 0);
     }
 }
 

@@ -4703,10 +4703,8 @@ async fn a_step_other_than_created_refuses_the_binding_for_good() {
     assert_eq!(verdicts[0]["binding_refusal"], "span_step_not_created");
 }
 
-/// The tagged capture is not what the untagged post sent: its narration
-/// carries the tag, so the binding refuses on content, for good.
-#[tokio::test]
-async fn a_readback_whose_narration_differs_refuses_the_binding() {
+/// The tagged capture, renumbered into the span an untagged post of it left.
+fn tagged_capture_in_span() -> String {
     let mut tagged_in_span = captured_posted_journal();
     tagged_in_span = replaced_once(
         &tagged_in_span,
@@ -4718,11 +4716,16 @@ async fn a_readback_whose_narration_differs_refuses_the_binding() {
         "<MASTERID TYPE=\"Number\"> 5</MASTERID>",
         "<MASTERID TYPE=\"Number\"> 295</MASTERID>",
     );
-    tagged_in_span =
-        tagged_in_span.replace(&format!("{GUID}-00000005"), &format!("{GUID}-00000127"));
+    tagged_in_span.replace(&format!("{GUID}-00000005"), &format!("{GUID}-00000127"))
+}
+
+/// The tagged capture is not what the untagged post sent: its narration
+/// carries the tag, so the binding refuses on content, for good.
+#[tokio::test]
+async fn a_readback_whose_narration_differs_refuses_the_binding() {
     let (posted, _, verdicts) = post_and_verify(
         company_marks(11, 50, "WR2 Unicode Lab"),
-        span_readback(tagged_in_span, 11),
+        span_readback(tagged_capture_in_span(), 11),
         Vec::new(),
     )
     .await;
@@ -4742,6 +4745,45 @@ async fn a_readback_whose_narration_differs_refuses_the_binding() {
     );
     assert_eq!(
         result["vouchers"][0]["marker"], "accounting_fingerprint",
+        "{posted}"
+    );
+    // The first line says the book holds a voucher of the same content, and
+    // never that it is this post's (#1039).
+    assert_eq!(
+        result["post_span_binding"]["summary"],
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.",
+        "{posted}"
+    );
+}
+
+/// A voucher matched by content only that is optional is not in the accounts:
+/// the first line never says the book holds it (#1039).
+#[tokio::test]
+async fn a_refused_binding_matched_only_by_an_optional_voucher_keeps_the_open_line() {
+    let optional = replaced_once(
+        &tagged_capture_in_span(),
+        "<ISOPTIONAL TYPE=\"Logical\">No</ISOPTIONAL>",
+        "<ISOPTIONAL TYPE=\"Logical\">Yes</ISOPTIONAL>",
+    );
+    let (posted, _, _) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(optional, 11),
+        Vec::new(),
+    )
+    .await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(result["post_span_binding"]["state"], "refused", "{posted}");
+    assert_eq!(
+        result["vouchers"][0]["status"], "matching_content_observed",
+        "{posted}"
+    );
+    assert_eq!(
+        result["vouchers"][0]["accounting_effective"], false,
+        "{posted}"
+    );
+    assert_eq!(
+        result["post_span_binding"]["summary"],
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.",
         "{posted}"
     );
 }
@@ -5185,6 +5227,13 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     assert_eq!(result["counts"]["posted_verified"], 0, "{posted}");
     assert_eq!(result["counts"]["matching_content_observed"], 2, "{posted}");
     assert_eq!(result["counts"]["sent_not_attributed"], 1, "{posted}");
+    // Two of three are matched by content: the first line says so, and never
+    // that they are this post's (#1039).
+    assert_eq!(
+        result["post_span_binding"]["summary"],
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.",
+        "{posted}"
+    );
     assert_eq!(result["counts"]["not_found"], 0, "{posted}");
     // Which rows landed, by transaction id: each matched by the content it
     // carries (its amount), never by position.

@@ -120,9 +120,12 @@ and other special files it did not count, folders it could not list (named, not
 read as empty), and the import journal's state: batches, batches sent or found
 posted, how many of those are not settled (with no recorded response, or with a
 response but a latest status that is not `posted_verified`: a post Tally
-rejected stays not settled), batches with no recorded dispatch that were never
-found posted (`no_dispatch_never_verified`: this includes a batch imported by
-hand whose verification is incomplete, which may well be in Tally, so no
+rejected stays not settled; `not_settled_binding_refused` counts the native
+posts whose binding to their own vouchers was refused, all of which stay not
+settled for good, a post Tally rejected in part or whole among them; it
+overlaps neither `not_settled_no_response` nor `not_settled_not_verified`),
+batches with no recorded dispatch that were never found posted
+(`no_dispatch_never_verified`: this includes a batch imported by hand whose verification is incomplete, which may well be in Tally, so no
 deletion may rest on it), and interrupted-write folders that Bridge must recover
 before it builds or reads. A journal it could not read is reported as
 `journal_unreadable` (could not be opened), `journal_read_failed` or
@@ -1891,7 +1894,11 @@ whose vouchers are then matched by content only. Such a batch stays
 `reconciliation_required`: the person checks its vouchers in Tally, and
 `acknowledge_post_review` does not apply to it, because it records a review only
 of a doubt beside vouchers that read back verified (closing such a batch inside
-Bridge is bridge#1039). `voucher_presence` cannot identify a native post's
+Bridge is bridge#1039). Its `post_span_binding.summary` says when the book holds,
+for each voucher it sent or for some, a voucher with the same date, voucher type
+and ledger entries that is neither cancelled nor optional, and that ComplyEaze
+Bridge cannot tell whether that voucher is this post's; `local_data_report` counts it under `not_settled_binding_refused`.
+`voucher_presence` cannot identify a native post's
 vouchers, because they carry no marker: one edited or re-dated in Tally can read
 `absent` there. Check a natively posted batch with `verify_import`, which finds
 its vouchers by the GUIDs its post created once its binding is made (and
@@ -2221,7 +2228,9 @@ Per tool:
   2. the company read;
   3. the window read's marks and census, data parts and closing marks;
   4. the corroborating window's data parts and closing marks (no marks read:
-     it replays the first window's);
+     it replays the first window's), unless the first window was divided, every
+     part was admitted against a census that names each voucher's GUID, and its
+     closing marks equal its opening marks: that read is not repeated (#1241);
   5. a scoped read of the company's marks (if the batch was posted natively
      and its voucher mark before the post was recorded, `current_voucher_mark`);
   6. the closing probe (if any voucher was not found);
@@ -2231,7 +2240,9 @@ Per tool:
 
   `evidence.mode_opening` is the opening probe and `mode_closing` the closing
   one (or null). `company` is the company read. `voucher_read` is the first
-  window's data parts only, and `voucher_read_corroboration` the second's.
+  window's data parts only, and `voucher_read_corroboration` the second's, or
+  `{"state": "not_sent", "reason": "counted_and_bracketed_read"}` when no second
+  read was made.
   No named key covers the marks or census requests, which is what the lab
   capture in #726 showed. A later page read with `proof_sha256` sends no
   request: its request digest hashes

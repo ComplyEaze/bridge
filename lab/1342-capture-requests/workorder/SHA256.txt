@@ -25,3 +25,5 @@ ab01192ccb7b0fcca3a7a8bd14ec7171db43a7acf2fe6a104da63906e3720b9a  w6-window-0915
 08b3a09d04299611273cff583768f10442b306c68b32d8e31dd42a6ae000f4ec  w8-status-narrow-window-sales.xml
 2a35b46b0d9204edc8c69c633295740ee0e9bc3d54a0c21389f51966b7be1940  w8-status-narrow-window.xml
 6c94de0ce12aec70c33fda1a59b759bd16bb5e44179756411fa254136c56cd65  w8-status-narrow-window-sales-byname.xml
+# W7C (the HSN/SAC of one ledger, then one read of 0021; steps in W7C-README.md)
+b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5  w7c-readback-status-0021.xml

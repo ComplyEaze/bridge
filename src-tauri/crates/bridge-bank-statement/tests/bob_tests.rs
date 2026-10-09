@@ -408,8 +408,10 @@ fn every_page_must_print_its_own_footer() {
     // out of order
     let mut swapped = pages();
     swapped.swap(0, 1);
-    // (the identity line is on the first page only, so it is put back on the new first page)
+    // (the identity line and the column header are on the first page only, so they are put back
+    // on the new first page)
     put_identity(&mut swapped[0]);
+    table_header(&mut swapped[0]);
     refuses(
         parse_statement(&swapped, Bank::Bob),
         "page_sequence_unproven",
@@ -501,20 +503,27 @@ fn a_date_cell_that_is_not_a_date_is_refused() {
 fn a_page_one_without_the_column_header_reads_no_rows_from_it() {
     // the table's start is the header: without it nothing is read and no later page is taken
     // for the table either; the statement is refused, never read in part
+    // (the identity is read above that header too, so the run is refused as an unrecognised bank)
     let mut no_header = pages();
     no_header[0] = bob_page(None, &[SMS, LOAN, ACME], Some(FOOTER_ONE));
     put_identity(&mut no_header[0]);
-    assert!(parse_statement(&no_header, Bank::Bob).unwrap().is_empty());
+    refuses(
+        parse_statement(&no_header, Bank::Bob),
+        "bank_not_recognised",
+    );
     // the header block is there but the column header's words are not: still no table
     let mut no_anchor = pages();
     no_anchor[0].retain(|word| !["TRAN", "VALUE", "NARRATION"].contains(&word.text.as_str()));
-    assert!(parse_statement(&no_anchor, Bank::Bob).unwrap().is_empty());
+    refuses(
+        parse_statement(&no_anchor, Bank::Bob),
+        "bank_not_recognised",
+    );
     let mapping = no_mapping();
     let controls = Controls::parse_optional("10,000.00", "-11,635.26", None, None).unwrap();
-    // no table means no header block above it either, so the account cannot be bound
+    // no table means no header block above it either: the identity is the first thing missing
     refuses(
         prepare(&no_header, &request(&controls, &mapping)),
-        "no_account_number_line",
+        "bank_not_recognised",
     );
 }
 
@@ -1025,4 +1034,26 @@ fn the_code_is_read_on_page_one_only_and_a_prefix_in_a_narration_is_not_identity
     narrated[0].retain(|word| !["IFSC", "Code:", IFSC_VALUE].contains(&word.text.as_str()));
     put(&mut narrated[0], 149.5, 500.0, "NEFT-BARB0SYNTH1-ACME");
     identity_refusal(&narrated);
+}
+
+#[test]
+fn a_row_that_prints_the_label_is_neither_identity_nor_a_second_line() {
+    // A row below the column header whose narration prints the label and a code with the
+    // bank's prefix, as separate words.
+    // Without the printed line, it is not identity.
+    let mut narrated = pages();
+    narrated[0].retain(|word| !["IFSC", "Code:", IFSC_VALUE].contains(&word.text.as_str()));
+    put(&mut narrated[0], 149.5, 500.0, "IFSC Code: BARB0SYNTH1");
+    identity_refusal(&narrated);
+    // With the printed line, it is not a second one.
+    let mut both = pages();
+    put(&mut both[0], 149.5, 500.0, "IFSC Code: BARB0SYNTH1");
+    parse_statement(&both, Bank::Bob).expect("the printed line alone is identity");
+}
+
+#[test]
+fn a_page_without_a_column_header_row_has_no_identity() {
+    let mut headless = pages();
+    headless[0].retain(|word| word.y0 != 324.0);
+    identity_refusal(&headless);
 }

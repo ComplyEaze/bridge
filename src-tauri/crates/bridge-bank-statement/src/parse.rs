@@ -270,7 +270,9 @@ const BOB_IFSC_PREFIX: &str = "BARB";
 /// compared as capitals, so lower case never matches. The
 /// measured statements print the bank's name only in an image, so the text layer has
 /// nothing else to read; the same four letters inside a narration are a counterparty's
-/// bank and are never looked at. The check is by label and position on page 1 only; a
+/// bank and are never looked at. The check is by label and position: page 1 only, and only
+/// the lines above the table's column header row (as the masked account number is read), so a
+/// row that prints those words is neither identity nor a second line; a
 /// missing, repeated, malformed or other-bank code refuses the whole run, and the
 /// refusal never carries the code.
 fn require_bank_identity(pages: &[Page]) -> Result<(), Refusal> {
@@ -278,15 +280,18 @@ fn require_bank_identity(pages: &[Page]) -> Result<(), Refusal> {
         Refusal::new(
             "bank_not_recognised",
             format!(
-                "page 1 of this statement does not carry the Bank of Baroda IFSC Code ({why}); this reader is measured on that layout only, so choose another bank or send a statement downloaded from net banking"
+                "page 1 of this statement does not carry the Bank of Baroda IFSC Code ({why}); this reader is measured on one Bank of Baroda layout only, so check the bank chosen"
             ),
         )
     };
     let first = pages
         .first()
         .ok_or_else(|| refuse("the statement has no page"))?;
+    let page_lines = lines(first);
+    let top = table_top(&page_lines, Bank::Bob)
+        .ok_or_else(|| refuse("the table's column header row was not found"))?;
     let mut found = Vec::new();
-    for line in lines(first) {
+    for line in page_lines.iter().filter(|line| line.y < top) {
         for (at, words) in line.words.windows(2).enumerate() {
             if words[0].text == "IFSC" && words[1].text == "Code:" {
                 found.push(line.words.get(at + 2).map(|word| word.text.clone()));

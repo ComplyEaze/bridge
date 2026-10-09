@@ -379,7 +379,7 @@ voucher to show that the `REMOTEID` was ever used: a book check cannot stand in 
 what was sent. A byte-identical resend after a cancel or delete was **not measured**, so it may not
 be assumed safe either. Note also that a cancel reports `ALTERED`, not `CANCELLED`.
 
-### 9.3a A refused import leaves its `REMOTEID` behind: the corrected send answers `ALTERED=1` while creating
+### 9.3a After a refusal, a corrected send under the same `REMOTEID` answered `ALTERED=1` while creating
 
 **PARTIAL: one synthetic company, run by hand over the XML gateway, one run of each step, on the lab's
 TallyPrime 7.1 Silver (the earlier rounds on that lab record the licence and release; these answers do
@@ -413,8 +413,12 @@ D). Only the contrast inside each pair (same id again, or a new id) is the obser
   and same-object evidence §9.3 asks for, from one book; recording Receipt as qualified is a separate
   decision this section does not make.
 - **VERIFIED (this book): the same content under a new id is a second voucher** (step 3).
-- **VERIFIED (this book): a refused send moved neither mark and left no gap in the numbers** (steps 4
-  and 6), read from the marks and the later windows, not from a window straight after each refusal.
+- **VERIFIED (this book): a refused send moved neither the voucher mark (`ALTVCHID`, 20 to 20 and 21
+  to 21) nor the master mark (`ALTMSTID`, 223 throughout), and left no gap in the numbers** (steps 4 and
+  6), read from the marks and the later windows, not from a window straight after each refusal. The
+  descriptive counters in the answers' `CMPINFO` block did rise across each refusal (`LEDGER` 23 to 24,
+  then 28 to 29), as they rose across other reads in the run; what they count is not established, so
+  nothing here rests on them.
 - **Rule: the import id (`REMOTEID`), not the voucher number.** A retry after a refusal goes out under
   a **new** `REMOTEID`. Bridge's native post sends a fresh one for every post (the resend note in the
   voucher-writes part) and so never reuses one. Never read `ALTERED=1` on a first send as "the voucher was already there", and never read it as
@@ -431,7 +435,9 @@ D). Only the contrast inside each pair (same id again, or a new id) is the obser
 
 Evidence: the answers (`workorder/aw5-receipt-*.xml`, `aw5-window-*.xml`, `aw5-marks-*.xml` and `aw-marks-end-extra.xml`) are held on
 the repository's `lab/1342-capture-answers` branch at `ec1eaae16`, listed by SHA-256 in its `SHA256.txt`;
-the requests (`w5-receipt-*.xml`) are on `lab/1342-capture-requests` at `5cc927e5`.
+the requests (`w5-receipt-*.xml`) are on `lab/1342-capture-requests` at `5cc927e5`. Step 2 sent
+`w5-receipt-first.xml` a second time; only the answers' `SHA256.txt` ties that answer to it, as there is no
+separate request file.
 
 ### 9.4 Master re-create is a silent Alter
 

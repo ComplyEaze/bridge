@@ -69,11 +69,11 @@ impl SummaryGroup {
     }
 }
 
-/// A grouping and, when the window was narrowed to one ledger, that ledger's resolved name.
+/// A grouping and, when the window was narrowed to one ledger, that ledger, bound to the window.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct SummaryRequest {
     pub(super) group: SummaryGroup,
-    pub(super) selected_ledger: Option<String>,
+    pub(super) selected_ledger: Option<SelectedLedger>,
     /// Each ledger's place in the group tree, read before and after the window and equal both
     /// times, for `group` and `primary_group`; `None` for every other grouping.
     pub(super) placements: Option<Arc<Placements>>,
@@ -338,7 +338,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
         }
         let counted = |amount: &EntryAmount<'_>| match (&request.selected_ledger, request.group) {
             (Some(selected), SummaryGroup::Month | SummaryGroup::VoucherType) => {
-                amount.ledger == selected
+                selected.carries(amount.ledger)
             }
             _ => true,
         };

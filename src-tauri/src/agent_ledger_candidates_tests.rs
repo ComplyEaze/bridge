@@ -678,6 +678,61 @@ fn resolved(
     requested: &str,
 ) -> Result<(LedgerMatch, String), ToolFailure> {
     resolve_catalogue_ledger_or_refuse(&ledgers(pairs), requested, Redaction::None)
+        .map(|(found, ledger)| (found, ledger.row().to_string()))
+}
+
+/// #1262: a window entry in either spelling of the selected ledger binds to it,
+/// and the ledger it gives back answers to both spellings exactly, to no other
+/// ledger's spelling and to no case fold of its own. Mutant killed: binding or
+/// carrying the row spelling alone, or the stored name alone.
+#[test]
+fn a_window_entry_binds_to_the_selected_ledger_by_either_spelling() {
+    let book = ledgers(&[("ROUND OFF", Some("Round Off")), ("Cash", None)]);
+    let selected = bind_window_entries(&book, &book[0], ["ROUND OFF", "Round Off", "Cash"])
+        .expect("every entry is a ledger of the catalogue");
+    assert!(selected.carries("ROUND OFF"));
+    assert!(selected.carries("Round Off"));
+    assert!(!selected.carries("round off"));
+    assert!(!selected.carries("Cash"));
+    assert_eq!(selected.row(), "ROUND OFF");
+}
+
+/// #1262: an entry spelled as no ledger of the catalogue is still drift, also
+/// when it differs from a spelling only in case or spaces: no fold. Mutant
+/// killed: letting an unknown spelling through, or folding case.
+#[test]
+fn a_window_entry_in_any_other_spelling_is_drift() {
+    let book = ledgers(&[("ROUND OFF", Some("Round Off")), ("Cash", None)]);
+    for entry in ["round off", "Round  Off", "Petty Cash", ""] {
+        let failure = bind_window_entries(&book, &book[0], ["Cash", entry]).unwrap_err();
+        assert_eq!(failure.code, "ledger_snapshot_drifted", "{entry:?}");
+        assert_eq!(failure.cause, None, "{entry:?}");
+    }
+}
+
+/// #1262: an entry spelled as the selected ledger and as another ledger cannot
+/// be attributed, and refuses with its own cause; the same window without that
+/// entry binds. Mutant killed: letting a shared spelling through, or refusing
+/// without the cause.
+#[test]
+fn a_window_entry_the_selected_ledger_shares_with_another_is_drift_with_its_cause() {
+    // `Round Off` is the selected ledger's stored name and the other's row spelling.
+    let book = ledgers(&[("ROUND OFF", Some("Round Off")), ("Round Off", None)]);
+    let failure = bind_window_entries(&book, &book[0], ["ROUND OFF", "Round Off"]).unwrap_err();
+    assert_eq!(failure.code, "ledger_snapshot_drifted");
+    assert_eq!(failure.cause, Some("row_spelling_of_two_ledgers"));
+    assert!(bind_window_entries(&book, &book[0], ["ROUND OFF"]).is_ok());
+}
+
+/// #1262: a spelling two other ledgers share is not the selected ledger's
+/// whichever it is, so it does not refuse a window of another ledger. Mutant
+/// killed: refusing every shared spelling.
+#[test]
+fn a_spelling_only_other_ledgers_share_binds_and_is_not_the_selected_ledgers() {
+    let book = ledgers(&[("Cash", None), ("SALES", Some("Sales")), ("Sales", None)]);
+    let selected = bind_window_entries(&book, &book[0], ["Cash", "Sales"])
+        .expect("the shared spelling is not the selected ledger's");
+    assert!(!selected.carries("Sales"));
 }
 
 /// #1085: a ledger whose row spelling and stored name differ is reached by
@@ -819,7 +874,7 @@ fn masking_withholds_a_shared_spelling_and_still_reaches_an_exact_one() {
     assert_eq!(candidates.miss.unwrap().listing, Listing::NamesMasked);
     let (found, row) =
         resolve_catalogue_ledger_or_refuse(&book, "ROUND OFF", Redaction::MaskParties).unwrap();
-    assert_eq!((found.name(), row.as_str()), ("Round Off", "ROUND OFF"));
+    assert_eq!((found.name(), row.row()), ("Round Off", "ROUND OFF"));
 }
 
 /// The answer says how the ledger's voucher rows spell it only when that differs.

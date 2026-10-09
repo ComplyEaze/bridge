@@ -23,7 +23,7 @@ fn captured_rows() -> Vec<Value> {
 fn request(group: SummaryGroup, selected_ledger: Option<&str>) -> SummaryRequest {
     SummaryRequest {
         group,
-        selected_ledger: selected_ledger.map(str::to_string),
+        selected_ledger: selected_ledger.map(|row| selected_ledger_for_tests(row, None)),
         placements: None,
     }
 }
@@ -197,6 +197,29 @@ fn a_narrowed_window_adds_only_the_selected_ledgers_entries_by_month_and_type() 
     let by_ledger = summed(&rows, SummaryGroup::Ledger, Some("WR2 Sales"));
     assert_eq!(by_ledger.entries_counted, "all_entries");
     assert_eq!(by_ledger.buckets.len(), 4);
+}
+
+/// #1262: a month or type summary of a ledger window counts the bound ledger's entries in either
+/// of its spellings. The captured rows carry `WR2 Sales`; the bound ledger's row spelling here is
+/// `WR2 SALES` with `WR2 Sales` as its stored name, so only its stored name reaches those
+/// entries. Mutant killed: the count comparing with the row spelling alone.
+#[test]
+fn a_narrowed_window_counts_the_bound_ledgers_entries_in_either_spelling() {
+    let rows = captured_rows();
+    for group in [SummaryGroup::Month, SummaryGroup::VoucherType] {
+        let summary = summarise(
+            &rows,
+            &SummaryRequest {
+                group,
+                selected_ledger: Some(selected_ledger_for_tests("WR2 SALES", Some("WR2 Sales"))),
+                placements: None,
+            },
+        )
+        .expect("the rows summarise");
+        assert_eq!(summary.entries_counted, "selected_ledger");
+        assert_eq!(summary.buckets[0]["vouchers"], 3);
+        assert_eq!(summary.buckets[0]["credit"], "306.06");
+    }
 }
 
 #[test]
@@ -522,7 +545,8 @@ fn the_live_ledger_selected_and_searched_summaries_are_reproduced() {
     let answers = live_answers();
     let selected = &answers["summary_with_ledger_selected"];
     let ledger = selected["ledger"].as_str().unwrap();
-    let kept = filter_voucher_rows_for_ledger(live_rows(), ledger);
+    let kept =
+        filter_voucher_rows_for_ledger(live_rows(), &selected_ledger_for_tests(ledger, None));
     assert_equals_live(
         &summed(&kept, SummaryGroup::Month, Some(ledger)),
         selected,
@@ -802,7 +826,8 @@ fn a_cancelled_voucher_that_keeps_its_entries_is_left_out_and_counted() {
 fn the_live_ledger_selected_month_buckets_count_only_that_ledgers_entries_by_an_independent_sum() {
     let rows = live_rows();
     let ledger = "Shape Buyer 1";
-    let kept = filter_voucher_rows_for_ledger(rows.clone(), ledger);
+    let kept =
+        filter_voucher_rows_for_ledger(rows.clone(), &selected_ledger_for_tests(ledger, None));
     let summary = summed(&kept, SummaryGroup::Month, Some(ledger));
     // The same rows with every other entry removed: a plain month sum of what is left.
     let only_that_ledger: Vec<Value> = kept

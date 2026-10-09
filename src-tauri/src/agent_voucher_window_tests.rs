@@ -5127,7 +5127,7 @@ async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
             window,
             None,
             Some(ledger_match.clone()),
-            Some("Cash".to_string()),
+            Some(selected_ledger_for_tests("Cash", None)),
             None,
             None,
         ))));
@@ -6019,7 +6019,7 @@ async fn a_held_ledger_window_summarises_only_that_ledgers_entries_by_month() {
             None,
             Some(json!({"ledger": "WR2 Sales", "matched": "exact",
                 "similar_ledgers": [], "similar_ledgers_total": 0})),
-            Some("WR2 Sales".to_string()),
+            Some(selected_ledger_for_tests("WR2 Sales", None)),
             None,
             None,
         ))));

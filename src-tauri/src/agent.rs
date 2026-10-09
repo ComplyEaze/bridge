@@ -49,9 +49,11 @@ mod company_features;
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
 mod ledger_candidates;
+#[cfg(test)]
+use ledger_candidates::selected_ledger_for_tests;
 use ledger_candidates::{
-    ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
-    CatalogueLedger,
+    bind_window_entries, ledger_match_json, resolve_catalogue_ledger_or_refuse,
+    resolve_ledger_or_refuse, CatalogueLedger, SelectedLedger,
 };
 #[path = "agent_ledgers.rs"]
 mod ledgers;
@@ -2571,7 +2573,7 @@ fn resolve_ledger_name<'a>(
     }
 }
 
-fn filter_voucher_rows_for_ledger(rows: Vec<Value>, ledger: &str) -> Vec<Value> {
+fn filter_voucher_rows_for_ledger(rows: Vec<Value>, ledger: &SelectedLedger) -> Vec<Value> {
     rows.into_iter()
         .filter(|row| {
             row.get("amounts")
@@ -2581,26 +2583,18 @@ fn filter_voucher_rows_for_ledger(rows: Vec<Value>, ledger: &str) -> Vec<Value> 
                         entry
                             .get("ledger")
                             .and_then(Value::as_str)
-                            .is_some_and(|name| name == ledger)
+                            .is_some_and(|name| ledger.carries(name))
                     })
                 })
         })
         .collect()
 }
 
-fn validate_then_filter_voucher_rows(
-    rows: Vec<Value>,
-    from: &str,
-    to: &str,
-    selected_ledger: Option<&str>,
-) -> Result<Vec<Value>, String> {
+fn validated_window_rows(rows: Vec<Value>, from: &str, to: &str) -> Result<Vec<Value>, String> {
     if !window_honoured(&rows, from, to) {
         return Err("window_not_honoured".to_string());
     }
-    match selected_ledger {
-        Some(ledger) => Ok(filter_voucher_rows_for_ledger(rows, ledger)),
-        None => Ok(rows),
-    }
+    Ok(rows)
 }
 
 fn window_honoured(rows: &[Value], from: &str, to: &str) -> bool {

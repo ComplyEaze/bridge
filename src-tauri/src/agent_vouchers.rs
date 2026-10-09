@@ -72,9 +72,9 @@ pub(super) struct VoucherPageSnapshot {
     /// already redacted, so a served page names the ledger it read as the first
     /// page did (#1076).
     ledger_match: Option<Value>,
-    /// The resolved name of that ledger, unredacted: a summary of a held window adds only
-    /// that ledger's entries by month or type (#1230).
-    selected_ledger: Option<String>,
+    /// That ledger, bound to the window: a summary of a held window adds only its entries by
+    /// month or type (#1230), in either of its spellings (#1262).
+    selected_ledger: Option<SelectedLedger>,
     /// Each ledger's place in the group tree, for a group summary: read before and after the window
     /// and equal both times, held so a later page needs no read of the masters (#1230).
     placements: Option<Arc<Placements>>,
@@ -95,7 +95,7 @@ impl VoucherPageSnapshot {
         window: Value,
         voucher_types: Option<Value>,
         ledger_match: Option<Value>,
-        selected_ledger: Option<String>,
+        selected_ledger: Option<SelectedLedger>,
         placements: Option<Arc<Placements>>,
         reason: Option<&'static str>,
     ) -> Self {
@@ -586,12 +586,12 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     .await?
             };
             accumulate_evidence(&mut accumulated, catalogue_evidence);
-            let (resolved, row_spelling) = resolve_catalogue_ledger_or_refuse(
+            let (resolved, ledger) = resolve_catalogue_ledger_or_refuse(
                 &ledgers,
                 &requested,
                 server.settings.redaction,
             )?;
-            Some((resolved, row_spelling, ledgers.iter().map(CatalogueLedger::row).map(str::to_string).collect::<Vec<_>>()))
+            Some((resolved, ledger, ledgers))
         } else {
             None
         };
@@ -631,10 +631,10 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         // A withheld voucher goes through every date, ledger and type check as
         // a row with no amounts, and is set aside only after them (#674).
         let rows = read.rows.into_iter().map(VoucherRow::into_filter_row).collect();
-        let mut rows = validate_then_filter_voucher_rows(rows, from.as_str(), to.as_str(), None)?;
+        let mut rows = validated_window_rows(rows, from.as_str(), to.as_str())?;
         let empty_window = if rows.is_empty() {
             let (read_evidence, partial, reason) = server
-                .corroborate_empty_voucher_read(&identity, &company.name, &from, &to, None, source_marks)
+                .corroborate_empty_voucher_read(&identity, &company.name, &from, &to, source_marks)
                 .await?;
             accumulate_evidence(&mut accumulated, read_evidence);
             Some((partial, reason))
@@ -676,38 +676,47 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         // Corroborate actual source emptiness before any client-side selector.
         let mut ledger_match = None;
         let mut selected_ledger = None;
-        if let Some((ledger, row_spelling, catalogue)) = selected_catalogue {
+        if let Some((found, ledger, catalogue)) = selected_catalogue {
             // A group grouping read the ledger list again after the window already, and refused if its
             // ledgers differed from the first read's (`same_ledgers` above): that read is this one.
             let corroboration = if placements.is_some() {
                 None
             } else {
-                let (names, catalogue_evidence) =
-                    server.read_ledger_catalogue(&identity, &company.name).await?;
+                let (ledgers, catalogue_evidence) =
+                    server.read_resolvable_ledgers(&identity, &company.name).await?;
                 accumulate_evidence(&mut accumulated, catalogue_evidence);
-                Some(names)
+                Some(ledgers)
             };
-            let initial = catalogue.iter().map(String::as_str).collect::<BTreeSet<_>>();
-            let repeated = corroboration
-                .as_ref()
-                .map(|names| names.iter().map(String::as_str).collect::<BTreeSet<_>>());
-            if initial.len() != catalogue.len()
-                || corroboration
-                    .as_ref()
-                    .zip(repeated.as_ref())
-                    .is_some_and(|(names, set)| set.len() != names.len() || *set != initial)
-                || rows.iter().flat_map(|row| row["amounts"].as_array().into_iter().flatten())
-                    .any(|entry| !initial.contains(entry["ledger"].as_str().unwrap_or_default()))
+            // Both reads compared on both spellings of every ledger (#1262).
+            let initial = catalogue.iter().collect::<BTreeSet<_>>();
+            let rows_distinct = catalogue
+                .iter()
+                .map(CatalogueLedger::row)
+                .collect::<BTreeSet<_>>();
+            if rows_distinct.len() != catalogue.len()
+                || corroboration.as_ref().is_some_and(|ledgers| {
+                    let repeated = ledgers.iter().collect::<BTreeSet<_>>();
+                    repeated.len() != ledgers.len() || repeated != initial
+                })
             {
                 return Err("ledger_snapshot_drifted".to_string().into());
             }
-            rows = filter_voucher_rows_for_ledger(rows, &row_spelling);
-            ledger_match = Some(ledger_match_json(
+            // Every entry of the window is bound to that catalogue once, here; the filter and a
+            // summary then compare only with the ledger this gives back (#1262).
+            let selected = bind_window_entries(
+                &catalogue,
                 &ledger,
-                &row_spelling,
+                rows.iter()
+                    .flat_map(|row| row["amounts"].as_array().into_iter().flatten())
+                    .map(|entry| entry["ledger"].as_str().unwrap_or_default()),
+            )?;
+            rows = filter_voucher_rows_for_ledger(rows, &selected);
+            ledger_match = Some(ledger_match_json(
+                &found,
+                selected.row(),
                 server.settings.redaction,
             ));
-            selected_ledger = Some(row_spelling);
+            selected_ledger = Some(selected);
         }
         let mut voucher_types = None;
         if let Some(selector) = &type_selector {
@@ -1044,7 +1053,6 @@ impl Server {
         company: &str,
         from: &TallyDate,
         to: &TallyDate,
-        ledger: Option<&str>,
         known_marks: Option<CompanyMarks>,
     ) -> Result<(Evidence, bool, Option<&'static str>), ToolFailure> {
         let (wider_from, wider_to) = widened_window(from, to)?;
@@ -1064,12 +1072,8 @@ impl Server {
         let mut evidence = wider.all_evidence();
         let wider_rows = wider.rows;
         let outcome = async {
-            let wider_rows = validate_then_filter_voucher_rows(
-                wider_rows,
-                wider_from.as_str(),
-                wider_to.as_str(),
-                ledger,
-            )?;
+            let wider_rows =
+                validated_window_rows(wider_rows, wider_from.as_str(), wider_to.as_str())?;
             let high_water = if wider_rows.is_empty() {
                 let (high_water_xml, high_water_evidence) = self
                     .post_read(identity, company_high_water_read(company))

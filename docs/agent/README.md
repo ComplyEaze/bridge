@@ -818,7 +818,10 @@ whitespace (#1076; the case of a letter outside A-Z is not folded, reference §9
 ledgers in a separate census of 13 books, not reproducible from this repository); for `vouchers` and the
 `outstandings` party detail either spelling is exact, a spelling that is two ledgers' is `ledger_ambiguous`,
 and `ledger_match` shows the ledger's own name (with `ledger_row_spelling` when its vouchers spell it
-differently), while the voucher filter and the trail still use the spelling the vouchers carry (#1085). What
+differently). The `vouchers` filter takes a voucher entry spelled exactly as either spelling of the
+selected ledger, with no case fold; an entry spelled as no ledger, or as the selected ledger and another,
+refuses with `ledger_snapshot_drifted` (cause `row_spelling_of_two_ledgers` for the second; #1262). The
+trail still uses the row's spelling (#1085). What
 the outstandings report carries for such a ledger is not measured, so a party detail that finds no bill or
 no unallocated row for a ledger with two spellings carries `report_spelling: not_established`: it may mean
 the report names the ledger differently. `ledger_movement` takes its names from

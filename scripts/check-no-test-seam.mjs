@@ -1,31 +1,36 @@
-// Proves the test-only native-approval seam (bridge#583) and the test-only
-// PDFium library override are absent from the executables it is given (Tauri's
-// bundle hook, CI's bundle job, the release workflow and package-mcpb call it),
-// and that their markers survive into a test build, so that absence means
+// Proves the test-only native-approval seam (bridge#583), the test-only
+// PDFium library override and the approval dialog's test stand-in (#702) are
+// absent from the executables it is given (Tauri's bundle hook, CI's bundle
+// job, the release workflow and package-mcpb call it), and that their markers
+// survive into the test builds that hold them, so that absence means
 // something.
 //
 // The seam lives in src-tauri/src/tally/approved_import.rs under bare
 // `#[cfg(test)]` and carries SEAM_MARKER, which it uses at runtime so the
 // optimiser keeps it. The override is pdfium_library() in
 // src-tauri/src/agent_bank_statement.rs, whose bare `#[cfg(test)]` lookup
-// reads the variable PDFIUM_OVERRIDE_MARKER names. A binary holding either
-// marker was compiled with that test-only code.
+// reads the variable PDFIUM_OVERRIDE_MARKER names. The stand-in is the
+// example src-tauri/examples/approval_standin.rs, which uses STANDIN_MARKER at
+// runtime the same way. A binary holding any marker was compiled with that
+// test-only code.
 //
 //   node scripts/check-no-test-seam.mjs <file-or-directory>...
 //       Fails if any regular file at or under the paths holds a marker.
-//   node scripts/check-no-test-seam.mjs --expect-present <file>
-//       Fails unless the file holds every marker (a positive control).
+//   node scripts/check-no-test-seam.mjs --expect-present <file> <marker>...
+//       Fails unless the file holds every marker named (a positive control).
 //   node scripts/check-no-test-seam.mjs --tauri-bundle-hook
 //       Tauri's beforeBundleCommand: scans the bridge and bridge_mcp
 //       executables `tauri build` just produced.
 //   node scripts/check-no-test-seam.mjs --test-harness [--release]
-//       Builds (or reuses) the bridge lib unit-test executable and requires
-//       every marker in it, in that profile. For SEAM_MARKER that is the seam
-//       itself. PDFIUM_OVERRIDE_MARKER also appears in the unit tests' own
-//       sources (their #[ignore] reasons and asserts), so for it the control
-//       shows only that the name survives into a test build; the test "the
-//       PDFium marker is the variable the Rust override reads, under bare
-//       cfg(test)" in check-no-test-seam.test.mjs ties it to the lookup.
+//       Builds (or reuses), in that profile, the bridge lib unit-test
+//       executable and the stand-in example, and runs each one's positive
+//       control (POSITIVE_CONTROLS). For SEAM_MARKER and STANDIN_MARKER that
+//       is the test-only code itself. PDFIUM_OVERRIDE_MARKER also appears in
+//       the unit tests' own sources (their #[ignore] reasons and asserts), so
+//       for it the control shows only that the name survives into a test
+//       build; the test "the PDFium marker is the variable the Rust override
+//       reads, under bare cfg(test)" in check-no-test-seam.test.mjs ties it to
+//       the lookup.
 //
 // Only uncompressed executables prove anything. A .dmg, .msi, .zip, .mcpb or
 // installer compresses its contents, so a clean scan of one would pass
@@ -39,7 +44,13 @@ import { fileURLToPath } from "node:url";
 
 export const SEAM_MARKER = "bridge-test-approval-seam-5f1c9e7a";
 export const PDFIUM_OVERRIDE_MARKER = "BRIDGE_PDFIUM_LIBRARY";
-export const TEST_ONLY_MARKERS = [SEAM_MARKER, PDFIUM_OVERRIDE_MARKER];
+export const STANDIN_MARKER = "bridge-test-approval-standin-1b1f4e18";
+export const TEST_ONLY_MARKERS = [SEAM_MARKER, PDFIUM_OVERRIDE_MARKER, STANDIN_MARKER];
+// Each test build holds only its own markers, so each positive control names the ones it expects.
+export const POSITIVE_CONTROLS = {
+  harness: [SEAM_MARKER, PDFIUM_OVERRIDE_MARKER],
+  standin: [STANDIN_MARKER],
+};
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const COMPRESSED = /\.(dmg|msi|zip|mcpb|gz|tgz|xz|bz2|7z|pkg|appimage|deb|rpm)$|-setup\.exe$/i;
@@ -175,61 +186,91 @@ export function tauriBuildExecutables(environment = process.env, sourceRoot = ro
   return executables;
 }
 
-/** The bridge lib unit-test executable Cargo builds for `profile`. */
-export function testHarnessExecutable(release, sourceRoot = root) {
-  const argumentsList = [
-    "test", "--locked", "--no-run", "--lib", "--message-format=json",
-    "--manifest-path", resolve(sourceRoot, "src-tauri", "Cargo.toml"),
-  ];
-  // A `-p bridge` build resolves features differently from the `--workspace` build the
-  // native job has just made, and recompiles the tauri stack. The debug path selects the
-  // workspace so it reuses that build; the release path keeps `-p bridge`, whose
-  // release dependencies are what bundle-smoke's cache holds.
-  if (release) argumentsList.push("-p", "bridge", "--release");
-  else argumentsList.push("--workspace");
-  const build = spawnSync("cargo", argumentsList, {
-    cwd: sourceRoot,
-    encoding: "utf8",
-    maxBuffer: 256 * 1024 * 1024,
-    stdio: ["ignore", "pipe", "inherit"],
-  });
-  if (build.status !== 0) throw new Error(`cargo test --no-run failed (${build.status})`);
-  const executables = build.stdout
+/** The compiler artefacts a cargo command reports, building what it must. */
+function cargoArtifacts(argumentsList, sourceRoot) {
+  const build = spawnSync(
+    "cargo",
+    [...argumentsList, "--locked", "--message-format=json", "--manifest-path", resolve(sourceRoot, "src-tauri", "Cargo.toml")],
+    {
+      cwd: sourceRoot,
+      encoding: "utf8",
+      maxBuffer: 256 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "inherit"],
+    },
+  );
+  if (build.status !== 0) throw new Error(`cargo ${argumentsList.join(" ")} failed (${build.status})`);
+  return build.stdout
     .split("\n")
     .filter((line) => line.startsWith("{"))
     .map((line) => JSON.parse(line))
-    .filter(
-      (message) =>
-        message.reason === "compiler-artifact" &&
-        message.target?.name === "bridge_lib" &&
-        message.profile?.test === true &&
-        message.executable,
-    )
-    .map((message) => message.executable);
-  if (executables.length !== 1) {
-    throw new Error(`expected one bridge lib test executable, found ${executables.length}`);
-  }
+    .filter((message) => message.reason === "compiler-artifact" && message.executable);
+}
+
+/** The one executable among `artifacts` that `matches`, named `what` in the error. */
+function onlyExecutable(artifacts, what, matches) {
+  const executables = artifacts.filter(matches).map((message) => message.executable);
+  if (executables.length !== 1) throw new Error(`expected one ${what}, found ${executables.length}`);
   return executables[0];
+}
+
+/**
+ * The executables Cargo builds for `profile` that hold test-only code, keyed as POSITIVE_CONTROLS is: the bridge lib
+ * unit-test executable, and the stand-in example built as a plain program, as `cargo test` builds it.
+ */
+export function testBuildExecutables(release, sourceRoot = root) {
+  const isStandin = (message) => message.target?.name === "approval_standin" && message.target.kind?.includes("example");
+  const isHarness = (message) => message.target?.name === "bridge_lib" && message.profile?.test === true;
+  if (!release) {
+    // Every workspace target, as the native job's `cargo nextest run --workspace` has just built them, so both come
+    // from that build. A `-p bridge` build resolves features differently from `--workspace` and recompiles the tauri
+    // stack.
+    const artifacts = cargoArtifacts(["test", "--no-run", "--workspace"], sourceRoot);
+    return {
+      harness: onlyExecutable(artifacts, "bridge lib test executable", isHarness),
+      standin: onlyExecutable(artifacts, "approval_standin example", (message) => isStandin(message) && message.profile?.test === false),
+    };
+  }
+  // The release path keeps `-p bridge`, whose release dependencies are what bundle-smoke's cache holds. `cargo test
+  // --example` would build the example as a test harness, without its `main`, so the example is built on its own.
+  return {
+    harness: onlyExecutable(
+      cargoArtifacts(["test", "--no-run", "--lib", "-p", "bridge", "--release"], sourceRoot),
+      "bridge lib test executable",
+      isHarness,
+    ),
+    standin: onlyExecutable(
+      cargoArtifacts(["build", "--example", "approval_standin", "-p", "bridge", "--release"], sourceRoot),
+      "approval_standin example",
+      isStandin,
+    ),
+  };
+}
+
+/** Throws unless `file` holds every one of `expected`, which must be test-only markers (a positive control). */
+export function expectPresent(file, expected) {
+  if (expected.length === 0) throw new Error("a positive control must name the markers it expects");
+  const unknown = expected.filter((marker) => !TEST_ONLY_MARKERS.includes(marker));
+  if (unknown.length > 0) throw new Error(`${unknown.join(", ")} is not a test-only marker`);
+  // The same scan the negative check runs, so the control proves that code.
+  if (!file || markedFiles([file]).length !== 1) {
+    throw new Error(`${file ?? "(no file)"} holds no marker: the scan cannot see the test-only code`);
+  }
+  const missing = expected.filter((marker) => !markersIn(file).includes(marker));
+  if (missing.length > 0) {
+    throw new Error(`${file} does not hold ${missing.join(", ")}: the scan cannot see that test-only code`);
+  }
+  console.log(`${expected.join(", ")} present in ${basename(file)}, as its positive control requires`);
 }
 
 function main(argumentsList) {
   if (argumentsList[0] === "--expect-present") {
-    const [file] = argumentsList.slice(1);
-    // The same scan the negative check runs, so the control proves that code.
-    if (!file || markedFiles([file]).length !== 1) {
-      throw new Error(`${file ?? "(no file)"} holds no marker: the scan cannot see the test-only code`);
-    }
-    const missing = TEST_ONLY_MARKERS.filter((marker) => !markersIn(file).includes(marker));
-    if (missing.length > 0) {
-      throw new Error(`${file} does not hold ${missing.join(", ")}: the scan cannot see that test-only code`);
-    }
-    console.log(`every marker present in ${basename(file)}, as a positive control requires`);
+    const [file, ...expected] = argumentsList.slice(1);
+    expectPresent(file, expected);
     return;
   }
   if (argumentsList[0] === "--test-harness") {
-    const release = argumentsList.includes("--release");
-    const executable = testHarnessExecutable(release);
-    main(["--expect-present", executable]);
+    const executables = testBuildExecutables(argumentsList.includes("--release"));
+    for (const [control, expected] of Object.entries(POSITIVE_CONTROLS)) expectPresent(executables[control], expected);
     return;
   }
   const paths = argumentsList[0] === "--tauri-bundle-hook" ? tauriBuildExecutables() : argumentsList;

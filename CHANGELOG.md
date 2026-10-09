@@ -33,7 +33,7 @@ These changes are in source and not yet in a published build.
   number masked (first and last three digits clear), so `account_label` must carry the whole number; only those six
   digits are compared, the masked middle cannot be. With no printed totals those balances and the footers are the
   only checks on which rows were read: missing rows whose amounts net to zero would not be seen. They print the newest row first; the rows are read oldest first and
-  numbered that way. The measured statements cut a narration at about 50 characters, so a name can end mid-word. A party is named
+  numbered that way. A statement is read as Bank of Baroda only if page 1 prints an IFSC Code with the bank's prefix on its `IFSC Code:` line; otherwise it is refused as `statement_bank_not_recognised`. The measured statements cut a narration at about 50 characters, so a name can end mid-word. A party is named
   only where the shape settles it: a UPI row names its VPA (when the VPA is whole), NEFT and RTGS rows name what
   follows the UTR (not when a line was broken at the cell edge inside the narration), and bank charges and a cash deposit are recognised by their wording; a loan recovery is named as printed, loan number included, so two loans are two parties. Two payers whose names agree up to the cut read as one party. IMPS,
   mobile-banking and internet-banking rows, interest and every other wording go to suspense. A statement that

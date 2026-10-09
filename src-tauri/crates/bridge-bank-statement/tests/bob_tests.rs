@@ -15,6 +15,7 @@ use bridge_bank_statement::money::Controls;
 use bridge_bank_statement::parse::{parse_statement, require_account_match, Row};
 use bridge_bank_statement::pipeline::{prepare, StatementRequest};
 use bridge_bank_statement::proposals::{format_amount, Disposition};
+use bridge_bank_statement::Refusal;
 use common::*;
 
 const CHAR: f64 = 4.2;
@@ -121,6 +122,21 @@ fn table_header(words: &mut Vec<Word>) {
     }
 }
 
+/// The identity line of the measured statements: the label, the code, and a right-hand
+/// label pair on the same visual line (all values invented).
+fn put_identity(words: &mut Vec<Word>) {
+    for (x, text) in [
+        (10.0, "IFSC"),
+        (38.0, "Code:"),
+        (110.0, IFSC_VALUE),
+        (485.0, "Product"),
+        (534.0, "Cur:"),
+        (600.0, "IN"),
+    ] {
+        put(words, x, 211.0, text);
+    }
+}
+
 /// A page: the page-1 header block when `header` is given, the rows, and a footer.
 fn bob_page(header: Option<&[&str]>, rows: &[Printed], footer: Option<&str>) -> Page {
     let mut words = Vec::new();
@@ -141,6 +157,7 @@ fn bob_page(header: Option<&[&str]>, rows: &[Printed], footer: Option<&str>) -> 
             268.0,
             "Statement of transactions in Current Account in INR",
         );
+        put_identity(&mut words);
         table_header(&mut words);
         top = 342.0;
     }
@@ -175,6 +192,8 @@ fn bob_page(header: Option<&[&str]>, rows: &[Printed], footer: Option<&str>) -> 
 }
 
 const MASKED: &[&str] = &["123XXXXXXXX456"];
+/// An invented code with the bank's prefix.
+const IFSC_VALUE: &str = "BARB0SYNTH1";
 const FOOTER_ONE: &str = "09/10/2026 10:30 SYNTH-ID/00000 Page 1 of 2";
 const FOOTER_TWO: &str = "09/10/2026 10:30 SYNTH-ID/00000 Page 2 of 2";
 
@@ -389,6 +408,10 @@ fn every_page_must_print_its_own_footer() {
     // out of order
     let mut swapped = pages();
     swapped.swap(0, 1);
+    // (the identity line and the column header are on the first page only, so they are put back
+    // on the new first page)
+    put_identity(&mut swapped[0]);
+    table_header(&mut swapped[0]);
     refuses(
         parse_statement(&swapped, Bank::Bob),
         "page_sequence_unproven",
@@ -480,19 +503,27 @@ fn a_date_cell_that_is_not_a_date_is_refused() {
 fn a_page_one_without_the_column_header_reads_no_rows_from_it() {
     // the table's start is the header: without it nothing is read and no later page is taken
     // for the table either; the statement is refused, never read in part
+    // (the identity is read above that header too, so the run is refused as an unrecognised bank)
     let mut no_header = pages();
     no_header[0] = bob_page(None, &[SMS, LOAN, ACME], Some(FOOTER_ONE));
-    assert!(parse_statement(&no_header, Bank::Bob).unwrap().is_empty());
+    put_identity(&mut no_header[0]);
+    refuses(
+        parse_statement(&no_header, Bank::Bob),
+        "bank_not_recognised",
+    );
     // the header block is there but the column header's words are not: still no table
     let mut no_anchor = pages();
     no_anchor[0].retain(|word| !["TRAN", "VALUE", "NARRATION"].contains(&word.text.as_str()));
-    assert!(parse_statement(&no_anchor, Bank::Bob).unwrap().is_empty());
+    refuses(
+        parse_statement(&no_anchor, Bank::Bob),
+        "bank_not_recognised",
+    );
     let mapping = no_mapping();
     let controls = Controls::parse_optional("10,000.00", "-11,635.26", None, None).unwrap();
-    // no table means no header block above it either, so the account cannot be bound
+    // no table means no header block above it either: the identity is the first thing missing
     refuses(
         prepare(&no_header, &request(&controls, &mapping)),
-        "no_account_number_line",
+        "bank_not_recognised",
     );
 }
 
@@ -874,4 +905,155 @@ fn a_bob_statement_proves_itself_from_the_callers_opening_and_closing_balances()
         prepare(&pages(), &request(&short, &mapping)),
         "extent_unproven",
     );
+}
+
+// --- Bank identity (the page-1 IFSC Code line) -----------------------------------
+
+/// The pages with page 1's identity words edited by `edit`.
+fn pages_with(edit: impl FnOnce(&mut Page)) -> Vec<Page> {
+    let mut pages = pages();
+    edit(&mut pages[0]);
+    pages
+}
+
+fn identity_refusal(pages: &[Page]) -> Refusal {
+    let refusal = refuses(parse_statement(pages, Bank::Bob), "bank_not_recognised");
+    // The refusal never carries the code it read.
+    assert!(!refusal.message.contains("BARB"), "{refusal}");
+    assert!(!refusal.message.contains(IFSC_VALUE), "{refusal}");
+    refusal
+}
+
+fn value_word(page: &mut Page) -> &mut Word {
+    page.iter_mut()
+        .find(|word| word.text == IFSC_VALUE)
+        .unwrap()
+}
+
+#[test]
+fn a_statement_whose_page_one_ifsc_code_has_the_bank_prefix_is_read() {
+    assert_eq!(rows().len(), 5);
+}
+
+#[test]
+fn another_banks_code_malformed_codes_and_a_missing_value_refuse() {
+    for bad in [
+        "HDFC0SYNTH1",  // another bank
+        "barb0synth1",  // not capitals
+        "BARB0SYNTH",   // ten characters
+        "BARB0SYNTH12", // twelve characters
+        "BARB1SYNTH1",  // the fifth character is not a zero
+        "BARB0SYNT-1",  // a character that is neither a capital letter nor a digit
+    ] {
+        let pages = pages_with(|page| value_word(page).text = bad.to_string());
+        identity_refusal(&pages);
+    }
+    // "Code:" is the last word on its line: nothing follows it.
+    let pages = pages_with(|page| page.retain(|word| word.x0 <= 38.0 || word.y0 != 211.0));
+    let refusal = identity_refusal(&pages);
+    assert!(refusal.message.contains("no value"), "{refusal}");
+    // The value glued to the label, and a non-ASCII value of the right length.
+    identity_refusal(&pages_with(|page| {
+        page.iter_mut()
+            .find(|word| word.text == "Code:")
+            .unwrap()
+            .text = format!("Code:{IFSC_VALUE}");
+        page.retain(|word| word.text != IFSC_VALUE);
+    }));
+    identity_refusal(&pages_with(|page| {
+        value_word(page).text = "BARB0SYNT\u{e9}1".to_string()
+    }));
+}
+
+#[test]
+fn the_identity_is_checked_before_the_footers() {
+    // Page 1 names another bank and page 2 has no footer: the first refusal wins.
+    let mut both = pages_with(|page| value_word(page).text = "HDFC0SYNTH1".to_string());
+    both[1] = bob_page(None, &[UPI, CASH], None);
+    identity_refusal(&both);
+}
+
+#[test]
+fn no_ifsc_line_a_split_label_or_a_repeated_line_refuses() {
+    // No line at all.
+    identity_refusal(&pages_with(|page| {
+        page.retain(|word| !["IFSC", "Code:", IFSC_VALUE].contains(&word.text.as_str()))
+    }));
+    // The label without "Code:".
+    identity_refusal(&pages_with(|page| page.retain(|word| word.text != "Code:")));
+    // The label followed by another word where "Code:" belongs, then a valid code.
+    identity_refusal(&pages_with(|page| {
+        page.iter_mut()
+            .find(|word| word.text == "Code:")
+            .unwrap()
+            .text = "Number:".to_string()
+    }));
+    // "Code:" first, then "IFSC".
+    identity_refusal(&pages_with(|page| {
+        for word in page.iter_mut() {
+            if word.text == "IFSC" {
+                word.text = "Code:".to_string();
+            } else if word.text == "Code:" {
+                word.text = "IFSC".to_string();
+            }
+        }
+    }));
+    // A second identical line.
+    identity_refusal(&pages_with(|page| {
+        let copy: Vec<Word> = page
+            .iter()
+            .filter(|word| ["IFSC", "Code:", IFSC_VALUE].contains(&word.text.as_str()))
+            .map(|word| {
+                Word::new(
+                    word.x0,
+                    word.y0 + 40.0,
+                    word.x1,
+                    word.y1 + 40.0,
+                    word.text.clone(),
+                )
+            })
+            .collect();
+        page.extend(copy);
+    }));
+}
+
+#[test]
+fn the_code_is_read_on_page_one_only_and_a_prefix_in_a_narration_is_not_identity() {
+    // The line moved to page 2 and removed from page 1.
+    let mut moved = pages();
+    let line: Vec<Word> = moved[0]
+        .iter()
+        .filter(|word| ["IFSC", "Code:", IFSC_VALUE].contains(&word.text.as_str()))
+        .cloned()
+        .collect();
+    moved[0].retain(|word| !["IFSC", "Code:", IFSC_VALUE].contains(&word.text.as_str()));
+    moved[1].extend(line);
+    identity_refusal(&moved);
+    // A narration that carries the bank's prefix is a counterparty's bank, not identity.
+    let mut narrated = pages();
+    narrated[0].retain(|word| !["IFSC", "Code:", IFSC_VALUE].contains(&word.text.as_str()));
+    put(&mut narrated[0], 149.5, 500.0, "NEFT-BARB0SYNTH1-ACME");
+    identity_refusal(&narrated);
+}
+
+#[test]
+fn a_row_that_prints_the_label_is_neither_identity_nor_a_second_line() {
+    // A row below the column header whose narration prints the label and a code with the
+    // bank's prefix, as separate words.
+    // Without the printed line, it is not identity.
+    let mut narrated = pages();
+    narrated[0].retain(|word| !["IFSC", "Code:", IFSC_VALUE].contains(&word.text.as_str()));
+    put(&mut narrated[0], 149.5, 500.0, "IFSC Code: BARB0SYNTH1");
+    identity_refusal(&narrated);
+    // With the printed line, it is not a second one.
+    let mut both = pages();
+    put(&mut both[0], 149.5, 500.0, "IFSC Code: BARB0SYNTH1");
+    parse_statement(&both, Bank::Bob).expect("the printed line alone is identity");
+}
+
+#[test]
+fn a_page_without_a_column_header_row_has_no_identity() {
+    let mut headless = pages();
+    headless[0].retain(|word| word.y0 != 324.0);
+    identity_refusal(&headless);
 }

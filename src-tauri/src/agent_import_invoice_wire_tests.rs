@@ -273,40 +273,234 @@ fn the_readback_read_is_dated_and_by_type_guid_and_number() {
     assert!(render_invoice_readback_request("Co", guid, "A B", ("20250401", "20260331")).is_none());
 }
 
+/// The pilot lab's tax units as Tally answered (see the set's PROVENANCE).
+const TAX_UNITS: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-typed-request.utf8.xml"
+);
+const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+const REGISTRATION_ROW: &str =
+    "<GSTREGISTRATIONDETAILS.LIST>\r\n      <FROMDATE>20260401</FROMDATE>";
+
+/// The captured answer with `from` replaced by `to`, which must occur once.
+fn units_with(from: &str, to: &str) -> String {
+    assert_eq!(TAX_UNITS.matches(from).count(), 1, "{from}");
+    TAX_UNITS.replacen(from, to, 1)
+}
+
+fn registration(xml: &str, as_of: &str) -> Result<CompanyRegistration, RegistrationOutcome> {
+    parse_company_registration(xml, PILOT_GUID, as_of)
+}
+
+fn refused_as(xml: &str, as_of: &str) -> &'static str {
+    match registration(xml, as_of) {
+        Err(RegistrationOutcome::Refused(code)) => code,
+        other => panic!("not refused: {other:?}"),
+    }
+}
+
 #[test]
-fn the_company_state_is_taken_from_the_row_with_the_verified_guid() {
-    let request = render_company_state_request("Co & Sons");
-    assert!(request.contains("<TYPE>Company</TYPE>") && request.contains("Co &amp; Sons"));
-    let row = |guid: &str, state: &str| {
-        format!("<COMPANY NAME=\"X\"><GUID>{guid}</GUID><STATENAME>{state}</STATENAME></COMPANY>")
-    };
-    let wrap = |rows: String| {
-        format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>")
-    };
-    // Another loaded company's row comes first and must not be taken.
-    let two = wrap(row("other", "Haryana") + &row("G-1", "Rajasthan"));
+fn the_company_registration_in_force_is_read_from_the_captured_tax_units() {
+    let request = render_company_registration_request("Co & Sons");
+    assert!(request.contains("<TYPE>TaxUnit</TYPE>") && request.contains("Co &amp; Sons"));
+    let read = Ok(CompanyRegistration {
+        gstin: "08ZZZZZ0000Z1ZQ".into(),
+        state: "Rajasthan".into(),
+    });
+    assert_eq!(registration(TAX_UNITS, "20260801"), read);
+    // A row dated on the invoice date applies; a day earlier nothing does.
+    assert_eq!(registration(TAX_UNITS, "20260401"), read);
     assert_eq!(
-        parse_company_state(&two, "g-1"),
+        refused_as(TAX_UNITS, "20260331"),
+        "invoice_company_registration_not_yet_in_force"
+    );
+    // The company's GUID is matched without regard to case.
+    assert_eq!(
+        parse_company_registration(TAX_UNITS, &PILOT_GUID.to_ascii_uppercase(), "20260801"),
+        read
+    );
+}
+
+#[test]
+fn a_registration_that_is_not_one_regular_unit_in_force_is_refused() {
+    let cases = [
+        (
+            units_with("<REGISTRATIONTYPE>Regular", "<REGISTRATIONTYPE>Composition"),
+            "invoice_company_registration_not_regular",
+        ),
+        (
+            units_with("<ISINACTIVE>No", "<ISINACTIVE>Yes"),
+            "invoice_company_registration_inactive",
+        ),
+        (
+            units_with("<ISINACTIVE>No</ISINACTIVE>", ""),
+            "invoice_company_registration_incomplete",
+        ),
+        (
+            units_with("<STATE>Rajasthan</STATE>", "<STATE>Rajastan</STATE>"),
+            "invoice_company_registration_incomplete",
+        ),
+        (
+            units_with("<FROMDATE>20260401", "<FROMDATE>20260231"),
+            "invoice_company_registration_incomplete",
+        ),
+        // The GSTIN's state code is Rajasthan's; the dated row names another.
+        (
+            units_with("<STATE>Rajasthan</STATE>", "<STATE>Haryana</STATE>"),
+            "invoice_company_registration_inconsistent",
+        ),
+        (
+            units_with("TAXREGISTRATION=\"08ZZZZZ0000Z1ZQ\"", "TAXREGISTRATION=\"08ZZZZZ0000Z2ZQ\""),
+            "invoice_company_registration_inconsistent",
+        ),
+        (
+            units_with("<USEDFOR>GST</USEDFOR>", "<USEDFOR/>"),
+            "invoice_company_registration_inconsistent",
+        ),
+        // Two dated rows on one day that differ.
+        (
+            units_with(
+                REGISTRATION_ROW,
+                &format!("<GSTREGISTRATIONDETAILS.LIST><FROMDATE>20260401</FROMDATE><STATE>Rajasthan</STATE><REGISTRATIONTYPE>Composition</REGISTRATIONTYPE><ISINACTIVE>No</ISINACTIVE></GSTREGISTRATIONDETAILS.LIST>{REGISTRATION_ROW}"),
+            ),
+            "invoice_company_registration_inconsistent",
+        ),
+        // Each marker of a GST unit must agree with the others.
+        (
+            units_with("TAXTYPE=\"GST\"", "TAXTYPE=\"\""),
+            "invoice_company_registration_inconsistent",
+        ),
+        (
+            units_with("<GSTREGNUMBER>08ZZZZZ0000Z1ZQ</GSTREGNUMBER>", ""),
+            "invoice_company_registration_inconsistent",
+        ),
+        // The GSTIN must be held twice, alike.
+        (
+            units_with(" TAXREGISTRATION=\"08ZZZZZ0000Z1ZQ\"", ""),
+            "invoice_company_registration_inconsistent",
+        ),
+        // Another company's unit is never dropped from the count.
+        (
+            units_with("-00000064</GUID>", "</GUID>"),
+            "invoice_company_registration_unbound",
+        ),
+        (
+            units_with("bfef-d32e2ab93c85-000000cd", "bfef-d32e2ab93c86-000000cd"),
+            "invoice_company_registration_unbound",
+        ),
+        (
+            units_with("bfef-d32e2ab93c85-00000064", "bfef-d32e2ab93c86-00000064"),
+            "invoice_company_registration_unbound",
+        ),
+    ];
+    for (xml, code) in cases {
+        assert_eq!(refused_as(&xml, "20260801"), code);
+    }
+    // A GSTIN that fails its check character, held alike in both places.
+    assert_eq!(TAX_UNITS.matches("08ZZZZZ0000Z1ZQ").count(), 2);
+    assert_eq!(
+        refused_as(
+            &TAX_UNITS.replace("08ZZZZZ0000Z1ZQ", "08ZZZZZ0000Z1ZA"),
+            "20260801"
+        ),
+        "invoice_company_registration_inconsistent"
+    );
+    // The registration's GSTIN was changed: an earlier GSTIN is held.
+    let registered = TAX_UNITS
+        .find("<TAXUNIT NAME=\"Rajasthan Registration\"")
+        .unwrap();
+    let old_gstin = format!(
+        "{}{}",
+        &TAX_UNITS[..registered],
+        TAX_UNITS[registered..].replacen(
+            "<GSTOLDREGNUMBER/>",
+            "<GSTOLDREGNUMBER>08ZZZZZ0000Z2ZQ</GSTOLDREGNUMBER>",
+            1
+        )
+    );
+    assert_eq!(
+        refused_as(&old_gstin, "20260801"),
+        "invoice_company_registration_inconsistent"
+    );
+    // No GST unit: only the Default Tax Unit is left.
+    let end = TAX_UNITS.rfind("</TAXUNIT>").unwrap() + "</TAXUNIT>".len();
+    let default_only = format!("{}{}", &TAX_UNITS[..registered], &TAX_UNITS[end..]);
+    assert_eq!(
+        refused_as(&default_only, "20260801"),
+        "invoice_company_registration_absent"
+    );
+    // A second GST unit in force, bound to the company.
+    let unit = &TAX_UNITS[registered..end];
+    let second = unit.replace("-000000cd</GUID>", "-000000ce</GUID>");
+    let two = format!("{}{second}{}", &TAX_UNITS[..end], &TAX_UNITS[end..]);
+    assert_eq!(
+        refused_as(&two, "20260801"),
+        "invoice_company_registration_ambiguous"
+    );
+    // A second unit whose row in force is inactive leaves the first alone.
+    let inactive = second.replacen("<ISINACTIVE>No", "<ISINACTIVE>Yes", 1);
+    let beside = format!("{}{inactive}{}", &TAX_UNITS[..end], &TAX_UNITS[end..]);
+    assert_eq!(
+        registration(&beside, "20260801").map(|read| read.gstin),
+        Ok("08ZZZZZ0000Z1ZQ".to_string())
+    );
+}
+
+#[test]
+fn the_dated_row_in_force_is_the_latest_on_or_before_the_invoice_date() {
+    // Document order is not date order: a later Composition row, written first.
+    let later = units_with(
+        REGISTRATION_ROW,
+        &format!("<GSTREGISTRATIONDETAILS.LIST><FROMDATE>20260701</FROMDATE><STATE>Rajasthan</STATE><REGISTRATIONTYPE>Composition</REGISTRATIONTYPE><ISINACTIVE>No</ISINACTIVE></GSTREGISTRATIONDETAILS.LIST>{REGISTRATION_ROW}"),
+    );
+    assert_eq!(
+        registration(&later, "20260630").map(|read| read.state),
         Ok("Rajasthan".to_string())
     );
     assert_eq!(
-        parse_company_state(&wrap(row("other", "Haryana")), "g-1"),
-        Err("invoice_company_row_missing")
+        refused_as(&later, "20260701"),
+        "invoice_company_registration_not_regular"
+    );
+}
+
+#[test]
+fn a_tax_unit_answer_that_cannot_be_read_is_a_failed_read() {
+    let collection = TAX_UNITS.find("<TAXUNIT NAME=\"Default").unwrap();
+    let end = TAX_UNITS.rfind("</TAXUNIT>").unwrap() + "</TAXUNIT>".len();
+    let none = format!("{}{}", &TAX_UNITS[..collection], &TAX_UNITS[end..]);
+    assert_eq!(
+        registration(&none, "20260801"),
+        Err(RegistrationOutcome::Failed(
+            "invoice_company_registration_unread"
+        ))
     );
     assert_eq!(
-        parse_company_state(&wrap(row("g-1", "")), "g-1"),
-        Err("invoice_company_state_unreadable")
-    );
-    assert_eq!(
-        parse_company_state(&wrap(row("g-1", "Rajastan")), "g-1"),
-        Err("invoice_company_state_unreadable")
-    );
-    assert_eq!(
-        parse_company_state(
-            &wrap(row("g-1", "Rajasthan") + &row("G-1", "Rajasthan")),
-            "g-1"
+        registration(
+            &units_with("<STATUS>1</STATUS>", "<STATUS>0</STATUS>"),
+            "20260801"
         ),
-        Err("invoice_company_row_repeated")
+        Err(RegistrationOutcome::Failed(
+            "invoice_read_status_not_success"
+        ))
+    );
+    assert_eq!(
+        registration(
+            &units_with(
+                "<GUID>6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000cd</GUID>",
+                ""
+            ),
+            "20260801"
+        ),
+        Err(RegistrationOutcome::Failed("invoice_tax_unit_without_guid"))
+    );
+    assert_eq!(
+        registration(
+            &units_with(
+                "<USEDFOR>GST</USEDFOR>",
+                "<USEDFOR>GST</USEDFOR><USEDFOR>GST</USEDFOR>"
+            ),
+            "20260801"
+        ),
+        Err(RegistrationOutcome::Failed("invoice_read_field_repeated"))
     );
 }
 

@@ -408,6 +408,9 @@ base revision.
 <a id="12a17-cost-centres-and-categories-are-returned-whatever-the-companys-setting-reads-an-imported-allocation-is-stored-although-it-reads-no"></a>
 
 [12a.17 Cost centres and categories are returned whatever the company's setting reads; an imported allocation is stored although it reads No](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a17-cost-centres-and-categories-are-returned-whatever-the-companys-setting-reads-an-imported-allocation-is-stored-although-it-reads-no)
+<a id="12a18-a-companys-gst-registration-is-a-tax-unit-with-dated-rows"></a>
+
+[12a.18 A company's GST registration is a tax unit, with dated rows](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a18-a-companys-gst-registration-is-a-tax-unit-with-dated-rows)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

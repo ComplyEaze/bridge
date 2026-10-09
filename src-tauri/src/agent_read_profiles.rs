@@ -390,9 +390,12 @@ pub(super) fn invoice_readback_read(
         .map(ReadRequest)
 }
 
-/// The company's state, for an invoice build (the answer is chosen by GUID).
-pub(super) fn invoice_company_state_read(company: &str) -> ReadRequest {
-    ReadRequest(agent_import::invoice::render_company_state_request(company))
+/// The company's GST registrations, for an invoice build (rows bound to the
+/// company by GUID).
+pub(super) fn invoice_company_registration_read(company: &str) -> ReadRequest {
+    ReadRequest(agent_import::invoice::render_company_registration_request(
+        company,
+    ))
 }
 
 /// The company's Currency masters: the request the outstandings paths send,

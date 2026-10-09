@@ -1198,10 +1198,38 @@ pub fn check_invariants(
         .collect();
     let tag_of = |f: &Figure| f.id[format!("{TEST_ID}.payee_total_").len()..].to_string();
 
-    // NP-1: a fresh walk of the population.
+    // NP-1: the population walked again with NP-1's own accumulators, as the reference keeps
+    // its own; only which payee a payment joins is taken from the walk.
+    let (mut unresolved, mut not_through) = (0, 0);
+    let mut fresh: BTreeMap<&str, i64> = BTreeMap::new();
+    for (at, v) in pop.iter().enumerate() {
+        let amount = total(
+            v.lines
+                .iter()
+                .filter(|l| l.amount_paise > 0 && read.contains(&l.ledger))
+                .map(|l| &l.amount_paise),
+        )?;
+        if amount == 0 {
+            continue;
+        }
+        if !v
+            .lines
+            .iter()
+            .any(|l| l.amount_paise < 0 && bank.contains(&l.ledger))
+        {
+            not_through = add(not_through, amount)?;
+        } else if let Some(&i) = w.payment_at.get(&at) {
+            let sum = fresh
+                .entry(w.payees[w.payee_of[i]].tag.as_str())
+                .or_insert(0);
+            *sum = add(*sum, amount)?;
+        } else {
+            unresolved = add(unresolved, amount)?;
+        }
+    }
     for (name, fresh) in [
-        ("unresolved_bank_total", w.unresolved_total),
-        ("not_through_bank_total", w.not_through_total),
+        ("unresolved_bank_total", unresolved),
+        ("not_through_bank_total", not_through),
     ] {
         if let Some(f) = figure(name) {
             if int_of(f) != fresh {
@@ -1212,11 +1240,6 @@ pub fn check_invariants(
             }
         }
     }
-    let fresh: HashMap<&str, i64> = w
-        .rows
-        .iter()
-        .map(|row| (w.payees[row.payee].tag.as_str(), row.total))
-        .collect();
     let mut figured = BTreeSet::new();
     for f in &totals {
         let tag = tag_of(f);
@@ -1234,9 +1257,8 @@ pub fn check_invariants(
         }
         figured.insert(tag);
     }
-    for row in &w.rows {
-        let tag = &w.payees[row.payee].tag;
-        if !figured.contains(tag) {
+    for tag in fresh.keys() {
+        if !figured.contains(*tag) {
             out.push(format!(
                 "NP-1: a fresh population walk finds payee tag {tag} with no payee_total_{tag} figure"
             ));
@@ -1261,10 +1283,14 @@ pub fn check_invariants(
         let tag = tag_of(f);
         for e in f.evidence.iter().filter(|e| e.kind == "voucher") {
             match resolve(e).flatten() {
-                None => out.push(format!(
-                    "NP-2: {} evidence voucher {} is not in the books population",
-                    f.id, e.id
-                )),
+                None => {
+                    // Nothing more is checked for it, as the reference skips the rest.
+                    out.push(format!(
+                        "NP-2: {} evidence voucher {} is not in the books population",
+                        f.id, e.id
+                    ));
+                    continue;
+                }
                 Some(at) if !w.outgoing.contains(&at) => {
                     return Err(AuditError::ModuleInvariant {
                         module: TEST_ID,

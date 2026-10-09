@@ -619,12 +619,6 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
 
     let round_off_ledgers =
         lbinder.bind_list(&engagement.round_off_ledgers, "roles.round_off_ledgers")?;
-    // `narration_payees`' list, read from the raw config so that a value that is not a list of
-    // names refuses here, as the reference's binding refuses it.
-    let narration_payee_ledgers = lbinder.bind_list(
-        &list_at(&engagement.raw_cfg, &["roles", "narration_payee_ledgers"])?,
-        "roles.narration_payee_ledgers",
-    )?;
 
     // `book_keeping_quality`'s name locations, in the reference's `LEDGER_PATHS` order (after
     // `round_off_ledgers`, before `[tds]`): the three lists, then every `tax_ledgers` head.
@@ -664,6 +658,16 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
             Some(lbinder.bind_list(&names_at(value, location)?, location)?)
         }
     };
+    // `[roles].narration_payee_ledgers` (`narration_payees`), after `no_supplier_expense_ledgers`
+    // and before `bank_reconciliation_ledger`, as in the reference's `LEDGER_PATHS`. That list also
+    // has `roles.rcm_tax_ledgers` between `no_supplier_expense_ledgers` and this location, which
+    // the crate does not bind; if it is ever ported, this location must come after it. Read from
+    // the raw config so that a value that is not a list of names refuses here, as the reference's
+    // binding refuses it.
+    let narration_payee_ledgers = lbinder.bind_list(
+        &list_at(&engagement.raw_cfg, &["roles", "narration_payee_ledgers"])?,
+        "roles.narration_payee_ledgers",
+    )?;
     // `[roles].bank_reconciliation_ledger`, a single name, binds before `tax_ledgers`, as in the
     // reference's `LEDGER_PATHS`.
     let bank_reconciliation_ledger = match roles.and_then(|r| r.get("bank_reconciliation_ledger")) {

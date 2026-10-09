@@ -12284,15 +12284,15 @@
   "by": "author",
   "what": "knock_off_candidates: only a Contra counts its money once",
   "file": "src/knock_off_candidates.rs",
-  "from": "if v.vtype == CONTRA || lines().all(|l| money.contains(l.ledger.as_str())) {",
-  "to": "if v.vtype == CONTRA {"
+  "from": "if v.base_type == CONTRA || lines().all(|l| money.contains(l.ledger.as_str())) {",
+  "to": "if v.base_type == CONTRA {"
  },
  {
   "id": "KO-24",
   "by": "author",
   "what": "knock_off_candidates: every voucher sums its money lines' absolute values",
   "file": "src/knock_off_candidates.rs",
-  "from": "if v.vtype == CONTRA || lines().all(|l| money.contains(l.ledger.as_str())) {",
+  "from": "if v.base_type == CONTRA || lines().all(|l| money.contains(l.ledger.as_str())) {",
   "to": "if false {"
  },
  {
@@ -13414,5 +13414,13 @@
   "file": "src/lib.rs",
   "from": "narration_payees::run(book, rules, &bank, &listed, &added)?;",
   "to": "narration_payees::run(book, rules, &bank, &listed, &BTreeSet::new())?;"
+ },
+ {
+  "id": "KO-32",
+  "by": "author",
+  "what": "knock_off_candidates: a Contra told by its type name, not its base type",
+  "file": "src/knock_off_candidates.rs",
+  "from": "if v.base_type == CONTRA || lines()",
+  "to": "if v.vtype == CONTRA || lines()"
  }
 ]

@@ -8,6 +8,8 @@ calibrated on (column bounds, anchors, the stacked SBI date), which is already
 public in that module. The Union Bank statement carries only the row *shapes*
 recorded in the `Bank::Ubi` profile; its x positions are invented, because
 that profile reads each row as one line of text and has no column bounds.
+The ICICI statement carries the measured geometry of two real statements
+(column positions and shapes only, no values) in its own section below.
 
 Standard library only, and deterministic: the same script writes the same
 bytes, so `--check` can prove the committed fixtures are this script's output
@@ -402,6 +404,120 @@ UBI_PAGE_2 = (
 )
 
 
+# --------------------------------------------------------------------------- #
+# ICICI-like statement                                                         #
+# --------------------------------------------------------------------------- #
+# The geometry is measured (two real statements read through PDFium): the
+# transaction date spans x 15-65 and the value date 87-137 on every row, the
+# narration starts at 148 and wraps at 360, withdrawals end at 543, deposits at
+# 662 and the balance at 787, a row's amount sits on its own line up to 12pt
+# below the date line, the newest row comes first, the column header is printed
+# on page 1 only, and every page ends with a `<date> <time> <word> Page N of M`
+# footer and a disclaimer line. Every word, number and amount below is invented;
+# the bank cuts a narration at about 50 characters, and the
+# fixture's two wrapped ones are longer, because Courier is wider than the
+# bank's font.
+
+ICICI_DATE_X, ICICI_VALUE_X, ICICI_NARRATION_X = 15.0, 87.0, 149.5
+ICICI_WRAP = 359.5   # a 50-character fragment ends here
+
+
+def indian(amount_paise):
+    """12345678 paise -> '1,23,456.78'."""
+    rupees, paise = divmod(amount_paise, 100)
+    digits = str(rupees)
+    head, tail = digits[:-3], digits[-3:]
+    groups = []
+    while head:
+        groups.insert(0, head[-2:])
+        head = head[:-2]
+    return ",".join(groups + [tail]) + f".{paise:02d}"
+
+
+def icici_row(top, date, narration, side, amount, balance, amount_dy=0, cheque=None):
+    """`narration` is a list of printed fragments; `balance` is signed paise."""
+    cells = [(ICICI_DATE_X, date), (ICICI_VALUE_X, date),
+             (ICICI_NARRATION_X, narration[0]),
+             right_aligned(787.14, indian(abs(balance)) + ("Cr" if balance >= 0 else "Dr"))]
+    if cheque:
+        cells.append((415.5, cheque))
+    lines = [(top, cells)]
+    edge = 543.0 if side == "dr" else 662.0
+    if amount_dy:
+        lines.append((top + amount_dy, [right_aligned(edge, indian(amount))]))
+    else:
+        cells.append(right_aligned(edge, indian(amount)))
+    for index, fragment in enumerate(narration[1:], start=1):
+        lines.append((top + 11 * index, [(ICICI_NARRATION_X, fragment)]))
+    return lines
+
+
+def icici_footer(number, count):
+    return [(1165, [(10, f"09/10/2026 10:30 SYNTH-ID/00000 Page {number} of {count}")]),
+            (1185, [(10, "*This is computer-generated statement.No signature is required.")])]
+
+
+# oldest first: (date, narration fragments, side, amount in paise, amount_dy, cheque)
+ICICI_ROWS = [
+    ("03/08/2026", ["BY CASH"], "cr", 75050, 0, None),
+    ("03/08/2026", ["UPI/600000000001/10:15:30/UPI/nw@okzz/ZZZZ BANK"], "cr", 150000, 0, None),
+    ("03/08/2026", ["UPI/600000000002/11:20:45/UPI/northwind.traders.sy",
+                    "nthetic@okzzzzzz/SYNTH"], "cr", 987654, 6, None),
+    ("04/08/2026", ["NEFT-ZZZZZ00000000001-ACME INDUSTRIES-EAST"], "dr", 225050, 0, None),
+    ("04/08/2026", ["RTGS-ZZZZZ00000000000000002-GREEN FIELD",
+                    "LTD"], "dr", 1200000, 6, None),
+    ("05/08/2026", ["IMPS/P2A/600000000003/ZZZZZZZZZZ1 234/NOTE"], "dr", 50000, 0, None),
+    ("05/08/2026", ["CHARGES FOR :IMPS/P2A/600000000003/XXXXXXXX",
+                    "0000", "0001"], "dr", 590, 11, None),
+    ("06/08/2026", ["Loan Recovery For00000000000001"], "dr", 300000, 0, None),
+    ("06/08/2026", ["SMS Charges for AUG 26"], "dr", 1180, 0, None),
+    ("07/08/2026", ["MBK/600000000004/12:00:00/SOME NAME"], "cr", 40000, 0, None),
+    ("07/08/2026", ["UPI/600000000005/09:09:09/UPI/cutoff@ok"], "cr", 10000, 0, None),
+    ("08/08/2026", ["SYNTHETIC SUPPLIES-MICR INWARD CLG (CTS)"], "dr", 8000000, 0, "000417"),
+    ("08/08/2026", ["EBANK:WIB/0000000001/order payment"], "dr", 100000, 0, None),
+    ("10/08/2026", ["NEFT-ZZZZZ00000000003-BLUE RIVER CO"], "cr", 6000000, 0, None),
+]
+ICICI_OPENING = 1000000   # paise: 10,000.00 Cr
+
+
+def icici_statement():
+    """Printed lines, newest first, and the balance after each row."""
+    balance, built = ICICI_OPENING, []
+    for date, narration, side, amount, dy, cheque in ICICI_ROWS:
+        balance += amount if side == "cr" else -amount
+        built.append((date, narration, side, amount, balance, dy, cheque))
+    return list(reversed(built)), balance
+
+
+ICICI_PRINTED, ICICI_CLOSING = icici_statement()
+ICICI_PAGE_BREAK = 9   # rows on page 1; the rest start page 2 with no header
+
+
+def icici_pages():
+    header = [
+        (71, [(10, "Your Account Statement as on 09/10/2026"), (640, "123XXXXXXXX456")]),
+        (90, [(10, "SYNTHETIC STATEMENT - NOT A REAL ACCOUNT")]),
+        (102, [(10, "SYNTHETIC CUSTOMER NAME"), (640, "BRANCH ZZ01")]),
+        (125, [(640, "123XXXXXXXX456")]),
+        (268, [(10, "Statement of transactions in Current Account 123XXXXXXXX456 "
+                    "in INR for the period 01/08/2026 - 31/08/2026")]),
+        (324, [(10, "TRAN"), (41, "DATE"), (82, "VALUE"), (119, "DATE"),
+               (160, "NARRATION"), (365, "CHQ.NO."), (457, "WITHDRAWAL(DR)"),
+               (602, "DEPOSIT(CR)"), (719, "BALANCE(INR)")]),
+    ]
+    pages = []
+    for number, (chunk, top, lead) in enumerate(
+            [(ICICI_PRINTED[:ICICI_PAGE_BREAK], 342, header),
+             (ICICI_PRINTED[ICICI_PAGE_BREAK:], 68, [])], start=1):
+        lines = list(lead)
+        for date, narration, side, amount, balance, dy, cheque in chunk:
+            lines += icici_row(top, date, narration, side, amount, balance, dy, cheque)
+            top += 18 + 11 * (len(narration) - 1)
+        lines += icici_footer(number, 2)
+        pages.append(tuple(lines))
+    return pages
+
+
 # What a phone scanner app prints over a page: words, and no digit.
 SCAN_STAMP = (
     (820, [(28, "SCANNED WITH A PHONE APP")]),
@@ -427,6 +543,11 @@ FIXTURES = {
     "ubi-synthetic.pdf": dict(
         pages=[UBI_PAGE_1, UBI_PAGE_2], width=595, height=842,
         user="synthetic-user-7788", owner="synthetic-owner-unused-c", seed="ubi"),
+    # owner-password encryption only (the user password is empty, as on a downloaded
+    # ICICI statement); one visual line per amount, newest row first, no printed totals
+    "icici-synthetic.pdf": dict(
+        pages=icici_pages(), width=842, height=1200,
+        user="", owner="synthetic-owner-unused-h", seed="icici"),
     # No text at all: a statement re-scanned by a phone app is one image per page
     "scan-image-only.pdf": dict(
         pages=[Drawn(full_page_image(638, 842), image=True)] * 2, width=638, height=842,

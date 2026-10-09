@@ -500,7 +500,9 @@ struct ReadVoucher {
     remote_id: Option<String>,
     guid: Option<String>,
     alter_id: Option<u64>,
-    date: Option<String>,
+    /// Parsed where the read is admitted: a row without a valid date never
+    /// becomes a `ReadVoucher` (#1425).
+    date: TallyDate,
     voucher_type: Option<String>,
     narration: Option<String>,
     voucher_number: Option<String>,
@@ -509,14 +511,14 @@ struct ReadVoucher {
     optional: Option<bool>,
     /// Absent when the response carried no `EFFECTIVEDATE` (or an empty one).
     #[serde(default)]
-    effective_date: Option<String>,
+    effective_date: Option<TallyDate>,
     #[serde(rename = "amounts")]
     entries: Vec<ReadEntry>,
 }
 
 impl super::WindowRow for ReadVoucher {
     fn window_date(&self) -> Option<&str> {
-        self.date.as_deref()
+        Some(self.date.as_str())
     }
     fn window_alter_id(&self) -> Option<u64> {
         self.alter_id
@@ -556,10 +558,30 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
                 .iter()
                 .all(|voucher| voucher["status"] == "tally_reported_not_created")
     });
+    // A refused binding leaves each voucher matched by content only (#1039):
+    // the first line says what the book holds without making it this post's.
+    // A match that is cancelled or optional is not in the accounts, so it is
+    // never counted as held.
+    let matched_by_content = vouchers.as_array().map_or(0, |vouchers| {
+        vouchers
+            .iter()
+            .filter(|voucher| {
+                voucher["status"] == "matching_content_observed"
+                    && voucher["accounting_effective"] == true
+            })
+            .count()
+    });
     let summary = if reported_not_created {
         "Tally reported that this post created none of its vouchers: follow each voucher's next step."
-    } else {
+    } else if report["state"] != "refused" || matched_by_content == 0 {
         summary
+    } else if vouchers
+        .as_array()
+        .is_some_and(|vouchers| vouchers.len() == matched_by_content)
+    {
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
+    } else {
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
     };
     report["summary"] = json!(summary);
     report
@@ -1468,27 +1490,45 @@ impl Server {
             if let Some(closing) = observed_read.closing_evidence {
                 accumulated = combine_evidence(accumulated.clone(), closing);
             }
-            // The corroborating read replays the ranges the first one actually
-            // read, rather than planning again: it must observe the same parts.
-            let corroboration_read = self
-                .read_verification_window(
-                    &identity,
-                    &company.name,
-                    window,
-                    super::WindowPlanSource::replay_of(observed_read.reads, observed_read.witness),
-                )
-                .await?;
-            let (corroboration, corroboration_evidence) =
-                (corroboration_read.source, corroboration_read.evidence);
-            accumulated = combine_evidence(accumulated.clone(), corroboration_evidence.clone());
-            if let Some(closing) = corroboration_read.closing_evidence {
-                accumulated = combine_evidence(accumulated.clone(), closing);
-            }
             // The window may have been served in parts, so there is no single
             // response to hash. The evidence's own response digest already folds
             // every part that was read, which is the honest commitment here.
             let voucher_read_sha256 = observed_evidence.response_sha256.clone();
-            corroborate_verification_window(&observed, &corroboration, line.date_from.as_str(), line.date_to.as_str())?;
+            // A corroborating read replays the ranges the first one actually
+            // read, rather than planning again: it must observe the same parts.
+            // A divided read admitted against a census of every GUID and closed
+            // on the marks it opened on holds a `BracketedCount`, and is not
+            // replayed (#1241). The checks the replay ran on a read's own rows
+            // (each row's date in the window, a GUID and an AlterID) still run
+            // on it; they send nothing.
+            let corroboration_proof = match super::SecondRead::of(
+                observed_read.reads,
+                observed_read.witness,
+                observed_read.bracketed,
+            ) {
+                super::SecondRead::Replay(replay) => {
+                    let corroboration_read = self
+                        .read_verification_window(&identity, &company.name, window, replay)
+                        .await?;
+                    let (corroboration, corroboration_evidence) =
+                        (corroboration_read.source, corroboration_read.evidence);
+                    accumulated =
+                        combine_evidence(accumulated.clone(), corroboration_evidence.clone());
+                    if let Some(closing) = corroboration_read.closing_evidence {
+                        accumulated = combine_evidence(accumulated.clone(), closing);
+                    }
+                    corroborate_verification_window(&observed, &corroboration, line.date_from.as_str(), line.date_to.as_str())?;
+                    json!(corroboration_evidence)
+                }
+                super::SecondRead::Spared(_) => {
+                    verification_window_identities(
+                        &observed,
+                        line.date_from.as_str(),
+                        line.date_to.as_str(),
+                    )?;
+                    json!({"state": "not_sent", "reason": "counted_and_bracketed_read"})
+                }
+            };
             let span = match pre_post_voucher_mark {
                 Some(pre_post_voucher_mark) => {
                     let (current, mark_evidence) =
@@ -1586,7 +1626,7 @@ impl Server {
                 "counts": result["counts"], "vouchers": result["vouchers"], "duplicates": result["duplicates"],
                 "post_span_binding": with_post_span_summary(span.report, &result["vouchers"]),
                 "unrelated_duplicates_in_window": result["unrelated_duplicates_in_window"],
-                "evidence": {"mode_opening": opening_mode.evidence, "mode_closing": closing_mode_evidence, "company": identity_evidence, "voucher_read": observed_evidence, "voucher_read_corroboration": corroboration_evidence, "voucher_read_sha256": voucher_read_sha256}
+                "evidence": {"mode_opening": opening_mode.evidence, "mode_closing": closing_mode_evidence, "company": identity_evidence, "voucher_read": observed_evidence, "voucher_read_corroboration": corroboration_proof, "voucher_read_sha256": voucher_read_sha256}
             });
             // This call's own check, or the doubt recorded when this batch was
             // posted: a later readback, which compares by name, never clears it.
@@ -1912,6 +1952,7 @@ impl Server {
             closing_evidence: read.closing_evidence,
             reads: read.reads,
             witness: read.witness,
+            bracketed: read.bracketed,
             refused_a_part: read.refused_a_part,
         })
     }
@@ -3873,6 +3914,8 @@ struct VerificationWindowRead {
     reads: Vec<super::WindowPart>,
     /// What a corroborating replay of this read must carry.
     witness: Option<super::WindowWitness>,
+    /// Held when a corroborating second read would add nothing.
+    bracketed: Option<super::BracketedCount>,
     /// Tally refused one of this read's data requests as too large or timed out.
     refused_a_part: bool,
 }

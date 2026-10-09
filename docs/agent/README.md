@@ -1615,7 +1615,9 @@ was not confirmed). Review a doubted batch's vouchers in Tally and do not rebuil
 no verdict. Its `invoice_stop` value is the one exception to "review": it
 releases the stop a sent Sales invoice that is not verified posted puts on its
 company (`invoice_company_stopped`), after the person has checked Tally, in the
-same dialog the model cannot answer.
+same dialog the model cannot answer. Called again for a batch it released as
+found, it ends that invoice's use as the number control
+(`invoice_number_control_missing`) when a fresh read shows the invoice gone.
 
 All three switches accept `true`/`false` or `1`/`0`; invalid values stop startup. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**

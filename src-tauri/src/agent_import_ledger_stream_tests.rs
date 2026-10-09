@@ -822,6 +822,7 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
         NumberControl::NoneVerified
     );
     let known = NumberControl::Known {
+        batch_id: "first".to_string(),
         number: "INV/1".to_string(),
         date: "20260901".to_string(),
     };
@@ -870,6 +871,7 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
     assert_eq!(
         control(journal(&[&later, &first, &next_year, &last_year])),
         NumberControl::Known {
+            batch_id: "later".to_string(),
             number: "INV/4".to_string(),
             date: "20261015".to_string()
         }
@@ -877,6 +879,7 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
     assert_eq!(
         control(journal(&[&next_year, &last_year])),
         NumberControl::Known {
+            batch_id: "next-year".to_string(),
             number: "INV/3".to_string(),
             date: "20270410".to_string()
         }
@@ -1153,6 +1156,7 @@ fn a_release_clears_the_number_control_refusal_by_what_it_found() {
     assert_eq!(
         control(release(true)),
         NumberControl::Known {
+            batch_id: "first".to_string(),
             number: "INV/1".to_string(),
             date: "20260901".to_string()
         }
@@ -1163,4 +1167,51 @@ fn a_release_clears_the_number_control_refusal_by_what_it_found() {
         control([release(false), vec![found(&first), incomplete(&first)]].concat()),
         NumberControl::NoneVerified
     );
+}
+
+/// How a sent, unverified invoice batch stands: stopping until a person
+/// releases it; released as found, it stays the number control and can be
+/// released again; released as not found, it is out of both; a later verified
+/// read voids a release, and the last release is the one that stands.
+#[test]
+fn a_batch_released_as_found_stands_as_the_control_until_released_again() {
+    let holds = |journal: Vec<Vec<u8>>| {
+        invoice_holds(Cursor::new(journal.concat()), "synthetic-guid").unwrap()
+    };
+    let first = invoice_batch("first", 'a', ("INV/1", "Sales Manual"), SALE);
+    let sent_only = vec![record(&first), sent(&first), incomplete(&first)];
+    let with = |more: Vec<Vec<u8>>| [sent_only.clone(), more].concat();
+    let only = |hold| BTreeMap::from([("first".to_string(), hold)]);
+    assert_eq!(holds(sent_only.clone()), only(InvoiceHold::Stopping));
+    assert_eq!(
+        holds(with(vec![released(&first, true)])),
+        only(InvoiceHold::ReleasedAsFound)
+    );
+    assert!(holds(with(vec![released(&first, false)])).is_empty());
+    // Released as found and then released as not found: out of both.
+    assert!(holds(with(vec![released(&first, true), released(&first, false)])).is_empty());
+    // Verified: neither.
+    assert!(holds(with(vec![released(&first, true), found(&first)])).is_empty());
+    // A divergence after a verified read is a new stop, and a release made
+    // before the verified read does not survive it.
+    assert_eq!(
+        holds(with(vec![
+            released(&first, true),
+            found(&first),
+            incomplete(&first)
+        ])),
+        only(InvoiceHold::Stopping)
+    );
+    // Another company's batch holds nothing here, and a batch never sent
+    // holds nothing.
+    let mut elsewhere = invoice_batch("elsewhere", 'b', ("INV/9", "Sales Manual"), SALE);
+    elsewhere.company_guid = "other-guid".to_string();
+    assert!(holds(vec![record(&elsewhere), sent(&elsewhere)]).is_empty());
+    assert!(holds(vec![record(&first)]).is_empty());
+    // The stops are the stopping ones only.
+    let stops = |journal: Vec<Vec<u8>>| {
+        invoice_stops(Cursor::new(journal.concat()), "synthetic-guid").unwrap()
+    };
+    assert_eq!(stops(sent_only.clone()), ["first"]);
+    assert!(stops(with(vec![released(&first, true)])).is_empty());
 }

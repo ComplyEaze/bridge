@@ -338,9 +338,11 @@ pub(super) fn resolve_voucher_type(
     // type reads Automatic (Manual Override) on top and Manual in its series;
     // the type keyed for the rehearsal reads None on top and Manual in its
     // series).
-    // Its "prevent duplicates" flag is Tally's own refusal of a second
-    // voucher of the type with a number already used (§9.8), the guard the
-    // number read's control relies on for a company's first invoice.
+    // Its "prevent duplicates" flag is required as a further guard, not
+    // relied on: §9.8 measured it only for a failed Journal Alter, and an
+    // import that creates a Sales voucher under a used number is not measured
+    // (implementation guide §3.4). For a company's first invoice the post's
+    // readback (`invoice_number_not_unique`) is what catches a duplicate.
     match target.series.as_slice() {
         [(_, method, Some(guard))] if method == "Manual" && guard == "Yes" => {}
         [(_, method, _)] if method == "Manual" => {

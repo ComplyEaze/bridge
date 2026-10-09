@@ -238,7 +238,7 @@
     },
     {
       "id": "high_value_register.cash_payment_single_transaction_no_reference_vouchers_count",
-      "value": 1,
+      "value": 2,
       "unit": "count",
       "definition_sha256_16": "969be8ee5ba0be17",
       "definition_text": "Cash payment vouchers with a qualifying money leg whose own REFERENCE field is blank -- not linkable to any other voucher by this books-only signal; limb (b) coverage is partial, stated as this count, never silently assumed complete.",
@@ -246,7 +246,7 @@
     },
     {
       "id": "high_value_register.cash_payment_voucher_any_amount_count",
-      "value": 1,
+      "value": 2,
       "unit": "count",
       "definition_sha256_16": "9f41d4c1cf640372",
       "definition_text": "Distinct (party, voucher) pairs with a cash payment on a population, non-Contra voucher.",
@@ -273,7 +273,7 @@
     },
     {
       "id": "high_value_register.cash_payment_voucher_at_or_over_threshold_count",
-      "value": 1,
+      "value": 0,
       "unit": "count",
       "definition_sha256_16": "5845873aaed59edf",
       "definition_text": "(party, voucher) pairs at or over the s.269ST(a) limit (20000000 paise), counting a pair only when its vouchers' own cash credited is at or over it too.",
@@ -406,7 +406,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_single_transaction_no_reference_vouchers_count",
-      "value": 1,
+      "value": 4,
       "unit": "count",
       "definition_sha256_16": "01416de5dc863104",
       "definition_text": "Cash receipt vouchers with a qualifying money leg whose own REFERENCE field is blank -- not linkable to any other voucher by this books-only signal; limb (b) coverage is partial, stated as this count, never silently assumed complete.",
@@ -414,7 +414,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_voucher_any_amount_count",
-      "value": 3,
+      "value": 6,
       "unit": "count",
       "definition_sha256_16": "bc440322d15f3f1f",
       "definition_text": "Distinct (party, voucher) pairs with a cash receipt on a population, non-Contra voucher.",
@@ -461,7 +461,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_voucher_at_or_over_threshold_count",
-      "value": 2,
+      "value": 0,
       "unit": "count",
       "definition_sha256_16": "52677af10362cd15",
       "definition_text": "(party, voucher) pairs at or over the s.269ST(a) limit (20000000 paise), counting a pair only when its vouchers' own cash debited is at or over it too.",

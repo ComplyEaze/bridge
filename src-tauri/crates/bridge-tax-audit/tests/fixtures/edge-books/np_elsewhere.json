@@ -1,0 +1,584 @@
+{
+ "comment": "Debits to other ledgers on a payee's bank payments. Wages is listed; the bank ledgers given are Bank A and Wallet Float (a ledger under Loans & Advances (Asset)). ALPHA TRADERS has a row from e01 and e08. Counted for it (15760 paise): e01's Driver Advances line beside its Wages line; e02 (Staff Loans); e09, which prints another name with ALPHA TRADERS' handle; e13 (Loading Charges, an expense ledger that is not listed); e14 (Driver Advances paid from Wallet Float); e16 (a ledger whose name is written with a combining diaeresis, shown composed in the dump). Not counted: e03 (TDS Payable, under Duties & Taxes); e04 (Cash); e05 (Bank B OD, under Bank OD A/c and not among the bank ledgers given); e06 (Wallet Float, a bank ledger given); e15 (Bank C, under Bank Accounts and not given); e07 (a Contra); e08's nil line on Driver Advances and its credit to Staff Loans; e10 (optional); e11 (paid in cash, so not a bank payment); e12 (a receipt). e20 names a payee with no row and e21's narration is not read: neither is listed. BETA STORES (e30) is listed for e31's Office Expenses line only, not its Input GST line. GAMMA MILLS (e40) has no debit elsewhere and no payee_elsewhere figure. No payee crosses a limit: no finding.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_elsewhere-000"
+  },
+  {
+   "name": "Bank B OD",
+   "chain": [
+    "Bank OD A/c",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-np_elsewhere-001"
+  },
+  {
+   "name": "Bank C",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_elsewhere-002"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_elsewhere-003"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_elsewhere-004"
+  },
+  {
+   "name": "Loading Charges",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_elsewhere-005"
+  },
+  {
+   "name": "Driver Advances",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-np_elsewhere-006"
+  },
+  {
+   "name": "Staff Loans",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-np_elsewhere-007"
+  },
+  {
+   "name": "Wallet Float",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-np_elsewhere-008"
+  },
+  {
+   "name": "Zoe\u0308 Advances",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-np_elsewhere-009"
+  },
+  {
+   "name": "Office Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-np_elsewhere-010"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-np_elsewhere-011"
+  },
+  {
+   "name": "Input GST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-np_elsewhere-012"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 510,
+   "credit": 53000,
+   "closing": -52490
+  },
+  {
+   "ledger": "Bank B OD",
+   "opening": 0,
+   "debit": 750,
+   "credit": 0,
+   "closing": 750
+  },
+  {
+   "ledger": "Bank C",
+   "opening": 0,
+   "debit": 290,
+   "credit": 0,
+   "closing": 290
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 830,
+   "credit": 470,
+   "closing": 360
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 15020,
+   "credit": 0,
+   "closing": 15020
+  },
+  {
+   "ledger": "Loading Charges",
+   "opening": 0,
+   "debit": 1630,
+   "credit": 0,
+   "closing": 1630
+  },
+  {
+   "ledger": "Driver Advances",
+   "opening": 0,
+   "debit": 25880,
+   "credit": 510,
+   "closing": 25370
+  },
+  {
+   "ledger": "Staff Loans",
+   "opening": 0,
+   "debit": 5460,
+   "credit": 310,
+   "closing": 5150
+  },
+  {
+   "ledger": "Wallet Float",
+   "opening": 0,
+   "debit": 670,
+   "credit": 350,
+   "closing": 320
+  },
+  {
+   "ledger": "Zoe\u0308 Advances",
+   "opening": 0,
+   "debit": 1190,
+   "credit": 0,
+   "closing": 1190
+  },
+  {
+   "ledger": "Office Expenses",
+   "opening": 0,
+   "debit": 1270,
+   "credit": 0,
+   "closing": 1270
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 910,
+   "credit": 0,
+   "closing": 910
+  },
+  {
+   "ledger": "Input GST",
+   "opening": 0,
+   "debit": 230,
+   "credit": 0,
+   "closing": 230
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "e01",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Wages",
+     5210
+    ],
+    [
+     "Driver Advances",
+     7130
+    ],
+    [
+     "Bank A",
+     -12340
+    ]
+   ]
+  },
+  {
+   "guid": "e02",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Staff Loans",
+     3170
+    ],
+    [
+     "Bank A",
+     -3170
+    ]
+   ]
+  },
+  {
+   "guid": "e03",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "TDS Payable",
+     910
+    ],
+    [
+     "Bank A",
+     -910
+    ]
+   ]
+  },
+  {
+   "guid": "e04",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Cash",
+     830
+    ],
+    [
+     "Bank A",
+     -830
+    ]
+   ]
+  },
+  {
+   "guid": "e05",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Bank B OD",
+     750
+    ],
+    [
+     "Bank A",
+     -750
+    ]
+   ]
+  },
+  {
+   "guid": "e06",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Wallet Float",
+     670
+    ],
+    [
+     "Bank A",
+     -670
+    ]
+   ]
+  },
+  {
+   "guid": "e07",
+   "date": "2025-05-08",
+   "base_type": "Contra",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Driver Advances",
+     590
+    ],
+    [
+     "Bank A",
+     -590
+    ]
+   ]
+  },
+  {
+   "guid": "e08",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Wages",
+     2050
+    ],
+    [
+     "Driver Advances",
+     0
+    ],
+    [
+     "Staff Loans",
+     -310
+    ],
+    [
+     "Bank A",
+     -1740
+    ]
+   ]
+  },
+  {
+   "guid": "e09",
+   "date": "2025-05-10",
+   "base_type": "Payment",
+   "narration": "UPI-A TRADERS-ALPHA.T@QQBK-PAY",
+   "lines": [
+    [
+     "Staff Loans",
+     2290
+    ],
+    [
+     "Bank A",
+     -2290
+    ]
+   ]
+  },
+  {
+   "guid": "e10",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "status": "optional",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Driver Advances",
+     430
+    ],
+    [
+     "Bank A",
+     -430
+    ]
+   ]
+  },
+  {
+   "guid": "e11",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Driver Advances",
+     470
+    ],
+    [
+     "Cash",
+     -470
+    ]
+   ]
+  },
+  {
+   "guid": "e12",
+   "date": "2025-05-13",
+   "base_type": "Receipt",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Bank A",
+     510
+    ],
+    [
+     "Driver Advances",
+     -510
+    ]
+   ]
+  },
+  {
+   "guid": "e13",
+   "date": "2025-05-14",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Loading Charges",
+     1630
+    ],
+    [
+     "Bank A",
+     -1630
+    ]
+   ]
+  },
+  {
+   "guid": "e14",
+   "date": "2025-05-15",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Driver Advances",
+     350
+    ],
+    [
+     "Wallet Float",
+     -350
+    ]
+   ]
+  },
+  {
+   "guid": "e15",
+   "date": "2025-05-16",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Bank C",
+     290
+    ],
+    [
+     "Bank A",
+     -290
+    ]
+   ]
+  },
+  {
+   "guid": "e16",
+   "date": "2025-05-17",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-PAY",
+   "lines": [
+    [
+     "Zoe\u0308 Advances",
+     1190
+    ],
+    [
+     "Bank A",
+     -1190
+    ]
+   ]
+  },
+  {
+   "guid": "e20",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "narration": "UPI-OMEGA MART-OM.M@ZZBK",
+   "lines": [
+    [
+     "Driver Advances",
+     9110
+    ],
+    [
+     "Bank A",
+     -9110
+    ]
+   ]
+  },
+  {
+   "guid": "e21",
+   "date": "2025-06-03",
+   "base_type": "Payment",
+   "narration": "ADVANCE TO DRIVER",
+   "lines": [
+    [
+     "Driver Advances",
+     8230
+    ],
+    [
+     "Bank A",
+     -8230
+    ]
+   ]
+  },
+  {
+   "guid": "e30",
+   "date": "2025-07-02",
+   "base_type": "Payment",
+   "narration": "IMPS-61-BETA STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     4410
+    ],
+    [
+     "Bank A",
+     -4410
+    ]
+   ]
+  },
+  {
+   "guid": "e31",
+   "date": "2025-07-03",
+   "base_type": "Payment",
+   "narration": "IMPS-62-BETA STORES-ZZBK",
+   "lines": [
+    [
+     "Office Expenses",
+     1270
+    ],
+    [
+     "Input GST",
+     230
+    ],
+    [
+     "Bank A",
+     -1500
+    ]
+   ]
+  },
+  {
+   "guid": "e40",
+   "date": "2025-08-02",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3350
+    ],
+    [
+     "Bank A",
+     -3350
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A",
+  "Wallet Float"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

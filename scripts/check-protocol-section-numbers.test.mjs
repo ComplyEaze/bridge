@@ -69,8 +69,11 @@ z
 w
 `;
 
+// The temporary repositories hold no .gitattributes, so a host's own core.autocrlf=true (the system
+// setting on Windows runners) would check every document out with CRLF and the gate would read no
+// headings at all (#1471). Each call keeps the bytes as written.
 const git = (cwd, ...args) => {
-  const out = spawnSync("git", args, { cwd, encoding: "utf8" });
+  const out = spawnSync("git", ["-c", "core.autocrlf=false", ...args], { cwd, encoding: "utf8" });
   if (out.status !== 0) throw new Error(`git ${args.join(" ")}: ${out.stderr}`);
   return out.stdout;
 };

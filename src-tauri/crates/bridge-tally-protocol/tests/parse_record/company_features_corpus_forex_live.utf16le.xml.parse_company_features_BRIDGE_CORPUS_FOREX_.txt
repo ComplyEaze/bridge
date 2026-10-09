@@ -1,0 +1,11 @@
+# fixture: tests/fixtures/company_features_corpus_forex_live.utf16le.xml
+# parser: parse_company_features(BRIDGE CORPUS FOREX)
+# source: captured
+Ok(NativeCompanyFeatures {
+    cost_centres: No,
+    gst: Yes,
+    batch_wise: No,
+    base_currency: Reported(
+        "₹",
+    ),
+})

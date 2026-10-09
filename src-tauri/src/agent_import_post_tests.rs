@@ -1149,7 +1149,7 @@ fn missing_counter_evidence_cannot_confirm_current_or_previous_dispatch() {
 #[test]
 fn post_date_refusal_retains_the_completed_profile_probe_evidence() {
     let (mut line, _) = batch();
-    line.vouchers[0].date = "20260907".into();
+    line.vouchers[0].date = bridge_tally_core::TallyDate::parse("20260907").unwrap();
     let payload = ImportPayload {
         company_guid: line.company_guid.clone(),
         vouchers: line.vouchers,
@@ -1239,13 +1239,13 @@ fn native_request_uses_a_private_remote_identity_and_an_untagged_narration() {
         let mut reader = quick_xml::Reader::from_str(xml);
         loop {
             match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"VOUCHER" => {
+                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "VOUCHER" => {
                     let attribute = tag
                         .attributes()
                         .map(Result::unwrap)
-                        .find(|attribute| attribute.key.as_ref() == b"REMOTEID")
+                        .find(|attribute| attribute.key.as_ref() == "REMOTEID")
                         .unwrap();
-                    break Uuid::parse_str(std::str::from_utf8(&attribute.value).unwrap()).unwrap();
+                    break Uuid::parse_str(&attribute.value).unwrap();
                 }
                 quick_xml::events::Event::Eof => panic!("voucher missing"),
                 _ => {}
@@ -2830,12 +2830,12 @@ fn a_native_request_renders_every_voucher_with_its_own_remote_id() {
     let mut remote_ids = Vec::new();
     loop {
         match reader.read_event().unwrap() {
-            quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"VOUCHER" => {
+            quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "VOUCHER" => {
                 let remote_id = tag
                     .attributes()
                     .map(Result::unwrap)
-                    .find(|attribute| attribute.key.as_ref() == b"REMOTEID")
-                    .map(|attribute| String::from_utf8(attribute.value.to_vec()).unwrap());
+                    .find(|attribute| attribute.key.as_ref() == "REMOTEID")
+                    .map(|attribute| attribute.value.into_owned());
                 remote_ids.push(remote_id.unwrap());
             }
             quick_xml::events::Event::Eof => break,
@@ -3009,7 +3009,7 @@ fn batch_of_every_type() -> (ImportLedgerLine, TallyEndpointConfig) {
     ));
     line.txn_ids
         .extend(["receipt-1", "payment-1", "contra-1"].map(String::from));
-    line.date_to = "20260902".into();
+    line.date_to = bridge_tally_core::TallyDate::parse("20260902").unwrap();
     line.sha256 = sha256_hex(
         render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id).as_bytes(),
     );
@@ -3075,6 +3075,23 @@ fn a_batch_is_admitted_only_under_the_batch_limit() {
             .err()
             .as_deref(),
         Some("import_post_requires_one_journal")
+    );
+}
+
+/// The batch text's dates are the batch's earliest and latest, whatever order
+/// its vouchers are in: here the earliest is the last voucher.
+#[test]
+fn the_batch_dates_are_the_earliest_and_latest_whatever_the_voucher_order() {
+    let (mut line, endpoint) = batch_of_every_type();
+    line.vouchers.rotate_left(1);
+    assert_eq!(line.vouchers.last().unwrap().date.as_str(), "20260901");
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        preview
+            .lines()
+            .filter(|text| text.starts_with("Dates: "))
+            .collect::<Vec<_>>(),
+        ["Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them"]
     );
 }
 
@@ -3196,8 +3213,9 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
 
 /// A narration or reference holding a layout or format character leaves the
 /// batch's totals and one line in place of the voucher lines (#1063). The
-/// batch is never refused for it, nothing is stripped, and the line does not
-/// echo the text.
+/// preview never refuses for it, nothing is stripped, and the line does not
+/// echo the text. (A native post refuses a narration holding a character that
+/// draws nothing before the dialog: `refuse_rewritten_narration`.)
 #[test]
 fn an_unsafe_narration_or_reference_leaves_the_totals_and_says_so() {
     for (narration, reference) in [

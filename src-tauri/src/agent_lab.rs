@@ -480,7 +480,7 @@ fn parse_lab_master_rows(
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let tag = event.name().as_ref().to_ascii_uppercase();
                 let at_collection = path == ["ENVELOPE", "BODY", "DATA", "COLLECTION"];
                 if at_collection {
                     if tag != row_tag {
@@ -490,13 +490,10 @@ fn parse_lab_master_rows(
                     for attribute in event.attributes() {
                         let attribute =
                             attribute.map_err(|_| "agent_read_protocol_invalid".to_string())?;
-                        if attribute.key.as_ref().eq_ignore_ascii_case(b"NAME") {
+                        if attribute.key.as_ref().eq_ignore_ascii_case("NAME") {
                             attribute_name = Some(
                                 attribute
-                                    .decoded_and_normalized_value(
-                                        quick_xml::XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )
+                                    .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                                     .map_err(|_| "agent_read_protocol_invalid".to_string())?
                                     .into_owned(),
                             );
@@ -528,15 +525,11 @@ fn parse_lab_master_rows(
             // wrong number that still looks like one. Same buffer, so a value
             // split across Text, GeneralRef and CDATA rejoins in order.
             Ok(quick_xml::events::Event::CData(text)) => {
-                buffer.push(
-                    &text
-                        .decode()
-                        .map_err(|_| "agent_read_protocol_invalid".to_string())?,
-                );
+                buffer.push(&text);
             }
             Ok(quick_xml::events::Event::Empty(_)) => buffer.abandon(),
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 // A field belongs to the row when its parent chain is exactly
                 // COLLECTION_PREFIX + [row_tag]; `path` still holds the closing
                 // element, so the parent chain is everything before it.
@@ -662,7 +655,7 @@ fn parse_lab_inventory_vouchers(xml: &str) -> Result<Vec<Value>, String> {
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let tag = event.name().as_ref().to_ascii_uppercase();
                 // `path` is the parent chain of the element about to open.
                 if path_is(&path, &COLLECTION_PREFIX) {
                     if tag != "VOUCHER" {
@@ -695,15 +688,11 @@ fn parse_lab_inventory_vouchers(xml: &str) -> Result<Vec<Value>, String> {
             // wrong number that still looks like one. Same buffer, so a value
             // split across Text, GeneralRef and CDATA rejoins in order.
             Ok(quick_xml::events::Event::CData(text)) => {
-                buffer.push(
-                    &text
-                        .decode()
-                        .map_err(|_| "agent_read_protocol_invalid".to_string())?,
-                );
+                buffer.push(&text);
             }
             Ok(quick_xml::events::Event::Empty(_)) => buffer.abandon(),
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 // `path` still holds the closing element, so its parent chain
                 // names the container the field belongs to. Resolving this at
                 // `End` rather than at each text event is what keeps a
@@ -999,13 +988,52 @@ mod tests {
     #[test]
     fn env_lab_writes_enabled_requires_exact_truthy_value() {
         let _guard = lock_env();
+        // Put the variable back as it was: removing it decided another test's
+        // result whenever this one ran first (#1435).
+        let previous = std::env::var_os("BRIDGE_LAB_WRITES");
         std::env::remove_var("BRIDGE_LAB_WRITES");
         assert!(!env_lab_writes_enabled());
         std::env::set_var("BRIDGE_LAB_WRITES", "1");
         assert!(env_lab_writes_enabled());
         std::env::set_var("BRIDGE_LAB_WRITES", "yes");
         assert!(!env_lab_writes_enabled());
-        std::env::remove_var("BRIDGE_LAB_WRITES");
+        match previous {
+            Some(value) => std::env::set_var("BRIDGE_LAB_WRITES", value),
+            None => std::env::remove_var("BRIDGE_LAB_WRITES"),
+        }
+    }
+
+    /// With the variable set, the catalogue registers each lab tool once. The
+    /// mask_parties test exempts only what registered (#1435), so this is the
+    /// one test that fails if they stop registering.
+    #[test]
+    fn the_lab_tools_register_when_lab_writes_is_set() {
+        let _guard = lock_env();
+        let previous = std::env::var_os("BRIDGE_LAB_WRITES");
+        std::env::set_var("BRIDGE_LAB_WRITES", "1");
+        let definitions = super::super::catalog::registered_tool_definitions(true, true);
+        // Restored before asserting, so a failure leaves the variable as found.
+        match previous {
+            Some(value) => std::env::set_var("BRIDGE_LAB_WRITES", value),
+            None => std::env::remove_var("BRIDGE_LAB_WRITES"),
+        }
+        let names = definitions
+            .as_array()
+            .expect("tools")
+            .iter()
+            .map(|tool| tool["name"].as_str().expect("tool name"))
+            .collect::<Vec<_>>();
+        for lab in [
+            "lab_import_masters",
+            "lab_import_vouchers",
+            "lab_read_inventory",
+        ] {
+            assert_eq!(
+                names.iter().filter(|name| **name == lab).count(),
+                1,
+                "{lab} is registered once when BRIDGE_LAB_WRITES=1"
+            );
+        }
     }
 
     #[test]

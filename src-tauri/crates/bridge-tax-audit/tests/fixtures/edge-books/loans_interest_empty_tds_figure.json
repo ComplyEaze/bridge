@@ -1,0 +1,117 @@
+{
+ "comment": "loans_interest, bridge#1259 item 2 (a published list that reads as empty), a firm: the client's list of TDS payable ledgers is the empty name alone, so the published tds_payable_ledgers figure is the empty text, while a repayment net of TDS posts its TDS line to the empty-named ledger and tds_in_principal is published (100000). LOAN-1 reads an empty figure as no ledger at all, re-derives 0 and says so; the tie itself holds.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_empty_tds_figure-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_empty_tds_figure-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_empty_tds_figure-002"
+  },
+  {
+   "name": "Loan F",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_empty_tds_figure-003"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 900000,
+   "closing": -900000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Loan F",
+   "opening": -5000000,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": -4000000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "f01",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Loan F",
+     1000000
+    ],
+    [
+     "",
+     -100000
+    ],
+    [
+     "Bank A",
+     -900000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan F": {
+   "lender": "Invented F Lender",
+   "lender_type": "person"
+  }
+ },
+ "tds_payable_ledgers": [
+  ""
+ ]
+}

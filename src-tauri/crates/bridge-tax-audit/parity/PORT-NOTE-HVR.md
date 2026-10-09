@@ -16,7 +16,8 @@ it, the finding says so and shows that line.
 ## Behaviour
 
 **Per voucher, per row.** While building the rows (both grains), each row keeps, for every voucher
-that contributes to it, keyed by the voucher's GUID:
+that contributes to it, keyed by the voucher's own key (`book::voucher_keys`: its GUID where no
+other voucher of the population has it, else the GUID and its place among those sharing it; #1243):
 
 - `share`: this party's amount from that voucher (what the row already adds; the unidentified-party
   row's share is the voucher's fallback total);
@@ -25,12 +26,13 @@ that contributes to it, keyed by the voucher's GUID:
   magnitudes of its negative amounts on the mode's ledgers (credited). Lines of the other direction
   and of the other mode are not counted.
 
-Both are **added per voucher occurrence as it is read**, so two vouchers that share a GUID (an empty
-GUID reads as `""`) add their lines and shares together and never pair one voucher's line with two
-vouchers' shares.
+Both are **added per voucher as it is read**, so one voucher's line is never paired with another
+voucher's share, even where the two share a GUID (an empty GUID reads as `""`). Keyed by GUID, as
+before #1243, two such vouchers each differing in opposite directions could cancel in the sum and the
+row would not say it differs.
 
 **When the row is marked.** Only for the (party, day) rows that raise a finding (at or over the row
-threshold). The row *differs* when, for at least one GUID, `line != share`. `line_total` is the sum
+threshold). The row *differs* when, for at least one voucher, `line != share`. `line_total` is the sum
 of the row's lines. `below` is `line_total < row_threshold` (the s.269ST(a) limit for cash rows, the
 CA vouching threshold for bank rows).
 

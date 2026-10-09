@@ -50,6 +50,7 @@
 use crate::geometry::{Page, Word};
 use crate::refusal::Refusal;
 use crate::text::is_space;
+use bridge_tally_primitives::text::draws_nothing;
 use pdfium_render::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -150,6 +151,12 @@ fn assemble_words(glyphs: impl IntoIterator<Item = Option<Glyph>>) -> Page {
             close_word(&mut current, &mut words);
             continue;
         }
+        // It draws nothing a reader sees, so it is not read, and the word around
+        // it goes on (the gap rule below still splits it if the font gave the
+        // character an advance).
+        if draws_nothing(glyph.character) {
+            continue;
+        }
         if let Some(previous) = current.last() {
             let size = previous.size.max(glyph.size).max(1.0);
             let gap = glyph.left - previous.right;
@@ -171,10 +178,12 @@ fn assemble_words(glyphs: impl IntoIterator<Item = Option<Glyph>>) -> Page {
 /// constantly (`NEFT DR-ZZZZ0000001-` / `ACME…`), and every HDFC party boundary
 /// is a hyphen, so the marker is read back as the hyphen that was printed.
 /// Residual: a line-ending soft hyphen (U+00AD) arrives the same way and is
-/// also read as `-`.
+/// also read as `-`. A soft hyphen reported as itself is read as `-` too: it is
+/// what a WinAnsi font's byte 0xAD prints, a hyphen, though it is a character
+/// that otherwise draws nothing ([`draws_nothing`]).
 fn printed_character(reported: Option<char>) -> char {
     match reported {
-        Some('\u{2}') => '-',
+        Some('\u{2}' | '\u{ad}') => '-',
         Some(character) => character,
         None => '\u{fffd}',
     }

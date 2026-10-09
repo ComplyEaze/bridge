@@ -143,6 +143,28 @@ returned `CREATED=1`.
 Note also that `EXCEPTIONS=1` arrived with **no `LINEERROR`** — a parser must treat a
 non-zero `EXCEPTIONS` as failure on its own, without waiting for an error string.
 
+**The method is kept per number series, not on the voucher type — verified 2026-10-09 on one
+book (PARTIAL).** On a synthetic book on Silver 7.1 on Windows 10, three voucher types were set on
+Tally's own screens (Journal Automatic; Payment Manual with duplicates prevented; Receipt Manual
+without), and one export of all 24 voucher types fetched `NUMBERINGMETHOD`, `PREVENTDUPLICATES` and
+`VOUCHERNUMBERSERIES.*` (request 1,106 bytes, response 81,966 bytes; both committed as
+`voucher_type_numbering_series_*` with their provenance, bridge#724).
+
+- **VERIFIED:** each type holds exactly one `VOUCHERNUMBERSERIES.LIST`, named `Default`. The series'
+  `NUMBERINGMETHOD` and `PREVENTDUPLICATES` match the screen for all three types (`Automatic`/`No`,
+  `Manual`/`Yes`, `Manual`/`No`); the 21 types left alone read `Automatic`/`No`.
+- **VERIFIED:** the type-level `NUMBERINGMETHOD` reads `None` for the three types set by hand and
+  `Default` for the rest, and the type-level `PREVENTDUPLICATES` reads `No` on all 24, including
+  Payment, whose screen says Yes. The type level is not the method and is never read for it.
+- **Observed, meaning not established:** `NUMBERINGSUBMETHOD` reads `Auto Retain` on all 24 series,
+  Manual ones included; `DUPLICATECONTROL` is present and empty on all 24 series.
+- **Not established:** more than one series on a type; a single series not named `Default`; `Automatic (Manual Override)` on a captured
+  response (seen on a real book on 2026-09-28, not committed); Multi-user Auto; a type created new
+  rather than altered; other releases; macOS. A type with no series or several is a typed
+  observation, not a method, and a method outside `Automatic`, `Manual` and
+  `Automatic (Manual Override)` is kept raw and never read as `Manual`
+  (`native_voucher_type_numbering.rs`).
+
 ### 9.13 Payment, Receipt and Contra — the bank-statement voucher shapes
 
 **VERIFIED 2026-09-10 (licensed TallyPrime 7.1 Gold; five files imported by hand through

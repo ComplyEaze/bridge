@@ -84,8 +84,8 @@
   "by": "reviewer",
   "what": "ls: journal_only ignores non-journal",
   "file": "src/ledger_scrutiny.rs",
-  "from": "!d.journal.is_empty() && d.non_journal.is_empty()",
-  "to": "!d.journal.is_empty()"
+  "from": "d.journal && !d.non_journal",
+  "to": "d.journal"
  },
  {
   "id": "M12",
@@ -1234,10 +1234,10 @@
  {
   "id": "R06",
   "by": "reviewer-opus",
-  "what": "duplicate-GUID voucher keeps the first, not the last",
+  "what": "of two vouchers sharing a GUID a creditor keeps only the first",
   "file": "src/creditor_ageing_43bh.rs",
-  "from": "                    vs.insert(v.guid.as_str(), *v);",
-  "to": "                    vs.entry(v.guid.as_str()).or_insert(*v);"
+  "from": "                    vs.insert(vk.clone(), v);",
+  "to": "                    if !vs.values().any(|w| w.guid == v.guid) {\n                        vs.insert(vk.clone(), v);\n                    }"
  },
  {
   "id": "R07",
@@ -1316,8 +1316,8 @@
   "by": "reviewer-opus",
   "what": "26(i)(A) payment evidence includes credit-only vouchers",
   "file": "src/statutory_dues_43b.rs",
-  "from": "                .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)",
-  "to": "                .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise != 0)"
+  "from": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)",
+  "to": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise != 0)"
  },
  {
   "id": "R17",
@@ -1354,10 +1354,10 @@
  {
   "id": "R21",
   "by": "reviewer-opus",
-  "what": "voucher evidence keeps the first of a duplicate GUID",
+  "what": "of two vouchers sharing a GUID a nature keeps only the first",
   "file": "src/statutory_dues_43b.rs",
-  "from": "            out.vouchers.insert(v.guid.as_str(), *v);",
-  "to": "            out.vouchers.entry(v.guid.as_str()).or_insert(*v);"
+  "from": "            out.vouchers.insert(vk.clone(), v);",
+  "to": "            if !out.vouchers.values().any(|w| w.guid == v.guid) {\n                out.vouchers.insert(vk.clone(), v);\n            }"
  },
  {
   "id": "R22",
@@ -1700,8 +1700,8 @@
   "by": "author (Lane C)",
   "what": "row id hashed without its prefix",
   "file": "src/tds_payees.rs",
-  "from": "let h = hash8(&format!(\"{prefix}:{}\", stable_ledger_tag(book, entity)?));",
-  "to": "let h = hash8(&stable_ledger_tag(book, entity)?);"
+  "from": "    Ok(hash8(&format!(\n        \"{prefix}:{}\",\n        stable_ledger_tag(book, entity)?\n    )))",
+  "to": "    Ok(hash8(&stable_ledger_tag(book, entity)?))"
  },
  {
   "id": "C1-32",
@@ -2452,24 +2452,24 @@
   "by": "author",
   "what": "equal MASTERIDs reversed",
   "file": "src/book_keeping_quality.rs",
-  "from": "    ordered.sort_by_key(|(mid, _)| *mid); // stable, as Python's sort",
-  "to": "    ordered.reverse();\n    ordered.sort_by_key(|(mid, _)| *mid);"
+  "from": "    ordered.sort_by_key(|(mid, _, _)| *mid); // stable, as Python's sort",
+  "to": "    ordered.reverse();\n    ordered.sort_by_key(|(mid, _, _)| *mid);"
  },
  {
   "id": "E1B-04",
   "by": "author",
   "what": "after-last-sale includes the last sale",
   "file": "src/book_keeping_quality.rs",
-  "from": ".filter(|(mid, _)| *mid > last)",
-  "to": ".filter(|(mid, _)| *mid >= last)"
+  "from": ".filter(|(mid, _, _)| *mid > last)",
+  "to": ".filter(|(mid, _, _)| *mid >= last)"
  },
  {
   "id": "E1B-06",
   "by": "author",
   "what": "a repeated GUID keeps its first lag",
   "file": "src/book_keeping_quality.rs",
-  "from": "lag.insert(v.guid.as_str(), (days, *v));",
-  "to": "lag.entry(v.guid.as_str()).or_insert((days, *v));"
+  "from": "        lag.insert(*k, (days, *v));",
+  "to": "        lag.entry(&keyed.iter().find(|(_, w)| w.guid == v.guid).unwrap().0)\n            .or_insert((days, *v));"
  },
  {
   "id": "E1B-07",
@@ -2492,7 +2492,7 @@
   "by": "author",
   "what": "a receipt can match twice",
   "file": "src/book_keeping_quality.rs",
-  "from": "                used.insert(rguid);\n",
+  "from": "                used.insert(rkey);\n",
   "to": ""
  },
  {
@@ -2796,8 +2796,8 @@
   "by": "reviewer",
   "what": "matched evidence cites every invoice",
   "file": "src/book_keeping_quality.rs",
-  "from": "            evidence(&within3, |d| d.0),",
-  "to": "            evidence(&invoices, |d| d.0),"
+  "from": "            evidence(within3.iter().copied()),",
+  "to": "            invoice_refs(),"
  },
  {
   "id": "E1B-O19",
@@ -3316,8 +3316,8 @@
   "by": "author (Lane E2)",
   "what": "LOAN-1 leaves out the TDS deducted on the loan",
   "file": "src/loans_interest.rs",
-  "from": "        let expected_movement = -taken_total + repaid_total - interest + tds_on_loan;",
-  "to": "        let expected_movement = -taken_total + repaid_total - interest;"
+  "from": "        let expected_movement =\n            -taken_total + repaid_total - interest + tds_on_loan - tds_in_principal;",
+  "to": "        let expected_movement =\n            -taken_total + repaid_total - interest - tds_in_principal;"
  },
  {
   "id": "LR-30",
@@ -3572,7 +3572,7 @@
   "by": "author",
   "what": "LOAN-4 reads no TDS ledger, naming an interest entry net of TDS",
   "file": "src/loans_interest.rs",
-  "from": "                    .all(|o| ils.contains(*o) || tds_read.contains(*o))",
+  "from": "                    .all(|o| ils.contains(*o) || tds_read_loan4.contains(*o))",
   "to": "                    .all(|o| ils.contains(*o))"
  },
  {
@@ -5068,8 +5068,8 @@
   "by": "author",
   "what": "the voucher grain keys by date",
   "file": "src/high_value_register.rs",
-  "from": "                        |v| v.guid.clone(),\n",
-  "to": "                        |v| v.date.clone(),\n"
+  "from": "                        |k, _| k.clone(),\n",
+  "to": "                        |_, v| v.date.clone(),\n"
  },
  {
   "id": "E2B2-24",
@@ -5180,8 +5180,8 @@
   "by": "reviewer-opus",
   "what": "the unidentified row's line is its share, so it never differs",
   "file": "src/high_value_register.rs",
-  "from": "row.add(v, fallback_total, line)?;",
-  "to": "row.add(v, fallback_total, fallback_total)?;"
+  "from": "row.add(&vk, v, fallback_total, line)?;",
+  "to": "row.add(&vk, v, fallback_total, fallback_total)?;"
  },
  {
   "id": "E2B2-38",
@@ -5492,7 +5492,7 @@
   "by": "author",
   "what": "the stock_items part is not kept",
   "file": "src/book.rs",
-  "from": "items: read.one(\"stock_items\").cloned(),",
+  "from": "items: items.cloned(),",
   "to": "items: None,"
  },
  {
@@ -6452,7 +6452,7 @@
   "by": "author",
   "what": "tds_payees re-pin: a bill-specific reversal applied on a row not holding its bill",
   "file": "src/tds_payees.rs",
-  "from": "            Some(Reversal::BillSpecific(bill)) if row.by_voucher.contains_key(bill.as_str()) => {",
+  "from": "            Some(Reversal::BillSpecific(bill)) if credited.contains(bill.as_str()) => {",
   "to": "            Some(Reversal::BillSpecific(bill)) => {"
  },
  {
@@ -6532,8 +6532,8 @@
   "by": "author",
   "what": "tds_payees re-pin: TDS on vouchers touching a payee not collected",
   "file": "src/tds_payees.rs",
-  "from": "    if !inputs.tds_ledgers.is_empty() {\n        for &v in &pop {",
-  "to": "    if false {\n        for &v in &pop {"
+  "from": "    if !inputs.tds_ledgers.is_empty() {\n        for (k, v) in &keyed {",
+  "to": "    if false {\n        for (k, v) in &keyed {"
  },
  {
   "id": "TR-17",
@@ -6780,8 +6780,8 @@
   "by": "author",
   "what": "tds_payees P2-2: a reversal does not keep deducted bills in (A)",
   "file": "src/tds_payees.rs",
-  "from": "    let deducted: Vec<&str> = if reversal {",
-  "to": "    let deducted: Vec<&str> = if false {"
+  "from": "    let deducted: Vec<&VoucherKey> = if reversal {",
+  "to": "    let deducted: Vec<&VoucherKey> = if false {"
  },
  {
   "id": "TR-48",
@@ -6924,7 +6924,7 @@
   "by": "author",
   "what": "partners re-pin: an off-capital interest voucher leaves s.40(b) computed",
   "file": "src/partners_40b_194t.rs",
-  "from": "                    w.off_capital_interest_vouchers.insert(guid(), v);",
+  "from": "                    w.off_capital_interest_vouchers.insert(key(), v);",
   "to": "                    let _ = v;"
  },
  {
@@ -6948,7 +6948,7 @@
   "by": "author",
   "what": "partners re-pin: a partner's own TDS also counted as unattributed",
   "file": "src/partners_40b_194t.rs",
-  "from": "                if !seen.contains_key(&v.guid)",
+  "from": "                if !seen.contains_key(vk)",
   "to": "                if true"
  },
  {
@@ -7100,7 +7100,7 @@
   "by": "author",
   "what": "partners plain gate: a non-plain voucher not named",
   "file": "src/partners_40b_194t.rs",
-  "from": "                w.nonplain_vouchers.insert(guid(), v);",
+  "from": "                w.nonplain_vouchers.insert(key(), v);",
   "to": "                let _ = v;"
  },
  {
@@ -7140,7 +7140,7 @@
   "by": "author",
   "what": "partners: a credit net of an unread ledger not named",
   "file": "src/partners_40b_194t.rs",
-  "from": "            w.unread_credit_vouchers.insert(guid(), (v, unread));",
+  "from": "            w.unread_credit_vouchers.insert(key(), (v, unread));",
   "to": "            let _ = (v, unread);"
  },
  {
@@ -7148,7 +7148,7 @@
   "by": "author",
   "what": "partners: an interest credit net of an unread ledger not named for s.40(b)",
   "file": "src/partners_40b_194t.rs",
-  "from": "                w.unread_credit_interest_vouchers.insert(guid(), v);",
+  "from": "                w.unread_credit_interest_vouchers.insert(key(), v);",
   "to": "                let _ = v;"
  },
  {
@@ -7228,8 +7228,8 @@
   "by": "author",
   "what": "partners: an unread-credit voucher also named as of another shape",
   "file": "src/partners_40b_194t.rs",
-  "from": "                        && !w.unread_credit_interest_vouchers.contains_key(*g)\n                        && !w.shared_tds_interest_vouchers.contains_key(*g)",
-  "to": "                        && !w.shared_tds_interest_vouchers.contains_key(*g)"
+  "from": "                        && !w.unread_credit_interest_vouchers.contains_key(*k)\n                        && !w.shared_tds_interest_vouchers.contains_key(*k)",
+  "to": "                        && !w.shared_tds_interest_vouchers.contains_key(*k)"
  },
  {
   "id": "PR-45",
@@ -7372,8 +7372,8 @@
   "by": "author",
   "what": "partners: unattributed TDS vouchers not cited on the s.194T finding",
   "file": "src/partners_40b_194t.rs",
-  "from": "            evidence.extend(unattributed.clone());",
-  "to": "            let _ = &unattributed;"
+  "from": "                    .chain(unattributed.values())\n",
+  "to": ""
  },
  {
   "id": "PR-63",
@@ -8820,8 +8820,8 @@
   "by": "author",
   "what": "bind drops the bound party identity table",
   "file": "src/binding.rs",
-  "from": "        party_identity,\n        ..engagement.clone()",
-  "to": "        ..engagement.clone()"
+  "from": "        party_identity,\n        party_groups,\n        party_identity_not_a_table,\n        ..engagement.clone()",
+  "to": "        party_groups,\n        party_identity_not_a_table,\n        ..engagement.clone()"
  },
  {
   "id": "EG-52",
@@ -9178,18 +9178,18 @@
  {
   "id": "HV-31",
   "by": "author",
-  "what": "the referenced-voucher count reads the labels of the referenced vouchers' keys, not their GUIDs",
+  "what": "the no-reference count subtracts no referenced voucher (as when the referenced side read labels where the other side held voucher identities)",
   "file": "src/high_value_register.rs",
-  "from": "    let with_ref: BTreeSet<&String> = rows\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))",
-  "to": "    let with_ref: BTreeSet<&String> = rows\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(_, l)| l))"
+  "from": "    let with_ref: BTreeSet<&VoucherKey> = rows.values().flat_map(|r| r.lines.keys()).collect();",
+  "to": "    let with_ref: BTreeSet<&VoucherKey> = rows.values().flat_map(|r| r.lines.keys()).filter(|_| false).collect();"
  },
  {
   "id": "HV-32",
   "by": "author",
-  "what": "the all-vouchers side of the no-reference count reads labels, not GUIDs",
+  "what": "the all-vouchers side of the no-reference count reads only the referenced rows' vouchers, so no voucher is counted",
   "file": "src/high_value_register.rs",
-  "from": "    let all_guids: BTreeSet<&String> = with_money_leg\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(g, _)| g))",
-  "to": "    let all_guids: BTreeSet<&String> = with_money_leg\n        .values()\n        .flat_map(|r| r.vouchers.keys().map(|(_, l)| l))"
+  "from": "    let all_vouchers: BTreeSet<&VoucherKey> = with_money_leg.keys().map(|(k, _)| k).collect();",
+  "to": "    let all_vouchers: BTreeSet<&VoucherKey> = rows.values().flat_map(|r| r.lines.keys()).collect();"
  },
  {
   "id": "EG-69",
@@ -9506,10 +9506,10 @@
  {
   "id": "RP-04",
   "by": "author",
-  "what": "related_parties_cl23: a later voucher sharing a GUID does not replace the earlier entry",
+  "what": "related_parties_cl23: a later voucher sharing a GUID is no entry, the earlier one's kept",
   "file": "src/related_parties_cl23.rs",
-  "from": "            entries.insert(v.guid.as_str(), (net, v));",
-  "to": "            entries.entry(v.guid.as_str()).or_insert((net, v));"
+  "from": "            entries.insert(key, (net, v));",
+  "to": "            if !entries.values().any(|(_, e)| e.guid == v.guid) {\n                entries.insert(key, (net, v));\n            }"
  },
  {
   "id": "RP-05",
@@ -9612,8 +9612,8 @@
   "by": "author",
   "what": "related_parties_cl23: an amount cites no voucher",
   "file": "src/related_parties_cl23.rs",
-  "from": "            evidence.extend(entries.values().map(",
-  "to": "            evidence.extend(entries.values().take(0).map("
+  "from": "                refs.iter()\n",
+  "to": "                refs.iter()\n                    .take(0)\n"
  },
  {
   "id": "RP-18",
@@ -9638,6 +9638,990 @@
   "file": "src/binding.rs",
   "from": "            *v = toml::Value::Array(\n                lbinder\n                    .bind_list(&names, &location)?",
   "to": "            *v = toml::Value::Array(\n                names"
+ },
+ {
+  "id": "P1243-LSC-01",
+  "by": "author",
+  "what": "ledger_scrutiny: an expense ledger's entries are by GUID: a voucher replaces an earlier one sharing its GUID",
+  "file": "src/ledger_scrutiny.rs",
+  "from": "row.entries.insert(vk.clone(), (v, net));",
+  "to": "row.entries.retain(|_, (w, _)| w.guid != v.guid);\n            row.entries.insert(vk.clone(), (v, net));"
+ },
+ {
+  "id": "P1243-LSC-02",
+  "by": "author",
+  "what": "ledger_scrutiny: the large-entry subset is by GUID: a voucher replaces an earlier one sharing its GUID",
+  "file": "src/ledger_scrutiny.rs",
+  "from": "row.large.insert(vk.clone(), (v, net));",
+  "to": "row.large.retain(|_, (w, _)| w.guid != v.guid);\n            row.large.insert(vk.clone(), (v, net));"
+ },
+ {
+  "id": "P1243-LSC-03",
+  "by": "author",
+  "what": "ledger_scrutiny: the round-sum subset is by GUID: a voucher replaces an earlier one sharing its GUID",
+  "file": "src/ledger_scrutiny.rs",
+  "from": "row.round_sum.insert(vk.clone(), (v, net));",
+  "to": "row.round_sum.retain(|_, (w, _)| w.guid != v.guid);\n            row.round_sum.insert(vk.clone(), (v, net));"
+ },
+ {
+  "id": "P1243-LSC-04",
+  "by": "author",
+  "what": "ledger_scrutiny: the last-days subset is by GUID: a voucher replaces an earlier one sharing its GUID",
+  "file": "src/ledger_scrutiny.rs",
+  "from": "row.last_days.insert(vk.clone(), (v, net));",
+  "to": "row.last_days.retain(|_, (w, _)| w.guid != v.guid);\n            row.last_days.insert(vk.clone(), (v, net));"
+ },
+ {
+  "id": "P1243-LSC-05",
+  "by": "author",
+  "what": "ledger_scrutiny: the cash-paid subset is by GUID: a voucher replaces an earlier one sharing its GUID",
+  "file": "src/ledger_scrutiny.rs",
+  "from": "row.cash_paid.insert(vk.clone(), (v, net));",
+  "to": "row.cash_paid.retain(|_, (w, _)| w.guid != v.guid);\n            row.cash_paid.insert(vk.clone(), (v, net));"
+ },
+ {
+  "id": "P1243-LSC-06",
+  "by": "author",
+  "what": "ledger_scrutiny: two vouchers with identical refs (one GUID, number, type and day) are cited twice",
+  "file": "src/ledger_scrutiny.rs",
+  "from": "let refs: BTreeSet<(&str, String)> = entries\n        .values()\n        .map(|(v, _)| (v.guid.as_str(), support::voucher_label(v)))\n        .collect();",
+  "to": "let mut refs: Vec<(&str, String)> = entries\n        .values()\n        .map(|(v, _)| (v.guid.as_str(), support::voucher_label(v)))\n        .collect();\n    refs.sort();"
+ },
+ {
+  "id": "P1243-LSC-07",
+  "by": "author",
+  "what": "ledger_scrutiny: a citation keeps one ref per GUID, so two vouchers sharing a GUID cite one",
+  "file": "src/ledger_scrutiny.rs",
+  "from": "let refs: BTreeSet<(&str, String)> = entries\n        .values()\n        .map(|(v, _)| (v.guid.as_str(), support::voucher_label(v)))\n        .collect();",
+  "to": "let refs: BTreeMap<&str, String> = entries\n        .values()\n        .map(|(v, _)| (v.guid.as_str(), support::voucher_label(v)))\n        .collect();"
+ },
+ {
+  "id": "P1243-LSC-08",
+  "by": "author",
+  "what": "ledger_scrutiny: a non-journal voucher does not mark its ledger, so a journal and a payment read journal-only",
+  "file": "src/ledger_scrutiny.rs",
+  "from": "row.non_journal = true;",
+  "to": "row.non_journal = false;"
+ },
+ {
+  "id": "P1243-PAR-01",
+  "by": "author",
+  "what": "partners: off-capital vouchers keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    w.off_capital_vouchers.insert(key(), v);",
+  "to": "                    w.off_capital_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-02",
+  "by": "author",
+  "what": "partners: off-capital interest vouchers keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    w.off_capital_interest_vouchers.insert(key(), v);",
+  "to": "                    w.off_capital_interest_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-03",
+  "by": "author",
+  "what": "partners: vouchers not of the plain shape keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                w.nonplain_vouchers.insert(key(), v);",
+  "to": "                w.nonplain_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-04",
+  "by": "author",
+  "what": "partners: interest vouchers not of the plain shape keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    w.nonplain_interest_vouchers.insert(key(), v);",
+  "to": "                    w.nonplain_interest_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-05",
+  "by": "author",
+  "what": "partners: vouchers whose TDS is shared keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                w.shared_tds_vouchers.insert(key(), v);",
+  "to": "                w.shared_tds_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-06",
+  "by": "author",
+  "what": "partners: interest vouchers whose TDS is shared keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    w.shared_tds_interest_vouchers.insert(key(), v);",
+  "to": "                    w.shared_tds_interest_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-07",
+  "by": "author",
+  "what": "partners: remuneration vouchers whose TDS is shared keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    w.shared_tds_remuneration_vouchers.insert(key(), v);",
+  "to": "                    w.shared_tds_remuneration_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-08",
+  "by": "author",
+  "what": "partners: unsplit mixed vouchers keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                w.mixed_unsplit_vouchers.insert(key(), v);",
+  "to": "                w.mixed_unsplit_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-09",
+  "by": "author",
+  "what": "partners: unsplit mixed vouchers that also debit the capital keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    w.mixed_set_off_vouchers.insert(key(), v);",
+  "to": "                    w.mixed_set_off_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-10",
+  "by": "author",
+  "what": "partners: the credits of a mixed voucher split exactly keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    *by_v.entry(key()).or_insert(0) += part;",
+  "to": "                    *by_v.entry(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone()).or_insert(0) += part;"
+ },
+ {
+  "id": "P1243-PAR-11",
+  "by": "author",
+  "what": "partners: the vouchers of a mixed voucher split exactly keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    vs.insert(key(), v);",
+  "to": "                    vs.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-12",
+  "by": "author",
+  "what": "partners: interest vouchers crediting a ledger not read keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                w.unread_credit_interest_vouchers.insert(key(), v);",
+  "to": "                w.unread_credit_interest_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-13",
+  "by": "author",
+  "what": "partners: vouchers crediting a ledger not read keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            w.unread_credit_vouchers.insert(key(), (v, unread));",
+  "to": "            w.unread_credit_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), (v, unread));"
+ },
+ {
+  "id": "P1243-PAR-14",
+  "by": "author",
+  "what": "partners: vouchers setting off the capital keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            w.capital_set_off_vouchers.insert(key(), v);",
+  "to": "            w.capital_set_off_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-15",
+  "by": "author",
+  "what": "partners: interest vouchers keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                w.interest_vouchers.insert(key(), v);",
+  "to": "                w.interest_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-16",
+  "by": "author",
+  "what": "partners: interest credits keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                *w.interest_by_voucher.entry(key()).or_insert(0) -= amount;",
+  "to": "                *w.interest_by_voucher.entry(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone()).or_insert(0) -= amount;"
+ },
+ {
+  "id": "P1243-PAR-17",
+  "by": "author",
+  "what": "partners: remuneration vouchers keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                w.remuneration_vouchers.insert(key(), v);",
+  "to": "                w.remuneration_vouchers.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-18",
+  "by": "author",
+  "what": "partners: remuneration credits keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                *w.remuneration_by_voucher.entry(key()).or_insert(0) -= amount;",
+  "to": "                *w.remuneration_by_voucher.entry(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone()).or_insert(0) -= amount;"
+ },
+ {
+  "id": "P1243-PAR-19",
+  "by": "author",
+  "what": "partners: the TDS seen keyed by GUID again, so two vouchers sharing a GUID are one",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    seen.insert(vk.clone(), v);",
+  "to": "                    seen.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-20",
+  "by": "author",
+  "what": "partners: TDS on a shared ledger attributed to no one keyed by GUID again",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    unattributed.insert(vk.clone(), v);",
+  "to": "                    unattributed.insert(keyed.iter().find(|k| k.1.guid == v.guid).unwrap().0.clone(), v);"
+ },
+ {
+  "id": "P1243-PAR-21",
+  "by": "author",
+  "what": "partners: a citation keeps one ref per GUID, so of two vouchers sharing a GUID one is cited",
+  "file": "src/partners_40b_194t.rs",
+  "from": "    let refs: BTreeSet<(&str, String)> = vs",
+  "to": "    let refs: BTreeMap<&str, String> = vs"
+ },
+ {
+  "id": "P1243-BKQ-01",
+  "by": "author",
+  "what": "book_keeping_quality: the entry-order lag keyed by GUID (two vouchers sharing one keep the last lag)",
+  "file": "src/book_keeping_quality.rs",
+  "from": "        lag.insert(*k, (days, *v));",
+  "to": "        lag.insert(&keyed.iter().find(|(_, w)| w.guid == v.guid).unwrap().0, (days, *v));"
+ },
+ {
+  "id": "P1243-BKQ-02",
+  "by": "author",
+  "what": "book_keeping_quality: the vouchers created after the last sale keyed by GUID",
+  "file": "src/book_keeping_quality.rs",
+  "from": "            .map(|(_, k, v)| (*k, *v))",
+  "to": "            .map(|(_, _, v)| (&keyed.iter().find(|(_, w)| w.guid == v.guid).unwrap().0, *v))"
+ },
+ {
+  "id": "P1243-BKQ-03",
+  "by": "author",
+  "what": "book_keeping_quality: payment-channel invoices keyed by GUID",
+  "file": "src/book_keeping_quality.rs",
+  "from": "            out.insert(k, (*v, amt));\n        }\n    }\n    Ok(out)\n}\n\n/// Non-Sales",
+  "to": "            out.insert(&keyed.iter().find(|(_, w)| w.guid == v.guid).unwrap().0, (*v, amt));\n        }\n    }\n    Ok(out)\n}\n\n/// Non-Sales"
+ },
+ {
+  "id": "P1243-BKQ-04",
+  "by": "author",
+  "what": "book_keeping_quality: payment-channel receipts keyed by GUID",
+  "file": "src/book_keeping_quality.rs",
+  "from": "            out.insert(k, (*v, amt));\n        }\n    }\n    Ok(out)\n}\n\n/// Greedy match",
+  "to": "            out.insert(&keyed.iter().find(|(_, w)| w.guid == v.guid).unwrap().0, (*v, amt));\n        }\n    }\n    Ok(out)\n}\n\n/// Greedy match"
+ },
+ {
+  "id": "P1243-BKQ-05",
+  "by": "author",
+  "what": "book_keeping_quality: a receipt counts as used when another receipt with its GUID was used",
+  "file": "src/book_keeping_quality.rs",
+  "from": "            if used.contains(rkey) {",
+  "to": "            if used.iter().any(|u| receipts[u].0.guid == receipts[rkey].0.guid) {"
+ },
+ {
+  "id": "P1243-BKQ-06",
+  "by": "author",
+  "what": "book_keeping_quality: an invoice counts as matched when another invoice with its GUID was matched",
+  "file": "src/book_keeping_quality.rs",
+  "from": "            .filter(|(k, _)| matches.contains_key(*k))",
+  "to": "            .filter(|(_, (v, _))| matches.keys().any(|m| invoices[m].0.guid == v.guid))"
+ },
+ {
+  "id": "P1243-BKQ-07",
+  "by": "author",
+  "what": "book_keeping_quality: invoices of one day tried in reverse key order",
+  "file": "src/book_keeping_quality.rs",
+  "from": "        invoices.iter().map(|(k, (v, a))| (*k, *v, *a)).collect();\n    ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));",
+  "to": "        invoices.iter().map(|(k, (v, a))| (*k, *v, *a)).collect();\n    ordered.sort_by(|a, b| (&a.1.date, b.0).cmp(&(&b.1.date, a.0)));"
+ },
+ {
+  "id": "P1243-BKQ-08",
+  "by": "author",
+  "what": "book_keeping_quality: re-issue narration rows keyed by GUID",
+  "file": "src/book_keeping_quality.rs",
+  "from": "            reissue.insert(k, v);",
+  "to": "            reissue.insert(&keyed.iter().find(|(_, w)| w.guid == v.guid).unwrap().0, v);"
+ },
+ {
+  "id": "P1243-BKQ-09",
+  "by": "author",
+  "what": "book_keeping_quality: Contra direction rows keyed by GUID",
+  "file": "src/book_keeping_quality.rs",
+  "from": "                mismatches.insert(k, (v, cash_net));",
+  "to": "                mismatches.insert(&keyed.iter().find(|(_, w)| w.guid == v.guid).unwrap().0, (v, cash_net));"
+ },
+ {
+  "id": "P1243-BKQ-10",
+  "by": "author",
+  "what": "book_keeping_quality: a Contra row id is never suffixed (a repeated id is refused)",
+  "file": "src/book_keeping_quality.rs",
+  "from": "        let h = if sharing[&base] > 1 {",
+  "to": "        let h = if sharing[&base] > 99 {"
+ },
+ {
+  "id": "P1243-BKQ-11",
+  "by": "author",
+  "what": "book_keeping_quality: a unique Contra row id gains a suffix",
+  "file": "src/book_keeping_quality.rs",
+  "from": "        let h = if sharing[&base] > 1 {",
+  "to": "        let h = if sharing[&base] > 0 {"
+ },
+ {
+  "id": "P1243-BKQ-12",
+  "by": "author",
+  "what": "book_keeping_quality: Contra row suffixes numbered in key order, not date then key",
+  "file": "src/book_keeping_quality.rs",
+  "from": "    ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));\n    // A row's id",
+  "to": "    ordered.sort_by(|a, b| a.0.cmp(b.0));\n    // A row's id"
+ },
+ {
+  "id": "P1243-BKQ-13",
+  "by": "author",
+  "what": "book_keeping_quality: Contra row suffixes numbered from 0",
+  "file": "src/book_keeping_quality.rs",
+  "from": "            format!(\"{base}_{n}\")",
+  "to": "            format!(\"{base}_{}\", *n - 1)"
+ },
+ {
+  "id": "P1243-BKQ-14",
+  "by": "author",
+  "what": "book_keeping_quality: evidence cites one ref per GUID",
+  "file": "src/book_keeping_quality.rs",
+  "from": "        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .map(|(g, label)| EvidenceRef::with_label(\"voucher\", g, &label))",
+  "to": "        .collect::<BTreeMap<_, _>>()\n        .into_iter()\n        .map(|(g, label)| EvidenceRef::with_label(\"voucher\", g, &label))"
+ },
+ {
+  "id": "P1243-BKQ-15",
+  "by": "author",
+  "what": "book_keeping_quality: evidence keeps every voucher's ref, identical ones too, in row order",
+  "file": "src/book_keeping_quality.rs",
+  "from": "        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .map(|(g, label)| EvidenceRef::with_label(\"voucher\", g, &label))",
+  "to": "        .collect::<Vec<_>>()\n        .into_iter()\n        .map(|(g, label)| EvidenceRef::with_label(\"voucher\", g, &label))"
+ },
+ {
+  "id": "P1243-TDS-01",
+  "by": "author",
+  "what": "voucher_keys gives a unique GUID a place too, not its own GUID as its key",
+  "file": "src/book.rs",
+  "from": "        let text = if count[guid] == 1 {",
+  "to": "        let text = if count[guid] == 0 {"
+ },
+ {
+  "id": "P1243-TDS-02",
+  "by": "author",
+  "what": "voucher_keys gives every voucher sharing a GUID the same place",
+  "file": "src/book.rs",
+  "from": "            *n += 1;\n            format!(",
+  "to": "            *n += 0;\n            format!("
+ },
+ {
+  "id": "P1243-TDS-03",
+  "by": "author",
+  "what": "voucher_keys does not refuse two equal keys",
+  "file": "src/book.rs",
+  "from": "    if distinct.len() != out.len() {",
+  "to": "    if false {"
+ },
+ {
+  "id": "P1243-TDS-04",
+  "by": "author",
+  "what": "a voucher key does not keep its population index",
+  "file": "src/book.rs",
+  "from": "        out.push((VoucherKey { text, index }, v));",
+  "to": "        out.push((VoucherKey { text, index: 0 }, v));"
+ },
+ {
+  "id": "P1243-TDS-05",
+  "by": "author",
+  "what": "tds_payees names a reversal's bills sharing a GUID against the books' order",
+  "file": "src/tds_payees.rs",
+  "from": "            for v in rows[&key].vouchers.values() {",
+  "to": "            for v in rows[&key].vouchers.values().rev() {"
+ },
+ {
+  "id": "P1243-TDS-06",
+  "by": "author",
+  "what": "tds_payees orders a day's payments by the key reversed, not by key as the reference does (re-anchored: the key has no index accessor)",
+  "file": "src/tds_payees.rs",
+  "from": "    out.sort_by(|a, b| (&row.vouchers[a].date, a).cmp(&(&row.vouchers[b].date, b)));",
+  "to": "    out.sort_by(|a, b| {\n        (&row.vouchers[a].date, std::cmp::Reverse(a)).cmp(&(&row.vouchers[b].date, std::cmp::Reverse(b)))\n    });"
+ },
+ {
+  "id": "P1243-TDS-07",
+  "by": "author",
+  "what": "tds_payees keeps one reversal per GUID on a row (the later), as before #1243",
+  "file": "src/tds_payees.rs",
+  "from": "                    rv.insert(k, (v, total));",
+  "to": "                    rv.retain(|_, (w, _)| w.guid != v.guid);\n                    rv.insert(k, (v, total));"
+ },
+ {
+  "id": "P1243-TDS-08",
+  "by": "author",
+  "what": "tds_payees counts one TDS voucher per GUID touching a payee (the later), as before #1243",
+  "file": "src/tds_payees.rs",
+  "from": "                tds_touching.entry(e).or_default().insert(k, v);",
+  "to": "                let m = tds_touching.entry(e).or_default();\n                m.retain(|_, w| w.guid != v.guid);\n                m.insert(k, v);"
+ },
+ {
+  "id": "P1243-TDS-09",
+  "by": "author",
+  "what": "tds_payees cites two identical voucher refs twice",
+  "file": "src/tds_payees.rs",
+  "from": "    ev.dedup();\n    ev\n}",
+  "to": "    ev\n}"
+ },
+ {
+  "id": "P1243-TDS-10",
+  "by": "author",
+  "what": "tds_payees sorts voucher refs by id alone, so identical refs apart are not merged",
+  "file": "src/tds_payees.rs",
+  "from": "    ev.sort_by(|a, b| (&a.id, &a.label).cmp(&(&b.id, &b.label)));",
+  "to": "    ev.sort_by(|a, b| a.id.cmp(&b.id));"
+ },
+ {
+  "id": "P1243-TDS-11",
+  "by": "author",
+  "what": "the s.194C(6) question cites each voucher, identical refs repeated",
+  "file": "src/tds_payees.rs",
+  "from": "        evidence: voucher_refs(vouchers.values().copied()),",
+  "to": "        evidence: vouchers.values().map(|v| voucher_ref(v)).collect(),"
+ },
+ {
+  "id": "P1243-TDS-12",
+  "by": "author",
+  "what": "a reversal naming a GUID two bills share is said against the first bill only",
+  "file": "src/tds_payees.rs",
+  "from": "                            bills[bill.as_str()]\n                                .iter()\n",
+  "to": "                            bills[bill.as_str()]\n                                .iter()\n                                .take(1)\n"
+ },
+ {
+  "id": "P1243-TDS-13",
+  "by": "author",
+  "what": "voucher_keys leaves a sharer's place unpadded, so a tenth sharer sorts before its second",
+  "file": "src/book.rs",
+  "from": "            format!(\"{guid}\\0{n:08}\")",
+  "to": "            format!(\"{guid}\\0{n}\")"
+ },
+ {
+  "id": "P1243-HVR-01",
+  "by": "author",
+  "what": "high_value_register: the voucher grain keys a row by GUID again, so two vouchers sharing a GUID are one voucher",
+  "file": "src/high_value_register.rs",
+  "from": "                        |k, _| k.clone(),",
+  "to": "                        |_, v| v.guid.clone(),"
+ },
+ {
+  "id": "P1243-HVR-02",
+  "by": "author",
+  "what": "high_value_register: a named party's row is keyed by the voucher's GUID, not its own key (the voucher grain merges vouchers sharing it)",
+  "file": "src/high_value_register.rs",
+  "from": "let row = rows.entry((key_fn(&vk, v), ledger)).or_default();",
+  "to": "let row = rows.entry((key_fn(&voucher_keys(&[v])?[0].0, v), ledger)).or_default();"
+ },
+ {
+  "id": "P1243-HVR-03",
+  "by": "author",
+  "what": "high_value_register: the unnamed row is keyed by the voucher's GUID, not its own key (the voucher grain merges vouchers sharing it)",
+  "file": "src/high_value_register.rs",
+  "from": ".entry((key_fn(&vk, v), UNIDENTIFIED_PARTY.to_string()))",
+  "to": ".entry((key_fn(&voucher_keys(&[v])?[0].0, v), UNIDENTIFIED_PARTY.to_string()))"
+ },
+ {
+  "id": "P1243-HVR-04",
+  "by": "author",
+  "what": "high_value_register: a named party's share and line are kept per GUID, so two vouchers' differences can cancel",
+  "file": "src/high_value_register.rs",
+  "from": "row.add(&vk, v, amt, line)?;",
+  "to": "row.add(&voucher_keys(&[v])?[0].0, v, amt, line)?;"
+ },
+ {
+  "id": "P1243-HVR-05",
+  "by": "author",
+  "what": "high_value_register: the unnamed row's share and line are kept per GUID, so two vouchers' differences can cancel",
+  "file": "src/high_value_register.rs",
+  "from": "row.add(&vk, v, fallback_total, line)?;",
+  "to": "row.add(&voucher_keys(&[v])?[0].0, v, fallback_total, line)?;"
+ },
+ {
+  "id": "P1243-HVR-06",
+  "by": "author",
+  "what": "high_value_register: the no-reference count counts (voucher, party) rows, so a two-party voucher counts twice",
+  "file": "src/high_value_register.rs",
+  "from": "let skipped = all_vouchers.difference(&with_ref).count();",
+  "to": "let skipped = with_money_leg.keys().filter(|(k, _)| !with_ref.contains(&k)).count();"
+ },
+ {
+  "id": "P1243-HVR-07",
+  "by": "author",
+  "what": "high_value_register: a voucher with no reference is taken as referenced when another voucher with its GUID has one",
+  "file": "src/high_value_register.rs",
+  "from": "let with_ref: BTreeSet<&VoucherKey> = rows.values().flat_map(|r| r.lines.keys()).collect();",
+  "to": "let with_ref: BTreeSet<&VoucherKey> = { let g: BTreeSet<&String> = rows.values().flat_map(|r| r.vouchers.keys().map(|(g, _)| g)).collect(); with_money_leg.iter().filter(|(_, d)| d.vouchers.keys().any(|(x, _)| g.contains(x))).map(|((k, _), _)| k).collect() };"
+ },
+ {
+  "id": "P1243-HVR-08",
+  "by": "author",
+  "what": "high_value_register: a journal-transfer row id that would repeat never takes a suffix",
+  "file": "src/high_value_register.rs",
+  "from": "let rid = if sharing[base.as_str()] > 1 {",
+  "to": "let rid = if false && sharing[base.as_str()] > 1 {"
+ },
+ {
+  "id": "P1243-HVR-09",
+  "by": "author",
+  "what": "high_value_register: every journal-transfer row id takes a suffix, even a unique one",
+  "file": "src/high_value_register.rs",
+  "from": "let rid = if sharing[base.as_str()] > 1 {",
+  "to": "let rid = if sharing[base.as_str()] >= 1 {"
+ },
+ {
+  "id": "P1243-HVR-10",
+  "by": "author",
+  "what": "high_value_register: a repeated journal-transfer row id's suffix counts from 0",
+  "file": "src/high_value_register.rs",
+  "from": "format!(\"{base}_{k}\")",
+  "to": "format!(\"{base}_{}\", *k - 1)"
+ },
+ {
+  "id": "P1243-HVR-11",
+  "by": "author",
+  "what": "high_value_register: repeated journal-transfer row ids take their suffixes in reverse order",
+  "file": "src/high_value_register.rs",
+  "from": "for (((_, h), j), base) in keyed.iter().zip(&base_ids) {",
+  "to": "for (((_, h), j), base) in keyed.iter().rev().zip(base_ids.iter().rev()) {"
+ },
+ {
+  "id": "P1243-HVR-12",
+  "by": "author",
+  "what": "high_value_register: journal rows of one day and ledger are ordered by amount, largest first, not in reading order",
+  "file": "src/high_value_register.rs",
+  "from": "keyed.sort_by(|a, b| a.0.cmp(&b.0)); // stable, as Python",
+  "to": "keyed.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.amount_paise.cmp(&a.1.amount_paise))); // stable, as Python"
+ },
+ {
+  "id": "P1243-HVR-13",
+  "by": "author",
+  "what": "high_value_register: journal lines under the threshold are counted among those sharing a row id",
+  "file": "src/high_value_register.rs",
+  "from": "    for base in &base_ids {\n        *sharing.entry(base.as_str()).or_insert(0) += 1;\n    }",
+  "to": "    let all_ids: Vec<String> = journal\n        .iter()\n        .map(|j| Ok(format!(\"{}_{}\", hash8(&j.voucher.guid), stable_ledger_tag(book, &j.ledger)?)))\n        .collect::<Result<_>>()?;\n    for base in &all_ids {\n        *sharing.entry(base.as_str()).or_insert(0) += 1;\n    }"
+ },
+ {
+  "id": "P1243-CL23-01",
+  "by": "author",
+  "what": "related_parties_cl23: a later voucher sharing a GUID replaces the earlier one's entry (one entry per GUID again)",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            entries.insert(key, (net, v));",
+  "to": "            entries.retain(|_, (_, e)| e.guid != v.guid);\n            entries.insert(key, (net, v));"
+ },
+ {
+  "id": "P1243-CL23-02",
+  "by": "author",
+  "what": "related_parties_cl23: two vouchers with the same GUID and label are cited twice (refs not distinct)",
+  "file": "src/related_parties_cl23.rs",
+  "from": "            let refs: BTreeSet<(&str, String)> = entries",
+  "to": "            let refs: Vec<(&str, String)> = entries"
+ },
+ {
+  "id": "P1243-CL23-03",
+  "by": "author",
+  "what": "related_parties_cl23: a voucher is cited without its label",
+  "file": "src/related_parties_cl23.rs",
+  "from": ".map(|(_, v)| (v.guid.as_str(), support::voucher_label(v)))",
+  "to": ".map(|(_, v)| (v.guid.as_str(), String::new()))"
+ },
+ {
+  "id": "P1243-KEY-01",
+  "by": "author",
+  "what": "VoucherKey compares its population index before its text, so keys sort in reading order, not as the reference's str keys",
+  "file": "src/book.rs",
+  "from": "    text: String,\n    /// The voucher's index in the population. Equality compares it too, and [`Debug`] shows it\n    /// alone, so a key can be told from another in a failure message without printing its text.\n    /// Keys of different GUIDs sort by text, not by this.\n    ///\n    /// [`Debug`]: std::fmt::Debug\n    index: usize,\n",
+  "to": "    /// The voucher's index in the population. Equality compares it too, and [`Debug`] shows it\n    /// alone, so a key can be told from another in a failure message without printing its text.\n    /// Keys of different GUIDs sort by text, not by this.\n    ///\n    /// [`Debug`]: std::fmt::Debug\n    index: usize,\n    text: String,\n"
+ },
+ {
+  "id": "P1243-KEY-02",
+  "by": "author",
+  "what": "voucher_keys joins a sharer's place to its GUID with no NUL separator",
+  "file": "src/book.rs",
+  "from": "format!(\"{guid}\\0{n:08}\")",
+  "to": "format!(\"{guid}{n:08}\")"
+ },
+ {
+  "id": "P1243-KEY-03",
+  "by": "author",
+  "what": "voucher_keys counts each GUID once however many vouchers hold it, so no voucher gets a place",
+  "file": "src/book.rs",
+  "from": "*count.entry(v.guid.as_str()).or_default() += 1;",
+  "to": "*count.entry(v.guid.as_str()).or_default() = 1;"
+ },
+ {
+  "id": "P1243-KEY-04",
+  "by": "author",
+  "what": "voucher_keys pads a sharer's place to two digits, not eight",
+  "file": "src/book.rs",
+  "from": "format!(\"{guid}\\0{n:08}\")",
+  "to": "format!(\"{guid}\\0{n:02}\")"
+ },
+ {
+  "id": "P1243-KEY-05",
+  "by": "author",
+  "what": "a VoucherKey's Debug prints its text, which has no accessor on purpose",
+  "file": "src/book.rs",
+  "from": "write!(f, \"VoucherKey(#{})\", self.index)",
+  "to": "write!(f, \"VoucherKey({})\", self.text)"
+ },
+ {
+  "id": "P1243-TDS-14",
+  "by": "reviewer",
+  "what": "tds_payees: a row's credits are kept under the first voucher of the row holding the GUID, so two vouchers sharing a GUID are one bill",
+  "file": "src/tds_payees.rs",
+  "from": "        let slot = self.by_voucher.entry(k).or_insert(0);",
+  "to": "        let first = self.vouchers.iter().find(|(_, w)| w.guid == v.guid).map_or(k, |(k0, _)| *k0);\n        let slot = self.by_voucher.entry(first).or_insert(0);"
+ },
+ {
+  "id": "P1243-TDS-15",
+  "by": "reviewer",
+  "what": "tds_payees: a row's vouchers are kept under the first voucher of the row holding the GUID, so the later of two sharing it replaces the earlier",
+  "file": "src/tds_payees.rs",
+  "from": "        self.vouchers.insert(k, v);\n        Ok(())",
+  "to": "        let first = self.vouchers.iter().find(|(_, w)| w.guid == v.guid).map_or(k, |(k0, _)| *k0);\n        self.vouchers.insert(first, v);\n        Ok(())"
+ },
+ {
+  "id": "P1243-TDS-16",
+  "by": "reviewer",
+  "what": "tds_payees: a bill's credit lands in the month of the LAST voucher sharing its GUID, so two sharing one are dated alike",
+  "file": "src/tds_payees.rs",
+  "from": "        let slot = months.entry(month_key(row.vouchers[k])).or_insert(0);",
+  "to": "        let slot = months\n            .entry(month_key(row.vouchers.values().filter(|w| w.guid == row.vouchers[k].guid).last().unwrap()))\n            .or_insert(0);"
+ },
+ {
+  "id": "P1243-TDS-17",
+  "by": "reviewer",
+  "what": "tds_payees: a tranche reads every voucher sharing a GUID as dated by the first of them",
+  "file": "src/tds_payees.rs",
+  "from": "        .map(|(k, p)| (row.vouchers[k].date.clone(), *k, *p))",
+  "to": "        .map(|(k, p)| (row.vouchers.values().find(|w| w.guid == row.vouchers[k].guid).unwrap().date.clone(), *k, *p))"
+ },
+ {
+  "id": "P1243-TDS-18",
+  "by": "reviewer",
+  "what": "tds_payees: the s.194I month grouping puts every voucher sharing a GUID in the month of the first of them",
+  "file": "src/tds_payees.rs",
+  "from": "                let s = c.0.as_str();",
+  "to": "                let s = row.vouchers.values().find(|w| w.guid == row.vouchers[c.1].guid).unwrap().date.as_str();"
+ },
+ {
+  "id": "P1243-TDS-19",
+  "by": "reviewer",
+  "what": "tds_payees: a voucher in a tranche makes every voucher sharing its GUID a tranche voucher",
+  "file": "src/tds_payees.rs",
+  "from": "    Ok(tranches.into_iter().flat_map(|t| t.ids).collect())",
+  "to": "    Ok(tranches\n        .into_iter()\n        .flat_map(|t| t.ids)\n        .flat_map(|id| row.vouchers.keys().copied().filter(move |o| row.vouchers[*o].guid == row.vouchers[id].guid))\n        .collect())"
+ },
+ {
+  "id": "P1243-TDS-20",
+  "by": "reviewer",
+  "what": "tds_payees: a GUID that two bills of a row share is not read as credited on it",
+  "file": "src/tds_payees.rs",
+  "from": "        self.by_voucher\n            .keys()\n            .map(|k| self.vouchers[k].guid.as_str())\n            .collect()",
+  "to": "        self.by_voucher\n            .keys()\n            .filter(|k| self.by_voucher.keys().filter(|o| self.vouchers[*o].guid == self.vouchers[**k].guid).count() == 1)\n            .map(|k| self.vouchers[k].guid.as_str())\n            .collect()"
+ },
+ {
+  "id": "P1243-TDS-21",
+  "by": "reviewer",
+  "what": "tds_payees: the client's classification of a reversal reads on the first reversal voucher holding its GUID only",
+  "file": "src/tds_payees.rs",
+  "from": "        match cfg.reversals.get(&v.guid) {",
+  "to": "        match cfg\n            .reversals\n            .get(&v.guid)\n            .filter(|_| row.reversals.values().find(|(w, _)| w.guid == v.guid).is_some_and(|(w, _)| std::ptr::eq(*w, v)))\n        {"
+ },
+ {
+  "id": "P1243-TDS-22",
+  "by": "reviewer",
+  "what": "tds_payees: a GUID counts as credited to a payee only through the first voucher of the population holding it",
+  "file": "src/tds_payees.rs",
+  "from": "    let credited: BTreeSet<&str> = rows.values().flat_map(Row::credited_guids).collect();",
+  "to": "    let credited: BTreeSet<&str> = {\n        let keyed = &keyed;\n        rows.values()\n            .flat_map(move |d| {\n                d.credited_guids().into_iter().filter(move |g| {\n                    keyed\n                        .iter()\n                        .find(|(_, w)| w.guid == **g)\n                        .is_some_and(|(k0, _)| d.by_voucher.contains_key(k0))\n                })\n            })\n            .collect()\n    };"
+ },
+ {
+  "id": "P1243-TDS-23",
+  "by": "reviewer",
+  "what": "tds_payees: a GUID counts as a reversal voucher only through the first voucher of the population holding it",
+  "file": "src/tds_payees.rs",
+  "from": "    let reversal_vouchers: BTreeSet<&str> = rows\n        .values()\n        .flat_map(|d| d.reversals.values().map(|(v, _)| v.guid.as_str()))\n        .collect();",
+  "to": "    let reversal_vouchers: BTreeSet<&str> = {\n        let keyed = &keyed;\n        rows.values()\n            .flat_map(move |d| {\n                d.reversals\n                    .iter()\n                    .filter(move |(k, (w, _))| keyed.iter().find(|(_, u)| u.guid == w.guid).is_some_and(|(k0, _)| k0 == **k))\n                    .map(|(_, (v, _))| v.guid.as_str())\n            })\n            .collect()\n    };"
+ },
+ {
+  "id": "P1243-TDS-24",
+  "by": "reviewer",
+  "what": "tds_payees: the credit of a shared-TDS bill is read from the first bill of the row holding its GUID",
+  "file": "src/tds_payees.rs",
+  "from": "                    adj.row.by_voucher.get(g).copied().ok_or_else(|| {",
+  "to": "                    adj.row.by_voucher.iter().find(|(k, _)| adj.row.vouchers[**k].guid == adj.row.vouchers[g].guid).map(|(_, v)| *v).ok_or_else(|| {"
+ },
+ {
+  "id": "P1243-TDS-25",
+  "by": "reviewer",
+  "what": "tds_payees: a duplicate-or-error classification is applied on a row that does not hold its bill",
+  "file": "src/tds_payees.rs",
+  "from": "            Some(Reversal::DuplicateOrError(bill)) if credited.contains(bill.as_str()) => {",
+  "to": "            Some(Reversal::DuplicateOrError(bill)) if true || credited.contains(bill.as_str()) => {"
+ },
+ {
+  "id": "P1243-TDS-26",
+  "by": "reviewer",
+  "what": "tds_payees: the TDS vouchers seen are named in key order, not by date and then key as the reference does",
+  "file": "src/tds_payees.rs",
+  "from": "    ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));",
+  "to": "    ordered.sort_by(|a, b| a.0.cmp(b.0));"
+ },
+ {
+  "id": "P1243-TDS-27",
+  "by": "reviewer",
+  "what": "tds_payees: the bills not rate tested are cited once each, identical refs merged, where the reference cites them twice",
+  "file": "src/tds_payees.rs",
+  "from": "                untested.iter().map(|g| voucher_ref(row.vouchers[g])).collect(),",
+  "to": "                voucher_refs(untested.iter().map(|g| row.vouchers[g])),"
+ },
+ {
+  "id": "P1243-LSC-09",
+  "by": "reviewer",
+  "what": "ledger_scrutiny: a journal voucher does not mark its ledger, so a ledger of journals only reads as touched by none",
+  "file": "src/ledger_scrutiny.rs",
+  "from": "row.journal = true;",
+  "to": "row.journal = false;"
+ },
+ {
+  "id": "P1243-PAR-22",
+  "by": "reviewer",
+  "what": "partners: a partner's s.194T credits are summed under the first voucher holding the GUID, so two vouchers sharing it are one credit",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            *amounts.entry(k).or_insert(0) += paise;",
+  "to": "            *amounts\n                .entry(vouchers.iter().find(|(_, w)| w.guid == vouchers[k].guid).unwrap().0)\n                .or_insert(0) += paise;"
+ },
+ {
+  "id": "P1243-PAR-23",
+  "by": "reviewer",
+  "what": "partners: a voucher split into interest and remuneration credits the partner only its remuneration, not both",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            *amounts.entry(k).or_insert(0) += paise;",
+  "to": "            *amounts.entry(k).or_insert(0) = *paise;"
+ },
+ {
+  "id": "P1243-PAR-24",
+  "by": "reviewer",
+  "what": "partners: the interest vouchers crediting a ledger not read are matched to the interest vouchers by GUID, not by key",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            .filter(|(k, _)| w.unread_credit_interest_vouchers.contains_key(*k))",
+  "to": "            .filter(|(k, _)| w.unread_credit_interest_vouchers.values().any(|u| u.guid == w.unread_credit_vouchers[*k].0.guid))"
+ },
+ {
+  "id": "P1243-PAR-25",
+  "by": "reviewer",
+  "what": "partners: the vouchers with a negative net credit are named in key order, not by date and then key as the reference does",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                reversals.sort_by(|a, b| (&a.0.date, a.1).cmp(&(&b.0.date, b.1)));",
+  "to": "                reversals.sort_by(|a, b| a.1.cmp(b.1));"
+ },
+ {
+  "id": "P1243-PAR-26",
+  "by": "reviewer",
+  "what": "partners: the TDS vouchers seen are named in key order, not by date and then key",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));",
+  "to": "                ordered.sort_by(|a, b| a.0.cmp(b.0));"
+ },
+ {
+  "id": "P1243-PAR-27",
+  "by": "reviewer",
+  "what": "partners: the TDS vouchers attributed to no partner are named in key order, not by date and then key",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                let l = by_date(&unattributed);",
+  "to": "                let l: Vec<String> = unattributed.values().map(|v| voucher_label(v)).collect();"
+ },
+ {
+  "id": "P1243-PAR-28",
+  "by": "reviewer",
+  "what": "partners: a list of exactly twelve vouchers is cut, and 'and 0 more' said",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    if labels.len() > 12 {",
+  "to": "                    if labels.len() >= 12 {"
+ },
+ {
+  "id": "P1243-PAR-29",
+  "by": "reviewer",
+  "what": "partners: a list of vouchers shows thirteen labels before 'and N more', not twelve",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                        .take(12)",
+  "to": "                        .take(13)"
+ },
+ {
+  "id": "P1243-PAR-30",
+  "by": "reviewer",
+  "what": "partners: 'and N more' counts the vouchers beyond thirteen, not twelve",
+  "file": "src/partners_40b_194t.rs",
+  "from": "format!(\", and {} more\", labels.len() - 12)",
+  "to": "format!(\", and {} more\", labels.len().saturating_sub(13))"
+ },
+ {
+  "id": "P1243-HVR-14",
+  "by": "reviewer",
+  "what": "high_value_register: a two-line journal's credit line is read first, whatever the books' order, so a debit-first one-ledger journal gives _1 to its credit",
+  "file": "src/high_value_register.rs",
+  "from": "        for l in &v.lines {\n            out.push(JournalLine {",
+  "to": "        let mut ordered: Vec<_> = v.lines.iter().collect();\n        ordered.sort_by_key(|l| l.amount_paise > 0);\n        for l in ordered {\n            out.push(JournalLine {"
+ },
+ {
+  "id": "P1243-HVR-15",
+  "by": "reviewer",
+  "what": "high_value_register: a two-line journal's debit line is read first, whatever the books' order, so a credit-first one-ledger journal gives _1 to its debit",
+  "file": "src/high_value_register.rs",
+  "from": "        for l in &v.lines {\n            out.push(JournalLine {",
+  "to": "        let mut ordered: Vec<_> = v.lines.iter().collect();\n        ordered.sort_by_key(|l| l.amount_paise < 0);\n        for l in ordered {\n            out.push(JournalLine {"
+ },
+ {
+  "id": "P1243-PAR-31",
+  "by": "reviewer",
+  "what": "partners: the voucher keys are formed for a firm with no partner too, so a population whose keys collide is refused where the reference reads it",
+  "file": "src/partners_40b_194t.rs",
+  "from": "    let keyed = if partners.is_empty() {",
+  "to": "    let keyed = if false {"
+ },
+ {
+  "id": "P1243-NIW-01",
+  "by": "reviewer",
+  "what": "no_internal_wording: the invariant detail is not a scanned prose key",
+  "file": "tests/no_internal_wording.rs",
+  "from": "    \"population_note_text\",\n    \"detail\",\n];",
+  "to": "    \"population_note_text\",\n    \"population_note_text\",\n];"
+ },
+ {
+  "id": "P1243-NIW-02",
+  "by": "reviewer",
+  "what": "no_internal_wording: the population note is not a scanned prose key",
+  "file": "tests/no_internal_wording.rs",
+  "from": "    \"ask_client_text\",\n    \"population_note_text\",\n    \"detail\",\n];",
+  "to": "    \"ask_client_text\",\n    \"detail\",\n    \"detail\",\n];"
+ },
+ {
+  "id": "P1243-NIW-03",
+  "by": "reviewer",
+  "what": "no_internal_wording: the coordinator's name is matched in its own case only",
+  "file": "tests/no_internal_wording.rs",
+  "from": "    c == p || c.to_lowercase().eq(std::iter::once(p)) || (p == 's' && c == '\\u{17f}')",
+  "to": "    c == p"
+ },
+ {
+  "id": "P1243-NIW-04",
+  "by": "reviewer",
+  "what": "no_internal_wording: the all-capitals person word is a hit, where the reference's pattern reads two forms only",
+  "file": "tests/no_internal_wording.rs",
+  "from": "    for needle in [concat!(\"ow\", \"ner\"), concat!(\"Ow\", \"ner\")] {",
+  "to": "    for needle in [concat!(\"ow\", \"ner\"), concat!(\"Ow\", \"ner\"), concat!(\"OW\", \"NER\")] {"
+ },
+ {
+  "id": "P1243-NIW-06",
+  "by": "reviewer",
+  "what": "no_internal_wording: a text whose lower-case form changes its length is skipped, as the old scan did",
+  "file": "tests/no_internal_wording.rs",
+  "from": "fn internal_wording(text: &str) -> Option<String> {\n",
+  "to": "fn internal_wording(text: &str) -> Option<String> {\n    if text.to_lowercase().len() != text.len() {\n        return None;\n    }\n"
+ },
+ {
+  "id": "P1243-NIW-07",
+  "by": "reviewer",
+  "what": "no_internal_wording: the person word is a hit after a capitalised truck, as the lower-case look-behind is not exact",
+  "file": "tests/no_internal_wording.rs",
+  "from": "                .any(|w| text[..i].ends_with(w))",
+  "to": "                .any(|w| text[..i].to_lowercase().ends_with(w))"
+ },
+ {
+  "id": "P1243-PAR-32",
+  "by": "author",
+  "what": "partners_40b_194t: the negative net credits of one day are named in the reverse of key order",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                reversals.sort_by(|a, b| (&a.0.date, a.1).cmp(&(&b.0.date, b.1)));",
+  "to": "                reversals.sort_by(|a, b| (&a.0.date, b.1).cmp(&(&b.0.date, a.1)));"
+ },
+ {
+  "id": "P1243-PAR-33",
+  "by": "author",
+  "what": "partners_40b_194t: the negative net credits of one day are named by GUID, not by key",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                reversals.sort_by(|a, b| (&a.0.date, a.1).cmp(&(&b.0.date, b.1)));",
+  "to": "                reversals.sort_by(|a, b| (&a.0.date, &a.0.guid).cmp(&(&b.0.date, &b.0.guid)));"
+ },
+ {
+  "id": "P1243-PAR-34",
+  "by": "author",
+  "what": "partners_40b_194t: the TDS seen on one day is named in the reverse of key order",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    first12(&by_date(&seen))",
+  "to": "                    first12(&{\n                        let mut o: Vec<(&VoucherKey, &&Voucher)> = seen.iter().collect();\n                        o.sort_by(|a, b| (&a.1.date, b.0).cmp(&(&b.1.date, a.0)));\n                        o.into_iter().map(|(_, v)| voucher_label(v)).collect::<Vec<String>>()\n                    })"
+ },
+ {
+  "id": "P1243-PAR-35",
+  "by": "author",
+  "what": "partners_40b_194t: the TDS of one day attributed to no one is named in the reverse of key order",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                let l = by_date(&unattributed);",
+  "to": "                let l: Vec<String> = {\n                    let mut o: Vec<(&VoucherKey, &&Voucher)> = unattributed.iter().collect();\n                    o.sort_by(|a, b| (&a.1.date, b.0).cmp(&(&b.1.date, a.0)));\n                    o.into_iter().map(|(_, v)| voucher_label(v)).collect()\n                };"
+ },
+ {
+  "id": "P1243-PAR-36",
+  "by": "author",
+  "what": "partners_40b_194t: vouchers of one day are named by GUID, not by key (a GUID that sorts between two keys of a shared one moves)",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));",
+  "to": "                ordered.sort_by(|a, b| (&a.1.date, &a.1.guid).cmp(&(&b.1.date, &b.1.guid)));"
+ },
+ {
+  "id": "P1243-TDS-28",
+  "by": "author",
+  "what": "tds_payees: the TDS seen on one day is named in the reverse of key order",
+  "file": "src/tds_payees.rs",
+  "from": "    ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));",
+  "to": "    ordered.sort_by(|a, b| (&a.1.date, b.0).cmp(&(&b.1.date, a.0)));"
+ },
+ {
+  "id": "P1243-TDS-29",
+  "by": "author",
+  "what": "tds_payees: the TDS seen on one day is named by GUID, not by key (a GUID that sorts between two keys of a shared one moves)",
+  "file": "src/tds_payees.rs",
+  "from": "    ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));",
+  "to": "    ordered.sort_by(|a, b| (&a.1.date, &a.1.guid).cmp(&(&b.1.date, &b.1.guid)));"
+ },
+ {
+  "id": "P1243-HVR-16",
+  "by": "author",
+  "what": "high_value_register: journal rows share a suffix sequence only within one GUID, so two GUIDs of one hash repeat an id",
+  "file": "src/high_value_register.rs",
+  "from": "    let mut sharing: BTreeMap<&str, usize> = BTreeMap::new();\n    for base in &base_ids {\n        *sharing.entry(base.as_str()).or_insert(0) += 1;\n    }\n    let mut place: BTreeMap<&str, usize> = BTreeMap::new();\n    for (((_, h), j), base) in keyed.iter().zip(&base_ids) {\n        let v = j.voucher;\n        let vh = hash8(&v.guid);\n        let rid = if sharing[base.as_str()] > 1 {\n            let k = place.entry(base.as_str()).or_insert(0);",
+  "to": "    let by_guid: Vec<String> = keyed\n        .iter()\n        .map(|((_, h), j)| format!(\"{}\\u{0}{h}\", j.voucher.guid))\n        .collect();\n    let mut sharing: BTreeMap<&str, usize> = BTreeMap::new();\n    for g in &by_guid {\n        *sharing.entry(g.as_str()).or_insert(0) += 1;\n    }\n    let mut place: BTreeMap<&str, usize> = BTreeMap::new();\n    for ((((_, h), j), base), g) in keyed.iter().zip(&base_ids).zip(&by_guid) {\n        let v = j.voucher;\n        let vh = hash8(&v.guid);\n        let rid = if sharing[g.as_str()] > 1 {\n            let k = place.entry(g.as_str()).or_insert(0);"
+ },
+ {
+  "id": "P1243-BKQ-16",
+  "by": "author",
+  "what": "book_keeping_quality: Contra rows share a suffix sequence only within one GUID, so two GUIDs of one hash repeat an id",
+  "file": "src/book_keeping_quality.rs",
+  "from": "        *sharing.entry(guid_hash12(&v.guid)).or_default() += 1;\n    }\n    let mut place: BTreeMap<String, usize> = BTreeMap::new();\n    for (_, v, cash_amount) in ordered {\n        let base = guid_hash12(&v.guid);\n        let h = if sharing[&base] > 1 {\n            let n = place.entry(base.clone()).or_default();",
+  "to": "        *sharing.entry(v.guid.clone()).or_default() += 1;\n    }\n    let mut place: BTreeMap<String, usize> = BTreeMap::new();\n    for (_, v, cash_amount) in ordered {\n        let base = guid_hash12(&v.guid);\n        let h = if sharing[&v.guid] > 1 {\n            let n = place.entry(v.guid.clone()).or_default();"
+ },
+ {
+  "id": "P1243-BKQ-17",
+  "by": "author",
+  "what": "book_keeping_quality: Contra rows of one day take their suffixes in the reverse of key order",
+  "file": "src/book_keeping_quality.rs",
+  "from": "    ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));\n    // A row's id is a hash of its voucher's GUID",
+  "to": "    ordered.sort_by(|a, b| (&a.1.date, b.0).cmp(&(&b.1.date, a.0)));\n    // A row's id is a hash of its voucher's GUID"
+ },
+ {
+  "id": "P1243-BKQ-18",
+  "by": "reviewer-opus",
+  "what": "book_keeping_quality: a Contra row takes a suffix only when its own GUID has more than one row, though rows of another GUID share its id hash",
+  "file": "src/book_keeping_quality.rs",
+  "from": "        *sharing.entry(guid_hash12(&v.guid)).or_default() += 1;\n    }\n    let mut place: BTreeMap<String, usize> = BTreeMap::new();\n    for (_, v, cash_amount) in ordered {\n        let base = guid_hash12(&v.guid);\n        let h = if sharing[&base] > 1 {",
+  "to": "        *sharing.entry(v.guid.clone()).or_default() += 1;\n    }\n    let mut place: BTreeMap<String, usize> = BTreeMap::new();\n    for (_, v, cash_amount) in ordered {\n        let base = guid_hash12(&v.guid);\n        let h = if sharing[&v.guid] > 1 {"
+ },
+ {
+  "id": "P1243-HVR-17",
+  "by": "reviewer-opus",
+  "what": "high_value_register: journal rows of one day and one ledger take their suffixes smallest amount first, not in the books' order",
+  "file": "src/high_value_register.rs",
+  "from": "    keyed.sort_by(|a, b| a.0.cmp(&b.0)); // stable, as Python's sorted: ties keep line order",
+  "to": "    keyed.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.amount_paise.cmp(&b.1.amount_paise))); // stable, as Python's sorted: ties keep line order"
  },
  {
   "id": "CC21-01",
@@ -10398,5 +11382,2285 @@
   "file": "src/specified_persons_40a2b.rs",
   "from": "            support::py_repr_str(pair.key),\n",
   "to": "            pair.key.to_string(),\n"
+ },
+ {
+  "id": "L1259-01",
+  "by": "author",
+  "what": "loans_interest: the loan rows read a ledger on a nil line as another ledger of the voucher",
+  "file": "src/loans_interest.rs",
+  "from": "        let others = posted_others_than(v, loan_ledger);",
+  "to": "        let others = others_than(v, loan_ledger);"
+ },
+ {
+  "id": "L1259-02",
+  "by": "author",
+  "what": "loans_interest: only a debit line counts as a posting among a voucher's other ledgers",
+  "file": "src/loans_interest.rs",
+  "from": "        .filter(|l| l.ledger != ledger && l.amount_paise != 0)\n        .map(|l| l.ledger.as_str())",
+  "to": "        .filter(|l| l.ledger != ledger && l.amount_paise > 0)\n        .map(|l| l.ledger.as_str())"
+ },
+ {
+  "id": "L1259-03",
+  "by": "author",
+  "what": "loans_interest: LOAN-2 (D) names a ledger on a nil line as a stray ledger",
+  "file": "src/loans_interest.rs",
+  "from": "                    .filter(|l| l.amount_paise != 0)\n                    .map(|l| l.ledger.as_str())\n                    .filter(|l| *l != loan.as_str()",
+  "to": "                    .map(|l| l.ledger.as_str())\n                    .filter(|l| *l != loan.as_str()"
+ },
+ {
+  "id": "L1259-04",
+  "by": "author",
+  "what": "loans_interest: LOAN-3 re-derives a paired loan's interest journals with a nil line's ledger among the rest",
+  "file": "src/loans_interest.rs",
+  "from": "                        let rest: Vec<&str> = posted_others_than(v, loan)",
+  "to": "                        let rest: Vec<&str> = others_than(v, loan)"
+ },
+ {
+  "id": "L1259-05",
+  "by": "author",
+  "what": "loans_interest: tds_in_principal leaves the vouchers counted in repaid out",
+  "file": "src/loans_interest.rs",
+  "from": "            .chain(&rows.repaid)\n            .map(|x| x.at)",
+  "to": "            .map(|x| x.at)"
+ },
+ {
+  "id": "L1259-06",
+  "by": "author",
+  "what": "loans_interest: tds_in_principal leaves the vouchers counted in taken out",
+  "file": "src/loans_interest.rs",
+  "from": "        let in_principal: BTreeSet<usize> = rows\n            .taken\n            .iter()\n            .chain(&rows.repaid)",
+  "to": "        let in_principal: BTreeSet<usize> = rows\n            .repaid\n            .iter()\n            .chain(&rows.repaid)"
+ },
+ {
+  "id": "L1259-07",
+  "by": "author",
+  "what": "loans_interest: tds_in_principal takes the TDS of every voucher with TDS, not only those counted in taken or repaid",
+  "file": "src/loans_interest.rs",
+  "from": "            .filter(|(at, _)| in_principal.contains(at))",
+  "to": "            .filter(|(at, _)| in_principal.contains(at) || true)"
+ },
+ {
+  "id": "L1259-08",
+  "by": "author",
+  "what": "loans_interest: tds_in_principal is published as nil where no taken or repaid voucher carries TDS",
+  "file": "src/loans_interest.rs",
+  "from": "        if !principal_tds.is_empty() {",
+  "to": "        if principal_tds.len() < 1000 {"
+ },
+ {
+  "id": "L1259-09",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 does not leave the TDS in principal out of its expected movement",
+  "file": "src/loans_interest.rs",
+  "from": "        let expected_movement =\n            -taken_total + repaid_total - interest + tds_on_loan - tds_in_principal;",
+  "to": "        let expected_movement = -taken_total + repaid_total - interest + tds_on_loan;"
+ },
+ {
+  "id": "L1259-10",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 prints all the TDS on the loan, not the part outside taken and repaid",
+  "file": "src/loans_interest.rs",
+  "from": "                tds_on_loan - tds_in_principal,\n                tb_row.opening_paise,",
+  "to": "                tds_on_loan,\n                tb_row.opening_paise,"
+ },
+ {
+  "id": "L1259-11",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 does not name a TDS in principal that its cited vouchers do not give",
+  "file": "src/loans_interest.rs",
+  "from": "            if derived != tds_in_principal {",
+  "to": "            if derived != tds_in_principal && false {"
+ },
+ {
+  "id": "L1259-12",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 re-derives the TDS in principal from a Contra voucher too",
+  "file": "src/loans_interest.rs",
+  "from": "                    cited.contains(v.guid.as_str())\n                        && v.base_type != \"Contra\"\n                        && v.lines",
+  "to": "                    cited.contains(v.guid.as_str())\n                        && v.lines"
+ },
+ {
+  "id": "L1259-13",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 re-derives the TDS in principal from a cited GUID's voucher with no line on the loan",
+  "file": "src/loans_interest.rs",
+  "from": "                        && v.lines\n                            .iter()\n                            .any(|l| l.ledger == **name && l.amount_paise != 0)\n                })",
+  "to": "                        && v.lines.iter().any(|l| l.ledger == **name || true)\n                })"
+ },
+ {
+  "id": "L1259-14",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 re-derives the TDS in principal from a voucher whose line on the loan is nil",
+  "file": "src/loans_interest.rs",
+  "from": "                            .any(|l| l.ledger == **name && l.amount_paise != 0)\n                })",
+  "to": "                            .any(|l| l.ledger == **name)\n                })"
+ },
+ {
+  "id": "L1259-15",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 re-derives the TDS in principal with the wrong sign",
+  "file": "src/loans_interest.rs",
+  "from": "                .map(|v| -net_on(v, &tds_read))\n                .sum();\n            if derived",
+  "to": "                .map(|v| net_on(v, &tds_read))\n                .sum();\n            if derived"
+ },
+ {
+  "id": "L1259-16",
+  "by": "author",
+  "what": "loans_interest: tds_in_principal cites every voucher with TDS on the loan",
+  "file": "src/loans_interest.rs",
+  "from": "                voucher_refs(principal_tds.iter().map(|&(at, _)| pop[at])),",
+  "to": "                ev_tds.clone(),"
+ },
+ {
+  "id": "L1259-17",
+  "by": "author",
+  "what": "loans_interest: tds_in_principal counts the vouchers listed as both crediting and debiting the loan",
+  "file": "src/loans_interest.rs",
+  "from": "            .chain(&rows.repaid)\n            .map(|x| x.at)\n            .collect();",
+  "to": "            .chain(&rows.repaid)\n            .map(|x| x.at)\n            .chain(rows.listed.iter().copied())\n            .collect();"
+ },
+ {
+  "id": "L1259-18",
+  "by": "reviewer-sonnet",
+  "what": "loans_interest: a voucher's posted other ledgers no longer leave out the ledger asked about",
+  "file": "src/loans_interest.rs",
+  "from": "        .filter(|l| l.ledger != ledger && l.amount_paise != 0)\n",
+  "to": "        .filter(|l| (l.ledger != ledger || true) && l.amount_paise != 0)\n"
+ },
+ {
+  "id": "L1259-19",
+  "by": "reviewer-sonnet",
+  "what": "loans_interest: tds_in_principal takes the TDS of every voucher with TDS as its value, its evidence unchanged",
+  "file": "src/loans_interest.rs",
+  "from": "                paise(principal_tds.iter().map(|&(_, x)| x).sum())?,",
+  "to": "                paise(tds_by_voucher.iter().map(|&(_, x)| x).sum())?,"
+ },
+ {
+  "id": "L1259-20",
+  "by": "reviewer-sonnet",
+  "what": "loans_interest: LOAN-1 adds the TDS in principal to the expected movement instead of leaving it out",
+  "file": "src/loans_interest.rs",
+  "from": "-taken_total + repaid_total - interest + tds_on_loan - tds_in_principal;",
+  "to": "-taken_total + repaid_total - interest + tds_on_loan + tds_in_principal;"
+ },
+ {
+  "id": "L1259-21",
+  "by": "reviewer-sonnet",
+  "what": "loans_interest: LOAN-1 re-derives the TDS in principal from no TDS ledger at all",
+  "file": "src/loans_interest.rs",
+  "from": "                .map(|v| -net_on(v, &tds_read))\n                .sum();\n            if derived != tds_in_principal {",
+  "to": "                .map(|v| -net_on(v, &BTreeSet::new()))\n                .sum();\n            if derived != tds_in_principal {"
+ },
+ {
+  "id": "L1259-22",
+  "by": "reviewer-sonnet",
+  "what": "loans_interest: LOAN-1 re-derives the TDS in principal from every voucher on the loan, not only the GUIDs the figure cites",
+  "file": "src/loans_interest.rs",
+  "from": "                    cited.contains(v.guid.as_str())\n",
+  "to": "                    (cited.contains(v.guid.as_str()) || true)\n"
+ },
+ {
+  "id": "L1259-23",
+  "by": "reviewer-opus",
+  "what": "loans_interest: LOAN-1 reads the published TDS ledger names without the empty name, as LOAN-4 does",
+  "file": "src/loans_interest.rs",
+  "from": "        .map(|f| lines_of(f))\n        .unwrap_or_default();\n    let tds_read_loan4",
+  "to": "        .map(|f| lines_of(f).into_iter().filter(|x| !x.is_empty()).collect())\n        .unwrap_or_default();\n    let tds_read_loan4"
+ },
+ {
+  "id": "L1259-24",
+  "by": "reviewer-opus",
+  "what": "loans_interest: LOAN-1 reads an empty published TDS ledger figure as one empty name, not as no ledger",
+  "file": "src/loans_interest.rs",
+  "from": "        .filter(|f| matches!(&f.value, Value::Text(t) if !t.is_empty()))\n",
+  "to": ""
+ },
+ {
+  "id": "L1259-25",
+  "by": "reviewer-opus",
+  "what": "loans_interest: LOAN-4 keeps the empty name among the TDS ledgers it reads",
+  "file": "src/loans_interest.rs",
+  "from": "tds_read.iter().filter(|x| !x.is_empty()).cloned().collect();",
+  "to": "tds_read.iter().cloned().collect();"
+ },
+ {
+  "id": "L1259-26",
+  "by": "reviewer-opus",
+  "what": "loans_interest: charge_shaped leaves out the ledgers on nil lines (the reference reads them)",
+  "file": "src/loans_interest.rs",
+  "from": "            let counter: Vec<&str> = others_than(v, loan_ledger)\n",
+  "to": "            let counter: Vec<&str> = posted_others_than(v, loan_ledger)\n"
+ },
+ {
+  "id": "L1259-27",
+  "by": "reviewer-opus",
+  "what": "loans_interest: tds_in_principal is published only where the principal vouchers' TDS does not net to nil",
+  "file": "src/loans_interest.rs",
+  "from": "        if !principal_tds.is_empty() {\n",
+  "to": "        if principal_tds.iter().map(|&(_, x)| x).sum::<i128>() != 0 {\n"
+ },
+ {
+  "id": "L1259-28",
+  "by": "reviewer-opus",
+  "what": "loans_interest: tds_in_principal sums only the TDS deducted, leaving out a TDS debit on a taken or repaid voucher",
+  "file": "src/loans_interest.rs",
+  "from": "paise(principal_tds.iter().map(|&(_, x)| x).sum())?,",
+  "to": "paise(principal_tds.iter().map(|&(_, x)| x).filter(|x| *x > 0).sum())?,"
+ },
+ {
+  "id": "L1259-29",
+  "by": "reviewer-opus",
+  "what": "loans_interest: the TDS-journal test reads the ledgers on nil lines (the reference's reads those on lines with an amount)",
+  "file": "src/loans_interest.rs",
+  "from": "            && others\n                .iter()\n                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))\n",
+  "to": "            && others_than(v, loan_ledger)\n                .iter()\n                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))\n"
+ },
+ {
+  "id": "L1259-30",
+  "by": "reviewer-opus",
+  "what": "loans_interest: LOAN-1 goes no further to the tie once it has said the TDS in principal differs from its cited vouchers'",
+  "file": "src/loans_interest.rs",
+  "from": "the lines on the TDS ledgers of the vouchers it cites on this loan are {derived}p\"\n                ));\n",
+  "to": "the lines on the TDS ledgers of the vouchers it cites on this loan are {derived}p\"\n                ));\n                continue;\n"
+ },
+ {
+  "id": "L1259-31",
+  "by": "reviewer-opus",
+  "what": "loans_interest: LOAN-1's re-derivation takes a voucher whose lines on the loan net to an amount, not one with a line with an amount on it",
+  "file": "src/loans_interest.rs",
+  "from": "                            .any(|l| l.ledger == **name && l.amount_paise != 0)",
+  "to": "                            .filter(|l| l.ledger == **name)\n                            .map(|l| i128::from(l.amount_paise))\n                            .sum::<i128>()\n                            != 0"
+ },
+ {
+  "id": "P1243-DEP-01",
+  "by": "author",
+  "what": "depreciation: a voucher is a depreciation journal when any voucher holding its GUID carries a depreciation-expense line (by GUID again), so a sale sharing the journal's GUID is book depreciation",
+  "file": "src/depreciation.rs",
+  "from": "        let is_dep_journal = v\n            .lines\n            .iter()\n            .any(|l| dep_expense_ledgers.contains(&l.ledger));\n        for l in &v.lines {\n            if !block_by_ledger.contains_key(&l.ledger) {",
+  "to": "        let is_dep_journal = keyed.iter().any(|(_, o)| {\n            o.guid == v.guid\n                && o.lines\n                    .iter()\n                    .any(|l| dep_expense_ledgers.contains(&l.ledger))\n        });\n        for l in &v.lines {\n            if !block_by_ledger.contains_key(&l.ledger) {"
+ },
+ {
+  "id": "P1243-DEP-02",
+  "by": "author",
+  "what": "depreciation: the same-day search for a cash payment to the supplier skips every voucher holding the addition's GUID again, not only the voucher itself",
+  "file": "src/depreciation.rs",
+  "from": "            if other_key == key {",
+  "to": "            if other_key == key || other.guid == v.guid {"
+ },
+ {
+  "id": "P1243-DEP-03",
+  "by": "author",
+  "what": "depreciation: a cash-flagged addition's row id that repeats takes no suffix (the repeated figure id again)",
+  "file": "src/depreciation.rs",
+  "from": "            let rid = if sharing[base.as_str()] > 1 {",
+  "to": "            let rid = if sharing[base.as_str()] > b.cash_rows.len() {"
+ },
+ {
+  "id": "P1243-DEP-04",
+  "by": "author",
+  "what": "depreciation: every cash-flagged addition's row id takes a suffix, also one that does not repeat",
+  "file": "src/depreciation.rs",
+  "from": "            let rid = if sharing[base.as_str()] > 1 {",
+  "to": "            let rid = if sharing[base.as_str()] > 0 {"
+ },
+ {
+  "id": "P1243-DEP-05",
+  "by": "author",
+  "what": "depreciation: the suffixes of a repeated row id start at 2",
+  "file": "src/depreciation.rs",
+  "from": "                *k += 1;\n                format!(\"{base}_{k}\")",
+  "to": "                *k += 1;\n                format!(\"{base}_{}\", *k + 1)"
+ },
+ {
+  "id": "P1243-DEP-06",
+  "by": "author",
+  "what": "depreciation: the suffixes of a repeated row id are numbered against the rows' order (last row first)",
+  "file": "src/depreciation.rs",
+  "from": "                *k += 1;\n                format!(\"{base}_{k}\")",
+  "to": "                *k += 1;\n                format!(\"{base}_{}\", sharing[base.as_str()] + 1 - *k)"
+ },
+ {
+  "id": "P1243-DEP-07",
+  "by": "author",
+  "what": "depreciation: rows of one voucher GUID on different ledgers count as sharing an id (the ledger's tag left out of what is counted), so an id that does not repeat takes a suffix",
+  "file": "src/depreciation.rs",
+  "from": "        for (base, _) in &tagged {\n            *sharing.entry(base.as_str()).or_insert(0) += 1;\n        }\n        let mut place: BTreeMap<&str, usize> = BTreeMap::new();\n        for (row, (base, h)) in b.cash_rows.iter().zip(&tagged) {\n            let v = row.voucher;\n            let rid = if sharing[base.as_str()] > 1 {\n                let k = place.entry(base.as_str()).or_insert(0);",
+  "to": "        for (base, _) in &tagged {\n            *sharing.entry(&base[..12]).or_insert(0) += 1;\n        }\n        let mut place: BTreeMap<&str, usize> = BTreeMap::new();\n        for (row, (base, h)) in b.cash_rows.iter().zip(&tagged) {\n            let v = row.voucher;\n            let rid = if sharing[&base[..12]] > 1 {\n                let k = place.entry(&base[..12]).or_insert(0);"
+ },
+ {
+  "id": "P1243-DEP-08",
+  "by": "author",
+  "what": "depreciation: every cash-flagged row and its finding cite the first row's voucher",
+  "file": "src/depreciation.rs",
+  "from": "        for (row, (base, h)) in b.cash_rows.iter().zip(&tagged) {\n            let v = row.voucher;",
+  "to": "        for (row, (base, h)) in b.cash_rows.iter().zip(&tagged) {\n            let v = b.cash_rows[0].voucher;"
+ },
+ {
+  "id": "P1243-DEP-09",
+  "by": "author",
+  "what": "depreciation: a population whose voucher keys would repeat (a GUID holding a NUL) is read as no vouchers, not refused",
+  "file": "src/depreciation.rs",
+  "from": "    let keyed = voucher_keys(&book.population()?)?;",
+  "to": "    let keyed = voucher_keys(&book.population()?).unwrap_or_default();"
+ },
+ {
+  "id": "P1243-DEP-10",
+  "by": "author",
+  "what": "depreciation: a put-to-use date given for a GUID reads only on the first voucher holding it, not on every voucher the client's list names",
+  "file": "src/depreciation.rs",
+  "from": "                let put_to_use = put_to_use_by_voucher\n                    .get(&v.guid)\n                    .cloned()",
+  "to": "                let put_to_use = put_to_use_by_voucher\n                    .get(&v.guid)\n                    .filter(|_| {\n                        keyed\n                            .iter()\n                            .find(|(_, o)| o.guid == v.guid)\n                            .is_some_and(|(first, _)| first == key)\n                    })\n                    .cloned()"
+ },
+ {
+  "id": "P1243-DEP-11",
+  "by": "author",
+  "what": "the edge dispatch of depreciation drops a put-to-use date given for the blank GUID",
+  "file": "tests/edge_books.rs",
+  "from": "                        .map(|(g, day)| (g.clone(), date(day.as_str().unwrap())))",
+  "to": "                        .filter(|(g, _)| !g.is_empty())\n                        .map(|(g, day)| (g.clone(), date(day.as_str().unwrap())))"
+ },
+ {
+  "id": "P1243-DEP-12",
+  "by": "reviewer",
+  "what": "depreciation: a repeated row id takes its place among all repeated ids of the block, not among the rows sharing it",
+  "file": "src/depreciation.rs",
+  "from": "                let k = place.entry(base.as_str()).or_insert(0);",
+  "to": "                let k = place.entry(\"\").or_insert(0);"
+ },
+ {
+  "id": "P1243-DEP-13",
+  "by": "reviewer",
+  "what": "depreciation: a voucher is a depreciation journal only when every line is on a depreciation-expense ledger",
+  "file": "src/depreciation.rs",
+  "from": "        let is_dep_journal = v\n            .lines\n            .iter()\n            .any(|l| dep_expense_ledgers.contains(&l.ledger));",
+  "to": "        let is_dep_journal = v\n            .lines\n            .iter()\n            .all(|l| dep_expense_ledgers.contains(&l.ledger));"
+ },
+ {
+  "id": "P1243-SD-01",
+  "by": "author",
+  "what": "statutory_dues_43b: a nature's vouchers are by GUID again: a voucher replaces an earlier one sharing its GUID, which is counted and not cited",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "            out.vouchers.insert(vk.clone(), v);",
+  "to": "            out.vouchers.retain(|_, w| w.guid != v.guid);\n            out.vouchers.insert(vk.clone(), v);"
+ },
+ {
+  "id": "P1243-SD-02",
+  "by": "author",
+  "what": "statutory_dues_43b: the charged and paid figures cite only the last voucher of the nature",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "        let voucher_ev = support::voucher_refs(nl.vouchers.values().copied());",
+  "to": "        let voucher_ev = support::voucher_refs(nl.vouchers.values().copied().last());"
+ },
+ {
+  "id": "P1243-SD-03",
+  "by": "author",
+  "what": "statutory_dues_43b: the due-date walk's figures and findings cite only the last voucher of the nature",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "    let lot_ev = support::voucher_refs(nl.vouchers.values().copied());",
+  "to": "    let lot_ev = support::voucher_refs(nl.vouchers.values().copied().last());"
+ },
+ {
+  "id": "P1243-SD-04",
+  "by": "author",
+  "what": "statutory_dues_43b: the payments cited for clause 26(i)(A) are taken one per GUID before the debit filter, so a payment whose GUID a later charge shares is cited nowhere",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "    let payment_ev = support::voucher_refs(nl.vouchers.values().copied().filter(|v| {",
+  "to": "    let by_guid: BTreeMap<&str, &Voucher> =\n        (nl.vouchers.values().map(|v| (v.guid.as_str(), *v))).collect();\n    let payment_ev = support::voucher_refs(by_guid.values().copied().filter(|v| {"
+ },
+ {
+  "id": "P1243-SD-05",
+  "by": "author",
+  "what": "statutory_dues_43b: a GUID that makes two voucher keys equal is not refused (the nature is walked with no voucher)",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "    for (vk, v) in voucher_keys(pop)? {",
+  "to": "    for (vk, v) in voucher_keys(pop).unwrap_or_default() {"
+ },
+ {
+  "id": "P1243-SD-06",
+  "by": "author",
+  "what": "statutory_dues_43b: voucher keys are made with no nature mapped too, a refusal the reference does not raise there",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "    let pop = book.population()?;",
+  "to": "    let pop = book.population()?;\n    voucher_keys(&pop)?;"
+ },
+ {
+  "id": "P1243-SD-07",
+  "by": "author",
+  "what": "voucher_refs: refs ordered by label before GUID",
+  "file": "src/support.rs",
+  "from": "        .map(|v| (v.guid.as_str(), voucher_label(v)))\n        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .map(|(guid, label)| EvidenceRef::with_label(\"voucher\", guid, &label))",
+  "to": "        .map(|v| (voucher_label(v), v.guid.as_str()))\n        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .map(|(label, guid)| EvidenceRef::with_label(\"voucher\", guid, &label))"
+ },
+ {
+  "id": "P1243-SD-08",
+  "by": "author",
+  "what": "voucher_refs: two vouchers with identical refs (one GUID, number, type and day) are cited twice",
+  "file": "src/support.rs",
+  "from": "    vouchers\n        .into_iter()\n        .map(|v| (v.guid.as_str(), voucher_label(v)))\n        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .map(|(guid, label)| EvidenceRef::with_label(\"voucher\", guid, &label))\n        .collect()",
+  "to": "    let mut refs: Vec<(&str, String)> = vouchers\n        .into_iter()\n        .map(|v| (v.guid.as_str(), voucher_label(v)))\n        .collect();\n    refs.sort();\n    refs.into_iter()\n        .map(|(guid, label)| EvidenceRef::with_label(\"voucher\", guid, &label))\n        .collect()"
+ },
+ {
+  "id": "P1243-SD-09",
+  "by": "author",
+  "what": "voucher_refs: a citation keeps one ref per GUID, so of two vouchers sharing a GUID one is cited",
+  "file": "src/support.rs",
+  "from": "        .collect::<BTreeSet<_>>()",
+  "to": "        .collect::<std::collections::BTreeMap<_, _>>()"
+ },
+ {
+  "id": "P1243-SD-10",
+  "by": "author",
+  "what": "voucher_refs: a voucher is cited without its label",
+  "file": "src/support.rs",
+  "from": "        .map(|v| (v.guid.as_str(), voucher_label(v)))",
+  "to": "        .map(|v| (v.guid.as_str(), String::new()))"
+ },
+ {
+  "id": "P1243-SD-11",
+  "by": "author",
+  "what": "voucher_refs: refs emitted in descending order (the canonical dump sorts them, so only the emitted-order test sees it)",
+  "file": "src/support.rs",
+  "from": "        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .map(|(guid, label)|",
+  "to": "        .collect::<BTreeSet<_>>()\n        .into_iter()\n        .rev()\n        .map(|(guid, label)|"
+ },
+ {
+  "id": "P1243-CA-01",
+  "by": "author",
+  "what": "creditor_ageing_43bh: a creditor's vouchers are by GUID again: a voucher replaces an earlier one sharing its GUID, which is walked and not cited",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "                    vs.insert(vk.clone(), v);",
+  "to": "                    vs.retain(|_, w| w.guid != v.guid);\n                    vs.insert(vk.clone(), v);"
+ },
+ {
+  "id": "P1243-CA-02",
+  "by": "author",
+  "what": "creditor_ageing_43bh: a creditor's figures and findings cite only its last voucher",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "        creditor_ev.extend(support::voucher_refs(d.vouchers.values().copied()));",
+  "to": "        creditor_ev.extend(support::voucher_refs(d.vouchers.values().copied().last()));"
+ },
+ {
+  "id": "P1243-CA-03",
+  "by": "author",
+  "what": "creditor_ageing_43bh: a creditor's voucher refs are emitted in descending order",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "        creditor_ev.extend(support::voucher_refs(d.vouchers.values().copied()));",
+  "to": "        creditor_ev.extend(\n            support::voucher_refs(d.vouchers.values().copied())\n                .into_iter()\n                .rev(),\n        );"
+ },
+ {
+  "id": "P1243-CA-04",
+  "by": "author",
+  "what": "creditor_ageing_43bh: a GUID that makes two voucher keys equal is not refused (the creditors are walked with no voucher)",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "    for (vk, v) in voucher_keys(pop)? {",
+  "to": "    for (vk, v) in voucher_keys(pop).unwrap_or_default() {"
+ },
+ {
+  "id": "P1243-CA-05",
+  "by": "author",
+  "what": "creditor_ageing_43bh: voucher keys are made only with a creditor in scope, so with none a GUID that makes two keys equal is not refused where the reference raises",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "    for (vk, v) in voucher_keys(pop)? {",
+  "to": "    if creditors.is_empty() {\n        return Ok(BTreeMap::new());\n    }\n    for (vk, v) in voucher_keys(pop)? {"
+ },
+ {
+  "id": "P1243-CA-06",
+  "by": "author",
+  "what": "creditor_ageing_43bh: a creditor's ledger is cited after its vouchers, not first",
+  "file": "src/creditor_ageing_43bh.rs",
+  "from": "        let mut creditor_ev = vec![EvidenceRef::new(\"ledger\", name)];\n        creditor_ev.extend(support::voucher_refs(d.vouchers.values().copied()));",
+  "to": "        let mut creditor_ev = support::voucher_refs(d.vouchers.values().copied());\n        creditor_ev.push(EvidenceRef::new(\"ledger\", name));"
+ },
+ {
+  "id": "P1243-SD-12",
+  "by": "author",
+  "what": "statutory_dues_43b: the payments cited for clause 26(i)(A) are the vouchers with a debit line on any ledger, so a charge is cited by its expense or party line",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)",
+  "to": "            .any(|l| l.amount_paise > 0)"
+ },
+ {
+  "id": "P1243-SD-14",
+  "by": "reviewer",
+  "what": "statutory_dues_43b: the clause 26(i)(A) payments are the vouchers with a credit line, not a debit line",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)\n    }));",
+  "to": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise < 0)\n    }));"
+ },
+ {
+  "id": "P1243-SD-13",
+  "by": "author",
+  "what": "statutory_dues_43b: a nil line on a ledger of the nature counts as a payment for clause 26(i)(A)",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)\n    }));",
+  "to": "            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise >= 0)\n    }));"
+ },
+ {
+  "id": "P1243-SD-15",
+  "by": "author",
+  "what": "statutory_dues_43b: voucher keys are made over the nature's own vouchers, not the whole population, so two keys that collide away from the nature are not refused",
+  "file": "src/statutory_dues_43b.rs",
+  "from": "    for (vk, v) in voucher_keys(pop)? {",
+  "to": "    let own: Vec<&Voucher> = pop\n        .iter()\n        .copied()\n        .filter(|v| v.lines.iter().any(|l| ledgers.contains(l.ledger.as_str())))\n        .collect();\n    for (vk, v) in voucher_keys(&own)? {"
+ },
+ {
+  "id": "QC-01",
+  "by": "author",
+  "what": "questionnaire_cl13: the count takes any population voucher dated up to the period's last day, not only on it",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "    v.date == *last_day\n        && v.base_type == JOURNAL",
+  "to": "    v.date <= *last_day\n        && v.base_type == JOURNAL"
+ },
+ {
+  "id": "QC-02",
+  "by": "author",
+  "what": "questionnaire_cl13: the base type is compared without its case",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        && v.base_type == JOURNAL\n",
+  "to": "        && v.base_type.eq_ignore_ascii_case(JOURNAL)\n"
+ },
+ {
+  "id": "QC-03",
+  "by": "author",
+  "what": "questionnaire_cl13: the voucher type name is read instead of the base type",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        && v.base_type == JOURNAL\n",
+  "to": "        && v.vtype == JOURNAL\n"
+ },
+ {
+  "id": "QC-04",
+  "by": "author",
+  "what": "questionnaire_cl13: a counted journal needs every line on an expense ledger, not one",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        && v.lines.iter().any(|l| expense.contains(l.ledger.as_str()))\n}",
+  "to": "        && v.lines.iter().all(|l| expense.contains(l.ledger.as_str()))\n}"
+ },
+ {
+  "id": "QC-05",
+  "by": "author",
+  "what": "questionnaire_cl13: an expense group counts only as the primary group, the last in the chain",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        .filter(|l| EXPENSE_GROUPS.iter().any(|g| l.under(g)))",
+  "to": "        .filter(|l| EXPENSE_GROUPS.iter().any(|g| l.chain.last().is_some_and(|p| p == g)))"
+ },
+ {
+  "id": "QC-06",
+  "by": "author",
+  "what": "questionnaire_cl13: the first of two counted vouchers sharing a GUID gives the label, not the later",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "            counted.insert(v.guid.as_str(), v);",
+  "to": "            counted.entry(v.guid.as_str()).or_insert(v);"
+ },
+ {
+  "id": "QC-07",
+  "by": "author",
+  "what": "questionnaire_cl13: the count is taken over every voucher, not the books population",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "    let population = book.population()?;",
+  "to": "    let population: Vec<&Voucher> = book.vouchers.iter().collect();"
+ },
+ {
+  "id": "QC-08",
+  "by": "author",
+  "what": "questionnaire_cl13: the stock pointer is attached with no stock result",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "            Pointer::StockFigure if stock_supplied => {",
+  "to": "            Pointer::StockFigure if true => {"
+ },
+ {
+  "id": "QC-09",
+  "by": "author",
+  "what": "questionnaire_cl13: any stock result attaches the pointer, whether or not it carries the figure",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "stock.is_some_and(|s| s.figures.iter().any(|f| f.id == STOCK_FIGURE))",
+  "to": "stock.is_some()"
+ },
+ {
+  "id": "QC-10",
+  "by": "author",
+  "what": "questionnaire_cl13: the method-of-accounting finding cites no voucher",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "                evidence.clone_from(&refs);\n",
+  "to": ""
+ },
+ {
+  "id": "QC-11",
+  "by": "author",
+  "what": "questionnaire_cl13: the method-of-accounting finding drops its count fact",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "                facts.push((COUNT.to_string(), count_id.clone()));\n",
+  "to": "                let _ = &count_id;\n"
+ },
+ {
+  "id": "QC-12",
+  "by": "author",
+  "what": "questionnaire_cl13: the answer definition writes the key bare, not as repr() writes it",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        py_repr_str(key)\n",
+  "to": "        key\n"
+ },
+ {
+  "id": "QC-13",
+  "by": "author",
+  "what": "questionnaire_cl13: QCL-1 is silent on a result without the count",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        return Ok(vec![format!(\"QCL-1: {id} missing from the result\")]);",
+  "to": "        return Ok(Vec::new());"
+ },
+ {
+  "id": "QC-14",
+  "by": "author",
+  "what": "questionnaire_cl13: QCL-1 never fires",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "    if figure.value == walked {",
+  "to": "    if true {"
+ },
+ {
+  "id": "QC-15",
+  "by": "author",
+  "what": "questionnaire_cl13: QCL-1's walk takes every voucher, not the regular ones",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        .filter(|v| v.status == VoucherStatus::Regular)\n",
+  "to": ""
+ },
+ {
+  "id": "QC-16",
+  "by": "author",
+  "what": "questionnaire_cl13: QCL-1's walk counts from the period's last day onward",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "        .filter(|v| v.date == period.to && v.base_type == \"Journal\")",
+  "to": "        .filter(|v| v.date >= period.to && v.base_type == \"Journal\")"
+ },
+ {
+  "id": "QC-17",
+  "by": "author",
+  "what": "questionnaire_cl13: QCL-1's walk finds Indirect Expenses ledgers only",
+  "file": "src/questionnaire_cl13.rs",
+  "from": "                .any(|g| g == \"Direct Expenses\" || g == \"Indirect Expenses\")",
+  "to": "                .any(|g| g == \"Indirect Expenses\")"
+ },
+ {
+  "id": "QC-18",
+  "by": "author",
+  "what": "questionnaire_cl13: questionnaire_cl13_on passes no stock result",
+  "file": "src/lib.rs",
+  "from": "questionnaire_cl13::run(book, rules, &bound.period, Some(&stock_result))?",
+  "to": "questionnaire_cl13::run(book, rules, &bound.period, None)?"
+ },
+ {
+  "id": "R1446-01",
+  "by": "author",
+  "what": "rules: the text before a trailing comment keeps the whitespace in front of the comment",
+  "file": "src/rules.rs",
+  "from": "            None if c == '#' => return line[..at].trim_end(),",
+  "to": "            None if c == '#' => return &line[..at],"
+ },
+ {
+  "id": "R1446-02",
+  "by": "author",
+  "what": "rules: a # inside a literal ('...') string starts a comment",
+  "file": "src/rules.rs",
+  "from": "            None if c == '\"' || c == '\\'' => quote = Some(c),",
+  "to": "            None if c == '\"' => quote = Some(c),"
+ },
+ {
+  "id": "R1446-03",
+  "by": "author",
+  "what": "rules: a backslash escapes the next character in a literal string too",
+  "file": "src/rules.rs",
+  "from": "                } else if c == '\\\\' && q == '\"' {",
+  "to": "                } else if c == '\\\\' {"
+ },
+ {
+  "id": "R1446-04",
+  "by": "author",
+  "what": "rules: one vendored block found in the live source is enough",
+  "file": "src/rules.rs",
+  "from": "        .all(|block| {",
+  "to": "        .any(|block| {"
+ },
+ {
+  "id": "R1446-05",
+  "by": "author",
+  "what": "rules: a block's lines may sit apart and in any order in the live source",
+  "file": "src/rules.rs",
+  "from": "            live.windows(want.len()).any(|w| w == want.as_slice())",
+  "to": "            want.iter().all(|l| live.contains(l))"
+ },
+ {
+  "id": "R1446-06",
+  "by": "author",
+  "what": "rules: an escaped quote in a string keeps the next character escaped",
+  "file": "src/rules.rs",
+  "from": "                    escaped = false;",
+  "to": "                    escaped = true;"
+ },
+ {
+  "id": "R1446-07",
+  "by": "author",
+  "what": "rules: a comment-only line of the live source between a block's lines is skipped",
+  "file": "src/rules.rs",
+  "from": "    let live: Vec<&str> = source.lines().map(without_comment).collect();",
+  "to": "    let live: Vec<&str> = source\n        .lines()\n        .filter(|l| !l.trim_start().starts_with('#'))\n        .map(without_comment)\n        .collect();"
+ },
+ {
+  "id": "KO-01",
+  "by": "author",
+  "what": "knock_off_candidates: a mark after a letter a to z is kept",
+  "file": "src/knock_off_candidates.rs",
+  "from": ".is_some_and(|p| !p.is_ascii_lowercase())",
+  "to": ".is_some()"
+ },
+ {
+  "id": "KO-02",
+  "by": "author",
+  "what": "knock_off_candidates: a mark that would start a token is kept",
+  "file": "src/knock_off_candidates.rs",
+  "from": ".is_some_and(|p| !p.is_ascii_lowercase())",
+  "to": ".is_none_or(|p| !p.is_ascii_lowercase())"
+ },
+ {
+  "id": "KO-03",
+  "by": "author",
+  "what": "knock_off_candidates: the zero-width joiner, non-joiner and soft hyphen end a token",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        if DROPPED.contains(&c) {\n            continue;\n        }\n",
+  "to": ""
+ },
+ {
+  "id": "KO-04",
+  "by": "author",
+  "what": "knock_off_candidates: the text is not cut at a late code point before normalising",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        if in_table(&LATE, c) {\n            flush(&mut piece, &mut out);",
+  "to": "        if false {\n            flush(&mut piece, &mut out);"
+ },
+ {
+  "id": "KO-05",
+  "by": "author",
+  "what": "knock_off_candidates: the text is not decomposed",
+  "file": "src/knock_off_candidates.rs",
+  "from": "let nfd: String = piece.nfd().collect();",
+  "to": "let nfd: String = piece.clone();"
+ },
+ {
+  "id": "KO-06",
+  "by": "author",
+  "what": "knock_off_candidates: the text is decomposed with NFKD, not NFD",
+  "file": "src/knock_off_candidates.rs",
+  "from": "let nfd: String = piece.nfd().collect();",
+  "to": "let nfd: String = piece.nfkd().collect();"
+ },
+ {
+  "id": "KO-07",
+  "by": "author",
+  "what": "knock_off_candidates: a mark is never a token character",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        } else if in_table(&MARK, c) {",
+  "to": "        } else if false {"
+ },
+ {
+  "id": "KO-08",
+  "by": "author",
+  "what": "knock_off_candidates: letters and numbers are taken by Rust's is_alphanumeric, not Python's categories",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        } else if in_table(&LETTER_OR_NUMBER, c) {",
+  "to": "        } else if c.is_alphanumeric() {"
+ },
+ {
+  "id": "KO-09",
+  "by": "author",
+  "what": "knock_off_candidates: `|` does not cut a part",
+  "file": "src/knock_off_candidates.rs",
+  "from": "const SEPARATORS: [char; 9] = ['-', '/', ',', ';', '|', ':', '(', ')', '\\\\'];",
+  "to": "const SEPARATORS: [char; 8] = ['-', '/', ',', ';', ':', '(', ')', '\\\\'];"
+ },
+ {
+  "id": "KO-10",
+  "by": "author",
+  "what": "knock_off_candidates: `neft` is name-like",
+  "file": "src/knock_off_candidates.rs",
+  "from": "    \"neft\",\n",
+  "to": "    \"neftx\",\n"
+ },
+ {
+  "id": "KO-11",
+  "by": "author",
+  "what": "knock_off_candidates: a one-letter word is name-like",
+  "file": "src/knock_off_candidates.rs",
+  "from": "token.chars().count() >= 2",
+  "to": "token.chars().count() >= 1"
+ },
+ {
+  "id": "KO-12",
+  "by": "author",
+  "what": "knock_off_candidates: a word with a digit is name-like",
+  "file": "src/knock_off_candidates.rs",
+  "from": "token.chars().all(|c| c.is_ascii_lowercase())",
+  "to": "token.chars().all(|c| c.is_ascii_alphanumeric())"
+ },
+ {
+  "id": "KO-13",
+  "by": "author",
+  "what": "knock_off_candidates: the word beside a name may sit in another part",
+  "file": "src/knock_off_candidates.rs",
+  "from": "n.tokens[t].1 == n.tokens[anchor].1 && name_like(words[t])",
+  "to": "name_like(words[t])"
+ },
+ {
+  "id": "KO-14",
+  "by": "author",
+  "what": "knock_off_candidates: a word in a disjoint kept span still makes a name inside",
+  "file": "src/knock_off_candidates.rs",
+  "from": "if !holding.is_empty() && !holding.iter()",
+  "to": "if false && !holding.iter()"
+ },
+ {
+  "id": "KO-15",
+  "by": "author",
+  "what": "knock_off_candidates: only the word before a name is looked at",
+  "file": "src/knock_off_candidates.rs",
+  "from": "beside(s.checked_sub(1), s) || beside(Some(e + 1), e)",
+  "to": "beside(s.checked_sub(1), s)"
+ },
+ {
+  "id": "KO-16",
+  "by": "author",
+  "what": "knock_off_candidates: the word before a name is compared with the part of its last token",
+  "file": "src/knock_off_candidates.rs",
+  "from": "beside(s.checked_sub(1), s) || beside(Some(e + 1), e)",
+  "to": "beside(s.checked_sub(1), e) || beside(Some(e + 1), e)"
+ },
+ {
+  "id": "KO-17",
+  "by": "author",
+  "what": "knock_off_candidates: a span inside a longer found span is kept",
+  "file": "src/knock_off_candidates.rs",
+  "from": ".any(|&(fs, fe, _)| fs <= s && e <= fe && (fs, fe) != (s, e))",
+  "to": ".any(|&(fs, fe, _)| false && fs <= s && e <= fe && (fs, fe) != (s, e))"
+ },
+ {
+  "id": "KO-18",
+  "by": "author",
+  "what": "knock_off_candidates: a name two masters share is bound to a party",
+  "file": "src/knock_off_candidates.rs",
+  "from": "let owner = (masters[&key] == 1).then_some(*name);",
+  "to": "let owner = Some(*name);"
+ },
+ {
+  "id": "KO-19",
+  "by": "author",
+  "what": "knock_off_candidates: a shared name is dropped from the index",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        index.insert(key, owner);\n",
+  "to": "        if owner.is_some() {\n            index.insert(key, owner);\n        }\n"
+ },
+ {
+  "id": "KO-20",
+  "by": "author",
+  "what": "knock_off_candidates: a ledger on the voucher is still reported",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        if on_voucher.contains(name) {\n            continue;\n        }\n",
+  "to": ""
+ },
+ {
+  "id": "KO-21",
+  "by": "author",
+  "what": "knock_off_candidates: an inside occurrence of a name also plain on the voucher is recorded",
+  "file": "src/knock_off_candidates.rs",
+  "from": "        if !out.plain.contains(name) {",
+  "to": "        if true {"
+ },
+ {
+  "id": "KO-22",
+  "by": "author",
+  "what": "knock_off_candidates: an inside part runs only to the end of the part of the name's first token",
+  "file": "src/knock_off_candidates.rs",
+  "from": "n.between(n.tokens[s].1, n.tokens[e].1)",
+  "to": "n.between(n.tokens[s].1, n.tokens[s].1)"
+ },
+ {
+  "id": "KO-23",
+  "by": "author",
+  "what": "knock_off_candidates: only a Contra counts its money once",
+  "file": "src/knock_off_candidates.rs",
+  "from": "if v.base_type == CONTRA || lines().all(|l| money.contains(l.ledger.as_str())) {",
+  "to": "if v.base_type == CONTRA {"
+ },
+ {
+  "id": "KO-24",
+  "by": "author",
+  "what": "knock_off_candidates: every voucher sums its money lines' absolute values",
+  "file": "src/knock_off_candidates.rs",
+  "from": "if v.base_type == CONTRA || lines().all(|l| money.contains(l.ledger.as_str())) {",
+  "to": "if false {"
+ },
+ {
+  "id": "KO-25",
+  "by": "author",
+  "what": "knock_off_candidates: a narration of exactly 80 characters is cut",
+  "file": "src/knock_off_candidates.rs",
+  "from": "collapsed.chars().count() > SHOWN_CHARS",
+  "to": "collapsed.chars().count() >= SHOWN_CHARS"
+ },
+ {
+  "id": "KO-26",
+  "by": "author",
+  "what": "knock_off_candidates: the engagement's party groups are ignored",
+  "file": "src/knock_off_candidates.rs",
+  "from": "PARTY_GROUPS.iter().any(|g| l.under(g)) || party_groups.iter().any(|g| l.under(g))",
+  "to": "PARTY_GROUPS.iter().any(|g| l.under(g))"
+ },
+ {
+  "id": "KO-27",
+  "by": "author",
+  "what": "knock_off_candidates: a bank or cash line does not block T1",
+  "file": "src/knock_off_candidates.rs",
+  "from": "if parties.len() >= 2 && !has_money {",
+  "to": "if parties.len() >= 2 {"
+ },
+ {
+  "id": "KO-28",
+  "by": "author",
+  "what": "knock_off_candidates: a zero line puts its ledger on the voucher",
+  "file": "src/knock_off_candidates.rs",
+  "from": "            .filter(|l| l.amount_paise != 0)\n            .map(|l| l.ledger.as_str())\n",
+  "to": "            .map(|l| l.ledger.as_str())\n"
+ },
+ {
+  "id": "KO-29",
+  "by": "author",
+  "what": "knock_off_candidates: T1's total adds every party line, credits included",
+  "file": "src/knock_off_candidates.rs",
+  "from": ".filter(|l| l.amount_paise > 0 && party.contains(l.ledger.as_str()))",
+  "to": ".filter(|l| party.contains(l.ledger.as_str()))"
+ },
+ {
+  "id": "KO-30",
+  "by": "author",
+  "what": "knock_off_candidates: knock_off_candidates_on runs on a [party_identity] that is not a table",
+  "file": "src/lib.rs",
+  "from": "    if bound.party_identity_not_a_table {",
+  "to": "    if false {"
+ },
+ {
+  "id": "KO-31",
+  "by": "author",
+  "what": "knock_off_candidates: bind keeps no party groups for knock_off_candidates",
+  "file": "src/binding.rs",
+  "from": "        party_groups = bound;\n",
+  "to": "        let _ = bound;\n"
+ },
+ {
+  "id": "CL44-01",
+  "by": "author",
+  "what": "clause44: a nil expense line is a line",
+  "file": "src/clause44.rs",
+  "from": "    amount_paise != 0 && primary_in(book, ledger, &EXPENDITURE_GROUPS)",
+  "to": "    primary_in(book, ledger, &EXPENDITURE_GROUPS)"
+ },
+ {
+  "id": "CL44-02",
+  "by": "author",
+  "what": "clause44: the primary group is read from the parent end of the chain",
+  "file": "src/clause44.rs",
+  "from": "        .and_then(|l| l.chain.last())",
+  "to": "        .and_then(|l| l.chain.first())"
+ },
+ {
+  "id": "CL44-03",
+  "by": "author",
+  "what": "clause44: the party ledger's GSTIN is never read",
+  "file": "src/clause44.rs",
+  "from": "            .map_or_else(String::new, |l| norm_gstin(&l.gstin))",
+  "to": "            .map_or_else(String::new, |_| String::new())"
+ },
+ {
+  "id": "CL44-04",
+  "by": "author",
+  "what": "clause44: the voucher's own PARTYGSTIN is never read",
+  "file": "src/clause44.rs",
+  "from": "        if !own.is_empty() {\n            return own;",
+  "to": "        if false {\n            return own;"
+ },
+ {
+  "id": "CL44-05",
+  "by": "author",
+  "what": "clause44: the voucher's PARTYGSTIN is not stripped",
+  "file": "src/clause44.rs",
+  "from": "        let own = norm_gstin(&v.party_gstin);",
+  "to": "        let own = v.party_gstin.clone();"
+ },
+ {
+  "id": "CL44-06",
+  "by": "author",
+  "what": "clause44: a PARTYGSTIN of only spaces is read as a GSTIN, with no fallback to the ledger's",
+  "file": "src/clause44.rs",
+  "from": "        let own = norm_gstin(&v.party_gstin);\n        if !own.is_empty() {",
+  "to": "        let own = norm_gstin(&v.party_gstin);\n        if !v.party_gstin.is_empty() {"
+ },
+ {
+  "id": "CL44-07",
+  "by": "author",
+  "what": "clause44: a nil tax line counts as input tax",
+  "file": "src/clause44.rs",
+  "from": "            .any(|l| l.amount_paise != 0 && inputs.tax_ledgers.contains(&l.ledger))",
+  "to": "            .any(|l| inputs.tax_ledgers.contains(&l.ledger))"
+ },
+ {
+  "id": "CL44-08",
+  "by": "author",
+  "what": "clause44: composition is decided before the GSTIN",
+  "file": "src/clause44.rs",
+  "from": "        let bucket = if supplier_gstin(v).is_empty() {\n            Bucket::Unregistered\n        } else if inputs.composition_ledgers.contains(&v.party_field) {",
+  "to": "        let bucket = if inputs.composition_ledgers.contains(&v.party_field) {\n            Bucket::Composition\n        } else if supplier_gstin(v).is_empty() {\n            Bucket::Unregistered\n        } else if false {"
+ },
+ {
+  "id": "CL44-09",
+  "by": "author",
+  "what": "clause44: input tax sends a line to the exempt column",
+  "file": "src/clause44.rs",
+  "from": "        } else if has_gst(v) {",
+  "to": "        } else if !has_gst(v) {"
+ },
+ {
+  "id": "CL44-10",
+  "by": "author",
+  "what": "clause44: round-off does not follow a no-supplier line (it looks past it for the line it rounds)",
+  "file": "src/clause44.rs",
+  "from": "            .filter(|l| !plain_round_off(&l.ledger))\n            .collect();",
+  "to": "            .filter(|l| {\n                !plain_round_off(&l.ledger) && !inputs.no_supplier_expense_ledgers.contains(&l.ledger)\n            })\n            .collect();"
+ },
+ {
+  "id": "CL44-11",
+  "by": "author",
+  "what": "clause44: round-off with no other expenditure line is read by the party instead of being a non-supply expense",
+  "file": "src/clause44.rs",
+  "from": "            .map_or(Class::NoSupplier(Reason::NonSupplyExpense), |l| {\n                class_of(&l.ledger)\n            });",
+  "to": "            .map_or(by_party, |l| class_of(&l.ledger));"
+ },
+ {
+  "id": "CL44-12",
+  "by": "author",
+  "what": "clause44: a round-off line is read like any line instead of taking the placement of the line it rounds",
+  "file": "src/clause44.rs",
+  "from": "            let class = if plain_round_off(&l.ledger) {\n                round_off_class",
+  "to": "            let class = if false {\n                round_off_class"
+ },
+ {
+  "id": "CL44-13",
+  "by": "author",
+  "what": "clause44: a judgement category comes before a depreciation ledger",
+  "file": "src/clause44.rs",
+  "from": "        if inputs.dep_expense_ledgers.contains(ledger) {\n            Some(Class::NoSupplier(Reason::DepreciationLedger))\n        } else if category.is_some_and(MoneyCategory::is_judgement) {\n            Some(Class::NoSupplier(Reason::JudgementMoneyItem))",
+  "to": "        if category.is_some_and(MoneyCategory::is_judgement) {\n            Some(Class::NoSupplier(Reason::JudgementMoneyItem))\n        } else if inputs.dep_expense_ledgers.contains(ledger) {\n            Some(Class::NoSupplier(Reason::DepreciationLedger))"
+ },
+ {
+  "id": "CL44-14",
+  "by": "author",
+  "what": "clause44: the no-supplier list comes before a judgement category",
+  "file": "src/clause44.rs",
+  "from": "        } else if category.is_some_and(MoneyCategory::is_judgement) {\n            Some(Class::NoSupplier(Reason::JudgementMoneyItem))\n        } else if inputs.no_supplier_expense_ledgers.contains(ledger) {",
+  "to": "        } else if category.is_some_and(MoneyCategory::is_judgement)\n            && !inputs.no_supplier_expense_ledgers.contains(ledger)\n        {\n            Some(Class::NoSupplier(Reason::JudgementMoneyItem))\n        } else if inputs.no_supplier_expense_ledgers.contains(ledger) {"
+ },
+ {
+  "id": "CL44-15",
+  "by": "author",
+  "what": "clause44: a forced category comes before the no-supplier list",
+  "file": "src/clause44.rs",
+  "from": "        } else if inputs.no_supplier_expense_ledgers.contains(ledger) {\n            Some(Class::NoSupplier(Reason::NonSupplyExpense))",
+  "to": "        } else if inputs.no_supplier_expense_ledgers.contains(ledger)\n            && category.and_then(MoneyCategory::forced).is_none()\n        {\n            Some(Class::NoSupplier(Reason::NonSupplyExpense))"
+ },
+ {
+  "id": "CL44-16",
+  "by": "author",
+  "what": "clause44: a forced category is applied after the party reasons (no party, a party that is a P&L ledger)",
+  "file": "src/clause44.rs",
+  "from": "        let class_of = |ledger: &str| own_placement(ledger).unwrap_or(by_party);",
+  "to": "        let class_of = |ledger: &str| match (own_placement(ledger), by_party) {\n            (Some(Class::Bucket { .. }), Class::NoSupplier(reason)) => Class::NoSupplier(reason),\n            (own, party) => own.unwrap_or(party),\n        };"
+ },
+ {
+  "id": "CL44-17",
+  "by": "author",
+  "what": "clause44: an income ledger as party is not a P&L party",
+  "file": "src/clause44.rs",
+  "from": "        if primary_in(book, &v.party_field, &PL_LEDGER_GROUPS) {",
+  "to": "        if primary_in(book, &v.party_field, &EXPENDITURE_GROUPS) {"
+ },
+ {
+  "id": "CL44-18",
+  "by": "author",
+  "what": "clause44: a forced column is not marked forced",
+  "file": "src/clause44.rs",
+  "from": "                    bucket,\n                    forced: true,",
+  "to": "                    bucket,\n                    forced: false,"
+ },
+ {
+  "id": "CL44-19",
+  "by": "author",
+  "what": "clause44: bank interest is forced to 'other than composition'",
+  "file": "src/clause44.rs",
+  "from": "            Self::InterestBankNbfc => Some(Bucket::ExemptNonGst),",
+  "to": "            Self::InterestBankNbfc => Some(Bucket::OtherRegistered),"
+ },
+ {
+  "id": "CL44-20",
+  "by": "author",
+  "what": "clause44: bank charges are forced to the exempt column",
+  "file": "src/clause44.rs",
+  "from": "            Self::BankCharges => Some(Bucket::OtherRegistered),",
+  "to": "            Self::BankCharges => Some(Bucket::ExemptNonGst),"
+ },
+ {
+  "id": "CL44-21",
+  "by": "author",
+  "what": "clause44: the individual-interest overlay skips a line with a reason",
+  "file": "src/clause44.rs",
+  "from": "                == Some(&MoneyCategory::InterestIndividualNoGstin)\n            {",
+  "to": "                == Some(&MoneyCategory::InterestIndividualNoGstin)\n                && !inputs.dep_expense_ledgers.contains(&l.ledger)\n            {"
+ },
+ {
+  "id": "CL44-22",
+  "by": "author",
+  "what": "clause44: individual interest is a judgement item",
+  "file": "src/clause44.rs",
+  "from": "            Self::PartnerInterestOrRemuneration | Self::MixedInterestAndCharges",
+  "to": "            Self::PartnerInterestOrRemuneration | Self::MixedInterestAndCharges | Self::InterestIndividualNoGstin"
+ },
+ {
+  "id": "CL44-23",
+  "by": "author",
+  "what": "clause44: a padded money category is accepted instead of refused",
+  "file": "src/clause44.rs",
+  "from": "                .and_then(MoneyCategory::parse)",
+  "to": "                .and_then(|text| MoneyCategory::parse(support::py_strip(text)))"
+ },
+ {
+  "id": "CL44-24",
+  "by": "author",
+  "what": "clause44: composition is not stripped",
+  "file": "src/clause44.rs",
+  "from": "                .map(|text| support::py_casefold(support::py_strip(text)))",
+  "to": "                .map(|text| support::py_casefold(text))"
+ },
+ {
+  "id": "CL44-25",
+  "by": "author",
+  "what": "clause44: composition is not case-folded",
+  "file": "src/clause44.rs",
+  "from": "                .map(|text| support::py_casefold(support::py_strip(text)))",
+  "to": "                .map(|text| support::py_strip(text).to_string())"
+ },
+ {
+  "id": "CL44-26",
+  "by": "author",
+  "what": "clause44: a registration type that is not text is read as blank instead of refused",
+  "file": "src/clause44.rs",
+  "from": "            let folded = value\n                .as_str()\n                .map(",
+  "to": "            let folded = value\n                .as_str()\n                .or(Some(\"\"))\n                .map("
+ },
+ {
+  "id": "CL44-27",
+  "by": "author",
+  "what": "clause44: a money category that is not text is read as bank charges instead of refused",
+  "file": "src/clause44.rs",
+  "from": "            let category = value\n                .as_str()\n                .and_then(",
+  "to": "            let category = value\n                .as_str()\n                .or(Some(\"bank_charges\"))\n                .and_then("
+ },
+ {
+  "id": "CL44-28",
+  "by": "author",
+  "what": "clause44: the reconciling item takes optional and cancelled vouchers",
+  "file": "src/clause44.rs",
+  "from": "        if v.status != VoucherStatus::Postdated {",
+  "to": "        if v.status == VoucherStatus::Regular {"
+ },
+ {
+  "id": "CL44-29",
+  "by": "author",
+  "what": "clause44: an excluded voucher is labelled by its first line",
+  "file": "src/clause44.rs",
+  "from": "        excluded_by_guid.insert(v.guid.as_str(), v);",
+  "to": "        excluded_by_guid.entry(v.guid.as_str()).or_insert(v);"
+ },
+ {
+  "id": "CL44-30",
+  "by": "author",
+  "what": "clause44: a voucher is cited once per line",
+  "file": "src/clause44.rs",
+  "from": "        .filter(|row| pred(row) && seen.insert(row.voucher.guid.as_str()))",
+  "to": "        .filter(|row| pred(row) && (seen.insert(row.voucher.guid.as_str()) || true))"
+ },
+ {
+  "id": "CL44-31",
+  "by": "author",
+  "what": "clause44: the total leaves out the reasons",
+  "file": "src/clause44.rs",
+  "from": "    for (_, paise) in bucket_totals.values().chain(reason_totals.values()) {",
+  "to": "    for (_, paise) in bucket_totals.values() {"
+ },
+ {
+  "id": "CL44-32",
+  "by": "author",
+  "what": "clause44: the walk reads every voucher",
+  "file": "src/clause44.rs",
+  "from": "    for v in book.population()? {",
+  "to": "    for v in book.vouchers.iter() {"
+ },
+ {
+  "id": "CL44-33",
+  "by": "author",
+  "what": "clause44: CL44-1 fires at the tolerance against the Trial Balance",
+  "file": "src/clause44.rs",
+  "from": "        if (reconciled - fs_expenditure).abs() > TIE_TOLERANCE_PAISE {",
+  "to": "        if (reconciled - fs_expenditure).abs() >= TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "CL44-34",
+  "by": "author",
+  "what": "clause44: CL44-1 misses a negative difference",
+  "file": "src/clause44.rs",
+  "from": "        if (reconciled - fs_expenditure).abs() > TIE_TOLERANCE_PAISE {",
+  "to": "        if (reconciled - fs_expenditure) > TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "CL44-35",
+  "by": "author",
+  "what": "clause44: CL44-1 leaves out the reconciling item",
+  "file": "src/clause44.rs",
+  "from": "        let reconciled = total + excluded;",
+  "to": "        let reconciled = total;"
+ },
+ {
+  "id": "CL44-36",
+  "by": "author",
+  "what": "clause44: CL44-1 fires at the tolerance against the columns",
+  "file": "src/clause44.rs",
+  "from": "        if (col_sum - total).abs() > TIE_TOLERANCE_PAISE {",
+  "to": "        if (col_sum - total).abs() >= TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "CL44-37",
+  "by": "author",
+  "what": "clause44: CL44-2 lets one unclassified line pass",
+  "file": "src/clause44.rs",
+  "from": "    if let Some(n) = unclassified.filter(|n| *n != 0) {",
+  "to": "    if let Some(n) = unclassified.filter(|n| *n > 1) {"
+ },
+ {
+  "id": "CL44-38",
+  "by": "author",
+  "what": "clause44: CL44-3 checks a forced column",
+  "file": "src/clause44.rs",
+  "from": "            if e.kind != \"voucher\" || forced.contains(e.id.as_str()) {",
+  "to": "            if e.kind != \"voucher\" {"
+ },
+ {
+  "id": "CL44-39",
+  "by": "author",
+  "what": "clause44: CL44-3 reads the first voucher with a GUID",
+  "file": "src/clause44.rs",
+  "from": "        by_guid.insert(v.guid.as_str(), v);",
+  "to": "        by_guid.entry(v.guid.as_str()).or_insert(v);"
+ },
+ {
+  "id": "CL44-40",
+  "by": "author",
+  "what": "clause44: CL44-3 never falls back to the ledger's GSTIN",
+  "file": "src/clause44.rs",
+  "from": "            if gstin.is_empty() {\n                if let Some(l) = book.ledgers.get(&v.party_field) {",
+  "to": "            if false {\n                if let Some(l) = book.ledgers.get(&v.party_field) {"
+ },
+ {
+  "id": "CL44-41",
+  "by": "author",
+  "what": "clause44: CL44-3 flags an unregistered voucher with no GSTIN",
+  "file": "src/clause44.rs",
+  "from": "            if bucket == Bucket::Unregistered && !gstin.is_empty() {",
+  "to": "            if bucket == Bucket::Unregistered && gstin.is_empty() {"
+ },
+ {
+  "id": "CL44-42",
+  "by": "author",
+  "what": "clause44: the individual-interest finding is always raised",
+  "file": "src/clause44.rs",
+  "from": "    if d.judgement_candidate.0 > 0 {",
+  "to": "    if true {"
+ },
+ {
+  "id": "CL44-43",
+  "by": "author",
+  "what": "clause44: the judgement money-item finding is always raised",
+  "file": "src/clause44.rs",
+  "from": "    if d.reason_totals[&judgement_money].0 > 0 {",
+  "to": "    if true {"
+ },
+ {
+  "id": "CL44-44",
+  "by": "author",
+  "what": "clause44: a voucher's PARTYGSTIN is not read",
+  "file": "src/book.rs",
+  "from": "            party_gstin: v.child_text(\"PARTYGSTIN\").to_string(),",
+  "to": "            party_gstin: String::new(),"
+ },
+ {
+  "id": "CL44-45",
+  "by": "author",
+  "what": "clause44: the no-supplier ledgers are not bound",
+  "file": "src/binding.rs",
+  "from": "            Some(lbinder.bind_list(&names_at(value, location)?, location)?)\n        }\n    };\n    // `[roles].narration_payee_ledgers`",
+  "to": "            Some(names_at(value, location)?)\n        }\n    };\n    // `[roles].narration_payee_ledgers`"
+ },
+ {
+  "id": "CL44-46",
+  "by": "author",
+  "what": "clause44: the registration types are not bound",
+  "file": "src/binding.rs",
+  "from": "            &[\"roles\", \"gst_registration_type_by_ledger\"],",
+  "to": "            &[\"roles\", \"gst_registration_type_by_ledger_unbound\"],"
+ },
+ {
+  "id": "CL44-47",
+  "by": "author",
+  "what": "clause44: the money categories are not bound",
+  "file": "src/binding.rs",
+  "from": "            &[\"clause44\", \"money_category_by_ledger\"],",
+  "to": "            &[\"clause44\", \"money_category_by_ledger_unbound\"],"
+ },
+ {
+  "id": "CL44-48",
+  "by": "author",
+  "what": "clause44: a missing round-off list is not refused",
+  "file": "src/lib.rs",
+  "from": "    if !round_off_present {",
+  "to": "    if false && !round_off_present {"
+ },
+ {
+  "id": "CL44-49",
+  "by": "author",
+  "what": "clause44: the tax ledgers are one head's",
+  "file": "src/lib.rs",
+  "from": "                .iter()\n                .flat_map(|(_, ledgers)| ledgers.iter().cloned())",
+  "to": "                .iter()\n                .take(1)\n                .flat_map(|(_, ledgers)| ledgers.iter().cloned())"
+ },
+ {
+  "id": "CL44-50",
+  "by": "author",
+  "what": "clause44: a total wraps instead of refusing",
+  "file": "src/clause44.rs",
+  "from": "    a.checked_add(b).ok_or_else(|| support::overflow(TEST_ID))",
+  "to": "    Ok(a.wrapping_add(b))"
+ },
+ {
+  "id": "CL44-51",
+  "by": "author",
+  "what": "clause44: round-off does not follow a depreciation line (it looks past it for the line it rounds)",
+  "file": "src/clause44.rs",
+  "from": "            .filter(|l| !plain_round_off(&l.ledger))\n            .collect();",
+  "to": "            .filter(|l| {\n                !plain_round_off(&l.ledger) && !inputs.dep_expense_ledgers.contains(&l.ledger)\n            })\n            .collect();"
+ },
+ {
+  "id": "CL44-52",
+  "by": "author",
+  "what": "clause44: round-off does not follow a judgement item (it looks past it for the line it rounds)",
+  "file": "src/clause44.rs",
+  "from": "            .filter(|l| !plain_round_off(&l.ledger))\n            .collect();",
+  "to": "            .filter(|l| {\n                !plain_round_off(&l.ledger)\n                    && !inputs\n                        .money_category_by_ledger\n                        .get(&l.ledger)\n                        .is_some_and(|c| c.is_judgement())\n            })\n            .collect();"
+ },
+ {
+  "id": "CL44-53",
+  "by": "author",
+  "what": "clause44: a round-off ledger with a placement of its own is not set aside when round-off looks for the line it rounds",
+  "file": "src/clause44.rs",
+  "from": "            .filter(|l| !plain_round_off(&l.ledger))\n            .collect();",
+  "to": "            .filter(|l| !inputs.round_off_ledgers.contains(&l.ledger))\n            .collect();"
+ },
+ {
+  "id": "CL44-54",
+  "by": "author",
+  "what": "clause44: round-off always follows the first other line, whether or not the party reads it",
+  "file": "src/clause44.rs",
+  "from": "            .find(|l| own_placement(&l.ledger).is_none())",
+  "to": "            .find(|_| false)"
+ },
+ {
+  "id": "CL44-55",
+  "by": "author",
+  "what": "clause44: round-off beside only lines placed by their own ledgers is a non-supply expense",
+  "file": "src/clause44.rs",
+  "from": "            .or(others.first())",
+  "to": "            .or(None)"
+ },
+ {
+  "id": "CL44-56",
+  "by": "author",
+  "what": "clause44: round-off falls back to the last other line instead of the first",
+  "file": "src/clause44.rs",
+  "from": "            .or(others.first())",
+  "to": "            .or(others.last())"
+ },
+ {
+  "id": "CL44-57",
+  "by": "author",
+  "what": "clause44: a round-off ledger with a placement of its own is placed as a plain round-off line",
+  "file": "src/clause44.rs",
+  "from": "        |ledger: &str| inputs.round_off_ledgers.contains(ledger) && own_placement(ledger).is_none();",
+  "to": "        |ledger: &str| inputs.round_off_ledgers.contains(ledger);"
+ },
+ {
+  "id": "CL44-58",
+  "by": "author",
+  "what": "clause44: the line round-off follows is read by the party even when its own ledger places it",
+  "file": "src/clause44.rs",
+  "from": "            .map_or(Class::NoSupplier(Reason::NonSupplyExpense), |l| {\n                class_of(&l.ledger)\n            });",
+  "to": "            .map_or(Class::NoSupplier(Reason::NonSupplyExpense), |_| by_party);"
+ },
+ {
+  "id": "CL44-59",
+  "by": "author",
+  "what": "clause44: the individual-interest overlay skips a plain round-off line",
+  "file": "src/clause44.rs",
+  "from": "                == Some(&MoneyCategory::InterestIndividualNoGstin)\n            {",
+  "to": "                == Some(&MoneyCategory::InterestIndividualNoGstin)\n                && !plain_round_off(&l.ledger)\n            {"
+ },
+ {
+  "id": "CL44-60",
+  "by": "author",
+  "what": "clause44: a registration type outside Tally's list is accepted",
+  "file": "src/clause44.rs",
+  "from": "                .filter(|folded| REGISTRATION_TYPES.contains(&folded.as_str()))",
+  "to": "                .filter(|_| true)"
+ },
+ {
+  "id": "CL44-61",
+  "by": "author",
+  "what": "clause44: the registration type 'regular - sez' is not accepted",
+  "file": "src/clause44.rs",
+  "from": "    \"regular - sez\",\n",
+  "to": "    \"regular - sez!\",\n"
+ },
+ {
+  "id": "CL44-62",
+  "by": "author",
+  "what": "clause44: the registration type 'consumer' is not accepted",
+  "file": "src/clause44.rs",
+  "from": "    \"consumer\",\n",
+  "to": "    \"consumer!\",\n"
+ },
+ {
+  "id": "CL44-63",
+  "by": "author",
+  "what": "clause44: the registration type 'unregistered/consumer' is not accepted",
+  "file": "src/clause44.rs",
+  "from": "    \"unregistered/consumer\",\n",
+  "to": "    \"unregistered/consumer!\",\n"
+ },
+ {
+  "id": "CL44-64",
+  "by": "author",
+  "what": "clause44: a blank registration type is not accepted",
+  "file": "src/clause44.rs",
+  "from": "    \"\",\n    \"regular\",",
+  "to": "    \"x\",\n    \"regular\","
+ },
+ {
+  "id": "CL44-65",
+  "by": "author",
+  "what": "clause44: a refused registration type names the money table",
+  "file": "src/clause44.rs",
+  "from": "            let table = \"roles.gst_registration_type_by_ledger\";",
+  "to": "            let table = \"clause44.money_category_by_ledger\";"
+ },
+ {
+  "id": "CL44-66",
+  "by": "author",
+  "what": "clause44: a refused registration type names no ledger",
+  "file": "src/clause44.rs",
+  "from": "                .ok_or_else(|| refusal(table, ledger))?;",
+  "to": "                .ok_or_else(|| refusal(table, \"\"))?;"
+ },
+ {
+  "id": "CL44-67",
+  "by": "author",
+  "what": "clause44: a refused money category names the registration table",
+  "file": "src/clause44.rs",
+  "from": "refusal(\"clause44.money_category_by_ledger\", ledger)",
+  "to": "refusal(\"roles.gst_registration_type_by_ledger\", ledger)"
+ },
+ {
+  "id": "CL44-68",
+  "by": "author",
+  "what": "clause44: the registration table's last offending entry is named instead of its first",
+  "file": "src/clause44.rs",
+  "from": "        for (ledger, value) in registration_type_by_ledger {",
+  "to": "        for (ledger, value) in registration_type_by_ledger.iter().rev() {"
+ },
+ {
+  "id": "CL44-69",
+  "by": "author",
+  "what": "clause44: the money table's last offending entry is named instead of its first",
+  "file": "src/clause44.rs",
+  "from": "        for (ledger, value) in money_category_by_ledger {",
+  "to": "        for (ledger, value) in money_category_by_ledger.iter().rev() {"
+ },
+ {
+  "id": "CL44-70",
+  "by": "author",
+  "what": "clause44: a registration type is lower-cased instead of case-folded before it is compared",
+  "file": "src/clause44.rs",
+  "from": "                .map(|text| support::py_casefold(support::py_strip(text)))",
+  "to": "                .map(|text| support::py_strip(text).to_lowercase())"
+ },
+ {
+  "id": "CL44-71",
+  "by": "reviewer",
+  "what": "clause44: a voucher with no party is read by its (absent) party ledger's GSTIN, not set aside",
+  "file": "src/clause44.rs",
+  "from": "        if v.party_field.is_empty() {\n            return Class::NoSupplier(Reason::NoParty);",
+  "to": "        if false {\n            return Class::NoSupplier(Reason::NoParty);"
+ },
+ {
+  "id": "CL44-72",
+  "by": "reviewer",
+  "what": "clause44: a ledger in both the depreciation set and the no-supplier list is a non-supply expense, not depreciation",
+  "file": "src/clause44.rs",
+  "from": "        if inputs.dep_expense_ledgers.contains(ledger) {\n            Some(Class::NoSupplier(Reason::DepreciationLedger))",
+  "to": "        if inputs.dep_expense_ledgers.contains(ledger)\n            && !inputs.no_supplier_expense_ledgers.contains(ledger)\n        {\n            Some(Class::NoSupplier(Reason::DepreciationLedger))"
+ },
+ {
+  "id": "CL44-73",
+  "by": "reviewer",
+  "what": "clause44: a forced money category places no line; the party reads it",
+  "file": "src/clause44.rs",
+  "from": "                .and_then(MoneyCategory::forced)\n                .map(|bucket| Class::Bucket {",
+  "to": "                .and_then(|_| None::<Bucket>)\n                .map(|bucket| Class::Bucket {"
+ },
+ {
+  "id": "CL44-74",
+  "by": "reviewer",
+  "what": "clause44: the registration type 'regular' is not accepted",
+  "file": "src/clause44.rs",
+  "from": "    \"regular\",\n",
+  "to": "    \"regular!\",\n"
+ },
+ {
+  "id": "CL44-75",
+  "by": "reviewer",
+  "what": "clause44: the registration type 'unregistered' is not accepted",
+  "file": "src/clause44.rs",
+  "from": "    \"unregistered\",\n",
+  "to": "    \"unregistered!\",\n"
+ },
+ {
+  "id": "CL44-76",
+  "by": "reviewer",
+  "what": "clause44: the registration type 'composition' is not accepted",
+  "file": "src/clause44.rs",
+  "from": "    \"composition\",\n",
+  "to": "    \"composition!\",\n"
+ },
+ {
+  "id": "CL44-77",
+  "by": "reviewer",
+  "what": "clause44: every ledger with a registration type but composition is read as a composition supplier",
+  "file": "src/clause44.rs",
+  "from": "            if folded == \"composition\" {",
+  "to": "            if folded != \"composition\" {"
+ },
+ {
+  "id": "CL44-78",
+  "by": "reviewer",
+  "what": "clause44: the party ledger's GSTIN is not stripped, so one of only spaces counts as a GSTIN",
+  "file": "src/clause44.rs",
+  "from": "            .map_or_else(String::new, |l| norm_gstin(&l.gstin))",
+  "to": "            .map_or_else(String::new, |l| l.gstin.clone())"
+ },
+ {
+  "id": "CL44-79",
+  "by": "reviewer",
+  "what": "clause44: a GSTIN is trimmed of Unicode white space only, so one of only U+001C to U+001F counts as a GSTIN",
+  "file": "src/clause44.rs",
+  "from": "    support::py_upper(support::py_strip(text))",
+  "to": "    support::py_upper(text.trim())"
+ },
+ {
+  "id": "CL44-80",
+  "by": "reviewer",
+  "what": "clause44: a registration type is trimmed of Unicode white space only, so one padded with U+001C to U+001F is refused",
+  "file": "src/clause44.rs",
+  "from": "                .map(|text| support::py_casefold(support::py_strip(text)))",
+  "to": "                .map(|text| support::py_casefold(text.trim()))"
+ },
+ {
+  "id": "NR-01",
+  "by": "author",
+  "what": "narration_payees: only the letters a to z upper-cased",
+  "file": "src/narration_payees.rs",
+  "from": "let text = py_split(&py_upper(narration)).join(\" \");",
+  "to": "let text = py_split(&narration.to_ascii_uppercase()).join(\" \");"
+ },
+ {
+  "id": "NR-02",
+  "by": "author",
+  "what": "narration_payees: Rust's whitespace in place of Python's",
+  "file": "src/narration_payees.rs",
+  "from": "let text = py_split(&py_upper(narration)).join(\" \");",
+  "to": "let text = py_upper(narration).split_whitespace().collect::<Vec<_>>().join(\" \");"
+ },
+ {
+  "id": "NR-03",
+  "by": "author",
+  "what": "narration_payees: a name of forms 1 to 3 keeps the space before its hyphen",
+  "file": "src/narration_payees.rs",
+  "from": "    if name.ends_with(' ') {\n        name.pop();\n    }\n    Some((name, end + 1))",
+  "to": "    Some((name, end + 1))"
+ },
+ {
+  "id": "NR-04",
+  "by": "author",
+  "what": "narration_payees: a name of forms 1 to 3 may hold an underscore",
+  "file": "src/narration_payees.rs",
+  "from": "matches!(x, ' ' | '.' | '&' | '\\'')",
+  "to": "matches!(x, ' ' | '.' | '&' | '\\'' | '_')"
+ },
+ {
+  "id": "NR-05",
+  "by": "author",
+  "what": "narration_payees: a channel word alone is a name",
+  "file": "src/narration_payees.rs",
+  "from": "    if CHANNEL_WORDS.contains(&name.as_str()) {\n        return Some(Reading::NoPayee);",
+  "to": "    if false {\n        return Some(Reading::NoPayee);"
+ },
+ {
+  "id": "NR-06",
+  "by": "author",
+  "what": "narration_payees: UPI is not a channel word",
+  "file": "src/narration_payees.rs",
+  "from": "const CHANNEL_WORDS: [&str; 4] = [\"UPI\", \"IMPS\", \"NEFT\", \"RTGS\"];",
+  "to": "const CHANNEL_WORDS: [&str; 3] = [\"IMPS\", \"NEFT\", \"RTGS\"];"
+ },
+ {
+  "id": "NR-07",
+  "by": "author",
+  "what": "narration_payees: the IMPS reference takes ASCII digits only",
+  "file": "src/narration_payees.rs",
+  "from": "let i = run1(c, lit(c, 0, \"IMPS-\")?, py_is_decimal)?;",
+  "to": "let i = run1(c, lit(c, 0, \"IMPS-\")?, |x| x.is_ascii_digit())?;"
+ },
+ {
+  "id": "NR-08",
+  "by": "author",
+  "what": "narration_payees: RTGS reported as NEFT",
+  "file": "src/narration_payees.rs",
+  "from": "None => (lit(c, 0, \"RTGS\")?, Channel::Rtgs),",
+  "to": "None => (lit(c, 0, \"RTGS\")?, Channel::Neft),"
+ },
+ {
+  "id": "NR-09",
+  "by": "author",
+  "what": "narration_payees: NEFT and RTGS need the space before DR",
+  "file": "src/narration_payees.rs",
+  "from": "let i = lit(c, opt(c, i, ' '), \"DR-\")?;",
+  "to": "let i = lit(c, i, \" DR-\")?;"
+ },
+ {
+  "id": "NR-10",
+  "by": "author",
+  "what": "narration_payees: the NEFT code takes any decimal digit",
+  "file": "src/narration_payees.rs",
+  "from": "let i = run1(c, i, |x| az(x) || x.is_ascii_digit())?;",
+  "to": "let i = run1(c, i, |x| az(x) || py_is_decimal(x))?;"
+ },
+ {
+  "id": "NR-11",
+  "by": "author",
+  "what": "narration_payees: the second layout's reference takes ASCII digits only",
+  "file": "src/narration_payees.rs",
+  "from": "|x| x == ' ' || py_is_decimal(x)",
+  "to": "|x| x == ' ' || x.is_ascii_digit()"
+ },
+ {
+  "id": "NR-12",
+  "by": "author",
+  "what": "narration_payees: the second layout's placeholders are payees",
+  "file": "src/narration_payees.rs",
+  "from": "    if PLACEHOLDERS.contains(&name.as_str()) {",
+  "to": "    if false {"
+ },
+ {
+  "id": "NR-13",
+  "by": "author",
+  "what": "narration_payees: the second layout's name needs a letter of any script",
+  "file": "src/narration_payees.rs",
+  "from": "    if !name.chars().any(az) {",
+  "to": "    if !name.chars().any(char::is_alphabetic) {"
+ },
+ {
+  "id": "NR-14",
+  "by": "author",
+  "what": "narration_payees: the second layout's handle is never cut",
+  "file": "src/narration_payees.rs",
+  "from": "        None => Handle::Cut(field),",
+  "to": "        None => Handle::Whole(field),"
+ },
+ {
+  "id": "NR-15",
+  "by": "author",
+  "what": "narration_payees: the second layout's handle is cut at the last @",
+  "file": "src/narration_payees.rs",
+  "from": "    let handle = match field.split_once('@') {",
+  "to": "    let handle = match field.rsplit_once('@') {"
+ },
+ {
+  "id": "NR-16",
+  "by": "author",
+  "what": "narration_payees: the first layout's handle suffix takes ASCII digits only",
+  "file": "src/narration_payees.rs",
+  "from": "        end = run1(c, end + 1, py_is_decimal)?;",
+  "to": "        end = run1(c, end + 1, |x| x.is_ascii_digit())?;"
+ },
+ {
+  "id": "NR-17",
+  "by": "author",
+  "what": "narration_payees: the first layout's handle may hold a space",
+  "file": "src/narration_payees.rs",
+  "from": "matches!(x, '.' | '_')\n",
+  "to": "matches!(x, '.' | '_' | ' ')\n"
+ },
+ {
+  "id": "NR-18",
+  "by": "author",
+  "what": "narration_payees: the cheque prefix is kept in the name",
+  "file": "src/narration_payees.rs",
+  "from": "    let i = cheque_prefix(c).unwrap_or(0);",
+  "to": "    let i = 0;"
+ },
+ {
+  "id": "NR-19",
+  "by": "author",
+  "what": "narration_payees: the cheque prefix may be followed by a letter",
+  "file": "src/narration_payees.rs",
+  "from": "    if c.get(i).is_some_and(|&x| az(x)) {\n        return None;\n    }",
+  "to": "    if false {\n        return None;\n    }"
+ },
+ {
+  "id": "NR-20",
+  "by": "author",
+  "what": "narration_payees: only the exact names SELF and CASH PAID TO are refused",
+  "file": "src/narration_payees.rs",
+  "from": ".is_some_and(|rest| !rest.starts_with(az))",
+  "to": ".is_some_and(str::is_empty)"
+ },
+ {
+  "id": "NR-21",
+  "by": "author",
+  "what": "narration_payees: a cheque name may hold digits",
+  "file": "src/narration_payees.rs",
+  "from": ".take_while(|&&x| az(x) || matches!(x, ' ' | '.'))",
+  "to": ".take_while(|&&x| az(x) || x.is_ascii_digit() || matches!(x, ' ' | '.'))"
+ },
+ {
+  "id": "NR-22",
+  "by": "author",
+  "what": "narration_payees: a cheque needs no space allowed after its hyphen",
+  "file": "src/narration_payees.rs",
+  "from": "lit(c, opt(c, j, ' '), \"CHQ PAID\")",
+  "to": "lit(c, j, \"CHQ PAID\")"
+ },
+ {
+  "id": "NR-23",
+  "by": "author",
+  "what": "narration_payees: a payment's amount is its net on the ledgers read",
+  "file": "src/narration_payees.rs",
+  "from": ".filter(|l| l.amount_paise > 0 && self.read.contains(&l.ledger))",
+  "to": ".filter(|l| self.read.contains(&l.ledger))"
+ },
+ {
+  "id": "NR-24",
+  "by": "author",
+  "what": "narration_payees: a bank debit counts as a bank leg",
+  "file": "src/narration_payees.rs",
+  "from": ".any(|l| l.amount_paise < 0 && self.bank.contains(&l.ledger))",
+  "to": ".any(|l| l.amount_paise != 0 && self.bank.contains(&l.ledger))"
+ },
+ {
+  "id": "NR-25",
+  "by": "author",
+  "what": "narration_payees: a placeholder left out of the unread total",
+  "file": "src/narration_payees.rs",
+  "from": "            reading if amount != 0 => {",
+  "to": "            reading if amount != 0 && reading != Reading::Placeholder => {"
+ },
+ {
+  "id": "NR-26",
+  "by": "author",
+  "what": "narration_payees: a cut handle joins without an agreeing name",
+  "file": "src/narration_payees.rs",
+  "from": ".any(|n| names_agree(n, &p.printed.name)) =>",
+  "to": ".any(|_| true) =>"
+ },
+ {
+  "id": "NR-27",
+  "by": "author",
+  "what": "narration_payees: a cut handle joins the first of several whole ones",
+  "file": "src/narration_payees.rs",
+  "from": "                [only]\n",
+  "to": "                [only, ..]\n"
+ },
+ {
+  "id": "NR-28",
+  "by": "author",
+  "what": "narration_payees: a payee keyed by its largest handle",
+  "file": "src/narration_payees.rs",
+  "from": ".filter_map(|p| p.joins_by.as_ref()).min()",
+  "to": ".filter_map(|p| p.joins_by.as_ref()).max()"
+ },
+ {
+  "id": "NR-29",
+  "by": "author",
+  "what": "narration_payees: a payee keyed without the upi: prefix",
+  "file": "src/narration_payees.rs",
+  "from": "Some(h) => format!(\"upi:{h}\"),",
+  "to": "Some(h) => h.clone(),"
+ },
+ {
+  "id": "NR-30",
+  "by": "author",
+  "what": "narration_payees: added ledgers: any nature mapped",
+  "file": "src/narration_payees.rs",
+  "from": ".filter(|l| nature_by_ledger.get(&l.ledger).map(String::as_str) == Some(\"194C\"))",
+  "to": ".filter(|l| nature_by_ledger.contains_key(&l.ledger))"
+ },
+ {
+  "id": "NR-31",
+  "by": "author",
+  "what": "narration_payees: added ledgers: a credit line adds its ledger too",
+  "file": "src/narration_payees.rs",
+  "from": "        .filter(|l| l.amount_paise > 0)\n        .filter(|l| nature_by_ledger",
+  "to": "        .filter(|l| nature_by_ledger"
+ },
+ {
+  "id": "NR-32",
+  "by": "author",
+  "what": "narration_payees: added ledgers: looked for under another nature's finding",
+  "file": "src/narration_payees.rs",
+  "from": "\"{}/194C_{}\",",
+  "to": "\"{}/194J_{}\","
+ },
+ {
+  "id": "NR-33",
+  "by": "author",
+  "what": "narration_payees: added count: a listed ledger counted again",
+  "file": "src/narration_payees.rs",
+  "from": "count(TEST_ID, added.difference(listed).count())?",
+  "to": "count(TEST_ID, added.len())?"
+ },
+ {
+  "id": "NR-34",
+  "by": "author",
+  "what": "narration_payees: over: the single-sum limit reached, not passed",
+  "file": "src/narration_payees.rs",
+  "from": "row.max > limits.single_sum_paise",
+  "to": "row.max >= limits.single_sum_paise"
+ },
+ {
+  "id": "NR-35",
+  "by": "author",
+  "what": "narration_payees: over: the aggregate limit reached, not passed",
+  "file": "src/narration_payees.rs",
+  "from": "row.total > limits.aggregate_paise",
+  "to": "row.total >= limits.aggregate_paise"
+ },
+ {
+  "id": "NR-36",
+  "by": "author",
+  "what": "narration_payees: same day: one payment is enough",
+  "file": "src/narration_payees.rs",
+  "from": "if ps.len() < 2 || sum <= limits.single_sum_paise {",
+  "to": "if sum <= limits.single_sum_paise {"
+ },
+ {
+  "id": "NR-37",
+  "by": "author",
+  "what": "narration_payees: same day: the limit reached, not passed",
+  "file": "src/narration_payees.rs",
+  "from": "if ps.len() < 2 || sum <= limits.single_sum_paise {",
+  "to": "if ps.len() < 2 || sum < limits.single_sum_paise {"
+ },
+ {
+  "id": "NR-38",
+  "by": "author",
+  "what": "narration_payees: elsewhere: a Contra counted",
+  "file": "src/narration_payees.rs",
+  "from": "        if v.base_type == \"Contra\" {",
+  "to": "        if false {"
+ },
+ {
+  "id": "NR-39",
+  "by": "author",
+  "what": "narration_payees: elsewhere: a bank ledger given counted",
+  "file": "src/narration_payees.rs",
+  "from": "                || self.bank.contains(&l.ledger)\n",
+  "to": "\n"
+ },
+ {
+  "id": "NR-40",
+  "by": "author",
+  "what": "narration_payees: elsewhere: a ledger with no master left out",
+  "file": "src/narration_payees.rs",
+  "from": ".is_some_and(|m| NOT_OTHER_GROUPS.iter().any(|g| m.under(g)));",
+  "to": ".is_none_or(|m| NOT_OTHER_GROUPS.iter().any(|g| m.under(g)));"
+ },
+ {
+  "id": "NR-41",
+  "by": "author",
+  "what": "narration_payees: elsewhere: a payee over a limit can cross again",
+  "file": "src/narration_payees.rs",
+  "from": "let crossing = !over(row)",
+  "to": "let crossing = true"
+ },
+ {
+  "id": "NR-42",
+  "by": "author",
+  "what": "narration_payees: elsewhere: all the other debits together tested against the single-sum limit",
+  "file": "src/narration_payees.rs",
+  "from": "|| largest > limits.single_sum_paise",
+  "to": "|| sum > limits.single_sum_paise"
+ },
+ {
+  "id": "NR-43",
+  "by": "author",
+  "what": "narration_payees: cut handles: a payment outside the rows counted",
+  "file": "src/narration_payees.rs",
+  "from": ".filter(|i| w.payments[*i].cut_unjoined.is_some() && in_row.contains(i))",
+  "to": ".filter(|i| w.payments[*i].cut_unjoined.is_some())"
+ },
+ {
+  "id": "NR-44",
+  "by": "author",
+  "what": "narration_payees: cut handles: a group of one listed",
+  "file": "src/narration_payees.rs",
+  "from": "        if payees.len() < 2 {",
+  "to": "        if payees.is_empty() {"
+ },
+ {
+  "id": "NR-45",
+  "by": "author",
+  "what": "narration_payees: cut handles: the group tag hashes upi: and the handle",
+  "file": "src/narration_payees.rs",
+  "from": "&format!(\"possible_same_{}\", hash8(cut)),",
+  "to": "&format!(\"possible_same_{}\", hash8(&format!(\"upi:{cut}\"))),"
+ },
+ {
+  "id": "NR-46",
+  "by": "author",
+  "what": "narration_payees: a citation's label replaces an empty number by the GUID",
+  "file": "src/narration_payees.rs",
+  "from": "        &format!(\"{} {} on {}\", v.vtype, v.number, iso(&v.date)),",
+  "to": "        &crate::support::voucher_label(v),"
+ },
+ {
+  "id": "NR-47",
+  "by": "author",
+  "what": "narration_payees: one citation per GUID, whatever the label",
+  "file": "src/narration_payees.rs",
+  "from": ".filter(|r| seen.insert((r.id.clone(), r.label.clone())))",
+  "to": ".filter(|r| seen.insert((r.id.clone(), String::new())))"
+ },
+ {
+  "id": "NR-48",
+  "by": "author",
+  "what": "narration_payees: check: a cited GUID resolves to its first population voucher",
+  "file": "src/narration_payees.rs",
+  "from": "        .enumerate()\n        .map(|(at, v)| (v.guid.as_str(), at))",
+  "to": "        .enumerate()\n        .rev()\n        .map(|(at, v)| (v.guid.as_str(), at))"
+ },
+ {
+  "id": "NR-49",
+  "by": "author",
+  "what": "narration_payees: check: no NP-3",
+  "file": "src/narration_payees.rs",
+  "from": "                if *earlier != tag {",
+  "to": "                if false {"
+ },
+ {
+  "id": "NR-50",
+  "by": "author",
+  "what": "narration_payees: check: NP-6 does not link by a shared name",
+  "file": "src/narration_payees.rs",
+  "from": "    if a.name == b.name {\n        return true;",
+  "to": "    if false {\n        return true;"
+ },
+ {
+  "id": "NR-51",
+  "by": "author",
+  "what": "narration_payees: check: a cited voucher with no bank leg reported, not stopped on",
+  "file": "src/narration_payees.rs",
+  "from": "Some(at) if !w.outgoing.contains(&at) => {",
+  "to": "Some(at) if false && !w.outgoing.contains(&at) => {"
+ },
+ {
+  "id": "NR-52",
+  "by": "author",
+  "what": "narration_payees: bind keeps no narration payee ledgers",
+  "file": "src/binding.rs",
+  "from": "        narration_payee_ledgers,\n        bank_reconciliation_ledger,",
+  "to": "        narration_payee_ledgers: Vec::new(),\n        bank_reconciliation_ledger,"
+ },
+ {
+  "id": "NR-53",
+  "by": "author",
+  "what": "narration_payees: narration_payees_on reads nothing added",
+  "file": "src/lib.rs",
+  "from": "narration_payees::run(book, rules, &bank, &listed, &added)?;",
+  "to": "narration_payees::run(book, rules, &bank, &listed, &BTreeSet::new())?;"
+ },
+ {
+  "id": "KO-32",
+  "by": "author",
+  "what": "knock_off_candidates: a Contra told by its type name, not its base type",
+  "file": "src/knock_off_candidates.rs",
+  "from": "if v.base_type == CONTRA || lines()",
+  "to": "if v.vtype == CONTRA || lines()"
+ },
+ {
+  "id": "NR-54",
+  "by": "author",
+  "what": "narration_payees: check: NP-1 does not compare resolved_total with the payee totals",
+  "file": "src/narration_payees.rs",
+  "from": "        if int_of(f) != sum {\n            out.push(format!(\n                \"NP-1: resolved_total",
+  "to": "        if false {\n            out.push(format!(\n                \"NP-1: resolved_total"
+ },
+ {
+  "id": "NR-55",
+  "by": "author",
+  "what": "narration_payees: check: NP-1 does not compare the unread and not-through-bank totals",
+  "file": "src/narration_payees.rs",
+  "from": "            if int_of(f) != fresh {",
+  "to": "            if false {"
+ },
+ {
+  "id": "NR-56",
+  "by": "author",
+  "what": "narration_payees: check: NP-1 does not compare a payee total with the fresh walk's",
+  "file": "src/narration_payees.rs",
+  "from": "            Some(&sum) if sum != int_of(f) => out.push(format!(",
+  "to": "            Some(&sum) if false && sum != int_of(f) => out.push(format!("
+ },
+ {
+  "id": "NR-57",
+  "by": "author",
+  "what": "narration_payees: check: NP-1 does not report a payee total the fresh walk does not find",
+  "file": "src/narration_payees.rs",
+  "from": "            None => out.push(format!(\n                \"NP-1: {} names a payee a fresh population walk does not find at all\",\n                f.id\n            )),",
+  "to": "            None => {}"
+ },
+ {
+  "id": "NR-58",
+  "by": "author",
+  "what": "narration_payees: check: NP-1 does not report a payee the fresh walk finds with no figure",
+  "file": "src/narration_payees.rs",
+  "from": "        if !figured.contains(*tag) {",
+  "to": "        if false {"
+ },
+ {
+  "id": "NR-59",
+  "by": "author",
+  "what": "narration_payees: walk: an unread payment's amount counted one paisa high",
+  "file": "src/narration_payees.rs",
+  "from": "w.unresolved_total = add(w.unresolved_total, amount)?;",
+  "to": "w.unresolved_total = add(w.unresolved_total, amount + 1)?;"
+ },
+ {
+  "id": "NR-60",
+  "by": "author",
+  "what": "narration_payees: walk: a row's total leaves out its first payment",
+  "file": "src/narration_payees.rs",
+  "from": "let total = total(payments.iter().map(|&i| &w.payments[i].amount))?;",
+  "to": "let total = total(payments.iter().skip(1).map(|&i| &w.payments[i].amount))?;"
+ },
+ {
+  "id": "NR-61",
+  "by": "author",
+  "what": "narration_payees: check: NP-2 still checks a cited voucher outside the population",
+  "file": "src/narration_payees.rs",
+  "from": "                        f.id, e.id\n                    ));\n                    continue;\n",
+  "to": "                        f.id, e.id\n                    ));\n"
+ },
+ {
+  "id": "NR-62",
+  "by": "author",
+  "what": "narration_payees: binding: roles.narration_payee_ledgers bound right after round_off_ledgers",
+  "file": "src/binding.rs",
+  "from": "        lbinder.bind_list(&engagement.round_off_ledgers, \"roles.round_off_ledgers\")?;\n",
+  "to": "        lbinder.bind_list(&engagement.round_off_ledgers, \"roles.round_off_ledgers\")?;\n    lbinder.bind_list(\n        &list_at(&engagement.raw_cfg, &[\"roles\", \"narration_payee_ledgers\"])?,\n        \"roles.narration_payee_ledgers\",\n    )?;\n"
+ },
+ {
+  "id": "OS-1",
+  "by": "author",
+  "what": "book.rs: an unknown integration flag read as integrated",
+  "file": "src/book.rs",
+  "from": "    if is_integrated != Some(true) {\n        return OpeningStock::NotApplicable;",
+  "to": "    if is_integrated == Some(false) {\n        return OpeningStock::NotApplicable;"
+ },
+ {
+  "id": "OS-2",
+  "by": "author",
+  "what": "book.rs: integrated inventory with no stock-items part read as not applicable",
+  "file": "src/book.rs",
+  "from": "        return OpeningStock::Unknown(OpeningStockUnknown::NotRead);",
+  "to": "        return OpeningStock::NotApplicable;"
+ },
+ {
+  "id": "OS-3",
+  "by": "author",
+  "what": "book.rs: a trial balance starting after the books' first day still takes the masters' opening values",
+  "file": "src/book.rs",
+  "from": "    if tb_from.is_none() || tb_from != books_from {",
+  "to": "    if tb_from.is_none() {"
+ },
+ {
+  "id": "OS-4",
+  "by": "author",
+  "what": "book.rs: an unreadable stock-items part read as no opening stock",
+  "file": "src/book.rs",
+  "from": "        Err(_) => OpeningStock::Unknown(OpeningStockUnknown::Unreadable),",
+  "to": "        Err(_) => OpeningStock::Valued(0),"
+ },
+ {
+  "id": "OS-5",
+  "by": "author",
+  "what": "book.rs: an item with no opening value counted as one paisa",
+  "file": "src/book.rs",
+  "from": "                .map(|m| m.opening_value_paise.unwrap_or(0))",
+  "to": "                .map(|m| m.opening_value_paise.unwrap_or(1))"
+ },
+ {
+  "id": "OS-6",
+  "by": "author",
+  "what": "invariants.rs: POP-3 subtracts opening stock instead of adding it",
+  "file": "src/invariants.rs",
+  "from": "            let difference = sum + stock;",
+  "to": "            let difference = sum - stock;"
+ },
+ {
+  "id": "OS-7",
+  "by": "author",
+  "what": "invariants.rs: POP-3 uses the new text for a zero stock term",
+  "file": "src/invariants.rs",
+  "from": "        OpeningStock::Valued(stock) if stock != 0 => {",
+  "to": "        OpeningStock::Valued(stock) => {"
+ },
+ {
+  "id": "OS-8",
+  "by": "author",
+  "what": "invariants.rs: POP-3 drops the reason an opening stock is unknown",
+  "file": "src/invariants.rs",
+  "from": "                \"TB {key} sums to {sum} paise; opening stock {}\",\n                why.as_str()",
+  "to": "                \"TB {key} sums to {sum} paise{}\",\n                \"\""
+ },
+ {
+  "id": "OS-9",
+  "by": "author",
+  "what": "book.rs: load_book passes no trial-balance window, so no read's opening stock is known",
+  "file": "src/book.rs",
+  "from": "        tp.window.as_ref().map(|w| &w.from),",
+  "to": "        None,"
+ },
+ {
+  "id": "OS-10",
+  "by": "author",
+  "what": "book.rs: load_book passes no books' first day, so no read's opening stock is known",
+  "file": "src/book.rs",
+  "from": "        read.books_from.as_ref(),\n",
+  "to": "        None,\n"
+ },
+ {
+  "id": "OS-11",
+  "by": "author",
+  "what": "invariants.rs: POP-3 reports a difference of exactly one rupee after opening stock",
+  "file": "src/invariants.rs",
+  "from": "            (difference.abs() > TIE_TOLERANCE_PAISE).then(|| {",
+  "to": "            (difference.abs() >= TIE_TOLERANCE_PAISE).then(|| {"
+ },
+ {
+  "id": "OS-12",
+  "by": "author",
+  "what": "invariants.rs: POP-3 reports a ledger sum of exactly one rupee when the opening stock is unknown",
+  "file": "src/invariants.rs",
+  "from": "        OpeningStock::Unknown(why) => (sum.abs() > TIE_TOLERANCE_PAISE).then(|| {",
+  "to": "        OpeningStock::Unknown(why) => (sum.abs() >= TIE_TOLERANCE_PAISE).then(|| {"
+ },
+ {
+  "id": "OS-13",
+  "by": "author",
+  "what": "book.rs: a read that records no trial-balance window takes the items' opening values",
+  "file": "src/book.rs",
+  "from": "    if tb_from.is_none() || tb_from != books_from {",
+  "to": "    if tb_from != books_from {"
+ },
+ {
+  "id": "OS-14",
+  "by": "author",
+  "what": "cash_book_integrity.rs: opening stock is subtracted from the ledger sum instead of added",
+  "file": "src/cash_book_integrity.rs",
+  "from": "            let rest = add(diff, stock)?;\n",
+  "to": "            let rest = diff.checked_sub(stock).ok_or_else(overflow)?;\n"
+ },
+ {
+  "id": "OS-15",
+  "by": "author",
+  "what": "cash_book_integrity.rs: a zero opening stock adds the stock figures",
+  "file": "src/cash_book_integrity.rs",
+  "from": "        OpeningStock::Valued(stock) if stock != 0 => {\n",
+  "to": "        OpeningStock::Valued(stock) => {\n"
+ },
+ {
+  "id": "OS-16",
+  "by": "author",
+  "what": "cash_book_integrity.rs: the finding is raised on the ledger sum, not on what remains after opening stock",
+  "file": "src/cash_book_integrity.rs",
+  "from": "    if remainder != 0 {\n",
+  "to": "    if diff != 0 {\n"
+ },
+ {
+  "id": "OS-17",
+  "by": "author",
+  "what": "cash_book_integrity.rs: an unknown opening stock is not named in the finding's limits",
+  "file": "src/cash_book_integrity.rs",
+  "from": "            limits.push(format!(\n",
+  "to": "            drop(format!(\n"
+ },
+ {
+  "id": "OS-18",
+  "by": "author",
+  "what": "cash_book_integrity.rs: the remainder figure carries the ledger sum",
+  "file": "src/cash_book_integrity.rs",
+  "from": "                Value::Int(rest),\n",
+  "to": "                Value::Int(diff),\n"
+ },
+ {
+  "id": "OS-19",
+  "by": "author",
+  "what": "cash_book_integrity.rs: the finding's difference fact points at the ledger sum, not the remainder",
+  "file": "src/cash_book_integrity.rs",
+  "from": "                (\"difference\".to_string(), f_rest),\n",
+  "to": "                (\"difference\".to_string(), f_diff.clone()),\n"
+ },
+ {
+  "id": "OS-20",
+  "by": "author",
+  "what": "cash_book_integrity.rs: the opening stock figure carries the stock with its sign reversed",
+  "file": "src/cash_book_integrity.rs",
+  "from": "                Value::Int(stock),\n",
+  "to": "                Value::Int(-stock),\n"
+ },
+ {
+  "id": "OS-21",
+  "by": "author",
+  "what": "invariants.rs: POP-3 with no stock term reports a ledger sum of exactly one rupee",
+  "file": "src/invariants.rs",
+  "from": "            (sum.abs() > TIE_TOLERANCE_PAISE).then(|| format!(\"TB {key} sums to {sum} paise\"))\n",
+  "to": "            (sum.abs() >= TIE_TOLERANCE_PAISE).then(|| format!(\"TB {key} sums to {sum} paise\"))\n"
  }
 ]

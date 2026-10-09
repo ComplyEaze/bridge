@@ -355,15 +355,15 @@ figure or byte enters this repository or its CI.
    Known exceptions: this crate's `Engagement::from_toml` still refuses these when the config
    loads, so a malformed value there refuses every test. They stay that way until they are brought
    in line, which is a change inside the crate.
-   - `[tds]` and `[tds_payees]` (`src/lib.rs:821-889`): `tds_payees` (batch C1) was written before
+   - `[tds]` and `[tds_payees]` (`src/lib.rs:822-890`): `tds_payees` (batch C1) was written before
      this convention. With them go two values the same test reads elsewhere, `[client].state` and
-     `[deductor]` with its `activity` (`src/lib.rs:956-957`, `src/tds_payees.rs:380-414`).
+     `[deductor]` with its `activity` (`src/lib.rs:957-958`, `src/tds_payees.rs:383-417`).
    - `[depreciation]`, when a required key is missing or an entry is wrongly typed
-     (`src/lib.rs:669-755`).
-   - `[tds_tcs_26as]`, when it is not a table or a key has the wrong type (`src/lib.rs:769-820`).
+     (`src/lib.rs:670-756`).
+   - `[tds_tcs_26as]`, when it is not a table or a key has the wrong type (`src/lib.rs:770-821`).
    - `[partners]`, when it or a partner is not a table, or an `interest_ledger` is not text
-     (`src/lib.rs:890-914`).
-   - `[presumptive_history]`, when it is not a table (`src/lib.rs:966-973`), although the bullet
+     (`src/lib.rs:891-915`).
+   - `[presumptive_history]`, when it is not a table (`src/lib.rs:967-974`), although the bullet
      above says such a table is refused only when its test runs.
 
 ## 11. Ledger tags: figure/finding ids keyed by GUID, not by name
@@ -405,16 +405,17 @@ relying on a successful group tag over a GUID-less group has been found), and th
 extend the fallback to groups without that same measurement.
 
 **Evidence refs name what they cite.** An evidence ref's id is the identifier of the thing cited, not
-a tag. The crate emits nine kinds: `voucher` and `excluded_voucher` (the voucher's GUID),
+a tag. The crate emits ten kinds: `voucher` and `excluded_voucher` (the voucher's GUID),
 `document_row` (`{document id}#{row}`, a locator the extractor chose, not a name), `row` (a fixed
 locator for a computed row), `rule` (a fixed key), `config` (the configuration entry cited: a fixed
 key such as `presumptive_history`, or, for a deductor alias, the deductor's TAN), `pan` (the entity's
-PAN, as recorded, set in the engagement's party table or derived from a GSTIN; bridge#1145 item 9)
-and `ledger` and `stock_item`, whose id is the NAME as the books write it (compared
-NFC-normalised, §2.2). This section's tag rule does not apply to any of them. The reference
-engine's renderer declares the kinds whose id is a name in `NAME_KINDS` (`ledger`, `stock_item` and
-`payee_name`, a kind this crate does not yet emit) and every other kind in `NOT_NAME_KINDS`, with a
-selftest that every kind a test constructs is in exactly one list.
+PAN, as recorded, set in the engagement's party table or derived from a GSTIN; bridge#1145 item 9),
+`ledger` and `stock_item`, whose id is the NAME as the books write it (compared NFC-normalised,
+§2.2), and `payee_name` (`narration_payees`: a payee's names as the bank printed them in the
+narration, upper-cased, joined by ` / `), whose id is a name too. This section's tag rule does not
+apply to any of them. The reference engine's renderer declares the kinds whose id is a name in
+`NAME_KINDS` (`ledger`, `stock_item` and `payee_name`) and every other kind in `NOT_NAME_KINDS`,
+with a selftest that every kind a test constructs is in exactly one list.
 
 A consumer that redacts or masks must therefore treat the id of a `ledger`, `payee_name` or
 `stock_item` ref as a name, and the id of a `pan` ref as a tax identifier; a `config` id may be a tax

@@ -1,0 +1,185 @@
+{
+ "comment": "depreciation, a depreciation journal and an asset sale that share a GUID (#1243): one GUID on a journal crediting Machine A and on a sale of Machine A; two blank GUIDs on a sale of Machine B (read first) and the journal crediting it; a third blank-GUID voucher, a sale of Machine A, whose GUID a journal on another ledger holds. Each sale is a deletion, never book depreciation: a voucher is a depreciation journal by its own lines.",
+ "groups": {
+  "Fixed Assets": null,
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Capital Account": null
+ },
+ "ledgers": [
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-dep_shared_guid_journal-000"
+  },
+  {
+   "name": "Machine A",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_shared_guid_journal-001"
+  },
+  {
+   "name": "Machine B",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_shared_guid_journal-002"
+  },
+  {
+   "name": "Depreciation",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-dep_shared_guid_journal-003"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-dep_shared_guid_journal-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Edge Bank",
+   "opening": 318207,
+   "debit": 180053,
+   "credit": 0,
+   "closing": 498260
+  },
+  {
+   "ledger": "Machine A",
+   "opening": 1204518,
+   "debit": 0,
+   "credit": 195049,
+   "closing": 1009469
+  },
+  {
+   "ledger": "Machine B",
+   "opening": 455309,
+   "debit": 0,
+   "credit": 90028,
+   "closing": 365281
+  },
+  {
+   "ledger": "Depreciation",
+   "opening": 0,
+   "debit": 105024,
+   "credit": 0,
+   "closing": 105024
+  },
+  {
+   "ledger": "Capital",
+   "opening": -1978034,
+   "debit": 0,
+   "credit": 0,
+   "closing": -1978034
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "dep-j-1",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "J1",
+   "lines": [
+    [
+     "Depreciation",
+     75013
+    ],
+    [
+     "Machine A",
+     -75013
+    ]
+   ]
+  },
+  {
+   "guid": "dep-j-1",
+   "date": "2025-08-14",
+   "base_type": "Receipt",
+   "number": "R1",
+   "lines": [
+    [
+     "Edge Bank",
+     80029
+    ],
+    [
+     "Machine A",
+     -80029
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-09",
+   "base_type": "Receipt",
+   "number": "R2",
+   "lines": [
+    [
+     "Edge Bank",
+     60017
+    ],
+    [
+     "Machine B",
+     -60017
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "J2",
+   "lines": [
+    [
+     "Depreciation",
+     30011
+    ],
+    [
+     "Machine B",
+     -30011
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-09-02",
+   "base_type": "Receipt",
+   "number": "R3",
+   "lines": [
+    [
+     "Edge Bank",
+     40007
+    ],
+    [
+     "Machine A",
+     -40007
+    ]
+   ]
+  }
+ ],
+ "depreciation": {
+  "block_by_ledger": {
+   "Machine A": "plant_machinery_15",
+   "Machine B": "plant_machinery_15"
+  },
+  "opening_wdv_paise": {
+   "plant_machinery_15": 1315402
+  },
+  "dep_expense_ledgers": [
+   "Depreciation"
+  ]
+ },
+ "tests": [
+  "depreciation"
+ ]
+}

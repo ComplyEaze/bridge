@@ -58,7 +58,7 @@ fn a_voucher_type_outside_the_qualified_list_is_refused() {
     // Every declared type is qualified today, so the gate is exercised against
     // a narrowed list. It is what refuses a type added ahead of its evidence,
     // and it runs before the first live request of a build.
-    let vouchers = payload().vouchers;
+    let vouchers = admitted_payload().vouchers;
     assert_eq!(
         refuse_unqualified_types(&vouchers, LIVE_QUALIFIED_VOUCHER_TYPES),
         Ok(())
@@ -73,7 +73,7 @@ fn a_voucher_type_outside_the_qualified_list_is_refused() {
             .filter(|candidate| **candidate != unqualified)
             .cloned()
             .collect::<Vec<_>>();
-        let mut input = payload();
+        let mut input = admitted_payload();
         input.vouchers[0].voucher_type = VoucherType::Journal;
         input.vouchers[1].voucher_type = unqualified;
         assert_eq!(
@@ -144,7 +144,7 @@ async fn an_unshaped_bank_voucher_is_refused_before_dispatch_or_persistence() {
                 writes_enabled: false,
                 batch_post_enabled: false,
             });
-            let mut input = payload();
+            let mut input = admitted_payload();
             input.vouchers.truncate(1);
             input.vouchers[0].voucher_type = voucher_type.clone();
             input.vouchers[0].voucher_number = None;
@@ -180,7 +180,7 @@ fn a_journal_keeps_every_shape_freedom_a_bank_voucher_gives_up() {
         side: EntrySide::Cr,
     });
     assert_eq!(
-        validate_payload(&ImportPayload {
+        payload_verdict(&ImportPayload {
             company_guid: GUID.into(),
             vouchers: vec![voucher],
             amends_batch_id: None,
@@ -191,7 +191,7 @@ fn a_journal_keeps_every_shape_freedom_a_bank_voucher_gives_up() {
 
 #[test]
 fn journal_renderer_preserves_create_remote_identity_with_optional_number() {
-    let mut voucher = captured_catalogue_payload().vouchers.remove(0);
+    let mut voucher = admitted_captured_payload().vouchers.remove(0);
     for number in [None, Some("CLIENT-42".to_string())] {
         voucher.voucher_number = number.clone();
         let xml = render_import_xml(
@@ -212,19 +212,16 @@ fn journal_renderer_preserves_create_remote_identity_with_optional_number() {
         let mut numbers = Vec::new();
         loop {
             match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"VOUCHER" => {
+                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "VOUCHER" => {
                     vouchers += 1;
                     let attributes = tag
                         .attributes()
                         .map(|attribute| {
                             let attribute = attribute.unwrap();
                             (
-                                String::from_utf8(attribute.key.as_ref().to_vec()).unwrap(),
+                                attribute.key.as_ref().to_string(),
                                 attribute
-                                    .decoded_and_normalized_value(
-                                        quick_xml::XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )
+                                    .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                                     .unwrap()
                                     .into_owned(),
                             )
@@ -243,20 +240,13 @@ fn journal_renderer_preserves_create_remote_identity_with_optional_number() {
                         ])
                     );
                 }
-                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == b"VOUCHERNUMBER" => {
-                    numbers.push(
-                        reader
-                            .read_text(tag.name())
-                            .unwrap()
-                            .decode()
-                            .unwrap()
-                            .into_owned(),
-                    );
+                quick_xml::events::Event::Start(tag) if tag.name().as_ref() == "VOUCHERNUMBER" => {
+                    numbers.push(reader.read_text(tag.name()).unwrap().to_string());
                 }
                 quick_xml::events::Event::Start(tag) | quick_xml::events::Event::Empty(tag) => {
                     assert!(!matches!(
                         tag.name().as_ref(),
-                        b"GUID" | b"MASTERID" | b"REMOTEID"
+                        "GUID" | "MASTERID" | "REMOTEID"
                     ));
                 }
                 quick_xml::events::Event::Eof => break,

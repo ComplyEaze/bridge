@@ -326,3 +326,27 @@ f530b9fbe828f590567342be67082265ebd84f0eb8fc80d477211b02a40578f9  149579  workor
 aaadc0d93e385f55525b0c0a73ee718bb5a4bef6665d0943e6e45aad0dd69159  407497  workorder/screens/w6-gstr1-sep-summary.png
 927ee558177f82a4034f75532ba35189680e03f7cb10939f9690a56a438b6b78  181330  workorder/screens/w6-taxanalysis-0020.png
 e9f8b48e7724b0723d193e1ae8c7903492217f2c4502e571a82fa4d8f755b8cf  257979  workorder/screens/w6-voucher-0020.png
+#
+# W7 part B (after backup TDBK1800_100033_7.001) and W8 (requests at ade0524c), 10 Oct 2026
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  976  r02-marks.xml
+9e2f23b3ab9d8e01b1f3878c2075de32af19aef30a1dd910df04a7457949ff68  712  d-vouchers.xml
+2a35b46b0d9204edc8c69c633295740ee0e9bc3d54a0c21389f51966b7be1940  1700  w8-status-narrow-window.xml
+08b3a09d04299611273cff583768f10442b306c68b32d8e31dd42a6ae000f4ec  1878  w8-status-narrow-window-sales.xml
+352dfca912a53499f058643e61db4febc301f6b53b753de54d7f2aac475db9c1  2252  w8-readback-status-single.xml
+3ba486fc1d41a46cbb3a14f1f5975edc6e01c969b8d06c3a4d5edf1353205bca  3396  workorder/aw7-marks-b.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.004140 s)
+db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  workorder/aw7-marks-b.xml.headers.txt
+32a77aec148480a97a26db2aaf73293fc62614b704d44e09d1935bc57e514690  523930  workorder/vouchers-w7.xml  <- d-vouchers.xml (curl exit 0, HTTP 200, 0.084904 s)
+0b99507b6e2de2533151d9652e06e343ccb9e9650c796a83d49e3da63f26a798  134  workorder/vouchers-w7.xml.headers.txt
+bdde73bd794236fd76b4b3975f34366b6080322ec4a113cbffb871e016dcde57  35928  workorder/aw8-status-narrow-window.xml  <- w8-status-narrow-window.xml (curl exit 0, HTTP 200, 0.031016 s)
+9133b5d621a52e5954355de3cb8da6cf8fc86e5ae92b4d025529592f1e4fe0e2  135  workorder/aw8-status-narrow-window.xml.headers.txt
+504d9b06911e222b31d585a092e0192a0a263ede91b9fdc5173040438a1e1672  21030  workorder/aw8-status-narrow-window-sales.xml  <- w8-status-narrow-window-sales.xml (curl exit 0, HTTP 200, 0.029297 s)
+8c9e743c3e9c1308c034b41b6bda67541eb5a2f0a56720319e37ae56d8f38089  135  workorder/aw8-status-narrow-window-sales.xml.headers.txt
+beae40f833bb3dfed5bd3df224a3538aa690ff623f0c55512bf5a185470374dc  94374  workorder/aw8-readback-status-single.xml  <- w8-readback-status-single.xml (curl exit 0, HTTP 200, 0.063180 s)
+050fda8244a382fb40d80f9ec7376bb7fde043b253cd82f1860852c6ee8ebd07  135  workorder/aw8-readback-status-single.xml.headers.txt
+# W7 part B screenshots
+d69a3b2f83f49380900e32848fbf9f5aba6346daa82053ee310d5b289912c8d8  454999  workorder/screens/w7b-gstr1-aug-summary.png
+0330ffff6b2cca64dc22b1a1f61528c5ac3bb77d2674a50c2fd6a8eab4d7f584  439539  workorder/screens/w7b-gstr1-aug-uncertain.png
+4d55aa94b2b6a0f1f4d8585547a86507f9add1a2b7b96c9386df5818c3040162  260525  workorder/screens/w7b-ledger-998314-gst.png
+e747a964009cecbd16de803266fa5f5bd3833567c99eb06d1ec3a12410bfcc43  308517  workorder/screens/w7b-ledger-998315.png
+a0268eb39ba72baab3a7aa9dee572a68ce9009c0c942bc9976249eb68bbdfef3  161458  workorder/screens/w7b-taxanalysis-0021.png
+9e039cbe42c3014424f75aa6c541fea032451f6a3e27b6180ac18db45637473e  181538  workorder/screens/w7b-voucher-0021.png

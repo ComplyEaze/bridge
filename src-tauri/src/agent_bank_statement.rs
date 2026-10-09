@@ -67,7 +67,7 @@ pub(super) fn input_schema() -> Value {
             "statement_path": path,
             "password_file": path,
             "bank":{"type":"string","enum":["sbi","hdfc","ubi","bob"],"description":"sbi (State Bank of India), hdfc (HDFC Bank), ubi (Union Bank of India) or bob (Bank of Baroda, in the layout measured on two real statements)."},
-            "account_label":{"type":"string","minLength":4,"maxLength":64,"pattern":r"\S","description":"A short label carrying at least the last 4 digits of the account, e.g. 'HDFC CA xx4321'. Those digits must end a number on the statement's account-number line. An bob statement prints its number masked (its first and last three digits clear): give the whole number (more than six digits); only those six clear digits are compared. The label is written into each narration."},
+            "account_label":{"type":"string","minLength":4,"maxLength":64,"pattern":r"\S","description":"A short label carrying at least the last 4 digits of the account, e.g. 'HDFC CA xx4321'. Those digits must end a number on the statement's account-number line. A Bank of Baroda statement in the measured layout prints its number masked (its first and last three digits clear): give the whole number (more than six digits); only those six clear digits are compared. The label is written into each narration."},
             "opening_balance": control,
             "closing_balance": control,
             "total_debits": totals_control.clone(),

@@ -1387,6 +1387,31 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              not rebuild it as a Journal: a GST invoice entered as a Journal is not filed as \
              an invoice.",
         ),
+        // The build of an invoice post_import would refuse for its approval
+        // text. These are the invoice build's own codes: the post's codes
+        // (`import_review_*`) also refuse a Journal, Payment, Receipt or
+        // Contra, whose advice is not this one.
+        "invoice_review_layout_text" | "invoice_review_format_text" => Some(
+            "A name or text in this invoice (the company, a ledger, the customer, the narration \
+             or the reference) holds a line break or a character the approval dialog cannot \
+             show faithfully, so it cannot be approved or posted, and no file was written. \
+             Ask the user to correct that text, then build the invoice again; do not offer to \
+             import it by hand.",
+        ),
+        "invoice_review_too_large" => Some(
+            "The approval text for this invoice does not fit in one native dialog, so it \
+             cannot be approved or posted, and no file was written. Ask the user to shorten \
+             the narration or reference, then build the invoice again; do not offer to import \
+             it by hand.",
+        ),
+        "invoice_post_not_enabled" => Some(
+            "An invoice is posted by post_import and in no other way, and voucher posting is \
+             switched off, so ComplyEaze Bridge built nothing and wrote no file. Tell the \
+             user that invoices need voucher posting switched on in the ComplyEaze Bridge \
+             settings; do not offer to import a file by hand, and do not enter the invoice \
+             as a Journal. An invoice that post_import would refuse for another reason is \
+             refused with that reason's code instead, and no file is written for it.",
+        ),
         "import_invoice_masters_changed" => Some(
             "Since this invoice was built, what Tally says about it has changed: the \
              customer's GSTIN, state, registration type or bill-wise setting, the voucher \

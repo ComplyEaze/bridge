@@ -2237,3 +2237,216 @@ fn the_compared_report_names_the_fields_of_each_requested_kind_only() {
         })
     );
 }
+
+// ---------------------------------------------------------------------------
+// A master directly under the root (bridge#974)
+//
+// TallyPrime 7.1 refused a bare `Primary` parent (godown: "Godown 'Primary'
+// does not exist!"; stock item: "Stock Group 'Primary' does not exist!"), and a
+// godown with no parent was refused the same way. The measured forms are in
+// bridge#974: a stock item and a stock group with no `PARENT`, a godown with
+// `&#4; Primary` (1-2 samples each, TallyPrime 7.1 Silver).
+// ---------------------------------------------------------------------------
+
+/// Every way a book can name the root, and the absence of a parent.
+fn root_spellings() -> Vec<Value> {
+    vec![
+        Value::Null,
+        json!("Primary"),
+        json!("primary"),
+        json!("\u{4} Primary"),
+        json!("&#4; Primary"),
+        json!("\u{fffd}#4; Primary"),
+    ]
+}
+
+fn book_with_parent<T: for<'de> Deserialize<'de>>(name: &str, parent: &Value) -> T {
+    let mut book = json!({"name": name});
+    if !parent.is_null() {
+        book["parent"] = parent.clone();
+    }
+    serde_json::from_value(book).expect("book parses")
+}
+
+fn captured_rows(bytes: &[u8], row_tag: &str) -> Vec<BTreeMap<String, String>> {
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    super::super::parse_lab_master_rows(&xml, row_tag).expect("captured rows parse")
+}
+
+#[test]
+fn a_root_stock_item_is_sent_with_no_parent_element() {
+    for parent in root_spellings() {
+        let mut book = json!({"name": "Lab Widget A", "base_unit": "Nos"});
+        if !parent.is_null() {
+            book["parent"] = parent.clone();
+        }
+        let item: BookStockItem = serde_json::from_value(book).unwrap();
+        assert_eq!(
+            render_stock_item_xml(&item),
+            "<TALLYMESSAGE><STOCKITEM NAME=\"Lab Widget A\" ACTION=\"Create\">\
+<NAME>Lab Widget A</NAME><BASEUNITS>Nos</BASEUNITS></STOCKITEM></TALLYMESSAGE>",
+            "book parent {parent}"
+        );
+    }
+}
+
+#[test]
+fn a_root_stock_group_is_sent_with_no_parent_element() {
+    for parent in root_spellings() {
+        let group: BookNamedParent = book_with_parent("Lab Group A", &parent);
+        assert_eq!(
+            render_parented_xml("STOCKGROUP", &group),
+            "<TALLYMESSAGE><STOCKGROUP NAME=\"Lab Group A\" ACTION=\"Create\">\
+<NAME>Lab Group A</NAME></STOCKGROUP></TALLYMESSAGE>",
+            "book parent {parent}"
+        );
+    }
+}
+
+#[test]
+fn a_root_godown_is_sent_with_the_reserved_root_reference() {
+    // bridge#974, third measurement: the one form of a root godown that
+    // TallyPrime 7.1 accepted. The reference is written as the literal text
+    // `&#4;`, not through `xml_escape`, which would turn the `&` into `&amp;`.
+    for parent in root_spellings() {
+        let godown: BookNamedParent = book_with_parent("R3 Godown A", &parent);
+        assert_eq!(
+            render_parented_xml("GODOWN", &godown),
+            "<TALLYMESSAGE><GODOWN NAME=\"R3 Godown A\" ACTION=\"Create\">\
+<NAME>R3 Godown A</NAME><PARENT>&#4; Primary</PARENT></GODOWN></TALLYMESSAGE>",
+            "book parent {parent}"
+        );
+    }
+}
+
+#[test]
+fn a_godown_under_another_godown_still_names_its_parent_escaped() {
+    let godown: BookNamedParent = book_with_parent("Bay 1", &json!("Wing A & B"));
+    assert_eq!(
+        render_parented_xml("GODOWN", &godown),
+        "<TALLYMESSAGE><GODOWN NAME=\"Bay 1\" ACTION=\"Create\"><NAME>Bay 1</NAME>\
+<PARENT>Wing A &amp; B</PARENT></GODOWN></TALLYMESSAGE>"
+    );
+}
+
+#[test]
+fn a_root_book_entry_reads_back_only_from_a_row_under_the_captured_root() {
+    // Captured rows: every parent below is the `&#4; Primary` Tally sent.
+    let godown_rows = captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_godowns_shape_lab_live.utf16le.xml"
+        ),
+        "GODOWN",
+    );
+    let group_rows = captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml"
+        ),
+        "STOCKGROUP",
+    );
+    let item_rows = captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/stock_items_negative_sale_lab_live.utf16le.xml"
+        ),
+        "STOCKITEM",
+    );
+    assert_eq!(
+        (godown_rows.len(), group_rows.len(), item_rows.len()),
+        (2, 3, 2)
+    );
+    for parent in root_spellings() {
+        for row in &godown_rows {
+            let book: BookNamedParent = book_with_parent(&row["NAME"], &parent);
+            assert_eq!(
+                diff_parented("godown", &book, row),
+                Vec::<String>::new(),
+                "{parent}"
+            );
+        }
+        for row in &group_rows {
+            let book: BookNamedParent = book_with_parent(&row["NAME"], &parent);
+            assert_eq!(
+                diff_parented("stock group", &book, row),
+                Vec::<String>::new(),
+                "{parent}"
+            );
+        }
+        for row in &item_rows {
+            let book: BookStockItem = book_with_parent(&row["NAME"], &parent);
+            assert_eq!(
+                diff_stock_item(&book, row),
+                Vec::<String>::new(),
+                "{parent}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_root_book_entry_does_not_read_back_from_a_row_under_a_named_parent() {
+    // Captured: every stock item here sits under a named stock group. A book
+    // that asks for the root, or leaves the parent out, must see the
+    // difference; it did not, because an absent parent was never compared.
+    let rows = captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/stock_items_shape_lab_fy_live.utf16le.xml"
+        ),
+        "STOCKITEM",
+    );
+    assert!(!rows.is_empty());
+    for parent in root_spellings() {
+        for row in &rows {
+            let book: BookStockItem = book_with_parent(&row["NAME"], &parent);
+            assert_eq!(
+                diff_stock_item(&book, row).len(),
+                1,
+                "{parent} against {:?}",
+                row["PARENT"]
+            );
+        }
+    }
+    // A named parent that matches the captured row still reads back.
+    let row = &rows[0];
+    let book: BookStockItem = book_with_parent(&row["NAME"], &json!(row["PARENT"]));
+    assert_eq!(diff_stock_item(&book, row), Vec::<String>::new());
+}
+
+#[test]
+fn a_book_entry_with_no_parent_is_compared_for_every_parented_kind() {
+    let named = row(&[("PARENT", "Factory Floor")]);
+    let godown: BookNamedParent = book_with_parent("Bay 1", &Value::Null);
+    assert_eq!(diff_parented("godown", &godown, &named).len(), 1);
+    let group: BookNamedParent = book_with_parent("Bay 1", &Value::Null);
+    assert_eq!(diff_parented("stock group", &group, &named).len(), 1);
+    // No PARENT column at all is not the root either.
+    assert_eq!(diff_parented("godown", &godown, &row(&[])).len(), 1);
+}
+
+#[test]
+fn a_group_under_the_root_is_refused_before_anything_is_sent() {
+    // bridge#974: no root form has been measured for a Group.
+    for parent in root_spellings() {
+        let masters = BookMasters {
+            groups: vec![book_with_parent("Lab Group R", &parent)],
+            ..Default::default()
+        };
+        let refusal = refuse_unsendable_masters(&masters)
+            .expect_err("a root group is refused, whatever its spelling");
+        assert_eq!(refusal.code(), "lab_root_parent_unmeasured", "{parent}");
+        assert_eq!(
+            refusal.logged_entries(),
+            vec!["Group:Lab Group R:root_parent"]
+        );
+    }
+    let under_a_group = BookMasters {
+        groups: vec![book_with_parent("Lab Group N", &json!("Current Assets"))],
+        ..Default::default()
+    };
+    assert_eq!(refuse_unsendable_masters(&under_a_group), Ok(()));
+}

@@ -5339,6 +5339,25 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
     );
 }
 
+/// The invoice's masters, read again in the endpoint queue after the approval
+/// (#1337): the build's own reads from its currency read to the tax units, in
+/// the same order and without the marks (the queue's binding marks are the
+/// marks). It stands between the queue's currency read and its closing profile.
+macro_rules! pilot_queue_block {
+    () => {
+        concat!(
+            "ebsbscscsbsbse",
+            "see",
+            "bsbsLsLsPsPsgsgsbsbs",
+            "ese",
+            "eQsQse",
+            "eTsTse",
+            "eNsNse",
+            "eCsCse"
+        )
+    };
+}
+
 // ---- BP/26-27/0010 on the pilot lab's own answers (#1342, 9 Oct 2026) ----
 //
 // Every answer is Tally's own bytes from the synthetic company BRIDGE PILOT LAB
@@ -5349,13 +5368,18 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
 // L compliance listing, Q the same listing with each ledger's GST rate and
 // rounding (10 Oct 2026), P paired listing, g groups, T voucher types, N number
 // read, k ledger catalogue, w/W the 1-Aug window before/after, C tax units, R
-// invoice read-back, Z Tally's answer to the import.
+// invoice read-back, Z Tally's answer to the import. The queue re-reads the
+// invoice's masters (the block in `pilot_queue_block!`) before its closing
+// profile and the aim marks (#1337).
 const PILOT_ORDER: &str = concat!(
     "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeT",
     "sTseeNsNseeCsCseemsmseekskseewswseseseesesemsmseewswseewswse",
     "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeT",
     "sTseeNsNseeCsCseecscseseekskseemsmseebsbscscsbsbseseebsbsLsL",
-    "sPsPsgsgsbsbseseeQsQseeTsTseeNsNseeCsCseseemekskseecscseseeewswsee",
+    "sPsPsgsgsbsbseseeQsQseeTsTseeNsNseeCsCseseemekskseecscse",
+    // The invoice's masters, read again in the queue after the approval (#1337).
+    pilot_queue_block!(),
+    "seeewswsee",
     "wswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
 );
 
@@ -5398,9 +5422,10 @@ const PILOT_QUALIFIED: &[VoucherType] = &[
     VoucherType::Sales,
 ];
 
-fn pilot_plan(letter: char) -> ScenarioPlan {
-    let bytes: &[u8] = match letter {
-        's' => return status(),
+/// The captured answer to a kind of read; `None` for the status probe.
+fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
+    Some(match letter {
+        's' => return None,
         'e' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml"),
         'm' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-before-post.utf16le.xml"),
         'M' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"),
@@ -5419,8 +5444,20 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml"),
         'Z' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml"),
         other => panic!("unknown kind {other}"),
-    };
-    ScenarioPlan::new(Fixture::SyntheticXml(captured(bytes)))
+    })
+}
+
+fn pilot_plan(letter: char) -> ScenarioPlan {
+    match pilot_bytes(letter) {
+        Some(bytes) => pilot_answer(captured(bytes)),
+        None => status(),
+    }
+}
+
+/// `body` as Tally's answer on the wire: UTF-16LE with no mark, a length
+/// header.
+fn pilot_answer(body: String) -> ScenarioPlan {
+    ScenarioPlan::new(Fixture::SyntheticXml(body))
         .with_encoding(WireEncoding::Utf16LeNoBom)
         .with_framing(ResponseFraming::ContentLength)
 }
@@ -5614,4 +5651,221 @@ async fn a_cgst_line_six_paise_above_the_state_tax_line_is_refused_on_the_pilot_
     assert_eq!(result["refusals"].as_array().unwrap().len(), 1);
     assert_eq!(observed.len(), PILOT_ORDER.find("CsCse").unwrap() + 5);
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}
+
+// ---- The queue re-reads the invoice's masters (#1337) ----
+//
+// The build and the re-reads before the post are the pilot lab's own answers.
+// What changes is only what Tally answers the queue's own re-read, after the
+// approval: a master that moved while the dialog was open, or in the seconds
+// between the last read and the queue. Each answer changed is a captured one
+// with a stated edit; where the edit is not enough to make an answer Tally
+// could give, the test says what it stands for.
+
+const PILOT_QUEUE_BLOCK: &str = pilot_queue_block!();
+const PILOT_QUEUE_ANCHOR: &str = "mekskseecscse";
+
+/// Where the queue's re-read of the invoice's masters stands in `PILOT_ORDER`.
+fn pilot_queue_range() -> std::ops::Range<usize> {
+    assert_eq!(PILOT_ORDER.matches(PILOT_QUEUE_ANCHOR).count(), 1);
+    let start = PILOT_ORDER.find(PILOT_QUEUE_ANCHOR).unwrap() + PILOT_QUEUE_ANCHOR.len();
+    assert_eq!(
+        &PILOT_ORDER[start..start + PILOT_QUEUE_BLOCK.len()],
+        PILOT_QUEUE_BLOCK
+    );
+    start..start + PILOT_QUEUE_BLOCK.len()
+}
+
+/// The positions in `PILOT_ORDER` of the queue's requests of one kind.
+fn pilot_queue_positions(letter: char) -> Vec<usize> {
+    pilot_queue_range()
+        .filter(|at| PILOT_ORDER[*at..].starts_with(letter))
+        .collect()
+}
+
+/// The captured answer to a kind of read, as text.
+fn pilot_text(letter: char) -> String {
+    captured(pilot_bytes(letter).expect("a kind with an answer"))
+}
+
+/// A change of one captured answer, by its place in `PILOT_ORDER`.
+struct Changed {
+    positions: Vec<usize>,
+    body: String,
+}
+
+/// The pilot lab's replay, with some answers changed.
+fn pilot_lab_changed(changes: &[Changed]) -> (SequenceSimulator, Server, tempfile::TempDir) {
+    let plans = PILOT_ORDER
+        .chars()
+        .enumerate()
+        .map(|(position, letter)| {
+            match changes
+                .iter()
+                .find(|change| change.positions.contains(&position))
+            {
+                Some(change) => pilot_answer(change.body.clone()),
+                None => pilot_plan(letter),
+            }
+        })
+        .collect();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    (simulator, server, directory)
+}
+
+/// What a replay of the build and the post met.
+struct PilotRun {
+    response: Value,
+    observed: Vec<tally_protocol_simulator::ObservedRequest>,
+    journal_after_build: Vec<u8>,
+    journal_after_post: Vec<u8>,
+}
+
+async fn pilot_post_changed(changes: &[Changed]) -> PilotRun {
+    let (simulator, server, directory) = pilot_lab_changed(changes);
+    let remote_id = Uuid::parse_str("00000000-0000-4000-8000-000000000777").unwrap();
+    let (response, journal_after_build) = TEST_QUALIFIED_VOUCHER_TYPES
+        .scope(PILOT_QUALIFIED, async {
+            let built = built_or_panic(
+                server
+                    .build_import_xml(&pilot_args("BRIDGE Walk-in", "25.02", "1051.00"))
+                    .await,
+            );
+            let batch_id = built.payload["result"]["batch_id"]
+                .as_str()
+                .unwrap()
+                .to_string();
+            let journal_after_build = journal(directory.path());
+            let response = SCRIPTED_REMOTE_IDS
+                .scope(
+                    vec![remote_id],
+                    SCRIPTED_APPROVAL.scope(
+                        ScriptedApproval::approving(),
+                        server.call_tool(
+                            "post_import",
+                            json!({"company_guid":PILOT_GUID,"batch_id":batch_id}),
+                        ),
+                    ),
+                )
+                .await;
+            (response, journal_after_build)
+        })
+        .await;
+    PilotRun {
+        response,
+        observed: sent(simulator),
+        journal_after_build,
+        journal_after_post: journal(directory.path()),
+    }
+}
+
+/// The post was refused in the queue, loud and before anything was recorded or
+/// sent: every read up to the aim marks was made and the write was not, no
+/// dispatch intent was journaled, and the only record added is the one
+/// verification status. Returns the refusal.
+fn pilot_refused_in_the_queue(run: &PilotRun, code: &str) -> Value {
+    let result = &run.response["structuredContent"]["result"];
+    let error = &result["error"];
+    assert_eq!(error["code"], code, "{}", run.response);
+    assert_eq!(result["attempt_recorded"], false, "{}", run.response);
+    assert_eq!(
+        run.observed.len(),
+        PILOT_ORDER.find('Z').unwrap(),
+        "every read up to the aim marks, and no write"
+    );
+    assert!(run
+        .observed
+        .iter()
+        .all(|request| request.request_body_sha256 != PILOT_REQUEST_SHA256));
+    assert_eq!(
+        appended_kinds(&run.journal_after_build, &run.journal_after_post),
+        ["verification_status"]
+    );
+    assert!(!String::from_utf8(run.journal_after_post.clone())
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+    error.clone()
+}
+
+/// The voucher type was changed between the build and the queue's re-read (the
+/// GUID the type is read with differs in its last hex digit): the post is
+/// refused as a master that moved, and the cause names it.
+#[tokio::test]
+async fn a_voucher_type_that_changed_after_the_approval_is_refused_in_the_queue() {
+    let run = pilot_post_changed(&[Changed {
+        positions: pilot_queue_positions('T'),
+        body: pilot_text('T').replacen("000000ce", "000000cf", 1),
+    }])
+    .await;
+    let error = pilot_refused_in_the_queue(&run, "import_invoice_masters_changed");
+    assert_eq!(error["cause"], "voucher_type", "{}", run.response);
+}
+
+/// A number another voucher took while the approval waited is refused under
+/// the admission's own code, not as a master that moved. The rehearsal's
+/// captured answer for a number a Sales voucher carries stands for it.
+#[tokio::test]
+async fn a_number_taken_after_the_approval_is_refused_in_the_queue_under_its_own_code() {
+    let run = pilot_post_changed(&[Changed {
+        positions: pilot_queue_positions('N'),
+        body: captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-known.utf16le.xml"
+        )),
+    }])
+    .await;
+    let error = pilot_refused_in_the_queue(&run, "invoice_number_already_used");
+    assert_eq!(error["cause"], Value::Null, "{}", run.response);
+}
+
+/// The company's registration read as composition while the approval waited
+/// (the registration type of the captured unit edited): refused under the
+/// admission's own code.
+#[tokio::test]
+async fn a_company_registration_that_lapsed_after_the_approval_is_refused_in_the_queue() {
+    let from = "<REGISTRATIONTYPE>Regular</REGISTRATIONTYPE>";
+    let tax_units = pilot_text('C');
+    assert_eq!(tax_units.matches(from).count(), 1);
+    let run = pilot_post_changed(&[Changed {
+        positions: pilot_queue_positions('C'),
+        body: tax_units.replacen(from, "<REGISTRATIONTYPE>Composition</REGISTRATIONTYPE>", 1),
+    }])
+    .await;
+    pilot_refused_in_the_queue(&run, "invoice_company_registration_not_regular");
+}
+
+/// A book that outgrew the size gate while the approval waited has no ledger
+/// count in the plan, so the queue cannot judge it: refused as a master that
+/// moved, naming the book's size. The binding marks' master mark is edited to
+/// be over the gate.
+#[tokio::test]
+async fn a_book_that_outgrew_the_size_gate_after_the_approval_is_refused_in_the_queue() {
+    let at = PILOT_ORDER.find(PILOT_QUEUE_ANCHOR).unwrap();
+    assert_eq!(&PILOT_ORDER[at..at + 1], "m");
+    let marks = pilot_text('m');
+    assert_eq!(marks.matches(" 223</ALTMSTID>").count(), 1);
+    let run = pilot_post_changed(&[Changed {
+        positions: vec![at],
+        body: marks.replacen(" 223</ALTMSTID>", " 5001</ALTMSTID>", 1),
+    }])
+    .await;
+    let error = pilot_refused_in_the_queue(&run, "import_invoice_masters_changed");
+    assert_eq!(error["cause"], "book_size", "{}", run.response);
+}
+
+/// A master changed after the queue's last invoice read is not seen by the
+/// judge; the aim check sees the company's master mark move (the aim marks
+/// edited to read one higher), and refuses.
+#[tokio::test]
+async fn a_master_mark_that_moves_after_the_invoice_reads_is_refused_by_the_aim_check() {
+    let aim = PILOT_ORDER.find('Z').unwrap() - 1;
+    assert_eq!(&PILOT_ORDER[aim..aim + 1], "m");
+    let marks = pilot_text('m');
+    let run = pilot_post_changed(&[Changed {
+        positions: vec![aim],
+        body: marks.replacen(" 223</ALTMSTID>", " 224</ALTMSTID>", 1),
+    }])
+    .await;
+    pilot_refused_in_the_queue(&run, "post_masters_moved");
 }

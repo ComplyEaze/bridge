@@ -1379,14 +1379,58 @@ fn a_re_read_admits_only_the_observation_the_build_recorded() {
     let recorded = observed();
     let mut moved = observed();
     moved.party_bill_wise = !moved.party_bill_wise;
-    assert!(observation_unchanged(Some(&recorded), Some(&observed())));
-    assert!(!observation_unchanged(Some(&recorded), Some(&moved)));
-    assert!(
-        !observation_unchanged(None, Some(&recorded)),
-        "nothing recorded is never unchanged"
+    assert_eq!(first_difference(Some(&recorded), Some(&observed())), None);
+    assert_eq!(
+        first_difference(Some(&recorded), Some(&moved)),
+        Some("party_bill_wise")
     );
-    assert!(!observation_unchanged(Some(&recorded), None));
-    assert!(!observation_unchanged(None, None));
+    for (nothing_recorded, nothing_now) in [(true, false), (false, true), (true, true)] {
+        assert_eq!(
+            first_difference(
+                (!nothing_recorded).then_some(&recorded),
+                (!nothing_now).then_some(&recorded)
+            ),
+            Some(NOT_RECORDED),
+            "nothing recorded or nothing observed is never unchanged"
+        );
+    }
+}
+
+/// Each field of the observation has its own name, and when several moved the
+/// first in the observation's order is the one named (#1337).
+#[test]
+fn the_first_field_that_moved_is_the_one_named() {
+    type Move = fn(&mut InvoiceObserved);
+    let moves: [(&str, Move); 6] = [
+        ("voucher_type", |o| o.voucher_type_guid.push('x')),
+        ("party_gstin", |o| o.party_gstin = Some("X".into())),
+        ("party_state", |o| o.party_state.push('x')),
+        ("party_registration", |o| {
+            o.party_registration_type.push('x')
+        }),
+        ("party_bill_wise", |o| {
+            o.party_bill_wise = !o.party_bill_wise
+        }),
+        ("company_state", |o| o.company_state.push('x')),
+    ];
+    let recorded = observed();
+    for (name, moved) in &moves {
+        let mut now = observed();
+        moved(&mut now);
+        assert_eq!(
+            first_difference(Some(&recorded), Some(&now)),
+            Some(*name),
+            "{name}"
+        );
+    }
+    let mut everything = observed();
+    for (_, moved) in &moves {
+        moved(&mut everything);
+    }
+    assert_eq!(
+        first_difference(Some(&recorded), Some(&everything)),
+        Some("voucher_type")
+    );
 }
 
 #[test]

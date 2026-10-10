@@ -1828,11 +1828,22 @@ impl Server {
         identity: &VerifiedCompanyIdentity,
         request: ReadRequest,
     ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
-        let request = request.into_xml();
-        let admitted = crate::tally::agent_read_request::AgentReadRequest::parse(request.clone())
-            .map_err(|error| error.to_string())?;
+        let admitted =
+            crate::tally::agent_read_request::AgentReadRequest::parse(request.into_xml())
+                .map_err(|error| error.to_string())?;
+        self.post_admitted_read(identity, admitted).await
+    }
+
+    /// One admitted read, paired and inside the company's identity brackets.
+    /// An invoice plan carries its requests already admitted (#1337), so the
+    /// build sends the very request the queue will send again.
+    async fn post_admitted_read(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        admitted: crate::tally::agent_read_request::AgentReadRequest,
+    ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
         let request_sha256 = sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
-            &request,
+            &admitted.clone().into_xml(),
         ));
         let response = self
             .runtime

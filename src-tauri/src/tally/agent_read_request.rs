@@ -5,7 +5,7 @@ use quick_xml::events::Event;
 /// the dispatch operation; it does not prove arbitrary embedded TDL side-effect free.
 /// The private field and crate-private API keep external library callers out of
 /// the agent's raw dispatch path.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AgentReadRequest(String);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]

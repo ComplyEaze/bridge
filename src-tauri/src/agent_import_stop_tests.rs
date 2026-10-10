@@ -692,7 +692,9 @@ fn the_missing_control_refusal_names_the_control_batch() {
         .find("super::ledger::NumberControl::Known { batch_id,")
         .expect("the control the admission reads against, with its batch taken");
     assert!(
-        source[known..].contains("\"invoice_number_control_missing\", &batch_id"),
+        // The judge matches the control by reference (#1337), so the batch is
+        // already a reference when the refusal takes it.
+        source[known..].contains("\"invoice_number_control_missing\", batch_id"),
         "the refusal's value is the control's batch"
     );
 }

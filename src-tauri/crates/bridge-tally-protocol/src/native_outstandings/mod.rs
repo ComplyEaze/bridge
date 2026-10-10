@@ -44,8 +44,9 @@ pub use request::{
     render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_parents,
     render_native_voucher_export_request, render_native_voucher_type_export_request,
     render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
-    NativeBillsReportKind, NativeLedgerExportPeriod, NativeLedgerExportPeriodError,
-    NativeLedgerSnapshotPeriod, NativeLedgerSnapshotPeriodError,
+    render_party_ledger_master_request_with_gst_details, NativeBillsReportKind,
+    NativeLedgerExportPeriod, NativeLedgerExportPeriodError, NativeLedgerSnapshotPeriod,
+    NativeLedgerSnapshotPeriodError,
 };
 pub(crate) use wire::is_foreign_currency_balance;
 pub use wire::{

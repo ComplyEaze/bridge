@@ -46,7 +46,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use bridge_tally_primitives::TallyDate;
 
 use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
-use crate::documents::{AisRow, BankStatementDoc};
+use crate::documents::{AisRow, BankStatementLoad};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::ledger_ids::stable_ledger_tag;
@@ -464,15 +464,14 @@ pub struct Inputs<'c> {
     pub bank: &'c BTreeSet<String>,
     /// `None`: `DEFAULT_CA_THRESHOLD_PAISE`, equal to the reference rules table's number.
     pub threshold_paise: Option<i64>,
-    pub bank_statement: Option<&'c BankStatementDoc>,
+    /// The caller's bank statement: none supplied, read, or refused with the reader's plain-words
+    /// reason (then s.194N's coverage says so, never "not supplied").
+    pub bank_statement: &'c BankStatementLoad,
     pub s194n_narration_terms: &'c BTreeSet<String>,
     pub ais_rows: &'c [AisRow],
     pub s194n_recipient_type: Option<Recipient>,
     pub round_off_ledgers: &'c BTreeSet<String>,
     pub counterparty_type_by_ledger: &'c BTreeMap<String, String>,
-    /// The reader's plain-words reason when the engagement's statement was supplied but refused;
-    /// then `bank_statement` is `None` and s.194N's coverage says so, never "not supplied".
-    pub bank_statement_refused: Option<&'c str>,
 }
 
 #[allow(clippy::too_many_lines)] // one section per limb, as the reference lays them out
@@ -1058,13 +1057,8 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
     });
 
     match i.bank_statement {
-        None => {
-            let coverage = match i.bank_statement_refused {
-                Some(reason) => {
-                    format!("the bank statement supplied was refused (it {reason})")
-                }
-                None => "no bank statement supplied for this engagement".to_string(),
-            };
+        BankStatementLoad::NotSupplied | BankStatementLoad::Refused(_) => {
+            let coverage = "no bank statement supplied for this engagement".to_string();
             r.fig(
                 "s194n_coverage",
                 Value::Text(coverage),
@@ -1074,7 +1068,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                 vec![],
             )?;
         }
-        Some(statement) => {
+        BankStatementLoad::Read(statement) => {
             let terms: BTreeSet<String> = i
                 .s194n_narration_terms
                 .iter()
@@ -1448,13 +1442,12 @@ mod tests {
             cash: &cash,
             bank: &bank,
             threshold_paise: None,
-            bank_statement: None,
+            bank_statement: &BankStatementLoad::NotSupplied,
             s194n_narration_terms: &none,
             ais_rows: &[],
             s194n_recipient_type: None,
             round_off_ledgers: &round_off,
             counterparty_type_by_ledger: &no_types,
-            bank_statement_refused: None,
         };
         let r = run(&book, &Rules::vendored().unwrap(), &inputs).unwrap();
         let figure = |prefix: &str| {

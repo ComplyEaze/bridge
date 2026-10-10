@@ -91,6 +91,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "changed_since",
         "company_features",
         "egress_log",
+        "gst_status",
         "ledger_masters",
         "ledger_movement",
         "list_companies",
@@ -1261,6 +1262,21 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "company_features",
             "not_reported, never no",
             "a setting Tally did not send is not a setting that is off",
+        ),
+        (
+            "gst_status",
+            "not a judgement of ComplyEaze Bridge",
+            "a status is Tally's own flag, not a finding about the voucher",
+        ),
+        (
+            "gst_status",
+            "never as included",
+            "a voucher whose flags were not read is not reported as in the return",
+        ),
+        (
+            "gst_status",
+            "The reason for a status (a tax mismatch, a missing HSN/SAC) is not available",
+            "the tool names no reason for a status",
         ),
     ];
     let definitions = registered_tool_definitions(true, true);

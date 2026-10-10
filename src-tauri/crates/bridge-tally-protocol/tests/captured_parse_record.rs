@@ -2287,12 +2287,29 @@ const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
      (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md: kept as evidence for §12a.16)";
+const GST_STATUS_READ: &str = "an answer of the GST status read (10 Oct 2026), which no parser of \
+     this crate reads: the app crate's gst_status tool parses it (src/agent_gst_status.rs), and its \
+     tests (src/agent_gst_status_tests.rs) pin what each parse returns; \
+     agent/gst-status/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
+    // The GST status read answers.
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-status-sales-window.utf16le.xml",
+        GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-status-three-vouchers.utf16le.xml",
+        GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-status-window.utf16le.xml",
+        GST_STATUS_READ,
+    ),
     // Import request bodies named without `request`.
     ("tests/fixtures/agent/d3-batch-import.xml", IMPORT_REQUEST),
     ("tests/fixtures/agent/l1-reentry-import.xml", IMPORT_REQUEST),

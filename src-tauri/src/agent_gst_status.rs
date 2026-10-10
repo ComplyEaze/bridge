@@ -97,14 +97,17 @@ impl Node {
         }
     }
 
-    /// Whether any descendant below the direct children carries one of `names`.
+    /// Whether any element below this one, at any depth, is named in `names`.
+    fn contains_any(&self, names: &[&str]) -> bool {
+        self.children
+            .iter()
+            .any(|child| names.contains(&child.name.as_str()) || child.contains_any(names))
+    }
+
+    /// Whether a status field sits below one of this element's direct
+    /// children, at any depth: it is not this element's own.
     fn nests_any(&self, names: &[&str]) -> bool {
-        self.children.iter().any(|child| {
-            child
-                .children
-                .iter()
-                .any(|inner| names.contains(&inner.name.as_str()) || inner.nests_any(names))
-        })
+        self.children.iter().any(|child| child.contains_any(names))
     }
 }
 
@@ -183,15 +186,7 @@ fn parse_tree(xml: &str) -> Result<Node, &'static str> {
     if envelope.name != "ENVELOPE" {
         return Err(invalid);
     }
-    let status = envelope
-        .children
-        .iter()
-        .find(|child| child.name == "HEADER")
-        .and_then(|header| header.one("STATUS"))
-        .flatten();
-    if status.as_deref() != Some("1") {
-        return Err("gst_status_read_status_not_success");
-    }
+    // The status of the answer was checked with the envelope above.
     Ok(envelope)
 }
 
@@ -352,7 +347,10 @@ impl Server {
         // refused: a voucher outside either is never reported.
         for row in &rows {
             let day = bridge_tally_core::TallyDate::parse(row.date.as_str())
-                .map_err(|_| "gst_status_read_voucher_unidentified".to_string())?;
+                .map_err(|_| {
+                    ToolFailure::from("gst_status_read_voucher_unidentified".to_string())
+                        .with_prior_evidence(evidence.clone())
+                })?;
             if day < from || day > to {
                 return Err(ToolFailure::from("window_not_honoured".to_string())
                     .with_prior_evidence(evidence));
@@ -369,12 +367,17 @@ impl Server {
         let mut counts = BTreeMap::<&str, u64>::new();
         let mut unread = 0_u64;
         for row in &rows {
+            // A voucher whose status or whose acceptance flag was not read is
+            // unread: the state of the answer is partial then.
+            if row.status.is_err() || row.overridden.is_err() {
+                unread += 1;
+            }
             match row.status {
                 Ok(GstStatus::Included) => *counts.entry("included").or_default() += 1,
                 Ok(GstStatus::Uncertain) => *counts.entry("uncertain").or_default() += 1,
                 Ok(GstStatus::Excluded) => *counts.entry("excluded").or_default() += 1,
                 Ok(GstStatus::NotInReturn) => *counts.entry("not_in_return").or_default() += 1,
-                Err(_) => unread += 1,
+                Err(_) => {}
             }
             if row.overridden == Ok(true) {
                 *counts.entry("accepted_as_it_stands").or_default() += 1;
@@ -412,7 +415,7 @@ impl Server {
                 "included means exactly one flag Yes and the voucher not accepted as it stands; a voucher accepted as it stands is included by a person's choice, not by its figures",
                 "not_in_return means all three flags No: Tally does not list the voucher in the return (the lab's Receipts and Purchases read so)",
                 "excluded has not been observed on the lab's book; it rests on the field's name",
-                "A voucher whose flags are absent, repeated, nested in another element or spelled another way is unread, never included",
+                "A voucher whose flags are absent, repeated, nested in another element or spelled another way is unread, never included; one whose acceptance flag is unread keeps its status but makes the answer partial",
                 "Measured on one synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured",
                 "The voucher type is selected by its exact name in the request; a type of the same class under another name is not read",
                 "The selection formula is evaluated on every voucher of the book, so a book whose voucher mark is above 25,000 is refused (provisional: timed only on a book of about thirty vouchers)",

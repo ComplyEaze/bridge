@@ -90,6 +90,7 @@ The ordinary default tools, in name order:
 - `cash_flow`
 - `company_features`
 - `egress_log`
+- `gst_status`
 - `ledger_masters`
 - `ledger_movement`
 - `list_companies`
@@ -111,8 +112,8 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `company_features` is in the source after
-release 0.5.0 and is not in a published build yet. `local_data_report` (also
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features` and `gst_status` are in the source
+after release 0.5.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -557,6 +558,40 @@ collection shape), `company_features_currency_invalid` (a symbol over 16 charact
 control character, a bidirectional override or isolate, a zero-width or other invisible format character, or a line or paragraph separator), `company_features_tally_reported_failure`, and the stability codes
 `company_features_changed` and `company_features_extent_changed`. Measured on three synthetic books of one
 TallyPrime 7.1 Silver (protocol reference §12a.18); the tool was run against those three books and equalled the F11 screen on all nine values.
+
+### GSTR-1 status of one voucher type (`gst_status`)
+
+`gst_status` takes `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD) and `voucher_type_name`, and
+optionally `limit` and `offset`. It reads Tally's own GSTR-1 status flags on the vouchers of that one voucher
+type in the window, and returns for each voucher its `voucher_number`, `date`, `voucher_type`, `master_id` and
+`alter_id`, a `gst_status` and `accepted_as_it_stands`. It returns no amount, party, ledger or narration.
+`voucher_type_name` is the exact name of ONE voucher type in the book (take it from `masters`); a type of the
+same class under another name is not read, and a name that holds a double quote, a backslash or a control
+character, or a space at either end, is refused before any read (`gst_status_type_name_invalid`).
+
+`gst_status` is `included`, `uncertain`, `excluded` or `not_in_return`. `not_in_return` means Tally's three flags
+all read No: it does not list the voucher in the return. `accepted_as_it_stands` is `true` when a person
+accepted the voucher as it stands (Accept As Is) and `false` otherwise; such a voucher is included by a
+person's choice, not by its figures. A status is Tally's own flag and not a judgement of ComplyEaze Bridge: it does not say the
+voucher is right or wrong, or that a return is ready. The reason for a status (a tax mismatch, a missing
+HSN/SAC, a GSTIN problem) is on Tally's screen only; no field carries it, so none is returned. A voucher
+keeps the status it was given when it was saved. The result holds `counts` (`included`, `uncertain`,
+`excluded`, `not_in_return`, `unread`, `accepted_as_it_stands`) over the whole window, `total`, and the page of
+`items`; page with `limit` and `offset` (`next_offset` when more remain).
+
+A voucher whose flags are absent, repeated, nested in another element or spelled another way keeps its row with
+`{"unread": code}` (`gst_status_not_reported` or `gst_status_unreadable`) in place of the value and is never read as
+`included`; the result's `state` is then `partial` (`gst_status_voucher_unread`). An answer in which a voucher
+cannot be told apart from another (a missing or repeated `MASTERID`, or a missing number, date, type or
+`ALTERID`) is refused (`gst_status_read_voucher_unidentified`, `gst_status_read_voucher_repeated`), as is a
+voucher dated outside the window (`window_not_honoured`) or of another type name
+(`gst_status_type_not_honoured`).
+
+Limits: at most 93 days (`gst_status_window_too_long`), and a book whose voucher mark is above 25,000 is
+refused (`gst_status_book_too_large`), because the selection is evaluated on every voucher of the book. That
+bound is provisional: the read has been timed only on a book of about thirty vouchers. Measured on one
+synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales invoices (protocol reference
+§9.17); a registered buyer, other releases and Gold are not measured, and `excluded` has not been observed.
 
 ### Stock Summary
 

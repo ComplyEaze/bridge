@@ -2544,9 +2544,14 @@ fn after_a_rejected_batch_the_read_lists_only_the_requested_names_it_shows() {
     assert!(present.is_empty());
     assert_eq!(report["state"], "not_shown");
     let note = report["note"].as_str().unwrap();
-    assert!(note.starts_with("the read did not show them"), "{note}");
-    // The read is never described as showing that nothing was written.
+    assert_eq!(
+        note,
+        "the read did not show them; the pre-import backup is the way back if Tally holds them"
+    );
+    // The read is never described as showing that nothing was written, and
+    // the note claims nothing about Tally's Import Exceptions report.
     assert!(!note.contains("not written") && !note.contains("nothing was"));
+    assert!(!note.contains("Import Exceptions"));
 
     assert_eq!(
         read_after_rejection_failed("agent_read_protocol_invalid"),
@@ -2649,4 +2654,160 @@ fn a_create_batch_with_unclean_counters_is_not_ok_even_when_the_read_back_matche
         created_batch_mismatches("Godown", true, (1, 0), vec!["godown G: parent".into()]),
         vec!["godown G: parent"]
     );
+}
+
+/// The live refusal of bridge#974's neighbour: one import answered
+/// `CREATED 0, ERRORS 0, EXCEPTIONS 1` with a `LINEERROR` (a committed
+/// capture, a voucher naming a missing ledger). It is the only committed
+/// refusal answer; no master refusal has been captured.
+fn captured_refusal() -> bridge_tally_protocol::TallyImportOutcome {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/single-import-missing-ledger.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    bridge_tally_protocol::parse_import_outcome(&xml).expect("the captured answer parses")
+}
+
+fn captured_stock_item_rows() -> Vec<BTreeMap<String, String>> {
+    captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/stock_items_negative_sale_lab_live.utf16le.xml"
+        ),
+        "STOCKITEM",
+    )
+}
+
+fn stock_items(names: &[&str]) -> BookMasters {
+    BookMasters {
+        stock_items: names
+            .iter()
+            .map(|name| book_with_parent(name, &Value::Null))
+            .collect(),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn a_rejected_batch_makes_the_result_not_ok_and_lists_the_names_the_read_showed() {
+    // The loop hands `record_rejected` the read after the rejection and
+    // reads nothing else of the batch. A requested name the read shows is a
+    // mismatch of its own, beside the rejection.
+    let chunk = stock_items(&["Lab Item NEG", "Lab Widget Z"]);
+    let readback =
+        rejected_batch_readback(MasterKind::StockItem, &chunk, &captured_stock_item_rows());
+    let mut log = CreateBatchLog::default();
+    log.record_rejected(MasterKind::StockItem, 2, &captured_refusal(), readback);
+
+    assert_eq!(log.mismatches.len(), 2, "{:?}", log.mismatches);
+    assert!(
+        log.mismatches[0]
+            .starts_with("StockItem rejected by Tally: CREATED=0 ALTERED=0 ERRORS=0 EXCEPTIONS=1"),
+        "{}",
+        log.mismatches[0]
+    );
+    assert_eq!(
+        log.mismatches[1],
+        "StockItem:Lab Item NEG is on the read-back although Tally rejected the batch"
+    );
+    assert!(log.created_masters.is_empty());
+    assert_eq!(log.batches.len(), 1);
+    let batch = &log.batches[0];
+    assert_eq!(batch["state"], "tally_rejected");
+    assert_eq!(batch["requested"], 2);
+    assert_eq!(batch["ok"], false);
+    assert_eq!(
+        batch["readback_after_rejection"],
+        json!({"state": "present", "present": ["Lab Item NEG"]})
+    );
+    assert_eq!(batch["counters"]["exceptions"], 1);
+}
+
+#[test]
+fn a_rejected_batch_whose_names_the_read_did_not_show_is_one_mismatch() {
+    let chunk = stock_items(&["Lab Widget Z"]);
+    let readback =
+        rejected_batch_readback(MasterKind::StockItem, &chunk, &captured_stock_item_rows());
+    let mut log = CreateBatchLog::default();
+    log.record_rejected(MasterKind::StockItem, 1, &captured_refusal(), readback);
+    assert_eq!(log.mismatches.len(), 1, "{:?}", log.mismatches);
+    assert_eq!(
+        log.batches[0]["readback_after_rejection"]["state"],
+        "not_shown"
+    );
+
+    // A read that failed is reported as failed, and is not "not shown".
+    let mut failed = CreateBatchLog::default();
+    failed.record_rejected(
+        MasterKind::StockItem,
+        1,
+        &captured_refusal(),
+        (
+            read_after_rejection_failed("agent_read_protocol_invalid"),
+            Vec::new(),
+        ),
+    );
+    assert_eq!(
+        failed.batches[0]["readback_after_rejection"]["state"],
+        "read_failed"
+    );
+}
+
+#[test]
+fn a_batch_with_unclean_counters_and_a_matching_read_back_stops_the_call_and_is_not_ok() {
+    // bridge#974: a root godown answered `CREATED 0, ALTERED 1` and read back
+    // as created. The read-back has no difference to report, so the result
+    // is not `ok` only because the batch itself adds a mismatch.
+    let chunk = BookMasters {
+        godowns: vec![book_with_parent("R3 Godown A", &Value::Null)],
+        ..Default::default()
+    };
+    let mut log = CreateBatchLog::default();
+    let goes_on = log.record_read_back(MasterKind::Godown, &chunk, false, (0, 1), Vec::new());
+    assert!(!goes_on);
+    assert_eq!(log.mismatches.len(), 1, "{:?}", log.mismatches);
+    assert!(log.mismatches[0].contains("CREATED=0 ALTERED=1"));
+    assert!(log.created_masters.is_empty());
+    assert_eq!(log.batches[0]["ok"], false);
+    assert_eq!(log.batches[0]["counters_clean"], false);
+    assert_eq!(log.batches[0]["mismatches"], json!([]));
+}
+
+#[test]
+fn a_batch_with_clean_counters_and_a_matching_read_back_goes_on_and_is_recorded_created() {
+    let chunk = stock_items(&["Lab Item NEG", "Lab Item POS"]);
+    let mut log = CreateBatchLog::default();
+    assert!(log.record_read_back(MasterKind::StockItem, &chunk, true, (2, 0), Vec::new()));
+    assert!(log.mismatches.is_empty());
+    assert_eq!(
+        log.created_masters,
+        vec!["StockItem:Lab Item NEG", "StockItem:Lab Item POS"]
+    );
+    assert_eq!(log.batches[0]["ok"], true);
+    assert_eq!(log.batches[0]["requested"], 2);
+}
+
+#[test]
+fn a_batch_with_clean_counters_and_a_read_back_difference_stops_the_call_and_is_not_ok() {
+    let chunk = stock_items(&["Lab Item NEG"]);
+    let mut log = CreateBatchLog::default();
+    let goes_on = log.record_read_back(
+        MasterKind::StockItem,
+        &chunk,
+        true,
+        (1, 0),
+        vec![
+            "stock item Lab Item NEG: parent expected the reserved root, observed \"Packaging\""
+                .into(),
+        ],
+    );
+    assert!(!goes_on);
+    assert_eq!(log.mismatches.len(), 1);
+    assert!(log.created_masters.is_empty());
+    assert_eq!(log.batches[0]["ok"], false);
 }

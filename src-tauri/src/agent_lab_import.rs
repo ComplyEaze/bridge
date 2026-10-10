@@ -1369,15 +1369,15 @@ pub(in crate::agent) async fn lab_import_masters(
         .stock_items
         .retain(|s| !already_present(MasterKind::StockItem, &s.name));
 
-    let mut batches = Vec::new();
-    let mut mismatches: Vec<String> = Vec::new();
+    let mut log = CreateBatchLog::default();
     let mut counts = serde_json::Map::new();
     // Per-master report (coordinator instruction, 2026-09-14): every master
     // actually Created in this call, "Kind:Name" -- alongside
     // `already_present_verified`/`altered_verified` below, this is the
     // `created` quarter of "created / already_present_verified /
-    // altered_verified / refused".
-    let mut created_masters: Vec<String> = Vec::new();
+    // altered_verified / refused". Held by `log` with the batch reports and
+    // the mismatches, so the loop below only calls the decisions that tests
+    // drive.
 
     'kinds: for kind in MasterKind::IMPORT_ORDER {
         let total = kind.count(&creatable);
@@ -1425,7 +1425,7 @@ pub(in crate::agent) async fn lab_import_masters(
                     },
                 )
                 .await;
-                let (readback_after_rejection, present_after_rejection) = match after {
+                let readback_after_rejection = match after {
                     Ok((read_xml, read_evidence)) => {
                         evidence = combine_evidence(evidence.clone(), read_evidence);
                         match parse_lab_master_rows(&read_xml, kind.tally_type()) {
@@ -1435,23 +1435,7 @@ pub(in crate::agent) async fn lab_import_masters(
                     }
                     Err(failure) => (read_after_rejection_failed(&failure.code), Vec::new()),
                 };
-                batches.push(json!({
-                    "kind": kind.tally_type(),
-                    "requested": chunk_len,
-                    "state": "tally_rejected",
-                    "counters": tally_import_counters_json(counters),
-                    "tally_line_errors": outcome.tally_line_errors(),
-                    "tally_line_errors_omitted": outcome.tally_line_errors_omitted(),
-                    "readback_after_rejection": readback_after_rejection,
-                    "ok": false,
-                }));
-                mismatches.push(tally_rejection_message(kind.tally_type(), &outcome));
-                mismatches.extend(present_after_rejection.into_iter().map(|name| {
-                    format!(
-                        "{}:{name} is on the read-back although Tally rejected the batch",
-                        kind.tally_type()
-                    )
-                }));
+                log.record_rejected(kind, chunk_len, &outcome, readback_after_rejection);
                 break 'kinds;
             }
 
@@ -1469,33 +1453,25 @@ pub(in crate::agent) async fn lab_import_masters(
                 .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
 
             let batch_mismatches = readback_mismatches(kind, &chunk_masters, &rows);
-            let batch_ok = clean && batch_mismatches.is_empty();
-            batches.push(json!({
-                "kind": kind.tally_type(),
-                "requested": chunk_len,
-                "counters_clean": clean,
-                "mismatches": batch_mismatches,
-                "ok": batch_ok,
-            }));
-            if !batch_ok {
-                mismatches.extend(created_batch_mismatches(
-                    kind.tally_type(),
-                    clean,
-                    (counters.created, counters.altered),
-                    batch_mismatches,
-                ));
+            if !log.record_read_back(
+                kind,
+                &chunk_masters,
+                clean,
+                (counters.created, counters.altered),
+                batch_mismatches,
+            ) {
                 break 'kinds; // stop on first mismatch, per the plan
             }
-            created_masters.extend(
-                kind.names(&chunk_masters)
-                    .into_iter()
-                    .map(|name| format!("{}:{name}", kind.tally_type())),
-            );
             created += chunk_len;
             chunk_start += MAX_MASTER_BATCH;
         }
         counts.insert(kind.tally_type().to_string(), json!(created));
     }
+    let CreateBatchLog {
+        mut batches,
+        mut mismatches,
+        created_masters,
+    } = log;
 
     // ---- Ledger reconcile: partial Alter for every pre-existing ledger --
     // Tally default (Cash/Profit & Loss A/c) or ordinary (coordinator
@@ -1784,6 +1760,95 @@ fn tally_import_counters_json(counters: &bridge_tally_protocol::TallyImportResul
     })
 }
 
+/// What a `lab_import_masters` call has recorded about its Create batches:
+/// the per-batch reports, the result's `mismatches`, and the masters created.
+/// The loop calls [`Self::record_rejected`] and [`Self::record_read_back`] and
+/// reads nothing else of a batch's outcome, so the decision of what a batch
+/// adds to the result is these two methods, and tests drive them.
+#[derive(Default)]
+struct CreateBatchLog {
+    batches: Vec<Value>,
+    mismatches: Vec<String>,
+    created_masters: Vec<String>,
+}
+
+impl CreateBatchLog {
+    /// A batch Tally refused. The call stops after it.
+    ///
+    /// The result is not `ok` (the rejection is a mismatch), and every
+    /// requested name the read after the rejection showed is a mismatch too:
+    /// a refused master that is on the read-back is held somewhere
+    /// (bridge#692, bridge#974). `readback_after_rejection` is
+    /// [`rejected_batch_readback`]'s report and names.
+    fn record_rejected(
+        &mut self,
+        kind: MasterKind,
+        requested: usize,
+        outcome: &bridge_tally_protocol::TallyImportOutcome,
+        readback_after_rejection: (Value, Vec<String>),
+    ) {
+        let (report, present) = readback_after_rejection;
+        self.batches.push(json!({
+            "kind": kind.tally_type(),
+            "requested": requested,
+            "state": "tally_rejected",
+            "counters": tally_import_counters_json(outcome.counters()),
+            "tally_line_errors": outcome.tally_line_errors(),
+            "tally_line_errors_omitted": outcome.tally_line_errors_omitted(),
+            "readback_after_rejection": report,
+            "ok": false,
+        }));
+        self.mismatches
+            .push(tally_rejection_message(kind.tally_type(), outcome));
+        self.mismatches.extend(present.into_iter().map(|name| {
+            format!(
+                "{}:{name} is on the read-back although Tally rejected the batch",
+                kind.tally_type()
+            )
+        }));
+    }
+
+    /// A batch Tally accepted, with its read-back compared against the book.
+    /// Returns whether the call goes on.
+    ///
+    /// A batch is `ok` only with clean counters and a matching read-back. One
+    /// that is not adds to the result's `mismatches` (so the result is not
+    /// `ok`), including the case of unclean counters and a matching read-back
+    /// (bridge#974: a root godown answered `CREATED 0, ALTERED 1`).
+    fn record_read_back(
+        &mut self,
+        kind: MasterKind,
+        chunk: &BookMasters,
+        counters_clean: bool,
+        counters: (u64, u64),
+        read_back_mismatches: Vec<String>,
+    ) -> bool {
+        let batch_ok = counters_clean && read_back_mismatches.is_empty();
+        self.batches.push(json!({
+            "kind": kind.tally_type(),
+            "requested": kind.count(chunk),
+            "counters_clean": counters_clean,
+            "mismatches": read_back_mismatches,
+            "ok": batch_ok,
+        }));
+        if !batch_ok {
+            self.mismatches.extend(created_batch_mismatches(
+                kind.tally_type(),
+                counters_clean,
+                counters,
+                read_back_mismatches,
+            ));
+            return false;
+        }
+        self.created_masters.extend(
+            kind.names(chunk)
+                .into_iter()
+                .map(|name| format!("{}:{name}", kind.tally_type())),
+        );
+        true
+    }
+}
+
 /// What a Create batch that is not `ok` adds to the result's `mismatches`.
 ///
 /// A batch whose counters are not a clean created-only success but whose
@@ -1809,10 +1874,11 @@ fn created_batch_mismatches(
 }
 
 /// What the read-back after a rejected master batch may say when it shows none
-/// of the requested names. It says no more: whether the gateway read can see
-/// a master Tally holds as an import exception is unmeasured (bridge#974).
-const REJECTED_BATCH_NOT_SHOWN: &str = "the read did not show them. This tool does not read \
-Tally's Import Exceptions report, and a refused master may be held there";
+/// of the requested names: that the read did not show them, and where to go
+/// back to. It says no more, because whether the gateway read can see a master
+/// Tally holds as an import exception is unmeasured (bridge#974).
+const REJECTED_BATCH_NOT_SHOWN: &str =
+    "the read did not show them; the pre-import backup is the way back if Tally holds them";
 
 /// The read after a rejected batch, by structure: which requested names the
 /// rows show, and the part of the result that says so.

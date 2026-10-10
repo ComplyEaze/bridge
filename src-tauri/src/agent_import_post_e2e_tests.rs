@@ -5342,7 +5342,12 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
 // ---- BP/26-27/0010 on the pilot lab's own answers (#1342, 9 Oct 2026) ----
 //
 // Every answer is Tally's own bytes from the synthetic company BRIDGE PILOT LAB
-// (fixtures/agent/pilot-lab/PROVENANCE.md). The order below is the order the
+// (fixtures/agent/pilot-lab/PROVENANCE.md). Two of them are
+// from 10 Oct 2026, after the book gained four ledgers: the ledger catalogue
+// `k` and the rates read `Q`, which is the read restricted to the parents of the
+// invoice's ledgers (#1331). They are one coherent pair (the scoped answer holds
+// exactly the catalogue's ledgers under those parents), paired here with the
+// 9 Oct answers of the same book; the pairing was not observed at one time. The order below is the order the
 // build and then the post asked in, as observed against a replay of those
 // answers; it is not an order read off the code. Legend: s status probe, e
 // company list, m/M marks before/after the import, b book extent, c currencies,
@@ -5375,7 +5380,7 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'b' => "eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49", // r03-book-extent.xml
         'c' => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661", // r04-currencies.xml
         'L' => "c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386", // r05-ledgers-compliance.xml
-        'Q' => "2e728e002305cbaa33c73bd36507ca8d6ab62c5dea5497b02204a07636385d88", // w7-ledgers-rates.xml
+        'Q' => "ec5f0fa02de3c9e577a21c4aefd3d2991b7f780002038075a14d7257dcc5d71d", // q1-rates-four-parents.xml (#1331)
         'P' => "71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f", // r06-ledgers-paired.xml
         'g' => "20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f", // r07-groups.xml
         'T' => "c351d6c62a09ce5173355f3998ef12746f01aba253ea8bdc42664b1b9766fb00", // r08-voucher-types.xml
@@ -5407,12 +5412,12 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml"),
         'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml"),
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
-        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml"),
+        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml"),
         'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
-        'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2.utf16le.xml"),
+        'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml"),
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
         'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),

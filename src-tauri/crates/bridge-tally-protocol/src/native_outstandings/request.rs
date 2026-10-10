@@ -203,7 +203,7 @@ fn render_native_ledger_snapshot(
 /// so section 6.1's space hazard does not apply. Several formulas are listed
 /// comma-separated and all apply (AND), which is how the complement part's
 /// `NOT (...)` chunks combine (section 11e).
-fn parent_filter_parts(part: Option<&ParentPart>) -> (String, String) {
+pub fn parent_filter_parts(part: Option<&ParentPart>) -> (String, String) {
     match part {
         None => (String::new(), String::new()),
         Some(part) => {

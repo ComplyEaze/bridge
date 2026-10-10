@@ -17,13 +17,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
+#[path = "agent_import_invoice_scope.rs"]
+mod scope;
 #[path = "agent_import_invoice_wire.rs"]
 mod wire;
 
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
     render_company_registration_request, render_invoice_number_request,
-    render_invoice_readback_request, render_ledger_rates_request, render_voucher_types_request,
+    render_invoice_readback_request, render_ledger_rates_request_for_parents,
+    render_voucher_types_request,
 };
 
 /// What an invoice voucher carries besides its entries.
@@ -341,8 +344,9 @@ fn mark_admits(mark: u64) -> bool {
 /// What a book above that mark may hold, by the company's own ledger count,
 /// and still be built on: the whole compliance listing is a few kilobytes a
 /// ledger, so this keeps one read of it to a few megabytes. The listing's own
-/// size gate stays in front of it; a follow-up scopes the read to the named
-/// ledgers' parent groups so large books can be admitted.
+/// size gate stays in front of it. The rate read is already narrowed to the named
+/// ledgers' parent groups (#1331); narrowing this listing the same way, so that
+/// large books can be admitted, waits for its own measurement.
 const INVOICE_MAX_LEDGERS: u64 = 2_000;
 
 /// Why a book over the mark is refused on the company's own ledger count, or
@@ -1455,6 +1459,17 @@ impl super::super::Server {
         {
             return Err(refused(refuse_value("invoice_company_stopped", &batch_id)));
         }
+        // The rate read asks only for the ledgers under the parents of the
+        // ledgers this invoice names. The scope is planned from the catalogue
+        // the caller has just read, so every refusal of it comes before any
+        // request to Tally (#1331).
+        let named = voucher
+            .entries
+            .iter()
+            .map(|entry| entry.ledger.as_str())
+            .collect::<Vec<_>>();
+        let scope = scope::InvoiceLedgerScope::from_catalogue(catalogue.catalog(), &named)
+            .map_err(refused)?;
         // 0. Refuse large books: the whole ledger compliance listing is read
         // three times for one invoice (build, before the dialog, after it).
         let (mark, mark_evidence) = self
@@ -1517,20 +1532,20 @@ impl super::super::Server {
         // sales ledger's own rate, so the rate is read, never inferred.
         let rates_window =
             financial_year_window(&as_of).ok_or_else(|| failed("invoice_date_invalid"))?;
-        let request = super::super::invoice_ledger_rates_read(
+        let request = super::super::invoice_ledger_rates_scoped_read(
             company_name,
             (&rates_window.0, as_of.as_str()),
+            scope.part(),
         )
         .ok_or_else(|| failed("invoice_date_invalid"))?;
         let (xml, read) = self.post_read(identity, request).await?;
         evidence = super::super::combine_evidence(evidence, read);
-        let wanted = voucher
-            .entries
-            .iter()
-            .map(|entry| entry.ledger.as_str())
-            .collect::<Vec<_>>();
-        let rates =
-            wire::parse_ledger_rates(&xml, identity.company_guid(), &wanted).map_err(failed)?;
+        let (rates, listed) =
+            wire::parse_ledger_rates_and_rows(&xml, identity.company_guid(), &named)
+                .map_err(failed)?;
+        // A scoped read is believed only when its rows are exactly the
+        // catalogue's ledgers under those parents.
+        scope.prove(&listed).map_err(refused)?;
         let mut facts = BTreeMap::new();
         for entry in &voucher.entries {
             let matching = listing

@@ -390,14 +390,17 @@ pub(super) fn invoice_readback_read(
         .map(ReadRequest)
 }
 
-/// The ledger listing with each ledger's GST rate and rounding, for the
-/// tax check of an invoice: its window is the invoice's financial year start
-/// and the invoice date.
-pub(super) fn invoice_ledger_rates_read(
+/// The ledger listing with each ledger's GST rate and rounding, for the tax
+/// check of an invoice, restricted to the ledgers under one scope's parents
+/// (#1331). Its window is the invoice's financial year start and the invoice
+/// date.
+pub(super) fn invoice_ledger_rates_scoped_read(
     company: &str,
     window: (&str, &str),
+    part: &bridge_tally_protocol::parent_partition::ParentPart,
 ) -> Option<ReadRequest> {
-    agent_import::invoice::render_ledger_rates_request(company, window).map(ReadRequest)
+    agent_import::invoice::render_ledger_rates_request_for_parents(company, window, part)
+        .map(ReadRequest)
 }
 
 /// The company's GST registrations, for an invoice build (rows bound to the

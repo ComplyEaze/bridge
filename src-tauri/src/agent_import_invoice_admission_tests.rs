@@ -83,11 +83,6 @@ fn plan(letter: char) -> ScenarioPlan {
         'L' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-ledgers-compliance.utf16le.xml")),
         'P' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-ledgers-paired.utf16le.xml")),
         'g' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-groups.utf16le.xml")),
-        // HAND-WRITTEN, not Tally's bytes: this book's rates were never read, so
-        // the listing is an empty collection. No case here reaches the tax
-        // arithmetic (the party of each is refused first); the lab's own rate
-        // listing is replayed in the pilot-lab tests.
-        'Q' => "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION></COLLECTION></DATA></BODY></ENVELOPE>".to_string(),
         'T' => voucher_types(),
         'N' => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml")),
         'C' => company_registration(),
@@ -98,11 +93,23 @@ fn plan(letter: char) -> ScenarioPlan {
         .with_framing(ResponseFraming::ContentLength)
 }
 
+/// The three ledgers `invoice_to` credits, beside its party.
+const LEG_LEDGERS: [&str; 3] = ["Sales - Goods", "Output CGST", "Output SGST"];
+
+/// The ledgers of the synthetic book one admission of an invoice to `party`
+/// reads: the party and the three legs, all under one group.
+fn book(party: &str) -> Vec<&str> {
+    std::iter::once(party).chain(LEG_LEDGERS).collect()
+}
+
 /// A synthetic V2 catalogue row for each named ledger (the listing fixtures
-/// carry no bill-wise flag; this one is not Tally's bytes).
+/// carry no bill-wise flag; this one is not Tally's bytes), and for the three
+/// legs of `invoice_to`, so the scope of the invoice resolves.
 fn catalogue(ledgers: &[(&str, bool)]) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
     let rows = ledgers
         .iter()
+        .copied()
+        .chain(LEG_LEDGERS.iter().map(|name| (*name, false)))
         .enumerate()
         .map(|(index, (name, bill_wise))| {
             format!(
@@ -110,7 +117,7 @@ fn catalogue(ledgers: &[(&str, bool)]) -> bridge_tally_protocol::StandardLedgerC
                  <PARENT TYPE=\"String\">Synthetic Group</PARENT><ISBILLWISEON TYPE=\"Logical\">{}</ISBILLWISEON>\
                  <BRIDGECOMPANYGUID TYPE=\"String\">{LAB_GUID}</BRIDGECOMPANYGUID>\
                  <BRIDGECOMPANYNAME TYPE=\"String\">{LAB}</BRIDGECOMPANYNAME></LEDGER>",
-                if *bill_wise { "Yes" } else { "No" }
+                if bill_wise { "Yes" } else { "No" }
             )
         })
         .collect::<String>();
@@ -120,6 +127,36 @@ fn catalogue(ledgers: &[(&str, bool)]) -> bridge_tally_protocol::StandardLedgerC
         LAB_GUID,
     )
     .unwrap()
+}
+
+/// HAND-WRITTEN, not Tally's bytes: this book's rates were never read, so the
+/// answer to the scoped rate read holds one bare row for each ledger of
+/// `book(party)`, with the identity `catalogue` gives it (name, GUID, group)
+/// and no rate rows. No case here reaches the tax arithmetic (the party of
+/// each is refused first); the lab's own scoped answer is replayed in the
+/// pilot-lab tests.
+fn rates_answer(party: &str) -> String {
+    let rows = book(party)
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            format!(
+                "<LEDGER NAME=\"{name}\"><GUID>{LAB_GUID}-{index:04}</GUID><PARENT>Synthetic Group</PARENT>\
+                 <BRIDGECOMPANYGUID>{LAB_GUID}</BRIDGECOMPANYGUID></LEDGER>"
+            )
+        })
+        .collect::<String>();
+    format!("<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>{rows}</COLLECTION></DATA></BODY></ENVELOPE>")
+}
+
+/// The answer to one request of an admission of an invoice to `party`.
+fn plan_for(party: &str, letter: char) -> ScenarioPlan {
+    match letter {
+        'Q' => ScenarioPlan::new(Fixture::SyntheticXml(rates_answer(party)))
+            .with_encoding(WireEncoding::Utf16LeNoBom)
+            .with_framing(ResponseFraming::ContentLength),
+        letter => plan(letter),
+    }
 }
 
 /// The number read's captured answer when one Sales voucher carries the
@@ -219,12 +256,12 @@ fn invoice_to(party: &str, filed: &str, observed: bool) -> ImportVoucher {
 
 /// The plans of one admission, with the number read answering "in use" when
 /// `number_used`.
-fn admission_plans(number_used: bool) -> Vec<ScenarioPlan> {
+fn admission_plans(party: &str, number_used: bool) -> Vec<ScenarioPlan> {
     ADMISSION_ORDER
         .chars()
         .map(|letter| match letter {
             'N' if number_used => number_in_use(),
-            letter => plan(letter),
+            letter => plan_for(party, letter),
         })
         .collect()
 }
@@ -241,7 +278,7 @@ async fn admit(
     ImportVoucher,
     usize,
 ) {
-    let lab = lab(admission_plans(number_used));
+    let lab = lab(admission_plans(party, number_used));
     let mut voucher = invoice_to(party, filed, false);
     let outcome = match lab
         .server
@@ -360,16 +397,16 @@ async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_un
             ("FAILED", "invoice_company_registration_unread"),
         ),
     ] {
+        let party = "Counter Sales - Unregistered";
         let lab = lab(ADMISSION_ORDER
             .chars()
             .map(|letter| match letter {
                 'C' => ScenarioPlan::new(Fixture::SyntheticXml(answer.clone()))
                     .with_encoding(WireEncoding::Utf16LeNoBom)
                     .with_framing(ResponseFraming::ContentLength),
-                letter => plan(letter),
+                letter => plan_for(party, letter),
             })
             .collect());
-        let party = "Counter Sales - Unregistered";
         let mut voucher = invoice_to(party, "Sales Manual", false);
         let result = lab
             .server
@@ -410,16 +447,16 @@ async fn the_registrations_state_is_the_supplier_state_the_place_of_supply_is_ch
     let units = company_registration()
         .replace("08ZZZZZ0000Z1ZQ", "06ZZZZZ0000Z1ZU")
         .replacen("<STATE>Rajasthan</STATE>", "<STATE>Haryana</STATE>", 1);
+    let party = "Counter Sales - Unregistered";
     let lab = lab(ADMISSION_ORDER
         .chars()
         .map(|letter| match letter {
             'C' => ScenarioPlan::new(Fixture::SyntheticXml(units.clone()))
                 .with_encoding(WireEncoding::Utf16LeNoBom)
                 .with_framing(ResponseFraming::ContentLength),
-            letter => plan(letter),
+            letter => plan_for(party, letter),
         })
         .collect());
-    let party = "Counter Sales - Unregistered";
     let mut voucher = invoice_to(party, "Sales Manual", false);
     let Err(invoice::InvoiceAdmission::Refused(refusals)) = lab
         .server
@@ -474,7 +511,7 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
         (false, "invoice_party_registration_not_reported", 70),
         (true, "invoice_number_already_used", 64),
     ] {
-        let lab = lab(admission_plans(number_used));
+        let lab = lab(admission_plans(party, number_used));
         let saved = invoice_to(party, "Sales Manual", true);
         let failure = lab
             .server
@@ -496,7 +533,7 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
 /// requests it sent.
 async fn admission_after_a_sent_invoice(then: Option<&str>) -> (Option<String>, usize) {
     let party = "Counter Sales - Unregistered";
-    let lab = lab(admission_plans(false));
+    let lab = lab(admission_plans(party, false));
     let line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-00000000-0000-4000-8000-000000000001","identity_scheme":"batch_v1",
         "company_guid":LAB_GUID,"endpoint_origin":"http://127.0.0.1:9000",
@@ -574,4 +611,170 @@ async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
         admission_after_a_sent_invoice(Some("posted_verified")).await,
         (None, 70)
     );
+}
+
+/// The part the scope of an admission to `party` plans: the one group the
+/// synthetic book holds, with the four ledgers of `book(party)` in it.
+fn synthetic_scope_part(party: &str) -> bridge_tally_protocol::parent_partition::ParentPart {
+    use bridge_tally_protocol::parent_partition::{
+        ParentObservation, ParentPartition, PartitionLimits,
+    };
+    let names = book(party);
+    let guids = (0..names.len())
+        .map(|index| format!("{LAB_GUID}-{index:04}"))
+        .collect::<Vec<_>>();
+    let plan = ParentPartition::plan(
+        names.iter().zip(&guids).map(|(name, guid)| {
+            (
+                *name,
+                guid.as_str(),
+                ParentObservation::Named("Synthetic Group"),
+            )
+        }),
+        PartitionLimits {
+            max_ledgers_per_part: 4_266,
+            max_parents_per_part: 200,
+            max_parts: 12,
+            max_complement_formula_bytes: 262_144,
+        },
+    )
+    .unwrap();
+    plan.parts()[0].clone()
+}
+
+/// The rate read of an admission is restricted to the parents of the ledgers
+/// the invoice names (#1331): both sends of it (the read and its repeat)
+/// carry, byte for byte, the request rendered for the scope's part, and no
+/// other request of the admission is that one. The financial year starts on
+/// 1 April 2025 for an invoice dated 10 March 2026.
+#[tokio::test]
+async fn the_rate_read_is_restricted_to_the_parents_of_the_invoices_ledgers() {
+    let party = "Counter Sales - Unregistered";
+    let lab = lab(admission_plans(party, false));
+    let mut voucher = invoice_to(party, "Sales Manual", false);
+    let _ = lab
+        .server
+        .admit_sales_invoice(
+            &lab.identity,
+            &lab.company,
+            &mut voucher,
+            &catalogue(&[(party, false)]),
+        )
+        .await;
+    lab.simulator.cancel();
+    let observed = lab.simulator.finish().unwrap();
+    let request = invoice::render_ledger_rates_request_for_parents(
+        LAB,
+        ("20250401", "20260310"),
+        &synthetic_scope_part(party),
+    )
+    .unwrap();
+    let expected = crate::agent::sha256_hex(
+        &bridge_tally_protocol::encode_tally_xml_request_utf16le(&request),
+    );
+    assert!(request.contains("$Parent = \"Synthetic Group\""));
+    let rate_reads = ADMISSION_ORDER
+        .char_indices()
+        .filter(|(_, letter)| *letter == 'Q')
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    assert_eq!(rate_reads.len(), 2);
+    for index in &rate_reads {
+        assert_eq!(
+            observed[*index].request_body_sha256, expected,
+            "request {index}"
+        );
+    }
+    assert_eq!(
+        observed
+            .iter()
+            .filter(|request| request.request_body_sha256 == expected)
+            .count(),
+        2
+    );
+}
+
+/// An answer to the rate read that is not the scope's rows, here one row too
+/// many from another group, is a refusal under its own code and nothing more
+/// is read after it (the admission stops at the first pair of that read).
+#[tokio::test]
+async fn a_rate_answer_that_is_not_the_scopes_rows_is_refused_and_ends_the_admission() {
+    let party = "Counter Sales - Unregistered";
+    let extra = "<LEDGER NAME=\"Cash\"><GUID>00000000-0000-4000-8000-0000000000ff</GUID>\
+                 <PARENT>Cash-in-Hand</PARENT>"
+        .to_string()
+        + &format!("<BRIDGECOMPANYGUID>{LAB_GUID}</BRIDGECOMPANYGUID></LEDGER></COLLECTION>");
+    let answer = rates_answer(party).replacen("</COLLECTION>", &extra, 1);
+    let lab = lab(ADMISSION_ORDER
+        .chars()
+        .map(|letter| match letter {
+            'Q' => ScenarioPlan::new(Fixture::SyntheticXml(answer.clone()))
+                .with_encoding(WireEncoding::Utf16LeNoBom)
+                .with_framing(ResponseFraming::ContentLength),
+            letter => plan_for(party, letter),
+        })
+        .collect());
+    let mut voucher = invoice_to(party, "Sales Manual", false);
+    let outcome = lab
+        .server
+        .admit_sales_invoice(
+            &lab.identity,
+            &lab.company,
+            &mut voucher,
+            &catalogue(&[(party, false)]),
+        )
+        .await;
+    let Err(invoice::InvoiceAdmission::Refused(refusals)) = outcome else {
+        panic!("not refused");
+    };
+    assert_eq!(
+        refusals
+            .iter()
+            .map(|refusal| (refusal.code, refusal.detail.clone()))
+            .collect::<Vec<_>>(),
+        vec![(
+            "invoice_ledger_rates_rows_differ",
+            invoice::RefusalDetail::Value("parent_part_row_count_differs".to_string())
+        )]
+    );
+    // Through the rate read's second send and its closing bracket: no voucher
+    // type, number or registration read follows.
+    assert_eq!(sent(lab.simulator), ADMISSION_ORDER.rfind('Q').unwrap() + 3);
+    assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
+}
+
+/// An invoice naming a ledger the catalogue does not hold is refused before
+/// the first request, because its scope cannot be planned.
+#[tokio::test]
+async fn an_invoice_naming_a_ledger_the_catalogue_lacks_is_refused_before_any_request() {
+    let party = "Counter Sales - Unregistered";
+    let lab = lab(admission_plans(party, false));
+    let mut voucher = invoice_to(party, "Sales Manual", false);
+    let smaller = {
+        // The synthetic catalogue without its tax legs is the party alone.
+        let _ = &voucher;
+        bridge_tally_protocol::parse_standard_ledger_catalog_v2_with_identities(
+            &format!(
+                "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+                 <LEDGER NAME=\"{party}\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">{LAB_GUID}-0000</GUID>\
+                 <PARENT TYPE=\"String\">Synthetic Group</PARENT><ISBILLWISEON TYPE=\"Logical\">No</ISBILLWISEON>\
+                 <BRIDGECOMPANYGUID TYPE=\"String\">{LAB_GUID}</BRIDGECOMPANYGUID>\
+                 <BRIDGECOMPANYNAME TYPE=\"String\">{LAB}</BRIDGECOMPANYNAME></LEDGER>\
+                 </COLLECTION></DATA></BODY></ENVELOPE>"
+            ),
+            LAB,
+            LAB_GUID,
+        )
+        .unwrap()
+    };
+    let Err(invoice::InvoiceAdmission::Refused(refusals)) = lab
+        .server
+        .admit_sales_invoice(&lab.identity, &lab.company, &mut voucher, &smaller)
+        .await
+    else {
+        panic!("not refused");
+    };
+    assert_eq!(refusals.len(), 1);
+    assert_eq!(refusals[0].code, "invoice_ledger_not_observed");
+    assert_eq!(sent(lab.simulator), 0);
 }

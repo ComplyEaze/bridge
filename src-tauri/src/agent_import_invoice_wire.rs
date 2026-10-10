@@ -714,10 +714,8 @@ pub(super) fn parse_company_registration(
 /// invoice date, as the request that was measured carried them (a ledger's
 /// rate rows came back whole; whether the window changes them was not tried).
 /// `None` when a date is not eight digits.
-pub(in crate::agent) fn render_ledger_rates_request(
-    company: &str,
-    window: (&str, &str),
-) -> Option<String> {
+#[cfg(test)]
+fn render_ledger_rates_request(company: &str, window: (&str, &str)) -> Option<String> {
     render_ledger_rates(company, window, None)
 }
 
@@ -769,6 +767,21 @@ impl Node {
     fn text_of(&self, name: &str) -> Result<Option<String>, &'static str> {
         let mut found = self.children.iter().filter(|child| child.name == name);
         let first = found.next().map(|child| clean(&child.text));
+        if found.next().is_some() {
+            return Err("invoice_read_field_repeated");
+        }
+        Ok(first)
+    }
+
+    /// [`Self::text_of`] without the cleaning of control-character markers,
+    /// trimmed of whitespace only: the text a catalogue row of the same
+    /// element carries, so the two compare. `None` for an absent or empty one.
+    fn raw_text_of(&self, name: &str) -> Result<Option<String>, &'static str> {
+        let mut found = self.children.iter().filter(|child| child.name == name);
+        let first = found
+            .next()
+            .map(|child| child.text.trim().to_string())
+            .filter(|text| !text.is_empty());
         if found.next().is_some() {
             return Err("invoice_read_field_repeated");
         }
@@ -949,11 +962,36 @@ const HEAD_RATE_CHILDREN: &[&str] = &["GSTRATE", "GSTRATEDUTYHEAD", "GSTRATEVALU
 /// `BRIDGECOMPANYGUID` compute); the rows of the named ledgers are read in
 /// full, and a name two of them claim refuses the answer. A row of any other
 /// ledger is not read, so one unrelated ledger cannot fail an invoice.
+#[cfg(test)]
 pub(super) fn parse_ledger_rates(
     xml: &str,
     company_guid: &str,
     wanted: &[&str],
 ) -> Result<BTreeMap<String, LedgerRateRow>, &'static str> {
+    parse_ledger_rates_and_rows(xml, company_guid, wanted).map(|(rates, _)| rates)
+}
+
+/// One row of a rate listing as the scope's coverage proof reads it: the
+/// row's `NAME` attribute, its GUID and its immediate `PARENT`, the last two
+/// as the answer wrote them (no cleaning, so the reserved root compares as the
+/// catalogue carries it).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ListedLedger {
+    pub(super) name: String,
+    /// `None` when the row carries none: the coverage proof refuses it there,
+    /// and a rate read that asks for no proof is not stopped by it.
+    pub(super) guid: Option<String>,
+    pub(super) parent: Option<String>,
+}
+
+/// [`parse_ledger_rates`], and with it the identity of every row the answer
+/// holds, named or not, in answer order: a scoped read is only believed when
+/// those rows are exactly the scope's (#1331).
+pub(super) fn parse_ledger_rates_and_rows(
+    xml: &str,
+    company_guid: &str,
+    wanted: &[&str],
+) -> Result<(BTreeMap<String, LedgerRateRow>, Vec<ListedLedger>), &'static str> {
     let envelope = parse_tree(xml)?;
     let body = envelope
         .all("BODY")
@@ -965,6 +1003,7 @@ pub(super) fn parse_ledger_rates(
         .next()
         .ok_or("invoice_read_collection_absent")?;
     let mut out = BTreeMap::new();
+    let mut listed = Vec::new();
     for ledger in collection.all("LEDGER") {
         let bound = ledger.text_of("BRIDGECOMPANYGUID");
         if !bound.is_ok_and(|guid| guid.is_some_and(|guid| guid.eq_ignore_ascii_case(company_guid)))
@@ -974,6 +1013,11 @@ pub(super) fn parse_ledger_rates(
         let Some(name) = ledger.attributes.get("NAME").cloned() else {
             continue;
         };
+        listed.push(ListedLedger {
+            name: name.clone(),
+            guid: ledger.text_of("GUID")?.filter(|guid| !guid.is_empty()),
+            parent: ledger.raw_text_of("PARENT")?,
+        });
         if !wanted.contains(&name.as_str()) {
             continue;
         }
@@ -1029,7 +1073,7 @@ pub(super) fn parse_ledger_rates(
             return Err("invoice_ledger_rates_name_repeated");
         }
     }
-    Ok(out)
+    Ok((out, listed))
 }
 
 #[cfg(test)]

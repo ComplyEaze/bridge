@@ -333,7 +333,10 @@ fn a_parent_with_whitespace_at_either_end_is_refused() {
         let padded = synthetic(&[("Customer", parent), ("Sales", "Sales Accounts")]);
         assert_eq!(
             scope_of(&padded, &["Customer"]).err(),
-            Some(refuse_ledger("invoice_ledger_parent_unnameable", "Customer")),
+            Some(refuse_ledger(
+                "invoice_ledger_parent_unnameable",
+                "Customer"
+            )),
             "{parent:?}"
         );
         assert!(scope_of(&padded, &["Sales"]).is_ok(), "{parent:?}");

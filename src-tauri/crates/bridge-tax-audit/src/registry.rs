@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 use crate::applicability_44ab::{ComparisonTurnover, TurnoverInputs};
 use crate::book::Book;
 use crate::books_examined::{CallerNamedDocument, DocumentRead};
+use crate::documents::BankStatementLoad;
 use crate::error::{AuditError, Result};
 use crate::financial_statements::ReportTotals;
 use crate::rules::Rules;
@@ -29,7 +30,7 @@ pub struct CallerData {
     /// The bank statement: none supplied (`bank_reconciliation` refuses; `high_value_register`'s
     /// s.194N section reports none supplied), read, or refused with the reader's plain-words reason
     /// (`bank_reconciliation` gives its `refused` result; s.194N's coverage says so).
-    pub bank_statement: crate::documents::BankStatementLoad,
+    pub bank_statement: BankStatementLoad,
     /// The documents loaded with the read whose data no field above holds (`books_examined`).
     pub named_documents: BTreeSet<CallerNamedDocument>,
 }
@@ -46,7 +47,10 @@ impl CallerData {
             (DocumentRead::Form26as, self.traces.form26as.is_some()),
             (DocumentRead::Ais, self.traces.ais.is_some()),
             (DocumentRead::Tis, self.traces.tis.is_some()),
-            (DocumentRead::BankStatement, false),
+            (
+                DocumentRead::BankStatement,
+                matches!(self.bank_statement, BankStatementLoad::Read(_)),
+            ),
         ];
         held.into_iter()
             .filter_map(|(d, loaded)| loaded.then_some(d))

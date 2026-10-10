@@ -474,6 +474,20 @@ pub struct Inputs<'c> {
     pub counterparty_type_by_ledger: &'c BTreeMap<String, String>,
 }
 
+/// s.194N's coverage figure when no statement is available, whether none was supplied or the reader
+/// refused it.
+fn s194n_coverage_unavailable(r: &mut TestResult, coverage: String) -> Result<()> {
+    r.fig(
+        "s194n_coverage",
+        Value::Text(coverage),
+        Unit::Text,
+        "s.194N reads bank-statement narration only; no statement is available for this \
+                     client.",
+        vec![],
+    )?;
+    Ok(())
+}
+
 #[allow(clippy::too_many_lines)] // one section per limb, as the reference lays them out
 pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
     let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
@@ -1057,17 +1071,14 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
     });
 
     match i.bank_statement {
-        BankStatementLoad::NotSupplied | BankStatementLoad::Refused(_) => {
-            let coverage = "no bank statement supplied for this engagement".to_string();
-            r.fig(
-                "s194n_coverage",
-                Value::Text(coverage),
-                Unit::Text,
-                "s.194N reads bank-statement narration only; no statement is available for this \
-                             client.",
-                vec![],
-            )?;
-        }
+        BankStatementLoad::NotSupplied => s194n_coverage_unavailable(
+            &mut r,
+            "no bank statement supplied for this engagement".to_string(),
+        )?,
+        BankStatementLoad::Refused(reason) => s194n_coverage_unavailable(
+            &mut r,
+            format!("the bank statement supplied was refused (it {reason})"),
+        )?,
         BankStatementLoad::Read(statement) => {
             let terms: BTreeSet<String> = i
                 .s194n_narration_terms

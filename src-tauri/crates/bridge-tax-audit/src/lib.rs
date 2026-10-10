@@ -1527,7 +1527,13 @@ pub fn bank_reconciliation_on(
 ) -> Result<serde_json::Value> {
     let statement = match statement {
         documents::BankStatementLoad::Read(statement) => statement,
-        documents::BankStatementLoad::NotSupplied | documents::BankStatementLoad::Refused(_) => {
+        documents::BankStatementLoad::Refused(reason) => {
+            engagement.bind(book)?;
+            let result = bank_reconciliation::refused(rules, reason)?;
+            let module_check = bank_reconciliation::check_invariants(&[], &result)?;
+            return canonical::canonical_test_result(book, &result, Some(module_check));
+        }
+        documents::BankStatementLoad::NotSupplied => {
             return Err(AuditError::Config(format!(
                 "{}: no bank statement was supplied (the reference runs this test only when the \
                  engagement has one)",

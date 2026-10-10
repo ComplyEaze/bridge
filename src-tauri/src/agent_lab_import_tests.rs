@@ -2626,3 +2626,27 @@ async fn the_root_group_refusal_runs_before_the_first_request() {
     assert_eq!(status["isError"], false, "{status}");
     assert_eq!(simulator.finish().unwrap().len(), 2);
 }
+
+#[test]
+fn a_create_batch_with_unclean_counters_is_not_ok_even_when_the_read_back_matches() {
+    // bridge#974, third measurement: a root godown answered CREATED 0,
+    // ALTERED 1 and read back as created. Nothing differed on the read-back,
+    // so the batch contributed no mismatch and the result said `ok`.
+    let reported = created_batch_mismatches("Godown", false, (0, 1), Vec::new());
+    assert_eq!(
+        reported,
+        vec![
+            "Godown: import counters are not a clean created-only success \
+(CREATED=0 ALTERED=1); the counters are not taken as proof either way"
+        ]
+    );
+    // The read-back's own differences are kept after it.
+    let both = created_batch_mismatches("Godown", false, (1, 0), vec!["godown G: parent".into()]);
+    assert_eq!(both.len(), 2);
+    assert_eq!(both[1], "godown G: parent");
+    // Clean counters add nothing of their own.
+    assert_eq!(
+        created_batch_mismatches("Godown", true, (1, 0), vec!["godown G: parent".into()]),
+        vec!["godown G: parent"]
+    );
+}

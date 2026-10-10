@@ -1478,7 +1478,12 @@ pub(in crate::agent) async fn lab_import_masters(
                 "ok": batch_ok,
             }));
             if !batch_ok {
-                mismatches.extend(batch_mismatches);
+                mismatches.extend(created_batch_mismatches(
+                    kind.tally_type(),
+                    clean,
+                    (counters.created, counters.altered),
+                    batch_mismatches,
+                ));
                 break 'kinds; // stop on first mismatch, per the plan
             }
             created_masters.extend(
@@ -1777,6 +1782,30 @@ fn tally_import_counters_json(counters: &bridge_tally_protocol::TallyImportResul
         "cancelled": counters.cancelled,
         "exceptions": counters.exceptions,
     })
+}
+
+/// What a Create batch that is not `ok` adds to the result's `mismatches`.
+///
+/// A batch whose counters are not a clean created-only success but whose
+/// read-back matches the book used to add nothing, so the result said `ok`
+/// while the batch did not (bridge#974: a root godown answered `CREATED 0,
+/// ALTERED 1` and read back as created). The counters are not taken as proof
+/// either way, and the batch is not passed on them.
+fn created_batch_mismatches(
+    label: &str,
+    counters_clean: bool,
+    (created, altered): (u64, u64),
+    read_back: Vec<String>,
+) -> Vec<String> {
+    let mut reported = Vec::new();
+    if !counters_clean {
+        reported.push(format!(
+            "{label}: import counters are not a clean created-only success \
+(CREATED={created} ALTERED={altered}); the counters are not taken as proof either way"
+        ));
+    }
+    reported.extend(read_back);
+    reported
 }
 
 /// What the read-back after a rejected master batch may say when it shows none

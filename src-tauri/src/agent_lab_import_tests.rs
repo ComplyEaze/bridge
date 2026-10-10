@@ -76,14 +76,22 @@ fn unit_create_xml_golden() {
 
 #[test]
 fn godown_create_xml_golden() {
+    // This used to pin `<PARENT>Primary</PARENT>` for a book parent of
+    // `Primary`. The first measurement in bridge#974 refuted that shape: on
+    // TallyPrime 7.1 Silver (1 October 2026, a synthetic lab company) the
+    // request answered `CREATED 0, ERRORS 0, EXCEPTIONS 1` with
+    // `LINEERROR: Godown 'Primary' does not exist!`, because Tally read the
+    // bare word as a godown name. The answer is held on the issue, not in this
+    // repository. The form Tally accepted (the third measurement) is pinned
+    // here instead.
     let g = BookNamedParent {
         name: "Main Godown".into(),
-        parent: Some("Primary".into()),
+        parent: BookParent::Root,
     };
     assert_eq!(
-        render_parented_xml("GODOWN", &g),
+        render_parented_xml(MasterKind::Godown, &g).unwrap(),
         "<TALLYMESSAGE><GODOWN NAME=\"Main Godown\" ACTION=\"Create\"><NAME>Main Godown</NAME>\
-<PARENT>Primary</PARENT></GODOWN></TALLYMESSAGE>"
+<PARENT>&#4; Primary</PARENT></GODOWN></TALLYMESSAGE>"
     );
 }
 
@@ -241,7 +249,7 @@ fn ledger_create_xml_never_emits_taxtype_outside_duties_and_taxes() {
 fn stock_item_create_xml_golden() {
     let s = BookStockItem {
         name: "Sodium Bicarbonate".into(),
-        parent: Some("Chemicals".into()),
+        parent: BookParent::Named("Chemicals".into()),
         base_unit: Some("Kgs".into()),
         opening_qty: Some("100".into()),
         opening_rate: Some("50.00".into()),
@@ -264,7 +272,7 @@ fn stock_item_create_xml_golden() {
 fn stock_item_create_xml_omits_opening_balance_when_zero() {
     let s = BookStockItem {
         name: "Sample Item".into(),
-        parent: Some("Primary".into()),
+        parent: BookParent::Root,
         base_unit: Some("Kgs".into()),
         opening_qty: Some("0".into()),
         opening_rate: Some("0".into()),
@@ -569,17 +577,17 @@ fn diff_ledger_treats_equal_decimals_as_equal_regardless_of_formatting() {
 fn diff_parented_uses_the_9_4d_fold_not_exact_equality() {
     let item = BookNamedParent {
         name: "Main Godown".into(),
-        parent: Some("Sub-Location".into()),
+        parent: BookParent::Named("Sub-Location".into()),
     };
     let observed = row(&[("PARENT", "Sub Location")]);
     assert!(diff_parented("godown", &item, &observed).is_empty());
 }
 
 #[test]
-fn diff_stock_item_flags_a_wrong_parent_but_not_an_unspecified_one() {
+fn diff_stock_item_flags_a_wrong_parent_and_an_unspecified_one_that_is_not_the_root() {
     let s = BookStockItem {
         name: "Widget".into(),
-        parent: Some("Chemicals".into()),
+        parent: BookParent::Named("Chemicals".into()),
         base_unit: None,
         opening_qty: None,
         opening_rate: None,
@@ -589,8 +597,16 @@ fn diff_stock_item_flags_a_wrong_parent_but_not_an_unspecified_one() {
     };
     let mismatched = diff_stock_item(&s, &row(&[("PARENT", "Consumables")]));
     assert_eq!(mismatched.len(), 1);
-    let s_no_parent_check = BookStockItem { parent: None, ..s };
-    assert!(diff_stock_item(&s_no_parent_check, &row(&[("PARENT", "Anything")])).is_empty());
+    // No parent in the book is the root, and is compared (bridge#974).
+    let at_the_root = BookStockItem {
+        parent: BookParent::Root,
+        ..s
+    };
+    assert_eq!(
+        diff_stock_item(&at_the_root, &row(&[("PARENT", "Anything")])).len(),
+        1
+    );
+    assert!(diff_stock_item(&at_the_root, &row(&[("PARENT", "\u{fffd}#4; Primary")])).is_empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -1257,10 +1273,7 @@ fn a_captured_top_level_group_read_back_matches_a_book_that_writes_the_root() {
             "\u{4} Primary",
             "&#4; Primary",
         ] {
-            let item = BookNamedParent {
-                name: row["NAME"].clone(),
-                parent: Some(book_parent.to_string()),
-            };
+            let item: BookNamedParent = book_with_parent(&row["NAME"], &json!(book_parent));
             assert!(
                 diff_parented("group", &item, row).is_empty(),
                 "{book_parent:?} against {:?}",
@@ -1270,29 +1283,27 @@ fn a_captured_top_level_group_read_back_matches_a_book_that_writes_the_root() {
         // A book naming an ordinary group is still a mismatch.
         let item = BookNamedParent {
             name: row["NAME"].clone(),
-            parent: Some("Current Assets".to_string()),
+            parent: BookParent::Named("Current Assets".to_string()),
         };
         assert!(!diff_parented("group", &item, row).is_empty());
     }
 }
 
 #[test]
-fn a_read_back_group_named_primary_is_compared_as_a_group() {
-    // Only the marked root is matched by meaning. An observed bare `Primary`
-    // is a group of that name, so a book asking for the root does not match
-    // it through the root rule -- only the ordinary fold, which a book's
-    // bare `Primary` happens to satisfy and its marked spelling does not.
+fn a_read_back_group_named_primary_is_not_the_root() {
+    // Only the marked root is the root on the read side. An observed bare
+    // `Primary` is a group of that name, so a book asking for the root, in any
+    // spelling (a book's own bare `Primary` is the root too, bridge#974), does
+    // not match it.
     let observed = row(&[("PARENT", "Primary")]);
-    let marked = BookNamedParent {
-        name: "House".into(),
-        parent: Some("\u{fffd}#4; Primary".into()),
-    };
-    assert!(!diff_parented("group", &marked, &observed).is_empty());
-    let bare = BookNamedParent {
-        name: "House".into(),
-        parent: Some("Primary".into()),
-    };
-    assert!(diff_parented("group", &bare, &observed).is_empty());
+    for parent in root_spellings() {
+        let item: BookNamedParent = book_with_parent("House", &parent);
+        assert_eq!(
+            diff_parented("group", &item, &observed).len(),
+            1,
+            "{parent}"
+        );
+    }
 }
 
 #[test]
@@ -1519,7 +1530,7 @@ fn already_present_verified_mismatches_covers_non_ledger_kinds_via_the_existing_
     let masters = BookMasters {
         groups: vec![BookNamedParent {
             name: "Sundry Debtors (Retail)".into(),
-            parent: Some("Sundry Debtors".into()),
+            parent: BookParent::Named("Sundry Debtors".into()),
         }],
         ..Default::default()
     };
@@ -2002,7 +2013,7 @@ fn multi_year_book_answer(request: &str) -> String {
         assert!(request.contains("<TYPE>StockItem</TYPE>"));
         format!(
             "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
-<STOCKITEM NAME=\"Bridge Synthetic Widget\"><PARENT>Primary</PARENT>\
+<STOCKITEM NAME=\"Bridge Synthetic Widget\"><PARENT>&#4; Primary</PARENT>\
 <OPENINGBALANCE>{stock_opening}</OPENINGBALANCE></STOCKITEM>\
 </COLLECTION></DATA></BODY></ENVELOPE>"
         )
@@ -2301,7 +2312,7 @@ fn a_root_stock_group_is_sent_with_no_parent_element() {
     for parent in root_spellings() {
         let group: BookNamedParent = book_with_parent("Lab Group A", &parent);
         assert_eq!(
-            render_parented_xml("STOCKGROUP", &group),
+            render_parented_xml(MasterKind::StockGroup, &group).unwrap(),
             "<TALLYMESSAGE><STOCKGROUP NAME=\"Lab Group A\" ACTION=\"Create\">\
 <NAME>Lab Group A</NAME></STOCKGROUP></TALLYMESSAGE>",
             "book parent {parent}"
@@ -2317,7 +2328,7 @@ fn a_root_godown_is_sent_with_the_reserved_root_reference() {
     for parent in root_spellings() {
         let godown: BookNamedParent = book_with_parent("R3 Godown A", &parent);
         assert_eq!(
-            render_parented_xml("GODOWN", &godown),
+            render_parented_xml(MasterKind::Godown, &godown).unwrap(),
             "<TALLYMESSAGE><GODOWN NAME=\"R3 Godown A\" ACTION=\"Create\">\
 <NAME>R3 Godown A</NAME><PARENT>&#4; Primary</PARENT></GODOWN></TALLYMESSAGE>",
             "book parent {parent}"
@@ -2329,7 +2340,7 @@ fn a_root_godown_is_sent_with_the_reserved_root_reference() {
 fn a_godown_under_another_godown_still_names_its_parent_escaped() {
     let godown: BookNamedParent = book_with_parent("Bay 1", &json!("Wing A & B"));
     assert_eq!(
-        render_parented_xml("GODOWN", &godown),
+        render_parented_xml(MasterKind::Godown, &godown).unwrap(),
         "<TALLYMESSAGE><GODOWN NAME=\"Bay 1\" ACTION=\"Create\"><NAME>Bay 1</NAME>\
 <PARENT>Wing A &amp; B</PARENT></GODOWN></TALLYMESSAGE>"
     );
@@ -2449,4 +2460,169 @@ fn a_group_under_the_root_is_refused_before_anything_is_sent() {
         ..Default::default()
     };
     assert_eq!(refuse_unsendable_masters(&under_a_group), Ok(()));
+}
+
+#[test]
+fn a_book_parent_is_parsed_once_into_the_root_or_a_name() {
+    for parent in root_spellings() {
+        let item: BookNamedParent = book_with_parent("X", &parent);
+        assert_eq!(item.parent, BookParent::Root, "{parent}");
+    }
+    let null_parent: BookNamedParent =
+        serde_json::from_value(json!({"name": "X", "parent": null})).unwrap();
+    assert_eq!(null_parent.parent, BookParent::Root);
+    let item: BookNamedParent = book_with_parent("X", &json!("Raw Chemicals"));
+    assert_eq!(item.parent, BookParent::Named("Raw Chemicals".into()));
+    // A blank parent is neither the root nor a name: the book is refused.
+    for blank in ["", "   "] {
+        assert!(
+            serde_json::from_value::<BookNamedParent>(json!({"name": "X", "parent": blank}))
+                .is_err(),
+            "{blank:?}"
+        );
+        assert!(
+            serde_json::from_value::<BookStockItem>(json!({"name": "X", "parent": blank})).is_err(),
+            "{blank:?}"
+        );
+    }
+}
+
+#[test]
+fn the_batch_renderer_does_not_render_a_root_group() {
+    // The refusal before the first request is the guard; this is the renderer
+    // saying the same if it is ever reached with one.
+    let masters = BookMasters {
+        groups: vec![book_with_parent("Lab Group R", &Value::Null)],
+        ..Default::default()
+    };
+    assert_eq!(
+        render_master_batch_xml("BRIDGE SYNTHETIC BOOK", MasterKind::Group, &masters),
+        Err(LabMastersRefusal::RootParentUnmeasured {
+            groups: vec!["Lab Group R".into()]
+        })
+    );
+    let named = BookMasters {
+        godowns: vec![book_with_parent("Bay 1", &Value::Null)],
+        ..Default::default()
+    };
+    let xml = render_master_batch_xml("BRIDGE SYNTHETIC BOOK", MasterKind::Godown, &named).unwrap();
+    assert!(
+        xml.ends_with("<PARENT>&#4; Primary</PARENT></GODOWN></TALLYMESSAGE></REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"),
+        "{xml}"
+    );
+}
+
+#[test]
+fn after_a_rejected_batch_the_read_lists_only_the_requested_names_it_shows() {
+    // Captured stock items: `Lab Item NEG` and `Lab Item POS`.
+    let rows = captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/stock_items_negative_sale_lab_live.utf16le.xml"
+        ),
+        "STOCKITEM",
+    );
+    let chunk = |names: &[&str]| BookMasters {
+        stock_items: names
+            .iter()
+            .map(|name| book_with_parent(name, &Value::Null))
+            .collect(),
+        ..Default::default()
+    };
+    let (report, present) = rejected_batch_readback(
+        MasterKind::StockItem,
+        &chunk(&["Lab Item NEG", "Lab Widget Z"]),
+        &rows,
+    );
+    assert_eq!(present, vec!["Lab Item NEG".to_string()]);
+    assert_eq!(
+        report,
+        json!({"state": "present", "present": ["Lab Item NEG"]})
+    );
+
+    let (report, present) =
+        rejected_batch_readback(MasterKind::StockItem, &chunk(&["Lab Widget Z"]), &rows);
+    assert!(present.is_empty());
+    assert_eq!(report["state"], "not_shown");
+    let note = report["note"].as_str().unwrap();
+    assert!(note.starts_with("the read did not show them"), "{note}");
+    // The read is never described as showing that nothing was written.
+    assert!(!note.contains("not written") && !note.contains("nothing was"));
+
+    assert_eq!(
+        read_after_rejection_failed("agent_read_protocol_invalid"),
+        json!({"state": "read_failed", "code": "agent_read_protocol_invalid"})
+    );
+}
+
+/// bridge#974, the order: a root Group is refused by `lab_import_masters`
+/// before its first request. As in the opening-bills test, the lab guards are
+/// not set, so a refusal placed after admission would answer
+/// `lab_writes_disabled` and the code assertion fails; the zero alone would
+/// not tell the two orders apart. The same server then reaches the double with
+/// `tally_status`, so the zero is a measurement and not an unreachable double.
+#[tokio::test]
+async fn the_root_group_refusal_runs_before_the_first_request() {
+    use tally_protocol_simulator::{
+        Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+    let raw = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    );
+    let captured = String::from_utf16(
+        &raw.chunks_exact(2)
+            .map(|b| u16::from_le_bytes([b[0], b[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let simulator = SequenceSimulator::spawn(vec![
+        ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime)),
+        ScenarioPlan::new(Fixture::SyntheticXml(captured)).with_encoding(WireEncoding::Utf16Le),
+    ])
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let args = json!({
+        "masters": {"groups": [
+            {"name": "Lab Group R"},
+            {"name": "Lab Group N", "parent": "Current Assets"},
+            {"name": "Lab Group P", "parent": "Primary"}
+        ]},
+        "company_guid": "61c6de69-1748-461c-ad3f-162cb949df9f",
+    });
+    let refusal = match lab_import_masters(&server, &args).await {
+        Ok(_) => panic!("a root group was not refused"),
+        Err(failure) => failure,
+    };
+    assert_eq!(refusal.code, "lab_root_parent_unmeasured");
+    assert_eq!(simulator.received(), 0);
+    let log =
+        fs::read_to_string(directory.path().join("lab/lab-precheck-collisions.jsonl")).unwrap();
+    let records: Vec<Value> = log
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(records.len(), 1);
+    assert_eq!(
+        records[0]["collisions"],
+        json!([
+            "Group:Lab Group R:root_parent",
+            "Group:Lab Group P:root_parent"
+        ])
+    );
+
+    let status = server.call_tool("tally_status", json!({})).await;
+    assert_eq!(status["isError"], false, "{status}");
+    assert_eq!(simulator.finish().unwrap().len(), 2);
 }

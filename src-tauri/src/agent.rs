@@ -289,8 +289,9 @@ struct Settings {
     import_enabled: bool,
     writes_enabled: bool,
     /// `BRIDGE_AGENT_ENABLE_BATCH_POST`: lets `post_import` post 2 to 50
-    /// vouchers of one batch in one import. Off by default and not in the
-    /// extension's settings until a live batch post through Bridge is proved.
+    /// vouchers of one batch in one import. Off by default; the extension's
+    /// `enable_batch_post` setting (also off by default) maps to it, and it
+    /// applies only together with posting (#1090).
     batch_post_enabled: bool,
 }
 

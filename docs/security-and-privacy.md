@@ -53,8 +53,9 @@ It writes to Tally only if you turn posting on, and then only one voucher at a
 time (a Journal, Payment, Receipt or Contra it prepared and saved), after you
 approve that voucher in a separate ComplyEaze Bridge window. No ComplyEaze
 Bridge tool can approve it. The server program also has a setting for posting 2
-to 50 vouchers of one saved batch after one approval; the published extension
-neither offers nor sets it, so it applies only if someone sets it by hand.
+to 50 vouchers of one saved batch after one approval. The published extension
+(0.5.1) neither offers nor sets it; from the next build the extension offers it as
+a separate setting, off by default, that applies only with posting on.
 
 Every tool refuses until the Terms of Use (version 2026-10.1 since 0.5.0) are
 accepted in the extension settings. In 0.5.0 the setting was marked required, and

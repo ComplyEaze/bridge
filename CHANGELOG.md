@@ -18,6 +18,13 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- The extension has a setting for batch posting, "Allow posting a batch of up to 50 vouchers under one
+  approval", off by default and used only when voucher posting is on (part of #1090). With both on, one
+  approval posts a saved batch of 2 to 50 Journals, or of 2 to 50 Payments, Receipts and Contras, in one
+  import, as a command-line installation already could; the approval window shows the batch's totals for
+  each ledger, with a line per voucher only for 10 or fewer. The cap, the checks before and after the post,
+  and the per-voucher read-back are unchanged. A batch post through the extension has not yet run on a live
+  Tally.
 - `stock_summary` now returns an item's closing quantity, `closing.quantity` with its `amount` and `unit`, where
   Tally's own plain Stock Summary has exactly one line with the item's name and shows the same quantity, unit
   and amount; every other item says why none is returned (`none_sent`, `unread`, `inside_stock_group`,

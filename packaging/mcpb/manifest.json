@@ -40,7 +40,8 @@
         "BRIDGE_TALLY_PORT": "${user_config.port}",
         "BRIDGE_AGENT_REDACTION": "${user_config.redaction}",
         "BRIDGE_AGENT_ENABLE_IMPORT": "true",
-        "BRIDGE_AGENT_ENABLE_WRITES": "${user_config.enable_writes}"
+        "BRIDGE_AGENT_ENABLE_WRITES": "${user_config.enable_writes}",
+        "BRIDGE_AGENT_ENABLE_BATCH_POST": "${user_config.enable_batch_post}"
       }
     }
   },
@@ -74,7 +75,13 @@
     "enable_writes": {
       "type": "boolean",
       "title": "Allow voucher posting (Journal, Payment, Receipt, Contra)",
-      "description": "Off by default. When on, ComplyEaze Bridge can post one Journal, Payment, Receipt or Contra into Tally at a time, each only after you approve it in a separate window. Leave it off unless you accept the known limits in Terms of Use section 9.2 (Posting), including these four: 1) Tally picks the company by name. A company renamed to, or opened under, that name (or one differing only in capitals or spaces) right after the last check could still receive the voucher. ComplyEaze Bridge may flag it afterwards, but cannot always say where the voucher went, and cannot prevent it. 2) A ledger renamed and replaced in that same moment can receive the post instead. It is marked for checking when seen, but not every such change is seen. 3) There is no undo: a wrong post must be corrected by hand in Tally. 4) The approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it. You can also record, in another window, that you reviewed a voucher marked for checking; that writes nothing to Tally. Reading, bank-statement parsing and voucher file preparation work either way.",
+      "description": "Off by default. When on, ComplyEaze Bridge can post one Journal, Payment, Receipt or Contra into Tally at a time (or a batch, if batch posting is also allowed), each only after you approve it in a separate window. Leave it off unless you accept the known limits in Terms of Use section 9.2 (Posting), including these four: 1) Tally picks the company by name. A company renamed to, or opened under, that name (or one differing only in capitals or spaces) right after the last check could still receive the voucher. ComplyEaze Bridge may flag it afterwards, but cannot always say where the voucher went, and cannot prevent it. 2) A ledger renamed and replaced in that same moment can receive the post instead. It is marked for checking when seen, but not every such change is seen. 3) There is no undo: a wrong post must be corrected by hand in Tally. 4) The approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it. You can also record, in another window, that you reviewed a voucher marked for checking; that writes nothing to Tally. Reading, bank-statement parsing and voucher file preparation work either way.",
+      "default": false
+    },
+    "enable_batch_post": {
+      "type": "boolean",
+      "title": "Allow posting a batch of up to 50 vouchers under one approval",
+      "description": "Off by default, and used only when voucher posting is on. When on, one approval can post a saved batch of 2 to 50 Journals, or of 2 to 50 Payments, Receipts and Contras, in one import. The approval window then shows a summary: the totals for each ledger, with a line for each voucher only when there are 10 or fewer. Leave it off unless you accept these known limits, beyond those of voucher posting: 1) If Tally creates only some vouchers of a batch, ComplyEaze Bridge reports which ones it finds in the book and which it does not, and refuses to post the missing ones again: check each in Tally. 2) A batch of more than 50, or one whose summary does not fit the window (about 20 ledgers), is refused: prepare it in parts, for example a bank statement by date range.",
       "default": false
     }
   }

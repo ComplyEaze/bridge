@@ -1701,9 +1701,10 @@ verification remains available without either switch.
 `BRIDGE_AGENT_ENABLE_WRITES=true`, lets `post_import` post a saved batch of 2 to
 50 vouchers in one import, after one approval of the batch's summary: every
 ledger's debit and credit totals, the money Receipts bring in and Payments take
-out, and the standing cautions. It is off by default. It is a command-line
-setting only, not in the MCPB extension, until a batch post through Bridge has
-been proved on a live book. A batch is `posted_verified` only when Tally created
+out, and the standing cautions. It is off by default. From the next build the
+extension offers it as its own setting, `enable_batch_post` ("Allow posting a batch of up to 50
+vouchers under one approval"), also off by default and used only with posting
+on (#1090). A batch is `posted_verified` only when Tally created
 exactly that many vouchers, the readback verifies every one, and the company's
 voucher mark moved by exactly that many. Otherwise it is
 `reconciliation_required` (`batch_step_unconfirmed` when only the mark

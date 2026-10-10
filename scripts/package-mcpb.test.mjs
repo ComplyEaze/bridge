@@ -122,6 +122,8 @@ test("every host manifest launches its bundled binary and maps user settings to 
     // Posting is off by default while the limits recorded on bridge#574 and bridge#579 remain;
     // preparation and bank-statement parsing stay on.
     assert.equal(manifest.user_config.enable_writes.default, false);
+    // Batch posting is its own setting, also off by default; the server uses it only with posting on.
+    assert.equal(manifest.user_config.enable_batch_post.default, false);
     assert.deepEqual(manifest.server.mcp_config.env, {
       BRIDGE_TERMS_ACCEPTED: "${user_config.accept_terms_2026_10_1}",
       BRIDGE_TALLY_HOST: "${user_config.host}",
@@ -129,6 +131,7 @@ test("every host manifest launches its bundled binary and maps user settings to 
       BRIDGE_AGENT_REDACTION: "${user_config.redaction}",
       BRIDGE_AGENT_ENABLE_IMPORT: "true",
       BRIDGE_AGENT_ENABLE_WRITES: "${user_config.enable_writes}",
+      BRIDGE_AGENT_ENABLE_BATCH_POST: "${user_config.enable_batch_post}",
     });
     for (const resource of resources) await writeFile(join(stage, resource), "packaging fixture");
     await assert.rejects(() => verifyMcpbStage(stage), /missing binary/);

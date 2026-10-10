@@ -499,3 +499,38 @@ fn two_rate_rows_with_one_duty_head_or_two_state_rows_with_one_name_are_a_duplic
     let two = format!("{}{row}{other}{}", &text[..from], &text[to..]);
     assert_eq!(entries_of(&parse(&two).unwrap(), GOODS)[0].states.len(), 2);
 }
+
+#[test]
+fn text_a_reference_or_cdata_directly_in_a_list_is_skipped_content_not_a_placeholder() {
+    let text = live_text();
+    // Alone in the list: not Tally's empty placeholder.
+    let empty = "<GSTDETAILS.LIST>     </GSTDETAILS.LIST>";
+    for only_content in ["5", "&amp;", "&#65;", "<![CDATA[5]]>"] {
+        let edited = edit(
+            &text,
+            "Cash",
+            empty,
+            &format!("<GSTDETAILS.LIST>{only_content}</GSTDETAILS.LIST>"),
+        );
+        assert_eq!(
+            observation_of(&parse(&edited).unwrap(), "Cash"),
+            unreadable(GstDetailsDefect::UnrecognisedContent),
+            "{only_content}"
+        );
+    }
+    // Beside the recognised fields, at the entry, the state row and the rate row:
+    // kept and flagged.
+    let date = "<APPLICABLEFROM TYPE=\"Date\">20260401</APPLICABLEFROM>";
+    let state_name = "<STATENAME TYPE=\"String\">&#4; Any</STATENAME>";
+    for content in ["5", "&amp;", "<![CDATA[5]]>"] {
+        for (from, to) in [
+            (date, format!("{date}{content}")),
+            (state_name, format!("{state_name}{content}")),
+            (RATE_18, format!("{RATE_18}{content}")),
+        ] {
+            let entries = entries_of(&parse(&edit(&text, GOODS, from, &to)).unwrap(), GOODS);
+            assert_eq!(entries.len(), 1, "{to}");
+            assert!(entries[0].other_content_skipped, "{to}");
+        }
+    }
+}

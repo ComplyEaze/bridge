@@ -1154,6 +1154,10 @@ fn read_gst_details_entry(
             }
             Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
             Event::Eof => return Err(crate::RowCutOff.into()),
+            // Text, a reference or CDATA directly in the list is content the parser does not read:
+            // it is flagged, so a list holding only that is not taken for an empty placeholder.
+            Event::Text(text) if !text.trim().is_empty() => entry.skipped = true,
+            Event::GeneralRef(_) | Event::CData(_) => entry.skipped = true,
             _ => {}
         }
     }
@@ -1231,6 +1235,10 @@ fn read_gst_state_details(
             }
             Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
             Event::Eof => return Err(crate::RowCutOff.into()),
+            // Text, a reference or CDATA directly in the list is content the parser does not read:
+            // it is flagged, so a list holding only that is not taken for an empty placeholder.
+            Event::Text(text) if !text.trim().is_empty() => state.skipped = true,
+            Event::GeneralRef(_) | Event::CData(_) => state.skipped = true,
             _ => {}
         }
     }
@@ -1280,6 +1288,10 @@ fn read_gst_rate_details(
             }
             Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
             Event::Eof => return Err(crate::RowCutOff.into()),
+            // Text, a reference or CDATA directly in the list is content the parser does not read:
+            // it is flagged, so a list holding only that is not taken for an empty placeholder.
+            Event::Text(text) if !text.trim().is_empty() => rate.skipped = true,
+            Event::GeneralRef(_) | Event::CData(_) => rate.skipped = true,
             _ => {}
         }
     }

@@ -370,3 +370,17 @@ db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  workorder
 3553b4ab810b0b65f83e7c26f7eed89605e242ffce172a74e7446b0810e04e1f  443791  workorder/screens/w7c-gstr1-aug-summary.png
 6a8a55e01ab8ec2a40cd0d37370ca12fd07c93a0ca69d2052b345e360381e608  363606  workorder/screens/w7c-gstr1-aug-uncertain.png
 4b7c6c68781cd16fe5a2838b07329d21ce99db5d75ebf62c4c9b090b5b98a973  343339  workorder/screens/w7c-ledger-998315-before-save.png
+#
+# W9 (requests at ed650aa9), 10 Oct 2026
+71154d26a2239b0a9b2b3da35ef938abb7afe9134b3d0c4caeaf4bfa2010c04f  1316  w9-ledger-hsn-all.xml
+ece27a8864b3b2d36bc97e8e8d5e9052e7c89d46824bfca9dcb9db20af9625fe  1534  w9-ledger-hsn-fields.xml
+fdd307de47969c638e46022e186f6a6246a8d4d337c2d280da5e86ff2b8af8ed  3394  workorder/aw9-marks-check.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003660 s) [extra, not in the list]
+a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0  134  workorder/aw9-marks-check.xml.headers.txt
+4346f288957d8d29af5a09b8f4a3bdb7209d8be025db5c7c6af8d659f2a30026  39296  workorder/aw9-ledger-hsn-all.xml  <- w9-ledger-hsn-all.xml (curl exit 0, HTTP 200, 0.035064 s)
+782fcf276b84b6f69ae931303d7aaf481cec6723fadc1e23c56ea587d34d2098  135  workorder/aw9-ledger-hsn-all.xml.headers.txt
+03c4c4b673a25354019706ed22d4a177db7e916c9ca612f1cadd6cdb269d4217  8710  workorder/aw9-ledger-hsn-fields.xml  <- w9-ledger-hsn-fields.xml (curl exit 0, HTTP 200, 0.008676 s)
+e5df563348b9fe78b665bc36cf10b16b64c51a310f3a7f07c78117d34c68328b  134  workorder/aw9-ledger-hsn-fields.xml.headers.txt
+fdd307de47969c638e46022e186f6a6246a8d4d337c2d280da5e86ff2b8af8ed  3394  workorder/aw9-marks-after.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003472 s) [extra, not in the list]
+a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0  134  workorder/aw9-marks-after.xml.headers.txt
+# W9 screenshot
+b84edcf00984ddf8262b466c096327839e0d1a85f707d7c0e81dd6bbf70fbd7a  301755  workorder/screens/w9-ledger-998315-screen.png

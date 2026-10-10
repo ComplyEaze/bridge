@@ -738,3 +738,68 @@ fn the_judge_asks_for_the_marks_first_and_a_ledger_count_only_over_the_gate() {
     answers.marks = Some(marks(5001));
     assert_eq!(needs(&answers), invoice::Need::LedgerCount);
 }
+
+/// `admit_queued_invoice` holds the plan the queue sent to the invoice's own
+/// before it judges any answer (#1337). The answers here are ones the judge
+/// refuses whatever plan stands beside them (the book is over the voucher mark),
+/// so a plan that does not fit is refused as a plan, not by the judge, and the
+/// call that checks it is pinned: without it each case below would come back as
+/// the judge's refusal. It is pure, so nothing is sent.
+#[test]
+fn the_queue_refuses_a_plan_that_does_not_fit_before_judging_any_answer() {
+    use crate::tally::approved_import::{
+        ApprovedImportAdmissionError::{
+            AdmissionInconsistent, InvoiceMastersChanged, InvoiceRefused,
+        },
+        QueuedInvoice,
+    };
+    let voucher = invoice_to("Customer", "Sales Manual", true);
+    let catalogue = catalogue(&[("Customer", true)]);
+    let answers = InvoiceAnswers {
+        marks: Some(format!(
+            "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+             <COMPANY NAME=\"{LAB}\"><GUID TYPE=\"String\">{LAB_GUID}</GUID>\
+             <ALTVCHID TYPE=\"Number\"> 25001</ALTVCHID><ALTMSTID TYPE=\"Number\"> 223</ALTMSTID>\
+             </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+        )),
+        ..InvoiceAnswers::default()
+    };
+    let never = ledger::NumberControl::NeverSent;
+    let known = known_control();
+    let admit = |carried: &InvoiceReadPlan, control: &ledger::NumberControl| {
+        invoice::admit_queued_invoice(
+            &voucher,
+            LAB,
+            LAB_GUID,
+            &catalogue,
+            control,
+            &QueuedInvoice {
+                plan: carried,
+                answers: &answers,
+            },
+        )
+    };
+    // The plan that fits is judged: the judge refuses these answers itself.
+    assert_eq!(
+        admit(&plan_of(&voucher, &never), &never),
+        Err(InvoiceRefused {
+            code: "invoice_book_too_many_vouchers".to_string()
+        })
+    );
+    // Another invoice's plan is a wiring fault, whatever the answers say.
+    let mut other = voucher.clone();
+    other.voucher_number = Some("TG/25-26/901".to_string());
+    assert_eq!(
+        admit(&plan_of(&other, &never), &never),
+        Err(AdmissionInconsistent)
+    );
+    // A control that moved either way since the plan is a named change.
+    for (carried, now) in [(&never, &known), (&known, &never)] {
+        assert_eq!(
+            admit(&plan_of(&voucher, carried), now),
+            Err(InvoiceMastersChanged {
+                field: "number_control"
+            })
+        );
+    }
+}

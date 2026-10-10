@@ -1,0 +1,1377 @@
+# fixture: tests/fixtures/ledger_gst_details_live.utf16le.xml
+# parser: parse_native_party_ledger_master_records_with_evidence(PILOT LAB)
+# source: captured
+Ok(ParsedExport {
+    records: [
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE CGST 2.5%",
+                    parent: Returned(
+                        "Duties & Taxes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "GST",
+                    ),
+                    gst_duty_head: Recognized {
+                        raw: "CGST",
+                        head: Cgst,
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [
+                            GstDetailsEntry {
+                                applicable_from: Some(
+                                    "20260401",
+                                ),
+                                taxability: None,
+                                source: Some(
+                                    "As per Company/Group",
+                                ),
+                                itc_eligible: Some(
+                                    true,
+                                ),
+                                states: [
+                                    GstStateDetails {
+                                        state_name: Some(
+                                            "�#4; Any",
+                                        ),
+                                        rates: [
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "CGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "SGST/UTGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "IGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "Cess",
+                                                ),
+                                                valuation_type: Some(
+                                                    "�#4; Not Applicable",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "State Cess",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                        ],
+                                        slab_rates_present: false,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d4",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d4",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "212",
+                ),
+            },
+            alter_id: Some(
+                "219",
+            ),
+            raw_source_sha256: "c1d3ffee81a7f1517e8369a5abbeec084a20b94700aaa090310e1fc897fe8612",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE CGST 9%",
+                    parent: Returned(
+                        "Duties & Taxes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "GST",
+                    ),
+                    gst_duty_head: Recognized {
+                        raw: "CGST",
+                        head: Cgst,
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "213",
+                ),
+            },
+            alter_id: Some(
+                "220",
+            ),
+            raw_source_sha256: "08e557306492dc7b1b28341bcddeecaab0fc8866ee6a3e561bd1f066b78c0b2d",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE Goods 18%",
+                    parent: Returned(
+                        "Sales Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [
+                            GstDetailsEntry {
+                                applicable_from: Some(
+                                    "20260401",
+                                ),
+                                taxability: Some(
+                                    "Taxable",
+                                ),
+                                source: Some(
+                                    "Specify Details Here",
+                                ),
+                                itc_eligible: Some(
+                                    true,
+                                ),
+                                states: [
+                                    GstStateDetails {
+                                        state_name: Some(
+                                            "�#4; Any",
+                                        ),
+                                        rates: [
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "CGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 9",
+                                                    decimal: "9",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "SGST/UTGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 9",
+                                                    decimal: "9",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "IGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 18",
+                                                    decimal: "18",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "Cess",
+                                                ),
+                                                valuation_type: Some(
+                                                    "�#4; Not Applicable",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "State Cess",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                        ],
+                                        slab_rates_present: false,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "211",
+                ),
+            },
+            alter_id: Some(
+                "218",
+            ),
+            raw_source_sha256: "1f9ddfa9be03e8ed00ee9ab7ecb98fb412279840692db8cbe4b94f9d44fb92cd",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE Output CGST XML",
+                    parent: Returned(
+                        "Duties & Taxes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "GST",
+                    ),
+                    gst_duty_head: Recognized {
+                        raw: "CGST",
+                        head: Cgst,
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d9",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d9",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "217",
+                ),
+            },
+            alter_id: Some(
+                "224",
+            ),
+            raw_source_sha256: "c50bd747aaf6f754d1de5eeb2233027105d1b4bf24f307ae9ec52305a4f99e32",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE Purchase Svc 5%",
+                    parent: Returned(
+                        "Purchase Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [
+                            GstDetailsEntry {
+                                applicable_from: Some(
+                                    "20260401",
+                                ),
+                                taxability: Some(
+                                    "Taxable",
+                                ),
+                                source: Some(
+                                    "Specify Details Here",
+                                ),
+                                itc_eligible: None,
+                                states: [
+                                    GstStateDetails {
+                                        state_name: Some(
+                                            "�#4; Any",
+                                        ),
+                                        rates: [
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "CGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 2.50",
+                                                    decimal: "2.50",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "SGST/UTGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 2.50",
+                                                    decimal: "2.50",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "IGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 5",
+                                                    decimal: "5",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "Cess",
+                                                ),
+                                                valuation_type: Some(
+                                                    "�#4; Not Applicable",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "State Cess",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                        ],
+                                        slab_rates_present: false,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000df",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000df",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "223",
+                ),
+            },
+            alter_id: Some(
+                "232",
+            ),
+            raw_source_sha256: "f9163c9f40f5e6a2429c6fddaa300f81844928b5a680da99584e32537ab4ddc8",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE Round Off",
+                    parent: Returned(
+                        "Indirect Expenses",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "216",
+                ),
+            },
+            alter_id: Some(
+                "223",
+            ),
+            raw_source_sha256: "b127bbe0ab3fd0ab76429432da902e87f27e94f66024ced9df81958462dd9ec6",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE SGST 2.5%",
+                    parent: Returned(
+                        "Duties & Taxes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "GST",
+                    ),
+                    gst_duty_head: Recognized {
+                        raw: "SGST/UTGST",
+                        head: SgstUtgst,
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d6",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d6",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "214",
+                ),
+            },
+            alter_id: Some(
+                "221",
+            ),
+            raw_source_sha256: "0f17200856f7b7f14a90489ea7f033d8bbaeaec6927212d5a7705dc1fa85b7a1",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE SGST 9%",
+                    parent: Returned(
+                        "Duties & Taxes",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "GST",
+                    ),
+                    gst_duty_head: Recognized {
+                        raw: "SGST/UTGST",
+                        head: SgstUtgst,
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "215",
+                ),
+            },
+            alter_id: Some(
+                "222",
+            ),
+            raw_source_sha256: "cb092760b3601cafd4235f44873b9f2bccb3fc0bc14a645743ac4783bdca1a7e",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE Supplier RJ",
+                    parent: Returned(
+                        "Sundry Creditors",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [
+                            GstRegistrationEntry {
+                                applicable_from: "20260401",
+                                gstin: Some(
+                                    "08ZZZZZ0000Z2ZP",
+                                ),
+                                registration_type: Some(
+                                    "Regular",
+                                ),
+                            },
+                        ],
+                    },
+                    gst_details: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000de",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000de",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "222",
+                ),
+            },
+            alter_id: Some(
+                "231",
+            ),
+            raw_source_sha256: "80315b6c440a6a41e1136eac7d17ac96d806a81aef732af240afeb9dd334a993",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE Svc 998313 5%",
+                    parent: Returned(
+                        "Sales Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [
+                            GstDetailsEntry {
+                                applicable_from: Some(
+                                    "20260401",
+                                ),
+                                taxability: Some(
+                                    "Taxable",
+                                ),
+                                source: Some(
+                                    "Specify Details Here",
+                                ),
+                                itc_eligible: Some(
+                                    true,
+                                ),
+                                states: [
+                                    GstStateDetails {
+                                        state_name: Some(
+                                            "�#4; Any",
+                                        ),
+                                        rates: [
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "CGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 2.50",
+                                                    decimal: "2.50",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "SGST/UTGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 2.50",
+                                                    decimal: "2.50",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "IGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 5",
+                                                    decimal: "5",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "Cess",
+                                                ),
+                                                valuation_type: Some(
+                                                    "�#4; Not Applicable",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "State Cess",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                        ],
+                                        slab_rates_present: false,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d1",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d1",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "209",
+                ),
+            },
+            alter_id: Some(
+                "216",
+            ),
+            raw_source_sha256: "28e46f33f8993f689b33cfdcd74a55de073921a8abf2077f950f74017fcd9e10",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE Svc 998314 5%",
+                    parent: Returned(
+                        "Sales Accounts",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [
+                            GstDetailsEntry {
+                                applicable_from: Some(
+                                    "20260401",
+                                ),
+                                taxability: Some(
+                                    "Taxable",
+                                ),
+                                source: Some(
+                                    "Specify Details Here",
+                                ),
+                                itc_eligible: Some(
+                                    true,
+                                ),
+                                states: [
+                                    GstStateDetails {
+                                        state_name: Some(
+                                            "�#4; Any",
+                                        ),
+                                        rates: [
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "CGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 2.50",
+                                                    decimal: "2.50",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "SGST/UTGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 2.50",
+                                                    decimal: "2.50",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "IGST",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Value {
+                                                    raw: " 5",
+                                                    decimal: "5",
+                                                },
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "Cess",
+                                                ),
+                                                valuation_type: Some(
+                                                    "�#4; Not Applicable",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                            GstRateDetails {
+                                                duty_head: Some(
+                                                    "State Cess",
+                                                ),
+                                                valuation_type: Some(
+                                                    "Based on Value",
+                                                ),
+                                                rate: Absent,
+                                            },
+                                        ],
+                                        slab_rates_present: false,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d2",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d2",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "210",
+                ),
+            },
+            alter_id: Some(
+                "217",
+            ),
+            raw_source_sha256: "64c9d3abe6147a1c77c0b6e4e5c3e4e296c09b84f6c7b46e0919ca17745d3edc",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "BRIDGE Walk-in",
+                    parent: Returned(
+                        "Sundry Debtors",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [
+                            GstRegistrationEntry {
+                                applicable_from: "20260401",
+                                gstin: None,
+                                registration_type: Some(
+                                    "Unregistered/Consumer",
+                                ),
+                            },
+                        ],
+                    },
+                    gst_details: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "208",
+                ),
+            },
+            alter_id: Some(
+                "215",
+            ),
+            raw_source_sha256: "45b5cd4ac4e946820c80c0f6e3ec594174f29b81afaa7abaa50bfb0fb8ba510d",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Cash",
+                    parent: Returned(
+                        "Cash-in-Hand",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001f",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001f",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "31",
+                ),
+            },
+            alter_id: Some(
+                "32",
+            ),
+            raw_source_sha256: "052ce9161ef055108ee349f7f381034393974cd78087000e926072a628fc1110",
+        },
+        ParsedSourceRecord {
+            record: PartyLedgerMasterRecord {
+                ledger: TallyLedger {
+                    name: "Profit & Loss A/c",
+                    parent: Returned(
+                        "�#4; Primary",
+                    ),
+                    party_gstin: NotObserved,
+                    opening_balance: Some(
+                        "0.00",
+                    ),
+                },
+                fields: PartyLedgerMasterFields {
+                    income_tax_number: NotObserved,
+                    name_on_pan: NotObserved,
+                    pin_code: Returned(
+                        "",
+                    ),
+                    gst_pin_code: Returned(
+                        "",
+                    ),
+                    msme_registration_number: NotObserved,
+                    udyam_registration_number: Returned(
+                        "",
+                    ),
+                    bank_account_holder_name: NotObserved,
+                    bank_details: NotObserved,
+                    ifsc_code: NotObserved,
+                    email: NotObserved,
+                    phone: NotObserved,
+                    state: NotObserved,
+                    address: Returned(
+                        "",
+                    ),
+                    tax_type: Returned(
+                        "Others",
+                    ),
+                    gst_duty_head: NotTaxLedger {
+                        tax_type: "Others",
+                    },
+                    gst_registrations: Entries {
+                        entries: [],
+                    },
+                    gst_details: Entries {
+                        entries: [],
+                    },
+                },
+            },
+            source_id: Some(
+                "6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001e",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001e",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "30",
+                ),
+            },
+            alter_id: Some(
+                "31",
+            ),
+            raw_source_sha256: "c392b8e1a7282e9165e77c44e52d8f9cf31afd37c7557b8f8dd891c2892eda64",
+        },
+    ],
+    evidence: ExportEvidence {
+        company_context: None,
+        schema: None,
+        object_type: None,
+        observed_record_count: Some(
+            14,
+        ),
+        source_record_count: None,
+        identified_record_count: 14,
+        duplicate_identities: [],
+        company_guid_prefix_match_count: 14,
+        company_guid_prefix_mismatch_count: 0,
+    },
+})

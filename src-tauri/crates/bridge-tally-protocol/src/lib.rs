@@ -33,6 +33,7 @@ pub mod bills_native_outstandings_probe;
 pub mod bills_payments_observation;
 pub mod currency_composite;
 pub mod group_ancestry;
+pub mod gst_details;
 pub mod gst_registration;
 mod import_outcome;
 #[cfg(feature = "india-tax-observation-parser")]

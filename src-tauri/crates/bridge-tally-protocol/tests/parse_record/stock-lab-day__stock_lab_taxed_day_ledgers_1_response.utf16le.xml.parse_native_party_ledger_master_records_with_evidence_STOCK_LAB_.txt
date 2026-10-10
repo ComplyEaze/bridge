@@ -46,6 +46,7 @@ Ok(ParsedExport {
                     gst_registrations: Entries {
                         entries: [],
                     },
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -111,6 +112,7 @@ Ok(ParsedExport {
                     gst_registrations: Entries {
                         entries: [],
                     },
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -177,6 +179,7 @@ Ok(ParsedExport {
                     gst_registrations: Entries {
                         entries: [],
                     },
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -243,6 +246,7 @@ Ok(ParsedExport {
                     gst_registrations: Entries {
                         entries: [],
                     },
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -308,6 +312,7 @@ Ok(ParsedExport {
                     gst_registrations: Entries {
                         entries: [],
                     },
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -373,6 +378,7 @@ Ok(ParsedExport {
                     gst_registrations: Entries {
                         entries: [],
                     },
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -438,6 +444,7 @@ Ok(ParsedExport {
                     gst_registrations: Entries {
                         entries: [],
                     },
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -503,6 +510,7 @@ Ok(ParsedExport {
                     gst_registrations: Entries {
                         entries: [],
                     },
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(

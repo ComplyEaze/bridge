@@ -384,3 +384,16 @@ fdd307de47969c638e46022e186f6a6246a8d4d337c2d280da5e86ff2b8af8ed  3394  workorde
 a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0  134  workorder/aw9-marks-after.xml.headers.txt
 # W9 screenshot
 b84edcf00984ddf8262b466c096327839e0d1a85f707d7c0e81dd6bbf70fbd7a  301755  workorder/screens/w9-ledger-998315-screen.png
+#
+# W7D (after backup TDBK1800_100033_9.001; requests at ed650aa9), 10 Oct 2026
+b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5  2252  w7c-readback-status-0021.xml
+fdd307de47969c638e46022e186f6a6246a8d4d337c2d280da5e86ff2b8af8ed  3394  workorder/aw7d-marks-before.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003517 s)
+a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0  134  workorder/aw7d-marks-before.xml.headers.txt
+e563f64f40fbec180295a2d3c56bec2da8d48d03786cddfc5da3dd62eb9c4ef6  98450  workorder/aw7d-readback-status-0021.xml  <- w7c-readback-status-0021.xml (curl exit 0, HTTP 200, 0.050833 s)
+0ab0c2d7d9242667353fbbd6c9e812c4ce0888a5d0f614c65c42a3ed914ac23b  135  workorder/aw7d-readback-status-0021.xml.headers.txt
+ef0d57daa9e6b7d8669f15550b2488c4e1bce49154a995ad697a22e96796498c  3396  workorder/aw7d-marks-after.xml  <- r02-marks.xml (curl exit 0, HTTP 200, 0.003147 s)
+db9b137db28569a10d72e1f9edb1f97fa4dc3c0f0c092ea2d8b3e1ba4cae016c  134  workorder/aw7d-marks-after.xml.headers.txt
+# W7D screenshots
+37aeabf0beef417e847d81b0c8732cc0ee5109a20c09f29c26a62cc421deaf87  441292  workorder/screens/w7d-gstr1-aug-summary.png
+bec70fde8436a1f95ef7555c8ba7f96ed92e455fdd94ce7489242602d39b81f1  400253  workorder/screens/w7d-gstr1-aug-uncertain.png
+40a9072d19f59e3cb089ceb0aff0f86aa525f075325bff25f141afb9607eb4a5  211766  workorder/screens/w7d-voucher-0021-before-save.png

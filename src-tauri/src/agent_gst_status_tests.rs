@@ -488,9 +488,8 @@ fn a_status_element_inside_another_element_of_the_voucher_is_not_the_vouchers_ow
 
 #[test]
 fn status_elements_two_wrappers_down_with_no_direct_copy_are_never_read_as_a_status() {
-    // The module detects a status element nested one wrapper down (above). Two wrappers down it
-    // is not detected as nested, and the voucher then has no direct flag at all. Whichever code
-    // that reads as, it must not read as a status: this pins only that.
+    // A status element nested at any depth is not the voucher's own: two wrappers down it is
+    // refused as the one wrapper down is, as unreadable and not as absent.
     let target = target_after(|block| {
         let mut block = block;
         for element in [INCLUDED, UNCERTAIN, EXCLUDED, OVERRIDDEN] {
@@ -504,7 +503,8 @@ fn status_elements_two_wrappers_down_with_no_direct_copy_are_never_read_as_a_sta
             ),
         )
     });
-    assert!(target.status.is_err(), "{:?}", target.status);
+    assert_eq!(target.status, Err(UNREADABLE));
+    assert_eq!(target.overridden, Err(UNREADABLE));
 }
 
 #[test]
@@ -1358,4 +1358,31 @@ async fn a_voucher_whose_flags_cannot_be_read_makes_the_result_partial_and_is_ne
             "{unread}"
         );
     }
+}
+
+/// A voucher whose status reads but whose acceptance flag does not is not a clean read: its
+/// status is kept, and the answer is partial with the reason that a voucher was unread.
+#[tokio::test]
+async fn a_voucher_whose_acceptance_flag_is_missing_keeps_its_status_and_makes_the_result_partial()
+{
+    let mutated = edit(&sales_window(), TARGET, |block| {
+        once(&block, OVERRIDDEN, "")
+    });
+    let call = run(plans_with(marks(), mutated), lab_arguments()).await;
+    assert_eq!(call.observed.len(), call.expected);
+    let result = payload(&call.response);
+    assert_eq!(result["state"], "partial");
+    assert_eq!(result["counts"]["included"], 6, "the status was read");
+    assert_eq!(result["counts"]["unread"], 1);
+    assert_eq!(receipt(&call.response)["state"], "partial");
+    assert_eq!(
+        receipt(&call.response)["reason_code"],
+        "gst_status_voucher_unread"
+    );
+    let rows = result["items"].as_array().unwrap();
+    let missing = rows
+        .iter()
+        .find(|row| row["accepted_as_it_stands"] == json!({"unread": "gst_status_not_reported"}))
+        .expect("the voucher with no acceptance flag");
+    assert_eq!(missing["gst_status"], "included");
 }

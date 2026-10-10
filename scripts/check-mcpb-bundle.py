@@ -20,6 +20,7 @@ DEFAULT_TOOLS = {
     "cash_flow",
     "company_features",
     "egress_log",
+    "gst_status",
     "ledger_masters",
     "ledger_movement",
     "list_companies",

@@ -32,6 +32,16 @@ These changes are in source and not yet in a published build.
   book whose report lists a group and an item under the root side by side, an item inside a stock group, a
   compound unit, other dates, other releases, macOS, and a group that carries an item's name.
 
+- `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
+  each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
+  return (measured for Receipts only), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
+  judgement of ComplyEaze Bridge; the reason for a status is on Tally's screen only, so none is returned. A voucher
+  whose flags are absent or odd is returned as unread, never as included. The voucher type is named exactly (a
+  type of the same class under another name is not read), a window is at most 93 days, and a book whose voucher
+  mark is above 25,000 is refused. Measured on one synthetic book of TallyPrime 7.1 Silver, for the unregistered
+  buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured, and an excluded
+  voucher has not been observed.
+
 - `company_features` reads three settings that a company's record in Tally holds today (cost centres, GST
   and batch-wise stock) and its currency symbol (part of #1231). Each setting is yes, no or
   not reported, and says what it rests on: each of the three was compared with Tally's own

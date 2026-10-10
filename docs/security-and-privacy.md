@@ -172,6 +172,13 @@ or `1` is not asked.
       and batch-wise settings as yes, no or not reported, and the currency
       symbol. It holds no amounts and no narrations, and `mask_parties` has
       nothing to shorten in it.
+    - The GSTR-1 status read (`gst_status`) sends the company name and its
+      identifier, the voucher type name you gave and the dates, and for each
+      voucher its number, date, voucher type name, Tally's identifier and
+      change number, and the voucher's GSTR-1 status (included, uncertain,
+      excluded or not in the return) and whether it was accepted as it
+      stands. It holds no amounts, no party or ledger names and no
+      narrations, and `mask_parties` has nothing to shorten in it.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

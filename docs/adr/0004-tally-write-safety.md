@@ -662,3 +662,51 @@ The owner approved this order on 8 Oct 2026: lab groundwork first, then each gua
 | Rollback inside ComplyEaze Bridge | No compensating Tally operation is implemented and verified (Decision, above). |
 
 **Not measured.** None of this has been measured against Tally: the native shape of a company's GST registration, the native shape of a sales ledger's dated GST rows, the transport of the GST status fields, and where GSTR-1 places a posted invoice.
+
+## Amendment — owner decision, 2026-10-10: master writes through the one approved path (dated deviation)
+
+The owner approved this direction on 10 Oct 2026: "yes to the direction for today, improve later". It reverses one row of the 8 Oct amendment's rejected table, "Creating masters through the approval window". The reason given there, a second dispatch path into the release, stays true of any second path. This amendment adds none. Nothing below is built yet. Every slice ships as a draft behind a setting that is off by default, and is measured on a lab company before it is switched on.
+
+**What changes.** Production may send three new write classes, each only through `post_approved_import`, the single dispatch path, with its queue, admission reads, all-company marks aim, wire lock, durable intent and native approval:
+
+- creating ledgers;
+- altering a ledger's GST, registration and state blocks, and renaming a ledger;
+- creating and altering voucher types.
+
+The request becomes a two-variant type, vouchers as today or a master batch. Each variant brings its own admission reads, approval binding, intent payload and verification. The two variants share no defaulted behaviour.
+
+**What still cannot be sent.**
+
+- Deletes of any master.
+- Openings.
+- Stock-in-Hand ledgers.
+- TDS and TCS ledgers where those features are on.
+- Caller-supplied XML. Requests are rendered by Bridge.
+- Any class not named above.
+
+**Rules that carry over unchanged.**
+
+- Every write is approved in the native dialog. A master dialog lists one master per item and refuses rather than cuts at the existing caps, so a large class is approved in parts.
+- The company is pinned by its full identity tuple. The company name in the import request is never treated as a guard.
+- Success is decided by reading back, never by Tally's counters. Counters and the company's master mark (`ALTMSTID`) are doubt signals only; one master write can move the mark by more than one.
+- An outcome unknown after bytes were sent is never re-sent. It is reconciled by reading back.
+
+**The dated deviation.** The 3 Oct design for automatic ledger creation chose a name-only Create followed by an Alter, subject to a lab run. That run has not been made, and a ledger's GST duty head is settable at Create but not reliably by Alter. This amendment instead creates a ledger with one direct Create, under four conditions:
+
+1. **Before.** An absence check runs inside the queue, over every ledger and group name and alias.
+2. **Before.** The company's master mark must be unchanged from the binding read to the last read before the request.
+3. **After.** Each created name must resolve to a master that did not exist before. A name that resolves to an existing master is reported for reconciliation, never as created.
+4. **Owner's acceptance.** The owner accepts the residual window between the last read and the request, which no read can close.
+
+**List fields.** An Alter replaces a whole list, as measured on one book. So a list is sent as exported, with any new dated entry added, under a check that the ledger is unchanged since it was read. The result is verified by comparing the whole ledger before and after.
+
+**Not measured.** All of these remain unmeasured:
+
+- How Tally resolves a new name against an existing alias, a case or space variant, or a group of the same name.
+- Whether a ledger's registration history is appended or replaced by an Alter.
+- Any write of a sales ledger's GST rate and HSN lists.
+- Every voucher-type write.
+- The class-batch dialog seen live.
+- The master mark's step for a list alter or a voucher type.
+
+Each slice names the lab measurement it waits on.

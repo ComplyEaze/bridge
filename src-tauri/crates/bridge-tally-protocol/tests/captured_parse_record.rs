@@ -2223,7 +2223,8 @@ const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oc
      src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
      feeds it through the build, the post and the read-back and pins what each parse returns; \
      pilot-lab/PROVENANCE.md says what it is";
-const PILOT_LAB_PARENT_FILTER: &str = "an answer of the pilot lab's parent-filter round (10 Oct 2026), \
+const PILOT_LAB_PARENT_FILTER: &str =
+    "an answer of the pilot lab's parent-filter round (10 Oct 2026), \
      with no row here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
      src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_scope_tests.rs, \
      and the replay in src/agent_import_post_e2e_tests.rs) pin what each parse returns; \

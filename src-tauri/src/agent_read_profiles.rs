@@ -219,7 +219,9 @@ pub(super) fn gst_status_type_name_literal_safe(name: &str) -> bool {
     !name.is_empty()
         && name.chars().count() <= 100
         && name == name.trim()
-        && !name.chars().any(|c| c == '"' || c == '\\' || c.is_control())
+        && !name
+            .chars()
+            .any(|c| c == '"' || c == '\\' || c.is_control())
 }
 
 /// The GST status of the vouchers of one type in a date window (R7, 10 Oct

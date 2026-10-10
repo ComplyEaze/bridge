@@ -378,7 +378,11 @@ fn an_answer_with_a_collection_and_no_voucher_is_an_empty_list() {
     let text = decode_utf16(SALES_WINDOW);
     let open = text.find("<COLLECTION").unwrap();
     let close = text.find("</COLLECTION>").unwrap() + "</COLLECTION>".len();
-    let empty = format!("{}<COLLECTION></COLLECTION>{}", &text[..open], &text[close..]);
+    let empty = format!(
+        "{}<COLLECTION></COLLECTION>{}",
+        &text[..open],
+        &text[close..]
+    );
     assert_eq!(parse_status_rows(&empty).unwrap(), Vec::<StatusRow>::new());
 }
 
@@ -587,7 +591,10 @@ fn a_voucher_that_cannot_be_told_apart_refuses_the_whole_answer() {
     let number = "<VOUCHERNUMBER>BP/26-27/0013</VOUCHERNUMBER>";
     let window = sales_window();
     let cases = [
-        ("no master id", edit(&window, TARGET, |b| once(&b, master, ""))),
+        (
+            "no master id",
+            edit(&window, TARGET, |b| once(&b, master, "")),
+        ),
         (
             "an empty master id",
             edit(&window, TARGET, |b| {
@@ -596,7 +603,9 @@ fn a_voucher_that_cannot_be_told_apart_refuses_the_whole_answer() {
         ),
         (
             "a master id twice",
-            edit(&window, TARGET, |b| once(&b, master, &format!("{master}{master}"))),
+            edit(&window, TARGET, |b| {
+                once(&b, master, &format!("{master}{master}"))
+            }),
         ),
         (
             "a master id twice, disagreeing",
@@ -604,11 +613,18 @@ fn a_voucher_that_cannot_be_told_apart_refuses_the_whole_answer() {
                 once(&b, master, &format!("{master}<MASTERID> 99</MASTERID>"))
             }),
         ),
-        ("no voucher number", edit(&window, TARGET, |b| once(&b, number, ""))),
+        (
+            "no voucher number",
+            edit(&window, TARGET, |b| once(&b, number, "")),
+        ),
         (
             "a voucher number twice",
             edit(&window, TARGET, |b| {
-                once(&b, number, &format!("{number}<VOUCHERNUMBER>X</VOUCHERNUMBER>"))
+                once(
+                    &b,
+                    number,
+                    &format!("{number}<VOUCHERNUMBER>X</VOUCHERNUMBER>"),
+                )
             }),
         ),
         (
@@ -617,12 +633,20 @@ fn a_voucher_that_cannot_be_told_apart_refuses_the_whole_answer() {
                 once(&b, number, "<VOUCHERNUMBER></VOUCHERNUMBER>")
             }),
         ),
-        ("no alter id", edit(&window, TARGET, |b| once(&b, alter, ""))),
+        (
+            "no alter id",
+            edit(&window, TARGET, |b| once(&b, alter, "")),
+        ),
         ("no date", edit(&window, TARGET, |b| once(&b, day, ""))),
-        ("no voucher type", edit(&window, TARGET, |b| once(&b, kind, ""))),
+        (
+            "no voucher type",
+            edit(&window, TARGET, |b| once(&b, kind, "")),
+        ),
         (
             "a voucher type twice",
-            edit(&window, TARGET, |b| once(&b, kind, &format!("{kind}{kind}"))),
+            edit(&window, TARGET, |b| {
+                once(&b, kind, &format!("{kind}{kind}"))
+            }),
         ),
     ];
     for (name, mutated) in cases {
@@ -715,7 +739,11 @@ fn a_line_error_or_an_error_element_anywhere_in_the_answer_refuses_it() {
         )
     });
     let lower_case = once(&text, "</COLLECTION>", "<error>x</error></COLLECTION>");
-    let response = once(&text, "</COLLECTION>", "<RESPONSE>x</RESPONSE></COLLECTION>");
+    let response = once(
+        &text,
+        "</COLLECTION>",
+        "<RESPONSE>x</RESPONSE></COLLECTION>",
+    );
     for mutated in [in_collection, in_voucher, lower_case, response] {
         assert_eq!(
             parse_status_rows(&mutated).unwrap_err(),
@@ -1312,7 +1340,11 @@ async fn a_voucher_whose_flags_cannot_be_read_makes_the_result_partial_and_is_ne
         assert_eq!(items.len(), 6);
         assert_eq!(items[1]["voucher_number"], TARGET);
         assert_eq!(items[1]["master_id"], "17");
-        assert_eq!(items[1]["gst_status"], json!({"unread": unread}), "{unread}");
+        assert_eq!(
+            items[1]["gst_status"],
+            json!({"unread": unread}),
+            "{unread}"
+        );
         // The five others are read as in the committed answer.
         for (position, expected) in SALES_WINDOW_ROWS.iter().enumerate() {
             if position != 1 {
@@ -1321,6 +1353,9 @@ async fn a_voucher_whose_flags_cannot_be_read_makes_the_result_partial_and_is_ne
         }
         let receipt = receipt(&call.response);
         assert_eq!(receipt["state"], "partial", "{unread}");
-        assert_eq!(receipt["reason_code"], "gst_status_voucher_unread", "{unread}");
+        assert_eq!(
+            receipt["reason_code"], "gst_status_voucher_unread",
+            "{unread}"
+        );
     }
 }

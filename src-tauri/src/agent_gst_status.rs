@@ -152,14 +152,10 @@ fn parse_tree(xml: &str) -> Result<Node, &'static str> {
                 name: start.name().as_ref().to_string(),
                 ..Node::default()
             }),
-            Event::Empty(empty) => stack
-                .last_mut()
-                .ok_or(invalid)?
-                .children
-                .push(Node {
-                    name: empty.name().as_ref().to_string(),
-                    ..Node::default()
-                }),
+            Event::Empty(empty) => stack.last_mut().ok_or(invalid)?.children.push(Node {
+                name: empty.name().as_ref().to_string(),
+                ..Node::default()
+            }),
             Event::Text(text) => {
                 let text = decoded_agent_text(text).map_err(|_| invalid)?;
                 stack.last_mut().ok_or(invalid)?.text.push_str(&text);
@@ -168,11 +164,7 @@ fn parse_tree(xml: &str) -> Result<Node, &'static str> {
                 let text = decoded_agent_reference(reference).map_err(|_| invalid)?;
                 stack.last_mut().ok_or(invalid)?.text.push_str(&text);
             }
-            Event::CData(text) => stack
-                .last_mut()
-                .ok_or(invalid)?
-                .text
-                .push_str(&text.to_string()),
+            Event::CData(text) => stack.last_mut().ok_or(invalid)?.text.push_str(&text),
             Event::End(_) => {
                 let node = stack.pop().ok_or(invalid)?;
                 stack.last_mut().ok_or(invalid)?.children.push(node);
@@ -327,41 +319,50 @@ impl Server {
             .await
             .map_err(|failure| failure.with_prior_evidence(prior.clone()))?;
         let evidence = combine_evidence(prior, marks_evidence);
-        let (vouchers, _) = parse_company_marks(&marks_xml, identity.company_guid())
-            .map_err(|code| ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone()))?;
+        let (vouchers, _) =
+            parse_company_marks(&marks_xml, identity.company_guid()).map_err(|code| {
+                ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone())
+            })?;
         if vouchers > STATUS_MAX_VOUCHER_MARK {
             return Err(ToolFailure::from("gst_status_book_too_large".to_string())
                 .with_prior_evidence(evidence));
         }
 
-        let request = gst_status_read(&company.name, &from, &to, type_name)
-            .map_err(|code| ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone()))?;
+        let request = gst_status_read(&company.name, &from, &to, type_name).map_err(|code| {
+            ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone())
+        })?;
         let (xml, read_evidence) = self
             .post_read(&identity, request)
             .await
             .map_err(|failure| failure.with_prior_evidence(evidence.clone()))?;
         let mut evidence = combine_evidence(evidence, read_evidence);
-        let mut rows = parse_status_rows(&xml)
-            .map_err(|code| ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone()))?;
+        let mut rows = parse_status_rows(&xml).map_err(|code| {
+            ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone())
+        })?;
         // The window and the type are honoured by Tally or the answer is
         // refused: a voucher outside either is never reported.
         for row in &rows {
-            let day = bridge_tally_core::TallyDate::parse(row.date.as_str())
-                .map_err(|_| {
-                    ToolFailure::from("gst_status_read_voucher_unidentified".to_string())
-                        .with_prior_evidence(evidence.clone())
-                })?;
+            let day = bridge_tally_core::TallyDate::parse(row.date.as_str()).map_err(|_| {
+                ToolFailure::from("gst_status_read_voucher_unidentified".to_string())
+                    .with_prior_evidence(evidence.clone())
+            })?;
             if day < from || day > to {
                 return Err(ToolFailure::from("window_not_honoured".to_string())
                     .with_prior_evidence(evidence));
             }
             if row.voucher_type != type_name {
-                return Err(ToolFailure::from("gst_status_type_not_honoured".to_string())
-                    .with_prior_evidence(evidence));
+                return Err(
+                    ToolFailure::from("gst_status_type_not_honoured".to_string())
+                        .with_prior_evidence(evidence),
+                );
             }
         }
         rows.sort_by(|a, b| {
-            (&a.date, &a.voucher_number, &a.master_id).cmp(&(&b.date, &b.voucher_number, &b.master_id))
+            (&a.date, &a.voucher_number, &a.master_id).cmp(&(
+                &b.date,
+                &b.voucher_number,
+                &b.master_id,
+            ))
         });
 
         let mut counts = BTreeMap::<&str, u64>::new();

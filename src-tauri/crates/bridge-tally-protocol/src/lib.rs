@@ -42,6 +42,9 @@ pub mod jsonex;
 #[cfg(feature = "jsonex-request-builder")]
 pub mod jsonex_request;
 pub mod ledger_census;
+/// One ledger `Create` message. Its one caller today is the lab rebuild;
+/// this crate runs its goldens in every build.
+pub mod ledger_create;
 pub mod native_cash_flow;
 pub mod native_company_features;
 pub mod native_funds_flow;

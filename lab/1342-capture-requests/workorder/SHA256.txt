@@ -27,3 +27,6 @@ ab01192ccb7b0fcca3a7a8bd14ec7171db43a7acf2fe6a104da63906e3720b9a  w6-window-0915
 6c94de0ce12aec70c33fda1a59b759bd16bb5e44179756411fa254136c56cd65  w8-status-narrow-window-sales-byname.xml
 # W7C (the HSN/SAC of one ledger, then one read of 0021; steps in W7C-README.md)
 b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5  w7c-readback-status-0021.xml
+# W9 (one ledger read two ways for its HSN/SAC and type of supply; steps in W9-README.md)
+71154d26a2239b0a9b2b3da35ef938abb7afe9134b3d0c4caeaf4bfa2010c04f  w9-ledger-hsn-all.xml
+ece27a8864b3b2d36bc97e8e8d5e9052e7c89d46824bfca9dcb9db20af9625fe  w9-ledger-hsn-fields.xml

@@ -236,7 +236,7 @@ def resolve_environment(manifest):
     mappings = manifest["server"]["mcp_config"]["env"]
     require(set(mappings) == {"BRIDGE_TERMS_ACCEPTED", "BRIDGE_TALLY_HOST", "BRIDGE_TALLY_PORT",
                               "BRIDGE_AGENT_REDACTION", "BRIDGE_AGENT_ENABLE_IMPORT",
-                              "BRIDGE_AGENT_ENABLE_WRITES"},
+                              "BRIDGE_AGENT_ENABLE_WRITES", "BRIDGE_AGENT_ENABLE_BATCH_POST"},
             "unexpected_environment_mapping")
     # No setting may be required. Claude Desktop builds no launch command while a required setting
     # has no stored value, and an update that renames the Terms setting leaves it with none, so
@@ -258,6 +258,14 @@ def resolve_environment(manifest):
     require(writes["default"] is False, "posting_must_default_off")
     require(mappings["BRIDGE_AGENT_ENABLE_WRITES"] == "${user_config.enable_writes}",
             "writes_environment_mapping_mismatch")
+    # Batch posting is a second, separate setting, also off by default. The server uses it only
+    # together with posting (agent.rs), so on its own it posts nothing.
+    batch = manifest["user_config"].get("enable_batch_post", {})
+    require(batch.get("type") == "boolean" and isinstance(batch.get("default"), bool),
+            "batch_post_default_must_be_boolean")
+    require(batch["default"] is False, "batch_post_must_default_off")
+    require(mappings["BRIDGE_AGENT_ENABLE_BATCH_POST"] == "${user_config.enable_batch_post}",
+            "batch_post_environment_mapping_mismatch")
     # Supply isolated client settings through the manifest itself. Overwriting
     # the resulting environment would hide broken host/port substitutions.
     values = {name: option["default"] for name, option in manifest["user_config"].items()}

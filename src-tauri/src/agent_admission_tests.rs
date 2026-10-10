@@ -1019,6 +1019,72 @@ fn the_posting_setting_keeps_each_known_limit() {
     );
 }
 
+/// The batch setting's own known limits, pinned phrase by phrase as the posting setting's are.
+#[test]
+fn the_batch_setting_keeps_each_known_limit() {
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    let batch = &manifest["user_config"]["enable_batch_post"];
+    assert_eq!(batch["type"], "boolean");
+    assert_eq!(batch["default"], false);
+    assert_eq!(
+        manifest["server"]["mcp_config"]["env"]["BRIDGE_AGENT_ENABLE_BATCH_POST"],
+        "${user_config.enable_batch_post}"
+    );
+    let text = batch["description"]
+        .as_str()
+        .expect("the enable_batch_post setting has a description");
+    const LIMITS: &[(&str, &str)] = &[
+        (
+            "Off by default",
+            "batch posting is off until the person turns it on",
+        ),
+        (
+            "used only when voucher posting is on",
+            "the setting adds nothing while posting is off (agent.rs: batch needs writes)",
+        ),
+        ("2 to 50", "the batch size the post admits"),
+        (
+            "shows a summary: the totals for each ledger",
+            "a batch's window shows per-ledger totals, not each voucher",
+        ),
+        (
+            "only when there are 10 or fewer",
+            "per-voucher lines appear only for small batches",
+        ),
+        (
+            "Leave it off unless you accept these known limits",
+            "turning it on accepts the limits that follow",
+        ),
+        (
+            "creates only some vouchers of a batch",
+            "limit 1: a batch can land partly",
+        ),
+        (
+            "which ones it finds in the book and which it does not",
+            "limit 1: the report is per voucher, by what the read-back finds",
+        ),
+        (
+            "refuses to post the missing ones again",
+            "limit 1: rows of a sent batch are refused if posted again",
+        ),
+        (
+            "check each in Tally",
+            "limit 1: a voucher not found may be absent or edited, so the person checks it",
+        ),
+        (
+            "more than 50, or one whose summary does not fit the window",
+            "limit 2: the cap and the window's size, each refused rather than cut",
+        ),
+    ];
+    for (phrase, kept) in LIMITS {
+        assert!(
+            text.contains(phrase),
+            "the batch setting lost {phrase:?}, which says: {kept}"
+        );
+    }
+}
+
 /// The sentences an assistant relies on for safety, each pinned on its own so a
 /// shorter description cannot drop one unnoticed (#1010). Only the phrase is
 /// asserted, never a whole description, so the text around it can still be

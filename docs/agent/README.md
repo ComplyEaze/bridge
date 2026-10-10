@@ -1568,8 +1568,9 @@ The four rest on different observations, and each build reports its own in
 Historical batch records remain readable. None of this qualifies every host,
 licence mode, or manually imported file. In the MCPB extension an unnumbered
 Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
-per approval (a voucher that carries a voucher number is refused); a saved batch of 2 to 50 posts in one import only in a source build
-that turns that on.
+per approval (a voucher that carries a voucher number is refused); a saved batch
+of 2 to 50 posts in one import when batch posting is also turned on (the
+extension's setting from the next build, or `BRIDGE_AGENT_ENABLE_BATCH_POST`).
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
    IDs are client-supplied, unique within the batch, and retained in the local import ledger.
@@ -1701,9 +1702,10 @@ verification remains available without either switch.
 `BRIDGE_AGENT_ENABLE_WRITES=true`, lets `post_import` post a saved batch of 2 to
 50 vouchers in one import, after one approval of the batch's summary: every
 ledger's debit and credit totals, the money Receipts bring in and Payments take
-out, and the standing cautions. It is off by default. It is a command-line
-setting only, not in the MCPB extension, until a batch post through Bridge has
-been proved on a live book. A batch is `posted_verified` only when Tally created
+out, and the standing cautions. It is off by default. From the next build the
+extension offers it as its own setting, `enable_batch_post` ("Allow posting a batch of up to 50
+vouchers under one approval"), also off by default and used only with posting
+on (#1090). A batch is `posted_verified` only when Tally created
 exactly that many vouchers, the readback verifies every one, and the company's
 voucher mark moved by exactly that many. Otherwise it is
 `reconciliation_required` (`batch_step_unconfirmed` when only the mark

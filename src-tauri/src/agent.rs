@@ -289,8 +289,9 @@ struct Settings {
     import_enabled: bool,
     writes_enabled: bool,
     /// `BRIDGE_AGENT_ENABLE_BATCH_POST`: lets `post_import` post 2 to 50
-    /// vouchers of one batch in one import. Off by default and not in the
-    /// extension's settings until a live batch post through Bridge is proved.
+    /// vouchers of one batch in one import. Off by default; the extension's
+    /// `enable_batch_post` setting (also off by default) maps to it, and it
+    /// applies only together with posting (#1090).
     batch_post_enabled: bool,
 }
 
@@ -335,9 +336,17 @@ impl Settings {
             redaction,
             import_enabled: enabled_setting("BRIDGE_AGENT_ENABLE_IMPORT")? || writes_enabled,
             writes_enabled,
-            // Validated even when posting is off, so a typo never hides.
-            batch_post_enabled: enabled_setting("BRIDGE_AGENT_ENABLE_BATCH_POST")?
-                && writes_enabled,
+            // Validated even when posting is off, so a typo never hides. An
+            // unresolved placeholder or an empty value reads as off, so an
+            // upgrade with no stored value keeps every tool.
+            batch_post_enabled: batch_post_setting(
+                match env::var("BRIDGE_AGENT_ENABLE_BATCH_POST") {
+                    Ok(value) => Some(value),
+                    Err(env::VarError::NotPresent) => None,
+                    Err(_) => return Err("boolean_setting_invalid".to_string()),
+                }
+                .as_deref(),
+            )? && writes_enabled,
         })
     }
 }
@@ -348,6 +357,25 @@ fn enabled_setting(name: &str) -> Result<bool, String> {
         Ok(value) if matches!(value.as_str(), "1" | "true") => Ok(true),
         Ok(value) if matches!(value.as_str(), "0" | "false") => Ok(false),
         _ => Err("boolean_setting_invalid".into()),
+    }
+}
+
+/// The extension's key for the batch setting, and what its manifest passes to
+/// the server for it. A test ties the two to `packaging/mcpb/manifest.json`.
+#[cfg(test)]
+const BATCH_POST_SETTING_KEY: &str = "enable_batch_post";
+const BATCH_POST_PLACEHOLDER: &str = "${user_config.enable_batch_post}";
+
+/// The batch setting's raw value. An upgrade from 0.5.1 stores nothing for this
+/// new key, so a host may pass the manifest's placeholder unresolved, or an
+/// empty string: both read as off rather than refusing to start. Anything else
+/// that is not a plain boolean still fails loud.
+fn batch_post_setting(value: Option<&str>) -> Result<bool, String> {
+    match value {
+        None | Some("") | Some(BATCH_POST_PLACEHOLDER) => Ok(false),
+        Some("1" | "true") => Ok(true),
+        Some("0" | "false") => Ok(false),
+        Some(_) => Err("boolean_setting_invalid".into()),
     }
 }
 

@@ -1413,6 +1413,95 @@ fn a_ledger_resolves_only_on_its_spelling_or_ascii_case_and_spaces() {
     );
 }
 
+/// An upgrade from 0.5.1 stores no value for the new batch key, so a host may
+/// pass the manifest's placeholder unresolved, or an empty string: both read as
+/// off, and the server keeps every tool. A typo still fails loud.
+#[test]
+fn the_batch_setting_reads_an_absent_empty_or_unresolved_value_as_off() {
+    assert_eq!(batch_post_setting(None), Ok(false));
+    assert_eq!(batch_post_setting(Some("")), Ok(false));
+    assert_eq!(batch_post_setting(Some(BATCH_POST_PLACEHOLDER)), Ok(false));
+    for on in ["1", "true"] {
+        assert_eq!(batch_post_setting(Some(on)), Ok(true), "{on}");
+    }
+    for off in ["0", "false"] {
+        assert_eq!(batch_post_setting(Some(off)), Ok(false), "{off}");
+    }
+    for bad in [
+        "probe",
+        "TRUE",
+        "yes",
+        " true",
+        " ",
+        // A different key's placeholder is not this key's.
+        "${user_config.accept_terms_2026_10_1}",
+        "${user_config.enable_batch_post} ",
+        "${user_config.enable_batch_post",
+    ] {
+        assert_eq!(
+            batch_post_setting(Some(bad)),
+            Err("boolean_setting_invalid".to_string()),
+            "{bad:?} must still fail at settings admission"
+        );
+    }
+}
+
+/// The placeholder the server tolerates is the one the manifest passes, so the
+/// two cannot drift.
+#[test]
+fn the_tolerated_batch_placeholder_is_the_manifests_own_mapping() {
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    let mapped = &manifest["server"]["mcp_config"]["env"]["BRIDGE_AGENT_ENABLE_BATCH_POST"];
+    assert_eq!(
+        mapped.as_str(),
+        Some(format!("${{user_config.{BATCH_POST_SETTING_KEY}}}").as_str())
+    );
+    assert_eq!(mapped.as_str(), Some(BATCH_POST_PLACEHOLDER));
+    assert!(manifest["user_config"][BATCH_POST_SETTING_KEY].is_object());
+}
+
+/// `Settings::from_env` reads the batch key through the tolerant function only.
+#[test]
+fn settings_read_the_batch_key_through_the_tolerant_function_only() {
+    let source = include_str!("agent.rs");
+    let start = source.find("impl Settings {").unwrap();
+    let body = &source[start..source[start..].find("\n}\n").unwrap() + start];
+    assert!(body.contains("batch_post_setting("), "{body}");
+    assert!(
+        body.contains("\"BRIDGE_AGENT_ENABLE_BATCH_POST\""),
+        "{body}"
+    );
+    assert!(
+        !body.contains("enabled_setting(\"BRIDGE_AGENT_ENABLE_BATCH_POST\")"),
+        "{body}"
+    );
+    assert!(
+        body.contains("enabled_setting(\"BRIDGE_AGENT_ENABLE_WRITES\")"),
+        "{body}"
+    );
+    assert!(body.contains("&& writes_enabled"), "{body}");
+}
+
+/// Only the batch key tolerates a placeholder: every other boolean setting
+/// still refuses one. `enabled_setting` reads the process environment, so this
+/// uses a name no other code reads (hermetic).
+#[test]
+fn other_boolean_settings_still_refuse_an_unresolved_placeholder() {
+    const NAME: &str = "BRIDGE_TEST_ONLY_BOOLEAN_PLACEHOLDER_SETTING";
+    std::env::set_var(NAME, "${user_config.enable_writes}");
+    let placeholder = enabled_setting(NAME);
+    std::env::set_var(NAME, "");
+    let empty = enabled_setting(NAME);
+    std::env::set_var(NAME, "true");
+    let on = enabled_setting(NAME);
+    std::env::remove_var(NAME);
+    assert_eq!(placeholder, Err("boolean_setting_invalid".to_string()));
+    assert_eq!(empty, Err("boolean_setting_invalid".to_string()));
+    assert_eq!(on, Ok(true));
+    assert_eq!(enabled_setting(NAME), Ok(false));
+}
+
 #[test]
 fn tally_port_defaults_only_when_the_environment_value_is_absent() {
     assert_eq!(tally_port(None), Ok(9000));

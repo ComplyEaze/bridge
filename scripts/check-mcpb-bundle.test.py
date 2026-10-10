@@ -170,6 +170,7 @@ class BundleSmokeTests(unittest.TestCase):
         self.assertEqual(resolved["BRIDGE_TALLY_HOST"], "127.0.0.1")
         self.assertEqual(resolved["BRIDGE_TALLY_PORT"], "9")
         self.assertEqual(resolved["BRIDGE_AGENT_ENABLE_WRITES"], "false")
+        self.assertEqual(resolved["BRIDGE_AGENT_ENABLE_BATCH_POST"], "false")
         self.assertEqual(resolved["BRIDGE_AGENT_ENABLE_IMPORT"], "true")
         for key in ("BRIDGE_TALLY_HOST", "BRIDGE_TALLY_PORT"):
             broken = json.loads(template.read_text(encoding="utf-8"))
@@ -233,6 +234,32 @@ class BundleSmokeTests(unittest.TestCase):
             manifest["server"]["mcp_config"]["env"]["BRIDGE_AGENT_ENABLE_WRITES"] = mapping
             with self.subTest(mapping=mapping), self.assertRaisesRegex(
                     smoke.SmokeError, "writes_environment_mapping_mismatch"):
+                smoke.resolve_environment(manifest)
+
+    def test_batch_posting_defaults_off_and_a_default_on_manifest_is_refused(self):
+        template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
+        manifest = json.loads(template.read_text(encoding="utf-8"))
+        self.assertIs(manifest["user_config"]["enable_batch_post"]["default"], False)
+        manifest["user_config"]["enable_batch_post"]["default"] = True
+        with self.assertRaisesRegex(smoke.SmokeError, "batch_post_must_default_off"):
+            smoke.resolve_environment(manifest)
+
+    def test_batch_post_setting_requires_a_real_boolean_default(self):
+        template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
+        for default in ("true", "false", 0, 1, None):
+            manifest = json.loads(template.read_text(encoding="utf-8"))
+            manifest["user_config"]["enable_batch_post"]["default"] = default
+            with self.subTest(default=default), self.assertRaisesRegex(
+                    smoke.SmokeError, "batch_post_default_must_be_boolean"):
+                smoke.resolve_environment(manifest)
+
+    def test_batch_post_mapping_cannot_bypass_its_user_setting(self):
+        template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
+        for mapping in ("true", "false", "${user_config.enable_writes}"):
+            manifest = json.loads(template.read_text(encoding="utf-8"))
+            manifest["server"]["mcp_config"]["env"]["BRIDGE_AGENT_ENABLE_BATCH_POST"] = mapping
+            with self.subTest(mapping=mapping), self.assertRaisesRegex(
+                    smoke.SmokeError, "batch_post_environment_mapping_mismatch"):
                 smoke.resolve_environment(manifest)
 
     def test_terms_setting_defaults_to_not_accepted_and_is_mapped(self):

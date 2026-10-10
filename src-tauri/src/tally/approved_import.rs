@@ -66,6 +66,52 @@ pub(crate) struct ApprovedImport {
     /// The all-company change marks, read last before the POST to confirm the
     /// aim and again right after it to see where the voucher went (#574).
     company_marks_request: AgentReadRequest,
+    /// The reads an invoice's admission makes, for the queue to make again
+    /// under its lock (#1337). `None` for every other voucher type. Boxed so
+    /// that an approval an enum carries stays the size it was.
+    invoice: Option<Box<InvoiceReadPlan>>,
+}
+
+/// The reads one Sales invoice's admission makes of its masters, fixed from the
+/// saved invoice when the plan is made (#1337). The queue sends exactly these
+/// inside the identity brackets of the POST and hands the answers back; what
+/// they mean is the admission's own judgement, run on them there, so the rule
+/// has one copy and a master added to the admission reaches the queue with it.
+#[derive(Clone, Debug)]
+pub(crate) struct InvoiceReadPlan {
+    /// The date the compliance listing is read as of.
+    pub(crate) listing_as_of: TallyDate,
+    /// The company's own ledger count, sent only when the book's master mark
+    /// was over the size gate's mark at the build.
+    pub(crate) ledger_count: Option<AgentReadRequest>,
+    pub(crate) rates: AgentReadRequest,
+    pub(crate) voucher_types: AgentReadRequest,
+    pub(crate) number: AgentReadRequest,
+    /// The same read for the invoice the journal held as the number's control.
+    pub(crate) number_control: Option<AgentReadRequest>,
+    pub(crate) registration: AgentReadRequest,
+}
+
+/// What the queue read for an [`InvoiceReadPlan`], or what the build has read
+/// of one so far: each answer is `None` until it is read. The admission's judge
+/// names the first answer it still needs.
+#[derive(Debug, Default)]
+pub(crate) struct InvoiceAnswers {
+    /// The all-company marks, as the binding reads began.
+    pub(crate) marks: Option<String>,
+    pub(crate) ledger_count: Option<String>,
+    pub(crate) listing: Option<super::runtime::PartyLedgerMasterListing>,
+    pub(crate) rates: Option<String>,
+    pub(crate) voucher_types: Option<String>,
+    pub(crate) number: Option<String>,
+    pub(crate) number_control: Option<String>,
+    pub(crate) registration: Option<String>,
+}
+
+/// An invoice's plan and the answers the queue read for it.
+pub(crate) struct QueuedInvoice<'a> {
+    pub(crate) plan: &'a InvoiceReadPlan,
+    pub(crate) answers: &'a InvoiceAnswers,
 }
 
 /// What the queue read for the last admission before the POST.
@@ -79,6 +125,8 @@ pub(crate) struct QueuedAdmission<'a> {
     pub(crate) company_marks_at_binding: &'a str,
     pub(crate) company_marks: &'a str,
     pub(crate) ledger_binding: &'a StandardLedgerCatalogBinding,
+    /// An invoice's masters, read again for the admission's judge (#1337).
+    pub(crate) invoice: Option<QueuedInvoice<'a>>,
 }
 
 /// Whether the profile accepts every voucher's date, and there is at least
@@ -115,7 +163,20 @@ impl ApprovedImport {
             group_collection_request,
             currency_request,
             company_marks_request,
+            invoice: None,
         })
+    }
+
+    /// The same approval, to be redeemed with an invoice's masters read again
+    /// in the queue. A plain field of the approval and no part of what the
+    /// person was shown: the queue's judge holds the plan to the invoice.
+    pub(crate) fn with_invoice(mut self, invoice: Option<InvoiceReadPlan>) -> Self {
+        self.invoice = invoice.map(Box::new);
+        self
+    }
+
+    pub(super) fn invoice_plan(&self) -> Option<&InvoiceReadPlan> {
+        self.invoice.as_deref()
     }
 
     pub(super) fn xml(&self) -> &str {
@@ -183,6 +244,7 @@ impl ApprovedImport {
             group_collection_request: None,
             currency_request,
             company_marks_request,
+            invoice: None,
         }
     }
 }
@@ -435,6 +497,15 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// data-free cause the refusal carries.
     #[error("post_catalogue_unreadable")]
     CatalogueUnreadable(#[source] bridge_tally_protocol::StandardLedgerCatalogError),
+    /// What the queue read of an invoice's masters differs from what the build
+    /// recorded (#1337). `field` names the first that differs.
+    #[error("import_invoice_masters_changed")]
+    InvoiceMastersChanged { field: &'static str },
+    /// The admission's judge refused the invoice on the queue's reads, under
+    /// the code the build would have refused it with: a number now in use, a
+    /// series set back to Automatic, a registration lapsed (#1337).
+    #[error("{code}")]
+    InvoiceRefused { code: String },
 }
 
 /// The data-free code a group snapshot refusal carries as its `cause`, for

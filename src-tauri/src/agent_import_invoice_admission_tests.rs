@@ -11,6 +11,8 @@
 //! capture, RE-LABELLED below) and the bill-wise catalogue row (HAND-WRITTEN). The ledger listing predates the rehearsal's two customers,
 //! so no case here is admitted.
 use super::*;
+use crate::agent::agent_import::invoice::InvoiceJudge;
+use crate::tally::approved_import::{InvoiceAnswers, InvoiceReadPlan};
 
 const LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const LAB: &str = "BRIDGE GST RECON LAB";
@@ -574,4 +576,230 @@ async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
         admission_after_a_sent_invoice(Some("posted_verified")).await,
         (None, 70)
     );
+}
+
+// ---- #1337: what the endpoint queue is handed, and when it refuses ----
+
+fn plan_of(voucher: &ImportVoucher, control: &ledger::NumberControl) -> InvoiceReadPlan {
+    let catalogue = catalogue(&[("Customer", true)]);
+    InvoiceJudge {
+        company_name: LAB,
+        company_guid: LAB_GUID,
+        voucher,
+        catalogue: &catalogue,
+        control,
+    }
+    .plan(
+        bridge_tally_core::TallyDate::parse("20261010".to_string()).unwrap(),
+        false,
+    )
+    .unwrap()
+}
+
+fn known_control() -> ledger::NumberControl {
+    ledger::NumberControl::Known {
+        batch_id: "bridge-00000000-0000-4000-8000-000000000001".to_string(),
+        number: "TG/25-26/899".to_string(),
+        date: "20260309".to_string(),
+    }
+}
+
+/// The queue sends the plan it was handed and judges its answers as the answers
+/// of this invoice's admission, so a plan that is another invoice's is a wiring
+/// fault, refused before any answer is judged.
+#[test]
+fn a_plan_that_is_not_the_invoices_does_not_fit_it() {
+    use crate::tally::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent;
+    let voucher = invoice_to("Customer", "Sales Manual", true);
+    let plan = plan_of(&voucher, &ledger::NumberControl::NeverSent);
+    assert_eq!(invoice::fit_plan(&plan, &plan), Ok(()));
+    // Another number and another financial year are each another invoice's
+    // plan; the voucher type is judged, not requested, and the date a listing
+    // is read as of is the clock's.
+    let mut other_number = voucher.clone();
+    other_number.voucher_number = Some("TG/25-26/901".to_string());
+    let mut other_year = voucher.clone();
+    other_year.date = "2027-05-10".to_string();
+    for other in [other_number, other_year] {
+        let carried = plan_of(&other, &ledger::NumberControl::NeverSent);
+        assert_eq!(
+            invoice::fit_plan(&plan, &carried),
+            Err(AdmissionInconsistent),
+            "{other:?}"
+        );
+    }
+    let mut later = plan.clone();
+    later.listing_as_of = bridge_tally_core::TallyDate::parse("20261011".to_string()).unwrap();
+    assert_eq!(invoice::fit_plan(&plan, &later), Ok(()));
+}
+
+/// The journal's control moved between the plan and the queue (another invoice
+/// verified, or the control released): a change, named, not a wiring fault.
+#[test]
+fn a_number_control_that_moved_since_the_plan_is_a_change_not_a_fault() {
+    use crate::tally::approved_import::ApprovedImportAdmissionError::InvoiceMastersChanged;
+    let voucher = invoice_to("Customer", "Sales Manual", true);
+    let with_control = plan_of(&voucher, &known_control());
+    let without = plan_of(&voucher, &ledger::NumberControl::NeverSent);
+    assert!(with_control.number_control.is_some() && without.number_control.is_none());
+    for (wanted, carried) in [(&with_control, &without), (&without, &with_control)] {
+        assert_eq!(
+            invoice::fit_plan(wanted, carried),
+            Err(InvoiceMastersChanged {
+                field: "number_control"
+            })
+        );
+    }
+}
+
+/// An invoice and its reads go to the queue together or not at all.
+#[test]
+fn an_invoice_without_reads_and_reads_without_an_invoice_are_refused_unseen() {
+    use crate::tally::approved_import::{
+        ApprovedImportAdmissionError::AdmissionInconsistent, QueuedInvoice,
+    };
+    let invoice_voucher = invoice_to("Customer", "Sales Manual", true);
+    let journal: ImportVoucher = serde_json::from_value(json!({
+        "bridge_txn_id":"j1", "date":"2026-03-10", "voucher_type":"Journal",
+        "entries":[
+            {"ledger":"Customer","amount":"10.00","side":"Dr"},
+            {"ledger":"Sales - Goods","amount":"10.00","side":"Cr"}
+        ]
+    }))
+    .unwrap();
+    let control = known_control();
+    let plan = plan_of(&invoice_voucher, &control);
+    let answers = InvoiceAnswers::default();
+    let queued = || {
+        Some(QueuedInvoice {
+            plan: &plan,
+            answers: &answers,
+        })
+    };
+    let vouchers = [invoice_voucher.clone()];
+    let journals = [journal.clone()];
+    // A batch with no invoice carries none of it.
+    assert!(matches!(
+        invoice::queued_invoice_for(&journals, None, None),
+        Ok(None)
+    ));
+    // An invoice with no reads, with reads and no control, or with a control
+    // and no reads.
+    for (invoice, control) in [(None, None), (queued(), None), (None, Some(&control))] {
+        assert_eq!(
+            invoice::queued_invoice_for(&vouchers, invoice, control).err(),
+            Some(AdmissionInconsistent)
+        );
+    }
+    // Reads and a control with no invoice in the batch, or with two vouchers.
+    for batch in [&journals[..], &[invoice_voucher.clone(), journal][..]] {
+        assert_eq!(
+            invoice::queued_invoice_for(batch, queued(), Some(&control)).err(),
+            Some(AdmissionInconsistent)
+        );
+    }
+    // The whole set is admitted.
+    assert!(matches!(
+        invoice::queued_invoice_for(&vouchers, queued(), Some(&control)),
+        Ok(Some(_))
+    ));
+}
+
+/// The judge names the answer it needs next, in the order the admission reads,
+/// and the queue's marks decide whether a ledger count is one of them.
+#[test]
+fn the_judge_asks_for_the_marks_first_and_a_ledger_count_only_over_the_gate() {
+    let voucher = invoice_to("Customer", "Sales Manual", true);
+    let catalogue = catalogue(&[("Customer", true)]);
+    let control = ledger::NumberControl::NeverSent;
+    let judge = InvoiceJudge {
+        company_name: LAB,
+        company_guid: LAB_GUID,
+        voucher: &voucher,
+        catalogue: &catalogue,
+        control: &control,
+    };
+    let needs = |answers: &InvoiceAnswers| match judge.judge(answers) {
+        Err(invoice::Verdict::Need(need)) => need,
+        other => panic!("{other:?}"),
+    };
+    let mut answers = InvoiceAnswers::default();
+    assert_eq!(needs(&answers), invoice::Need::Marks);
+    let marks = |masters: u64| {
+        format!(
+            "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+             <COMPANY NAME=\"{LAB}\"><GUID TYPE=\"String\">{LAB_GUID}</GUID>\
+             <ALTVCHID TYPE=\"Number\"> 16</ALTVCHID><ALTMSTID TYPE=\"Number\"> {masters}</ALTMSTID>\
+             </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+        )
+    };
+    answers.marks = Some(marks(223));
+    assert_eq!(needs(&answers), invoice::Need::Listing);
+    answers.marks = Some(marks(5001));
+    assert_eq!(needs(&answers), invoice::Need::LedgerCount);
+}
+
+/// `admit_queued_invoice` holds the plan the queue sent to the invoice's own
+/// before it judges any answer (#1337). The answers here are ones the judge
+/// refuses whatever plan stands beside them (the book is over the voucher mark),
+/// so a plan that does not fit is refused as a plan, not by the judge, and the
+/// call that checks it is pinned: without it each case below would come back as
+/// the judge's refusal. It is pure, so nothing is sent.
+#[test]
+fn the_queue_refuses_a_plan_that_does_not_fit_before_judging_any_answer() {
+    use crate::tally::approved_import::{
+        ApprovedImportAdmissionError::{
+            AdmissionInconsistent, InvoiceMastersChanged, InvoiceRefused,
+        },
+        QueuedInvoice,
+    };
+    let voucher = invoice_to("Customer", "Sales Manual", true);
+    let catalogue = catalogue(&[("Customer", true)]);
+    let answers = InvoiceAnswers {
+        marks: Some(format!(
+            "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+             <COMPANY NAME=\"{LAB}\"><GUID TYPE=\"String\">{LAB_GUID}</GUID>\
+             <ALTVCHID TYPE=\"Number\"> 25001</ALTVCHID><ALTMSTID TYPE=\"Number\"> 223</ALTMSTID>\
+             </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+        )),
+        ..InvoiceAnswers::default()
+    };
+    let never = ledger::NumberControl::NeverSent;
+    let known = known_control();
+    let admit = |carried: &InvoiceReadPlan, control: &ledger::NumberControl| {
+        invoice::admit_queued_invoice(
+            &voucher,
+            LAB,
+            LAB_GUID,
+            &catalogue,
+            control,
+            &QueuedInvoice {
+                plan: carried,
+                answers: &answers,
+            },
+        )
+    };
+    // The plan that fits is judged: the judge refuses these answers itself.
+    assert_eq!(
+        admit(&plan_of(&voucher, &never), &never),
+        Err(InvoiceRefused {
+            code: "invoice_book_too_many_vouchers".to_string()
+        })
+    );
+    // Another invoice's plan is a wiring fault, whatever the answers say.
+    let mut other = voucher.clone();
+    other.voucher_number = Some("TG/25-26/901".to_string());
+    assert_eq!(
+        admit(&plan_of(&other, &never), &never),
+        Err(AdmissionInconsistent)
+    );
+    // A control that moved either way since the plan is a named change.
+    for (carried, now) in [(&never, &known), (&known, &never)] {
+        assert_eq!(
+            admit(&plan_of(&voucher, carried), now),
+            Err(InvoiceMastersChanged {
+                field: "number_control"
+            })
+        );
+    }
 }

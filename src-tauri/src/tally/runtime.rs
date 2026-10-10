@@ -1800,6 +1800,180 @@ pub(crate) fn observed_opening_boundary(
     }
 }
 
+/// An invoice plan's reads on `client`, in the order the admission makes them
+/// (#1337): the ledger count when the plan has one, the compliance listing, the
+/// rates, the voucher types, the number, the number's control, the company's
+/// registration. Each goes through the identity-bracketed paired read, and the
+/// listing through the bracketed source read. `marks` is the all-company marks
+/// read as the queue's binding reads began, which the size gate judges.
+async fn read_invoice_plan(
+    client: &TallyClient,
+    identity: &VerifiedCompanyIdentity,
+    plan: &super::approved_import::InvoiceReadPlan,
+    marks: &str,
+) -> anyhow::Result<(super::approved_import::InvoiceAnswers, RuntimeReadEvidence)> {
+    async fn paired(
+        client: &TallyClient,
+        identity: &VerifiedCompanyIdentity,
+        request: &super::agent_read_request::AgentReadRequest,
+        evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<String> {
+        let (read, read_evidence) = fetch_admitted_agent_read(client, identity, request.clone())
+            .await
+            .map_err(|error| with_read_evidence(error, evidence.clone()))?;
+        *evidence = evidence.clone().combine(read_evidence);
+        Ok(read.body)
+    }
+    let mut evidence = RuntimeReadEvidence::empty();
+    let mut answers = super::approved_import::InvoiceAnswers {
+        marks: Some(marks.to_string()),
+        ..Default::default()
+    };
+    if let Some(request) = &plan.ledger_count {
+        answers.ledger_count = Some(paired(client, identity, request, &mut evidence).await?);
+    }
+    let currency_read = read_classified_currency_with_extent(client, identity)
+        .await
+        .map_err(|error| with_read_evidence(error, evidence.clone()))?;
+    let assertion = admitted_listing_assertion(&currency_read)
+        .map_err(|error| with_read_evidence(error, evidence.clone()))?;
+    let (source, source_evidence) =
+        read_party_ledger_master_source(client, identity, assertion, &plan.listing_as_of)
+            .await
+            .map_err(|error| {
+                with_read_evidence(error, evidence.clone().combine(currency_read.evidence()))
+            })?;
+    let listing = party_ledger_listing(&currency_read, source, source_evidence);
+    evidence = evidence.combine(listing.evidence.clone());
+    answers.listing = Some(listing);
+    answers.rates = Some(paired(client, identity, &plan.rates, &mut evidence).await?);
+    answers.voucher_types =
+        Some(paired(client, identity, &plan.voucher_types, &mut evidence).await?);
+    answers.number = Some(paired(client, identity, &plan.number, &mut evidence).await?);
+    if let Some(request) = &plan.number_control {
+        answers.number_control = Some(paired(client, identity, request, &mut evidence).await?);
+    }
+    answers.registration = Some(paired(client, identity, &plan.registration, &mut evidence).await?);
+    Ok((answers, evidence))
+}
+
+/// The classified currency read on `client`, pinned between two equal book
+/// extents inside the identity brackets. The existing detection and the queue's
+/// re-read of an invoice's masters (#1337) both make it.
+async fn read_classified_currency_with_extent(
+    client: &TallyClient,
+    identity: &VerifiedCompanyIdentity,
+) -> anyhow::Result<ClassifiedCompanyCurrencyRead> {
+    let mut evidence = RuntimeReadEvidence::empty();
+    let result = async {
+        bracket_verified_company_identity(client, identity).await?;
+        let extent = client.fetch_company_book_extent(identity).await?;
+        let (currency_count, identified) =
+            read_classified_currency(client, identity, &mut evidence).await?;
+        let closing_extent = client.fetch_company_book_extent(identity).await?;
+        if closing_extent != extent {
+            return Err(anyhow::Error::new(
+                PairedReadValidationError::CurrencyExtent,
+            ));
+        }
+        bracket_verified_company_identity(client, identity).await?;
+        Ok(ClassifiedCompanyCurrencyRead {
+            currency_count,
+            identified,
+            extent,
+            evidence: evidence.clone(),
+        })
+    }
+    .await;
+    result.map_err(|error| with_read_evidence(error, evidence))
+}
+
+/// The compliance read's currency assertion, from the classified currency read
+/// it was pinned under; a book whose base is not INR is refused here.
+fn admitted_listing_assertion(
+    currency_read: &ClassifiedCompanyCurrencyRead,
+) -> anyhow::Result<PartyLedgerMasterCurrencyAssertion> {
+    Ok(currency_read
+        .clone()
+        .admit_inr_classified()
+        .map_err(|code| {
+            with_read_evidence(
+                anyhow::Error::new(CurrencyAdmissionRefusal(code)),
+                currency_read.evidence(),
+            )
+        })?
+        .into_compliance_assertion())
+}
+
+/// The listing a source read makes, with the extent the whole read was pinned
+/// under (#630) and the evidence of both reads.
+fn party_ledger_listing(
+    currency_read: &ClassifiedCompanyCurrencyRead,
+    source: PartyLedgerMasterSource,
+    source_evidence: RuntimeReadEvidence,
+) -> PartyLedgerMasterListing {
+    let evidence = currency_read.evidence().combine(source_evidence);
+    let groups = source.groups.clone();
+    let foreign = source.foreign_currency_ledgers_excluded.clone();
+    let mixed = source.mixed_currency_ledgers_excluded.clone();
+    let count_cross_check = source.count_cross_check;
+    // The master request's SVFROMDATE (the admitted BOOKSFROM): each opening is as of it.
+    let opening_as_of = source.from.clone();
+    let records = source
+        .rows
+        .into_iter()
+        .map(|row| bridge_tally_protocol::PartyLedgerMasterRecord {
+            ledger: TallyLedger {
+                name: row.name,
+                parent: row.parent,
+                party_gstin: row.party_gstin,
+                opening_balance: Some(row.opening_balance.as_str().to_string()),
+            },
+            fields: row.fields,
+        })
+        .collect();
+    PartyLedgerMasterListing {
+        records,
+        groups,
+        foreign_currency_ledgers_excluded: foreign,
+        mixed_currency_ledgers_excluded: mixed,
+        count_cross_check,
+        opening_as_of,
+        extent: currency_read.extent.clone(),
+        evidence,
+    }
+}
+
+/// One party ledger source read on `client`: the opening product and mode,
+/// the identity bracket, the paired master, balance and group reads, the
+/// closing bracket and mode. The existing listing and the queue's re-read of an
+/// invoice's masters (#1337) both make it, so the queue's is the read the
+/// build's is.
+async fn read_party_ledger_master_source(
+    client: &TallyClient,
+    identity: &VerifiedCompanyIdentity,
+    currency_assertion: PartyLedgerMasterCurrencyAssertion,
+    today: &TallyDate,
+) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
+    let mut evidence = RuntimeReadEvidence::empty();
+    let result = async {
+        let (boundary_profile, opening_evidence) = observe_read_boundary(client).await?;
+        evidence = opening_evidence;
+        bracket_verified_company_identity(client, identity).await?;
+        let (source, count_evidence) = client
+            .fetch_party_ledger_master_source(identity, boundary_profile, currency_assertion, today)
+            .await?;
+        evidence = TallyRuntime::party_ledger_master_source_evidence(&source, evidence.clone())
+            .combine(count_evidence);
+        bracket_verified_company_identity(client, identity).await?;
+        let closing_evidence = confirm_read_boundary(client, boundary_profile).await?;
+        evidence = evidence.clone().combine(closing_evidence);
+        Ok((source, evidence.clone()))
+    }
+    .await;
+    result.map_err(|error| with_read_evidence(error, evidence))
+}
+
 async fn observe_read_boundary(
     client: &TallyClient,
 ) -> anyhow::Result<(DateBoundaryProfile, RuntimeReadEvidence)> {
@@ -3267,31 +3441,8 @@ impl TallyRuntime {
                 let currency_assertion = currency_assertion.clone();
                 let today = today.clone();
                 async move {
-                    let mut evidence = RuntimeReadEvidence::empty();
-                    let result = async {
-                        let (boundary_profile, opening_evidence) =
-                            observe_read_boundary(&client).await?;
-                        evidence = opening_evidence;
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let (source, count_evidence) = client
-                            .fetch_party_ledger_master_source(
-                                &identity,
-                                boundary_profile,
-                                currency_assertion,
-                                &today,
-                            )
-                            .await?;
-                        evidence =
-                            Self::party_ledger_master_source_evidence(&source, evidence.clone())
-                                .combine(count_evidence);
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let closing_evidence =
-                            confirm_read_boundary(&client, boundary_profile).await?;
-                        evidence = evidence.clone().combine(closing_evidence);
-                        Ok((source, evidence.clone()))
-                    }
-                    .await;
-                    result.map_err(|error| with_read_evidence(error, evidence))
+                    read_party_ledger_master_source(&client, &identity, currency_assertion, &today)
+                        .await
                 }
             },
         )
@@ -3322,54 +3473,16 @@ impl TallyRuntime {
         let currency_read = self
             .detect_classified_base_currency_with_extent(config.clone(), identity)
             .await?;
-        let currency_evidence = currency_read.evidence();
-        // The source refuses unless its opening extent equals this one, and
-        // its closing extent its opening one, so this is the extent the whole
-        // compliance read was pinned under (#630).
-        let extent = currency_read.extent.clone();
-        let assertion = currency_read
-            .admit_inr_classified()
-            .map_err(|code| {
-                with_read_evidence(
-                    anyhow::Error::new(CurrencyAdmissionRefusal(code)),
-                    currency_evidence.clone(),
-                )
-            })?
-            .into_compliance_assertion();
+        let assertion = admitted_listing_assertion(&currency_read)?;
         let (source, source_evidence) = self
             .fetch_party_ledger_master_source_with_evidence(config, identity, assertion, today)
             .await
-            .map_err(|error| with_read_evidence(error, currency_evidence.clone()))?;
-        let evidence = currency_evidence.combine(source_evidence);
-        let groups = source.groups.clone();
-        let foreign = source.foreign_currency_ledgers_excluded.clone();
-        let mixed = source.mixed_currency_ledgers_excluded.clone();
-        let count_cross_check = source.count_cross_check;
-        // The master request's SVFROMDATE (the admitted BOOKSFROM): each opening is as of it.
-        let opening_as_of = source.from.clone();
-        let records = source
-            .rows
-            .into_iter()
-            .map(|row| bridge_tally_protocol::PartyLedgerMasterRecord {
-                ledger: TallyLedger {
-                    name: row.name,
-                    parent: row.parent,
-                    party_gstin: row.party_gstin,
-                    opening_balance: Some(row.opening_balance.as_str().to_string()),
-                },
-                fields: row.fields,
-            })
-            .collect();
-        Ok(PartyLedgerMasterListing {
-            records,
-            groups,
-            foreign_currency_ledgers_excluded: foreign,
-            mixed_currency_ledgers_excluded: mixed,
-            count_cross_check,
-            opening_as_of,
-            extent,
-            evidence,
-        })
+            .map_err(|error| with_read_evidence(error, currency_read.evidence()))?;
+        Ok(party_ledger_listing(
+            &currency_read,
+            source,
+            source_evidence,
+        ))
     }
 
     /// The company's book extent, paired, inside the identity bracket: the one
@@ -3917,6 +4030,29 @@ impl TallyRuntime {
                                 .await
                                 .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
                         let admission_evidence = admission_evidence.combine(currency_evidence);
+                        // An invoice's masters (#1337): the reads its admission
+                        // makes, sent again here in the same brackets and judged
+                        // by that admission's own rule in the recheck below, so a
+                        // master that moved while the approval waited is seen
+                        // under the lock and not only before it.
+                        let (invoice_answers, admission_evidence) = match request.invoice_plan() {
+                            Some(plan) => {
+                                // Boxed: this future would otherwise sit inside the
+                                // post's, whatever the voucher type.
+                                let (answers, invoice_evidence) = Box::pin(read_invoice_plan(
+                                    &reads,
+                                    &identity,
+                                    plan,
+                                    &binding_marks.text,
+                                ))
+                                .await
+                                .map_err(|error| {
+                                    with_read_evidence(error, admission_evidence.clone())
+                                })?;
+                                (Some(answers), admission_evidence.combine(invoice_evidence))
+                            }
+                            None => (None, admission_evidence),
+                        };
                         let (profile, mode_evidence) = observe_read_boundary(&reads)
                             .await
                             .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3988,6 +4124,12 @@ impl TallyRuntime {
                             company_marks_at_binding: &binding_marks.text,
                             company_marks: &before_marks.text,
                             ledger_binding: request.ledger_binding(),
+                            invoice: request.invoice_plan().zip(invoice_answers.as_ref()).map(
+                                |(plan, answers)| super::approved_import::QueuedInvoice {
+                                    plan,
+                                    answers,
+                                },
+                            ),
                         })
                         .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
                         Ok::<_, anyhow::Error>((admission_evidence, before_marks))
@@ -4659,30 +4801,7 @@ impl TallyRuntime {
             ReadRetryPolicy::SINGLE_ATTEMPT,
             move |client| {
                 let identity = identity.clone();
-                async move {
-                    let mut evidence = RuntimeReadEvidence::empty();
-                    let result = async {
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let extent = client.fetch_company_book_extent(&identity).await?;
-                        let (currency_count, identified) =
-                            read_classified_currency(&client, &identity, &mut evidence).await?;
-                        let closing_extent = client.fetch_company_book_extent(&identity).await?;
-                        if closing_extent != extent {
-                            return Err(anyhow::Error::new(
-                                PairedReadValidationError::CurrencyExtent,
-                            ));
-                        }
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        Ok(ClassifiedCompanyCurrencyRead {
-                            currency_count,
-                            identified,
-                            extent,
-                            evidence: evidence.clone(),
-                        })
-                    }
-                    .await;
-                    result.map_err(|error| with_read_evidence(error, evidence))
-                }
+                async move { read_classified_currency_with_extent(&client, &identity).await }
             },
         )
         .await

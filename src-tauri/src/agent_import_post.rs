@@ -99,7 +99,9 @@ pub(in crate::agent) enum Pass {
 
 /// What waiting on a dialog came to.
 enum Waited {
-    Answered((Result<ApprovedImport, String>, Answered)),
+    /// Boxed: an approval carries an invoice's read plan (#1337), and the two
+    /// other cases are a handle and a unit.
+    Answered(Box<(Result<ApprovedImport, String>, Answered)>),
     Open(PendingPostApproval),
     /// The call was withdrawn while it waited. The dialog was dropped, which
     /// closes it.
@@ -188,7 +190,7 @@ async fn wait_for_answer(dialog: PendingPostApproval, budget: std::time::Duratio
         biased;
         () = withdrawal => Waited::Cancelled,
         waited = dialog.answer_within(budget) => match waited {
-            Ok(answer) => Waited::Answered(answer),
+            Ok(answer) => Waited::Answered(Box::new(answer)),
             Err(dialog) => Waited::Open(dialog),
         },
     }
@@ -587,6 +589,9 @@ impl Server {
         // Set when the batch that met that refusal holds an invoice: the
         // unsettled batch of this machine with its figures, if there is one.
         let mut preexisting_invoice: Option<Result<Option<String>, String>> = None;
+        // The reads of the invoice's masters the last re-read made, for the
+        // queue to make again under its lock (#1337).
+        let mut invoice_plan: Option<crate::tally::approved_import::InvoiceReadPlan> = None;
         let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
@@ -677,7 +682,7 @@ impl Server {
                                 return Err("request_cancelled".to_string().into())
                             }
                             Waited::Open(dialog) => Err(dialog),
-                            Waited::Answered(answer) => Ok(answer),
+                            Waited::Answered(answer) => Ok(*answer),
                         };
                         return match self.post_approvals.settle_join(batch_id, waited) {
                             Joined::StillOpen { remaining } => {
@@ -851,16 +856,16 @@ impl Server {
                 .iter()
                 .any(|voucher| voucher.voucher_type.is_invoice())
             {
-                let evidence = self
-                    .recheck_sales_invoice(
-                        &identity,
-                        &company,
-                        &line.vouchers[0],
-                        &catalogue_identities,
-                    )
-                    .await
-                    .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
+                let (evidence, plan) = Box::pin(self.recheck_sales_invoice(
+                    &identity,
+                    &company,
+                    &line.vouchers[0],
+                    &catalogue_identities,
+                ))
+                .await
+                .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
                 accumulated = combine_evidence(accumulated.clone(), evidence);
+                invoice_plan = Some(plan);
             }
             let group_collection_request = if renders_bank_shape(&payload.vouchers) {
                 let (groups, evidence) =
@@ -942,7 +947,8 @@ impl Server {
                         currency_request,
                         company_marks_request.clone(),
                     )
-                    .await?,
+                    .await?
+                    .with_invoice(invoice_plan.clone()),
                     native,
                 ),
                 PostScope::Vouchers => {
@@ -976,7 +982,8 @@ impl Server {
                                     accumulated.clone(),
                                 ))));
                             }
-                            Waited::Answered((answer, answered)) => {
+                            Waited::Answered(answer) => {
+                                let (answer, answered) = *answer;
                                 self.post_approvals.hold_approved(
                                     batch_id,
                                     binding.clone(),
@@ -1016,21 +1023,21 @@ impl Server {
                             .await
                             .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
                         accumulated = combine_evidence(accumulated.clone(), catalogue_read);
-                        let evidence = self
-                            .recheck_sales_invoice(
-                                &identity,
-                                &company,
-                                &line.vouchers[0],
-                                &fresh_catalogue,
-                            )
-                            .await
-                            .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
+                        let (evidence, plan) = Box::pin(self.recheck_sales_invoice(
+                            &identity,
+                            &company,
+                            &line.vouchers[0],
+                            &fresh_catalogue,
+                        ))
+                        .await
+                        .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
                         accumulated = combine_evidence(accumulated.clone(), evidence);
+                        invoice_plan = Some(plan);
                     }
                     let (taken, request, native) =
                         self.post_approvals.take_for_dispatch(batch_id, &binding)?;
                     redemption = Some(taken);
-                    (request, native)
+                    (request.with_invoice(invoice_plan.clone()), native)
                 }
             };
             let redemption_id = redemption.as_ref().map(approval::Redemption::id);
@@ -1050,6 +1057,10 @@ impl Server {
             // this machine to this endpoint can be sent between this read and
             // the queued recheck that uses it.
             let invoice_identity = self.import_invoice_identity(&line)?;
+            // And the number's control the journal offers now, inside the same
+            // lease: the queue's judge reads the number against that control,
+            // and a control that moved since the plan is a change (#1337).
+            let invoice_control = self.queued_invoice_control(&line)?;
             let posted = self
                 .runtime
                 .post_approved_import(
@@ -1068,6 +1079,8 @@ impl Server {
                             queued.currencies,
                             queued.ledger_binding,
                             invoice_identity,
+                            queued.invoice,
+                            invoice_control.as_ref(),
                         )?;
                         admit_queued_aim(
                             queued.company_marks_at_binding,
@@ -1193,6 +1206,24 @@ impl Server {
                     .chain()
                     .find_map(|cause| cause.downcast_ref::<ApprovedImportAdmissionError>())
                     .and_then(refused_cash_in_hand);
+                // An invoice's masters, judged in the queue (#1337): the code the
+                // judge refused under, or the master that moved.
+                let invoice_refusal = error.chain().find_map(|cause| {
+                    match cause.downcast_ref::<ApprovedImportAdmissionError>() {
+                        Some(ApprovedImportAdmissionError::InvoiceRefused { code }) => {
+                            Some(code.clone())
+                        }
+                        _ => None,
+                    }
+                });
+                let invoice_field = error.chain().find_map(|cause| {
+                    match cause.downcast_ref::<ApprovedImportAdmissionError>() {
+                        Some(ApprovedImportAdmissionError::InvoiceMastersChanged { field }) => {
+                            Some(*field)
+                        }
+                        _ => None,
+                    }
+                });
                 let code = if error.chain().any(|cause| {
                     cause.is::<crate::tally::approved_import::AmbiguousImportCompany>()
                 }) {
@@ -1225,6 +1256,8 @@ impl Server {
                     )
                 }) {
                     "import_bank_classification_changed"
+                } else if invoice_field.is_some() {
+                    "import_invoice_masters_changed"
                 } else if error.chain().any(|cause| {
                     matches!(
                         cause.downcast_ref::<ApprovedImportAdmissionError>(),
@@ -1340,6 +1373,7 @@ impl Server {
                 } else {
                     "import_dispatch_outcome_unknown"
                 };
+                let code = invoice_refusal.as_deref().unwrap_or(code);
                 // A queue read that failed in transport has no typed cause of
                 // its own; the transport's safe code names it.
                 let transport = (code == "post_queue_read_failed")
@@ -1363,7 +1397,8 @@ impl Server {
                 // itself in `from_runtime`; it is not repeated as the cause.
                 let mut failure = ToolFailure::from_runtime(code, error);
                 if failure.cause.is_none() {
-                    failure.cause = refusal_cause(&failure.code, group, transport);
+                    failure.cause =
+                        refusal_cause(&failure.code, group.or(invoice_field), transport);
                 }
                 failure
             })?;
@@ -2049,6 +2084,8 @@ fn recheck_import_admission(
     currencies: &str,
     ledger_binding: &bridge_tally_protocol::StandardLedgerCatalogBinding,
     invoice_identity: InvoiceIdentity,
+    invoice: Option<crate::tally::approved_import::QueuedInvoice<'_>>,
+    invoice_control: Option<&ledger::NumberControl>,
 ) -> anyhow::Result<()> {
     // The ledgers the build found under Cash-in-Hand (#815): a record without
     // them predates the field and has nothing to check again.
@@ -2121,6 +2158,22 @@ fn recheck_import_admission(
             .any(|party| super::invoice::party_bill_wise_in(&catalogue, party) != Some(true))
     {
         return Err(ApprovedImportAdmissionError::BillWiseChanged.into());
+    }
+    // An invoice's masters, read again in this queue, judged by the rule the
+    // build judged them by and held to what the build recorded (#1337). A batch
+    // that holds an invoice with no such reads, or reads with no invoice, is a
+    // wiring fault: refused, never skipped.
+    if let Some((voucher, queued, control)) =
+        super::invoice::queued_invoice_for(&line.vouchers, invoice, invoice_control)?
+    {
+        super::invoice::admit_queued_invoice(
+            voucher,
+            company_name,
+            company_guid,
+            &catalogue,
+            control,
+            &queued,
+        )?;
     }
     // The binding above compares each ledger's name and GUID, not its parent,
     // so it cannot see a ledger or a group re-parented since approval. A bank

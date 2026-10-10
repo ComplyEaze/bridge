@@ -13,6 +13,7 @@
 //! and the rendering. The reads that fill `LedgerFacts` belong to the build.
 
 use super::{xml_escape, EntrySide, ImportEntry, ImportVoucher};
+use crate::tally::approved_import::{InvoiceAnswers, InvoiceReadPlan};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
@@ -944,45 +945,54 @@ fn refused(refusal: InvoiceRefusal) -> InvoiceAdmission {
 }
 
 fn failed(code: &'static str) -> InvoiceAdmission {
-    InvoiceAdmission::Failed(super::super::ToolFailure::from(code.to_string()))
+    failed_with(code.to_string())
+}
+
+fn failed_with(code: String) -> InvoiceAdmission {
+    InvoiceAdmission::Failed(super::super::ToolFailure::from(code))
 }
 
 impl super::super::Server {
     /// Read the invoice's masters again. The invoice must be admitted again
     /// (every leg's group and duty head, the type's series, the number still
     /// unused: a refusal there comes back under its own code), and what the
-    /// build recorded must be unchanged (`import_invoice_masters_changed`): the
+    /// build recorded must be unchanged (`import_invoice_masters_changed`, its
+    /// `cause` naming the first field that differs): the
     /// party's GSTIN, state, registration and bill-wise flag, the type's GUID
     /// and the company's state (its registration's, ADR 0004 slice 1). Run
     /// before the approval
     /// dialog and again, after it is answered, before the post is dispatched,
-    /// because a dialog can stay open and a book can change under it.
+    /// because a dialog can stay open and a book can change under it. The post
+    /// reads them once more in the endpoint queue (#1337).
+    /// Also returns the plan of the reads it made, for the queue to make again
+    /// (#1337).
     pub(super) async fn recheck_sales_invoice(
         &self,
         identity: &super::super::VerifiedCompanyIdentity,
         company: &bridge_tally_protocol::TallyCompany,
         saved: &ImportVoucher,
         catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
-    ) -> Result<super::super::Evidence, super::super::ToolFailure> {
+    ) -> Result<(super::super::Evidence, InvoiceReadPlan), super::super::ToolFailure> {
         let mut fresh = saved.clone();
         let recorded = fresh
             .invoice
             .as_mut()
             .and_then(|detail| detail.observed.take());
-        let changed =
-            || super::super::ToolFailure::from("import_invoice_masters_changed".to_string());
-        let evidence = match self
-            .admit_sales_invoice(identity, company, &mut fresh, catalogue)
-            .await
+        // Boxed, with the other large futures of this path: the post's own
+        // future holds this one twice, and a thread's stack is small (#1337).
+        let (evidence, plan) = match Box::pin(
+            self.admit_sales_invoice_planned(identity, company, &mut fresh, catalogue),
+        )
+        .await
         {
-            Ok(evidence) => evidence,
+            Ok(admitted) => admitted,
             Err(InvoiceAdmission::Failed(failure)) => return Err(failure),
             // The refusal's own code is the answer: a number now in use is not
             // "a master changed", and a rebuild would only be refused again.
             Err(InvoiceAdmission::Refused(refusals)) => {
                 return Err(match refusals.first() {
                     Some(first) => super::super::ToolFailure::from(first.code.to_string()),
-                    None => changed(),
+                    None => masters_changed(NOT_RECORDED),
                 });
             }
         };
@@ -990,21 +1000,212 @@ impl super::super::Server {
             .invoice
             .as_ref()
             .and_then(|detail| detail.observed.as_ref());
-        if !observation_unchanged(recorded.as_ref(), now) {
-            return Err(changed());
+        match first_difference(recorded.as_ref(), now) {
+            None => Ok((evidence, plan)),
+            Some(field) => Err(masters_changed(field)),
         }
-        Ok(evidence)
     }
 }
 
-/// A re-read admits a post only when the build recorded an observation and the
-/// re-read made the same one, whole. An invoice with none recorded is never
-/// "unchanged".
-fn observation_unchanged(
+impl super::super::Server {
+    /// The number control the journal offers now for the invoice of `line`, or
+    /// none for a batch with no invoice. Read inside the endpoint's dispatch
+    /// lease, for the queue's judge (#1337).
+    pub(super) fn queued_invoice_control(
+        &self,
+        line: &super::ImportLedgerLine,
+    ) -> Result<Option<super::ledger::NumberControl>, String> {
+        let Some(voucher) = line
+            .vouchers
+            .iter()
+            .find(|voucher| voucher.voucher_type.is_invoice())
+        else {
+            return Ok(None);
+        };
+        let as_of = super::super::normalized_date(&voucher.date)
+            .map_err(|_| "invoice_date_invalid".to_string())?;
+        let year = financial_year_window(as_of.as_str())
+            .ok_or_else(|| "invoice_date_invalid".to_string())?;
+        self.import_invoice_number_control(&line.company_guid, (&year.0, &year.1))
+            .map(Some)
+    }
+}
+
+/// Whether the queue's reads and the batch agree on there being an invoice: a
+/// batch with none carries no reads and no control, and a batch with exactly
+/// one invoice carries its reads and its control. Anything else is a wiring
+/// fault, refused before any request is sent and never skipped (#1337).
+pub(super) fn queued_invoice_for<'a>(
+    vouchers: &'a [ImportVoucher],
+    invoice: Option<crate::tally::approved_import::QueuedInvoice<'a>>,
+    control: Option<&'a super::ledger::NumberControl>,
+) -> Result<
+    Option<(
+        &'a ImportVoucher,
+        crate::tally::approved_import::QueuedInvoice<'a>,
+        &'a super::ledger::NumberControl,
+    )>,
+    crate::tally::approved_import::ApprovedImportAdmissionError,
+> {
+    let invoiced = vouchers
+        .iter()
+        .any(|voucher| voucher.voucher_type.is_invoice());
+    match (invoiced, invoice, control, vouchers) {
+        (false, None, None, _) => Ok(None),
+        (true, Some(queued), Some(control), [voucher]) => Ok(Some((voucher, queued, control))),
+        _ => {
+            Err(crate::tally::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent)
+        }
+    }
+}
+
+/// Whether the plan the queue sent is the one this invoice calls for. The
+/// requests are a function of the invoice alone, apart from the number's
+/// control, which is the journal's: a plan that differs in any other request is
+/// a wiring fault, and a control that moved since the plan is a change. The
+/// ledger count is not compared: whether it is needed depends on the marks, and
+/// the judge asks for it.
+pub(super) fn fit_plan(
+    wanted: &InvoiceReadPlan,
+    carried: &InvoiceReadPlan,
+) -> Result<(), crate::tally::approved_import::ApprovedImportAdmissionError> {
+    use crate::tally::approved_import::ApprovedImportAdmissionError as Refusal;
+    let InvoiceReadPlan {
+        listing_as_of: _,
+        ledger_count: _,
+        rates,
+        voucher_types,
+        number,
+        number_control,
+        registration,
+    } = wanted;
+    if *rates != carried.rates
+        || *voucher_types != carried.voucher_types
+        || *number != carried.number
+        || *registration != carried.registration
+    {
+        return Err(Refusal::AdmissionInconsistent);
+    }
+    if *number_control != carried.number_control {
+        return Err(Refusal::InvoiceMastersChanged {
+            field: "number_control",
+        });
+    }
+    Ok(())
+}
+
+/// An invoice's masters, read again in the endpoint queue, judged by the rule
+/// the build judged them by and held to what the build recorded (#1337).
+///
+/// Refused, each before any intent: a plan that is not the one this invoice
+/// calls for (a wiring fault); a number control that moved since the plan; a
+/// book that outgrew the size gate since the build; the judge's own refusal;
+/// and an observation that differs from the recorded one, naming the first
+/// field that does.
+pub(super) fn admit_queued_invoice(
+    voucher: &ImportVoucher,
+    company_name: &str,
+    company_guid: &str,
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    control: &super::ledger::NumberControl,
+    queued: &crate::tally::approved_import::QueuedInvoice<'_>,
+) -> Result<(), crate::tally::approved_import::ApprovedImportAdmissionError> {
+    use crate::tally::approved_import::ApprovedImportAdmissionError as Refusal;
+    let mut fresh = voucher.clone();
+    let recorded = fresh
+        .invoice
+        .as_mut()
+        .and_then(|detail| detail.observed.take());
+    let judge = InvoiceJudge {
+        company_name,
+        company_guid,
+        voucher: &fresh,
+        catalogue,
+        control,
+    };
+    let refused = |verdict: Verdict| match verdict {
+        Verdict::Refused(refusals) => match refusals.first() {
+            Some(first) => Refusal::InvoiceRefused {
+                code: first.code.to_string(),
+            },
+            None => Refusal::InvoiceMastersChanged {
+                field: NOT_RECORDED,
+            },
+        },
+        Verdict::Failed(code) => Refusal::InvoiceRefused { code },
+        // A request the plan does not carry is a plan that does not fit.
+        Verdict::Need(_) => Refusal::AdmissionInconsistent,
+    };
+    // What the queue read must be what this invoice's admission reads: the
+    // requests are a function of the invoice alone, apart from the control,
+    // which is the journal's.
+    let wanted = judge
+        .plan(
+            queued.plan.listing_as_of.clone(),
+            queued.plan.ledger_count.is_some(),
+        )
+        .map_err(refused)?;
+    fit_plan(&wanted, queued.plan)?;
+    match judge.judge(queued.answers) {
+        Ok(observed) => match first_difference(recorded.as_ref(), Some(&observed)) {
+            None => Ok(()),
+            Some(field) => Err(Refusal::InvoiceMastersChanged { field }),
+        },
+        // The book outgrew the size gate while the approval waited: the count
+        // the gate now needs was not part of the plan.
+        Err(Verdict::Need(Need::LedgerCount)) => {
+            Err(Refusal::InvoiceMastersChanged { field: "book_size" })
+        }
+        Err(verdict) => Err(refused(verdict)),
+    }
+}
+
+/// The refusal for an invoice whose masters moved, naming the first field that
+/// differs as its typed cause.
+fn masters_changed(field: &'static str) -> super::super::ToolFailure {
+    let mut failure = super::super::ToolFailure::from("import_invoice_masters_changed".to_string());
+    failure.cause = Some(field);
+    failure
+}
+
+/// What `first_difference` names when the build recorded no observation, or
+/// the re-read made none.
+pub(super) const NOT_RECORDED: &str = "observation";
+
+/// The first field in which what the re-read observed differs from what the
+/// build recorded, or none when they are equal whole. An invoice with no
+/// observation recorded is never "unchanged". The recorded fields are
+/// destructured, so a field added to the observation cannot be left out.
+pub(super) fn first_difference(
     recorded: Option<&InvoiceObserved>,
     now: Option<&InvoiceObserved>,
-) -> bool {
-    matches!((recorded, now), (Some(recorded), Some(now)) if recorded == now)
+) -> Option<&'static str> {
+    let (Some(recorded), Some(now)) = (recorded, now) else {
+        return Some(NOT_RECORDED);
+    };
+    let InvoiceObserved {
+        voucher_type_guid,
+        party_gstin,
+        party_state,
+        party_registration_type,
+        party_bill_wise,
+        company_state,
+    } = recorded;
+    if *voucher_type_guid != now.voucher_type_guid {
+        Some("voucher_type")
+    } else if *party_gstin != now.party_gstin {
+        Some("party_gstin")
+    } else if *party_state != now.party_state {
+        Some("party_state")
+    } else if *party_registration_type != now.party_registration_type {
+        Some("party_registration")
+    } else if *party_bill_wise != now.party_bill_wise {
+        Some("party_bill_wise")
+    } else if *company_state != now.company_state {
+        Some("company_state")
+    } else {
+        None
+    }
 }
 
 /// Every field of an invoice's detail, one length-prefixed value each, for the
@@ -1413,124 +1614,214 @@ fn duty_head_of(observation: &bridge_tally_protocol::GstDutyHeadObservation) -> 
     }
 }
 
-impl super::super::Server {
-    /// Read what the masters say about one Sales invoice, classify every leg,
-    /// and record what was observed on the voucher. The reads: the company's
-    /// marks (and its ledger count when the master mark is high), the ledger
-    /// compliance listing (reserved group ancestry, duty head, the GSTIN in
-    /// force on the invoice date), the same listing with each ledger's GST
-    /// rate and rounding (the tax is worked out from it), the voucher types (the named type, its
-    /// class and its series-level numbering), the vouchers carrying the number
-    /// and the company's GST registration in force on the invoice date. The
-    /// party's bill-wise flag comes from the
-    /// catalogue the caller already read. Each answer is bound to the verified
-    /// company.
-    pub(super) async fn admit_sales_invoice(
+/// What the admission's judge still needs read before it can decide (#1337).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Need {
+    Marks,
+    LedgerCount,
+    Listing,
+    Rates,
+    VoucherTypes,
+    Number,
+    NumberControl,
+    Registration,
+}
+
+/// Why the judge has no observation yet.
+#[derive(Debug)]
+pub(super) enum Verdict {
+    /// The next answer it needs, which the caller reads and offers again.
+    Need(Need),
+    Refused(Vec<InvoiceRefusal>),
+    /// A read that could not be used, under the code that names it.
+    Failed(String),
+}
+
+fn refusing(refusal: InvoiceRefusal) -> Verdict {
+    Verdict::Refused(vec![refusal])
+}
+
+fn unusable(code: &'static str) -> Verdict {
+    Verdict::Failed(code.to_string())
+}
+
+/// What one Sales invoice's admission is judged on, apart from the answers: the
+/// invoice, the catalogue its party's bill-wise flag is read from, and the
+/// number control the journal offers.
+pub(super) struct InvoiceJudge<'a> {
+    pub(super) company_name: &'a str,
+    pub(super) company_guid: &'a str,
+    pub(super) voucher: &'a ImportVoucher,
+    pub(super) catalogue: &'a bridge_tally_protocol::StandardLedgerCatalogV2,
+    pub(super) control: &'a super::ledger::NumberControl,
+}
+
+fn admitted(
+    request: super::super::ReadRequest,
+) -> Result<crate::tally::agent_read_request::AgentReadRequest, Verdict> {
+    crate::tally::agent_read_request::AgentReadRequest::parse(request.into_xml())
+        .map_err(|error| Verdict::Failed(error.to_string()))
+}
+
+impl InvoiceJudge<'_> {
+    fn as_of(&self) -> Result<String, Verdict> {
+        super::super::normalized_date(&self.voucher.date)
+            .map(|date| date.as_str().to_string())
+            .map_err(|_| unusable("invoice_date_invalid"))
+    }
+
+    fn year(&self) -> Result<(String, String), Verdict> {
+        financial_year_window(&self.as_of()?).ok_or_else(|| unusable("invoice_date_invalid"))
+    }
+
+    /// The request that reads what `need` names, fixed from the invoice: the
+    /// build sends it and the queue sends it again. The marks and the listing
+    /// are not requests of the plan (the queue's binding marks are the marks;
+    /// the listing is read as the compliance read reads it).
+    pub(super) fn request(
         &self,
-        identity: &super::super::VerifiedCompanyIdentity,
-        company: &bridge_tally_protocol::TallyCompany,
-        voucher: &mut ImportVoucher,
-        catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
-    ) -> Result<super::super::Evidence, InvoiceAdmission> {
-        let company_name = company.name.as_str();
-        let Some(detail) = voucher.invoice.as_ref() else {
-            return Err(refused(refuse("invoice_detail_required")));
+        need: Need,
+    ) -> Result<crate::tally::agent_read_request::AgentReadRequest, Verdict> {
+        let company = self.company_name;
+        match need {
+            Need::LedgerCount => admitted(super::super::invoice_ledger_count_read(company)),
+            Need::VoucherTypes => admitted(super::super::invoice_voucher_types_read(company)),
+            Need::Registration => {
+                admitted(super::super::invoice_company_registration_read(company))
+            }
+            Need::Rates => {
+                let window = self.year()?;
+                let request = super::super::invoice_ledger_rates_read(
+                    company,
+                    (&window.0, self.as_of()?.as_str()),
+                )
+                .ok_or_else(|| unusable("invoice_date_invalid"))?;
+                admitted(request)
+            }
+            Need::Number => {
+                let number = self.voucher.voucher_number.clone().unwrap_or_default();
+                let year = self.year()?;
+                let request =
+                    super::super::invoice_number_read(company, &number, (&year.0, &year.1))
+                        .ok_or_else(|| refusing(refuse_value("invoice_number_invalid", &number)))?;
+                admitted(request)
+            }
+            Need::NumberControl => match self.number_control_request()? {
+                Some(request) => Ok(request),
+                None => Err(unusable("invoice_number_control_unreadable")),
+            },
+            Need::Marks | Need::Listing => Err(unusable("invoice_read_plan_inconsistent")),
+        }
+    }
+
+    /// The read of the invoice the journal offers as the number's control, or
+    /// none when it offers none.
+    fn number_control_request(
+        &self,
+    ) -> Result<Option<crate::tally::agent_read_request::AgentReadRequest>, Verdict> {
+        let super::ledger::NumberControl::Known { number, date, .. } = self.control else {
+            return Ok(None);
         };
-        let as_of = super::super::normalized_date(&voucher.date)
-            .map_err(|_| failed("invoice_date_invalid"))?
-            .as_str()
-            .to_string();
+        let window = financial_year_window(date)
+            .ok_or_else(|| unusable("invoice_number_control_unreadable"))?;
+        let request =
+            super::super::invoice_number_read(self.company_name, number, (&window.0, &window.1))
+                .ok_or_else(|| unusable("invoice_number_control_unreadable"))?;
+        admitted(request).map(Some)
+    }
+
+    /// The plan an admission that read the answers it did makes: every request
+    /// fixed from the invoice, the ledger count only when it was read.
+    pub(super) fn plan(
+        &self,
+        listing_as_of: bridge_tally_core::TallyDate,
+        counted: bool,
+    ) -> Result<InvoiceReadPlan, Verdict> {
+        Ok(InvoiceReadPlan {
+            listing_as_of,
+            ledger_count: if counted {
+                Some(self.request(Need::LedgerCount)?)
+            } else {
+                None
+            },
+            rates: self.request(Need::Rates)?,
+            voucher_types: self.request(Need::VoucherTypes)?,
+            number: self.request(Need::Number)?,
+            number_control: self.number_control_request()?,
+            registration: self.request(Need::Registration)?,
+        })
+    }
+
+    /// Classify the invoice on the answers read so far: the observation the
+    /// build records, a refusal, or the next answer needed. The same function
+    /// runs in the build, in the re-read before the dialog and after it, and in
+    /// the queue (#1337); each answer is judged as it arrives, in this order,
+    /// so a refusal needs none of the reads after it.
+    pub(super) fn judge(&self, answers: &InvoiceAnswers) -> Result<InvoiceObserved, Verdict> {
+        let voucher = self.voucher;
+        let Some(detail) = voucher.invoice.as_ref() else {
+            return Err(refusing(refuse("invoice_detail_required")));
+        };
+        let as_of = self.as_of()?;
         let type_name = detail.voucher_type_name.clone();
         let party_name = party_entry(voucher)
             .map(|entry| entry.ledger.clone())
-            .ok_or_else(|| refused(refuse("invoice_party_missing")))?;
+            .ok_or_else(|| refusing(refuse("invoice_party_missing")))?;
 
-        // A sent invoice of this company that is not verified posted stops
-        // every further invoice until a person releases it (ADR 0004, slice
-        // 4). Asked first, from the journal alone, so a stopped company costs
-        // Tally no request; the post asks again under its lock.
-        if let Some(batch_id) = self
-            .import_invoice_stop(identity.company_guid())
-            .map_err(|_| failed("invoice_stop_unreadable"))?
-        {
-            return Err(refused(refuse_value("invoice_company_stopped", &batch_id)));
-        }
         // 0. Refuse large books: the whole ledger compliance listing is read
         // three times for one invoice (build, before the dialog, after it).
-        let (mark, mark_evidence) = self
-            .pre_import_mark(company, identity)
-            .await
-            .map_err(InvoiceAdmission::Failed)?;
+        let Some(marks) = answers.marks.as_deref() else {
+            return Err(Verdict::Need(Need::Marks));
+        };
+        let mark = super::pre_import_mark_of(marks, self.company_guid).map_err(Verdict::Failed)?;
         // The duplicate-number read and the read-back each walk the book's
         // vouchers (a formula decides the rows, so Tally evaluates every
         // voucher): at the build, at both re-reads, after the post and at
         // every later verification. The voucher mark bounds that walk.
         if let Some(refusal) = voucher_mark_refusal(mark.value) {
-            return Err(refused(refusal));
+            return Err(refusing(refusal));
         }
-        let mut size_evidence = mark_evidence;
         match mark.master_value {
             Some(value) if mark_admits(value) => {}
             // The mark counts every master alteration, so a long-lived or
             // stock-heavy book is over it whatever its ledger count: the
             // company's own count of its ledgers can admit such a book.
             Some(value) => {
-                let (xml, read) = self
-                    .post_read(
-                        identity,
-                        super::super::invoice_ledger_count_read(&company.name),
-                    )
-                    .await?;
-                size_evidence = super::super::combine_evidence(size_evidence, read);
+                let Some(body) = answers.ledger_count.as_deref() else {
+                    return Err(Verdict::Need(Need::LedgerCount));
+                };
                 let count = bridge_tally_protocol::outstandings_shared::parse_company_ledger_count(
-                    &xml,
-                    &company.name,
-                    identity.company_guid(),
+                    body,
+                    self.company_name,
+                    self.company_guid,
                 )
-                .map_err(|_| failed("invoice_book_size_unreadable"))?;
+                .map_err(|_| unusable("invoice_book_size_unreadable"))?;
                 if let Some(refusal) = ledger_count_refusal(count.map(|count| count.get()), value) {
-                    return Err(refused(refusal));
+                    return Err(refusing(refusal));
                 }
             }
-            None => return Err(refused(refuse("invoice_book_size_unknown"))),
+            None => return Err(refusing(refuse("invoice_book_size_unknown"))),
         }
-        let mark_evidence = size_evidence;
 
         // 1. The compliance listing.
-        let today = bridge_tally_core::TallyDate::parse(super::super::tally_host_today())
-            .map_err(|_| failed("current_date_invalid"))?;
-        let listing = self
-            .runtime
-            .fetch_agent_party_ledger_masters_with_evidence(self.tally_config(), identity, today)
-            .await
-            .map_err(|error| {
-                super::super::ToolFailure::from_runtime("party_ledger_master_read_failed", error)
-            })?;
-        let mut evidence = super::super::combine_evidence(
-            mark_evidence,
-            super::super::evidence_from_runtime_read(listing.evidence.clone()),
-        );
+        let Some(listing) = answers.listing.as_ref() else {
+            return Err(Verdict::Need(Need::Listing));
+        };
         let index =
             bridge_tally_protocol::group_ancestry::GroupIndex::build(listing.groups.clone());
         // 1b. Each ledger's GST rate and rounding, from the same listing with
         // four fields added (W7, 10 Oct 2026): the tax is worked out from the
         // sales ledger's own rate, so the rate is read, never inferred.
-        let rates_window =
-            financial_year_window(&as_of).ok_or_else(|| failed("invoice_date_invalid"))?;
-        let request = super::super::invoice_ledger_rates_read(
-            company_name,
-            (&rates_window.0, as_of.as_str()),
-        )
-        .ok_or_else(|| failed("invoice_date_invalid"))?;
-        let (xml, read) = self.post_read(identity, request).await?;
-        evidence = super::super::combine_evidence(evidence, read);
+        let Some(rates_body) = answers.rates.as_deref() else {
+            return Err(Verdict::Need(Need::Rates));
+        };
         let wanted = voucher
             .entries
             .iter()
             .map(|entry| entry.ledger.as_str())
             .collect::<Vec<_>>();
-        let rates =
-            wire::parse_ledger_rates(&xml, identity.company_guid(), &wanted).map_err(failed)?;
+        let rates = wire::parse_ledger_rates(rates_body, self.company_guid, &wanted)
+            .map_err(|code| Verdict::Failed(code.to_string()))?;
         let mut facts = BTreeMap::new();
         for entry in &voucher.entries {
             let matching = listing
@@ -1575,8 +1866,8 @@ impl super::super::Server {
         // already reads (the V2 catalogue carries ISBILLWISEON per ledger,
         // section 12a.15): no extra read, and the same answer the bill-wise
         // approval gate judges.
-        let bill_wise = party_bill_wise_in(catalogue, &party_name).ok_or_else(|| {
-            refused(refuse_ledger(
+        let bill_wise = party_bill_wise_in(self.catalogue, &party_name).ok_or_else(|| {
+            refusing(refuse_ledger(
                 "invoice_party_bill_wise_unknown",
                 &party_name,
             ))
@@ -1586,26 +1877,24 @@ impl super::super::Server {
         }
 
         // 3. The voucher type: named by the caller, never chosen.
-        let (xml, read) = self
-            .post_read(
-                identity,
-                super::super::invoice_voucher_types_read(company_name),
-            )
-            .await?;
-        evidence = super::super::combine_evidence(evidence, read);
-        let types = wire::parse_voucher_types(&xml).map_err(failed)?;
+        let Some(types_body) = answers.voucher_types.as_deref() else {
+            return Err(Verdict::Need(Need::VoucherTypes));
+        };
+        let types = wire::parse_voucher_types(types_body)
+            .map_err(|code| Verdict::Failed(code.to_string()))?;
         let resolved = wire::resolve_voucher_type(&types, &type_name, "Sales")
-            .map_err(|code| refused(refuse_value(code, &type_name)))?;
+            .map_err(|code| refusing(refuse_value(code, &type_name)))?;
 
         // 3b. The number must not already be in use in this type and year.
         let number = voucher.voucher_number.clone().unwrap_or_default();
-        let year = financial_year_window(&as_of).ok_or_else(|| failed("invoice_date_invalid"))?;
-        let request = super::super::invoice_number_read(company_name, &number, (&year.0, &year.1))
-            .ok_or_else(|| refused(refuse_value("invoice_number_invalid", &number)))?;
-        let (xml, read) = self.post_read(identity, request).await?;
-        evidence = super::super::combine_evidence(evidence, read);
-        if wire::count_sales_vouchers(&xml).map_err(failed)? != 0 {
-            return Err(refused(refuse_value(
+        let Some(number_body) = answers.number.as_deref() else {
+            return Err(Verdict::Need(Need::Number));
+        };
+        if wire::count_sales_vouchers(number_body)
+            .map_err(|code| Verdict::Failed(code.to_string()))?
+            != 0
+        {
+            return Err(refusing(refuse_value(
                 "invoice_number_already_used",
                 &number,
             )));
@@ -1615,62 +1904,214 @@ impl super::super::Server {
         // must find it (a read that matches nothing on this Tally fails
         // here), or the book holds no voucher at all, or this is the
         // company's first invoice sent (whose read-back is then the check).
-        let control = self
-            .import_invoice_number_control(identity.company_guid(), (&year.0, &year.1))
-            .map_err(|_| failed("invoice_number_control_unreadable"))?;
-        let _absence = match control {
+        let _absence = match self.control {
             super::ledger::NumberControl::Known {
                 batch_id,
                 number: known,
                 date,
             } => {
-                let window = financial_year_window(&date)
-                    .ok_or_else(|| failed("invoice_number_control_unreadable"))?;
-                let request =
-                    super::super::invoice_number_read(company_name, &known, (&window.0, &window.1))
-                        .ok_or_else(|| failed("invoice_number_control_unreadable"))?;
-                let (xml, read) = self.post_read(identity, request).await?;
-                evidence = super::super::combine_evidence(evidence, read);
-                if !wire::control_row_found(&xml, &known, &date).map_err(failed)? {
-                    return Err(refused(refuse_value(
+                let Some(control_body) = answers.number_control.as_deref() else {
+                    return Err(Verdict::Need(Need::NumberControl));
+                };
+                if !wire::control_row_found(control_body, known, date)
+                    .map_err(|code| Verdict::Failed(code.to_string()))?
+                {
+                    return Err(refusing(refuse_value(
                         "invoice_number_control_missing",
-                        &batch_id,
+                        batch_id,
                     )));
                 }
                 NumberAbsence::Controlled
             }
             super::ledger::NumberControl::NeverSent => {
-                absence_without_control(false, mark.value).map_err(refused)?
+                absence_without_control(false, mark.value).map_err(refusing)?
             }
             super::ledger::NumberControl::NoneVerified => {
-                absence_without_control(true, mark.value).map_err(refused)?
+                absence_without_control(true, mark.value).map_err(refusing)?
             }
         };
 
         // 4. The company's own GST registration in force on the invoice date
         // (ADR 0004, slice 1); its state is the supplier's state.
-        let (xml, read) = self
-            .post_read(
-                identity,
-                super::super::invoice_company_registration_read(company_name),
-            )
-            .await?;
-        evidence = super::super::combine_evidence(evidence, read);
-        let company_state = wire::parse_company_registration(&xml, identity.company_guid(), &as_of)
-            .map_err(|outcome| match outcome {
-                wire::RegistrationOutcome::Refused(code) => refused(refuse(code)),
-                wire::RegistrationOutcome::Failed(code) => failed(code),
-            })?
-            .state;
+        let Some(registration_body) = answers.registration.as_deref() else {
+            return Err(Verdict::Need(Need::Registration));
+        };
+        let company_state =
+            wire::parse_company_registration(registration_body, self.company_guid, &as_of)
+                .map_err(|outcome| match outcome {
+                    wire::RegistrationOutcome::Refused(code) => refusing(refuse(code)),
+                    wire::RegistrationOutcome::Failed(code) => unusable(code),
+                })?
+                .state;
 
         let roles = classify_sales_invoice(voucher, &facts, &company_state, &as_of)
-            .map_err(InvoiceAdmission::Refused)?;
+            .map_err(Verdict::Refused)?;
         let party = &voucher.entries[roles.party].ledger;
-        let observed = observe(&facts[party].gstin, resolved.guid, bill_wise, company_state);
+        Ok(observe(
+            &facts[party].gstin,
+            resolved.guid,
+            bill_wise,
+            company_state,
+        ))
+    }
+}
+
+impl super::super::Server {
+    /// Read what the masters say about one Sales invoice, classify every leg,
+    /// and record what was observed on the voucher. The reads: the company's
+    /// marks (and its ledger count when the master mark is high), the ledger
+    /// compliance listing (reserved group ancestry, duty head, the GSTIN in
+    /// force on the invoice date), the same listing with each ledger's GST
+    /// rate and rounding (the tax is worked out from it), the voucher types (the named type, its
+    /// class and its series-level numbering), the vouchers carrying the number
+    /// and the company's GST registration in force on the invoice date. The
+    /// party's bill-wise flag comes from the
+    /// catalogue the caller already read. Each answer is bound to the verified
+    /// company.
+    pub(super) async fn admit_sales_invoice(
+        &self,
+        identity: &super::super::VerifiedCompanyIdentity,
+        company: &bridge_tally_protocol::TallyCompany,
+        voucher: &mut ImportVoucher,
+        catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    ) -> Result<super::super::Evidence, InvoiceAdmission> {
+        Box::pin(self.admit_sales_invoice_planned(identity, company, voucher, catalogue))
+            .await
+            .map(|(evidence, _)| evidence)
+    }
+
+    /// [`Self::admit_sales_invoice`], also returning the reads it made as the
+    /// plan the queue makes again under its lock (#1337).
+    pub(super) async fn admit_sales_invoice_planned(
+        &self,
+        identity: &super::super::VerifiedCompanyIdentity,
+        company: &bridge_tally_protocol::TallyCompany,
+        voucher: &mut ImportVoucher,
+        catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    ) -> Result<(super::super::Evidence, InvoiceReadPlan), InvoiceAdmission> {
+        if voucher.invoice.is_none() {
+            return Err(refused(refuse("invoice_detail_required")));
+        }
+        let as_of = super::super::normalized_date(&voucher.date)
+            .map_err(|_| failed("invoice_date_invalid"))?
+            .as_str()
+            .to_string();
+        let year = financial_year_window(&as_of).ok_or_else(|| failed("invoice_date_invalid"))?;
+
+        // A sent invoice of this company that is not verified posted stops
+        // every further invoice until a person releases it (ADR 0004, slice
+        // 4). Asked first, from the journal alone, so a stopped company costs
+        // Tally no request; the post asks again under its lock.
+        if let Some(batch_id) = self
+            .import_invoice_stop(identity.company_guid())
+            .map_err(|_| failed("invoice_stop_unreadable"))?
+        {
+            return Err(refused(refuse_value("invoice_company_stopped", &batch_id)));
+        }
+        // The journal's offer of a control for the number read, as it stands now.
+        let control = self
+            .import_invoice_number_control(identity.company_guid(), (&year.0, &year.1))
+            .map_err(|_| failed("invoice_number_control_unreadable"))?;
+        let today = bridge_tally_core::TallyDate::parse(super::super::tally_host_today())
+            .map_err(|_| failed("current_date_invalid"))?;
+        let judge = InvoiceJudge {
+            company_name: company.name.as_str(),
+            company_guid: identity.company_guid(),
+            voucher: &*voucher,
+            catalogue,
+            control: &control,
+        };
+        let mut answers = InvoiceAnswers::default();
+        let mut evidence: Option<super::super::Evidence> = None;
+        let note = |evidence: &mut Option<super::super::Evidence>, read: super::super::Evidence| {
+            *evidence = Some(match evidence.take() {
+                Some(earlier) => super::super::combine_evidence(earlier, read),
+                None => read,
+            });
+        };
+        let observed = loop {
+            match judge.judge(&answers) {
+                Ok(observed) => break observed,
+                Err(Verdict::Refused(refusals)) => return Err(InvoiceAdmission::Refused(refusals)),
+                Err(Verdict::Failed(code)) => {
+                    let failure = super::super::ToolFailure::from(code);
+                    return Err(InvoiceAdmission::Failed(match evidence.clone() {
+                        Some(read) => failure.with_prior_evidence(read),
+                        None => failure,
+                    }));
+                }
+                Err(Verdict::Need(need)) => match need {
+                    Need::Marks => {
+                        let (xml, read) = self
+                            .post_read(
+                                identity,
+                                super::super::company_high_water_read(&company.name),
+                            )
+                            .await?;
+                        answers.marks = Some(xml);
+                        note(&mut evidence, read);
+                    }
+                    Need::Listing => {
+                        let listing =
+                            Box::pin(self.runtime.fetch_agent_party_ledger_masters_with_evidence(
+                                self.tally_config(),
+                                identity,
+                                today.clone(),
+                            ))
+                            .await
+                            .map_err(|error| {
+                                super::super::ToolFailure::from_runtime(
+                                    "party_ledger_master_read_failed",
+                                    error,
+                                )
+                            })?;
+                        note(
+                            &mut evidence,
+                            super::super::evidence_from_runtime_read(listing.evidence.clone()),
+                        );
+                        answers.listing = Some(listing);
+                    }
+                    Need::LedgerCount
+                    | Need::Rates
+                    | Need::VoucherTypes
+                    | Need::Number
+                    | Need::NumberControl
+                    | Need::Registration => {
+                        let request = judge.request(need).map_err(|verdict| match verdict {
+                            Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
+                            Verdict::Failed(code) => failed_with(code),
+                            Verdict::Need(_) => failed("invoice_read_plan_inconsistent"),
+                        })?;
+                        let (xml, read, _) = self.post_admitted_read(identity, request).await?;
+                        let slot = match need {
+                            Need::LedgerCount => &mut answers.ledger_count,
+                            Need::Rates => &mut answers.rates,
+                            Need::VoucherTypes => &mut answers.voucher_types,
+                            Need::Number => &mut answers.number,
+                            Need::NumberControl => &mut answers.number_control,
+                            _ => &mut answers.registration,
+                        };
+                        *slot = Some(xml);
+                        note(&mut evidence, read);
+                    }
+                },
+            }
+        };
+        let counted = answers.ledger_count.is_some();
+        let plan = judge
+            .plan(today, counted)
+            .map_err(|verdict| match verdict {
+                Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
+                Verdict::Failed(code) => failed_with(code),
+                Verdict::Need(_) => failed("invoice_read_plan_inconsistent"),
+            })?;
         if let Some(detail) = voucher.invoice.as_mut() {
             detail.observed = Some(observed);
         }
-        Ok(evidence)
+        match evidence {
+            Some(evidence) => Ok((evidence, plan)),
+            None => Err(failed("invoice_read_plan_inconsistent")),
+        }
     }
 }
 

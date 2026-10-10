@@ -140,6 +140,16 @@ fn pre_import_mark_refusal(parse_error: &str) -> &'static str {
     }
 }
 
+/// The company's two change marks from a read of them, as the build records
+/// them, or the code the build refuses with. The queue's re-read of an
+/// invoice's masters judges the marks it read as its binding reads began with
+/// this too (#1337).
+fn pre_import_mark_of(xml: &str, guid: &str) -> Result<PreImportMark, String> {
+    let high_water = parse_company_high_water(xml, guid)
+        .map_err(|code| pre_import_mark_refusal(&code).to_string())?;
+    company_high_water_mark(&high_water)
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ImportPayload {
@@ -2269,11 +2279,7 @@ impl Server {
         let (xml, evidence) = self
             .post_read(identity, company_high_water_read(&company.name))
             .await?;
-        let high_water = parse_company_high_water(&xml, guid).map_err(|code| {
-            ToolFailure::from(pre_import_mark_refusal(&code).to_string())
-                .with_prior_evidence(evidence.clone())
-        })?;
-        let mark = company_high_water_mark(&high_water)
+        let mark = pre_import_mark_of(&xml, guid)
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
         Ok((mark, evidence))
     }

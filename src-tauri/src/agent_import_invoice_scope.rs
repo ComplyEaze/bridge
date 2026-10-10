@@ -37,7 +37,7 @@ impl InvoiceLedgerScope {
     /// of the ledgers under their parents. Refused before any request:
     /// - `invoice_ledger_not_observed`: the catalogue holds no ledger so spelled;
     /// - `invoice_ledger_parent_unnameable`: the ledger has no parent, or one
-    ///   that cannot be written inside a filter;
+    ///   that cannot be written inside a filter or has whitespace at either end;
     /// - `invoice_scope_parent_folds`: another parent of the book differs from
     ///   one of these only in letter case. Tally's `$Parent` folds case
     ///   (reference 11e), so a filter naming one would return both;
@@ -56,7 +56,13 @@ impl InvoiceLedgerScope {
                 return Err(refuse_ledger("invoice_ledger_not_observed", name));
             };
             match parent {
-                ParentObservation::Named(text) if ParentName::parse(text).is_ok() => {
+                // A parent with a space or other whitespace at either end is
+                // not named either: the catalogue keeps it verbatim, and
+                // whether Tally's filter matches such a name was never
+                // measured, so the scope would read nothing it can prove.
+                ParentObservation::Named(text)
+                    if text.trim() == *text && ParentName::parse(text).is_ok() =>
+                {
                     parents.insert(*text);
                 }
                 _ => return Err(refuse_ledger("invoice_ledger_parent_unnameable", name)),

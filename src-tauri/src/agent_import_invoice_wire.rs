@@ -773,15 +773,16 @@ impl Node {
         Ok(first)
     }
 
-    /// [`Self::text_of`] without the cleaning of control-character markers,
-    /// trimmed of whitespace only: the text a catalogue row of the same
-    /// element carries, so the two compare. `None` for an absent or empty one.
+    /// [`Self::text_of`] without the cleaning of control-character markers and
+    /// without trimming: the text a catalogue row of the same element carries
+    /// (it keeps a `PARENT` verbatim), so the two compare byte for byte.
+    /// `None` for an absent element or one holding only whitespace.
     fn raw_text_of(&self, name: &str) -> Result<Option<String>, &'static str> {
         let mut found = self.children.iter().filter(|child| child.name == name);
         let first = found
             .next()
-            .map(|child| child.text.trim().to_string())
-            .filter(|text| !text.is_empty());
+            .map(|child| child.text.clone())
+            .filter(|text| !text.trim().is_empty());
         if found.next().is_some() {
             return Err("invoice_read_field_repeated");
         }

@@ -227,6 +227,13 @@ fn one_row_of_the_real_answer_changed_is_refused() {
         differs("parent_part_row_differs_from_catalogue")
     );
 
+    let mut padded = rows.clone();
+    padded[0].parent = padded[0].parent.as_ref().map(|parent| format!("{parent} "));
+    assert_eq!(
+        scope.prove(&padded),
+        differs("parent_part_row_differs_from_catalogue")
+    );
+
     let mut renamed = rows.clone();
     renamed[0].name = "Renamed".to_string();
     assert_eq!(
@@ -314,6 +321,23 @@ fn a_parent_that_cannot_be_written_in_a_filter_is_refused() {
     );
     // A parent no named ledger is under does not matter.
     assert!(scope_of(&quoted, &["Customer"]).is_ok());
+}
+
+/// A parent with whitespace at either end is not named: the catalogue keeps it
+/// verbatim, and whether Tally's filter matches such a name was never
+/// measured. Refused with the ledger, not read with a name that may match
+/// nothing. (SYNTHETIC: the lab book holds no such group.)
+#[test]
+fn a_parent_with_whitespace_at_either_end_is_refused() {
+    for parent in [" Sundry Debtors", "Sundry Debtors ", "\u{a0}Sundry Debtors"] {
+        let padded = synthetic(&[("Customer", parent), ("Sales", "Sales Accounts")]);
+        assert_eq!(
+            scope_of(&padded, &["Customer"]).err(),
+            Some(refuse_ledger("invoice_ledger_parent_unnameable", "Customer")),
+            "{parent:?}"
+        );
+        assert!(scope_of(&padded, &["Sales"]).is_ok(), "{parent:?}");
+    }
 }
 
 /// `$Parent` folds case, so a filter for `Sales Accounts` would also return

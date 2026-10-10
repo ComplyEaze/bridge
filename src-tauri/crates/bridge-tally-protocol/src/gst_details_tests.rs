@@ -6,6 +6,7 @@ fn rate(text: Option<&str>) -> RawGstRateDetails {
         valuation_type: Some("Based on Value".to_string()),
         rate: text.map(str::to_string),
         repeated_field: false,
+        skipped: false,
     }
 }
 
@@ -15,6 +16,7 @@ fn state(rates: Vec<RawGstRateDetails>) -> RawGstStateDetails {
         rates,
         slab_rates_present: false,
         repeated_field: false,
+        skipped: false,
     }
 }
 
@@ -26,6 +28,7 @@ fn entry(date: Option<&str>, rates: Vec<RawGstRateDetails>) -> RawGstDetailsEntr
         itc_eligible: Some("Yes".to_string()),
         states: vec![state(rates)],
         repeated_field: false,
+        skipped: false,
     }
 }
 
@@ -104,10 +107,7 @@ fn entries_are_sorted_by_date_whatever_the_document_order() {
     let GstDetailsObservation::Entries { entries } = observation else {
         panic!("readable");
     };
-    let dates: Vec<_> = entries
-        .iter()
-        .map(|e| e.applicable_from.as_deref().unwrap())
-        .collect();
+    let dates: Vec<_> = entries.iter().map(|e| e.applicable_from.as_str()).collect();
     assert_eq!(dates, ["20250401", "20260401"]);
 }
 
@@ -247,4 +247,74 @@ fn the_observation_serialises_with_its_tag() {
         json,
         serde_json::json!({"observation": "unreadable", "defect": "rate_not_decimal"})
     );
+}
+
+#[test]
+fn skipped_content_decides_placeholder_unrecognised_or_kept() {
+    // Only skipped content: not a placeholder, an unrecognised-content defect.
+    let only_skipped = RawGstDetailsEntry {
+        skipped: true,
+        ..RawGstDetailsEntry::default()
+    };
+    assert!(!only_skipped.is_placeholder());
+    assert_eq!(
+        defect(vec![only_skipped]),
+        Some(GstDetailsDefect::UnrecognisedContent)
+    );
+    // Recognised fields plus a skipped child at each level: kept, and said so.
+    let flag = |edit: fn(&mut RawGstDetailsEntry)| {
+        let mut e = entry(Some("20260401"), vec![rate(Some(" 5"))]);
+        edit(&mut e);
+        match GstDetailsObservation::from_raw(vec![e]) {
+            GstDetailsObservation::Entries { entries } => entries[0].other_content_skipped,
+            other => panic!("{other:?}"),
+        }
+    };
+    assert!(!flag(|_| {}));
+    assert!(flag(|e| e.skipped = true));
+    assert!(flag(|e| e.states[0].skipped = true));
+    assert!(flag(|e| e.states[0].rates[0].skipped = true));
+}
+
+#[test]
+fn duplicate_duty_heads_or_state_names_are_a_defect_and_absent_ones_are_not_compared() {
+    let head = |name: Option<&str>| RawGstRateDetails {
+        duty_head: name.map(str::to_string),
+        ..rate(Some(" 5"))
+    };
+    assert_eq!(
+        defect(vec![entry(
+            Some("20260401"),
+            vec![
+                head(Some("CGST")),
+                head(Some("SGST/UTGST")),
+                head(Some("CGST"))
+            ]
+        )]),
+        Some(GstDetailsDefect::DuplicateRow)
+    );
+    assert_eq!(
+        defect(vec![entry(
+            Some("20260401"),
+            vec![head(Some("CGST")), head(Some("CGST "))]
+        )]),
+        None,
+        "compared verbatim"
+    );
+    assert_eq!(
+        defect(vec![entry(Some("20260401"), vec![head(None), head(None)])]),
+        None,
+        "absent heads are not compared"
+    );
+    let mut two_states = entry(Some("20260401"), vec![]);
+    two_states.states = vec![state(vec![]), state(vec![])];
+    assert_eq!(
+        defect(vec![two_states.clone()]),
+        Some(GstDetailsDefect::DuplicateRow)
+    );
+    two_states.states[1].state_name = Some("Rajasthan".to_string());
+    assert_eq!(defect(vec![two_states.clone()]), None);
+    two_states.states[0].state_name = None;
+    two_states.states[1].state_name = None;
+    assert_eq!(defect(vec![two_states]), None);
 }

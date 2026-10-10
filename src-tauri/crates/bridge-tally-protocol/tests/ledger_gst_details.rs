@@ -120,7 +120,7 @@ fn a_ledger_with_a_rate_carries_leading_spaces_and_the_state_marker() {
     let parsed = parse(&live_text()).unwrap();
     let purchase = entries_of(&parsed, "BRIDGE Purchase Svc 5%");
     let entry = &purchase[0];
-    assert_eq!(entry.applicable_from.as_deref(), Some("20260401"));
+    assert_eq!(entry.applicable_from, "20260401");
     assert_eq!(entry.taxability.as_deref(), Some("Taxable"));
     assert_eq!(entry.source.as_deref(), Some("Specify Details Here"));
     assert_eq!(
@@ -315,7 +315,7 @@ fn two_entries_are_sorted_and_two_on_one_date_must_agree() {
     let parsed = parse(&with(&earlier)).unwrap();
     let dates: Vec<_> = entries_of(&parsed, GOODS)
         .iter()
-        .map(|e| e.applicable_from.clone().unwrap())
+        .map(|e| e.applicable_from.clone())
         .collect();
     assert_eq!(
         dates,
@@ -369,9 +369,9 @@ fn a_ledger_without_the_element_is_not_observed() {
 }
 
 #[test]
-fn an_ordinary_ledger_read_retains_nothing_of_it() {
-    // The ordinary source-record parser reads the same response without error;
-    // its record type has no GST details field to fill.
+fn the_ordinary_ledger_parser_reads_the_same_response_without_error() {
+    // This asserts only that the ordinary source-record parser accepts the
+    // response; it does not inspect what that parser keeps.
     let text = live_text();
     let ordinary = parse_native_ledger_source_records_with_evidence(&text, GUID);
     assert!(ordinary.is_ok(), "{:?}", ordinary.err());
@@ -393,4 +393,109 @@ fn a_state_name_is_kept_exactly_as_sent_spaces_and_all() {
             .as_deref(),
         Some("  \u{fffd}#4; Any  ")
     );
+}
+
+const SGST_ROW_HEAD: &str = "<GSTRATEDUTYHEAD TYPE=\"String\">SGST/UTGST</GSTRATEDUTYHEAD>";
+
+fn unreadable(defect: GstDetailsDefect) -> GstDetailsObservation {
+    GstDetailsObservation::Unreadable { defect }
+}
+
+#[test]
+fn the_unmodified_capture_skips_no_content_on_any_entry() {
+    let parsed = parse(&live_text()).unwrap();
+    for name in WITH_ENTRY {
+        for entry in entries_of(&parsed, name) {
+            assert!(!entry.other_content_skipped, "{name}");
+        }
+    }
+}
+
+#[test]
+fn a_repeated_rate_inside_one_rate_row_repeats_a_field() {
+    let text = live_text();
+    assert_eq!(
+        goods_defect(&edit(&text, GOODS, RATE_18, &format!("{RATE_18}{RATE_18}"))),
+        unreadable(GstDetailsDefect::EntryRepeatsAField)
+    );
+}
+
+#[test]
+fn an_entry_whose_only_child_is_unknown_is_unrecognised_content_not_a_placeholder() {
+    let text = live_text();
+    let empty = "<GSTDETAILS.LIST>     </GSTDETAILS.LIST>";
+    for only_child in [
+        "<FUTUREELEMENT>x</FUTUREELEMENT>",
+        "<FUTUREELEMENT/>",
+        // A misplaced rate directly under the entry is not recognised there.
+        "<GSTRATE TYPE=\"Number\"> 5</GSTRATE>",
+    ] {
+        let edited = edit(
+            &text,
+            "Cash",
+            empty,
+            &format!("<GSTDETAILS.LIST>{only_child}</GSTDETAILS.LIST>"),
+        );
+        assert_eq!(
+            observation_of(&parse(&edited).unwrap(), "Cash"),
+            unreadable(GstDetailsDefect::UnrecognisedContent),
+            "{only_child}"
+        );
+    }
+}
+
+#[test]
+fn an_unknown_child_beside_the_recognised_ones_is_kept_and_flagged() {
+    let text = live_text();
+    let date = "<APPLICABLEFROM TYPE=\"Date\">20260401</APPLICABLEFROM>";
+    let state_name = "<STATENAME TYPE=\"String\">&#4; Any</STATENAME>";
+    let extras = [
+        // at the entry
+        (date, format!("{date}<HSNCODE>9983</HSNCODE>")),
+        // in the state row
+        (state_name, format!("{state_name}<FUTURE/>")),
+        // in a rate row
+        (RATE_18, format!("{RATE_18}<RATEFUTURE>1</RATEFUTURE>")),
+    ];
+    for (from, to) in extras {
+        let parsed = parse(&edit(&text, GOODS, from, &to)).unwrap();
+        let entries = entries_of(&parsed, GOODS);
+        assert_eq!(entries.len(), 1, "{to}");
+        assert!(entries[0].other_content_skipped, "{to}");
+    }
+    let plain = entries_of(&parse(&text).unwrap(), GOODS);
+    assert!(!plain[0].other_content_skipped);
+}
+
+#[test]
+fn two_rate_rows_with_one_duty_head_or_two_state_rows_with_one_name_are_a_duplicate_row() {
+    let text = live_text();
+    // Rename the SGST row's head to CGST: two CGST rows in one state row.
+    let edited = edit(
+        &text,
+        GOODS,
+        SGST_ROW_HEAD,
+        "<GSTRATEDUTYHEAD TYPE=\"String\">CGST</GSTRATEDUTYHEAD>",
+    );
+    assert_eq!(
+        goods_defect(&edited),
+        unreadable(GstDetailsDefect::DuplicateRow)
+    );
+    // Repeat the whole state row.
+    let start = text.find("<LEDGER NAME=\"BRIDGE Goods 18%\"").unwrap();
+    let from = start + text[start..].find("<STATEWISEDETAILS.LIST>").unwrap();
+    let to = from
+        + text[from..].find("</STATEWISEDETAILS.LIST>").unwrap()
+        + "</STATEWISEDETAILS.LIST>".len();
+    let row = &text[from..to];
+    let doubled = format!("{}{row}{row}{}", &text[..from], &text[to..]);
+    assert_eq!(
+        goods_defect(&doubled),
+        unreadable(GstDetailsDefect::DuplicateRow)
+    );
+    // A second state row with a different name is fine.
+    let other = row.replace("&#4; Any", "Rajasthan");
+    assert_ne!(other, row);
+    let two = format!("{}{row}{other}{}", &text[..from], &text[to..]);
+    assert_eq!(entries_of(&parse(&two).unwrap(), GOODS)[0].states.len(), 2);
 }

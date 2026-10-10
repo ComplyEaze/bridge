@@ -1062,7 +1062,9 @@ fn read_gst_registration_entry(
 
 /// One element's text exactly as sent: not trimmed, entity and numeric
 /// references resolved (a forbidden one arrives as the sanitiser's marker text).
-/// Nested markup is refused like every master scalar.
+/// Nested markup inside the scalar fails the whole read, not one ledger, as
+/// for every master scalar; only the typed defects of `GstDetailsDefect` are
+/// per ledger.
 fn read_verbatim_text(reader: &mut Reader<&[u8]>, name: QName<'_>) -> anyhow::Result<String> {
     let expected = name.as_ref().as_bytes().to_ascii_uppercase();
     with_untrimmed_text(reader, |reader| {
@@ -1099,7 +1101,7 @@ fn set_once(slot: &mut Option<String>, value: String, repeated: &mut bool) {
 }
 
 /// One `GSTDETAILS.LIST` element. Children this slice does not model are
-/// consumed and not kept.
+/// consumed and not kept; each level records that it skipped one.
 fn read_gst_details_entry(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
@@ -1127,6 +1129,7 @@ fn read_gst_details_entry(
                         entry.states.push(state);
                     }
                     _ => {
+                        entry.skipped = true;
                         let child_name = child.name().as_ref().to_owned();
                         reader.read_to_end(QName(&child_name).to_owned())?;
                     }
@@ -1145,6 +1148,8 @@ fn read_gst_details_entry(
                     set_once(slot, String::new(), &mut entry.repeated_field);
                 } else if upper.as_slice() == b"STATEWISEDETAILS.LIST" {
                     entry.states.push(RawGstStateDetails::default());
+                } else {
+                    entry.skipped = true;
                 }
             }
             Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
@@ -1202,6 +1207,7 @@ fn read_gst_state_details(
                         }
                     }
                     _ => {
+                        state.skipped = true;
                         let child_name = child.name().as_ref().to_owned();
                         reader.read_to_end(QName(&child_name).to_owned())?;
                     }
@@ -1218,7 +1224,9 @@ fn read_gst_state_details(
                         );
                     }
                     b"RATEDETAILS.LIST" => state.rates.push(RawGstRateDetails::default()),
-                    _ => {}
+                    // An empty slab list holds nothing.
+                    b"GSTSLABRATES.LIST" => {}
+                    _ => state.skipped = true,
                 }
             }
             Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
@@ -1250,6 +1258,7 @@ fn read_gst_rate_details(
                         set_once(slot, value, &mut rate.repeated_field);
                     }
                     _ => {
+                        rate.skipped = true;
                         let child_name = child.name().as_ref().to_owned();
                         reader.read_to_end(QName(&child_name).to_owned())?;
                     }
@@ -1265,6 +1274,8 @@ fn read_gst_rate_details(
                 };
                 if let Some(slot) = slot {
                     set_once(slot, String::new(), &mut rate.repeated_field);
+                } else {
+                    rate.skipped = true;
                 }
             }
             Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,

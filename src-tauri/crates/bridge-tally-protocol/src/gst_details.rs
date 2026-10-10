@@ -11,8 +11,14 @@
 //! Absent, empty and zero rates are three different observations and are
 //! never merged: [`GstRate`]. A rate that is not a plain non-negative decimal
 //! makes this ledger's details unreadable; it is never read as zero or absent.
-//! Nothing here chooses an entry or sums a rate, and nothing calls this
-//! observation yet.
+//! The per-ledger fail-closed rule covers the typed defects of
+//! [`GstDetailsDefect`] only. A scalar with nested markup, or XML that is not
+//! well formed, fails the whole read, as for every master scalar.
+//!
+//! Children this parser does not model are skipped; an entry that holds
+//! recognised fields and skipped children is kept and says so in
+//! `other_content_skipped`. Nothing here chooses an entry or sums a rate, and
+//! nothing calls this observation yet.
 use bridge_tally_primitives::TallyDate;
 use serde::{Deserialize, Serialize};
 
@@ -33,15 +39,19 @@ pub enum GstDetailsObservation {
 /// One dated entry of `GSTDETAILS.LIST`. Text fields are as Tally sent them.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GstDetailsEntry {
-    /// `YYYYMMDD`, a real calendar date; `None` only when the element is absent
-    /// (which is reported as a defect unless the whole entry is empty).
-    pub applicable_from: Option<String>,
+    /// `YYYYMMDD`, a real calendar date. Always present: a missing or invalid
+    /// date is a defect, never an entry.
+    pub applicable_from: String,
     pub taxability: Option<String>,
     /// `SRCOFGSTDETAILS`.
     pub source: Option<String>,
     /// `GSTINELIGIBLEITC`, `Yes` or `No`.
     pub itc_eligible: Option<bool>,
     pub states: Vec<GstStateDetails>,
+    /// True when the element held content this parser does not model, at the
+    /// entry, in any state row or in any rate row. The read is then not the
+    /// whole element; a later capture may add children (such as HSN/SAC).
+    pub other_content_skipped: bool,
 }
 
 /// One `STATEWISEDETAILS.LIST`.
@@ -90,6 +100,11 @@ pub enum GstDetailsDefect {
     RateNotDecimal,
     /// A `GSTINELIGIBLEITC` other than `Yes` or `No`.
     ItcNotYesNo,
+    /// An entry whose only content is children this parser does not model.
+    UnrecognisedContent,
+    /// Two rate rows with the same duty head in one state row, or two state
+    /// rows with the same state name in one entry (compared verbatim).
+    DuplicateRow,
 }
 
 /// One `GSTDETAILS.LIST` element before validation.
@@ -101,6 +116,8 @@ pub struct RawGstDetailsEntry {
     pub itc_eligible: Option<String>,
     pub states: Vec<RawGstStateDetails>,
     pub repeated_field: bool,
+    /// An unrecognised child was skipped at this level.
+    pub skipped: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -109,6 +126,8 @@ pub struct RawGstStateDetails {
     pub rates: Vec<RawGstRateDetails>,
     pub slab_rates_present: bool,
     pub repeated_field: bool,
+    /// An unrecognised child was skipped at this level.
+    pub skipped: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -118,11 +137,23 @@ pub struct RawGstRateDetails {
     /// `None` when the element is missing; the text exactly as sent otherwise.
     pub rate: Option<String>,
     pub repeated_field: bool,
+    /// An unrecognised child was skipped at this level.
+    pub skipped: bool,
 }
 
 impl RawGstDetailsEntry {
+    /// An empty element: nothing recognised and nothing skipped.
     fn is_placeholder(&self) -> bool {
-        *self == Self::default()
+        self.has_no_recognised_content() && !self.skipped
+    }
+
+    /// No recognised field and no state row.
+    fn has_no_recognised_content(&self) -> bool {
+        self.applicable_from.is_none()
+            && self.taxability.is_none()
+            && self.source.is_none()
+            && self.itc_eligible.is_none()
+            && self.states.is_empty()
     }
 }
 
@@ -171,6 +202,14 @@ fn validate_entry(entry: RawGstDetailsEntry) -> Result<GstDetailsEntry, GstDetai
     if repeated {
         return Err(GstDetailsDefect::EntryRepeatsAField);
     }
+    if entry.skipped && entry.has_no_recognised_content() {
+        return Err(GstDetailsDefect::UnrecognisedContent);
+    }
+    let other_content_skipped = entry.skipped
+        || entry
+            .states
+            .iter()
+            .any(|s| s.skipped || s.rates.iter().any(|r| r.skipped));
     let Some(applicable_from) = entry.applicable_from else {
         return Err(GstDetailsDefect::EntryWithoutDate);
     };
@@ -185,6 +224,22 @@ fn validate_entry(entry: RawGstDetailsEntry) -> Result<GstDetailsEntry, GstDetai
         Some(_) => return Err(GstDetailsDefect::ItcNotYesNo),
     };
     let mut states = Vec::with_capacity(entry.states.len());
+    let mut seen_states: Vec<&str> = Vec::new();
+    for state in &entry.states {
+        if let Some(name) = state.state_name.as_deref() {
+            if seen_states.contains(&name) {
+                return Err(GstDetailsDefect::DuplicateRow);
+            }
+            seen_states.push(name);
+        }
+        let mut seen_heads: Vec<&str> = Vec::new();
+        for head in state.rates.iter().filter_map(|r| r.duty_head.as_deref()) {
+            if seen_heads.contains(&head) {
+                return Err(GstDetailsDefect::DuplicateRow);
+            }
+            seen_heads.push(head);
+        }
+    }
     for state in entry.states {
         let mut rates = Vec::with_capacity(state.rates.len());
         for rate in state.rates {
@@ -201,11 +256,12 @@ fn validate_entry(entry: RawGstDetailsEntry) -> Result<GstDetailsEntry, GstDetai
         });
     }
     Ok(GstDetailsEntry {
-        applicable_from: Some(applicable_from),
+        applicable_from,
         taxability: entry.taxability,
         source: entry.source,
         itc_eligible,
         states,
+        other_content_skipped,
     })
 }
 

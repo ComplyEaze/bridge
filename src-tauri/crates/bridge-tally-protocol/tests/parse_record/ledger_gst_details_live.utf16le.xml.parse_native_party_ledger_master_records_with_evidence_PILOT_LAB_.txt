@@ -50,9 +50,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [
                             GstDetailsEntry {
-                                applicable_from: Some(
-                                    "20260401",
-                                ),
+                                applicable_from: "20260401",
                                 taxability: None,
                                 source: Some(
                                     "As per Company/Group",
@@ -115,6 +113,7 @@ Ok(ParsedExport {
                                         slab_rates_present: false,
                                     },
                                 ],
+                                other_content_skipped: false,
                             },
                         ],
                     },
@@ -255,9 +254,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [
                             GstDetailsEntry {
-                                applicable_from: Some(
-                                    "20260401",
-                                ),
+                                applicable_from: "20260401",
                                 taxability: Some(
                                     "Taxable",
                                 ),
@@ -331,6 +328,7 @@ Ok(ParsedExport {
                                         slab_rates_present: false,
                                     },
                                 ],
+                                other_content_skipped: false,
                             },
                         ],
                     },
@@ -471,9 +469,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [
                             GstDetailsEntry {
-                                applicable_from: Some(
-                                    "20260401",
-                                ),
+                                applicable_from: "20260401",
                                 taxability: Some(
                                     "Taxable",
                                 ),
@@ -545,6 +541,7 @@ Ok(ParsedExport {
                                         slab_rates_present: false,
                                     },
                                 ],
+                                other_content_skipped: false,
                             },
                         ],
                     },
@@ -900,9 +897,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [
                             GstDetailsEntry {
-                                applicable_from: Some(
-                                    "20260401",
-                                ),
+                                applicable_from: "20260401",
                                 taxability: Some(
                                     "Taxable",
                                 ),
@@ -976,6 +971,7 @@ Ok(ParsedExport {
                                         slab_rates_present: false,
                                     },
                                 ],
+                                other_content_skipped: false,
                             },
                         ],
                     },
@@ -1047,9 +1043,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [
                             GstDetailsEntry {
-                                applicable_from: Some(
-                                    "20260401",
-                                ),
+                                applicable_from: "20260401",
                                 taxability: Some(
                                     "Taxable",
                                 ),
@@ -1123,6 +1117,7 @@ Ok(ParsedExport {
                                         slab_rates_present: false,
                                     },
                                 ],
+                                other_content_skipped: false,
                             },
                         ],
                     },

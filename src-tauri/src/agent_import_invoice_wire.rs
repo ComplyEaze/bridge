@@ -718,12 +718,33 @@ pub(in crate::agent) fn render_ledger_rates_request(
     company: &str,
     window: (&str, &str),
 ) -> Option<String> {
+    render_ledger_rates(company, window, None)
+}
+
+/// [`render_ledger_rates_request`] restricted to the ledgers under one
+/// [`ParentPart`]'s parents, through the same `SYSTEM` formula and `FILTERS`
+/// element the compliance listing's parts carry (#679, #1331). The fetch list
+/// is the unfiltered request's, unchanged.
+pub(in crate::agent) fn render_ledger_rates_request_for_parents(
+    company: &str,
+    window: (&str, &str),
+    part: &bridge_tally_protocol::parent_partition::ParentPart,
+) -> Option<String> {
+    render_ledger_rates(company, window, Some(part))
+}
+
+fn render_ledger_rates(
+    company: &str,
+    window: (&str, &str),
+    part: Option<&bridge_tally_protocol::parent_partition::ParentPart>,
+) -> Option<String> {
     let digits = |date: &str| date.len() == 8 && date.bytes().all(|byte| byte.is_ascii_digit());
     if !digits(window.0) || !digits(window.1) {
         return None;
     }
+    let (formula, filters) = bridge_tally_protocol::native_outstandings::parent_filter_parts(part);
     Some(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
         from = window.0,
         to = window.1,

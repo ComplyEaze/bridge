@@ -742,6 +742,66 @@ fn the_ledger_rates_request_is_the_one_the_lab_answered() {
     );
 }
 
+/// One part naming exactly these parents, planned the way a scope plans them
+/// (one catalogue row per parent is enough to name it).
+fn part_of(parents: &[&str]) -> bridge_tally_protocol::parent_partition::ParentPart {
+    use bridge_tally_protocol::parent_partition::{
+        ParentObservation, ParentPartition, PartitionLimits,
+    };
+    let names = parents
+        .iter()
+        .enumerate()
+        .map(|(index, parent)| (format!("ledger {index}"), format!("guid-{index}"), *parent))
+        .collect::<Vec<_>>();
+    let plan = ParentPartition::plan(
+        names.iter().map(|(name, guid, parent)| {
+            (
+                name.as_str(),
+                guid.as_str(),
+                ParentObservation::Named(parent),
+            )
+        }),
+        PartitionLimits {
+            max_ledgers_per_part: 4_266,
+            max_parents_per_part: 200,
+            max_parts: 12,
+            max_complement_formula_bytes: 262_144,
+        },
+    )
+    .unwrap();
+    assert_eq!(plan.parts().len(), 1);
+    plan.parts()[0].clone()
+}
+
+/// The scoped rates request is the unfiltered one with the parent formula
+/// added and nothing else changed (#1331): same fetch list, same window, the
+/// `FILTERS` element after the computed company GUID, as the compliance
+/// listing's parts carry it (§11e).
+#[test]
+fn a_scoped_rates_request_adds_only_the_parent_formula_and_its_filter() {
+    let window = ("20260401", "20260801");
+    let whole = render_ledger_rates_request("BRIDGE PILOT LAB", window).unwrap();
+    let part = part_of(&[
+        "Sundry Debtors",
+        "Sales Accounts",
+        "Duties & Taxes",
+        "Indirect Expenses",
+    ]);
+    let scoped =
+        render_ledger_rates_request_for_parents("BRIDGE PILOT LAB", window, &part).unwrap();
+    let formula = concat!(
+        "<SYSTEM TYPE=\"Formulae\" NAME=\"BridgeParentPart\">",
+        "$Parent = \"Duties &amp; Taxes\" OR $Parent = \"Indirect Expenses\" OR ",
+        "$Parent = \"Sales Accounts\" OR $Parent = \"Sundry Debtors\"</SYSTEM>"
+    );
+    assert!(scoped.contains(formula), "{scoped}");
+    let undone = scoped
+        .replace(formula, "")
+        .replace("<FILTERS>BridgeParentPart</FILTERS>", "");
+    assert_eq!(undone, whole);
+    assert!(render_ledger_rates_request_for_parents("X", ("2026", "20260801"), &part).is_none());
+}
+
 /// The lab's answer, read at the edge: each sales ledger's one dated row with
 /// its all-states block, the tax ledgers' own rate and rounding, and what an
 /// absent field is (an element that was not returned, never an empty string).

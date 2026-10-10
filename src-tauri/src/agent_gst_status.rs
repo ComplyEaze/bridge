@@ -209,11 +209,22 @@ pub(super) fn parse_status_rows(xml: &str) -> Result<Vec<StatusRow>, &'static st
         .find(|child| child.name == "BODY")
         .and_then(|body| body.children.iter().find(|child| child.name == "DATA"))
         .ok_or("gst_status_read_collection_absent")?;
-    let collection = data
-        .children
-        .iter()
-        .find(|child| child.name == "COLLECTION")
+    let mut collections = data.children.iter().filter(|c| c.name == "COLLECTION");
+    let collection = collections
+        .next()
         .ok_or("gst_status_read_collection_absent")?;
+    // One collection answers the request: a second one, or a voucher outside
+    // the collection's direct children, is rows this parse would drop.
+    if collections.next().is_some()
+        || data.children.iter().any(|c| {
+            c.name != "COLLECTION" && (c.name == "VOUCHER" || c.contains_any(&["VOUCHER"]))
+        })
+        || collection.children.iter().any(|c| {
+            c.name != "VOUCHER" && (c.name == "COLLECTION" || c.contains_any(&["VOUCHER"]))
+        })
+    {
+        return Err("gst_status_read_collection_unexpected");
+    }
     let mut rows = Vec::new();
     let mut seen = std::collections::BTreeSet::new();
     for voucher in collection
@@ -411,15 +422,19 @@ impl Server {
             },
             "items": page,
             "limitations": [
-                "These are the status flags Tally holds on each voucher when it is read. A voucher keeps the status it was given when it was saved: on the lab's book, setting a ledger's HSN/SAC afterwards did not change the status of a voucher already saved",
-                "The reason Tally gives for an uncertain voucher (a tax mismatch, a missing HSN/SAC, a GSTIN problem) is on its screen only; no field carries it, so none is returned",
-                "included means exactly one flag Yes and the voucher not accepted as it stands; a voucher accepted as it stands is included by a person's choice, not by its figures",
-                "not_in_return means all three flags No: Tally does not list the voucher in the return (the lab's Receipts and Purchases read so)",
+                "These are the status flags Tally holds on each voucher when it is read. Tally keeps the status a voucher was given when it was saved; on the lab's book, correcting a master afterwards did not change the status of a voucher already saved (one voucher, cause unverified)",
+                "The reason Tally gives for an uncertain voucher is on its screen only; no field carries it, so none is returned. The one reason measured on the lab's book is a tax figure that did not match Tally's own figure",
+                "included means exactly one flag Yes; it counts a voucher a person accepted as it stands as well (see accepted_as_it_stands), so included is not 'clean'. unread is a count within the other counts, not apart from them: a voucher whose acceptance flag was unread is counted under its status and under unread, and the answer is partial",
+                "not_in_return means all three flags No. The lab's Receipts read so, which supports 'Tally does not list the voucher in the return' for Receipts only; it is not measured for Sales in a company without GST or for any other type, and the lab's keyed Purchase invoices read uncertain",
                 "excluded has not been observed on the lab's book; it rests on the field's name",
-                "A voucher whose flags are absent, repeated, nested in another element or spelled another way is unread, never included; one whose acceptance flag is unread keeps its status but makes the answer partial",
+                "accepted_as_it_stands is Tally's flag ISGSTOVERRIDDEN. It was seen to go from No to Yes once, by Accept As Is; whether other actions set it is not measured",
+                "A voucher whose flags are absent, repeated, nested in another element or spelled another way is unread, never included",
+                "Cancelled, optional and post-dated vouchers are not marked: the request does not fetch those fields, and none was measured. A voucher of the type in the window is reported with its status flags whatever its kind",
+                "A total of 0 may mean no voucher of that name in the window or a type name that matched nothing; the name is not checked against the book's voucher types, take it from masters",
+                "Each page is a new read of Tally: a voucher saved between two pages can shift the offsets, so a page may repeat or skip one. Read all the pages in one sitting, or narrow the window",
                 "Measured on one synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured",
-                "The voucher type is selected by its exact name in the request; a type of the same class under another name is not read",
-                "The selection formula is evaluated on every voucher of the book, so a book whose voucher mark is above 25,000 is refused (provisional: timed only on a book of about thirty vouchers)",
+                "The voucher type is selected by its exact name in the request (a name holding & < > ' or a quote is refused); a type of the same class under another name is not read",
+                "The selection formula is evaluated on every voucher of the book, so a book whose voucher mark is above 25,000 is refused (provisional: timed only on a book of about thirty vouchers); the size of an answer is not otherwise bounded",
             ],
         });
         if let Some(next) = next_offset {

@@ -1275,7 +1275,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "gst_status",
-            "The reason for a status (a tax mismatch, a missing HSN/SAC) is not available",
+            "The reason for a status is not available",
             "the tool names no reason for a status",
         ),
     ];

@@ -566,16 +566,18 @@ optionally `limit` and `offset`. It reads Tally's own GSTR-1 status flags on the
 type in the window, and returns for each voucher its `voucher_number`, `date`, `voucher_type`, `master_id` and
 `alter_id`, a `gst_status` and `accepted_as_it_stands`. It returns no amount, party, ledger or narration.
 `voucher_type_name` is the exact name of ONE voucher type in the book (take it from `masters`); a type of the
-same class under another name is not read, and a name that holds a double quote, a backslash or a control
+same class under another name is not read, and a name that holds a double quote, a backslash, `&`, `<`, `>`, `'` or a control
 character, or a space at either end, is refused before any read (`gst_status_type_name_invalid`).
 
 `gst_status` is `included`, `uncertain`, `excluded` or `not_in_return`. `not_in_return` means Tally's three flags
-all read No: it does not list the voucher in the return. `accepted_as_it_stands` is `true` when a person
-accepted the voucher as it stands (Accept As Is) and `false` otherwise; such a voucher is included by a
-person's choice, not by its figures. A status is Tally's own flag and not a judgement of ComplyEaze Bridge: it does not say the
-voucher is right or wrong, or that a return is ready. The reason for a status (a tax mismatch, a missing
-HSN/SAC, a GSTIN problem) is on Tally's screen only; no field carries it, so none is returned. A voucher
-keeps the status it was given when it was saved. The result holds `counts` (`included`, `uncertain`,
+all read No. On the lab's Receipts that means Tally does not list the voucher in the return; it is not measured for other types, and the lab's keyed Purchase invoices read `uncertain`. `accepted_as_it_stands` is `true` when a person
+accepted the voucher as it stands (Accept As Is) and `false` otherwise; `included` counts such a voucher too, so it is not
+'clean', and it is included by a person's choice, not by its figures. A status is Tally's own flag and not a judgement of ComplyEaze Bridge: it does not say the
+voucher is right or wrong, or that a return is ready. The reason for a status (the one measured is a tax figure that did not match Tally's own)
+is on Tally's screen only; no field carries it, so none is returned. Tally keeps the
+status a voucher was given when it was saved (one voucher, cause unverified). Cancelled, optional and post-dated
+vouchers are not marked, and a total of 0 may mean that the type name matched nothing. Each page is a new read,
+so a voucher saved between two pages can shift the offsets. The result holds `counts` (`included`, `uncertain`,
 `excluded`, `not_in_return`, `unread`, `accepted_as_it_stands`) over the whole window, `total`, and the page of
 `items`; page with `limit` and `offset` (`next_offset` when more remain).
 
@@ -591,7 +593,7 @@ Limits: at most 93 days (`gst_status_window_too_long`), and a book whose voucher
 refused (`gst_status_book_too_large`), because the selection is evaluated on every voucher of the book. That
 bound is provisional: the read has been timed only on a book of about thirty vouchers. Measured on one
 synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales invoices (protocol reference
-§9.17); a registered buyer, other releases and Gold are not measured, and `excluded` has not been observed.
+§9.17 holds the Sales flags and Accept As Is; the by-name selection and the narrow field list are in the fixtures' PROVENANCE.md); a registered buyer, other releases and Gold are not measured, and `excluded` has not been observed.
 
 ### Stock Summary
 

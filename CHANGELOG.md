@@ -34,7 +34,7 @@ These changes are in source and not yet in a published build.
 
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
-  return, and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
+  return (measured for Receipts only), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
   judgement of ComplyEaze Bridge; the reason for a status is on Tally's screen only, so none is returned. A voucher
   whose flags are absent or odd is returned as unread, never as included. The voucher type is named exactly (a
   type of the same class under another name is not read), a window is at most 93 days, and a book whose voucher

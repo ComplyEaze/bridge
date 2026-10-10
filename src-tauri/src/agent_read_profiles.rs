@@ -210,18 +210,18 @@ pub(super) fn render_agent_lab_inventory_vouchers(
     render_windowed_vouchers(company, from, to, "", AGENT_LAB_INVENTORY_VOUCHER_FETCH, "")
 }
 
-/// The names of the four voucher fields that carry Tally's own GSTR-1 status.
 /// A voucher type's name is quoted into a TDL string literal in the status
 /// read, where XML escaping cannot protect it (Tally decodes `&quot;` before
 /// evaluating, #861), so a name is admitted only when it holds nothing a
-/// literal could be closed or broken by.
+/// literal could be closed or broken by. `&`, `<`, `>` and `'` are refused as
+/// well: Tally's handling of them inside the literal has not been measured.
 pub(super) fn gst_status_type_name_literal_safe(name: &str) -> bool {
     !name.is_empty()
         && name.chars().count() <= 100
         && name == name.trim()
         && !name
             .chars()
-            .any(|c| c == '"' || c == '\\' || c.is_control())
+            .any(|c| matches!(c, '"' | '\\' | '&' | '<' | '>' | '\'') || c.is_control())
 }
 
 /// The GST status of the vouchers of one type in a date window (R7, 10 Oct

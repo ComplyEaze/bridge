@@ -223,8 +223,6 @@ fn a_type_name_is_admitted_only_when_it_cannot_break_the_string_literal_it_is_qu
     for admitted in [
         "BRIDGE Sales",
         "BRIDGE Sales Z1",
-        "R&D Sales",
-        "Sales <Export>",
         "a",
         "Part and Labour Sale",
     ] {
@@ -248,22 +246,35 @@ fn a_type_name_is_admitted_only_when_it_cannot_break_the_string_literal_it_is_qu
         " BRIDGE Sales".to_string(),
         "BRIDGE Sales ".to_string(),
         " ".to_string(),
+        "R&D Sales".to_string(),
+        "Sales <Export>".to_string(),
+        "Sales >".to_string(),
+        "Bob's Sales".to_string(),
+        "x&quot; OR $VoucherTypeName <> &quot;y".to_string(),
     ] {
         assert!(!safe(&refused), "{refused:?}");
     }
 }
 
 #[test]
-fn the_renderer_escapes_an_ampersand_and_refuses_an_unsafe_type_name() {
+fn the_renderer_quotes_the_type_name_and_refuses_an_unsafe_one() {
     let (from, to) = (tally_date("20260802"), tally_date("20260803"));
     let rendered =
-        read_profiles::render_gst_status_window(LAB_COMPANY, &from, &to, "R&D <Sales>").unwrap();
+        read_profiles::render_gst_status_window(LAB_COMPANY, &from, &to, "BRIDGE Sales").unwrap();
     assert!(
-        rendered.contains("AND $VoucherTypeName = \"R&amp;D &lt;Sales&gt;\"</SYSTEM>"),
+        rendered.contains("AND $VoucherTypeName = \"BRIDGE Sales\"</SYSTEM>"),
         "{rendered}"
     );
-    assert!(!rendered.contains("R&D"), "{rendered}");
-    for refused in ["", "a\"b", "a\\b", "a\u{7}b", " a", "a ", &"a".repeat(101)] {
+    for refused in [
+        "",
+        "a\"b",
+        "a\\b",
+        "a\u{7}b",
+        " a",
+        "a ",
+        "R&D <Sales>",
+        &"a".repeat(101),
+    ] {
         assert_eq!(
             read_profiles::render_gst_status_window(LAB_COMPANY, &from, &to, refused),
             Err("gst_status_type_name_invalid".to_string()),
@@ -724,6 +735,33 @@ fn an_answer_with_no_collection_or_no_data_names_the_missing_collection() {
 }
 
 #[test]
+fn a_second_collection_or_a_voucher_outside_the_collection_refuses_the_answer() {
+    let text = sales_window();
+    let close = "</COLLECTION>";
+    let second = once(
+        &text,
+        close,
+        &format!("{close}<COLLECTION><VOUCHER><MASTERID>9</MASTERID></VOUCHER></COLLECTION>"),
+    );
+    let wrapped = once(
+        &text,
+        close,
+        "<WRAP><VOUCHER><MASTERID>9</MASTERID></VOUCHER></WRAP></COLLECTION>",
+    );
+    let beside = once(
+        &text,
+        close,
+        &format!("{close}<VOUCHER><MASTERID>9</MASTERID></VOUCHER>"),
+    );
+    for changed in [second, wrapped, beside] {
+        assert_eq!(
+            parse_status_rows(&changed).unwrap_err(),
+            "gst_status_read_collection_unexpected"
+        );
+    }
+}
+
+#[test]
 fn a_line_error_or_an_error_element_anywhere_in_the_answer_refuses_it() {
     let text = sales_window();
     let in_collection = once(
@@ -993,7 +1031,27 @@ async fn a_read_returns_each_vouchers_status_and_sends_the_request_the_lab_sent(
         Value::Array(SALES_WINDOW_ROWS.iter().map(item).collect())
     );
     assert!(result.get("next_offset").is_none(), "{result}");
-    assert!(!result["limitations"].as_array().unwrap().is_empty());
+    let limitations = result["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|line| line.as_str().unwrap())
+        .collect::<Vec<_>>()
+        .join("\n");
+    for stated in [
+        "included is not 'clean'",
+        "Receipts only",
+        "Cancelled, optional and post-dated vouchers are not marked",
+        "A total of 0 may mean",
+        "a voucher saved between two pages",
+        "excluded has not been observed",
+    ] {
+        assert!(limitations.contains(stated), "{stated}");
+    }
+    assert!(
+        !limitations.contains("Receipts and Purchases"),
+        "{limitations}"
+    );
     // The first-line company block.
     let company = &call.response["structuredContent"]["company"];
     assert_eq!(company["name"], LAB_COMPANY);
@@ -1358,6 +1416,27 @@ async fn a_voucher_whose_flags_cannot_be_read_makes_the_result_partial_and_is_ne
             "{unread}"
         );
     }
+}
+
+/// The counts of the two states the lab's answers never held, through the tool: a voucher with
+/// only the excluded flag Yes and one with all three No.
+#[tokio::test]
+async fn excluded_and_not_in_return_vouchers_are_counted_under_their_own_keys() {
+    let mutated = edit(&sales_window(), TARGET, |block| {
+        let block = once(&block, INCLUDED, &INCLUDED.replace(">Yes<", ">No<"));
+        once(&block, EXCLUDED, &EXCLUDED.replace(">No<", ">Yes<"))
+    });
+    let mutated = edit(&mutated, "BP/26-27/0012", |block| {
+        once(&block, INCLUDED, &INCLUDED.replace(">Yes<", ">No<"))
+    });
+    let call = run(plans_with(marks(), mutated), lab_arguments()).await;
+    assert_eq!(call.observed.len(), call.expected);
+    let result = payload(&call.response);
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["counts"]["included"], 4);
+    assert_eq!(result["counts"]["excluded"], 1);
+    assert_eq!(result["counts"]["not_in_return"], 1);
+    assert_eq!(result["counts"]["uncertain"], 0);
 }
 
 /// A voucher whose status reads but whose acceptance flag does not is not a clean read: its

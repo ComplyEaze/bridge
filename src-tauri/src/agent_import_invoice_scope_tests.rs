@@ -297,6 +297,37 @@ fn only_the_named_ledgers_parents_are_read() {
     );
 }
 
+/// The row parser keeps a `PARENT` as the answer wrote it, a trailing space
+/// included, because the catalogue keeps it the same way: trimmed, a padded
+/// row would prove against an unpadded catalogue. A scope never plans such a
+/// parent in the first place. (SYNTHETIC answer: the lab book holds no such
+/// group.)
+#[test]
+fn a_row_parent_with_a_trailing_space_is_read_verbatim() {
+    let answer = format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+         <LEDGER NAME=\"Sales\"><GUID>{}</GUID><PARENT>Sales Accounts </PARENT>\
+         <BRIDGECOMPANYGUID>{PILOT_GUID}</BRIDGECOMPANYGUID></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>",
+        guid(0)
+    );
+    let (_, rows) = wire::parse_ledger_rates_and_rows(&answer, PILOT_GUID, &["Sales"]).unwrap();
+    assert_eq!(rows, [row(0, "Sales", "Sales Accounts ")]);
+    // A catalogue holding the same padded parent is refused before any request.
+    assert_eq!(
+        scope_of(&synthetic(&[("Sales", "Sales Accounts ")]), &["Sales"]).err(),
+        Some(refuse_ledger("invoice_ledger_parent_unnameable", "Sales"))
+    );
+    // Against the unpadded catalogue the verbatim row does not prove.
+    let plain = scope_of(&synthetic(&[("Sales", "Sales Accounts")]), &["Sales"]).unwrap();
+    assert_eq!(
+        plain.prove(&rows),
+        Err(refuse_value(
+            "invoice_ledger_rates_rows_differ",
+            "parent_part_row_differs_from_catalogue"
+        ))
+    );
+}
+
 /// A name is resolved exactly on the catalogue's row spelling: another case, a
 /// stray space or a ledger the book does not hold is not a ledger of the book.
 #[test]

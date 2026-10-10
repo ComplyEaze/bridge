@@ -688,17 +688,17 @@ The request becomes a two-variant type, vouchers as today or a master batch. Eac
 
 - Every write is approved in the native dialog. A master dialog lists one master per item and refuses rather than cuts at the existing caps, so a large class is approved in parts.
 - The company is pinned by its full identity tuple. The company name in the import request is never treated as a guard.
-- Success is decided by reading back, never by Tally's counters. Counters and the company's master mark (`ALTMSTID`) are doubt signals only; one master write can move the mark by more than one.
+- Success is decided by reading back, never by Tally's counters. Counters and the company's master mark (`ALTMSTID`) are doubt signals only. The mark moved by one for each single ledger change measured (a create, a rename, a regroup, an opening change, a delete), and by two for one rename of the base currency on screen (TALLY_PROTOCOL_REFERENCE §10, §11c.5). It is not measured for the list alters and voucher-type writes added here, so a step other than the expected one is recorded as doubt, and only reading back decides.
 - An outcome unknown after bytes were sent is never re-sent. It is reconciled by reading back.
 
-**The dated deviation.** The 3 Oct design for automatic ledger creation chose a name-only Create followed by an Alter, subject to a lab run. That run has not been made, and a ledger's GST duty head is settable at Create but not reliably by Alter. This amendment instead creates a ledger with one direct Create, under four conditions:
+**The dated deviation.** The alternative chosen first, on 3 Oct 2026, created a ledger in two requests: a Create carrying only the name and parent, then an Alter setting its other fields, subject to a lab run. That run has not been made. It takes two writes where one approval covers one request, it can leave a ledger half made, and a ledger's GST duty head is settable at Create but not reliably by Alter (TALLY_PROTOCOL_REFERENCE §8.3). This amendment instead creates a ledger with one direct Create, under four conditions:
 
 1. **Before.** An absence check runs inside the queue, over every ledger and group name and alias.
 2. **Before.** The company's master mark must be unchanged from the binding read to the last read before the request.
 3. **After.** Each created name must resolve to a master that did not exist before. A name that resolves to an existing master is reported for reconciliation, never as created.
 4. **Owner's acceptance.** The owner accepts the residual window between the last read and the request, which no read can close.
 
-**List fields.** An Alter replaces a whole list, as measured on one book. So a list is sent as exported, with any new dated entry added, under a check that the ledger is unchanged since it was read. The result is verified by comparing the whole ledger before and after.
+**List fields.** An Alter that carried a stock item's GST list replaced the whole list, on one book, once (TALLY_PROTOCOL_REFERENCE §9.4a); a ledger's lists are not measured and are treated the same. So a list is sent as exported, with any new dated entry added, under a check that the ledger is unchanged since it was read. The result is verified by comparing the whole ledger before and after.
 
 **Not measured.** All of these remain unmeasured:
 

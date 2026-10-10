@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 use crate::applicability_44ab::{ComparisonTurnover, TurnoverInputs};
 use crate::book::Book;
 use crate::books_examined::{CallerNamedDocument, DocumentRead};
+use crate::documents::BankStatementLoad;
 use crate::error::{AuditError, Result};
 use crate::financial_statements::ReportTotals;
 use crate::rules::Rules;
@@ -26,13 +27,10 @@ pub struct CallerData {
     /// The assessee's Form 26AS/AIS/TIS rows (`tds_tcs_26as`, `twentysixas_receipts`; the AIS rows
     /// also `high_value_register`).
     pub traces: crate::documents::TracesDocuments,
-    /// A bank statement (`bank_reconciliation`, which refuses without one; `high_value_register`,
-    /// whose s.194N section reports none supplied).
-    pub bank_statement: Option<crate::documents::BankStatementDoc>,
-    /// The reader's plain-words reason a supplied statement was refused (`bank_reconciliation`
-    /// gives its `refused` result; `high_value_register`'s s.194N coverage says so); `None` when
-    /// none was supplied or it was read.
-    pub bank_statement_refused: Option<String>,
+    /// The bank statement: none supplied (`bank_reconciliation` refuses; `high_value_register`'s
+    /// s.194N section reports none supplied), read, or refused with the reader's plain-words reason
+    /// (`bank_reconciliation` gives its `refused` result; s.194N's coverage says so).
+    pub bank_statement: BankStatementLoad,
     /// The documents loaded with the read whose data no field above holds (`books_examined`).
     pub named_documents: BTreeSet<CallerNamedDocument>,
 }
@@ -42,26 +40,22 @@ impl CallerData {
     /// each document whose file was loaded, rows or none, in the pack's order (#1281). Form 26AS, AIS
     /// and TIS when `traces` holds them, GSTR-1 when its comparison turnover is held (the pack takes
     /// both from the one file), the bank statement when it was read (a refused one is not), and the
-    /// caller's `named_documents`. Refuses a bank statement both held and refused.
-    pub fn documents_read(&self) -> Result<BTreeSet<DocumentRead>> {
-        if self.bank_statement.is_some() && self.bank_statement_refused.is_some() {
-            return Err(AuditError::Config(format!(
-                "{}: a bank statement was supplied and also refused",
-                crate::books_examined::TEST_ID
-            )));
-        }
+    /// caller's `named_documents`.
+    pub fn documents_read(&self) -> BTreeSet<DocumentRead> {
         let held = [
             (DocumentRead::Gstr1, self.turnover_inputs.gstr1.is_some()),
             (DocumentRead::Form26as, self.traces.form26as.is_some()),
             (DocumentRead::Ais, self.traces.ais.is_some()),
             (DocumentRead::Tis, self.traces.tis.is_some()),
-            (DocumentRead::BankStatement, self.bank_statement.is_some()),
+            (
+                DocumentRead::BankStatement,
+                matches!(self.bank_statement, BankStatementLoad::Read(_)),
+            ),
         ];
-        Ok(held
-            .into_iter()
+        held.into_iter()
             .filter_map(|(d, loaded)| loaded.then_some(d))
             .chain(self.named_documents.iter().map(|d| d.document()))
-            .collect())
+            .collect()
     }
 }
 
@@ -83,15 +77,7 @@ pub const PORTED: &[PortedTest] = &[
     PortedTest {
         id: "bank_reconciliation",
         min_figures: 40,
-        run_on: |e, b, r, c| {
-            crate::bank_reconciliation_on(
-                e,
-                b,
-                r,
-                c.bank_statement.as_ref(),
-                c.bank_statement_refused.as_deref(),
-            )
-        },
+        run_on: |e, b, r, c| crate::bank_reconciliation_on(e, b, r, &c.bank_statement),
     },
     PortedTest {
         id: "book_keeping_quality",
@@ -102,7 +88,7 @@ pub const PORTED: &[PortedTest] = &[
         id: "books_examined",
         // `books_maintained` and `books_examined`, on any book.
         min_figures: 2,
-        run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read()?),
+        run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read()),
     },
     PortedTest {
         id: "cash_44ab",
@@ -164,14 +150,7 @@ pub const PORTED: &[PortedTest] = &[
         // 38 on any book: no row figures, no statement and an unknown recipient type.
         min_figures: 38,
         run_on: |e, b, r, c| {
-            crate::high_value_register_on(
-                e,
-                b,
-                r,
-                c.bank_statement.as_ref(),
-                c.bank_statement_refused.as_deref(),
-                c.traces.ais_rows(),
-            )
+            crate::high_value_register_on(e, b, r, &c.bank_statement, c.traces.ais_rows())
         },
     },
     PortedTest {
@@ -436,34 +415,22 @@ mod tests {
     fn a_refused_bank_statement_is_never_listed() {
         use super::CallerData;
         use crate::books_examined::DocumentRead;
-        let refused = CallerData {
-            bank_statement_refused: Some("no closing balance".to_string()),
-            ..Default::default()
+        use crate::documents::BankStatementLoad;
+        let listed = |bank_statement| {
+            CallerData {
+                bank_statement,
+                ..Default::default()
+            }
+            .documents_read()
+            .into_iter()
+            .collect::<Vec<_>>()
         };
-        assert!(refused.documents_read().unwrap().is_empty());
-        let read = CallerData {
-            bank_statement: Some(statement()),
-            ..Default::default()
-        };
+        assert!(listed(BankStatementLoad::NotSupplied).is_empty());
+        assert!(listed(BankStatementLoad::Refused("no closing balance".to_string())).is_empty());
         assert_eq!(
-            read.documents_read()
-                .unwrap()
-                .into_iter()
-                .collect::<Vec<_>>(),
+            listed(BankStatementLoad::Read(statement())),
             [DocumentRead::BankStatement]
         );
-    }
-
-    #[test]
-    fn a_statement_both_held_and_refused_is_refused() {
-        use super::CallerData;
-        use crate::error::AuditError;
-        let both = CallerData {
-            bank_statement: Some(statement()),
-            bank_statement_refused: Some("no closing balance".to_string()),
-            ..Default::default()
-        };
-        assert!(matches!(both.documents_read(), Err(AuditError::Config(_))));
     }
 
     #[test]
@@ -477,7 +444,7 @@ mod tests {
                 coverage: "full".to_string(),
             })
         };
-        let listed = |c: &CallerData| c.documents_read().unwrap().into_iter().collect::<Vec<_>>();
+        let listed = |c: &CallerData| c.documents_read().into_iter().collect::<Vec<_>>();
         assert!(listed(&CallerData::default()).is_empty());
         // Each derived document alone: a TRACES file loaded with no rows is listed.
         let mut c = CallerData::default();
@@ -511,7 +478,7 @@ mod tests {
                 ais: Some(Vec::new()),
                 tis: Some(Vec::new()),
             },
-            bank_statement: Some(statement()),
+            bank_statement: crate::documents::BankStatementLoad::Read(statement()),
             named_documents: [
                 N::DraftForm3cd,
                 N::Gstr3bVs2b,

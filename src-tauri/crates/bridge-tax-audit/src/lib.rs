@@ -1516,31 +1516,24 @@ pub fn cash_book_integrity_on(
 /// parity dump. Refuses with `AuditError::Config` without a statement (the reference runs this
 /// test only when the engagement has one) or without `[roles].bank_reconciliation_ledger` (the
 /// reference's `require` raises). The statement's own rows feed BANK-1, as the reference sets
-/// `eng.bank` to them. `statement_refused` is the reader's reason when the engagement's statement
-/// was supplied but refused (then `statement` is `None`): the result is
+/// `eng.bank` to them. A statement the engagement supplied but the reader refused
+/// ([`documents::BankStatementLoad::Refused`], with the reader's reason) gives
 /// [`bank_reconciliation::refused`], as the reference's pack gives it, and BANK-1 has no rows.
 pub fn bank_reconciliation_on(
     engagement: &Engagement,
     book: &book::Book,
     rules: &Rules,
-    statement: Option<&documents::BankStatementDoc>,
-    statement_refused: Option<&str>,
+    statement: &documents::BankStatementLoad,
 ) -> Result<serde_json::Value> {
-    let statement = match (statement, statement_refused) {
-        (Some(statement), None) => statement,
-        (None, Some(reason)) => {
+    let statement = match statement {
+        documents::BankStatementLoad::Read(statement) => statement,
+        documents::BankStatementLoad::Refused(reason) => {
             engagement.bind(book)?;
             let result = bank_reconciliation::refused(rules, reason)?;
             let module_check = bank_reconciliation::check_invariants(&[], &result)?;
             return canonical::canonical_test_result(book, &result, Some(module_check));
         }
-        (Some(_), Some(_)) => {
-            return Err(AuditError::Config(format!(
-                "{}: a bank statement was supplied and also refused",
-                bank_reconciliation::TEST_ID
-            )))
-        }
-        (None, None) => {
+        documents::BankStatementLoad::NotSupplied => {
             return Err(AuditError::Config(format!(
                 "{}: no bank statement was supplied (the reference runs this test only when the \
                  engagement has one)",
@@ -1573,16 +1566,15 @@ pub fn bank_reconciliation_on(
 /// caller documents (`None` and empty when not supplied). The counterparty types are the
 /// configured loan ledgers' `lender_type`, overridden by `[roles].counterparty_type_by_ledger`; the
 /// s.194N recipient type follows `[client].entity_type`. Refuses when `[loans]` is not a table, as
-/// the reference's `loan_ledgers_config` raises there. `statement_refused` is the reader's reason
-/// when the engagement's statement was supplied but refused (then `statement` is `None`). The
+/// the reference's `loan_ledgers_config` raises there. A statement the engagement supplied but the
+/// reader refused is [`documents::BankStatementLoad::Refused`], with the reader's reason. The
 /// reference module has no
 /// `check_invariants`, so the dump's module invariants are empty on both sides.
 pub fn high_value_register_on(
     engagement: &Engagement,
     book: &book::Book,
     rules: &Rules,
-    statement: Option<&documents::BankStatementDoc>,
-    statement_refused: Option<&str>,
+    statement: &documents::BankStatementLoad,
     ais_rows: &[documents::AisRow],
 ) -> Result<serde_json::Value> {
     let (bound, _report) = engagement.bind(book)?;
@@ -1605,7 +1597,6 @@ pub fn high_value_register_on(
         ),
         round_off_ledgers: &round_off_ledgers,
         counterparty_type_by_ledger: &counterparty_types,
-        bank_statement_refused: statement_refused,
     };
     let result = high_value_register::run(book, rules, &inputs)?;
     canonical::canonical_test_result(book, &result, None)

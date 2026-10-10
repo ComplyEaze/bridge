@@ -45,6 +45,8 @@ mod cash_flow;
 mod changes;
 #[path = "agent_company_features.rs"]
 mod company_features;
+#[path = "agent_gst_status.rs"]
+mod gst_status;
 #[path = "agent_headline.rs"]
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
@@ -2142,6 +2144,7 @@ impl Server {
             "changed_since" => self.changed_since(args).await,
             "company_features" => self.company_features(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
+            "gst_status" => self.gst_status(args).await,
             "ledger_masters" => self.ledger_masters(args).await,
             "ledger_movement" => self.ledger_movement(args).await,
             "list_companies" => {

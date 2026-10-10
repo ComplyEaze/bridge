@@ -485,7 +485,7 @@ dependencies = [
  "bridge-tally-primitives",
  "bridge-tally-protocol",
  "flate2",
- "quick-xml 0.41.0",
+ "quick-xml 0.42.0",
  "serde",
  "serde_json",
  "sha1",

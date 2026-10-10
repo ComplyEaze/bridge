@@ -861,6 +861,7 @@ async fn a_batch_is_refused_while_batch_posting_is_off() {
         "{response}"
     );
     assert!(sent(simulator).is_empty());
+    assert_no_batch_headline(&response);
 }
 
 /// The same REMOTEID recorded by another process while the dialog is open is
@@ -1084,6 +1085,8 @@ async fn a_declined_post_sends_nothing_and_journals_no_intent() {
     );
     assert_ne!(result["attempt_recorded"], json!(true), "{response}");
     assert_eq!(observed.len(), expected);
+    // Nothing was dispatched, so the readback before the send is no outcome.
+    assert_no_batch_headline(&response);
     assert_eq!(
         appended_kinds(&before, &journal(directory.path())),
         ["verification_status"]
@@ -2495,6 +2498,12 @@ async fn native_post_read_back(mark_after: u64, step: u64, matches_created: bool
         assert_eq!(result["counts"]["posted_verified"], 1, "{response}");
         assert_eq!(result["post_span_binding"]["state"], "bound", "{response}");
         assert!(result.get("error").is_none(), "{response}");
+        assert_batch_counts(&response, 1, 1, &[]);
+        assert_eq!(
+            batch_headline(&response)["lead"],
+            "The voucher of this batch is confirmed in Tally.",
+            "{response}"
+        );
     } else {
         assert_eq!(
             result["error"]["code"], "import_reconciliation_required",
@@ -4664,6 +4673,7 @@ async fn a_bound_voucher_missing_from_a_later_window_is_never_read_as_absent() {
         1,
         "the later verify journals no second verdict"
     );
+    assert_batch_counts(&verified[0], 1, 0, &[("bound_not_in_window", 1)]);
 }
 
 /// A book that reads below the mark the post left was rolled back (a backup
@@ -5117,9 +5127,14 @@ const PARTIAL_AMOUNTS: [&str; 3] = ["12.61", "13.61", "14.61"];
 /// `saved_captured_line`'s Journal three times, each with its own amount, as
 /// one batch: the second (13.61) is the one Tally rejects.
 fn saved_partial_batch(server: &Server) -> (ImportLedgerLine, Value) {
+    saved_journal_batch(server, &PARTIAL_AMOUNTS)
+}
+
+/// `saved_captured_line`'s Journal once for each of `amounts`, as one batch.
+fn saved_journal_batch(server: &Server, amounts: &[&str]) -> (ImportLedgerLine, Value) {
     let mut line = saved_captured_line(server);
     let template = line.vouchers[0].clone();
-    line.vouchers = PARTIAL_AMOUNTS
+    line.vouchers = amounts
         .iter()
         .enumerate()
         .map(|(index, amount)| {
@@ -5153,15 +5168,14 @@ fn saved_partial_batch(server: &Server) -> (ImportLedgerLine, Value) {
     (line, args)
 }
 
-/// The window after the partial post: the captured posted Journal, untagged,
-/// twice, as the first and third vouchers. Each copy's named changes: the
-/// amount (both entries), ALTERID (11 and 12, inside the span (10, 12] the
-/// marks give), and MASTERID with the GUID and REMOTEID suffixes to match
-/// (1745 and 1746, the captured response's LASTVCHID being 1746): the window's
-/// MasterIDs are derived by named edits from the Payment capture. Each copy's
-/// VCHKEY suffix is set to its MasterID only to keep the two keys distinct: it
-/// is a synthetic value, not derived from the capture.
-fn partial_window() -> String {
+/// The window after a post of `saved_partial_batch`: the captured posted
+/// Journal, untagged, once for each of `copies` (amount, ALTERID, MASTERID).
+/// Each copy's named changes: the amount (both entries), ALTERID, and MASTERID
+/// with the GUID and REMOTEID suffixes to match: the window's MasterIDs are
+/// derived by named edits from the Payment capture. Each copy's VCHKEY suffix
+/// is set to its MasterID only to keep the keys distinct: it is a synthetic
+/// value, not derived from the capture.
+fn window_of(copies: &[(&str, u64, u64)]) -> String {
     let body = untagged_posted_journal();
     let start = body.find("<VOUCHER ").expect("the capture holds a voucher");
     // Searched from the voucher on: CMPINFO's `<VOUCHER>12</VOUCHER>` count
@@ -5195,12 +5209,22 @@ fn partial_window() -> String {
             &format!("{GUID}-0000b4bf:{master_id:08x}"),
         )
     };
-    let both = format!(
-        "{}\n    {}",
-        copy(PARTIAL_AMOUNTS[0], 11, 1745),
-        copy(PARTIAL_AMOUNTS[2], 12, 1746)
-    );
-    format!("{}{}{}", &body[..start], both, &body[end..])
+    let all = copies
+        .iter()
+        .map(|(amount, alter_id, master_id)| copy(amount, *alter_id, *master_id))
+        .collect::<Vec<_>>()
+        .join("\n    ");
+    format!("{}{}{}", &body[..start], all, &body[end..])
+}
+
+/// The window after the partial post: the first and third vouchers, as
+/// ALTERIDs 11 and 12, inside the span (10, 12] the marks give, and MasterIDs
+/// 1745 and 1746, the captured response's LASTVCHID being 1746.
+fn partial_window() -> String {
+    window_of(&[
+        (PARTIAL_AMOUNTS[0], 11, 1745),
+        (PARTIAL_AMOUNTS[2], 12, 1746),
+    ])
 }
 
 /// The captured answer is what the test says it is.
@@ -5314,6 +5338,19 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
         "sent_not_attributed",
         "{posted}"
     );
+    // The headline counts them voucher by voucher: matching content is not
+    // confirmation, so none of the three is confirmed.
+    assert_batch_counts(
+        &posted,
+        3,
+        0,
+        &[("matching_content_observed", 2), ("sent_not_attributed", 1)],
+    );
+    assert_eq!(
+        batch_headline(&posted)["lead"],
+        "0 of 3 vouchers of this batch are confirmed in Tally. 3 are not: check each in Tally before doing anything else with it; its next step says how. ComplyEaze Bridge will not send them again.",
+        "{posted}"
+    );
     let verdicts = String::from_utf8(journal(directory.path()))
         .unwrap()
         .lines()
@@ -5399,6 +5436,7 @@ async fn a_batch_tally_rejected_whole_reads_as_not_created_by_tally() {
             "{posted}"
         );
     }
+    assert_batch_counts(&posted, 3, 0, &[("tally_reported_not_created", 3)]);
 }
 
 /// The same answer with the voucher mark moved by one across the post: Tally
@@ -5420,4 +5458,150 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
         "Tally reported that this post created none of its vouchers: follow each voucher's next step.",
         "{posted}"
     );
+    assert_batch_counts(&posted, 3, 0, &[("sent_not_attributed", 3)]);
+}
+
+// The headline of a post: how the batch ended, counted voucher by voucher.
+
+/// The headline of a response, from its structured content.
+fn batch_headline(response: &Value) -> &Value {
+    &response["structuredContent"]["headline"]
+}
+
+/// A response that sent nothing says nothing about how a batch ended.
+fn assert_no_batch_headline(response: &Value) {
+    assert!(
+        response["structuredContent"].get("headline").is_none(),
+        "{response}"
+    );
+}
+
+/// The headline's typed counts: the batch's vouchers, those confirmed, and for
+/// every other status the number given (zero when it is not listed).
+fn assert_batch_counts(
+    response: &Value,
+    vouchers: u64,
+    confirmed: u64,
+    not_confirmed: &[(&str, u64)],
+) {
+    let batch = &batch_headline(response)["batch"];
+    assert_eq!(batch["vouchers"], vouchers, "{response}");
+    assert_eq!(batch["confirmed"], confirmed, "{response}");
+    let counts = batch["not_confirmed"]
+        .as_object()
+        .unwrap_or_else(|| panic!("the headline counts the rest: {response}"));
+    for (status, count) in not_confirmed {
+        assert_eq!(
+            counts.get(*status),
+            Some(&json!(count)),
+            "{status}: {response}"
+        );
+    }
+    for (status, count) in counts {
+        let wanted = not_confirmed
+            .iter()
+            .find(|(named, _)| named == status)
+            .map_or(0, |(_, count)| *count);
+        assert_eq!(count, &json!(wanted), "{status}: {response}");
+    }
+    let sum = confirmed + counts.values().filter_map(Value::as_u64).sum::<u64>();
+    assert_eq!(sum, vouchers, "every voucher is counted once: {response}");
+}
+
+/// The captured live answer to an import of five Journals that Tally created
+/// whole (`post-span-journal-import-response`): CREATED 5, every other counter
+/// 0, LASTVCHID 1738. Only the answer is borrowed; the batch posted here is
+/// this suite's own five Journals, so their MasterIDs are 1734 to 1738.
+fn created_five() -> String {
+    captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-journal-import-response.utf16le.xml"
+    ))
+}
+
+/// A batch of five that Tally created whole and that reads back whole says so
+/// in one headline.
+#[tokio::test]
+async fn a_clean_batch_of_five_says_all_five_are_confirmed() {
+    let amounts = ["12.61", "13.61", "14.61", "15.61", "16.61"];
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_five())));
+    plans.push(xml(company_marks(15, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(
+        window_of(&[
+            (amounts[0], 11, 1734),
+            (amounts[1], 12, 1735),
+            (amounts[2], 13, 1736),
+            (amounts[3], 14, 1737),
+            (amounts[4], 15, 1738),
+        ]),
+        15,
+    ));
+    let expected_requests = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = batch_server_at(simulator.address(), directory.path());
+    let (_, args) = saved_journal_batch(&server, &amounts);
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    assert_eq!(sent(simulator).len(), expected_requests, "{posted}");
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(posted["isError"], json!(false), "{posted}");
+    assert_eq!(result["dispatch"]["state"], "posted_verified", "{posted}");
+    assert_eq!(result["counts"]["posted_verified"], 5, "{posted}");
+    assert_batch_counts(&posted, 5, 5, &[]);
+    assert_eq!(
+        batch_headline(&posted)["batch"]["verdict"],
+        "posted_verified",
+        "{posted}"
+    );
+    assert_eq!(
+        batch_headline(&posted)["lead"],
+        "All 5 vouchers of this batch are confirmed in Tally.",
+        "{posted}"
+    );
+}
+
+/// `verify_import` of the captured batch, never posted by ComplyEaze Bridge,
+/// against a book that serves `plans`.
+async fn verify_unposted(plans: Vec<ScenarioPlan>) -> Value {
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_captured_batch(&server);
+    let verified = server.call_tool("verify_import", args).await;
+    let _ = sent(simulator);
+    verified
+}
+
+/// A batch that was built and never posted reads every row as not found; that
+/// is not an outcome, and it can still be posted, so no headline says
+/// otherwise.
+#[tokio::test]
+async fn a_built_batch_never_posted_carries_no_headline() {
+    let mut plans = probe();
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(probe());
+    let verified = verify_unposted(plans).await;
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(result["counts"]["not_found"], 1, "{verified}");
+    assert!(result.get("dispatch").is_none(), "{verified}");
+    assert_no_batch_headline(&verified);
+}
+
+/// A batch imported by hand and then verified was never posted by
+/// ComplyEaze Bridge: its rows read back, and it still carries no headline.
+#[tokio::test]
+async fn a_batch_verified_after_a_hand_import_carries_no_headline() {
+    let verified = verify_unposted(reconcile_readback()).await;
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(result["counts"]["posted_verified"], 1, "{verified}");
+    assert!(result.get("dispatch").is_none(), "{verified}");
+    assert_no_batch_headline(&verified);
 }

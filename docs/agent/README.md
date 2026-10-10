@@ -2368,6 +2368,19 @@ profit and loss the Cost of Sales heading when it is off the derived cost of sal
 derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
 `profit_and_loss` and `balance_sheet` carry one; the other read tools and the refusals follow.
 
+`post_import` (after a send was read back) and every page of `verify_import` carry a headline that
+says how the batch ended, counted voucher by voucher from the verification's own rows, never from
+tool arguments and never stored in the proof (a later page recomputes the same one from the saved
+proof). The lead says how many of the batch's vouchers are confirmed (`posted_verified`) and how many
+are not; `batch` holds `vouchers`, `confirmed`, `not_confirmed` (one count for each other row status,
+and `unrecognised` for any status this build does not know) and `verdict` (`posted_verified` only when
+every voucher is confirmed and the readback as a whole is). When every voucher reads back but the
+batch as a whole is not confirmed (a duplicate, or a doubt about the ledgers or the voucher mark), the
+lead says so and does not call the batch confirmed. Only a batch ComplyEaze Bridge dispatched natively
+(`result.dispatch.state` present and not `not_dispatched`) carries one: a built batch not yet posted, a
+file imported by hand and a refusal before anything was sent carry none, because the batch can still be
+posted.
+
 ## Protocol and migration notes
 
 The server negotiates MCP `2025-06-18` or `2024-11-05`, returning a supported

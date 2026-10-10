@@ -1319,6 +1319,8 @@ impl Server {
         self.admit_verification_page(&page)
             .map_err(|failure| failure.with_prior_evidence(evidence))?;
         outcome.payload["result"] = page;
+        // From the whole proof, whose rows the page splits.
+        verification::attach_batch_headline(&mut outcome.payload, &proof);
         Ok(outcome)
     }
 
@@ -1347,8 +1349,11 @@ impl Server {
             return Err("verification_proof_batch_mismatch".to_string().into());
         }
         self.admit_verification_page(&page)?;
+        // From the whole proof, so every page states the same outcome.
+        let mut payload = json!({"company": proof["company"], "result": page});
+        verification::attach_batch_headline(&mut payload, &proof);
         Ok(ToolOutcome {
-            payload: json!({"company": proof["company"], "result": page}),
+            payload,
             evidence: Evidence {
                 request_sha256: sha256_hex(
                     format!("verify_import_page:{batch_id}:{offset}").as_bytes(),

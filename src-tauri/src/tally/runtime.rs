@@ -4037,12 +4037,14 @@ impl TallyRuntime {
                         // under the lock and not only before it.
                         let (invoice_answers, admission_evidence) = match request.invoice_plan() {
                             Some(plan) => {
-                                let (answers, invoice_evidence) = read_invoice_plan(
+                                // Boxed: this future would otherwise sit inside the
+                                // post's, whatever the voucher type.
+                                let (answers, invoice_evidence) = Box::pin(read_invoice_plan(
                                     &reads,
                                     &identity,
                                     plan,
                                     &binding_marks.text,
-                                )
+                                ))
                                 .await
                                 .map_err(|error| {
                                     with_read_evidence(error, admission_evidence.clone())

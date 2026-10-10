@@ -856,15 +856,14 @@ impl Server {
                 .iter()
                 .any(|voucher| voucher.voucher_type.is_invoice())
             {
-                let (evidence, plan) = self
-                    .recheck_sales_invoice(
-                        &identity,
-                        &company,
-                        &line.vouchers[0],
-                        &catalogue_identities,
-                    )
-                    .await
-                    .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
+                let (evidence, plan) = Box::pin(self.recheck_sales_invoice(
+                    &identity,
+                    &company,
+                    &line.vouchers[0],
+                    &catalogue_identities,
+                ))
+                .await
+                .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
                 accumulated = combine_evidence(accumulated.clone(), evidence);
                 invoice_plan = Some(plan);
             }
@@ -1024,15 +1023,14 @@ impl Server {
                             .await
                             .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
                         accumulated = combine_evidence(accumulated.clone(), catalogue_read);
-                        let (evidence, plan) = self
-                            .recheck_sales_invoice(
-                                &identity,
-                                &company,
-                                &line.vouchers[0],
-                                &fresh_catalogue,
-                            )
-                            .await
-                            .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
+                        let (evidence, plan) = Box::pin(self.recheck_sales_invoice(
+                            &identity,
+                            &company,
+                            &line.vouchers[0],
+                            &fresh_catalogue,
+                        ))
+                        .await
+                        .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
                         accumulated = combine_evidence(accumulated.clone(), evidence);
                         invoice_plan = Some(plan);
                     }

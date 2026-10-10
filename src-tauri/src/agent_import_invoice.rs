@@ -978,9 +978,12 @@ impl super::super::Server {
             .invoice
             .as_mut()
             .and_then(|detail| detail.observed.take());
-        let (evidence, plan) = match self
-            .admit_sales_invoice_planned(identity, company, &mut fresh, catalogue)
-            .await
+        // Boxed, with the other large futures of this path: the post's own
+        // future holds this one twice, and a thread's stack is small (#1337).
+        let (evidence, plan) = match Box::pin(
+            self.admit_sales_invoice_planned(identity, company, &mut fresh, catalogue),
+        )
+        .await
         {
             Ok(admitted) => admitted,
             Err(InvoiceAdmission::Failed(failure)) => return Err(failure),
@@ -1972,7 +1975,7 @@ impl super::super::Server {
         voucher: &mut ImportVoucher,
         catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
     ) -> Result<super::super::Evidence, InvoiceAdmission> {
-        self.admit_sales_invoice_planned(identity, company, voucher, catalogue)
+        Box::pin(self.admit_sales_invoice_planned(identity, company, voucher, catalogue))
             .await
             .map(|(evidence, _)| evidence)
     }
@@ -2049,13 +2052,12 @@ impl super::super::Server {
                         note(&mut evidence, read);
                     }
                     Need::Listing => {
-                        let listing = self
-                            .runtime
-                            .fetch_agent_party_ledger_masters_with_evidence(
+                        let listing =
+                            Box::pin(self.runtime.fetch_agent_party_ledger_masters_with_evidence(
                                 self.tally_config(),
                                 identity,
                                 today.clone(),
-                            )
+                            ))
                             .await
                             .map_err(|error| {
                                 super::super::ToolFailure::from_runtime(

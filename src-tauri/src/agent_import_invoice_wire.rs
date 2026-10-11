@@ -937,6 +937,12 @@ pub(super) fn parse_ledger_rates(
         .all("COLLECTION")
         .next()
         .ok_or("invoice_read_collection_absent")?;
+    // A company always has ledgers (the invoice's own were read in the
+    // compliance listing before this one), so a listing with none is a read
+    // that went wrong, never "no ledger has a rate".
+    if collection.all("LEDGER").next().is_none() {
+        return Err("invoice_ledger_rates_listing_empty");
+    }
     let mut out = BTreeMap::new();
     for ledger in collection.all("LEDGER") {
         let bound = ledger.text_of("BRIDGECOMPANYGUID");

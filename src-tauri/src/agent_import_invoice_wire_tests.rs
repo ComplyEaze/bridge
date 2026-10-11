@@ -864,6 +864,30 @@ fn a_rate_listing_that_is_not_this_companys_or_not_whole_is_refused() {
     );
 }
 
+/// A listing with no ledger row is a read that went wrong, never "no ledger
+/// has a rate": a company always has ledgers (the invoice's own were read in
+/// the compliance listing before it). One that holds rows, but not the ledger
+/// asked for, reads as no row for that ledger.
+#[test]
+fn an_empty_rate_listing_is_its_own_failure_and_a_listing_without_the_ledger_is_not() {
+    for empty in [
+        "<COLLECTION></COLLECTION>",
+        "<COLLECTION> </COLLECTION>",
+        "<COLLECTION/>",
+    ] {
+        let xml = format!(
+            "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA>{empty}</DATA></BODY></ENVELOPE>"
+        );
+        assert_eq!(
+            parse_ledger_rates(&xml, LAB_GUID, &["L"]),
+            Err("invoice_ledger_rates_listing_empty"),
+            "{empty}"
+        );
+    }
+    let other = parse_ledger_rates(&ledger_answer("Other", ""), LAB_GUID, &["L"]).unwrap();
+    assert!(other.is_empty());
+}
+
 /// One ledger row around `inner`, bound to the lab company.
 fn ledger_answer(name: &str, inner: &str) -> String {
     format!(

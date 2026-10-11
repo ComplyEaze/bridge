@@ -2124,6 +2124,15 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
         refused(&|f| f.get_mut("Sales").unwrap().rates = None),
         vec![refuse_ledger("invoice_sales_ledger_rate_unknown", "Sales")]
     );
+    // A listing that holds rows, but none of the sales ledger: the lab's own,
+    // read for this invoice's ledgers, which it does not carry.
+    assert_eq!(
+        refused(&|f| {
+            let listed = lab_rates(&["Sales"]);
+            f.get_mut("Sales").unwrap().rates = listed.get("Sales").cloned();
+        }),
+        vec![refuse_ledger("invoice_sales_ledger_rate_unknown", "Sales")]
+    );
     // A tax ledger that rounds, or whose own rate is not the sales ledger's.
     assert_eq!(
         refused(&|f| f

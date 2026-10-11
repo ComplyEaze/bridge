@@ -1,0 +1,5 @@
+src-tauri/src/db/tally_mirror.rs
+src-tauri/src/sync/snapshot.rs
+src-tauri/src/tally/connector.rs
+src/MirrorProofScreen.tsx
+reviewer: lamemustafa

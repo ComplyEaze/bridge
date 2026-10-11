@@ -372,11 +372,16 @@ const MAX_INVOICE_ENTRIES: usize = 6;
 
 /// The IGST rates GST has, in thousandths of a percent: the slab list the check
 /// admitted before it read ledgers (5, 12, 18, 28 and 40 percent). A ledger at
-/// any other rate (a mistyped one, or 3 or 0.25 percent) is refused, though the
-/// invoice and the ledger agree: the lab measured 5 percent and one exact 18
-/// percent bill only, so the list bounds which rates are worked out and says
-/// nothing of how Tally treats the rest.
+/// any other rate (a mistyped one, or 3 or 0.25 percent) is refused as no slab,
+/// though the invoice and the ledger agree.
 const SLAB_IGST_MILLI: &[i128] = &[5_000, 12_000, 18_000, 28_000, 40_000];
+
+/// The slabs the lab measured on this path (§9.17), the only ones admitted: 5
+/// percent (2.5 a head) and 18 percent (9 a head, on one exact two-rate bill,
+/// voucher 0009). A slab not here is refused as not measured. A lab
+/// measurement of Tally's expected tax at a rate would open it; the slabs it
+/// would open are 12, 28 and 40 percent.
+const MEASURED_IGST_MILLI: &[i128] = &[5_000, 18_000];
 
 /// The most sales lines an invoice may carry. Tax was measured on one and two
 /// lines (the lab, 10 Oct 2026); a third waits for a measured three-line bill.
@@ -484,6 +489,9 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
     }
     if !SLAB_IGST_MILLI.contains(&igst) {
         return Err("invoice_sales_ledger_rate_not_a_slab");
+    }
+    if !MEASURED_IGST_MILLI.contains(&igst) {
+        return Err("invoice_sales_ledger_rate_not_measured");
     }
     Ok(cgst)
 }

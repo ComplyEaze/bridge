@@ -46,9 +46,10 @@ use super::{
     party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
     reviewed_probe_commitment_sha256, tally_command_error, tally_runtime_command_error,
     verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
-    OutstandingsRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
-    VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
+    OutstandingsRequest, PartyLedgerMasterRequest, PersistedTallyCompany, SavedTallySetup,
+    SelectedCompanyIdentity, VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
 };
+use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
 // path cannot be constructed portably. The import must carry the same gate as
 // the test, or Windows fails on an unused import under `-D warnings`.

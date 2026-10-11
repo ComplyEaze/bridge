@@ -3561,6 +3561,36 @@ async fn reviewed_tally_error_codes_are_precise_allowlisted_and_persisted() {
             "company_identity_not_found",
         ),
         (
+            TallyError::InvalidData {
+                code: "company_book_changed_during_group_read".to_string(),
+            },
+            "source_changed_during_run",
+        ),
+        (
+            TallyError::InvalidData {
+                code: "company_book_changed_during_ledger_read".to_string(),
+            },
+            "source_changed_during_run",
+        ),
+        (
+            TallyError::InvalidData {
+                code: "company_book_changed_during_voucher_read".to_string(),
+            },
+            "source_changed_during_run",
+        ),
+        (
+            TallyError::InvalidData {
+                code: "company_book_extent_drifted".to_string(),
+            },
+            "company_book_extent_drifted",
+        ),
+        (
+            TallyError::InvalidData {
+                code: "company_altmstid_missing".to_string(),
+            },
+            "company_altmstid_missing",
+        ),
+        (
             TallyError::Protocol {
                 code: "company_identity_ambiguous".to_string(),
             },

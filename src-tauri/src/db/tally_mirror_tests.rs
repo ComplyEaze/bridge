@@ -4548,6 +4548,31 @@ fn public_support_export_is_minimized_uncorrelatable_and_checksum_stable() {
     assert!(validate_export_code("future_unreviewed_code").is_err());
 }
 
+/// What the snapshot engine records for a core-window refusal must be a code
+/// the redacted proof export accepts, or a failed run could not be exported.
+#[test]
+fn redacted_proof_export_accepts_the_code_recorded_for_each_core_window_refusal() {
+    for raw in [
+        "company_book_changed_during_group_read",
+        "company_book_changed_during_ledger_read",
+        "company_book_changed_during_voucher_read",
+        "company_book_extent_drifted",
+        "company_altmstid_missing",
+        "company_identity_mismatch",
+    ] {
+        let recorded =
+            crate::sync::snapshot::tally_error_code(&bridge_tally_core::TallyError::InvalidData {
+                code: raw.to_string(),
+            });
+        assert_ne!(
+            recorded, "response_parse_failed",
+            "{raw} fell to the catch-all"
+        );
+        validate_export_code(recorded)
+            .unwrap_or_else(|_| panic!("{raw} -> {recorded} not exportable"));
+    }
+}
+
 #[test]
 fn redacted_proof_export_accepts_every_reviewed_precise_tally_terminal_code() {
     for code in REVIEWED_TALLY_TERMINAL_CODES {

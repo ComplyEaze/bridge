@@ -154,6 +154,21 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
     action: "Run again during a controlled quiet period. A stable reread still does not prove atomic isolation.",
     retry: "after_change",
   },
+  company_book_extent_drifted: {
+    title: "Tally gave two different answers to the same read",
+    action: "Two back-to-back reads of the company's book did not match, so the run stopped. Run again when nobody is entering vouchers or masters in this company.",
+    retry: "after_change",
+  },
+  company_altmstid_missing: {
+    title: "Tally did not report its master-change marker",
+    action: "Without that marker ComplyEaze Bridge cannot tell whether masters changed during the read, so the run stopped. Retrying unchanged will stop the same way; check the TallyPrime release and the company before a new run.",
+    retry: "not_useful",
+  },
+  company_identity_mismatch: {
+    title: "Tally answered for a different company",
+    action: "The company Tally reported is not the one selected for this run. Check which company is open in Tally, select it again, and start a new run.",
+    retry: "after_change",
+  },
   minimum_window_response_too_large: {
     title: "One Tally day exceeds the bounded response limit",
     action: "ComplyEaze Bridge cannot split below one calendar day. Reduce that day's source density or use a future qualified collection filter before starting a new run; retrying unchanged will fail again.",

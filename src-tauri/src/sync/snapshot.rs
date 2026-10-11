@@ -3640,7 +3640,7 @@ fn terminal_kind(error: &TallyError) -> TerminalKind {
     }
 }
 
-fn tally_error_code(error: &TallyError) -> &'static str {
+pub(crate) fn tally_error_code(error: &TallyError) -> &'static str {
     match error {
         TallyError::Unreachable => "tally_unreachable",
         TallyError::Protocol { code } => match code.as_str() {
@@ -3669,6 +3669,15 @@ fn tally_error_code(error: &TallyError) -> &'static str {
             _ => "tally_protocol_failed",
         },
         TallyError::InvalidData { code } => match code.as_str() {
+            // The mid-read book changes share one code with the whole-run
+            // stability gap: the book was edited while it was being read, and
+            // the operator's step is the same (read again when nobody is
+            // editing). The stage that noticed it is not part of that step.
+            "company_book_changed_during_group_read"
+            | "company_book_changed_during_ledger_read"
+            | "company_book_changed_during_voucher_read" => "source_changed_during_run",
+            "company_altmstid_missing" => "company_altmstid_missing",
+            "company_book_extent_drifted" => "company_book_extent_drifted",
             "company_identity_mismatch" => "company_identity_mismatch",
             "connector_context_invalid" => "connector_context_invalid",
             "endpoint_invalid" => "endpoint_invalid",

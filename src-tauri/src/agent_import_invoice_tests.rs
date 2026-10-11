@@ -628,7 +628,8 @@ fn a_round_off_ledger_is_admitted_only_with_the_rate_and_rounding_fields_the_lab
         (Some("0"), Some("0"), None)
     );
     assert_eq!(round_off_with(measured.clone()), Ok(Some(4)));
-    let changes: [(&str, fn(&mut wire::LedgerRateRow)); 9] = [
+    type Change = fn(&mut wire::LedgerRateRow);
+    let changes: [(&str, Change); 9] = [
         ("rate 2.50", |r| {
             r.rate_of_tax_calculation = Some("2.50".into())
         }),

@@ -58,6 +58,8 @@ async fn every_tool_refuses_until_the_terms_are_accepted_and_sends_nothing_to_ta
         Some("TRUE"),
         Some("yes"),
         Some(" true"),
+        // What a host passes if it leaves the manifest's placeholder unresolved.
+        Some("${user_config.accept_terms_2026_10_1}"),
     ] {
         let directory = tempfile::tempdir().unwrap();
         let server = Server::for_mcp_with(settings(directory.path()), setting);
@@ -79,6 +81,12 @@ async fn every_tool_refuses_until_the_terms_are_accepted_and_sends_nothing_to_ta
                 "{name}"
             );
             assert!(message.contains("Nothing was read from Tally"), "{name}");
+            // One verb for the setting, the one the extension's own description uses (#1458).
+            assert!(
+                message.contains("tick \"I accept the ComplyEaze Bridge Terms of Use\""),
+                "{name}: {message}"
+            );
+            assert!(!message.contains("turn on"), "{name}: {message}");
         }
         assert!(
             record_lines(directory.path()).is_empty(),
@@ -294,7 +302,6 @@ fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
     );
     let setting = &manifest["user_config"][&key];
     assert_eq!(setting["type"], "boolean", "{key}");
-    assert_eq!(setting["required"], true);
     assert_eq!(setting["default"], false);
     assert!(setting["title"]
         .as_str()
@@ -306,6 +313,18 @@ fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
         .unwrap()
         .ends_with(&format!("(version {TERMS_VERSION})")));
     let description = setting["description"].as_str().unwrap();
+    // The setting is not marked required (below), so its text must not say it is: it says what ticking
+    // does and what happens until then.
+    assert!(
+        description.starts_with(
+            "Tick to use ComplyEaze Bridge: it refuses every tool call until you accept the Terms of Use."
+        ),
+        "{description}"
+    );
+    assert!(
+        !description.to_ascii_lowercase().contains("required"),
+        "{description}"
+    );
     assert!(description.contains("https://bridge.complyeaze.com/terms"));
     assert!(description.contains("https://bridge.complyeaze.com/privacy"));
     assert_eq!(
@@ -314,11 +333,13 @@ fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
     );
     // Posting keeps its own separate setting; accepting the Terms above covers the whole Terms.
     assert_eq!(manifest["user_config"]["enable_writes"]["default"], false);
-    // No other setting is required except the accept-terms one.
+    // No setting is required, the accept-terms one included. Claude Desktop builds no launch
+    // command while a required setting has no stored value, and an update that renames the
+    // setting for new terms leaves it with none, so the program would never run to refuse
+    // (bridge#1413). Not required, an absent value takes the default `false` and every tool
+    // refuses in band.
     for (name, option) in manifest["user_config"].as_object().unwrap() {
-        if name != &key {
-            assert_ne!(option["required"], true, "{name}");
-        }
+        assert_ne!(option["required"], true, "{name}");
     }
 }
 

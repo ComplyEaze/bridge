@@ -1,0 +1,928 @@
+{
+ "comment": "UPI handles and joins: payments of Wages from Bank A, and one receipt. One handle joins two names: h01 to h03 (ALPHA.T, h03 in lower case), h04 and h05 (BETA_S.9: letters, an underscore, a full stop, a digit), h06 and h07 (70412-2, with its one suffix of a hyphen and digits), h24 and h25 (NU.S, the @ being the last character of h24's narration), h26 and h27 (a suffix in Devanagari digits). h08's handle is 70412, another payee than 70412-2; h28's is XI-12, another than the one in Devanagari digits. No handle is read where the text before the @ holds a space (h10, h11), a suffix of a letter (h12, h13), two suffixes (h14, h15), an ampersand (h16, h17), nothing (h18, h19), a suffix and nothing before it (h41, h42), a letter outside A to Z (h22, h23), a Devanagari digit (h43, h44), or where the @ is the full-width one (h20, h21): each pair shares that text under two names and stays two payees. Second UPI layout, joined to a payment in the first layout by the handle its fourth field prints: h30 with h31 (the text after the @ dropped), h32 with h33 (the spaces inside the field removed), h36 with h37 (an empty bank field), h39 with h40 (cut at the first of two @). h34's fourth field has no closing slash, so no handle is read and h35 is another payee; h38's field starts with @, so no handle is read either. h50 and h51 are one name on two handles: one payee, keyed by the smaller handle (ABE.9, not ZED.1). h52 to h56 chain three names over two handles and an IMPS payment: one payee, three names, channels IMPS and UPI. h60 (PSI ONE, PSI.A) and h61 (PSI TWO, PSI.B) stay two payees: h62, which prints PSI ONE with PSI.B, is a receipt and joins nothing. Thirty-six payees, no finding.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_handles-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_handles-001"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_handles-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-np_handles-003"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 4410,
+   "credit": 83334,
+   "closing": -78924
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 83334,
+   "credit": 0,
+   "closing": 83334
+  },
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4410,
+   "closing": -4410
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "h01",
+   "date": "2025-04-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-WAGES",
+   "lines": [
+    [
+     "Wages",
+     101
+    ],
+    [
+     "Bank A",
+     -101
+    ]
+   ]
+  },
+  {
+   "guid": "h02",
+   "date": "2025-04-03",
+   "base_type": "Payment",
+   "narration": "UPI-A TRADERS-ALPHA.T@QQBK-WAGES",
+   "lines": [
+    [
+     "Wages",
+     163
+    ],
+    [
+     "Bank A",
+     -163
+    ]
+   ]
+  },
+  {
+   "guid": "h03",
+   "date": "2025-04-04",
+   "base_type": "Payment",
+   "narration": "upi-alpha traders-alpha.t@zzbk",
+   "lines": [
+    [
+     "Wages",
+     227
+    ],
+    [
+     "Bank A",
+     -227
+    ]
+   ]
+  },
+  {
+   "guid": "h04",
+   "date": "2025-04-05",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-BETA_S.9@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     293
+    ],
+    [
+     "Bank A",
+     -293
+    ]
+   ]
+  },
+  {
+   "guid": "h05",
+   "date": "2025-04-06",
+   "base_type": "Payment",
+   "narration": "UPI-B STORES-BETA_S.9@QQBK",
+   "lines": [
+    [
+     "Wages",
+     361
+    ],
+    [
+     "Bank A",
+     -361
+    ]
+   ]
+  },
+  {
+   "guid": "h06",
+   "date": "2025-04-07",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-70412-2@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     414
+    ],
+    [
+     "Bank A",
+     -414
+    ]
+   ]
+  },
+  {
+   "guid": "h07",
+   "date": "2025-04-08",
+   "base_type": "Payment",
+   "narration": "UPI-G MILLS-70412-2@QQBK",
+   "lines": [
+    [
+     "Wages",
+     469
+    ],
+    [
+     "Bank A",
+     -469
+    ]
+   ]
+  },
+  {
+   "guid": "h08",
+   "date": "2025-04-09",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA M-70412@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     543
+    ],
+    [
+     "Bank A",
+     -543
+    ]
+   ]
+  },
+  {
+   "guid": "h10",
+   "date": "2025-04-10",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-DELTA W@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     602
+    ],
+    [
+     "Bank A",
+     -602
+    ]
+   ]
+  },
+  {
+   "guid": "h11",
+   "date": "2025-04-11",
+   "base_type": "Payment",
+   "narration": "UPI-D WORKS-DELTA W@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     663
+    ],
+    [
+     "Bank A",
+     -663
+    ]
+   ]
+  },
+  {
+   "guid": "h12",
+   "date": "2025-04-12",
+   "base_type": "Payment",
+   "narration": "UPI-ETA-ETA-X@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     726
+    ],
+    [
+     "Bank A",
+     -726
+    ]
+   ]
+  },
+  {
+   "guid": "h13",
+   "date": "2025-04-13",
+   "base_type": "Payment",
+   "narration": "UPI-E-ETA-X@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     774
+    ],
+    [
+     "Bank A",
+     -774
+    ]
+   ]
+  },
+  {
+   "guid": "h14",
+   "date": "2025-04-14",
+   "base_type": "Payment",
+   "narration": "UPI-THETA-TH-1-2@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     841
+    ],
+    [
+     "Bank A",
+     -841
+    ]
+   ]
+  },
+  {
+   "guid": "h15",
+   "date": "2025-04-15",
+   "base_type": "Payment",
+   "narration": "UPI-T-TH-1-2@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     910
+    ],
+    [
+     "Bank A",
+     -910
+    ]
+   ]
+  },
+  {
+   "guid": "h16",
+   "date": "2025-04-16",
+   "base_type": "Payment",
+   "narration": "UPI-IOTA-IOTA&CO@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     964
+    ],
+    [
+     "Bank A",
+     -964
+    ]
+   ]
+  },
+  {
+   "guid": "h17",
+   "date": "2025-04-17",
+   "base_type": "Payment",
+   "narration": "UPI-I-IOTA&CO@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1020
+    ],
+    [
+     "Bank A",
+     -1020
+    ]
+   ]
+  },
+  {
+   "guid": "h18",
+   "date": "2025-04-18",
+   "base_type": "Payment",
+   "narration": "UPI-KAPPA-@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1078
+    ],
+    [
+     "Bank A",
+     -1078
+    ]
+   ]
+  },
+  {
+   "guid": "h19",
+   "date": "2025-04-19",
+   "base_type": "Payment",
+   "narration": "UPI-K-@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1138
+    ],
+    [
+     "Bank A",
+     -1138
+    ]
+   ]
+  },
+  {
+   "guid": "h20",
+   "date": "2025-04-20",
+   "base_type": "Payment",
+   "narration": "UPI-LAMBDA-LAM.BDA＠ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1200
+    ],
+    [
+     "Bank A",
+     -1200
+    ]
+   ]
+  },
+  {
+   "guid": "h21",
+   "date": "2025-04-21",
+   "base_type": "Payment",
+   "narration": "UPI-L-LAM.BDA＠ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1264
+    ],
+    [
+     "Bank A",
+     -1264
+    ]
+   ]
+  },
+  {
+   "guid": "h22",
+   "date": "2025-04-22",
+   "base_type": "Payment",
+   "narration": "UPI-MU-MÜ@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1330
+    ],
+    [
+     "Bank A",
+     -1330
+    ]
+   ]
+  },
+  {
+   "guid": "h23",
+   "date": "2025-04-23",
+   "base_type": "Payment",
+   "narration": "UPI-M-MÜ@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1398
+    ],
+    [
+     "Bank A",
+     -1398
+    ]
+   ]
+  },
+  {
+   "guid": "h24",
+   "date": "2025-04-24",
+   "base_type": "Payment",
+   "narration": "UPI-NU STORES-NU.S@",
+   "lines": [
+    [
+     "Wages",
+     1451
+    ],
+    [
+     "Bank A",
+     -1451
+    ]
+   ]
+  },
+  {
+   "guid": "h25",
+   "date": "2025-04-25",
+   "base_type": "Payment",
+   "narration": "UPI-N STORES-NU.S@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1506
+    ],
+    [
+     "Bank A",
+     -1506
+    ]
+   ]
+  },
+  {
+   "guid": "h26",
+   "date": "2025-04-26",
+   "base_type": "Payment",
+   "narration": "UPI-XI MART-XI-१२@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1580
+    ],
+    [
+     "Bank A",
+     -1580
+    ]
+   ]
+  },
+  {
+   "guid": "h27",
+   "date": "2025-04-27",
+   "base_type": "Payment",
+   "narration": "UPI-X MART-XI-१२@QQBK",
+   "lines": [
+    [
+     "Wages",
+     1639
+    ],
+    [
+     "Bank A",
+     -1639
+    ]
+   ]
+  },
+  {
+   "guid": "h28",
+   "date": "2025-04-28",
+   "base_type": "Payment",
+   "narration": "UPI-XI SHOP-XI-12@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1700
+    ],
+    [
+     "Bank A",
+     -1700
+    ]
+   ]
+  },
+  {
+   "guid": "h30",
+   "date": "2025-05-01",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/OMICRON/ZZBK/OMI.CRON@ZZ/PAY",
+   "lines": [
+    [
+     "Wages",
+     1763
+    ],
+    [
+     "Bank A",
+     -1763
+    ]
+   ]
+  },
+  {
+   "guid": "h31",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "UPI-OMICRON STORES-OMI.CRON@ZZBK-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1811
+    ],
+    [
+     "Bank A",
+     -1811
+    ]
+   ]
+  },
+  {
+   "guid": "h32",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/PI ST/ZZBK/PI ST ORE@Z Z/PAY",
+   "lines": [
+    [
+     "Wages",
+     1878
+    ],
+    [
+     "Bank A",
+     -1878
+    ]
+   ]
+  },
+  {
+   "guid": "h33",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "narration": "UPI-PI STORE-PISTORE@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1947
+    ],
+    [
+     "Bank A",
+     -1947
+    ]
+   ]
+  },
+  {
+   "guid": "h34",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/RHO/ZZBK/RHOMART.1@ZZ",
+   "lines": [
+    [
+     "Wages",
+     2001
+    ],
+    [
+     "Bank A",
+     -2001
+    ]
+   ]
+  },
+  {
+   "guid": "h35",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "narration": "UPI-RHO MART-RHOMART.1@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2057
+    ],
+    [
+     "Bank A",
+     -2057
+    ]
+   ]
+  },
+  {
+   "guid": "h36",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/SIGMA//SIG.MA@ZZ/",
+   "lines": [
+    [
+     "Wages",
+     2115
+    ],
+    [
+     "Bank A",
+     -2115
+    ]
+   ]
+  },
+  {
+   "guid": "h37",
+   "date": "2025-05-08",
+   "base_type": "Payment",
+   "narration": "UPI-SIGMA SALES-SIG.MA@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2175
+    ],
+    [
+     "Bank A",
+     -2175
+    ]
+   ]
+  },
+  {
+   "guid": "h38",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/TAU/ZZBK/@ZZ/PAY",
+   "lines": [
+    [
+     "Wages",
+     2237
+    ],
+    [
+     "Bank A",
+     -2237
+    ]
+   ]
+  },
+  {
+   "guid": "h39",
+   "date": "2025-05-10",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/UPSILON/ZZBK/UPS@Z@Q/PAY",
+   "lines": [
+    [
+     "Wages",
+     2301
+    ],
+    [
+     "Bank A",
+     -2301
+    ]
+   ]
+  },
+  {
+   "guid": "h40",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "narration": "UPI-UPSILON CO-UPS@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2367
+    ],
+    [
+     "Bank A",
+     -2367
+    ]
+   ]
+  },
+  {
+   "guid": "h41",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "narration": "UPI-OMEGA--12@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2435
+    ],
+    [
+     "Bank A",
+     -2435
+    ]
+   ]
+  },
+  {
+   "guid": "h42",
+   "date": "2025-05-13",
+   "base_type": "Payment",
+   "narration": "UPI-O--12@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2488
+    ],
+    [
+     "Bank A",
+     -2488
+    ]
+   ]
+  },
+  {
+   "guid": "h43",
+   "date": "2025-05-14",
+   "base_type": "Payment",
+   "narration": "UPI-BANYAN ONE-BN१@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2543
+    ],
+    [
+     "Bank A",
+     -2543
+    ]
+   ]
+  },
+  {
+   "guid": "h44",
+   "date": "2025-05-15",
+   "base_type": "Payment",
+   "narration": "UPI-BANYAN TWO-BN१@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2617
+    ],
+    [
+     "Bank A",
+     -2617
+    ]
+   ]
+  },
+  {
+   "guid": "h50",
+   "date": "2025-05-16",
+   "base_type": "Payment",
+   "narration": "UPI-CHI TRADERS-ZED.1@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2676
+    ],
+    [
+     "Bank A",
+     -2676
+    ]
+   ]
+  },
+  {
+   "guid": "h51",
+   "date": "2025-05-17",
+   "base_type": "Payment",
+   "narration": "UPI-CHI TRADERS-ABE.9@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2737
+    ],
+    [
+     "Bank A",
+     -2737
+    ]
+   ]
+  },
+  {
+   "guid": "h52",
+   "date": "2025-05-18",
+   "base_type": "Payment",
+   "narration": "UPI-PHI ONE-MID.5@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2800
+    ],
+    [
+     "Bank A",
+     -2800
+    ]
+   ]
+  },
+  {
+   "guid": "h53",
+   "date": "2025-05-19",
+   "base_type": "Payment",
+   "narration": "UPI-PHI TWO-MID.5@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2848
+    ],
+    [
+     "Bank A",
+     -2848
+    ]
+   ]
+  },
+  {
+   "guid": "h54",
+   "date": "2025-05-20",
+   "base_type": "Payment",
+   "narration": "UPI-PHI TWO-LOW.2@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2915
+    ],
+    [
+     "Bank A",
+     -2915
+    ]
+   ]
+  },
+  {
+   "guid": "h55",
+   "date": "2025-05-21",
+   "base_type": "Payment",
+   "narration": "UPI-PHI THREE-LOW.2@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2984
+    ],
+    [
+     "Bank A",
+     -2984
+    ]
+   ]
+  },
+  {
+   "guid": "h56",
+   "date": "2025-05-22",
+   "base_type": "Payment",
+   "narration": "IMPS-88-PHI THREE-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     3038
+    ],
+    [
+     "Bank A",
+     -3038
+    ]
+   ]
+  },
+  {
+   "guid": "h60",
+   "date": "2025-05-23",
+   "base_type": "Payment",
+   "narration": "UPI-PSI ONE-PSI.A@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     3094
+    ],
+    [
+     "Bank A",
+     -3094
+    ]
+   ]
+  },
+  {
+   "guid": "h61",
+   "date": "2025-05-24",
+   "base_type": "Payment",
+   "narration": "UPI-PSI TWO-PSI.B@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     3152
+    ],
+    [
+     "Bank A",
+     -3152
+    ]
+   ]
+  },
+  {
+   "guid": "h62",
+   "date": "2025-08-04",
+   "base_type": "Receipt",
+   "narration": "UPI-PSI ONE-PSI.B@ZZBK",
+   "lines": [
+    [
+     "Bank A",
+     4410
+    ],
+    [
+     "Capital",
+     -4410
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

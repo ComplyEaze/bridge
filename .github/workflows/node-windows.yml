@@ -1,0 +1,72 @@
+name: Node suite on Windows
+
+# Informational. The Node test suite (scripts/*.test.mjs) runs on ubuntu-latest in Bridge CI; this
+# runs it on windows-latest, where bridge#1471 measured 107 of 608 tests failing. It is not a
+# required check and is not part of Bridge CI's `Required checks`, so it cannot hold a pull request
+# or the merge queue. It goes red only for a failure that .github/node-windows-known-failures.txt
+# does not list, and for a run that cannot be trusted (no outcomes, a different set of test files,
+# a non-zero exit with no failed test). When the known-failures file is empty, delete it and the
+# comparison, and move the job into ci.yml as a required job.
+#
+# Deliberately no push, schedule or merge_group trigger: a failing run on master would mark a
+# commit red, and the merge queue must not wait on it.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+
+concurrency:
+  group: node-windows-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  node-windows:
+    name: Node suite (windows-latest, informational)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: corepack pnpm install --frozen-lockfile
+      # The same command as the first part of `pnpm test`, under bash because the suite's own tests
+      # call bash, jq and python. The exit status is recorded and the next step decides the job's
+      # result from the per-test outcomes, not from this status.
+      - name: Run the Node suite
+        id: node
+        shell: bash
+        run: |
+          status=0
+          node --experimental-strip-types --test \
+            --test-reporter=spec --test-reporter-destination=stdout \
+            --test-reporter=./scripts/node-test-outcomes.mjs --test-reporter-destination="$RUNNER_TEMP/outcomes.jsonl" \
+            scripts/*.test.mjs || status=$?
+          echo "node_exit=$status" >> "$GITHUB_OUTPUT"
+      - name: Compare with the known failures
+        if: ${{ !cancelled() && steps.node.outcome != 'skipped' }}
+        shell: bash
+        env:
+          NODE_EXIT: ${{ steps.node.outputs.node_exit }}
+        run: |
+          node scripts/check-node-windows-outcomes.mjs \
+            --outcomes "$RUNNER_TEMP/outcomes.jsonl" \
+            --baseline .github/node-windows-known-failures.txt \
+            --node-exit "$NODE_EXIT" \
+            --host "Runner ${{ runner.os }} ${{ runner.arch }}; Node $(node -v); bash $BASH_VERSION" \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - name: Keep the per-test outcomes
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: node-windows-outcomes
+          path: ${{ runner.temp }}/outcomes.jsonl
+          if-no-files-found: warn
+          retention-days: 14

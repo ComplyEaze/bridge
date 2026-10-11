@@ -134,7 +134,7 @@ pub(super) fn release_preview(line: &ImportLedgerLine, company_name: &str, seen:
             format!(
                 "  {} dated {}",
                 shown(voucher.voucher_number.as_deref().unwrap_or("(no number)")),
-                shown(&voucher.date)
+                shown(voucher.date.as_str())
             )
         })
         .collect::<Vec<_>>()

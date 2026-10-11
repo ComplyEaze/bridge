@@ -405,16 +405,17 @@ relying on a successful group tag over a GUID-less group has been found), and th
 extend the fallback to groups without that same measurement.
 
 **Evidence refs name what they cite.** An evidence ref's id is the identifier of the thing cited, not
-a tag. The crate emits nine kinds: `voucher` and `excluded_voucher` (the voucher's GUID),
+a tag. The crate emits ten kinds: `voucher` and `excluded_voucher` (the voucher's GUID),
 `document_row` (`{document id}#{row}`, a locator the extractor chose, not a name), `row` (a fixed
 locator for a computed row), `rule` (a fixed key), `config` (the configuration entry cited: a fixed
 key such as `presumptive_history`, or, for a deductor alias, the deductor's TAN), `pan` (the entity's
-PAN, as recorded, set in the engagement's party table or derived from a GSTIN; bridge#1145 item 9)
-and `ledger` and `stock_item`, whose id is the NAME as the books write it (compared
-NFC-normalised, §2.2). This section's tag rule does not apply to any of them. The reference
-engine's renderer declares the kinds whose id is a name in `NAME_KINDS` (`ledger`, `stock_item` and
-`payee_name`, a kind this crate does not yet emit) and every other kind in `NOT_NAME_KINDS`, with a
-selftest that every kind a test constructs is in exactly one list.
+PAN, as recorded, set in the engagement's party table or derived from a GSTIN; bridge#1145 item 9),
+`ledger` and `stock_item`, whose id is the NAME as the books write it (compared NFC-normalised,
+§2.2), and `payee_name` (`narration_payees`: a payee's names as the bank printed them in the
+narration, upper-cased, joined by ` / `), whose id is a name too. This section's tag rule does not
+apply to any of them. The reference engine's renderer declares the kinds whose id is a name in
+`NAME_KINDS` (`ledger`, `stock_item` and `payee_name`) and every other kind in `NOT_NAME_KINDS`,
+with a selftest that every kind a test constructs is in exactly one list.
 
 A consumer that redacts or masks must therefore treat the id of a `ledger`, `payee_name` or
 `stock_item` ref as a name, and the id of a `pan` ref as a tax identifier; a `config` id may be a tax

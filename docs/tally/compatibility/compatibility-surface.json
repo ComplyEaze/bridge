@@ -250,6 +250,22 @@
       "reason": "Tests pinning the Cash Flow request to its captured bytes and the parser's and window's refusals, on the live captures; a weakened test lets a month be misplaced or an empty answer pass unseen."
     },
     {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_company_features.rs",
+      "reason": "Company features read: renders the Company collection request and parses its answer closed, binding the one row to the verified company by GUID, name, number and books-from date; a defect shows another company's setting or reads a missing or empty one as No."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_company_features_tests.rs",
+      "reason": "Tests pinning the company features request to its captured bytes and the parser's refusals on the live captures; a weakened test lets a wrong company's setting, an empty setting or a repeated one pass unseen."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_funds_flow.rs",
+      "reason": "Funds Flow read: renders the report request and parses the answer with the Cash Flow's closed grammar over whole months, keeping Tally's three columns under neutral names; a defect swaps two columns, places a month in the wrong year or reads an empty or refused answer as a funds flow."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_funds_flow_tests.rs",
+      "reason": "Tests pinning the Funds Flow request to its captured bytes, the parse of the live capture and the mapping of each shared refusal to its own variant; a weakened test lets a swapped column or an empty answer pass unseen."
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_ledger_collection.rs"
     },
     {
@@ -259,6 +275,14 @@
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_masters_tests.rs",
       "reason": "Tests pinning the masters requests to their captured bytes and the parser's refusals, company binding and size arithmetic; a weakened test lets a masters defect ship unseen."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_negative_stock.rs",
+      "reason": "Negative Stock read: renders the report request and parses the answer closed, item by item; a defect reads an empty or refused answer as 'no negative stock' or shows one item's quantity or value as another's."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_negative_stock_tests.rs",
+      "reason": "Tests pinning the Negative Stock request to its captured bytes, the parse of the live capture, and the parser's refusals on mutated copies of it; a weakened test lets an empty answer or a malformed row pass unseen."
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_outstandings/compute.rs"
@@ -409,6 +433,10 @@
     },
     {
       "path": "src-tauri/src/agent_company.rs"
+    },
+    {
+      "path": "src-tauri/src/agent_company_features.rs",
+      "reason": "The company_features tool: returns three settings from Tally's company record and a currency symbol, each setting saying what it rests on. A defect presents a setting Tally did not send as off, or one not compared with the screen as checked."
     },
     {
       "path": "src-tauri/src/agent_delivery.rs"
@@ -818,6 +846,14 @@
       "path": "src-tauri/src/tally/runtime.rs"
     },
     {
+      "path": "src-tauri/src/tally/runtime_company_features.rs",
+      "reason": "Runs the company features read inside the company, mode and book-extent bracket and binds the one row to the verified company. A defect returns settings of another company or of a book that moved."
+    },
+    {
+      "path": "src-tauri/src/tally/runtime_company_features_tests.rs",
+      "reason": "Tests for the company features runtime's bracket, row binding and refusals; a weakened test lets settings of the wrong company or a moved book ship unseen."
+    },
+    {
       "path": "src-tauri/src/tally/runtime_control.rs"
     },
     {
@@ -865,9 +901,6 @@
     },
     {
       "path": "src/ErrorBoundary.tsx"
-    },
-    {
-      "path": "src/GstScreen.tsx"
     },
     {
       "path": "src/JournalPostingScreen.tsx"

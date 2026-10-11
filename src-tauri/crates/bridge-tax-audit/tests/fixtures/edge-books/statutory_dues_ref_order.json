@@ -1,0 +1,303 @@
+{
+ "comment": "statutory_dues_43b, the refs of vouchers that share a GUID (#1243), each cited by its own GUID and label: three charges on one GUID whose numbers differ only in case; six on another whose numbers are a letter, an accented letter in its composed and in its decomposed form (two refs that the canonical dump shows alike), a full-width letter and a character beyond U+FFFF, one of them again under a type differing only in case and again on an earlier day; two blank-GUID payments whose numbers differ only in case; and two GUIDs differing only in case. The canonical dump sorts refs itself, so this golden does not pin the order the module emits them in.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Output GST Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-so-l01"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-so-l02"
+  },
+  {
+   "name": "Trade Debtors",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-so-l03"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Output GST Payable",
+   "opening": -9000,
+   "debit": 3000,
+   "credit": 880,
+   "closing": -6880
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "edge-so-case",
+   "date": "2025-10-01",
+   "base_type": "Journal",
+   "number": "inv-a",
+   "lines": [
+    [
+     "Output GST Payable",
+     -100
+    ],
+    [
+     "Trade Debtors",
+     100
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-case",
+   "date": "2025-10-01",
+   "base_type": "Journal",
+   "number": "INV-A",
+   "lines": [
+    [
+     "Output GST Payable",
+     -200
+    ],
+    [
+     "Trade Debtors",
+     200
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-case",
+   "date": "2025-10-01",
+   "base_type": "Journal",
+   "number": "Inv-a",
+   "lines": [
+    [
+     "Output GST Payable",
+     -300
+    ],
+    [
+     "Trade Debtors",
+     300
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-uni",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "number": "\ud83d\udcd11",
+   "lines": [
+    [
+     "Output GST Payable",
+     -10
+    ],
+    [
+     "Trade Debtors",
+     10
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-uni",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "number": "\uff211",
+   "lines": [
+    [
+     "Output GST Payable",
+     -20
+    ],
+    [
+     "Trade Debtors",
+     20
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-uni",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "number": "\u00e91",
+   "lines": [
+    [
+     "Output GST Payable",
+     -30
+    ],
+    [
+     "Trade Debtors",
+     30
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-uni",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "number": "z1",
+   "lines": [
+    [
+     "Output GST Payable",
+     -40
+    ],
+    [
+     "Trade Debtors",
+     40
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-uni",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "number": "e\u03011",
+   "lines": [
+    [
+     "Output GST Payable",
+     -50
+    ],
+    [
+     "Trade Debtors",
+     50
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-uni",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "vtype": "journal",
+   "number": "z1",
+   "lines": [
+    [
+     "Output GST Payable",
+     -60
+    ],
+    [
+     "Trade Debtors",
+     60
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-uni",
+   "date": "2025-10-31",
+   "base_type": "Journal",
+   "number": "z1",
+   "lines": [
+    [
+     "Output GST Payable",
+     -70
+    ],
+    [
+     "Trade Debtors",
+     70
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-12-01",
+   "base_type": "Payment",
+   "number": "pay-b",
+   "lines": [
+    [
+     "Output GST Payable",
+     400
+    ],
+    [
+     "Bank",
+     -400
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-12-01",
+   "base_type": "Payment",
+   "number": "PAY-B",
+   "lines": [
+    [
+     "Output GST Payable",
+     500
+    ],
+    [
+     "Bank",
+     -500
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-G",
+   "date": "2025-12-02",
+   "base_type": "Payment",
+   "number": "G1",
+   "lines": [
+    [
+     "Output GST Payable",
+     600
+    ],
+    [
+     "Bank",
+     -600
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-g",
+   "date": "2025-12-02",
+   "base_type": "Payment",
+   "number": "G1",
+   "lines": [
+    [
+     "Output GST Payable",
+     700
+    ],
+    [
+     "Bank",
+     -700
+    ]
+   ]
+  },
+  {
+   "guid": "edge-so-g",
+   "date": "2025-12-03",
+   "base_type": "Payment",
+   "number": "G0",
+   "lines": [
+    [
+     "Output GST Payable",
+     800
+    ],
+    [
+     "Bank",
+     -800
+    ]
+   ]
+  }
+ ],
+ "cash": [],
+ "bank": [
+  "Bank"
+ ],
+ "statutory_dues": {
+  "nature_by_ledger": {
+   "Output GST Payable": "gst_payable"
+  }
+ },
+ "tests": [
+  "statutory_dues_43b"
+ ]
+}

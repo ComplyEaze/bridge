@@ -19,7 +19,7 @@ pub(super) fn parse_master_domain_high_water(xml: &str) -> Result<u64, String> {
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                tag = event.name().as_ref().to_ascii_uppercase();
                 if matches!(tag.as_str(), "LEDGER" | "GROUP") && scope.collection() {
                     in_domain_row = true;
                 }
@@ -30,18 +30,14 @@ pub(super) fn parse_master_domain_high_water(xml: &str) -> Result<u64, String> {
                     && (scope.field("LEDGER") || scope.field("GROUP"))
                     && tag == "ALTERID" =>
             {
-                let value = text
-                    .decode()
-                    .map_err(|_| "master_checkpoint_invalid".to_string())?;
                 high_water = high_water.max(
-                    value
-                        .trim()
+                    text.trim()
                         .parse::<u64>()
                         .map_err(|_| "master_checkpoint_invalid".to_string())?,
                 );
             }
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 if scope.row("LEDGER") || scope.row("GROUP") {
                     in_domain_row = false;
                 }
@@ -49,7 +45,7 @@ pub(super) fn parse_master_domain_high_water(xml: &str) -> Result<u64, String> {
                 tag.clear();
             }
             Ok(quick_xml::events::Event::Empty(event)) => {
-                let name = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let name = event.name().as_ref().to_ascii_uppercase();
                 if scope.collection() && matches!(name.as_str(), "COMPANY" | "LEDGER" | "GROUP") {
                     return Err("agent_read_protocol_invalid".to_string());
                 }
@@ -116,7 +112,7 @@ pub(super) fn parse_agent_changed_masters(xml: &str) -> Result<Vec<Value>, Strin
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let next = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let next = event.name().as_ref().to_ascii_uppercase();
                 if matches!(next.as_str(), "LEDGER" | "GROUP") && scope.collection() {
                     current = Some((next.clone(), BTreeMap::new()));
                 }
@@ -140,7 +136,7 @@ pub(super) fn parse_agent_changed_masters(xml: &str) -> Result<Vec<Value>, Strin
                 }
             }
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 if scope.row("LEDGER") || scope.row("GROUP") {
                     if let Some((kind, fields)) = current.take() {
                         let alter_id = fields
@@ -165,7 +161,7 @@ pub(super) fn parse_agent_changed_masters(xml: &str) -> Result<Vec<Value>, Strin
                 tag.clear();
             }
             Ok(quick_xml::events::Event::Empty(event)) => {
-                let name = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let name = event.name().as_ref().to_ascii_uppercase();
                 if scope.collection() && matches!(name.as_str(), "COMPANY" | "LEDGER" | "GROUP") {
                     return Err("agent_read_protocol_invalid".to_string());
                 }

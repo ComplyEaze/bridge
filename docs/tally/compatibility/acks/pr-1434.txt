@@ -1,0 +1,13 @@
+src-tauri/Cargo.lock
+src-tauri/Cargo.toml
+src-tauri/src/agent_change_parse.rs
+src-tauri/src/agent_import.rs
+src-tauri/src/agent_read_validation.rs
+src-tauri/src/agent_tests.rs
+src-tauri/src/agent_voucher_parse.rs
+src-tauri/src/agent_voucher_window.rs
+src-tauri/src/reports/trial_balance_xlsx_tests.rs
+src-tauri/src/source_draft_xml.rs
+src-tauri/src/tally/agent_read_request.rs
+src-tauri/src/tally/runtime.rs
+reviewer: lamemustafa

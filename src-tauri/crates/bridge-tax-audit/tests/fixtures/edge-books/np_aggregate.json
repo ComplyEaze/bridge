@@ -1,0 +1,290 @@
+{
+ "comment": "The aggregate limit (10000000 paise); Wages from Bank A, every payment on a day of its own. a01 to a04 pay DELTA WORKS 2500000 four times: exactly the limit, not over. a11 to a15 pay EPSILON CARRIERS 2500000 four times and 1 paisa: one paisa over, so over, with no payment over the single-sum limit. a21 to a24 pay ZETA 2999999, 3000000, 3000000 and 1000000: one paisa under, not over, its largest payment exactly at the single-sum limit. One payee over; payees_over_194c_total is 10000001.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_aggregate-100"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_aggregate-101"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_aggregate-102"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 30000000,
+   "closing": -30000000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 30000000,
+   "credit": 0,
+   "closing": 30000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "a01",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "a02",
+   "date": "2025-06-07",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "a03",
+   "date": "2025-07-07",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "a04",
+   "date": "2025-08-07",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "a11",
+   "date": "2025-05-08",
+   "base_type": "Payment",
+   "narration": "UPI-EPSILON CARRIERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "a12",
+   "date": "2025-06-08",
+   "base_type": "Payment",
+   "narration": "UPI-EPSILON CARRIERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "a13",
+   "date": "2025-07-08",
+   "base_type": "Payment",
+   "narration": "UPI-EPSILON CARRIERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "a14",
+   "date": "2025-08-08",
+   "base_type": "Payment",
+   "narration": "UPI-EPSILON CARRIERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "a15",
+   "date": "2025-09-08",
+   "base_type": "Payment",
+   "narration": "UPI-EPSILON CARRIERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1
+    ],
+    [
+     "Bank A",
+     -1
+    ]
+   ]
+  },
+  {
+   "guid": "a21",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2999999
+    ],
+    [
+     "Bank A",
+     -2999999
+    ]
+   ]
+  },
+  {
+   "guid": "a22",
+   "date": "2025-06-09",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "a23",
+   "date": "2025-07-09",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "a24",
+   "date": "2025-08-09",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

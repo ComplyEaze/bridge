@@ -1089,6 +1089,7 @@ mod tests {
             ledgers: BTreeMap::new(),
             stock: None,
             currency_read: false,
+            opening_stock: crate::book::OpeningStock::NotApplicable,
             vouchers,
             tb: BTreeMap::from([(
                 "Bank".to_string(),

@@ -1,0 +1,675 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "statutory_dues_43b",
+  "test_version": "2",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "60f4750c0ff10ed0",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). Each nature's opening/closing liability is the Trial Balance sum across every ledger the client's setup maps to it; charged/paid are population voucher-line sums on the same ledgers (never a filtered sub-table).",
+  "figures": [
+    {
+      "id": "statutory_dues_43b.charged_gst_payable",
+      "value": 8400,
+      "unit": "paise",
+      "definition_sha256_16": "68bc579b646bf6d9",
+      "definition_text": "Sum of population voucher CREDIT lines (amount added to the liability) on ledgers mapped to nature 'gst_payable'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal  on 2025-08-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal MIX on 2025-12-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B1 on 2025-08-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B2 on 2025-08-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "EDGE-SG-A",
+          "label": "Payment P9 on 2025-12-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-a",
+          "label": "Journal J1 on 2025-07-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-a",
+          "label": "Payment P1 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-twin",
+          "label": "Payment TW on 2025-09-01"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.charged_gst_payable_rcm",
+      "value": 2100,
+      "unit": "paise",
+      "definition_sha256_16": "854c6fb861b86275",
+      "definition_text": "Sum of population voucher CREDIT lines (amount added to the liability) on ledgers mapped to nature 'gst_payable_rcm'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal R1 on 2026-01-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal R2 on 2026-01-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-rn",
+          "label": "Journal R3 on 2026-01-12"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.charged_tds_payable",
+      "value": 50,
+      "unit": "paise",
+      "definition_sha256_16": "4180b4107f2f37fe",
+      "definition_text": "Sum of population voucher CREDIT lines (amount added to the liability) on ledgers mapped to nature 'tds_payable'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal MIX on 2025-12-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment T1 on 2026-02-07"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.closing_liability_gst_payable",
+      "value": 22400,
+      "unit": "paise",
+      "definition_sha256_16": "baff7b5fb2ce628f",
+      "definition_text": "Trial Balance closing balance (Dr+/Cr- flipped to a liability-positive figure), summed across every ledger the client's setup maps to nature 'gst_payable'.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Output GST Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.closing_liability_gst_payable_rcm",
+      "value": 5100,
+      "unit": "paise",
+      "definition_sha256_16": "4fef24f79efcce1a",
+      "definition_text": "Trial Balance closing balance (Dr+/Cr- flipped to a liability-positive figure), summed across every ledger the client's setup maps to nature 'gst_payable_rcm'.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "RCM GST Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "RCM IGST Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.closing_liability_tds_payable",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "73a4fa3013ce2bd8",
+      "definition_text": "Trial Balance closing balance (Dr+/Cr- flipped to a liability-positive figure), summed across every ledger the client's setup maps to nature 'tds_payable'.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "TDS Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_gst_payable",
+      "value": 50000,
+      "unit": "paise",
+      "definition_sha256_16": "95f4af0b65a219c5",
+      "definition_text": "Trial Balance opening balance (Dr+/Cr- flipped to a liability-positive figure), summed across every ledger the client's setup maps to nature 'gst_payable'.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Output GST Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_gst_payable_rcm",
+      "value": 3000,
+      "unit": "paise",
+      "definition_sha256_16": "e17072d4caacc89e",
+      "definition_text": "Trial Balance opening balance (Dr+/Cr- flipped to a liability-positive figure), summed across every ledger the client's setup maps to nature 'gst_payable_rcm'.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "RCM GST Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "RCM IGST Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_tds_payable",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "d22dfbcf86f7ead2",
+      "definition_text": "Trial Balance opening balance (Dr+/Cr- flipped to a liability-positive figure), summed across every ledger the client's setup maps to nature 'tds_payable'.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "TDS Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_s43b_paid_this_year_gst_payable",
+      "value": 36000,
+      "unit": "paise",
+      "definition_sha256_16": "f4770c215bc3a65f",
+      "definition_text": "Clause 26(i)(A)(a) CANDIDATE: portion of nature 'gst_payable's opening (pre-existing) Trial Balance liability matched, FIFO oldest-first, to this year's own payment vouchers on its mapped ledgers. NOT a settled 'allowable' fact: GN 46.5 limits 26(i)(A) to a sum that was NOT already allowable in an earlier year, which can only be verified from last year's own income-tax return/Form 3CD (not available to this module) -- treating the whole TB opening balance as 26(i)(A) risks double-deducting an amount already allowed last year.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B1 on 2025-08-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B2 on 2025-08-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "EDGE-SG-A",
+          "label": "Payment P9 on 2025-12-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-a",
+          "label": "Payment P1 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-twin",
+          "label": "Payment TW on 2025-09-01"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_s43b_paid_this_year_gst_payable_rcm",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "13a766f529546826",
+      "definition_text": "Clause 26(i)(A)(a) CANDIDATE: portion of nature 'gst_payable_rcm's opening (pre-existing) Trial Balance liability matched, FIFO oldest-first, to this year's own payment vouchers on its mapped ledgers. NOT a settled 'allowable' fact: GN 46.5 limits 26(i)(A) to a sum that was NOT already allowable in an earlier year, which can only be verified from last year's own income-tax return/Form 3CD (not available to this module) -- treating the whole TB opening balance as 26(i)(A) risks double-deducting an amount already allowed last year.",
+      "evidence": []
+    },
+    {
+      "id": "statutory_dues_43b.opening_s43b_still_unpaid_gst_payable",
+      "value": 14000,
+      "unit": "paise",
+      "definition_sha256_16": "cd536cddeb6f18e5",
+      "definition_text": "Clause 26(i)(A)(b) CANDIDATE: portion of nature 'gst_payable's opening (pre-existing) liability still unmatched to any payment in this year's population. Same GN 46.5 limitation as the portion of that liability paid this year: this is a candidate needing last year's return to confirm it was not already allowable in an earlier year, not a settled figure; it carries forward as next year's own opening balance either way, and is EXCLUDED from clause 26(i)(B) so it is never counted twice.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Output GST Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_s43b_still_unpaid_gst_payable_rcm",
+      "value": 3000,
+      "unit": "paise",
+      "definition_sha256_16": "d4a31b098c13a49d",
+      "definition_text": "Clause 26(i)(A)(b) CANDIDATE: portion of nature 'gst_payable_rcm's opening (pre-existing) liability still unmatched to any payment in this year's population. Same GN 46.5 limitation as the portion of that liability paid this year: this is a candidate needing last year's return to confirm it was not already allowable in an earlier year, not a settled figure; it carries forward as next year's own opening balance either way, and is EXCLUDED from clause 26(i)(B) so it is never counted twice.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "RCM GST Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "RCM IGST Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.paid_gst_payable",
+      "value": 36000,
+      "unit": "paise",
+      "definition_sha256_16": "4bcb25060331ecbe",
+      "definition_text": "Sum of population voucher DEBIT lines (amount paid against the liability) on ledgers mapped to nature 'gst_payable'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal  on 2025-08-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal MIX on 2025-12-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B1 on 2025-08-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B2 on 2025-08-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "EDGE-SG-A",
+          "label": "Payment P9 on 2025-12-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-a",
+          "label": "Journal J1 on 2025-07-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-a",
+          "label": "Payment P1 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-twin",
+          "label": "Payment TW on 2025-09-01"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.paid_gst_payable_rcm",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "5f758cdf3d2f1189",
+      "definition_text": "Sum of population voucher DEBIT lines (amount paid against the liability) on ledgers mapped to nature 'gst_payable_rcm'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal R1 on 2026-01-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal R2 on 2026-01-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-rn",
+          "label": "Journal R3 on 2026-01-12"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.paid_tds_payable",
+      "value": 50,
+      "unit": "paise",
+      "definition_sha256_16": "3f44f4f09e5d7b00",
+      "definition_text": "Sum of population voucher DEBIT lines (amount paid against the liability) on ledgers mapped to nature 'tds_payable'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal MIX on 2025-12-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment T1 on 2026-02-07"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.this_year_closing_liability_gst_payable",
+      "value": 8400,
+      "unit": "paise",
+      "definition_sha256_16": "ad69a4e0d6ce3a8f",
+      "definition_text": "3CD-26(i)(B): THIS YEAR's own unpaid s.43B liability for nature 'gst_payable' -- the Trial Balance closing balance LESS any still-unpaid remainder of the OPENING (pre-existing) liability reported separately under clause 26(i)(A)(b), so the same rupee is never counted under both clauses (GN 46.4-46.7).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Output GST Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.this_year_closing_liability_gst_payable_rcm",
+      "value": 2100,
+      "unit": "paise",
+      "definition_sha256_16": "a3add00bbac2ade1",
+      "definition_text": "3CD-26(i)(B): THIS YEAR's own unpaid s.43B liability for nature 'gst_payable_rcm' -- the Trial Balance closing balance LESS any still-unpaid remainder of the OPENING (pre-existing) liability reported separately under clause 26(i)(A)(b), so the same rupee is never counted under both clauses (GN 46.4-46.7).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "RCM GST Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "RCM IGST Payable",
+          "label": ""
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "statutory_dues_43b/opening_paid/gst_payable",
+      "clauses": [
+        "s.43B",
+        "3CD-26(i)(A)(a)"
+      ],
+      "confidence": "indicative",
+      "facts": [
+        {
+          "name": "opening_liability",
+          "figure_id": "statutory_dues_43b.opening_liability_gst_payable"
+        },
+        {
+          "name": "opening_paid",
+          "figure_id": "statutory_dues_43b.opening_s43b_paid_this_year_gst_payable"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B1 on 2025-08-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment B2 on 2025-08-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "EDGE-SG-A",
+          "label": "Payment P9 on 2025-12-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-a",
+          "label": "Payment P1 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sg-twin",
+          "label": "Payment TW on 2025-09-01"
+        }
+      ],
+      "title_sha256_16": "5fb5f3beb72b7fec",
+      "title_text": "Sum under s.43B for 'gst payable' incurred in an earlier year, paid during this year: a clause 26(i)(A) candidate",
+      "limits_sha256_16": "7a78e3e4b904f2cd",
+      "limits_text": [
+        "FIFO order is an assumption about which specific bill or liability instalment a payment settled first -- the ledger itself does not say (the same assumption used for creditor ageing elsewhere in this pack); confirm against the challan/payment advice if the exact instalment paid matters.",
+        "Candidate only (GN 46.5): this is only a clause 26(i)(A)(a) amount if it was NOT already allowable in an earlier year -- that needs last year's own income-tax return/Form 3CD, which this module does not have."
+      ],
+      "ask_client_sha256_16": "3845655c27753c69",
+      "ask_client_text": [
+        "Challan(s)/payment proof identifying which specific prior-year dues these payments settled, to confirm the FIFO attribution.",
+        "Last year's income-tax return/Form 3CD, to confirm this amount was not already allowable in an earlier year."
+      ]
+    },
+    {
+      "id": "statutory_dues_43b/opening_unpaid/gst_payable",
+      "clauses": [
+        "s.43B",
+        "3CD-26(i)(A)(b)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "opening_liability",
+          "figure_id": "statutory_dues_43b.opening_liability_gst_payable"
+        },
+        {
+          "name": "opening_unpaid",
+          "figure_id": "statutory_dues_43b.opening_s43b_still_unpaid_gst_payable"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Output GST Payable",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "ec7a6420a66fadfe",
+      "title_text": "Sum under s.43B for 'gst payable' incurred in an earlier year, still unpaid at this year end: a clause 26(i)(A) candidate",
+      "limits_sha256_16": "6a4faba405ce1cb3",
+      "limits_text": [
+        "Candidate only (GN 46.5): this is only a clause 26(i)(A)(b) amount if it was NOT already allowable in an earlier year -- that needs last year's own income-tax return/Form 3CD, which this module does not have, so this is NOT a settled COMPUTED figure. If and when it is paid, it is allowed only in the year of actual payment (GN 46.4-46.5: no return-due-date relief for a pre-existing liability); it carries forward as next year's own opening balance either way."
+      ],
+      "ask_client_sha256_16": "65b4256fa8e918ee",
+      "ask_client_text": [
+        "Last year's income-tax return/Form 3CD, to confirm whether this amount was already allowable in an earlier year."
+      ]
+    },
+    {
+      "id": "statutory_dues_43b/opening_unpaid/gst_payable_rcm",
+      "clauses": [
+        "s.43B",
+        "3CD-26(i)(A)(b)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "opening_liability",
+          "figure_id": "statutory_dues_43b.opening_liability_gst_payable_rcm"
+        },
+        {
+          "name": "opening_unpaid",
+          "figure_id": "statutory_dues_43b.opening_s43b_still_unpaid_gst_payable_rcm"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "RCM GST Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "RCM IGST Payable",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "d70420fc17cc5a74",
+      "title_text": "Sum under s.43B for 'gst payable rcm' incurred in an earlier year, still unpaid at this year end: a clause 26(i)(A) candidate",
+      "limits_sha256_16": "6a4faba405ce1cb3",
+      "limits_text": [
+        "Candidate only (GN 46.5): this is only a clause 26(i)(A)(b) amount if it was NOT already allowable in an earlier year -- that needs last year's own income-tax return/Form 3CD, which this module does not have, so this is NOT a settled COMPUTED figure. If and when it is paid, it is allowed only in the year of actual payment (GN 46.4-46.5: no return-due-date relief for a pre-existing liability); it carries forward as next year's own opening balance either way."
+      ],
+      "ask_client_sha256_16": "65b4256fa8e918ee",
+      "ask_client_text": [
+        "Last year's income-tax return/Form 3CD, to confirm whether this amount was already allowable in an earlier year."
+      ]
+    },
+    {
+      "id": "statutory_dues_43b/unpaid/gst_payable",
+      "clauses": [
+        "s.43B",
+        "3CD-26(i)(B)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "charged",
+          "figure_id": "statutory_dues_43b.charged_gst_payable"
+        },
+        {
+          "name": "closing_liability",
+          "figure_id": "statutory_dues_43b.this_year_closing_liability_gst_payable"
+        },
+        {
+          "name": "opening_liability",
+          "figure_id": "statutory_dues_43b.opening_liability_gst_payable"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Output GST Payable",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "fe123cbebc197c78",
+      "title_text": "Closing balance under s.43B for gst payable, incurred this year, as recorded in the books",
+      "limits_sha256_16": "605e701a116cb457",
+      "limits_text": [
+        "Allowability under s.43B turns on payment on or before the return due date under s.139(1) (2026-10-31 per the rules table, status partial); a challan or payment proof dated after 31 March is needed and is not in this book. (s.43B and its proviso (payment on or before the s.139(1) return due date); Explanation 5 (employees' contributions are governed by s.36(1)(va), not this proviso), status=confirm)",
+        "Clause 26(i)(B) splits (a) paid on or before the s.139(1) due date from (b) not so paid; this closing balance alone cannot be placed in either without post-year payment evidence (a challan or bank statement dated after 31 March), so this finding stays tagged the bare 26(i)(B), not (a) or (b).",
+        "Under the exclusive method (GST kept outside profit and loss, clause 26(ii) answered 'No'), s.43B does not disallow this amount in computing income because it was never claimed as a deduction; the Guidance Note still requires it to be shown as a NOTE under clause 26 -- the amount collected but not paid, and the date/amount of any payment made before the due date (GN 46.17, 46.23). Confirm the accounting method (exclusive vs inclusive) before wording clause 26."
+      ],
+      "ask_client_sha256_16": "049cfc23d80e53b8",
+      "ask_client_text": [
+        "Challan(s) or payment proof for 'gst_payable' dated after 31 March, on or before the s.139(1) return due date."
+      ]
+    },
+    {
+      "id": "statutory_dues_43b/unpaid/gst_payable_rcm",
+      "clauses": [
+        "s.43B",
+        "3CD-26(i)(B)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "charged",
+          "figure_id": "statutory_dues_43b.charged_gst_payable_rcm"
+        },
+        {
+          "name": "closing_liability",
+          "figure_id": "statutory_dues_43b.this_year_closing_liability_gst_payable_rcm"
+        },
+        {
+          "name": "opening_liability",
+          "figure_id": "statutory_dues_43b.opening_liability_gst_payable_rcm"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "RCM GST Payable",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "RCM IGST Payable",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "ff894a3212c4b0f8",
+      "title_text": "Closing balance under s.43B for gst payable rcm, incurred this year, as recorded in the books",
+      "limits_sha256_16": "39f3ff32db29da5e",
+      "limits_text": [
+        "Allowability under s.43B turns on payment on or before the return due date under s.139(1) (2026-10-31 per the rules table, status partial); a challan or payment proof dated after 31 March is needed and is not in this book. (s.43B and its proviso (payment on or before the s.139(1) return due date); Explanation 5 (employees' contributions are governed by s.36(1)(va), not this proviso), status=confirm)",
+        "Clause 26(i)(B) splits (a) paid on or before the s.139(1) due date from (b) not so paid; this closing balance alone cannot be placed in either without post-year payment evidence (a challan or bank statement dated after 31 March), so this finding stays tagged the bare 26(i)(B), not (a) or (b).",
+        "Under the exclusive method (GST kept outside profit and loss, clause 26(ii) answered 'No'), s.43B does not disallow this amount in computing income because it was never claimed as a deduction; the Guidance Note still requires it to be shown as a NOTE under clause 26 -- the amount collected but not paid, and the date/amount of any payment made before the due date (GN 46.17, 46.23). Confirm the accounting method (exclusive vs inclusive) before wording clause 26.",
+        "This is reverse-charge (RCM) GST payable: GN 46.26 separately requires RCM GST booked but not paid by the due date to be reported under clause 26, in addition to the exclusive-method note above."
+      ],
+      "ask_client_sha256_16": "515f7943471e74ec",
+      "ask_client_text": [
+        "Challan(s) or payment proof for 'gst_payable_rcm' dated after 31 March, on or before the s.139(1) return due date."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "POP-1",
+      "subject": "Bank",
+      "detail": "vouchers -36130 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Trade Debtors",
+      "detail": "vouchers 10630 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to -27500 paise"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "opening_paise",
+      "detail": "TB opening_paise sums to -53000 paise"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "(blank)",
+      "detail": "8 in-books voucher(s) have no GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "edge-sg-a",
+      "detail": "3 in-books vouchers share this GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "edge-sg-twin",
+      "detail": "2 in-books vouchers share this GUID"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "statutory_dues_43b.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

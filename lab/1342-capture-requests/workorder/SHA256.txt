@@ -36,3 +36,4 @@ bd6fb5b6f933a505227f7ff2ad1a5ba9f9fed705500e0657e7f68dfac8ef38fb  w10-rates-buil
 a9725222e696368aaca63d056a5df2ca42921e3596d9a835bcb30deb3e93075c  w10-rates-early-window.xml
 e10e6269e2bb5c1dee54ba3d140bfee83003b35a17ef3001977d9005554879ab  w10-ledger-gst-switch-fields.xml
 850ffa0355be2fa98097791575f301897f1fc2391e88a5208bdb4d6a1fe10247  w10-status-window-0806.xml
+e5ef516621141b75061ad2de7c68fed7ebbfa4c367f3164471fb2fcd8583cb0c  w10-status-window-0806-lowercase.xml

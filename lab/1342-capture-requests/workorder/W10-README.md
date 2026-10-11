@@ -33,7 +33,8 @@ After W9. This work writes: it creates four ledgers, alters one of them, and key
 10. Key `BP/26-27/0024` the same way as `0022` (dated 6-Aug-2026, walk-in customer, invoice mode, no round off): one sales line `BRIDGE Svc 998314 5%` 100.30, `BRIDGE CGST 2.5%` and `BRIDGE SGST 2.5%`, amounts left as Tally fills them. The tax on this line is 2.5075 for each head, a fraction above half a paisa. Save it. Screenshot the voucher.
 11. Key `BP/26-27/0025` the same way: three sales lines of 100.10 each on `BRIDGE Svc 998313 5%`, `BRIDGE Svc 998314 5%` and `BRIDGE Svc 998315 5%`, with `BRIDGE CGST 2.5%` and `BRIDGE SGST 2.5%`. Tally fills 7.50 for each head; **change both amounts to 7.51** (the figure worked out on the whole bill) before you save. If Tally refuses to save, stop and tell us. Screenshot the voucher before and after the change.
 12. Send `w10-status-window-0806.xml` again, saved as `aw10-status-0806-b.xml`, once all vouchers you keyed are saved (send it once at the end if you did steps 7 to 11 in one sitting; one answer holds every voucher of 6-Aug-2026).
-13. Screens (look, change nothing): GSTR-1 for August 2026, showing whether each of `0022` to `0025` is included or uncertain, with Tally's reason if uncertain.
+13. Send `w10-status-window-0806-lowercase.xml` (the same request with the voucher type's name in lower case, `bridge sales`), saved as `aw10-status-0806-lowercase.xml`. It tells us whether Tally compares the type's name with its case. Say whether the answer holds the vouchers or none.
+14. Screens (look, change nothing): GSTR-1 for August 2026, showing whether each of `0022` to `0025` is included or uncertain, with Tally's reason if uncertain.
 
 **What to post back.** The answers, the backup's place and the screenshots in a folder `workorder/` on the same branch, their hashes added to `SHA256.txt`, and for each step what happened, with curl's exit code and printed line. Say whether you did anything that differs from this list.
 

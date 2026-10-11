@@ -155,7 +155,7 @@ export type OutstandingsEvidence =
       sourceBytes: number;
       receivableTotal: string;
       payableTotal: string;
-      // The native read can establish this residual; voucher scans cannot.
+      // The native read can establish this residual.
       // Undefined is intentionally distinct from an exact zero amount.
       unallocatedTotal?: string;
     }
@@ -326,7 +326,6 @@ export function OutstandingsScreen({
           currencyAssertion: inrCompleteResult.currency_assertion,
           readProvenance: {
             read_strategy: inrCompleteResult.read_strategy,
-            source_voucher_count: inrCompleteResult.report.source_voucher_count,
             open_receivable_bill_count: inrCompleteResult.report.open_receivable_bill_count,
           },
           sourceBytes: inrCompleteResult.report.source_bytes,
@@ -610,7 +609,6 @@ export function OutstandingsScreen({
             {completeResult
               ? ` · ${readProvenance({
                   read_strategy: completeResult.read_strategy,
-                  source_voucher_count: completeResult.report.source_voucher_count,
                   open_receivable_bill_count: completeResult.report.open_receivable_bill_count,
                 })}`
               : ""}

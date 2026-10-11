@@ -85,14 +85,6 @@ fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     assert!(!bootstrap.contains("<TALLYREQUEST>IMPORT"));
     assert!(bootstrap.contains("&lt;/SVCURRENTCOMPANY&gt;"));
 
-    let extent_request = ReadOnlyProfile::CompanyBookExtentV1 {
-        company: &injection,
-    }
-    .render();
-    assert_eq!(extent_request.matches("<TALLYREQUEST>").count(), 1);
-    assert!(!extent_request.contains("<TALLYREQUEST>IMPORT"));
-    assert!(extent_request.contains("&lt;/SVCURRENTCOMPANY&gt;"));
-
     let extent_v2_request = ReadOnlyProfile::CompanyBookExtentV2 {
         company: &injection,
     }
@@ -139,10 +131,6 @@ fn profile_ids_and_template_hashes_are_stable() {
         (
             ReadOnlyProfileId::CompanyListV2,
             "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
-        ),
-        (
-            ReadOnlyProfileId::CompanyBookExtentV1,
-            "f46420fd96ee567069d1bf70c7895e76c75482b5370fc52e97aea64b8950d3a5",
         ),
         (
             ReadOnlyProfileId::CompanyBookExtentV2,
@@ -584,7 +572,6 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         match id {
             ReadOnlyProfileId::CompanyListV1
             | ReadOnlyProfileId::CompanyListV2
-            | ReadOnlyProfileId::CompanyBookExtentV1
             | ReadOnlyProfileId::CompanyBookExtentV2
             | ReadOnlyProfileId::StandardLedgerIdentityV1
             | ReadOnlyProfileId::StandardLedgerCatalogV1
@@ -600,7 +587,6 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
     let ids = vec![
         ReadOnlyProfileId::CompanyListV1,
         ReadOnlyProfileId::CompanyListV2,
-        ReadOnlyProfileId::CompanyBookExtentV1,
         ReadOnlyProfileId::CompanyBookExtentV2,
         ReadOnlyProfileId::StandardLedgerIdentityV1,
         ReadOnlyProfileId::StandardLedgerCatalogV1,

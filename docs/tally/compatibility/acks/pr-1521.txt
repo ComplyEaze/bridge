@@ -1,3 +1,5 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md
 src-tauri/src/agent.rs
 src-tauri/src/agent_catalog.rs
 src-tauri/src/agent_gst_status.rs

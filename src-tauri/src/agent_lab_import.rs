@@ -694,55 +694,30 @@ fn render_parented_xml(tag: &str, item: &BookNamedParent) -> String {
 
 fn render_ledger_xml(l: &BookLedger) -> String {
     let parent = l.parent.as_deref().unwrap_or("Primary");
-    let name = xml_escape(&l.name);
-    // Explicit on every Create, defaulting the unspecified case to `No` --
-    // the proven capture never omits it.
-    let billwise = format!(
-        "<ISBILLWISEON>{}</ISBILLWISEON>",
-        if l.is_billwise_on.unwrap_or(false) {
-            "Yes"
-        } else {
-            "No"
-        }
-    );
     // Only when non-zero: the proven capture's zero-balance ledgers (e.g.
     // "Sales", "Wages and Salary") carry no `OPENINGBALANCE` element at all.
     let opening = l.opening_balance.as_deref().unwrap_or("0.00");
-    let opening_balance = if is_zero_amount(opening) {
-        String::new()
-    } else {
-        format!("<OPENINGBALANCE>{}</OPENINGBALANCE>", xml_escape(opening))
-    };
-    // GST fields are passed through exactly as observed on the source ledger
-    // (§8.3: `GSTDUTYHEAD` vocabulary is irregular, `State Tax` not `SGST`);
-    // never synthesised. §8.3: settable at Create, silently not at Alter --
-    // this renderer only ever builds a Create.
-    let gstin = l
-        .party_gstin
-        .as_deref()
-        .map(|g| format!("<PARTYGSTIN>{}</PARTYGSTIN>", xml_escape(g)))
-        .unwrap_or_default();
     // Only when the book actually carries a real GST/duty classification
     // (not empty, not Tally's own inert default "Others") AND the ledger is
     // parented under Duties & Taxes -- the 2026-09-14 rehearsal sent
     // `<TAXTYPE>Others</TAXTYPE>` on every ledger, including a bank ledger
     // and a wages ledger, neither of which is a duty head.
-    let tax_type = l
-        .tax_type
-        .as_deref()
-        .filter(|t| is_real_gst_duty_type(t) && is_duties_and_taxes_parent(parent))
-        .map(|t| format!("<TAXTYPE>{}</TAXTYPE>", xml_escape(t)))
-        .unwrap_or_default();
-    let duty_head = l
-        .gst_duty_head
-        .as_deref()
-        .map(|d| format!("<GSTDUTYHEAD>{}</GSTDUTYHEAD>", xml_escape(d)))
-        .unwrap_or_default();
-    format!(
-        "<TALLYMESSAGE><LEDGER NAME=\"{name}\" ACTION=\"Create\"><NAME>{name}</NAME>\
-<PARENT>{parent}</PARENT>{billwise}{opening_balance}{gstin}{tax_type}{duty_head}</LEDGER></TALLYMESSAGE>",
-        parent = xml_escape(parent)
-    )
+    bridge_tally_protocol::ledger_create::LedgerCreate {
+        name: &l.name,
+        parent,
+        // Explicit on every Create, defaulting the unspecified case to `No`.
+        is_billwise_on: l.is_billwise_on.unwrap_or(false),
+        opening_balance: (!is_zero_amount(opening)).then_some(opening),
+        // GST fields are passed through exactly as observed on the source
+        // ledger, never synthesised.
+        party_gstin: l.party_gstin.as_deref(),
+        tax_type: l
+            .tax_type
+            .as_deref()
+            .filter(|t| is_real_gst_duty_type(t) && is_duties_and_taxes_parent(parent)),
+        gst_duty_head: l.gst_duty_head.as_deref(),
+    }
+    .render_message()
 }
 
 fn render_stock_item_xml(s: &BookStockItem) -> String {

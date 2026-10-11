@@ -35,7 +35,8 @@ async function scan(fields) {
     try {
       execFileSync("node", [GATE, "--root", root], { encoding: "utf8", stdio: "pipe" });
     } catch (error) {
-      const output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+      // The gate fails by an uncaught throw; on Windows Node prints that with CRLF line ends (#1471).
+      const output = `${error.stdout ?? ""}${error.stderr ?? ""}`.replaceAll("\r\n", "\n");
       assert.match(output, /\nmissing:\n/, "the scan must complete and report the pinned set missing");
       const unexpected = /\nunexpected:\n([\s\S]*?)(?:\nmissing:|$)/.exec(output)?.[1] ?? "";
       return new Set(unexpected.split("\n").filter(Boolean).map((line) => line.replace(/^- /, "")));
@@ -109,7 +110,7 @@ async function scanTree(files) {
     try {
       execFileSync("node", [GATE, "--root", root], { encoding: "utf8", stdio: "pipe" });
     } catch (error) {
-      const output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+      const output = `${error.stdout ?? ""}${error.stderr ?? ""}`.replaceAll("\r\n", "\n");
       assert.match(output, /\nmissing:\n/, "the scan must complete and report the pinned set missing");
       const unexpected = /\nunexpected:\n([\s\S]*?)(?:\nmissing:|$)/.exec(output)?.[1] ?? "";
       return [...new Set(unexpected.split("\n").filter(Boolean).map((line) => line.replace(/^- /, "")))].sort();

@@ -1,5 +1,5 @@
 {
- "comment": "Every form of narration that names a payee: one payment of Wages from Bank A each, amounts from 101 to 4285 paise, all different. f01 to f05 and f09 name ALPHA TRADERS: f01 in the first UPI layout; f02 in lower and mixed case; f03 with leading spaces, a tab and spaces inside the name, a space before the closing hyphen and a newline at the end; f04 with further hyphens after the name (the name ends at the first); f05 with the closing hyphen as the last character; f09 by IMPS, so the row's channels are IMPS and UPI. f06 has a digit, a full stop, an ampersand and an apostrophe in the name (A1 B.C & D'E); f07 a one-letter name, Z; f08 names PHONEPE in the first UPI layout, where it is a payee. f10 to f12 and f14 name BETA STORES by IMPS: f11 in lower case, f12 with a one-digit reference and the closing hyphen last, f14 with a space before the closing hyphen. f13 is an IMPS narration whose name field is the word UPI: the payee is UPI. f20 to f25 name GAMMA MILLS: f20 by NEFT, f21 with no space before DR, f22 by RTGS (the row's channels are NEFT and RTGS), f23 in lower case with a one-character code, f24 by RTGS with no space, a one-letter code and the closing hyphen last, f25 with a space before the closing hyphen. f30 to f33 name DELTAWO in the second UPI layout, the spaces inside the name removed: f30 with a space inside the reference, f31 with a space after TO TRANSFER- and the name split elsewhere, f32 in lower case with two spaces after TO, f33 with a reference of one space. f34's name field holds a hyphen, a digit, an ampersand and a full stop (D-7&CO.); f35 (PHONEPE1) and f36 (BANKACCT) are near the two placeholders and are payees. f40 to f47 name EPSILON CARRIERS on a cheque: f40 with text after CHQ PAID, f41 with no space round the hyphen, f42 to f45 after WITHDRAWAL BY, WITHDRWAL BY, WITHDRAWL BY and WITHDRWL BY, f46 in lower case with two spaces after BY and none after the hyphen, f47 with CHQ PAIDX. f48 (M.K. ZETA) and f49 (ZETA.) keep their full stops; f50 (MYSELF) and f51 (CASH PAID) only resemble the two refused beginnings. f52 (WITHDRAWAL BY), f53 (WITHDRAWALBY ETA), f54 (PAID TO THETA) and f55 (WITHDRAWAL BYWAY CARRIERS) are read whole as names. f56 is a cheque with a one-letter name and no space, Z: it joins f07's row, whose channels are CHEQUE_COUNTER and UPI. Twenty payees, no payment unread, no finding.",
+ "comment": "Every form of narration that names a payee: one payment of Wages from Bank A each, amounts from 101 to 4931 paise, all different. f01 to f05 and f09 name ALPHA TRADERS: f01 in the first UPI layout; f02 in lower and mixed case; f03 with leading spaces, a tab and spaces inside the name, a space before the closing hyphen and a newline at the end; f04 with further hyphens after the name (the name ends at the first); f05 with the closing hyphen as the last character; f09 by IMPS, so the row's channels are IMPS and UPI. f06 has a digit, a full stop, an ampersand and an apostrophe in the name (A1 B.C & D'E); f07 a one-letter name, Z; f08 names PHONEPE in the first UPI layout, where it is a payee. f10 to f12 and f14 name BETA STORES by IMPS: f11 in lower case, f12 with a one-digit reference and the closing hyphen last, f14 with a space before the closing hyphen. f20 to f25 name GAMMA MILLS: f20 by NEFT, f21 with no space before DR, f22 by RTGS (the row's channels are NEFT and RTGS), f23 in lower case with a one-character code, f24 by RTGS with no space, a one-letter code and the closing hyphen last, f25 with a space before the closing hyphen. f30 to f33 name DELTAWO in the second UPI layout, the spaces inside the name removed: f30 with a space inside the reference, f31 with a space after TO TRANSFER- and the name split elsewhere, f32 in lower case with two spaces after TO, f33 with a reference of one space. f34's name field holds a hyphen, a digit, an ampersand and a full stop (D-7&CO.); f35 (PHONEPE1) and f36 (BANKACCT) are near the two placeholders and are payees. f40 to f47 name EPSILON CARRIERS on a cheque: f40 with text after CHQ PAID, f41 with no space round the hyphen, f42 to f45 after WITHDRAWAL BY, WITHDRWAL BY, WITHDRAWL BY and WITHDRWL BY, f46 in lower case with two spaces after BY and none after the hyphen, f47 with CHQ PAIDX. f48 (M.K. ZETA) and f49 (ZETA.) keep their full stops; f50 (MYSELF) and f51 (CASH PAID) only resemble the two refused beginnings. f53 (WITHDRAWALBY ETA) and f55 (WITHDRAWAL BYWAY CARRIERS) only resemble the prefix, and f54 (PAID TO THETA) ends like CASH PAID TO; all three are read whole as names. f56 is a cheque with a one-letter name and no space, Z: it joins f07's row, whose channels are CHEQUE_COUNTER and UPI. f57 (SELFMADE MILLS) and f58 (CASH PAID TOWER) begin with the characters, not the words, of the two refused beginnings. f59 (IMPS, UPIKA STORES) and f60 (NEFT, UPI STORES) have a name that only begins with a channel word. f61 is the second UPI layout with the name field UPI, which that layout reads as a name: the payee is UPI. f62 is a cheque whose name is UPI, which the cheque form also reads as a name: it joins f61's row, whose channels are CHEQUE_COUNTER and UPI. Twenty-three payees, no payment unread, no finding.",
  "groups": {
   "Capital Account": null,
   "Current Assets": null,
@@ -46,8 +46,8 @@
    "ledger": "Bank A",
    "opening": 0,
    "debit": 0,
-   "credit": 96559,
-   "closing": -96559
+   "credit": 119360,
+   "closing": -119360
   },
   {
    "ledger": "Cash",
@@ -59,9 +59,9 @@
   {
    "ledger": "Wages",
    "opening": 0,
-   "debit": 96559,
+   "debit": 119360,
    "credit": 0,
-   "closing": 96559
+   "closing": 119360
   }
  ],
  "vouchers": [
@@ -254,22 +254,6 @@
     [
      "Bank A",
      -1170
-    ]
-   ]
-  },
-  {
-   "guid": "f13",
-   "date": "2025-04-14",
-   "base_type": "Payment",
-   "narration": "IMPS-55-UPI-ALPHA TRADERS-ZZBK",
-   "lines": [
-    [
-     "Wages",
-     1273
-    ],
-    [
-     "Bank A",
-     -1273
     ]
    ]
   },
@@ -690,22 +674,6 @@
    ]
   },
   {
-   "guid": "f52",
-   "date": "2025-05-13",
-   "base_type": "Payment",
-   "narration": "WITHDRAWAL BY - CHQ PAID",
-   "lines": [
-    [
-     "Wages",
-     3892
-    ],
-    [
-     "Bank A",
-     -3892
-    ]
-   ]
-  },
-  {
    "guid": "f53",
    "date": "2025-05-14",
    "base_type": "Payment",
@@ -766,6 +734,102 @@
     [
      "Bank A",
      -4285
+    ]
+   ]
+  },
+  {
+   "guid": "f57",
+   "date": "2025-05-18",
+   "base_type": "Payment",
+   "narration": "SELFMADE MILLS - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     4391
+    ],
+    [
+     "Bank A",
+     -4391
+    ]
+   ]
+  },
+  {
+   "guid": "f58",
+   "date": "2025-05-19",
+   "base_type": "Payment",
+   "narration": "CASH PAID TOWER - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     4507
+    ],
+    [
+     "Bank A",
+     -4507
+    ]
+   ]
+  },
+  {
+   "guid": "f59",
+   "date": "2025-05-20",
+   "base_type": "Payment",
+   "narration": "IMPS-55-UPIKA STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     4603
+    ],
+    [
+     "Bank A",
+     -4603
+    ]
+   ]
+  },
+  {
+   "guid": "f60",
+   "date": "2025-05-21",
+   "base_type": "Payment",
+   "narration": "NEFT DR-ZZBK77-UPI STORES-NET",
+   "lines": [
+    [
+     "Wages",
+     4721
+    ],
+    [
+     "Bank A",
+     -4721
+    ]
+   ]
+  },
+  {
+   "guid": "f61",
+   "date": "2025-05-22",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/UPI/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     4813
+    ],
+    [
+     "Bank A",
+     -4813
+    ]
+   ]
+  },
+  {
+   "guid": "f62",
+   "date": "2025-05-23",
+   "base_type": "Payment",
+   "narration": "UPI - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     4931
+    ],
+    [
+     "Bank A",
+     -4931
     ]
    ]
   }

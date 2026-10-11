@@ -1,0 +1,356 @@
+{
+ "comment": "Near misses: nothing is read, and the dump is byte-identical to np_empty's. Wages and Loading Charges are listed; Cartage is mapped 194C. q01 (optional), q02 (cancelled) and q03 (post-dated) pay Wages from Bank A with a narration that names a payee: none is in the population. q04 pays Office Expenses, a ledger that is not read, with the same narration. q05 is a receipt: it debits Bank A and credits Wages, so no ledger read is debited. q06 has a nil line on Wages and its amount on Office Expenses. q07 pays Job Work, which is not listed. q08, q09 and q10 pay Cartage 3000000 paise each from Bank A and q11 pays 1000000 in cash: the TDS payee test pools them at exactly the single-sum limit and exactly the aggregate limit, so it raises no finding for payments with no payee named, and Cartage is not added. q12 credits a Cartage bill of 3500000 to the creditor Neem Supplies: the TDS payee test raises its finding for that named payee (it is in this book's tds_payees golden), which adds nothing here.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_quiet-700"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_quiet-701"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_quiet-702"
+  },
+  {
+   "name": "Loading Charges",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_quiet-703"
+  },
+  {
+   "name": "Cartage",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_quiet-704"
+  },
+  {
+   "name": "Job Work",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_quiet-705"
+  },
+  {
+   "name": "Office Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-np_quiet-706"
+  },
+  {
+   "name": "Neem Supplies",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-np_quiet-707"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 60000,
+   "credit": 9200000,
+   "closing": -9140000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1000000,
+   "closing": -1000000
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 0,
+   "credit": 60000,
+   "closing": -60000
+  },
+  {
+   "ledger": "Loading Charges",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Cartage",
+   "opening": 0,
+   "debit": 13500000,
+   "credit": 0,
+   "closing": 13500000
+  },
+  {
+   "ledger": "Job Work",
+   "opening": 0,
+   "debit": 80000,
+   "credit": 0,
+   "closing": 80000
+  },
+  {
+   "ledger": "Office Expenses",
+   "opening": 0,
+   "debit": 120000,
+   "credit": 0,
+   "closing": 120000
+  },
+  {
+   "ledger": "Neem Supplies",
+   "opening": 0,
+   "debit": 0,
+   "credit": 3500000,
+   "closing": -3500000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "q01",
+   "date": "2025-04-02",
+   "base_type": "Payment",
+   "status": "optional",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-WAGES",
+   "lines": [
+    [
+     "Wages",
+     40000
+    ],
+    [
+     "Bank A",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "q02",
+   "date": "2025-04-03",
+   "base_type": "Payment",
+   "status": "cancelled",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-WAGES",
+   "lines": [
+    [
+     "Wages",
+     30000
+    ],
+    [
+     "Bank A",
+     -30000
+    ]
+   ]
+  },
+  {
+   "guid": "q03",
+   "date": "2025-04-04",
+   "base_type": "Payment",
+   "status": "postdated",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-WAGES",
+   "lines": [
+    [
+     "Wages",
+     20000
+    ],
+    [
+     "Bank A",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "q04",
+   "date": "2025-04-05",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-WAGES",
+   "lines": [
+    [
+     "Office Expenses",
+     50000
+    ],
+    [
+     "Bank A",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "q05",
+   "date": "2025-04-07",
+   "base_type": "Receipt",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-WAGES",
+   "lines": [
+    [
+     "Bank A",
+     60000
+    ],
+    [
+     "Wages",
+     -60000
+    ]
+   ]
+  },
+  {
+   "guid": "q06",
+   "date": "2025-04-08",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-WAGES",
+   "lines": [
+    [
+     "Wages",
+     0
+    ],
+    [
+     "Office Expenses",
+     70000
+    ],
+    [
+     "Bank A",
+     -70000
+    ]
+   ]
+  },
+  {
+   "guid": "q07",
+   "date": "2025-04-09",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK-WAGES",
+   "lines": [
+    [
+     "Job Work",
+     80000
+    ],
+    [
+     "Bank A",
+     -80000
+    ]
+   ]
+  },
+  {
+   "guid": "q08",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-BETA.S@ZZBK-CARTAGE",
+   "lines": [
+    [
+     "Cartage",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "q09",
+   "date": "2025-06-05",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-BETA.S@ZZBK-CARTAGE",
+   "lines": [
+    [
+     "Cartage",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "q10",
+   "date": "2025-07-05",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-BETA.S@ZZBK-CARTAGE",
+   "lines": [
+    [
+     "Cartage",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "q11",
+   "date": "2025-08-05",
+   "base_type": "Payment",
+   "narration": "Cartage paid in cash",
+   "lines": [
+    [
+     "Cartage",
+     1000000
+    ],
+    [
+     "Cash",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "q12",
+   "date": "2025-09-05",
+   "base_type": "Journal",
+   "narration": "Cartage bill of Neem Supplies",
+   "lines": [
+    [
+     "Cartage",
+     3500000
+    ],
+    [
+     "Neem Supplies",
+     -3500000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages",
+  "Loading Charges"
+ ],
+ "nature_by_ledger": {
+  "Cartage": "194C"
+ },
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

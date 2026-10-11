@@ -1,0 +1,329 @@
+{
+ "comment": "Nothing is listed: every voucher is a near miss, so every figure is 0 and there is no finding. q01 names only its own booked party. q02 has one party against a sales ledger. q03 has two lines on one party ledger and an expense (one distinct party). q04 has two parties and a bank line, with no narration. q05 has two parties and a cash line, and its narration names no ledger. q06 has a second party only on a zero-amount line. q07's narration names a bank ledger and an expense ledger, which are not parties. q08's narration is spaces only. q09 names another party but has no bank or cash line. q10 names a party only partly or run together. q11 names another party, but its only bank line is zero, so it has no bank or cash line.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_quiet-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_quiet-001"
+  },
+  {
+   "name": "Beta Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_quiet-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-ko_quiet-cap-1"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_quiet-004"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_quiet-005"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-ko_quiet-006"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 450000,
+   "credit": 1900000,
+   "closing": -1450000
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 1600000,
+   "credit": 400000,
+   "closing": 51200000
+  },
+  {
+   "ledger": "Beta Stores",
+   "opening": 0,
+   "debit": 820000,
+   "credit": 200000,
+   "closing": 620000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 450000,
+   "credit": 470000,
+   "closing": -20000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 150000,
+   "closing": -150000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 200000,
+   "closing": -200000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "q01",
+   "date": "2025-04-10",
+   "base_type": "Receipt",
+   "narration": "Received from Alpha Traders against bill",
+   "lines": [
+    [
+     "Bank A",
+     1500000
+    ],
+    [
+     "Alpha Traders",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "q02",
+   "date": "2025-04-20",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Alpha Traders",
+     200000
+    ],
+    [
+     "Sales",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "q03",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "narration": "Rectified Beta Stores entries",
+   "lines": [
+    [
+     "Beta Stores",
+     300000
+    ],
+    [
+     "Beta Stores",
+     -100000
+    ],
+    [
+     "Office Rent",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "q04",
+   "date": "2025-05-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Alpha Traders",
+     -400000
+    ],
+    [
+     "Beta Stores",
+     300000
+    ],
+    [
+     "Bank A",
+     100000
+    ]
+   ]
+  },
+  {
+   "guid": "q05",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "narration": "Paid at counter",
+   "lines": [
+    [
+     "Beta Stores",
+     100000
+    ],
+    [
+     "Alpha Traders",
+     50000
+    ],
+    [
+     "Petty Cash",
+     -150000
+    ]
+   ]
+  },
+  {
+   "guid": "q06",
+   "date": "2025-06-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Alpha Traders",
+     200000
+    ],
+    [
+     "Beta Stores",
+     0
+    ],
+    [
+     "Office Rent",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "q07",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "narration": "Office Rent paid through Bank A",
+   "lines": [
+    [
+     "Office Rent",
+     250000
+    ],
+    [
+     "Bank A",
+     -250000
+    ]
+   ]
+  },
+  {
+   "guid": "q08",
+   "date": "2025-07-15",
+   "base_type": "Payment",
+   "narration": "   ",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "q09",
+   "date": "2025-08-01",
+   "base_type": "Journal",
+   "narration": "Being rent due to Alpha Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Beta Stores",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "q10",
+   "date": "2025-08-20",
+   "base_type": "Payment",
+   "narration": "Paid AlphaTraders and Alpha",
+   "lines": [
+    [
+     "Beta Stores",
+     50000
+    ],
+    [
+     "Bank A",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "q11",
+   "date": "2025-09-10",
+   "base_type": "Journal",
+   "narration": "Settled for Alpha Traders",
+   "lines": [
+    [
+     "Beta Stores",
+     70000
+    ],
+    [
+     "Office Rent",
+     -70000
+    ],
+    [
+     "Bank A",
+     0
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ]
+}

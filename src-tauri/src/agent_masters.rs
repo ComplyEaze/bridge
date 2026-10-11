@@ -95,7 +95,7 @@ impl Server {
         ];
         match kind {
             MastersKind::Native(NativeMasterKind::VoucherTypes) => limitations.extend([
-                "numbering_method is as Tally reported it; a value other than Automatic, Manual or Default is returned raw under `unrecognised` (only those three seen, on one synthetic book)",
+                "numbering_method is the type-level value as Tally reported it, not the voucher type's numbering method: it read `None` for types set to Automatic and to Manual on the screen (one synthetic book, Windows). It can differ from the number series that decides what a supplied number does; do not pass it to voucher_presence's numbering. A value other than Automatic, Manual or Default is returned raw under `unrecognised`",
                 "`default` is Tally's reported value, not evidence that the type numbers automatically",
                 "The company's voucher-type count (NUMVOUCHERTYPES) did not equal the rows returned on two books (35 vs 26, 33 vs 24), and on one book equalled the number-series count (inferred to count series, unmeasured): do not check these rows against it",
                 "The completeness of this list is unverified: absence from it is not evidence that a voucher type is absent from the book",

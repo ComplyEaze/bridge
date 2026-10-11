@@ -167,8 +167,8 @@ digest of the committed bytes, labelled an integrity digest.
 
 `scripts/check-unbounded-reads.mjs` requires every `Read::read_to_end`/
 `read_to_string` call site (outside tests) to be capped with `.take(N)`, the
-pattern already used in `agent_desktop_journal.rs`,
-`source_draft/files.rs`, and `tools/bridge-tally-qualification`. When wired it
+pattern already used in `src-tauri/src/source_draft/files.rs` and
+`tools/bridge-tally-qualification`. When wired it
 passed clean: 11 call sites scanned, 11 bounded, 0 unbounded, 3 reviewed
 exceptions (zip entries read from a bundled XLSX/PDF template, not untrusted
 input — named in the script's `ALLOWED_UNBOUNDED`).

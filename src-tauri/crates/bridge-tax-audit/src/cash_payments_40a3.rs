@@ -1146,6 +1146,7 @@ mod tests {
             invented_ledger("Customer B", "Sundry Debtors"),
             invented_ledger("Customer C", "Sundry Debtors"),
             invented_ledger("Customer D", "Sundry Debtors"),
+            invented_ledger("Customer E", "Sundry Debtors"),
             invented_ledger("Sales", "Sales Accounts"),
             invented_ledger("Purchases", "Purchase Accounts"),
             invented_ledger("GST", "Duties & Taxes"),
@@ -1216,6 +1217,16 @@ mod tests {
             voucher("g9", base, &[("Cash", 1_000_000), ("Loan X", -1_000_000)]),
             // Pooled with g5: it prints the bank ledger, which names no one.
             voucher("ga", base, &[("Cash", 1_000), (own, -1_000)]),
+            // A bank line on a cash voucher is never a party, and stays out of the total.
+            voucher(
+                "gc",
+                base,
+                &[
+                    ("Cash", 10_000_000),
+                    ("Bank", -3_000_000),
+                    ("Customer E", -7_000_000),
+                ],
+            ),
             // The same party on the next day is a row of its own.
             voucher(
                 "gb",
@@ -1238,8 +1249,8 @@ mod tests {
         }
     }
 
-    /// The s.269ST rows of `s269st_book`, read through `run`: eight rows, two of them at the limit,
-    /// and 68,001,100 paise in all.
+    /// The s.269ST rows of `s269st_book`, read through `run`: nine rows, two of them at the limit,
+    /// and 75,001,100 paise in all.
     fn check_s269st_leg(receipt: bool) {
         let (own, other) = if receipt {
             ("Sales", "Purchases")
@@ -1267,15 +1278,15 @@ mod tests {
         };
         assert!(matches!(
             fig(&format!("{prefix}_party_days_any_amount_count")).value,
-            Value::Int(8)
+            Value::Int(9)
         ));
         let total = fig(&format!("{prefix}_party_days_any_amount_total"));
-        assert!(matches!(total.value, Value::Int(68_001_100)));
+        assert!(matches!(total.value, Value::Int(75_001_100)));
         // g6 (Contra) and g7 (no cash line) are cited nowhere.
         let cited: Vec<&str> = total.evidence.iter().map(|e| e.id.as_str()).collect();
         assert_eq!(
             cited,
-            ["g1", "g2", "g3", "g4", "g5", "g8", "g9", "ga", "gb"]
+            ["g1", "g2", "g3", "g4", "g5", "g8", "g9", "ga", "gb", "gc"]
         );
         let over = format!("{prefix}_at_or_over_limit_count");
         assert!(matches!(fig(&over).value, Value::Int(2)));

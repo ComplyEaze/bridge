@@ -690,3 +690,95 @@ fn the_lock_folder_is_counted_when_the_data_folder_is_missing() {
     assert_eq!(report.folders_not_read, ["lock_folder"]);
     assert_eq!(report.incomplete_reason(), Some("folder_not_listed"));
 }
+
+fn master_journal_text(verdict: bool, truncated: bool) -> String {
+    let id = "bridge-00000000-0000-4000-8000-0000000000aa";
+    let sha = "a".repeat(64);
+    let batch = serde_json::json!({
+        "record_type": "master_batch", "batch_id": id, "batch_sha256": sha,
+        "class": "ledger_create",
+        "company": {"guid": "00000000-0000-0000-0000-000000000001", "name": "Synthetic",
+            "number": "1", "books_from": "20260401"},
+        "items": [{"name": "Synthetic One", "kind": "suspense", "bill_wise": false,
+            "party_gstin": null, "gst_duty_head": null}]
+    });
+    let intent = serde_json::json!({
+        "record_type": "master_dispatch_intent", "batch_id": id, "batch_sha256": sha,
+        "native_request_sha256": "b".repeat(64),
+        "items": [{"name": "Synthetic One", "canonical_key": "k", "absence_key": "a"}],
+        "pre_image_sha256": "c".repeat(64), "pre_image_count": 2,
+        "pre_post_master_marks": [{"company_guid": "00000000-0000-0000-0000-000000000001",
+            "altmstid": 7}]
+    });
+    let verdict_line = serde_json::json!({
+        "record_type": "master_verdict", "batch_id": id, "batch_sha256": sha,
+        "state": "posted_verified",
+        "items": [{"name": "Synthetic One", "guid": "00000000-aaaa-bbbb-cccc-000000000000",
+            "reason": null}]
+    });
+    let mut text = format!("{batch}\n{intent}\n");
+    if verdict {
+        text.push_str(&format!("{verdict_line}\n"));
+    }
+    if truncated {
+        text.pop();
+    }
+    text
+}
+
+#[test]
+fn a_master_journal_with_an_open_intent_is_shown_apart_from_the_voucher_journal() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let path = root.join("agent-master-ledger.jsonl");
+    let master = |root: &Path| {
+        to_json(&build(root, None), SystemTime::now(), None)["master_journal"].clone()
+    };
+    assert_eq!(master(root)["state"], "absent");
+    write(&path, master_journal_text(false, false).as_bytes());
+    let open = master(root);
+    assert_eq!(open["state"], "read");
+    assert_eq!(open["batches"], 1);
+    assert_eq!(open["dispatched"], 1);
+    assert_eq!(open["not_settled"], 1);
+    // The voucher journal's own account is untouched by it.
+    assert_eq!(
+        to_json(&build(root, None), SystemTime::now(), None)["journal"]["state"],
+        "absent"
+    );
+    fs::remove_file(&path).unwrap();
+    write(&path, master_journal_text(true, false).as_bytes());
+    assert_eq!(master(root)["not_settled"], 0);
+}
+
+#[test]
+fn an_unreadable_master_journal_makes_the_report_incomplete() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    write(
+        &root.join("agent-master-ledger.jsonl"),
+        master_journal_text(false, true).as_bytes(),
+    );
+    let report = build(root, None);
+    assert_eq!(
+        report.master_journal,
+        MasterJournal::NotRead(JOURNAL_INVALID)
+    );
+    assert_eq!(report.incomplete_reason(), Some("journal_not_read"));
+}
+
+#[test]
+fn a_stage_left_beside_a_sidecar_is_counted_with_the_journal() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let id = "bridge-00000000-0000-4000-8000-0000000000aa";
+    write(
+        &root.join(format!(
+            "master-pre-image-{id}.00000000-0000-4000-8000-0000000000bb.next"
+        )),
+        b"123",
+    );
+    let report = build(root, None);
+    assert_eq!(*class(&report, "journal"), Class { files: 1, bytes: 3 });
+    assert_eq!(*class(&report, "other"), Class { files: 0, bytes: 0 });
+}

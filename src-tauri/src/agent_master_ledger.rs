@@ -12,12 +12,17 @@
 //!
 //! The one door into the journal is [`MasterJournal::admit`], used both to read
 //! a line back and to check a record before it is appended: a record the reader
-//! would refuse is never written. Callers hold the import admission lock
-//! (`Server::lock_import_admission`), which serializes every writer of this
-//! data directory; this module takes no lock of its own. Every write takes the
-//! guard by reference ([`AdmissionLock`]), so a write with no lock held does not
-//! compile. The guard is a plain `File`, so the type shows that a lock was
-//! passed, not that it is the admission lock.
+//! would refuse is never written.
+//!
+//! Every write takes an [`ExclusiveAdmission`]. It is built only by
+//! [`ExclusiveAdmission::acquire`], which takes the import admission lock
+//! exclusively itself, the lock `Server::lock_import_admission` takes; there is no
+//! conversion from a `File`, so a shared lock (`lock_import_admission_shared`) or
+//! no lock at all cannot reach a write. Appending an intent returns a
+//! [`RecordedIntent`], and the send that follows must consume it: a send cannot be
+//! built without an intent recorded under the exclusive lock.
+//! [`MasterJournal::dispatched`] reads without the lock and is for reporting,
+//! not a gate for a send.
 //!
 //! Two contracts a caller meets:
 //!
@@ -31,6 +36,14 @@
 //! - An intent with no terminal verdict blocks every overlapping batch for good.
 //!   The read-back-absent terminal state and the rules for it belong to the
 //!   dispatch slice; until then, recovering such a batch is an operator decision.
+//! - After a terminal verdict the same ledgers could be sent again under a new
+//!   batch id. What stops that is the dispatch slice's absence check against the
+//!   books as they are then, made in the same queue as the send. This journal does
+//!   not stop it and must not be read as if it did.
+//!
+//! - A line cut short is refused on read, but a file cut back to a record
+//!   boundary reads as a shorter, valid journal: whole trailing records lost to a
+//!   crash or a restore are not detectable here.
 //!
 //! Reuse: bounded record reading ([`ledger::read_record`]), the append that
 //! syncs and truncates a failed write back ([`append_private_import_ledger`]),
@@ -46,23 +59,59 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
+use uuid::Uuid;
 
 const JOURNAL_FILE: &str = "agent-master-ledger.jsonl";
 const PRE_IMAGE_PREFIX: &str = "master-pre-image-";
 
-/// What `Server::lock_import_admission` returns, held while a master record or
-/// sidecar is written.
-pub(super) type AdmissionLock = std::fs::File;
+/// Proof that the import admission lock is held exclusively. Built only by
+/// [`ExclusiveAdmission::acquire`]; it holds the locked file for as long as it
+/// lives. It duplicates the few lines of `Server::lock_import_admission` rather
+/// than wrapping a `File`, because a `File` may hold a shared lock and carries
+/// nothing that says which.
+#[derive(Debug)]
+pub(super) struct ExclusiveAdmission {
+    /// Held for its lock; closing it releases the lock.
+    _held: std::fs::File,
+}
 
-/// Whether `name` is a file this module writes: the journal, or a sidecar named
-/// for a well-formed batch id. The local-data report classes these with the
+impl ExclusiveAdmission {
+    /// Take the admission lock of `data_dir` exclusively, without waiting:
+    /// contention is a refusal, as for a voucher post.
+    pub(super) fn acquire(data_dir: &Path) -> Result<Self, String> {
+        let path = data_dir.join("agent-import-admission.lock");
+        let file = local_file::open_local_file(&path, true)
+            .map_err(|_| "import_admission_lock_unavailable".to_string())?;
+        file.try_lock()
+            .map_err(super::import_admission_lock_error)?;
+        persistence::require_settled(&data_dir.join("imports"))?;
+        Ok(Self { _held: file })
+    }
+
+    /// For tests that exercise a write on a directory of their own.
+    #[cfg(test)]
+    fn standing_in(file: std::fs::File) -> Self {
+        Self { _held: file }
+    }
+}
+
+/// Whether `name` is a file this module writes: the journal, a sidecar named for
+/// a well-formed batch id, or the stage a sidecar write leaves behind if it stops
+/// (`<batch id>.<uuid>.next`). The local-data report classes these with the
 /// import journal.
 pub(super) fn is_master_file(name: &str) -> bool {
-    name == JOURNAL_FILE
-        || name
-            .strip_prefix(PRE_IMAGE_PREFIX)
-            .and_then(|rest| rest.strip_suffix(".json"))
-            .is_some_and(valid_batch_id)
+    if name == JOURNAL_FILE {
+        return true;
+    }
+    let Some(rest) = name.strip_prefix(PRE_IMAGE_PREFIX) else {
+        return false;
+    };
+    if let Some(batch_id) = rest.strip_suffix(".json") {
+        return valid_batch_id(batch_id);
+    }
+    rest.strip_suffix(".next")
+        .and_then(|stem| stem.rsplit_once('.'))
+        .is_some_and(|(batch_id, stage)| valid_batch_id(batch_id) && Uuid::parse_str(stage).is_ok())
 }
 
 /// What kind of master write a batch is. One class today; the field is in the
@@ -155,19 +204,24 @@ pub(super) struct MasterMark {
 /// through a private wire type ([`parse_record`]) and admits the result, so no
 /// code outside this module can build an intent from JSON. A test pins that this
 /// type and [`MasterRecord`] do not implement `Deserialize`.
+///
+/// Every field is private, so a value cannot be re-pointed at another batch
+/// after it was bound to its sidecar. `Clone` stays because [`MasterRecord`] is
+/// cloned by callers; a clone is inert, since the journal admits one intent per
+/// batch.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub(super) struct MasterDispatchIntent {
-    pub(super) batch_id: String,
-    pub(super) batch_sha256: String,
-    pub(super) native_request_sha256: String,
-    pub(super) items: Vec<IntentItem>,
+    batch_id: String,
+    batch_sha256: String,
+    native_request_sha256: String,
+    items: Vec<IntentItem>,
     /// The digest and count of the pre-image sidecar written before this
     /// intent. Private: an intent takes them only from a [`WrittenPreImage`].
     pre_image_sha256: String,
     pre_image_count: u64,
     /// Every loaded company's mark, the batch's own company included, so a
     /// write that landed in another company can be told apart.
-    pub(super) pre_post_master_marks: Vec<MasterMark>,
+    pre_post_master_marks: Vec<MasterMark>,
 }
 
 impl MasterDispatchIntent {
@@ -191,6 +245,26 @@ impl MasterDispatchIntent {
             pre_image_count: pre_image.count,
             pre_post_master_marks,
         })
+    }
+
+    pub(super) fn batch_id(&self) -> &str {
+        &self.batch_id
+    }
+
+    pub(super) fn batch_sha256(&self) -> &str {
+        &self.batch_sha256
+    }
+
+    pub(super) fn native_request_sha256(&self) -> &str {
+        &self.native_request_sha256
+    }
+
+    pub(super) fn items(&self) -> &[IntentItem] {
+        &self.items
+    }
+
+    pub(super) fn pre_post_master_marks(&self) -> &[MasterMark] {
+        &self.pre_post_master_marks
     }
 
     pub(super) fn pre_image_sha256(&self) -> &str {
@@ -407,6 +481,8 @@ pub(super) enum MasterLedgerError {
     RollbackFailed,
     /// A second dispatch intent for a batch that already has one.
     DuplicateDispatch,
+    /// An intent given to [`append`]; it goes through [`append_intent`].
+    UseAppendIntent,
     /// An intent for ledgers an earlier dispatched batch also names, while that
     /// batch's outcome is open: sending them again under a new batch id.
     OpenDispatchOverlaps,
@@ -424,6 +500,7 @@ impl MasterLedgerError {
             Self::SerializationFailed => "master_ledger_serialization_failed",
             Self::RollbackFailed => "master_ledger_rollback_failed",
             Self::DuplicateDispatch => "master_ledger_duplicate_dispatch",
+            Self::UseAppendIntent => "master_ledger_use_append_intent",
             Self::OpenDispatchOverlaps => "master_ledger_open_dispatch_overlaps",
             Self::DirectorySyncFailed => "master_ledger_directory_sync_failed",
             Self::Invalid(_) => "master_ledger_invalid",
@@ -487,12 +564,6 @@ impl StoredLedgerCreate {
     }
 }
 
-/// Tally folds case in a master's name, so two names that differ only in case
-/// are one name.
-fn name_key(name: &str) -> String {
-    name.trim().to_lowercase()
-}
-
 impl MasterBatch {
     fn validate(&self) -> Result<(), Invalid> {
         check_ids(&self.batch_id, &self.batch_sha256)?;
@@ -511,12 +582,16 @@ impl MasterBatch {
         if self.items.is_empty() {
             return Err(Invalid::EmptyItems);
         }
-        let mut names = BTreeSet::new();
+        // Two names Tally might take for one master (any fold the core knows,
+        // across every position) cannot go in one POST.
+        let mut folds = BTreeSet::new();
         for item in &self.items {
             item.validate()?;
-            if !names.insert(name_key(&item.name)) {
+            let keys = twin_fold_keys(&item.name);
+            if keys.iter().any(|key| folds.contains(key)) {
                 return Err(Invalid::DuplicateName);
             }
+            folds.extend(keys);
         }
         match self.class {
             MasterClass::LedgerCreate => Ok(()),
@@ -615,6 +690,15 @@ impl MasterRecord {
     }
 }
 
+/// Counts for the local-data report: batches, those dispatched, and of those
+/// the ones with no terminal verdict, which block overlapping batches.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct MasterSummary {
+    pub(super) batches: usize,
+    pub(super) dispatched: usize,
+    pub(super) not_settled: usize,
+}
+
 /// Everything the journal holds about one batch.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct BatchState {
@@ -646,7 +730,8 @@ impl MasterJournal {
     }
 
     /// Whether a dispatch intent is recorded for the batch: the batch was, or
-    /// may have been, sent.
+    /// may have been, sent. A read without the lock, for reporting. It is not a
+    /// gate for a send: that is [`append_intent`] under the exclusive lock.
     pub(super) fn dispatched(&self, batch_id: &str) -> bool {
         self.state(batch_id)
             .is_some_and(|state| state.intent.is_some())
@@ -655,6 +740,25 @@ impl MasterJournal {
     pub(super) fn verdict(&self, batch_id: &str) -> Option<&MasterVerdict> {
         self.state(batch_id)
             .and_then(|state| state.verdict.as_ref())
+    }
+
+    /// What the local-data report shows of this journal.
+    pub(super) fn summary(&self) -> MasterSummary {
+        let dispatched = self
+            .batches
+            .values()
+            .filter(|state| state.intent.is_some())
+            .count();
+        let not_settled = self
+            .batches
+            .values()
+            .filter(|state| state.intent.is_some() && !state.is_settled())
+            .count();
+        MasterSummary {
+            batches: self.batches.len(),
+            dispatched,
+            not_settled,
+        }
     }
 
     /// The state of the batch a record belongs to, if that batch is introduced
@@ -830,6 +934,11 @@ fn sync_directory(_directory: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Counts of the journal in `reader`, for the local-data report.
+pub(super) fn read_summary(reader: impl BufRead) -> Result<MasterSummary, MasterLedgerError> {
+    MasterJournal::read(reader).map(|journal| journal.summary())
+}
+
 /// Append one record, after admitting it against the journal as it stands: a
 /// record the reader would refuse (a second intent included) is never written.
 /// The caller holds the admission lock. The data directory is synced after the
@@ -838,18 +947,68 @@ fn sync_directory(_directory: &Path) -> std::io::Result<()> {
 /// a power failure could make vanish is no record that a dispatch was recorded.
 /// The state is read afresh on each append, so an earlier append that created the
 /// file and then failed does not excuse a later one.
+/// An intent does not go through here: see [`append_intent`].
 pub(super) fn append(
     data_dir: &Path,
-    lock: &AdmissionLock,
+    lock: &ExclusiveAdmission,
     record: MasterRecord,
 ) -> Result<(), MasterLedgerError> {
+    if record.is_dispatch_intent() {
+        return Err(MasterLedgerError::UseAppendIntent);
+    }
     append_syncing(data_dir, lock, record, sync_directory)
 }
 
-/// [`append`] with the directory sync given, so a test can fail it.
+/// An intent that is in the journal, synced, under the exclusive lock. The send
+/// it licenses takes this by value: no send is built without one. Only
+/// [`append_intent`] makes one.
+#[must_use = "the send consumes the recorded intent"]
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct RecordedIntent {
+    batch_id: String,
+    native_request_sha256: String,
+}
+
+impl RecordedIntent {
+    pub(super) fn batch_id(&self) -> &str {
+        &self.batch_id
+    }
+
+    pub(super) fn native_request_sha256(&self) -> &str {
+        &self.native_request_sha256
+    }
+}
+
+/// Append a dispatch intent and return the token for its send. An error, a
+/// failed directory sync included, returns no token: the intent may be in the
+/// file, and the batch must be treated as dispatched.
+pub(super) fn append_intent(
+    data_dir: &Path,
+    lock: &ExclusiveAdmission,
+    intent: MasterDispatchIntent,
+) -> Result<RecordedIntent, MasterLedgerError> {
+    append_intent_syncing(data_dir, lock, intent, sync_directory)
+}
+
+fn append_intent_syncing(
+    data_dir: &Path,
+    lock: &ExclusiveAdmission,
+    intent: MasterDispatchIntent,
+    sync: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> Result<RecordedIntent, MasterLedgerError> {
+    let recorded = RecordedIntent {
+        batch_id: intent.batch_id.clone(),
+        native_request_sha256: intent.native_request_sha256.clone(),
+    };
+    append_syncing(data_dir, lock, MasterRecord::DispatchIntent(intent), sync)?;
+    Ok(recorded)
+}
+
+/// [`append`] for any record, with the directory sync given so a test can fail
+/// it.
 fn append_syncing(
     data_dir: &Path,
-    _lock: &AdmissionLock,
+    _lock: &ExclusiveAdmission,
     record: MasterRecord,
     sync: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> Result<(), MasterLedgerError> {
@@ -904,6 +1063,8 @@ pub(super) enum PreImageError {
     TooLargeToWrite,
     /// A token written for another batch.
     OtherBatch,
+    /// The sidecar is in place but its directory entry could not be made durable.
+    DirectorySyncFailed,
     WriteFailed,
 }
 
@@ -920,16 +1081,19 @@ impl PreImageError {
             Self::Missing => "master_pre_image_missing",
             Self::Unreadable | Self::TooLarge => "master_pre_image_unavailable",
             Self::OtherBatch => "master_pre_image_invalid",
-            Self::ExistsDifferent | Self::TooLargeToWrite | Self::WriteFailed => {
-                "master_pre_image_write_failed"
-            }
+            Self::ExistsDifferent
+            | Self::TooLargeToWrite
+            | Self::DirectorySyncFailed
+            | Self::WriteFailed => "master_pre_image_write_failed",
         }
     }
 }
 
 /// The company's masters before the post: each GUID, lower-case, with its
 /// ALTERID. Sorted, so equal books give equal bytes and an equal digest.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Serialize only: a sidecar is read as a plain map and rebuilt through
+/// [`PreImage::new`], so a key the writer would refuse is refused on read too.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 pub(super) struct PreImage(BTreeMap<String, u64>);
 
@@ -1004,9 +1168,22 @@ impl WrittenPreImage {
 /// left alone and refused.
 pub(super) fn write_pre_image(
     data_dir: &Path,
-    _lock: &AdmissionLock,
+    lock: &ExclusiveAdmission,
     batch: &MasterBatch,
     pre_image: &PreImage,
+) -> Result<WrittenPreImage, PreImageError> {
+    write_pre_image_syncing(data_dir, lock, batch, pre_image, sync_directory)
+}
+
+/// [`write_pre_image`] with the directory sync given. The shared record write
+/// ignores a failed directory sync; for the sidecar it is checked here, whether
+/// the sidecar was just placed or was there already.
+fn write_pre_image_syncing(
+    data_dir: &Path,
+    _lock: &ExclusiveAdmission,
+    batch: &MasterBatch,
+    pre_image: &PreImage,
+    sync: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> Result<WrittenPreImage, PreImageError> {
     let path = pre_image_path(data_dir, &batch.batch_id)?;
     let bytes = pre_image.bytes()?;
@@ -1023,6 +1200,7 @@ pub(super) fn write_pre_image(
         }
         Err(RecordOnce::Failed) => return Err(PreImageError::WriteFailed),
     }
+    sync(data_dir).map_err(|_| PreImageError::DirectorySyncFailed)?;
     Ok(WrittenPreImage {
         batch_id: batch.batch_id.clone(),
         sha256: sha256_hex(&bytes),

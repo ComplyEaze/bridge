@@ -107,8 +107,22 @@ fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict 
     }
 }
 
-fn lock() -> AdmissionLock {
-    tempfile::tempfile().unwrap()
+fn lock() -> ExclusiveAdmission {
+    ExclusiveAdmission::standing_in(tempfile::tempfile().unwrap())
+}
+
+/// `append` for any record: an intent goes through `append_intent`, as a caller's does.
+fn put(
+    directory: &Path,
+    lock: &ExclusiveAdmission,
+    record: MasterRecord,
+) -> Result<(), MasterLedgerError> {
+    match record {
+        MasterRecord::DispatchIntent(intent) => {
+            append_intent(directory, lock, intent).map(|_recorded| ())
+        }
+        other => append(directory, lock, other),
+    }
 }
 
 fn write(directory: &Path, id: &str, image: &PreImage) -> Result<WrittenPreImage, PreImageError> {
@@ -679,7 +693,7 @@ fn appending_master_records_leaves_the_voucher_journal_byte_for_byte() {
     let batch = batch(&batch_id());
     let lock = lock();
     for record in full_records(&batch) {
-        append(directory.path(), &lock, record).unwrap();
+        put(directory.path(), &lock, record).unwrap();
     }
     assert_eq!(
         std::fs::read_to_string(&voucher_path).unwrap(),
@@ -700,7 +714,7 @@ fn a_missing_journal_is_empty_and_append_builds_it_in_order() {
     let batch = batch(&batch_id());
     let lock = lock();
     for record in full_records(&batch) {
-        append(directory.path(), &lock, record).unwrap();
+        put(directory.path(), &lock, record).unwrap();
     }
     let on_disk = std::fs::read_to_string(directory.path().join(JOURNAL_FILE)).unwrap();
     assert_eq!(on_disk, journal_text(&full_records(&batch)));
@@ -715,7 +729,7 @@ fn append_never_writes_a_record_the_reader_would_refuse() {
     let lock = lock();
     // Nothing is written for an intent whose batch is not there.
     assert_eq!(
-        append(
+        put(
             directory.path(),
             &lock,
             MasterRecord::DispatchIntent(intent_for(&batch))
@@ -724,15 +738,15 @@ fn append_never_writes_a_record_the_reader_would_refuse() {
         invalid(Invalid::NoBatch)
     );
     assert!(!path.exists());
-    append(directory.path(), &lock, MasterRecord::Batch(batch.clone())).unwrap();
-    append(
+    put(directory.path(), &lock, MasterRecord::Batch(batch.clone())).unwrap();
+    put(
         directory.path(),
         &lock,
         MasterRecord::DispatchIntent(intent_for(&batch)),
     )
     .unwrap();
     let before = std::fs::read(&path).unwrap();
-    let error = append(
+    let error = put(
         directory.path(),
         &lock,
         MasterRecord::DispatchIntent(intent_for(&batch)),
@@ -748,7 +762,7 @@ fn a_corrupt_journal_file_blocks_appends() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(directory.path().join(JOURNAL_FILE), "garbage\n").unwrap();
     assert_eq!(
-        append(
+        put(
             directory.path(),
             &lock(),
             MasterRecord::Batch(batch(&batch_id()))
@@ -992,13 +1006,13 @@ fn append_refuses_an_overlapping_intent_and_writes_nothing() {
     let lock = lock();
     let (_, first) = dispatched_batch("Synthetic One", "key-one", "absent-one");
     for record in first {
-        append(directory.path(), &lock, record).unwrap();
+        put(directory.path(), &lock, record).unwrap();
     }
     let (_, second) = dispatched_batch("Synthetic One", "key-one", "absent-one");
-    append(directory.path(), &lock, second[0].clone()).unwrap();
+    put(directory.path(), &lock, second[0].clone()).unwrap();
     let before = std::fs::read(directory.path().join(JOURNAL_FILE)).unwrap();
     assert_eq!(
-        append(directory.path(), &lock, second[1].clone()).unwrap_err(),
+        put(directory.path(), &lock, second[1].clone()).unwrap_err(),
         MasterLedgerError::OpenDispatchOverlaps
     );
     assert_eq!(
@@ -1188,12 +1202,19 @@ fn the_local_data_report_names_exactly_the_files_this_module_writes() {
     let id = batch_id();
     assert!(is_master_file("agent-master-ledger.jsonl"));
     assert!(is_master_file(&format!("master-pre-image-{id}.json")));
+    // The stage a sidecar write leaves behind if it stops.
+    assert!(is_master_file(&format!(
+        "master-pre-image-{id}.{}.next",
+        Uuid::new_v4()
+    )));
     for name in [
         "master-pre-image-x.json",
         "master-pre-image-.json",
         &format!("master-pre-image-{id}.json.next"),
         &format!("{id}.json"),
         "agent-master-ledger.jsonl.bak",
+        &format!("master-pre-image-{id}.not-a-uuid.next"),
+        &format!("master-pre-image-x.{}.next", Uuid::new_v4()),
     ] {
         assert!(!is_master_file(name), "{name}");
     }
@@ -1208,7 +1229,7 @@ impl SyncProbe {
     fn append(
         &self,
         directory: &Path,
-        lock: &AdmissionLock,
+        lock: &ExclusiveAdmission,
         record: MasterRecord,
         result: std::io::Result<()>,
     ) -> Result<(), MasterLedgerError> {
@@ -1373,5 +1394,230 @@ fn names_that_fold_together_overlap_whatever_keys_the_caller_supplied() {
     assert_eq!(
         read(&journal_text(&[first, second].concat())).unwrap_err(),
         MasterLedgerError::OpenDispatchOverlaps
+    );
+}
+
+#[test]
+fn only_acquire_makes_an_exclusive_admission_and_a_shared_lock_blocks_it() {
+    // By type: nothing converts a `File` into one, so the lock a shared holder
+    // has (`lock_import_admission_shared` returns a `File`) cannot reach a write.
+    trait AmbiguousIfFromFile<A> {
+        fn probe() {}
+    }
+    impl<T: ?Sized> AmbiguousIfFromFile<()> for T {}
+    impl<T: From<std::fs::File>> AmbiguousIfFromFile<u8> for T {}
+    <ExclusiveAdmission as AmbiguousIfFromFile<_>>::probe();
+    // By behaviour: acquiring takes the lock exclusively.
+    let directory = tempfile::tempdir().unwrap();
+    let first = ExclusiveAdmission::acquire(directory.path()).unwrap();
+    assert!(ExclusiveAdmission::acquire(directory.path()).is_err());
+    drop(first);
+    let shared =
+        local_file::open_local_file(&directory.path().join("agent-import-admission.lock"), true)
+            .unwrap();
+    shared.try_lock_shared().unwrap();
+    assert!(ExclusiveAdmission::acquire(directory.path()).is_err());
+    drop(shared);
+    assert!(ExclusiveAdmission::acquire(directory.path()).is_ok());
+}
+
+#[test]
+fn an_intent_is_appended_only_through_append_intent_which_returns_the_token() {
+    let directory = tempfile::tempdir().unwrap();
+    let lock = lock();
+    let batch = batch(&batch_id());
+    put(directory.path(), &lock, MasterRecord::Batch(batch.clone())).unwrap();
+    let before = std::fs::read(directory.path().join(JOURNAL_FILE)).unwrap();
+    // `append` refuses an intent and writes nothing.
+    let error = append(
+        directory.path(),
+        &lock,
+        MasterRecord::DispatchIntent(intent_for(&batch)),
+    )
+    .unwrap_err();
+    assert_eq!(error, MasterLedgerError::UseAppendIntent);
+    assert_eq!(error.code(), "master_ledger_use_append_intent");
+    assert_eq!(
+        std::fs::read(directory.path().join(JOURNAL_FILE)).unwrap(),
+        before
+    );
+    let recorded = append_intent(directory.path(), &lock, intent_for(&batch)).unwrap();
+    assert_eq!(recorded.batch_id(), batch.batch_id);
+    assert_eq!(recorded.native_request_sha256(), digest('b'));
+    // A second intent, or one whose directory sync fails, returns no token.
+    assert_eq!(
+        append_intent(directory.path(), &lock, intent_for(&batch)).unwrap_err(),
+        MasterLedgerError::DuplicateDispatch
+    );
+    let other = single("Synthetic Other");
+    put(directory.path(), &lock, MasterRecord::Batch(other.clone())).unwrap();
+    assert_eq!(
+        append_intent_syncing(directory.path(), &lock, intent_for(&other), |_: &Path| {
+            injected()
+        })
+        .unwrap_err(),
+        MasterLedgerError::DirectorySyncFailed
+    );
+    // The intent reached the file, so the batch reads as dispatched.
+    assert!(read_journal(directory.path())
+        .unwrap()
+        .dispatched(&other.batch_id));
+}
+
+#[test]
+fn an_intent_is_read_through_accessors_only() {
+    let batch = batch(&batch_id());
+    let intent = intent_for(&batch);
+    assert_eq!(intent.batch_id(), batch.batch_id);
+    assert_eq!(intent.batch_sha256(), batch.batch_sha256);
+    assert_eq!(intent.native_request_sha256(), digest('b'));
+    assert_eq!(intent.items().len(), 2);
+    assert_eq!(intent.pre_post_master_marks().len(), 1);
+}
+
+#[test]
+fn names_that_fold_together_cannot_share_a_batch() {
+    let id = batch_id();
+    let record = |names: &[&str]| {
+        MasterRecord::Batch(batch_with(
+            &id,
+            &digest('a'),
+            names
+                .iter()
+                .map(|name| ledger(name, StoredLedgerKind::Suspense))
+                .collect(),
+        ))
+    };
+    for names in [
+        &["Rent  A", "Rent A"][..],
+        &["Rent-A", "Rent A"][..],
+        &["Rent/A", "Rent A"][..],
+        &["Alpha", "Beta", "RENT\tA", "Rent A"][..],
+    ] {
+        assert_eq!(
+            read(&line(&record(names))).unwrap_err(),
+            invalid(Invalid::DuplicateName),
+            "{names:?}"
+        );
+    }
+    assert!(read(&line(&record(&["Rent A", "Rent B", "Alpha"]))).is_ok());
+}
+
+#[test]
+fn a_journal_cut_inside_a_record_is_refused_to_read_and_to_append() {
+    let directory = tempfile::tempdir().unwrap();
+    let lock = lock();
+    let batch = batch(&batch_id());
+    put(directory.path(), &lock, MasterRecord::Batch(batch.clone())).unwrap();
+    put(
+        directory.path(),
+        &lock,
+        MasterRecord::DispatchIntent(intent_for(&batch)),
+    )
+    .unwrap();
+    let path = directory.path().join(JOURNAL_FILE);
+    let whole_bytes = std::fs::read(&path).unwrap();
+    let whole = whole_bytes.len() as u64;
+    // Every cut inside the last record, the delimiter included, is refused.
+    for cut in [1, 2, 7, 40] {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_len(whole - cut)
+            .unwrap();
+        assert!(matches!(
+            read_journal(directory.path()).unwrap_err(),
+            MasterLedgerError::Invalid(Invalid::Unterminated | Invalid::Parse)
+        ));
+        let cut_bytes = std::fs::read(&path).unwrap();
+        assert!(put(
+            directory.path(),
+            &lock,
+            MasterRecord::DispatchResponse(response_for(&batch))
+        )
+        .is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), cut_bytes);
+        std::fs::write(&path, &whole_bytes).unwrap();
+    }
+    assert!(read_journal(directory.path())
+        .unwrap()
+        .dispatched(&batch.batch_id));
+}
+
+#[test]
+fn the_sidecar_directory_sync_is_checked_whether_the_sidecar_is_new_or_there() {
+    let directory = tempfile::tempdir().unwrap();
+    let lock = lock();
+    let batch = batch(&batch_id());
+    let synced = std::cell::Cell::new(0);
+    let sync = |result: std::io::Result<()>| {
+        let synced = &synced;
+        move |_: &Path| {
+            synced.set(synced.get() + 1);
+            result
+        }
+    };
+    assert_eq!(
+        write_pre_image_syncing(
+            directory.path(),
+            &lock,
+            &batch,
+            &pre_image(),
+            sync(injected())
+        )
+        .unwrap_err(),
+        PreImageError::DirectorySyncFailed
+    );
+    assert_eq!(synced.get(), 1);
+    // The sidecar is in place; writing it again syncs again, and a failure is reported.
+    assert_eq!(
+        write_pre_image_syncing(
+            directory.path(),
+            &lock,
+            &batch,
+            &pre_image(),
+            sync(injected())
+        )
+        .unwrap_err(),
+        PreImageError::DirectorySyncFailed
+    );
+    assert_eq!(synced.get(), 2);
+    assert!(
+        write_pre_image_syncing(directory.path(), &lock, &batch, &pre_image(), sync(Ok(())))
+            .is_ok()
+    );
+    assert_eq!(synced.get(), 3);
+}
+
+#[test]
+fn a_pre_image_cannot_be_deserialised_outside_the_reader() {
+    trait AmbiguousIfDeserialize<A> {
+        fn probe() {}
+    }
+    impl<T: ?Sized> AmbiguousIfDeserialize<()> for T {}
+    impl<T: serde::de::DeserializeOwned> AmbiguousIfDeserialize<u8> for T {}
+    <PreImage as AmbiguousIfDeserialize<_>>::probe();
+}
+
+#[test]
+fn the_summary_counts_open_intents() {
+    let (first, mut records) = dispatched_batch("Synthetic One", "key-one", "absent-one");
+    let (_, second) = dispatched_batch("Synthetic Two", "key-two", "absent-two");
+    records.extend(second);
+    let (_, never_sent) = dispatched_batch("Synthetic Three", "key-3", "absent-3");
+    records.push(never_sent[0].clone());
+    records.push(MasterRecord::Verdict(verdict_for(
+        &first,
+        MasterVerdictState::PostedVerified,
+    )));
+    let summary = read(&journal_text(&records)).unwrap().summary();
+    assert_eq!(
+        summary,
+        MasterSummary {
+            batches: 3,
+            dispatched: 2,
+            not_settled: 1
+        }
     );
 }

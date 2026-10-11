@@ -803,13 +803,17 @@ The answers are committed byte for byte with their hashes (the `gst-status` fixt
   returns those fields without the ledger entries.** An answer cost about 3.0 KB per voucher and 3.2 KB once;
   the full voucher export of the same book is 78 to 94 KB per voucher.
 - **VERIFIED: selecting the type by its name and by its GUID gave byte-identical answers, and neither
-  selected another type.** A second Sales type (`Z1`) in the same window was not selected by the first type's name.
+  selected another type.** The by-GUID answer is `aw8-status-narrow-window-sales.xml` on the lab's answers branch
+  (commit `313f5439b`), with the same SHA-256 as the by-name answer committed as a fixture, so it is not committed
+  twice. A second Sales type (`Z1`) in the same window was not selected by the first type's name.
 - **VERIFIED: the three flags read No, No, No on the four Receipts in the window.** For Receipts that is
   Tally not listing the voucher in the return. It is **not measured** for any other type, and the two keyed Purchase
   invoices of §9.19 read uncertain, so "all three No" is not a general meaning.
 - **VERIFIED: the flags were read as No, Yes, No on an uncertain voucher (the tax figure of §9.17 that differed),
-  and an Accept As Is voucher read included with `ISGSTOVERRIDDEN` Yes.** The wider field list of the
-  voucher read-back returned the same flags.
+  and an Accept As Is voucher read included with `ISGSTOVERRIDDEN` Yes.** The uncertain voucher is dated 1-Aug-2026,
+  outside the narrow two-day window, so it was shown by the wider voucher read-back (the `three-vouchers` fixture),
+  not by the narrow request; the narrow request has **not** been seen to answer an uncertain voucher. The Accept As Is
+  voucher was read by both.
 - **NOT established:**
   - a voucher flagged excluded (never observed);
   - a registered buyer;

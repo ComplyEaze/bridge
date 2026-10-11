@@ -983,8 +983,10 @@ pub(super) struct ListedLedger {
 }
 
 /// [`parse_ledger_rates`], and with it the identity of every row the answer
-/// holds, named or not, in answer order: a scoped read is only believed when
-/// those rows are exactly the scope's (#1331).
+/// holds, in answer order: a scoped read is only believed when those rows are
+/// exactly the scope's (#1331). Every row is named: a row with no name fails
+/// the read (`invoice_ledger_rates_row_unnamed`) before it is listed, so the
+/// list never holds a row the proof cannot match by name.
 pub(super) fn parse_ledger_rates_and_rows(
     xml: &str,
     company_guid: &str,

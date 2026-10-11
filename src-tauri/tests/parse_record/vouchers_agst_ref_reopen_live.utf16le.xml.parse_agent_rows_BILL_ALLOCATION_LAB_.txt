@@ -1,0 +1,989 @@
+# fixture: vouchers_agst_ref_reopen_live.utf16le.xml
+# parser: parse_agent_rows(BILL_ALLOCATION_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(1),
+        "amounts": Array [
+            Object {
+                "amount": String("-1137.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1137.50"),
+                        "bill_date": String("20250408"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-001"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 02"),
+            },
+            Object {
+                "amount": String("1137.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250408"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000001"),
+        "is_invoice": Bool(false),
+        "master_id": String("1"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("1"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(3),
+        "amounts": Array [
+            Object {
+                "amount": String("-1275.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1275.00"),
+                        "bill_date": String("20250415"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-002"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 03"),
+            },
+            Object {
+                "amount": String("1275.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250415"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000003"),
+        "is_invoice": Bool(false),
+        "master_id": String("3"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("2"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(5),
+        "amounts": Array [
+            Object {
+                "amount": String("-1412.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1412.50"),
+                        "bill_date": String("20250422"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-003"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 01"),
+            },
+            Object {
+                "amount": String("1412.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250422"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000005"),
+        "is_invoice": Bool(false),
+        "master_id": String("5"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("3"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(2),
+        "amounts": Array [
+            Object {
+                "amount": String("1137.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1137.50"),
+                        "bill_date": String("20250408"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-001"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 02"),
+            },
+            Object {
+                "amount": String("-1137.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250428"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000002"),
+        "is_invoice": Bool(false),
+        "master_id": String("2"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("1"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(7),
+        "amounts": Array [
+            Object {
+                "amount": String("-1550.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1550.00"),
+                        "bill_date": String("20250429"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-004"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 02"),
+            },
+            Object {
+                "amount": String("1550.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250429"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000007"),
+        "is_invoice": Bool(false),
+        "master_id": String("7"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("4"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(4),
+        "amounts": Array [
+            Object {
+                "amount": String("1275.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1275.00"),
+                        "bill_date": String("20250415"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-002"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 03"),
+            },
+            Object {
+                "amount": String("-1275.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250505"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000004"),
+        "is_invoice": Bool(false),
+        "master_id": String("4"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("2"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(9),
+        "amounts": Array [
+            Object {
+                "amount": String("-1687.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1687.50"),
+                        "bill_date": String("20250506"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-005"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 03"),
+            },
+            Object {
+                "amount": String("1687.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250506"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000009"),
+        "is_invoice": Bool(false),
+        "master_id": String("9"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("5"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(6),
+        "amounts": Array [
+            Object {
+                "amount": String("1412.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1412.50"),
+                        "bill_date": String("20250422"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-003"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 01"),
+            },
+            Object {
+                "amount": String("-1412.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250512"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000006"),
+        "is_invoice": Bool(false),
+        "master_id": String("6"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("3"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(11),
+        "amounts": Array [
+            Object {
+                "amount": String("-1825.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1825.00"),
+                        "bill_date": String("20250513"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-006"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 01"),
+            },
+            Object {
+                "amount": String("1825.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250513"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-0000000b"),
+        "is_invoice": Bool(false),
+        "master_id": String("11"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("6"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(8),
+        "amounts": Array [
+            Object {
+                "amount": String("1550.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1550.00"),
+                        "bill_date": String("20250429"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-004"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 02"),
+            },
+            Object {
+                "amount": String("-1550.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250519"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000008"),
+        "is_invoice": Bool(false),
+        "master_id": String("8"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("4"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(13),
+        "amounts": Array [
+            Object {
+                "amount": String("-1962.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-1962.50"),
+                        "bill_date": String("20250520"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-007"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 02"),
+            },
+            Object {
+                "amount": String("1962.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250520"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-0000000d"),
+        "is_invoice": Bool(false),
+        "master_id": String("13"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("7"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(10),
+        "amounts": Array [
+            Object {
+                "amount": String("1687.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1687.50"),
+                        "bill_date": String("20250506"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-005"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 03"),
+            },
+            Object {
+                "amount": String("-1687.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250526"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-0000000a"),
+        "is_invoice": Bool(false),
+        "master_id": String("10"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("5"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(15),
+        "amounts": Array [
+            Object {
+                "amount": String("-2100.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-2100.00"),
+                        "bill_date": String("20250527"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-008"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 03"),
+            },
+            Object {
+                "amount": String("2100.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250527"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-0000000f"),
+        "is_invoice": Bool(false),
+        "master_id": String("15"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("8"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(12),
+        "amounts": Array [
+            Object {
+                "amount": String("1825.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1825.00"),
+                        "bill_date": String("20250513"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-006"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 01"),
+            },
+            Object {
+                "amount": String("-1825.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250602"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-0000000c"),
+        "is_invoice": Bool(false),
+        "master_id": String("12"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("6"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(17),
+        "amounts": Array [
+            Object {
+                "amount": String("-2237.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-2237.50"),
+                        "bill_date": String("20250603"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-009"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 01"),
+            },
+            Object {
+                "amount": String("2237.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250603"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000011"),
+        "is_invoice": Bool(false),
+        "master_id": String("17"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("9"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(14),
+        "amounts": Array [
+            Object {
+                "amount": String("1962.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("1962.50"),
+                        "bill_date": String("20250520"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-007"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 02"),
+            },
+            Object {
+                "amount": String("-1962.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250609"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-0000000e"),
+        "is_invoice": Bool(false),
+        "master_id": String("14"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("7"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(19),
+        "amounts": Array [
+            Object {
+                "amount": String("-2375.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-2375.00"),
+                        "bill_date": String("20250610"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-010"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 02"),
+            },
+            Object {
+                "amount": String("2375.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250610"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000013"),
+        "is_invoice": Bool(false),
+        "master_id": String("19"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("10"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(16),
+        "amounts": Array [
+            Object {
+                "amount": String("2100.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("2100.00"),
+                        "bill_date": String("20250527"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-008"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 03"),
+            },
+            Object {
+                "amount": String("-2100.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250616"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000010"),
+        "is_invoice": Bool(false),
+        "master_id": String("16"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("8"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(21),
+        "amounts": Array [
+            Object {
+                "amount": String("-2512.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-2512.50"),
+                        "bill_date": String("20250617"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-011"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 03"),
+            },
+            Object {
+                "amount": String("2512.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250617"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000015"),
+        "is_invoice": Bool(false),
+        "master_id": String("21"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("11"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(18),
+        "amounts": Array [
+            Object {
+                "amount": String("2237.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("2237.50"),
+                        "bill_date": String("20250603"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-009"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 01"),
+            },
+            Object {
+                "amount": String("-2237.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250623"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000012"),
+        "is_invoice": Bool(false),
+        "master_id": String("18"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("9"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(23),
+        "amounts": Array [
+            Object {
+                "amount": String("-2650.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-2650.00"),
+                        "bill_date": String("20250624"),
+                        "bill_type": String("New Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-012"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Debtor 01"),
+            },
+            Object {
+                "amount": String("2650.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Sales"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250624"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000017"),
+        "is_invoice": Bool(false),
+        "master_id": String("23"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("12"),
+        "voucher_type": String("Sales"),
+    },
+    Object {
+        "alter_id": Number(20),
+        "amounts": Array [
+            Object {
+                "amount": String("2375.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("2375.00"),
+                        "bill_date": String("20250610"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-010"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 02"),
+            },
+            Object {
+                "amount": String("-2375.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250630"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000014"),
+        "is_invoice": Bool(false),
+        "master_id": String("20"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("10"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(22),
+        "amounts": Array [
+            Object {
+                "amount": String("2512.50"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("2512.50"),
+                        "bill_date": String("20250617"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-011"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 03"),
+            },
+            Object {
+                "amount": String("-2512.50"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250707"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000016"),
+        "is_invoice": Bool(false),
+        "master_id": String("22"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("11"),
+        "voucher_type": String("Receipt"),
+    },
+    Object {
+        "alter_id": Number(24),
+        "amounts": Array [
+            Object {
+                "amount": String("2650.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("2650.00"),
+                        "bill_date": String("20250624"),
+                        "bill_type": String("Agst Ref"),
+                        "credit_period": Object {
+                            "unit": String("days"),
+                            "value": Number(30),
+                        },
+                        "reference": Object {
+                            "kind": String("named"),
+                            "name": String("SET-INV-012"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SETTLED Debtor 01"),
+            },
+            Object {
+                "amount": String("-2650.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("SETTLED Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250714"),
+        "guid": String("74d7e825-396a-4667-90b2-83f593f06a36-00000018"),
+        "is_invoice": Bool(false),
+        "master_id": String("24"),
+        "narration": Null,
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("12"),
+        "voucher_type": String("Receipt"),
+    },
+])

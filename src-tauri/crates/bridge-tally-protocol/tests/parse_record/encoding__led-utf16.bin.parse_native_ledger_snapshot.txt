@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/encoding/led-utf16.bin
+# parser: parse_native_ledger_snapshot
+# source: captured
+Err(InvalidResponse("ledger_opening_balance_missing"))

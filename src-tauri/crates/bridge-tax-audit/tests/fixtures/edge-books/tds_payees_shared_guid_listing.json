@@ -1,0 +1,233 @@
+{
+ "comment": "tds_payees, #1243: how a payee's bills and TDS vouchers are listed when GUIDs are blank or run against the dates. Contractor U: three s.194C bills each also crediting Helper T and carrying Rs 500 of TDS, so none is rate tested; two have a blank GUID and the same number and day, the third another number: the figure counting bills not rate tested cites the identical pair of the first two twice, as the reference does. Contractor W: one bill over the single sum and two TDS journals of unique GUIDs whose GUID order is the reverse of their date order: the TDS seen is named by date, October's journal first.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Secured Loans": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Fixed Assets": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Contract Work",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-tds_payees_shared_guid_listing-000"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_listing-001"
+  },
+  {
+   "name": "Contractor U",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_listing-002"
+  },
+  {
+   "name": "Helper T",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_listing-003"
+  },
+  {
+   "name": "Contractor W",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_listing-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Contract Work",
+   "opening": 0,
+   "debit": 15254600,
+   "credit": 0,
+   "closing": 15254600
+  },
+  {
+   "ledger": "Contractor U",
+   "opening": 0,
+   "debit": 0,
+   "credit": 11711100,
+   "closing": -11711100
+  },
+  {
+   "ledger": "Contractor W",
+   "opening": 0,
+   "debit": 64200,
+   "credit": 3213500,
+   "closing": -3149300
+  },
+  {
+   "ledger": "Helper T",
+   "opening": 0,
+   "debit": 0,
+   "credit": 180000,
+   "closing": -180000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 214200,
+   "closing": -214200
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "U1",
+   "lines": [
+    [
+     "Contract Work",
+     4013700
+    ],
+    [
+     "Contractor U",
+     -3903700
+    ],
+    [
+     "Helper T",
+     -60000
+    ],
+    [
+     "TDS Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "U1",
+   "lines": [
+    [
+     "Contract Work",
+     4013700
+    ],
+    [
+     "Contractor U",
+     -3903700
+    ],
+    [
+     "Helper T",
+     -60000
+    ],
+    [
+     "TDS Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-10",
+   "base_type": "Journal",
+   "number": "U2",
+   "lines": [
+    [
+     "Contract Work",
+     4013700
+    ],
+    [
+     "Contractor U",
+     -3903700
+    ],
+    [
+     "Helper T",
+     -60000
+    ],
+    [
+     "TDS Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "w-bill",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "number": "W1",
+   "lines": [
+    [
+     "Contract Work",
+     3213500
+    ],
+    [
+     "Contractor W",
+     -3213500
+    ]
+   ]
+  },
+  {
+   "guid": "k2",
+   "date": "2025-10-15",
+   "base_type": "Journal",
+   "number": "W11",
+   "lines": [
+    [
+     "Contractor W",
+     32100
+    ],
+    [
+     "TDS Payable",
+     -32100
+    ]
+   ]
+  },
+  {
+   "guid": "k1",
+   "date": "2025-11-15",
+   "base_type": "Journal",
+   "number": "W12",
+   "lines": [
+    [
+     "Contractor W",
+     32100
+    ],
+    [
+     "TDS Payable",
+     -32100
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Contract Work": "194C"
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

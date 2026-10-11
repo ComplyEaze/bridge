@@ -1,0 +1,340 @@
+{
+ "comment": "tds_payees, #1243: TDS on vouchers that share a GUID. Contractor H: four bills of Rs 29,000 cross the aggregate; two blank-GUID journals each carry Rs 1,000 of TDS against it: Rs 2,000 of TDS is seen, on two vouchers. Contractor J: three blank-GUID plain bills of Rs 50,000, each carrying its own TDS: July's at the higher rate (deducted on its own voucher, listed on the TDS question), August's two short of the lower rate and between the rates, in a month the challans show nothing deposited for (clause 21(b)(ii)(B)). Contractor S: two blank-GUID bills of Rs 28,000, each also crediting Helper T and carrying Rs 500 of TDS the books do not divide: each bill with that TDS is Rs 28,500, under the single sum, and the two under the aggregate.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Secured Loans": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Fixed Assets": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Contract Work",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-tds_payees_shared_guid_tds-000"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_tds-001"
+  },
+  {
+   "name": "Contractor H",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_tds-002"
+  },
+  {
+   "name": "Contractor J",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_tds-003"
+  },
+  {
+   "name": "Contractor S",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_tds-004"
+  },
+  {
+   "name": "Helper T",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_tds-005"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Contract Work",
+   "opening": 0,
+   "debit": 32400000,
+   "credit": 0,
+   "closing": 32400000
+  },
+  {
+   "ledger": "Contractor H",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 11600000,
+   "closing": -11400000
+  },
+  {
+   "ledger": "Contractor J",
+   "opening": 0,
+   "debit": 0,
+   "credit": 14830000,
+   "closing": -14830000
+  },
+  {
+   "ledger": "Contractor S",
+   "opening": 0,
+   "debit": 0,
+   "credit": 5600000,
+   "closing": -5600000
+  },
+  {
+   "ledger": "Helper T",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 470000,
+   "closing": -470000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "h1",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "number": "H1",
+   "lines": [
+    [
+     "Contract Work",
+     2900000
+    ],
+    [
+     "Contractor H",
+     -2900000
+    ]
+   ]
+  },
+  {
+   "guid": "h2",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "H2",
+   "lines": [
+    [
+     "Contract Work",
+     2900000
+    ],
+    [
+     "Contractor H",
+     -2900000
+    ]
+   ]
+  },
+  {
+   "guid": "h3",
+   "date": "2025-07-10",
+   "base_type": "Journal",
+   "number": "H3",
+   "lines": [
+    [
+     "Contract Work",
+     2900000
+    ],
+    [
+     "Contractor H",
+     -2900000
+    ]
+   ]
+  },
+  {
+   "guid": "h4",
+   "date": "2025-08-10",
+   "base_type": "Journal",
+   "number": "H4",
+   "lines": [
+    [
+     "Contract Work",
+     2900000
+    ],
+    [
+     "Contractor H",
+     -2900000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-10-15",
+   "base_type": "Journal",
+   "number": "H11",
+   "lines": [
+    [
+     "Contractor H",
+     100000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-11-15",
+   "base_type": "Journal",
+   "number": "H12",
+   "lines": [
+    [
+     "Contractor H",
+     100000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-10",
+   "base_type": "Journal",
+   "number": "J1",
+   "lines": [
+    [
+     "Contract Work",
+     5000000
+    ],
+    [
+     "Contractor J",
+     -4900000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-10",
+   "base_type": "Journal",
+   "number": "J2",
+   "lines": [
+    [
+     "Contract Work",
+     5000000
+    ],
+    [
+     "Contractor J",
+     -4980000
+    ],
+    [
+     "TDS Payable",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-20",
+   "base_type": "Journal",
+   "number": "J3",
+   "lines": [
+    [
+     "Contract Work",
+     5000000
+    ],
+    [
+     "Contractor J",
+     -4950000
+    ],
+    [
+     "TDS Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "S1",
+   "lines": [
+    [
+     "Contract Work",
+     2900000
+    ],
+    [
+     "Contractor S",
+     -2800000
+    ],
+    [
+     "Helper T",
+     -50000
+    ],
+    [
+     "TDS Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-10",
+   "base_type": "Journal",
+   "number": "S2",
+   "lines": [
+    [
+     "Contract Work",
+     2900000
+    ],
+    [
+     "Contractor S",
+     -2800000
+    ],
+    [
+     "Helper T",
+     -50000
+    ],
+    [
+     "TDS Payable",
+     -50000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Contract Work": "194C"
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ],
+ "challans": [
+  {
+   "date": "2025-08-07",
+   "section": "194C",
+   "month": "2025-07",
+   "amount_paise": 100000
+  }
+ ]
+}

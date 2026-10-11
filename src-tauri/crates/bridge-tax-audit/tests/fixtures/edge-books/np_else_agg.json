@@ -1,0 +1,468 @@
+{
+ "comment": "Payees under both limits on Wages whose debits to other ledgers take them over one; every payment from Bank A. Each of ALPHA TRADERS, BETA STORES and GAMMA MILLS has 7000000 paise booked to Driver Advances and Staff Loans in three payments, none over the single-sum limit. ALPHA TRADERS (g01 to g05): 3000000 of Wages, exactly the aggregate limit together: not listed. BETA STORES (g11 to g16): 3000001 of Wages in three payments, one paisa over together: listed. GAMMA MILLS (g21 to g24): 2999999 of Wages, one paisa under together: not listed. DELTA WORKS (g31, g32): already over the single-sum limit on Wages (3500000), so not listed here, whatever its 8000000 elsewhere. EPSILON CARRIERS (g41, g42): one payment debits Driver Advances and Staff Loans 2000000 each, 4000000 in the voucher, over the single-sum limit: listed. ZETA (g51 to g53): two payments of 2000000 elsewhere, neither over the single-sum limit, and 4500000 with its Wages: not listed. elsewhere_over_count is 2 and elsewhere_over_total 11000000; the elsewhere finding cites the payments of BETA STORES and EPSILON CARRIERS, of Wages and elsewhere.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_else_agg-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_else_agg-001"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_else_agg-002"
+  },
+  {
+   "name": "Driver Advances",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-np_else_agg-003"
+  },
+  {
+   "name": "Staff Loans",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-np_else_agg-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 50500000,
+   "closing": -50500000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 13500000,
+   "credit": 0,
+   "closing": 13500000
+  },
+  {
+   "ledger": "Driver Advances",
+   "opening": 0,
+   "debit": 32000000,
+   "credit": 0,
+   "closing": 32000000
+  },
+  {
+   "ledger": "Staff Loans",
+   "opening": 0,
+   "debit": 5000000,
+   "credit": 0,
+   "closing": 5000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "g01",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank A",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank A",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "g03",
+   "date": "2025-07-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "g04",
+   "date": "2025-08-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "g05",
+   "date": "2025-09-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-LOAN",
+   "lines": [
+    [
+     "Staff Loans",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "g11",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank A",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "g12",
+   "date": "2025-06-03",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank A",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "g13",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1
+    ],
+    [
+     "Bank A",
+     -1
+    ]
+   ]
+  },
+  {
+   "guid": "g14",
+   "date": "2025-07-03",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "g15",
+   "date": "2025-08-03",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "g16",
+   "date": "2025-09-03",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-LOAN",
+   "lines": [
+    [
+     "Staff Loans",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "g21",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2999999
+    ],
+    [
+     "Bank A",
+     -2999999
+    ]
+   ]
+  },
+  {
+   "guid": "g22",
+   "date": "2025-07-04",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "g23",
+   "date": "2025-08-04",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "g24",
+   "date": "2025-09-04",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-LOAN",
+   "lines": [
+    [
+     "Staff Loans",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "g31",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3500000
+    ],
+    [
+     "Bank A",
+     -3500000
+    ]
+   ]
+  },
+  {
+   "guid": "g32",
+   "date": "2025-07-05",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     8000000
+    ],
+    [
+     "Bank A",
+     -8000000
+    ]
+   ]
+  },
+  {
+   "guid": "g41",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "narration": "UPI-EPSILON CARRIERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "g42",
+   "date": "2025-06-06",
+   "base_type": "Payment",
+   "narration": "UPI-EPSILON CARRIERS-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     2000000
+    ],
+    [
+     "Staff Loans",
+     2000000
+    ],
+    [
+     "Bank A",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "g51",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "g52",
+   "date": "2025-06-07",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "g53",
+   "date": "2025-06-08",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-ADVANCE",
+   "lines": [
+    [
+     "Driver Advances",
+     2000000
+    ],
+    [
+     "Bank A",
+     -2000000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

@@ -1,0 +1,129 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "clause21a_candidates",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "797c2b1bb11ca213",
+  "population_note_text": "Every debit line on a ledger under Purchase Accounts, Direct Expenses or Indirect Expenses, in the books population; credits on those ledgers that match are shown beside.",
+  "figures": [
+    {
+      "id": "clause21a_candidates.candidate_total_capital",
+      "value": 29200000,
+      "unit": "paise",
+      "definition_sha256_16": "4ef775a47629d6ac",
+      "definition_text": "Clause 21(a) (i) capital expenditure: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-00000005",
+          "label": "Purchase PU/1 on 2025-06-03, Purchases - Hardware, ₹90,000"
+        },
+        {
+          "kind": "voucher",
+          "id": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-0000000e",
+          "label": "Payment P/5 on 2025-11-11, Purchases - Hardware, ₹12,000"
+        },
+        {
+          "kind": "voucher",
+          "id": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-00000024",
+          "label": "Purchase PU/2 on 2025-07-03, Purchases - Hardware, ₹1,90,000"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.credits_total_capital",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a1138831649df0d8",
+      "definition_text": "Credits on the same P&L ledgers matching the (i) capital expenditure words: shown beside, never netted.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "clause21a_candidates/capital",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_capital"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_capital"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-00000005",
+          "label": "Purchase PU/1 on 2025-06-03, Purchases - Hardware, ₹90,000"
+        },
+        {
+          "kind": "voucher",
+          "id": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-0000000e",
+          "label": "Payment P/5 on 2025-11-11, Purchases - Hardware, ₹12,000"
+        },
+        {
+          "kind": "voucher",
+          "id": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-00000024",
+          "label": "Purchase PU/2 on 2025-07-03, Purchases - Hardware, ₹1,90,000"
+        }
+      ],
+      "title_sha256_16": "9023ac7f6bb14c77",
+      "title_text": "Clause 21(a) (i) capital expenditure: candidates listed for the CA, not reported",
+      "limits_sha256_16": "322e1478df6622c0",
+      "limits_text": [
+        "3 P&L debit line(s) match the words for this item (ICAI GN on tax audit (2025) ch.33 paras 33.2-33.6; the clause 21(a) candidate spec (repairs/software/computer ledgers, purchase narrations, preliminary expenses)); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "3ad99277f198a838",
+      "ask_client_text": [
+        "Is any of this capital expenditure debited to P&L (enduring benefit, fixed asset, intangible, preliminary expenses)? Confirm the amount per item, and whether an accounting-standard observation is needed in para 3 of 3CA / para 3(a) of 3CB."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "MAP-1",
+      "subject": "Unmapped Holding",
+      "detail": "chain incomplete: Legacy Holding"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Electricity",
+      "detail": "vouchers 365050 vs TB movement 365550 paise"
+    },
+    {
+      "invariant": "POP-2",
+      "subject": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-0000000c",
+      "detail": "Journal J/1 2025-09-28 lines sum 200"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to 700 paise"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

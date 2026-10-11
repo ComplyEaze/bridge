@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/agent/native-bank-allocation-status.utf16le.xml
+# parser: export_status
+# source: captured
+Ok(Success)

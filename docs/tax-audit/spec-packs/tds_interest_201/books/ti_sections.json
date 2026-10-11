@@ -1,0 +1,424 @@
+{
+ "comment": "A firm's payees under the other sections, one rule each: 11 rows, 9 findings; one payee is classified foreseeable and none one-off, so there is no one-off total. Dogwood Estates (s.194-I, each month on its own, lower rate 2% and higher rate 10%): s01 and s02 make April Rs 55,000, over the monthly limit on 25 April, so both are one tranche dated 25 April; s03 makes May exactly Rs 50,000, not over, no tranche; s04 makes July Rs 50,000.01, a tranche dated 5 July. Elm Associates (s.194J professional, one rate, 10%; classified foreseeable): s05 and s06 pass Rs 50,000 on 10 October, one tranche of Rs 50,000.01; s07 credits the same payee Rs 45,000 of technical fees, a separate category that stays within its limit and gives no row. Fir Labs (s.194J technical, one rate, 2%): s08 is Rs 50,000.01. Gum Designs (s.194J royalty, no rate settled by the category: lower 2%, higher 10%): s09. Hazel Ventures (s.194J, a s.28(va) sum, likewise two rates): s10. Ivy Agency (s.194H, one rate, 2%): s11 is Rs 20,000.01.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Workshop Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_sections-ledger-00c"
+  },
+  {
+   "name": "Legal Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_sections-ledger-01c"
+  },
+  {
+   "name": "Lab Testing",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_sections-ledger-02c"
+  },
+  {
+   "name": "Pattern Royalty",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_sections-ledger-03c"
+  },
+  {
+   "name": "Non-compete Fee",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_sections-ledger-04c"
+  },
+  {
+   "name": "Sales Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_sections-ledger-05c"
+  },
+  {
+   "name": "Dogwood Estates",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_sections-ledger-06c"
+  },
+  {
+   "name": "Elm Associates",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_sections-ledger-07c"
+  },
+  {
+   "name": "Fir Labs",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_sections-ledger-08c"
+  },
+  {
+   "name": "Gum Designs",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_sections-ledger-09c"
+  },
+  {
+   "name": "Hazel Ventures",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_sections-ledger-10c"
+  },
+  {
+   "name": "Ivy Agency",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_sections-ledger-11c"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_sections-ledger-12c"
+  },
+  {
+   "name": "Proprietor Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_sections-ledger-13c"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Workshop Rent",
+   "opening": 0,
+   "debit": 15500001,
+   "credit": 0,
+   "closing": 15500001
+  },
+  {
+   "ledger": "Legal Fees",
+   "opening": 0,
+   "debit": 5000001,
+   "credit": 0,
+   "closing": 5000001
+  },
+  {
+   "ledger": "Lab Testing",
+   "opening": 0,
+   "debit": 9500001,
+   "credit": 0,
+   "closing": 9500001
+  },
+  {
+   "ledger": "Pattern Royalty",
+   "opening": 0,
+   "debit": 7000000,
+   "credit": 0,
+   "closing": 7000000
+  },
+  {
+   "ledger": "Non-compete Fee",
+   "opening": 0,
+   "debit": 6000000,
+   "credit": 0,
+   "closing": 6000000
+  },
+  {
+   "ledger": "Sales Commission",
+   "opening": 0,
+   "debit": 2000001,
+   "credit": 0,
+   "closing": 2000001
+  },
+  {
+   "ledger": "Dogwood Estates",
+   "opening": 0,
+   "debit": 0,
+   "credit": 15500001,
+   "closing": -15500001
+  },
+  {
+   "ledger": "Elm Associates",
+   "opening": 0,
+   "debit": 0,
+   "credit": 9500001,
+   "closing": -9500001
+  },
+  {
+   "ledger": "Fir Labs",
+   "opening": 0,
+   "debit": 0,
+   "credit": 5000001,
+   "closing": -5000001
+  },
+  {
+   "ledger": "Gum Designs",
+   "opening": 0,
+   "debit": 0,
+   "credit": 7000000,
+   "closing": -7000000
+  },
+  {
+   "ledger": "Hazel Ventures",
+   "opening": 0,
+   "debit": 0,
+   "credit": 6000000,
+   "closing": -6000000
+  },
+  {
+   "ledger": "Ivy Agency",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2000001,
+   "closing": -2000001
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 50000000
+  },
+  {
+   "ledger": "Proprietor Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-s01",
+   "date": "2025-04-05",
+   "base_type": "Journal",
+   "number": "RJ/01",
+   "lines": [
+    [
+     "Workshop Rent",
+     3000000
+    ],
+    [
+     "Dogwood Estates",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-s02",
+   "date": "2025-04-25",
+   "base_type": "Journal",
+   "number": "RJ/02",
+   "lines": [
+    [
+     "Workshop Rent",
+     2500000
+    ],
+    [
+     "Dogwood Estates",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-s03",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "number": "RJ/03",
+   "lines": [
+    [
+     "Workshop Rent",
+     5000000
+    ],
+    [
+     "Dogwood Estates",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-s04",
+   "date": "2025-07-05",
+   "base_type": "Journal",
+   "number": "RJ/04",
+   "lines": [
+    [
+     "Workshop Rent",
+     5000001
+    ],
+    [
+     "Dogwood Estates",
+     -5000001
+    ]
+   ]
+  },
+  {
+   "guid": "ti-s05",
+   "date": "2025-09-10",
+   "base_type": "Journal",
+   "number": "FJ/05",
+   "lines": [
+    [
+     "Legal Fees",
+     4000000
+    ],
+    [
+     "Elm Associates",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-s06",
+   "date": "2025-10-10",
+   "base_type": "Journal",
+   "number": "FJ/06",
+   "lines": [
+    [
+     "Legal Fees",
+     1000001
+    ],
+    [
+     "Elm Associates",
+     -1000001
+    ]
+   ]
+  },
+  {
+   "guid": "ti-s07",
+   "date": "2025-10-11",
+   "base_type": "Journal",
+   "number": "FJ/07",
+   "lines": [
+    [
+     "Lab Testing",
+     4500000
+    ],
+    [
+     "Elm Associates",
+     -4500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-s08",
+   "date": "2025-09-01",
+   "base_type": "Journal",
+   "number": "FJ/08",
+   "lines": [
+    [
+     "Lab Testing",
+     5000001
+    ],
+    [
+     "Fir Labs",
+     -5000001
+    ]
+   ]
+  },
+  {
+   "guid": "ti-s09",
+   "date": "2025-12-12",
+   "base_type": "Journal",
+   "number": "FJ/09",
+   "lines": [
+    [
+     "Pattern Royalty",
+     7000000
+    ],
+    [
+     "Gum Designs",
+     -7000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-s10",
+   "date": "2025-12-19",
+   "base_type": "Journal",
+   "number": "FJ/10",
+   "lines": [
+    [
+     "Non-compete Fee",
+     6000000
+    ],
+    [
+     "Hazel Ventures",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-s11",
+   "date": "2026-01-23",
+   "base_type": "Journal",
+   "number": "FJ/11",
+   "lines": [
+    [
+     "Sales Commission",
+     2000001
+    ],
+    [
+     "Ivy Agency",
+     -2000001
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Workshop Rent": "194I",
+  "Legal Fees": "194J",
+  "Lab Testing": "194J",
+  "Pattern Royalty": "194J",
+  "Non-compete Fee": "194J",
+  "Sales Commission": "194H"
+ },
+ "s194j_category_by_ledger": {
+  "Legal Fees": "professional",
+  "Lab Testing": "technical",
+  "Pattern Royalty": "royalty",
+  "Non-compete Fee": "28va"
+ },
+ "foreseeability": {
+  "Elm Associates": "foreseeable"
+ }
+}

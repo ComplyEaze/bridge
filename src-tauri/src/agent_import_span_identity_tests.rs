@@ -58,7 +58,7 @@ fn sent() -> Vec<ImportVoucher> {
     use VoucherType::{Contra, Payment, Receipt};
     let v = |n: usize, voucher_type, narration: &str, entries| ImportVoucher {
         bridge_txn_id: format!("span-{n:02}"),
-        date: "2026-07-10".into(),
+        date: bridge_tally_core::TallyDate::parse("20260710").unwrap(),
         voucher_type,
         narration: Some(narration.into()),
         reference: None,
@@ -448,7 +448,7 @@ fn content_that_differs_from_what_was_sent_refuses_at_its_position() {
         .iter_mut()
         .find(|row| row.alter_id == Some(1804))
         .unwrap();
-    ninth.effective_date = Some("20260711".into());
+    ninth.effective_date = Some(bridge_tally_core::TallyDate::parse("20260711").unwrap());
     assert_eq!(
         refusal(bind(
             &span,
@@ -627,7 +627,7 @@ fn sent_journals() -> Vec<ImportVoucher> {
     use EntrySide::{Cr, Dr};
     let v = |n: usize, narration: &str, entries| ImportVoucher {
         bridge_txn_id: format!("journal-{n:02}"),
-        date: "2026-07-11".into(),
+        date: bridge_tally_core::TallyDate::parse("20260711").unwrap(),
         voucher_type: VoucherType::Journal,
         narration: Some(narration.into()),
         reference: None,

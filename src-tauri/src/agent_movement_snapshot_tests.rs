@@ -383,6 +383,10 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
                 response["structuredContent"]["result"]["voucher_rows_observed"],
                 200
             );
+            // A quick call's result is unchanged: no block, nothing left out (#1239).
+            let result = &response["structuredContent"]["result"];
+            assert!(result.get("read_cost").is_none(), "{result}");
+            assert!(result.get("read_cost_left_out").is_none(), "{result}");
         } else {
             assert_eq!(response["isError"], true, "{response}");
             assert_eq!(

@@ -1,0 +1,207 @@
+{
+ "comment": "ledger_scrutiny, vouchers with a blank GUID (#1243): on Carriage Outward, Rs 4,00,000 paid in cash in June and Rs 1,00,000 by bank in the last days (two entries: the cash share is 80 percent of both debits, never more than the debits); on Conveyance, two cash payments in the last days (each counted in the last-days and cash-paid subsets); on Freight Inward, a journal and a bank payment (two entries, not journal-only). Each finding cites both vouchers under the blank GUID.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "lsg-cash"
+  },
+  {
+   "name": "Bank One",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "lsg-bank-one"
+  },
+  {
+   "name": "Carrier One",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "lsg-carrier-one"
+  },
+  {
+   "name": "Carriage Outward",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "lsg-carriage-outward"
+  },
+  {
+   "name": "Conveyance",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "lsg-conveyance"
+  },
+  {
+   "name": "Freight Inward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "lsg-freight-inward"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 41200000,
+   "closing": -41200000
+  },
+  {
+   "ledger": "Bank One",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10150000,
+   "closing": -10150000
+  },
+  {
+   "ledger": "Carrier One",
+   "opening": 0,
+   "debit": 0,
+   "credit": 150000,
+   "closing": -150000
+  },
+  {
+   "ledger": "Carriage Outward",
+   "opening": 0,
+   "debit": 50000000,
+   "credit": 0,
+   "closing": 50000000
+  },
+  {
+   "ledger": "Conveyance",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 0,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Freight Inward",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 0,
+   "closing": 300000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "number": "1",
+   "lines": [
+    [
+     "Carriage Outward",
+     40000000
+    ],
+    [
+     "Cash",
+     -40000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-03-29",
+   "base_type": "Payment",
+   "number": "2",
+   "lines": [
+    [
+     "Carriage Outward",
+     10000000
+    ],
+    [
+     "Bank One",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-03-27",
+   "base_type": "Payment",
+   "number": "3",
+   "lines": [
+    [
+     "Conveyance",
+     700000
+    ],
+    [
+     "Cash",
+     -700000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-03-30",
+   "base_type": "Payment",
+   "number": "4",
+   "lines": [
+    [
+     "Conveyance",
+     500000
+    ],
+    [
+     "Cash",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-05",
+   "base_type": "Journal",
+   "number": "5",
+   "lines": [
+    [
+     "Freight Inward",
+     150000
+    ],
+    [
+     "Carrier One",
+     -150000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-06",
+   "base_type": "Payment",
+   "number": "6",
+   "lines": [
+    [
+     "Freight Inward",
+     150000
+    ],
+    [
+     "Bank One",
+     -150000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "tests": [
+  "ledger_scrutiny"
+ ]
+}

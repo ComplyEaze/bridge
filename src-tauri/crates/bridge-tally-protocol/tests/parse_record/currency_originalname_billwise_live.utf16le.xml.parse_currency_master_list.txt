@@ -1,0 +1,15 @@
+# fixture: tests/fixtures/currency_originalname_billwise_live.utf16le.xml
+# parser: parse_currency_master_list
+# source: captured
+Ok(CurrencyMasters {
+    masters: [
+        CurrencyMaster {
+            name: "Rs.",
+            original_name: Some(
+                "Rs.",
+            ),
+            mailing_name: "Indian Rupees",
+            decimal_places: 2,
+        },
+    ],
+})

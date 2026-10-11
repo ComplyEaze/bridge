@@ -306,7 +306,7 @@ on the demo company.
 | `VoucherType` | 24 | |
 | `Voucher` | 150 (whole book) | See §5 for date scoping |
 
-**UNVERIFIED:** godowns, cost centres, currencies, units, budgets — never probed. Stock items
+**UNVERIFIED:** budgets — never probed. (Godowns, units and cost centres were read later, cost centres in §12a.17; currency masters in §9.10a.2.) Stock items
 are unprobed *as a collection read*; for writing them inside an invoice see §9.12.
 
 ---

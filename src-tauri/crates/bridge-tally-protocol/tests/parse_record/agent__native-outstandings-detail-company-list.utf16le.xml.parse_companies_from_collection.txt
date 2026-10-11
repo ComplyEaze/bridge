@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/agent/native-outstandings-detail-company-list.utf16le.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "BRIDGE OUTSTANDINGS LAB",
+        guid: Some(
+            "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
+        ),
+        company_number: Some(
+            "100028",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+])

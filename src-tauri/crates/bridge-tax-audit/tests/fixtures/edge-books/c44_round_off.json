@@ -1,0 +1,1142 @@
+{
+ "comment": "clause44: a plain round-off line (a round-off ledger with no role of its own) is shown exactly where the line it rounds is shown: the voucher's first expenditure line that is read by the party, else its first other expenditure line, else non-supply. On a journal with no party or one whose party is an expense or income ledger it takes that reason, a debit or a credit; beside bank charges or bank interest (forced) it is forced with them and counted as forced; beside a partner's remuneration, a mixed ledger, a depreciation line or a no-supplier line it takes that reason; round-off first, then bank charges, then bank interest follows the charges; a salary (no supplier) and then bank charges: it follows the salary; a line read by the party wins over an earlier forced one, a credit one too; on a capital invoice whose only other lines are not expenditure (a zero purchase line is no row) it is non-supply; two round-off lines both follow; beside an own-role round-off ledger it follows that line; and a round-off ledger given its own category, depreciation or no-supplier role is placed by that role whatever it rounds. Every GSTIN is invented (fourteenth character Y).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Fixed Assets": null,
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Direct Incomes": null,
+  "Indirect Incomes": null,
+  "Carriage Inward": "Direct Expenses",
+  "Office Costs": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-c44_round_off-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_round_off-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_round_off-002"
+  },
+  {
+   "name": "Input CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_round_off-003"
+  },
+  {
+   "name": "Input SGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_round_off-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c44_round_off-005"
+  },
+  {
+   "name": "Office Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-006"
+  },
+  {
+   "name": "Bank Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-007"
+  },
+  {
+   "name": "Bank Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-008"
+  },
+  {
+   "name": "Partner Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-009"
+  },
+  {
+   "name": "Depreciation",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-010"
+  },
+  {
+   "name": "Staff Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-011"
+  },
+  {
+   "name": "Mixed Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-012"
+  },
+  {
+   "name": "Lender Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-013"
+  },
+  {
+   "name": "Hardware Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-c44_round_off-014"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-015"
+  },
+  {
+   "name": "Round Off Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-016"
+  },
+  {
+   "name": "Round Off Partner",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-017"
+  },
+  {
+   "name": "Round Off Dep",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-018"
+  },
+  {
+   "name": "Round Off Staff",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-019"
+  },
+  {
+   "name": "Round Off Lender",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_round_off-020"
+  },
+  {
+   "name": "Machinery",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-c44_round_off-021"
+  },
+  {
+   "name": "Provision",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_round_off-022"
+  },
+  {
+   "name": "Scrap Sales",
+   "chain": [
+    "Indirect Incomes"
+   ],
+   "guid": "edge-c44_round_off-023"
+  },
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_round_off-024",
+   "gstin": "27ALPHA1111A1Y1"
+  },
+  {
+   "name": "Beta Composition Co",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_round_off-025",
+   "gstin": "27BETAC2222B1Y2"
+  },
+  {
+   "name": "Gamma Works",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_round_off-026",
+   "gstin": ""
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Input CGST",
+   "opening": 0,
+   "debit": 72555,
+   "credit": 0,
+   "closing": 72555
+  },
+  {
+   "ledger": "Input SGST",
+   "opening": 0,
+   "debit": 154044,
+   "credit": 0,
+   "closing": 154044
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Office Expenses",
+   "opening": 0,
+   "debit": 395271,
+   "credit": 0,
+   "closing": 395271
+  },
+  {
+   "ledger": "Bank Fees",
+   "opening": 0,
+   "debit": 472929,
+   "credit": 0,
+   "closing": 472929
+  },
+  {
+   "ledger": "Bank Interest",
+   "opening": 0,
+   "debit": 152062,
+   "credit": 0,
+   "closing": 152062
+  },
+  {
+   "ledger": "Partner Salary",
+   "opening": 0,
+   "debit": 67188,
+   "credit": 0,
+   "closing": 67188
+  },
+  {
+   "ledger": "Depreciation",
+   "opening": 0,
+   "debit": 284877,
+   "credit": 0,
+   "closing": 284877
+  },
+  {
+   "ledger": "Staff Salary",
+   "opening": 0,
+   "debit": 142052,
+   "credit": 0,
+   "closing": 142052
+  },
+  {
+   "ledger": "Mixed Charges",
+   "opening": 0,
+   "debit": 97161,
+   "credit": 0,
+   "closing": 97161
+  },
+  {
+   "ledger": "Lender Interest",
+   "opening": 0,
+   "debit": 42221,
+   "credit": 0,
+   "closing": 42221
+  },
+  {
+   "ledger": "Hardware Purchases",
+   "opening": 0,
+   "debit": 317069,
+   "credit": 0,
+   "closing": 317069
+  },
+  {
+   "ledger": "Round Off",
+   "opening": 0,
+   "debit": 842669,
+   "credit": 0,
+   "closing": 842669
+  },
+  {
+   "ledger": "Round Off Fees",
+   "opening": 0,
+   "debit": 85215,
+   "credit": 0,
+   "closing": 85215
+  },
+  {
+   "ledger": "Round Off Partner",
+   "opening": 0,
+   "debit": 17924,
+   "credit": 0,
+   "closing": 17924
+  },
+  {
+   "ledger": "Round Off Dep",
+   "opening": 0,
+   "debit": 6845,
+   "credit": 0,
+   "closing": 6845
+  },
+  {
+   "ledger": "Round Off Staff",
+   "opening": 0,
+   "debit": 97793,
+   "credit": 0,
+   "closing": 97793
+  },
+  {
+   "ledger": "Round Off Lender",
+   "opening": 0,
+   "debit": 4400,
+   "credit": 0,
+   "closing": 4400
+  },
+  {
+   "ledger": "Machinery",
+   "opening": 0,
+   "debit": 162479,
+   "credit": 0,
+   "closing": 162479
+  },
+  {
+   "ledger": "Provision",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1344805,
+   "closing": -1344805
+  },
+  {
+   "ledger": "Scrap Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 54649,
+   "closing": -54649
+  },
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 726779,
+   "closing": -726779
+  },
+  {
+   "ledger": "Beta Composition Co",
+   "opening": 0,
+   "debit": 0,
+   "credit": 45816,
+   "closing": -45816
+  },
+  {
+   "ledger": "Gamma Works",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1242705,
+   "closing": -1242705
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "a1",
+   "date": "2025-05-02",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Office Expenses",
+     97828
+    ],
+    [
+     "Round Off",
+     10115
+    ],
+    [
+     "Provision",
+     -107943
+    ]
+   ],
+   "number": "J-1"
+  },
+  {
+   "guid": "a2",
+   "date": "2025-05-03",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Office Expenses",
+     58234
+    ],
+    [
+     "Round Off",
+     -11355
+    ],
+    [
+     "Provision",
+     -46879
+    ]
+   ],
+   "number": "J-2"
+  },
+  {
+   "guid": "b1",
+   "date": "2025-05-04",
+   "base_type": "Journal",
+   "party": "Scrap Sales",
+   "lines": [
+    [
+     "Office Expenses",
+     9336
+    ],
+    [
+     "Round Off",
+     74527
+    ],
+    [
+     "Scrap Sales",
+     -83863
+    ]
+   ],
+   "number": "J-3"
+  },
+  {
+   "guid": "b2",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "party": "Scrap Sales",
+   "lines": [
+    [
+     "Office Expenses",
+     64381
+    ],
+    [
+     "Round Off",
+     -93595
+    ],
+    [
+     "Scrap Sales",
+     29214
+    ]
+   ],
+   "number": "J-4"
+  },
+  {
+   "guid": "b3",
+   "date": "2025-05-06",
+   "base_type": "Journal",
+   "party": "Office Expenses",
+   "lines": [
+    [
+     "Office Expenses",
+     65054
+    ],
+    [
+     "Round Off",
+     21270
+    ],
+    [
+     "Provision",
+     -86324
+    ]
+   ],
+   "number": "J-5"
+  },
+  {
+   "guid": "c1",
+   "date": "2025-06-02",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Bank Fees",
+     64818
+    ],
+    [
+     "Round Off",
+     67728
+    ],
+    [
+     "Gamma Works",
+     -132546
+    ]
+   ],
+   "number": "P-1"
+  },
+  {
+   "guid": "c2",
+   "date": "2025-06-03",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Bank Interest",
+     60854
+    ],
+    [
+     "Round Off",
+     51348
+    ],
+    [
+     "Gamma Works",
+     -112202
+    ]
+   ],
+   "number": "P-2"
+  },
+  {
+   "guid": "c3",
+   "date": "2025-06-04",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Partner Salary",
+     67188
+    ],
+    [
+     "Round Off",
+     31813
+    ],
+    [
+     "Gamma Works",
+     -99001
+    ]
+   ],
+   "number": "P-3"
+  },
+  {
+   "guid": "c4",
+   "date": "2025-06-05",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Depreciation",
+     103304
+    ],
+    [
+     "Round Off",
+     74807
+    ],
+    [
+     "Gamma Works",
+     -178111
+    ]
+   ],
+   "number": "P-4"
+  },
+  {
+   "guid": "c5",
+   "date": "2025-06-06",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Staff Salary",
+     86678
+    ],
+    [
+     "Round Off",
+     8891
+    ],
+    [
+     "Gamma Works",
+     -95569
+    ]
+   ],
+   "number": "P-5"
+  },
+  {
+   "guid": "c6",
+   "date": "2025-06-07",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Mixed Charges",
+     97161
+    ],
+    [
+     "Round Off",
+     93179
+    ],
+    [
+     "Gamma Works",
+     -190340
+    ]
+   ],
+   "number": "P-6"
+  },
+  {
+   "guid": "d1",
+   "date": "2025-07-02",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Round Off",
+     97199
+    ],
+    [
+     "Bank Fees",
+     50607
+    ],
+    [
+     "Bank Interest",
+     38066
+    ],
+    [
+     "Provision",
+     -185872
+    ]
+   ],
+   "number": "J-6"
+  },
+  {
+   "guid": "d2",
+   "date": "2025-07-03",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Round Off",
+     23193
+    ],
+    [
+     "Bank Interest",
+     53142
+    ],
+    [
+     "Bank Fees",
+     36173
+    ],
+    [
+     "Provision",
+     -112508
+    ]
+   ],
+   "number": "J-7"
+  },
+  {
+   "guid": "e1",
+   "date": "2025-07-04",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Bank Fees",
+     74513
+    ],
+    [
+     "Lender Interest",
+     42221
+    ],
+    [
+     "Round Off",
+     42506
+    ],
+    [
+     "Gamma Works",
+     -159240
+    ]
+   ],
+   "number": "P-7"
+  },
+  {
+   "guid": "e2",
+   "date": "2025-07-05",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Bank Fees",
+     47213
+    ],
+    [
+     "Hardware Purchases",
+     -70596
+    ],
+    [
+     "Round Off",
+     5865
+    ],
+    [
+     "Gamma Works",
+     17518
+    ]
+   ],
+   "number": "P-8"
+  },
+  {
+   "guid": "f1",
+   "date": "2025-08-02",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Machinery",
+     162479
+    ],
+    [
+     "Input CGST",
+     64080
+    ],
+    [
+     "Input SGST",
+     87485
+    ],
+    [
+     "Round Off",
+     64015
+    ],
+    [
+     "Hardware Purchases",
+     0
+    ],
+    [
+     "Alpha Traders",
+     -378059
+    ]
+   ],
+   "number": "P-9"
+  },
+  {
+   "guid": "g1",
+   "date": "2025-08-03",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Hardware Purchases",
+     78415
+    ],
+    [
+     "Round Off Fees",
+     46450
+    ],
+    [
+     "Gamma Works",
+     -124865
+    ]
+   ],
+   "number": "P-10"
+  },
+  {
+   "guid": "h1",
+   "date": "2025-08-04",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Hardware Purchases",
+     90191
+    ],
+    [
+     "Input CGST",
+     8475
+    ],
+    [
+     "Input SGST",
+     66559
+    ],
+    [
+     "Round Off",
+     19632
+    ],
+    [
+     "Alpha Traders",
+     -184857
+    ]
+   ],
+   "number": "P-11"
+  },
+  {
+   "guid": "h2",
+   "date": "2025-08-05",
+   "base_type": "Purchase",
+   "party": "Beta Composition Co",
+   "lines": [
+    [
+     "Hardware Purchases",
+     34499
+    ],
+    [
+     "Round Off",
+     11317
+    ],
+    [
+     "Beta Composition Co",
+     -45816
+    ]
+   ],
+   "number": "P-12"
+  },
+  {
+   "guid": "i1",
+   "date": "2025-09-02",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Office Expenses",
+     100438
+    ],
+    [
+     "Round Off",
+     31270
+    ],
+    [
+     "Round Off",
+     3222
+    ],
+    [
+     "Provision",
+     -134930
+    ]
+   ],
+   "number": "J-8"
+  },
+  {
+   "guid": "j1",
+   "date": "2025-09-03",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Hardware Purchases",
+     13414
+    ],
+    [
+     "Round Off Partner",
+     17924
+    ],
+    [
+     "Gamma Works",
+     -31338
+    ]
+   ],
+   "number": "P-13"
+  },
+  {
+   "guid": "j2",
+   "date": "2025-09-04",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Hardware Purchases",
+     11747
+    ],
+    [
+     "Round Off Dep",
+     6845
+    ],
+    [
+     "Gamma Works",
+     -18592
+    ]
+   ],
+   "number": "P-14"
+  },
+  {
+   "guid": "j3",
+   "date": "2025-09-05",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Hardware Purchases",
+     66070
+    ],
+    [
+     "Round Off Staff",
+     97793
+    ],
+    [
+     "Alpha Traders",
+     -163863
+    ]
+   ],
+   "number": "P-15"
+  },
+  {
+   "guid": "j4",
+   "date": "2025-09-06",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Hardware Purchases",
+     81975
+    ],
+    [
+     "Round Off Lender",
+     4400
+    ],
+    [
+     "Gamma Works",
+     -86375
+    ]
+   ],
+   "number": "P-16"
+  },
+  {
+   "guid": "k1",
+   "date": "2025-10-02",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Round Off",
+     97032
+    ],
+    [
+     "Round Off Fees",
+     38765
+    ],
+    [
+     "Provision",
+     -135797
+    ]
+   ],
+   "number": "J-9"
+  },
+  {
+   "guid": "l1",
+   "date": "2025-10-03",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Round Off",
+     20690
+    ],
+    [
+     "Hardware Purchases",
+     11354
+    ],
+    [
+     "Gamma Works",
+     -32044
+    ]
+   ],
+   "number": "P-17"
+  },
+  {
+   "guid": "m1",
+   "date": "2025-10-04",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Depreciation",
+     90192
+    ],
+    [
+     "Bank Fees",
+     37100
+    ],
+    [
+     "Round Off",
+     15867
+    ],
+    [
+     "Provision",
+     -143159
+    ]
+   ],
+   "number": "J-10"
+  },
+  {
+   "guid": "m2",
+   "date": "2025-10-05",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Bank Fees",
+     91784
+    ],
+    [
+     "Depreciation",
+     91381
+    ],
+    [
+     "Round Off",
+     55338
+    ],
+    [
+     "Provision",
+     -238503
+    ]
+   ],
+   "number": "J-11"
+  },
+  {
+   "guid": "n1",
+   "date": "2025-10-06",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Round Off",
+     6529
+    ],
+    [
+     "Provision",
+     -6529
+    ]
+   ],
+   "number": "J-12"
+  },
+  {
+   "guid": "o1",
+   "date": "2025-10-07",
+   "base_type": "Journal",
+   "party": "",
+   "lines": [
+    [
+     "Staff Salary",
+     55374
+    ],
+    [
+     "Bank Fees",
+     70721
+    ],
+    [
+     "Round Off",
+     20266
+    ],
+    [
+     "Provision",
+     -146361
+    ]
+   ],
+   "number": "J-13"
+  }
+ ],
+ "clause44": {
+  "tax_ledgers": {
+   "cgst": [
+    "Input CGST"
+   ],
+   "sgst": [
+    "Input SGST"
+   ]
+  },
+  "dep_expense_ledgers": [
+   "Depreciation",
+   "Round Off Dep"
+  ],
+  "no_supplier_expense_ledgers": [
+   "Staff Salary",
+   "Round Off Staff"
+  ],
+  "round_off_ledgers": [
+   "Round Off",
+   "Round Off Fees",
+   "Round Off Partner",
+   "Round Off Dep",
+   "Round Off Staff",
+   "Round Off Lender"
+  ],
+  "registration_type_by_ledger": {
+   "Beta Composition Co": "Composition",
+   "Alpha Traders": "Regular"
+  },
+  "money_category_by_ledger": {
+   "Bank Fees": "bank_charges",
+   "Bank Interest": "interest_bank_nbfc",
+   "Partner Salary": "partner_interest_or_remuneration",
+   "Mixed Charges": "mixed_interest_and_charges",
+   "Lender Interest": "interest_individual_no_gstin",
+   "Round Off Fees": "bank_charges",
+   "Round Off Partner": "partner_interest_or_remuneration",
+   "Round Off Lender": "interest_individual_no_gstin"
+  }
+ },
+ "tests": [
+  "clause44"
+ ],
+ "cash": [],
+ "bank": []
+}

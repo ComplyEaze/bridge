@@ -1,0 +1,261 @@
+{
+ "comment": "tds_payees, #1243: where the client's lists and the TDS on a shared bill meet vouchers that share a GUID. Contractor X: a bill-specific reversal names a bill GUID whose first holder in the books is a bank-to-cash transfer and whose second holder is the bill, and the reversal's own GUID likewise has a transfer for its first holder and the reversal for its second: the bill is a credit to a payee and the reversal is named, so nothing is refused or reported as matching nothing. Contractor Y: two blank-GUID bills each also crediting Helper T and carrying TDS the books do not divide; the second, with its TDS, passes the single sum of Rs 30,000, the first does not.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Secured Loans": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Fixed Assets": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Labour Charges",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-tds_payees_shared_guid_lists-000"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_lists-001"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-tds_payees_shared_guid_lists-002"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-tds_payees_shared_guid_lists-003"
+  },
+  {
+   "name": "Contractor X",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_lists-004"
+  },
+  {
+   "name": "Contractor Y",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_lists-005"
+  },
+  {
+   "name": "Helper T",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_lists-006"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 1007400,
+   "credit": 0,
+   "closing": 1007400
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1007400,
+   "closing": -1007400
+  },
+  {
+   "ledger": "Contractor X",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 2513400,
+   "closing": -2413400
+  },
+  {
+   "ledger": "Contractor Y",
+   "opening": 0,
+   "debit": 0,
+   "credit": 3966400,
+   "closing": -3966400
+  },
+  {
+   "ledger": "Helper T",
+   "opening": 0,
+   "debit": 0,
+   "credit": 70000,
+   "closing": -70000
+  },
+  {
+   "ledger": "Labour Charges",
+   "opening": 0,
+   "debit": 6633500,
+   "credit": 100000,
+   "closing": 6533500
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 83700,
+   "closing": -83700
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "dup-x",
+   "date": "2025-05-02",
+   "base_type": "Journal",
+   "number": "X0",
+   "lines": [
+    [
+     "Bank",
+     503700
+    ],
+    [
+     "Cash",
+     -503700
+    ]
+   ]
+  },
+  {
+   "guid": "dup-x",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "number": "X1",
+   "lines": [
+    [
+     "Labour Charges",
+     2513400
+    ],
+    [
+     "Contractor X",
+     -2513400
+    ]
+   ]
+  },
+  {
+   "guid": "rv-x",
+   "date": "2025-08-02",
+   "base_type": "Journal",
+   "number": "X20",
+   "lines": [
+    [
+     "Bank",
+     503700
+    ],
+    [
+     "Cash",
+     -503700
+    ]
+   ]
+  },
+  {
+   "guid": "rv-x",
+   "date": "2025-09-10",
+   "base_type": "Journal",
+   "number": "X21",
+   "lines": [
+    [
+     "Contractor X",
+     100000
+    ],
+    [
+     "Labour Charges",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "Y1",
+   "lines": [
+    [
+     "Labour Charges",
+     1057800
+    ],
+    [
+     "Contractor Y",
+     -1004100
+    ],
+    [
+     "Helper T",
+     -20000
+    ],
+    [
+     "TDS Payable",
+     -33700
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-10",
+   "base_type": "Journal",
+   "number": "Y2",
+   "lines": [
+    [
+     "Labour Charges",
+     3062300
+    ],
+    [
+     "Contractor Y",
+     -2962300
+    ],
+    [
+     "Helper T",
+     -50000
+    ],
+    [
+     "TDS Payable",
+     -50000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Labour Charges": "194C"
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ],
+ "reversals": {
+  "rv-x": {
+   "kind": "bill_specific",
+   "bill": "dup-x"
+  }
+ }
+}

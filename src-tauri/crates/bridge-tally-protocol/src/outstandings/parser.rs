@@ -445,7 +445,7 @@ fn count_voucher_start_elements(xml: &str) -> Result<usize, OutstandingsError> {
         match reader.read_event() {
             Ok(Event::Start(element)) => {
                 let name = element.name();
-                let name = name.as_ref();
+                let name = name.as_ref().as_bytes();
                 if name.eq_ignore_ascii_case(b"DATA") {
                     data_depth += 1;
                 } else if data_depth > 0 && name.eq_ignore_ascii_case(b"VOUCHER") {
@@ -453,12 +453,12 @@ fn count_voucher_start_elements(xml: &str) -> Result<usize, OutstandingsError> {
                 }
             }
             Ok(Event::Empty(element)) => {
-                if data_depth > 0 && element.name().as_ref().eq_ignore_ascii_case(b"VOUCHER") {
+                if data_depth > 0 && element.name().as_ref().eq_ignore_ascii_case("VOUCHER") {
                     count += 1;
                 }
             }
             Ok(Event::End(element)) => {
-                if element.name().as_ref().eq_ignore_ascii_case(b"DATA") {
+                if element.name().as_ref().eq_ignore_ascii_case("DATA") {
                     data_depth = data_depth.saturating_sub(1);
                 }
             }

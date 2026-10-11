@@ -71,10 +71,8 @@ pub(super) fn verification_window_identities(
     to: &str,
 ) -> Result<BTreeSet<(String, u64)>, String> {
     if observed.rows.iter().any(|voucher| {
-        voucher
-            .date
-            .as_deref()
-            .is_none_or(|date| date < from || date > to)
+        let date = voucher.date.as_str();
+        date < from || date > to
     }) {
         return Err("window_not_honoured".to_string());
     }
@@ -147,9 +145,7 @@ impl VerificationCandidates {
 /// the matching use the same key.
 pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFingerprint {
     (
-        normalized_date(&voucher.date)
-            .ok()
-            .map(|date| date.as_str().to_string()),
+        Some(voucher.date.as_str().to_owned()),
         Some(voucher.voucher_type.as_str().to_string()),
         expected_entry_fingerprint(voucher),
     )
@@ -161,7 +157,7 @@ const MAX_EFFECTIVE_COPIES_LISTED: usize = 5;
 
 pub(super) fn observed_fingerprint(voucher: &ReadVoucher) -> VerificationFingerprint {
     (
-        voucher.date.clone(),
+        Some(voucher.date.as_str().to_owned()),
         voucher.voucher_type.clone(),
         actual_entry_fingerprint(voucher),
     )
@@ -874,11 +870,8 @@ pub(super) fn voucher_diffs(
     entries_match: bool,
 ) -> Vec<Value> {
     let mut diffs = Vec::new();
-    let expected_date = normalized_date(&expected.date).ok();
-    let expected_date = expected_date
-        .as_ref()
-        .map(bridge_tally_core::TallyDate::as_str);
-    if actual.date.as_deref() != expected_date {
+    let expected_date = expected.date.as_str();
+    if actual.date.as_str() != expected_date {
         diffs.push(json!("date"));
     }
     // A bank voucher is written with EFFECTIVEDATE equal to DATE (§9.13), and
@@ -888,8 +881,8 @@ pub(super) fn voucher_diffs(
     if expected.voucher_type != VoucherType::Journal
         && actual
             .effective_date
-            .as_deref()
-            .is_some_and(|observed| Some(observed) != expected_date)
+            .as_ref()
+            .is_some_and(|observed| observed.as_str() != expected_date)
     {
         diffs.push(json!("effective_date"));
     }

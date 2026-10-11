@@ -1,0 +1,7 @@
+# fixture: agent/d3-cancelled-company-high-water.utf16le.xml
+# parser: parse_company_marks(IMPORT_LAB)
+# source: captured
+Ok((
+    1685,
+    232,
+))

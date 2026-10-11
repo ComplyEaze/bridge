@@ -1,0 +1,41 @@
+# fixture: tests/fixtures/statement_balance_sheet_dense_month_live.utf16le.xml
+# parser: parse_native_statement(BalanceSheet)
+# source: captured
+Ok(NativeStatement {
+    kind: BalanceSheet,
+    lines: [
+        NativeStatementLine {
+            name: "Capital Account",
+            sub: Empty,
+            main: Empty,
+        },
+        NativeStatementLine {
+            name: "Loans (Liability)",
+            sub: Empty,
+            main: Empty,
+        },
+        NativeStatementLine {
+            name: "Current Liabilities",
+            sub: Empty,
+            main: Empty,
+        },
+        NativeStatementLine {
+            name: "Profit & Loss A/c",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "222962422.38",
+                ),
+            ),
+        },
+        NativeStatementLine {
+            name: "Current Assets",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "-222962422.38",
+                ),
+            ),
+        },
+    ],
+})

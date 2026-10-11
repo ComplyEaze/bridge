@@ -24,6 +24,8 @@ impl MastersKind {
             "godowns" => Some(Self::Native(NativeMasterKind::Godowns)),
             "units" => Some(Self::Native(NativeMasterKind::Units)),
             "stock_groups" => Some(Self::Native(NativeMasterKind::StockGroups)),
+            "cost_centres" => Some(Self::Native(NativeMasterKind::CostCentres)),
+            "cost_categories" => Some(Self::Native(NativeMasterKind::CostCategories)),
             "groups" => Some(Self::Groups),
             _ => None,
         }
@@ -35,6 +37,8 @@ impl MastersKind {
             Self::Native(NativeMasterKind::Godowns) => "godowns",
             Self::Native(NativeMasterKind::Units) => "units",
             Self::Native(NativeMasterKind::StockGroups) => "stock_groups",
+            Self::Native(NativeMasterKind::CostCentres) => "cost_centres",
+            Self::Native(NativeMasterKind::CostCategories) => "cost_categories",
             Self::Groups => "groups",
         }
     }

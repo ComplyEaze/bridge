@@ -1,0 +1,13 @@
+# fixture: tests/fixtures/currency_inr_legacy_live.utf16le.xml
+# parser: parse_company_currency
+# source: captured
+Ok(CompanyCurrency {
+    symbol: "Rs.",
+    mailing_name: "Indian Rupees",
+    currency_count: 1,
+    decimal_places: 2,
+    is_inr: true,
+    names: [
+        "Rs.",
+    ],
+})

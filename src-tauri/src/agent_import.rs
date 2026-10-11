@@ -14,7 +14,8 @@ use bridge_tally_core::master_binding::{
     self, twin_fold_keys, BindingBasis, BindingStatus, Candidates, EntityBinding, MasterCatalog,
     MasterClass, SourceEntity,
 };
-use bridge_tally_core::ExactDecimal;
+use bridge_tally_core::text::draws_nothing;
+use bridge_tally_core::{ExactDecimal, TallyDate};
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
@@ -136,11 +137,13 @@ fn pre_import_mark_refusal(parse_error: &str) -> &'static str {
     }
 }
 
+/// A batch's vouchers. `D` is the voucher date: the tool's text as
+/// `parse_payload` reads it, and a `TallyDate` from `validate_payload` on.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ImportPayload {
+struct ImportPayload<D = TallyDate> {
     company_guid: String,
-    vouchers: Vec<ImportVoucher>,
+    vouchers: Vec<ImportVoucher<D>>,
     /// A batch this Bridge built whose vouchers this build corrects in place.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     amends_batch_id: Option<String>,
@@ -148,9 +151,9 @@ struct ImportPayload {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ImportVoucher {
+struct ImportVoucher<D = TallyDate> {
     bridge_txn_id: String,
-    date: String,
+    date: D,
     voucher_type: VoucherType,
     #[serde(default)]
     narration: Option<String>,
@@ -159,6 +162,49 @@ struct ImportVoucher {
     #[serde(default)]
     voucher_number: Option<String>,
     entries: Vec<ImportEntry>,
+}
+
+impl<D> ImportVoucher<D> {
+    /// This voucher, holding `date` as its date.
+    fn dated(self, date: TallyDate) -> ImportVoucher {
+        let ImportVoucher {
+            bridge_txn_id,
+            date: _,
+            voucher_type,
+            narration,
+            reference,
+            voucher_number,
+            entries,
+        } = self;
+        ImportVoucher {
+            bridge_txn_id,
+            date,
+            voucher_type,
+            narration,
+            reference,
+            voucher_number,
+            entries,
+        }
+    }
+}
+
+/// A voucher date as `validate_payload` receives it, and the `TallyDate` it
+/// stands for. A tool's date is the caller's text, parsed by `normalized_date`;
+/// a saved batch's date already is one.
+trait PayloadDate {
+    fn tally_date(&self) -> Result<TallyDate, String>;
+}
+
+impl PayloadDate for String {
+    fn tally_date(&self) -> Result<TallyDate, String> {
+        normalized_date(self)
+    }
+}
+
+impl PayloadDate for TallyDate {
+    fn tally_date(&self) -> Result<TallyDate, String> {
+        Ok(self.clone())
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -280,8 +326,8 @@ pub(super) struct ImportLedgerLine {
     #[serde(default)]
     company: Option<ImportCompanyTuple>,
     txn_ids: Vec<String>,
-    date_from: String,
-    date_to: String,
+    date_from: TallyDate,
+    date_to: TallyDate,
     sha256: String,
     built_at: String,
     status: String,
@@ -431,7 +477,7 @@ struct ImportCompanyTuple {
     name: String,
     guid: String,
     company_number: String,
-    books_from: String,
+    books_from: TallyDate,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -454,7 +500,9 @@ struct ReadVoucher {
     remote_id: Option<String>,
     guid: Option<String>,
     alter_id: Option<u64>,
-    date: Option<String>,
+    /// Parsed where the read is admitted: a row without a valid date never
+    /// becomes a `ReadVoucher` (#1425).
+    date: TallyDate,
     voucher_type: Option<String>,
     narration: Option<String>,
     voucher_number: Option<String>,
@@ -463,14 +511,14 @@ struct ReadVoucher {
     optional: Option<bool>,
     /// Absent when the response carried no `EFFECTIVEDATE` (or an empty one).
     #[serde(default)]
-    effective_date: Option<String>,
+    effective_date: Option<TallyDate>,
     #[serde(rename = "amounts")]
     entries: Vec<ReadEntry>,
 }
 
 impl super::WindowRow for ReadVoucher {
     fn window_date(&self) -> Option<&str> {
-        self.date.as_deref()
+        Some(self.date.as_str())
     }
     fn window_alter_id(&self) -> Option<u64> {
         self.alter_id
@@ -510,10 +558,30 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
                 .iter()
                 .all(|voucher| voucher["status"] == "tally_reported_not_created")
     });
+    // A refused binding leaves each voucher matched by content only (#1039):
+    // the first line says what the book holds without making it this post's.
+    // A match that is cancelled or optional is not in the accounts, so it is
+    // never counted as held.
+    let matched_by_content = vouchers.as_array().map_or(0, |vouchers| {
+        vouchers
+            .iter()
+            .filter(|voucher| {
+                voucher["status"] == "matching_content_observed"
+                    && voucher["accounting_effective"] == true
+            })
+            .count()
+    });
     let summary = if reported_not_created {
         "Tally reported that this post created none of its vouchers: follow each voucher's next step."
-    } else {
+    } else if report["state"] != "refused" || matched_by_content == 0 {
         summary
+    } else if vouchers
+        .as_array()
+        .is_some_and(|vouchers| vouchers.len() == matched_by_content)
+    {
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
+    } else {
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again."
     };
     report["summary"] = json!(summary);
     report
@@ -719,14 +787,12 @@ impl Server {
         let mut args = resolved.args.clone();
         let approvals = bill_wise::take_approvals(&mut args).map_err(approval_invalid)?;
         let args = &args;
-        let mut payload = parse_payload(args)?;
-        validate_payload(&payload)?;
+        let payload = validate_payload(parse_payload(args)?)?;
         // After the whole of `validate_payload`: in a batch with several
         // defects, the first one it finds is reported, not this one (#1055).
         refuse_rewritten_narration(&payload.vouchers)?;
         let (debit, credit) = totals(&payload.vouchers)?;
         refuse_unqualified_types(&payload.vouchers, LIVE_QUALIFIED_VOUCHER_TYPES)?;
-        normalize_payload_dates(&mut payload)?;
         // Refuse an amendment Bridge could never admit before reading Tally.
         // Admission is repeated under the exclusive lock before publication.
         if payload.amends_batch_id.is_some() {
@@ -998,21 +1064,10 @@ impl Server {
                 // The window must hold each voucher where it is now as well as
                 // where the amendment moves it, or both checks miss it.
                 Some(lineage) => lineage.window(&payload.vouchers),
-                None => (
-                    payload
-                        .vouchers
-                        .iter()
-                        .map(|voucher| voucher.date.clone())
-                        .min()
-                        .unwrap_or_default(),
-                    payload
-                        .vouchers
-                        .iter()
-                        .map(|voucher| voucher.date.clone())
-                        .max()
-                        .unwrap_or_default(),
-                ),
-            };
+                None => date_window(payload.vouchers.iter().map(|voucher| &voucher.date)),
+            }
+            // `validate_payload` refuses an empty batch the same way.
+            .ok_or_else(|| "voucher_count_invalid".to_string())?;
             // Exercise the exact future readback projection before publishing a file.
             // This observes today's source, not a bound on later Tally mutations.
             // The high-water mark was read just above, so the pre-flight bound
@@ -1043,7 +1098,7 @@ impl Server {
             if let Some(closing) = preflight_read.closing_evidence {
                 accumulated = combine_evidence(accumulated.clone(), closing);
             }
-            verification_window_identities(&preflight, &date_from, &date_to)?;
+            verification_window_identities(&preflight, date_from.as_str(), date_to.as_str())?;
             let amendment = match &lineage {
                 Some(lineage) => match lineage.compare_and_swap(
                     &payload.vouchers,
@@ -1413,7 +1468,7 @@ impl Server {
             if line.company.as_ref() != Some(&import_company_tuple(&company)?) {
                 return Err("company_identity_mismatch".to_string().into());
             }
-            let window = (line.date_from.as_str(), line.date_to.as_str());
+            let window = (&line.date_from, &line.date_to);
             let observed_read = self
                 .read_verification_window(
                     &identity,
@@ -1435,27 +1490,45 @@ impl Server {
             if let Some(closing) = observed_read.closing_evidence {
                 accumulated = combine_evidence(accumulated.clone(), closing);
             }
-            // The corroborating read replays the ranges the first one actually
-            // read, rather than planning again: it must observe the same parts.
-            let corroboration_read = self
-                .read_verification_window(
-                    &identity,
-                    &company.name,
-                    window,
-                    super::WindowPlanSource::replay_of(observed_read.reads, observed_read.witness),
-                )
-                .await?;
-            let (corroboration, corroboration_evidence) =
-                (corroboration_read.source, corroboration_read.evidence);
-            accumulated = combine_evidence(accumulated.clone(), corroboration_evidence.clone());
-            if let Some(closing) = corroboration_read.closing_evidence {
-                accumulated = combine_evidence(accumulated.clone(), closing);
-            }
             // The window may have been served in parts, so there is no single
             // response to hash. The evidence's own response digest already folds
             // every part that was read, which is the honest commitment here.
             let voucher_read_sha256 = observed_evidence.response_sha256.clone();
-            corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)?;
+            // A corroborating read replays the ranges the first one actually
+            // read, rather than planning again: it must observe the same parts.
+            // A divided read admitted against a census of every GUID and closed
+            // on the marks it opened on holds a `BracketedCount`, and is not
+            // replayed (#1241). The checks the replay ran on a read's own rows
+            // (each row's date in the window, a GUID and an AlterID) still run
+            // on it; they send nothing.
+            let corroboration_proof = match super::SecondRead::of(
+                observed_read.reads,
+                observed_read.witness,
+                observed_read.bracketed,
+            ) {
+                super::SecondRead::Replay(replay) => {
+                    let corroboration_read = self
+                        .read_verification_window(&identity, &company.name, window, replay)
+                        .await?;
+                    let (corroboration, corroboration_evidence) =
+                        (corroboration_read.source, corroboration_read.evidence);
+                    accumulated =
+                        combine_evidence(accumulated.clone(), corroboration_evidence.clone());
+                    if let Some(closing) = corroboration_read.closing_evidence {
+                        accumulated = combine_evidence(accumulated.clone(), closing);
+                    }
+                    corroborate_verification_window(&observed, &corroboration, line.date_from.as_str(), line.date_to.as_str())?;
+                    json!(corroboration_evidence)
+                }
+                super::SecondRead::Spared(_) => {
+                    verification_window_identities(
+                        &observed,
+                        line.date_from.as_str(),
+                        line.date_to.as_str(),
+                    )?;
+                    json!({"state": "not_sent", "reason": "counted_and_bracketed_read"})
+                }
+            };
             let span = match pre_post_voucher_mark {
                 Some(pre_post_voucher_mark) => {
                     let (current, mark_evidence) =
@@ -1553,7 +1626,7 @@ impl Server {
                 "counts": result["counts"], "vouchers": result["vouchers"], "duplicates": result["duplicates"],
                 "post_span_binding": with_post_span_summary(span.report, &result["vouchers"]),
                 "unrelated_duplicates_in_window": result["unrelated_duplicates_in_window"],
-                "evidence": {"mode_opening": opening_mode.evidence, "mode_closing": closing_mode_evidence, "company": identity_evidence, "voucher_read": observed_evidence, "voucher_read_corroboration": corroboration_evidence, "voucher_read_sha256": voucher_read_sha256}
+                "evidence": {"mode_opening": opening_mode.evidence, "mode_closing": closing_mode_evidence, "company": identity_evidence, "voucher_read": observed_evidence, "voucher_read_corroboration": corroboration_proof, "voucher_read_sha256": voucher_read_sha256}
             });
             // This call's own check, or the doubt recorded when this batch was
             // posted: a later readback, which compares by name, never clears it.
@@ -1689,7 +1762,7 @@ impl Server {
             update,
             &json,
             markdown.as_bytes(),
-            || self.append_import_record_while_admitted(&ledger::StatusRecord::from(update)),
+            |record| self.append_import_record_while_admitted(record),
             |_| Ok(()),
         )?;
         // The first verified ALTERID of each voucher, for a later amendment to
@@ -1853,22 +1926,16 @@ impl Server {
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company: &str,
-        (from, to): (&str, &str),
+        (from, to): (&TallyDate, &TallyDate),
         source: super::WindowPlanSource,
     ) -> Result<VerificationWindowRead, ToolFailure> {
-        // The window comes from the stored batch, not a tool argument: it is
-        // parsed here, where it enters the window layer.
-        let (from, to) = (
-            super::parse_window_date(from)?,
-            super::parse_window_date(to)?,
-        );
         let shape = super::VoucherReadShape::ImportVerification;
         let read = self
             .read_voucher_window(
                 identity,
                 company,
-                &from,
-                &to,
+                from,
+                to,
                 shape,
                 source,
                 super::WindowReadLimits::for_shape(shape),
@@ -1885,6 +1952,7 @@ impl Server {
             closing_evidence: read.closing_evidence,
             reads: read.reads,
             witness: read.witness,
+            bracketed: read.bracketed,
             refused_a_part: read.refused_a_part,
         })
     }
@@ -2116,18 +2184,21 @@ impl Server {
         Ok((mark, evidence))
     }
 
-    /// The proof the last verification of `batch_id` persisted, read whole.
-    /// The batch must be one the import journal records, and the file is
-    /// named exactly as `publish_proofs` names it, from the recorded id, so
-    /// a caller's argument never becomes a path on its own.
+    /// The proof the journal names current for `batch_id`, read whole. The
+    /// batch must be one the import journal records, and the file is named
+    /// exactly as `publish_proofs` names it, from the recorded id and the
+    /// recorded proof name, so a caller's argument never becomes a path on
+    /// its own. A saved proof must hash to the digest its name records.
     fn read_persisted_proof(&self, batch_id: &str) -> Result<Vec<u8>, String> {
         const MAX_PERSISTED_PROOF_BYTES: usize = 32 * 1024 * 1024;
-        let recorded = self
+        let snapshot = self
             .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?
-            .batch
-            .batch_id;
-        let path = self.imports_dir()?.join(format!("{recorded}.proof.json"));
+            .ok_or_else(|| "import_batch_not_found".to_string())?;
+        let recorded = &snapshot.batch.batch_id;
+        let path = self.imports_dir()?.join(match &snapshot.current_proof {
+            ledger::CurrentProof::Saved(name) => name.json_file(recorded),
+            ledger::CurrentProof::Legacy => format!("{recorded}.proof.json"),
+        });
         let file = super::local_file::open_local_file(&path, false)
             .map_err(|_| "verification_proof_missing".to_string())?;
         let mut bytes = Vec::new();
@@ -2139,7 +2210,48 @@ impl Server {
         if bytes.len() > MAX_PERSISTED_PROOF_BYTES {
             return Err("verification_proof_too_large".into());
         }
+        if let ledger::CurrentProof::Saved(name) = &snapshot.current_proof {
+            if sha256_hex(&bytes) != name.sha256() {
+                return Err("verification_proof_altered".into());
+            }
+        }
         Ok(bytes)
+    }
+
+    /// The JSON and Markdown files of the proof the journal names current.
+    #[cfg(test)]
+    pub(super) fn current_proof_paths(&self, batch_id: &str) -> [PathBuf; 2] {
+        let snapshot = self.latest_import_snapshot(batch_id).unwrap().unwrap();
+        let imports = self.imports_dir().unwrap();
+        match &snapshot.current_proof {
+            ledger::CurrentProof::Saved(name) => [
+                imports.join(name.json_file(batch_id)),
+                imports.join(name.markdown_file(batch_id)),
+            ],
+            ledger::CurrentProof::Legacy => [
+                imports.join(format!("{batch_id}.proof.json")),
+                imports.join(format!("{batch_id}.proof.md")),
+            ],
+        }
+    }
+
+    /// Save `json` as the batch's current proof, as a verification would.
+    #[cfg(test)]
+    pub(super) fn save_current_proof(&self, batch_id: &str, json: &[u8]) {
+        let _admission = self.lock_import_admission().unwrap();
+        let snapshot = self
+            .import_snapshot_while_admitted(Some(batch_id))
+            .unwrap()
+            .unwrap();
+        persistence::publish_proofs(
+            &self.imports_dir().unwrap(),
+            &snapshot.batch,
+            json,
+            b"",
+            |record| self.append_import_record_while_admitted(record),
+            |_| Ok(()),
+        )
+        .unwrap();
     }
 
     /// The XML file Bridge persisted when it built `batch_id`, read whole. The
@@ -2430,7 +2542,7 @@ fn batch_guid_matches(stored: &str, supplied: &str) -> bool {
     stored.eq_ignore_ascii_case(supplied)
 }
 
-fn parse_payload(args: &Value) -> Result<ImportPayload, String> {
+fn parse_payload(args: &Value) -> Result<ImportPayload<String>, String> {
     serde_json::from_value(args.clone()).map_err(|_| "voucher_schema_invalid".to_string())
 }
 
@@ -2456,9 +2568,7 @@ fn import_company_tuple(
                 .books_from
                 .as_deref()
                 .ok_or_else(|| "company_identity_incomplete".to_string())?,
-        )?
-        .as_str()
-        .to_string(),
+        )?,
     })
 }
 
@@ -2700,7 +2810,7 @@ fn renders_bank_shape(vouchers: &[ImportVoucher]) -> bool {
 /// (§9.8 against §9.13). No file mixing the two has been imported — the
 /// reallocation Journals went in on their own — so the union is refused rather
 /// than assumed from holding both citations at once.
-fn refuse_mixed_shapes(vouchers: &[ImportVoucher]) -> Result<(), String> {
+fn refuse_mixed_shapes<D>(vouchers: &[ImportVoucher<D>]) -> Result<(), String> {
     let bank = vouchers
         .iter()
         .filter(|voucher| voucher.voucher_type.bank_shape().is_some())
@@ -2710,7 +2820,10 @@ fn refuse_mixed_shapes(vouchers: &[ImportVoucher]) -> Result<(), String> {
         .ok_or_else(|| "voucher_type_shapes_mixed".to_string())
 }
 
-fn validate_payload(payload: &ImportPayload) -> Result<(), String> {
+/// Every check a batch must pass before Tally is read, and its vouchers with
+/// their dates parsed. A date is parsed where it is checked, so a batch with
+/// several defects is refused for the same one whatever `D` is.
+fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportPayload, String> {
     refuse_mixed_shapes(&payload.vouchers)?;
     if payload.company_guid.trim().is_empty()
         || payload.vouchers.is_empty()
@@ -2720,11 +2833,12 @@ fn validate_payload(payload: &ImportPayload) -> Result<(), String> {
     }
     let mut txn_ids = BTreeSet::new();
     let mut ledger_names = BTreeSet::new();
+    let mut dates = Vec::with_capacity(payload.vouchers.len());
     for voucher in &payload.vouchers {
         if !valid_txn_id(&voucher.bridge_txn_id) || !txn_ids.insert(&voucher.bridge_txn_id) {
             return Err("bridge_txn_id_invalid_or_duplicate".to_string());
         }
-        normalized_date(&voucher.date)?;
+        dates.push(voucher.date.tally_date()?);
         if voucher.entries.len() < 2 {
             return Err("voucher_entries_too_few".to_string());
         }
@@ -2792,7 +2906,16 @@ fn validate_payload(payload: &ImportPayload) -> Result<(), String> {
             validate_bank_voucher_shape(voucher)?;
         }
     }
-    Ok(())
+    Ok(ImportPayload {
+        company_guid: payload.company_guid,
+        vouchers: payload
+            .vouchers
+            .into_iter()
+            .zip(dates)
+            .map(|(voucher, date)| voucher.dated(date))
+            .collect(),
+        amends_batch_id: payload.amends_batch_id,
+    })
 }
 
 /// Payment, Receipt and Contra take two or more entries with at least one on
@@ -2811,7 +2934,7 @@ fn validate_payload(payload: &ImportPayload) -> Result<(), String> {
 /// through Tally's Import menu.
 ///
 /// One ledger on both sides would net inside the voucher, so it is refused.
-fn validate_bank_voucher_shape(voucher: &ImportVoucher) -> Result<(), String> {
+fn validate_bank_voucher_shape<D>(voucher: &ImportVoucher<D>) -> Result<(), String> {
     let debits = voucher
         .entries
         .iter()
@@ -3119,11 +3242,15 @@ fn cash_bank_refusals(
 /// compared, so refusing it would refuse a value nothing downstream would
 /// ever notice as changed, and `validate_payload` does not.
 ///
-/// The value's five XML characters are escaped first (`quick_xml`'s escape),
-/// so a literal `&#4;` in it is text, not a reference, and is not refused.
-/// The writer (`xml_text::escape_text`) also writes CR and LF as `&#13;` and
-/// `&#10;`; this check does not apply that step, so it judges only the text
-/// itself, not the references the writer adds for a line ending.
+/// The value is escaped first with `quick_xml`'s escape, which writes the five
+/// XML characters as entities and a carriage return as `&#13;`, so a literal
+/// `&#4;` in it is text, not a reference, and is not refused. `&#13;` names a
+/// character XML admits, which the marking leaves alone, so a carriage return
+/// does not change the answer
+/// (`text_with_a_carriage_return_or_replacement_character_reads_back_as_measured`).
+/// The writer (`xml_text::escape_text`) also writes LF as `&#10;`; this escape
+/// leaves it raw, and the marking does not touch raw text, so a line feed does
+/// not change the answer either.
 fn reads_back_as_other_text(value: &str) -> bool {
     matches!(
         bridge_tally_protocol::mark_forbidden_numeric_references(&quick_xml::escape::escape(value)),
@@ -3135,15 +3262,15 @@ fn reads_back_as_other_text(value: &str) -> bool {
 /// back byte for byte (`agent_import_span_identity.rs`), so a narration that
 /// would read back rewritten is refused when the batch is built, and before a
 /// native POST of a batch saved before this check, rather than refusing that
-/// post's binding for good. `validate_payload` still admits such a saved batch
-/// for review and reconciliation. The reference is never compared, so it is
-/// not refused.
+/// post's binding for good. So is a narration holding a character that draws
+/// nothing ([`draws_nothing`]). `validate_payload` still admits such a saved
+/// batch for review and reconciliation. The reference is never compared, so it
+/// is not refused.
 fn refuse_rewritten_narration(vouchers: &[ImportVoucher]) -> Result<(), String> {
     if vouchers.iter().any(|voucher| {
-        voucher
-            .narration
-            .as_deref()
-            .is_some_and(reads_back_as_other_text)
+        voucher.narration.as_deref().is_some_and(|narration| {
+            reads_back_as_other_text(narration) || narration.chars().any(draws_nothing)
+        })
     }) {
         return Err("voucher_text_invalid".to_string());
     }
@@ -3156,13 +3283,17 @@ fn contains_reserved_marker(value: &str) -> bool {
         .unwrap_or_else(|_| value.to_ascii_uppercase().contains("[BRIDGE:"))
 }
 
-/// Dates cross the tool boundary in the human-friendly form but are persisted
-/// in the exact Tally form used in the generated XML and verification window.
-fn normalize_payload_dates(payload: &mut ImportPayload) -> Result<(), String> {
-    for voucher in &mut payload.vouchers {
-        voucher.date = normalized_date(&voucher.date)?.as_str().to_string();
-    }
-    Ok(())
+/// The first and last of `dates`, which bound the read window that holds every
+/// one of them; `None` when there are none.
+fn date_window<'a>(
+    dates: impl IntoIterator<Item = &'a TallyDate>,
+) -> Option<(TallyDate, TallyDate)> {
+    let mut dates = dates.into_iter();
+    let first = dates.next()?;
+    let (from, to) = dates.fold((first, first), |(from, to), date| {
+        (from.min(date), to.max(date))
+    });
+    Some((from.clone(), to.clone()))
 }
 
 fn validate_dates(payload: &ImportPayload, books_from: Option<&str>) -> Result<(), String> {
@@ -3170,8 +3301,8 @@ fn validate_dates(payload: &ImportPayload, books_from: Option<&str>) -> Result<(
         normalized_date(books_from.ok_or_else(|| "company_identity_incomplete".to_string())?)?;
     let today = super::tally_host_today();
     for voucher in &payload.vouchers {
-        let date = normalized_date(&voucher.date)?;
-        if date < from || date.as_str() > today.as_str() {
+        let date = &voucher.date;
+        if *date < from || date.as_str() > today.as_str() {
             return Err("voucher_date_outside_company_extent".to_string());
         }
     }
@@ -3196,9 +3327,7 @@ fn validate_import_dates_for_profile(
 ) -> Result<(), String> {
     let boundary_profile = boundary_profile_for(profile);
     for voucher in &payload.vouchers {
-        let date = bridge_tally_core::TallyDate::parse(voucher.date.clone())
-            .map_err(|_| "voucher_date_invalid".to_string())?;
-        if !boundary_profile.accepts_boundary(&date) {
+        if !boundary_profile.accepts_boundary(&voucher.date) {
             return Err("education_voucher_date_unsupported".to_string());
         }
     }
@@ -3273,7 +3402,7 @@ fn valid_2dp_amount(value: &str) -> bool {
             .is_ok_and(|amount| !amount.is_zero() && !amount.is_negative())
 }
 
-fn totals(vouchers: &[ImportVoucher]) -> Result<(ExactDecimal, ExactDecimal), String> {
+fn totals<D>(vouchers: &[ImportVoucher<D>]) -> Result<(ExactDecimal, ExactDecimal), String> {
     let mut debit = ExactDecimal::zero();
     let mut credit = ExactDecimal::zero();
     for entry in vouchers.iter().flat_map(|voucher| &voucher.entries) {
@@ -3785,9 +3914,7 @@ fn render_voucher_xml(
         let amount = match entry.side { EntrySide::Dr => format!("-{}", entry.amount), EntrySide::Cr => entry.amount.clone() };
         format!("<ALLLEDGERENTRIES.LIST><LEDGERNAME>{}</LEDGERNAME><ISDEEMEDPOSITIVE>{}</ISDEEMEDPOSITIVE><AMOUNT>{}</AMOUNT></ALLLEDGERENTRIES.LIST>", xml_escape(&entry.ledger), entry.side.tally_positive(), amount)
     }).collect::<String>();
-    let date = normalized_date(&voucher.date)
-        .map(|date| date.as_str().to_string())
-        .unwrap_or_default();
+    let date = voucher.date.as_str();
     // §9.13: the imported Payment/Receipt/Contra files carried EFFECTIVEDATE
     // beside DATE, and named the party on the side opposite the money. The
     // Journal shape qualified in §9.8 carries neither element, and is left
@@ -3831,6 +3958,8 @@ struct VerificationWindowRead {
     reads: Vec<super::WindowPart>,
     /// What a corroborating replay of this read must carry.
     witness: Option<super::WindowWitness>,
+    /// Held when a corroborating second read would add nothing.
+    bracketed: Option<super::BracketedCount>,
     /// Tally refused one of this read's data requests as too large or timed out.
     refused_a_part: bool,
 }
@@ -3877,16 +4006,23 @@ fn now() -> String {
 /// The state of a masters check that has not finished (#239).
 pub(super) const MASTERS_CHECK_PENDING: &str = "check_pending";
 
-// The masters-check pair (`*.masters_check.json`, `*.masters_doubt.json`)
-// holds a post's durable doubts: the masters verdict (#239) and, for a batch
-// of more than one voucher, the batch step verdict (`batch_step`), whose own
-// doubt is kept in `*.batch_step_doubt.json`. Neither verdict overwrites or
-// masks the other. The names stay as they were, so older records still read;
-// a record with no `batch_step` has no step verdict, which is right for a
+// The masters-check records hold a post's durable doubts: the masters verdict
+// (#239) and, for a batch of more than one voucher, the batch step verdict
+// (`batch_step`), whose own doubt is kept in `*.batch_step_doubt.json`. The
+// post marks both pending in `*.masters_check.json`; a finished masters
+// verdict goes to `*.masters_verdict.json` and an observed one to
+// `*.masters_doubt.json`, each written once and never replaced, so a
+// verification only adds files (#911). Neither verdict overwrites or masks
+// the other. The names stay as they were, so older records still read; a
+// record with no `batch_step` has no step verdict, which is right for a
 // one-voucher post.
 
 fn masters_check_path(imports: &Path, batch_id: &str) -> PathBuf {
     imports.join(format!("{batch_id}.masters_check.json"))
+}
+
+fn masters_verdict_path(imports: &Path, batch_id: &str) -> PathBuf {
+    imports.join(format!("{batch_id}.masters_verdict.json"))
 }
 
 fn masters_doubt_path(imports: &Path, batch_id: &str) -> PathBuf {
@@ -3897,13 +4033,25 @@ fn batch_step_doubt_path(imports: &Path, batch_id: &str) -> PathBuf {
     imports.join(format!("{batch_id}.batch_step_doubt.json"))
 }
 
-/// Write an observed doubt to its own file. When that fails, the verdict that
-/// goes into the check record says so (`doubt_record: unavailable`, #722):
-/// it still holds the doubt, and it says in-band why no review can find it.
-/// The readers decide from the file's absence, not from this mark, so a file
-/// lost later is refused the same way.
+/// Write an observed doubt to its own file, once: a doubt of the same kind
+/// already there is the first one observed and stays (#911). When the write
+/// fails, or the name holds anything else, the verdict that goes into the
+/// check record says so (`doubt_record: unavailable`, #722): it still holds
+/// the doubt, and it says in-band why no review can find it. The readers
+/// decide from the file's absence, not from this mark, so a file lost later
+/// is refused the same way.
 fn record_doubt(path: &Path, verdict: &mut Value) {
-    if write_masters_record(path, verdict).is_err() {
+    let written = serde_json::to_vec_pretty(verdict)
+        .map_err(|_| persistence::RecordOnce::Failed)
+        .and_then(|bytes| persistence::write_record_once(path, &bytes));
+    let recorded = match written {
+        Ok(()) => true,
+        Err(persistence::RecordOnce::Exists) => {
+            read_masters_record(path).is_some_and(|kept| kept["state"] == verdict["state"])
+        }
+        Err(persistence::RecordOnce::Failed) => false,
+    };
+    if !recorded {
         verdict["doubt_record"] = json!("unavailable");
     }
 }
@@ -3911,17 +4059,21 @@ fn record_doubt(path: &Path, verdict: &mut Value) {
 /// The durable checks recorded for this batch: the masters verdict (#239),
 /// with the batch step verdict beside it as `batch_step` when the post was a
 /// batch. An observed doubt of either kind is kept in a file of its own that
-/// nothing removes or replaces, and it overrides that kind's verdict in the
-/// check record. Absent only for a batch dispatched before these records
-/// existed.
+/// nothing removes or replaces, and it overrides that kind's verdict; a
+/// finished masters verdict overrides the pending mark in the check record,
+/// which keeps the step. Absent only for a batch dispatched before these
+/// records existed.
 fn read_masters_check(imports: &Path, batch_id: &str) -> Option<Value> {
     let check = read_masters_record(&masters_check_path(imports, batch_id));
-    let mut masters =
-        read_masters_record(&masters_doubt_path(imports, batch_id)).or_else(|| check.clone())?;
+    let verdict = read_masters_record(&masters_verdict_path(imports, batch_id));
+    let mut masters = read_masters_record(&masters_doubt_path(imports, batch_id))
+        .or_else(|| verdict.clone())
+        .or_else(|| check.clone())?;
     let step = read_masters_record(&batch_step_doubt_path(imports, batch_id)).or_else(|| {
         check
             .as_ref()
             .and_then(|check| check.get("batch_step").cloned())
+            .or_else(|| verdict.as_ref()?.get("batch_step").cloned())
     });
     if let (Some(step), Some(fields)) = (step, masters.as_object_mut()) {
         fields.insert("batch_step".into(), step);
@@ -4071,24 +4223,35 @@ impl Server {
         }
         // The batch step verdict beside it is kept, never overwritten; for a
         // batch whose step verdict cannot be read, it stays pending (doubt).
-        let path = masters_check_path(&imports, batch_id);
-        let step = read_masters_record(&path)
+        let step = read_masters_record(&masters_check_path(&imports, batch_id))
             .and_then(|check| check.get("batch_step").cloned())
             .or_else(|| batch.then(|| json!({"state": MASTERS_CHECK_PENDING})));
         if let (Some(step), Some(fields)) = (step, verdict.as_object_mut()) {
             fields.insert("batch_step".into(), step);
         }
-        let _ = write_masters_record(&path, &verdict);
+        // Written once beside the pending mark, which stays: a verdict
+        // already there was the first and stays too.
+        if let Ok(bytes) = serde_json::to_vec_pretty(&verdict) {
+            let _ =
+                persistence::write_record_once(&masters_verdict_path(&imports, batch_id), &bytes);
+        }
         read_masters_check(&imports, batch_id).unwrap_or(pending)
     }
 }
 
+/// The whole baseline an older build wrote, and replaced as it grew.
 fn verified_baseline_path(imports: &Path, batch_id: &str) -> PathBuf {
     imports.join(format!("{batch_id}.baseline.json"))
 }
 
+/// The `index`th addition to a build's baseline, written once (#911).
+fn verified_baseline_addition_path(imports: &Path, batch_id: &str, index: usize) -> PathBuf {
+    imports.join(format!("{batch_id}.baseline.{index}.json"))
+}
+
 /// A build's verified baseline, or `None` when it has none or it cannot be
 /// read. Either way an amendment of that build refuses.
+#[cfg(test)]
 fn read_verified_baseline(imports: &Path, batch_id: &str) -> Option<amend::VerifiedBaseline> {
     read_verified_baseline_for(imports, batch_id, 1)
 }
@@ -4110,35 +4273,68 @@ fn read_verified_baseline_for(
             return None;
         }
     }
-    let mut file =
-        super::local_file::open_local_file(&verified_baseline_path(imports, batch_id), false)
-            .ok()?;
-    let bytes = read_capped_record(&mut file)?;
-    serde_json::from_slice(&bytes).ok()
+    read_baseline_files(imports, batch_id).ok()?.0
+}
+
+/// A build's baseline files merged, with the index the next addition takes:
+/// the whole baseline an older build wrote, then each addition from 1 until
+/// the first absent one. `None` when there are none. Refused when any of
+/// them cannot be read, or when an addition repeats a voucher already
+/// recorded: nothing then proves which value came first.
+fn read_baseline_files(
+    imports: &Path,
+    batch_id: &str,
+) -> Result<(Option<amend::VerifiedBaseline>, usize), ()> {
+    let read = |path: &Path| -> Result<Option<amend::VerifiedBaseline>, ()> {
+        let mut file = match super::local_file::open_local_file(path, false) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => return Err(()),
+        };
+        let bytes = read_capped_record(&mut file).ok_or(())?;
+        serde_json::from_slice(&bytes).map(Some).map_err(|_| ())
+    };
+    let mut merged = read(&verified_baseline_path(imports, batch_id))?;
+    let mut index = 1;
+    while let Some(addition) = read(&verified_baseline_addition_path(imports, batch_id, index))? {
+        let baseline = merged.get_or_insert_with(amend::VerifiedBaseline::default);
+        for (txn_id, alter_id) in addition.vouchers {
+            if baseline.vouchers.insert(txn_id, alter_id).is_some() {
+                return Err(());
+            }
+        }
+        index += 1;
+    }
+    Ok((merged, index))
 }
 
 /// Record each voucher's first verified ALTERID; a voucher already recorded
-/// keeps its value. Called under the import admission lock.
+/// keeps its value. The vouchers this verification adds go to a file of their
+/// own, written once, so no earlier file changes (#911). Called under the
+/// import admission lock.
 fn record_verified_baseline(imports: &Path, batch_id: &str, proof: &Value) -> Result<(), String> {
-    let path = verified_baseline_path(imports, batch_id);
-    let mut baseline = if path.exists() {
-        // An unreadable baseline is never rewritten: nothing proves which
-        // values were first, so amendments of this build stay refused.
-        read_verified_baseline(imports, batch_id)
-            .ok_or_else(|| "verified_baseline_unreadable".to_string())?
-    } else {
-        amend::VerifiedBaseline::default()
-    };
-    if amend::record_first_verified(&mut baseline, proof) {
-        let bytes = serde_json::to_vec_pretty(&baseline)
-            .map_err(|_| "verified_baseline_serialization_failed".to_string())?;
-        // Staged and renamed, so a failed write leaves the previous file whole
-        // rather than a truncated one that would refuse every amendment.
-        let staged = imports.join(format!("{batch_id}.baseline.json.next"));
-        write_private(&staged, &bytes)?;
-        fs::rename(&staged, &path).map_err(|_| "verified_baseline_publish_failed".to_string())?;
+    // An unreadable baseline is never added to: nothing proves which values
+    // were first, so amendments of this build stay refused.
+    let (recorded, next) = read_baseline_files(imports, batch_id)
+        .map_err(|()| "verified_baseline_unreadable".to_string())?;
+    let recorded = recorded.unwrap_or_default();
+    let mut baseline = recorded.clone();
+    if !amend::record_first_verified(&mut baseline, proof) {
+        return Ok(());
     }
-    Ok(())
+    baseline
+        .vouchers
+        .retain(|txn_id, _| !recorded.vouchers.contains_key(txn_id));
+    let bytes = serde_json::to_vec_pretty(&baseline)
+        .map_err(|_| "verified_baseline_serialization_failed".to_string())?;
+    // Placed whole or not at all, so a failed write leaves the earlier files
+    // as they were rather than a truncated one that would refuse every
+    // amendment.
+    persistence::write_record_once(
+        &verified_baseline_addition_path(imports, batch_id, next),
+        &bytes,
+    )
+    .map_err(|_| "verified_baseline_publish_failed".to_string())
 }
 
 fn verified_baselines(imports: &Path, lineage: &amend::Lineage) -> amend::VerifiedBaselines {

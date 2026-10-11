@@ -79,7 +79,8 @@ pub enum GroupNameIndexError {
     UnrecognisedNameShape { row: usize, shape: NameShape },
     /// An element no capture shows holds a `GROUP`, `GUID`, `NAME`,
     /// `NAME.LIST` or `LANGUAGENAME.LIST` somewhere inside it (in the row or in
-    /// its language list), where a name or identity could be read around.
+    /// its language list), where a name or identity could be read around; or a
+    /// `GROUP` sits directly inside the row.
     HiddenInUnknownElement { row: usize },
     /// A child the captures show only as a leaf (`RESERVEDNAME`,
     /// `LANGUAGEID` and the like) holds elements, which the index does not read.

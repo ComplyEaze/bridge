@@ -1197,6 +1197,14 @@ fn parse_group_row(
                 identity.note_shape(NameShape::NameListOutsideLanguageList);
                 skip_subtree(reader)?;
             }
+            // A row directly inside a row is read by no walk.
+            Event::Start(child) if index && child.name().as_ref().eq_ignore_ascii_case("GROUP") => {
+                identity.hidden_in_unknown_element = true;
+                skip_subtree(reader)?;
+            }
+            Event::Empty(child) if index && child.name().as_ref().eq_ignore_ascii_case("GROUP") => {
+                identity.hidden_in_unknown_element = true;
+            }
             // A name directly under the row belongs to no name list.
             Event::Start(child) if index && child.name().as_ref().eq_ignore_ascii_case("NAME") => {
                 identity.note_shape(NameShape::NameDirectlyUnderRow);

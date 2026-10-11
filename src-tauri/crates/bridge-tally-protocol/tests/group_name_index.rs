@@ -511,6 +511,33 @@ fn insert_in_row(text: &str, row_open: &str, inserted: &str) -> String {
     changed
 }
 
+/// A `GROUP` directly inside a row, self-closing or not, is a row no walk
+/// reads; the index refuses it rather than stepping over it.
+#[test]
+fn a_group_directly_inside_a_row_is_refused() {
+    let text = shape_lab();
+    let snapshot = parse_native_group_snapshot(&text, SHAPE_GUID).unwrap();
+    let row_open = "<GROUP NAME=\"Bank OD A/c\"";
+    let row_number = row_of(&text, "Bank OD A/c");
+    for inserted in [
+        "<GROUP NAME=\"Nested\"/>",
+        "<GROUP NAME=\"Nested\"></GROUP>",
+        "<GROUP NAME=\"Nested\">text</GROUP>",
+    ] {
+        let changed = insert_in_row(&text, row_open, inserted);
+        assert_eq!(
+            parse(&changed),
+            Err(GroupNameIndexError::HiddenInUnknownElement { row: row_number }),
+            "{inserted}"
+        );
+        assert_eq!(
+            parse_native_group_snapshot(&changed, SHAPE_GUID).as_ref(),
+            Ok(&snapshot),
+            "{inserted}"
+        );
+    }
+}
+
 /// A `NAME` that is a direct child of `GROUP`, bare or self-closing, holds a
 /// name no `NAME.LIST` carries; the index refuses it instead of skipping it.
 /// A second `GUID`, in either form, and a self-closing language list are the

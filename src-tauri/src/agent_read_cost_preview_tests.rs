@@ -334,6 +334,7 @@ async fn the_measured_block_is_constant_text_with_its_markers() {
         assert_eq!(point["source"], "protocol reference 11c.5");
         // The book's mark is rounded: it is not a lab company.
         assert_eq!(point["voucher_mark"], "about 250,000");
+        assert_eq!(point["book"], "an inventory-heavy book");
     }
     assert_eq!(block["kind"], "measured_census_runs_not_a_bound");
     // Each point is exactly what the public reference records.

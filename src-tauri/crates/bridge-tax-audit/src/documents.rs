@@ -96,6 +96,19 @@ pub struct BankStatementDoc {
     pub rows: Vec<BankStatementRow>,
 }
 
+/// What the caller has of the engagement's bank statement: none supplied, the document read, or the
+/// reader's refusal of it. A statement both read and refused is not a state (AGENTS.md P2), so no
+/// consumer checks for it (#1507).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum BankStatementLoad {
+    /// No statement was supplied for the engagement.
+    #[default]
+    NotSupplied,
+    Read(BankStatementDoc),
+    /// A statement was supplied and the reader refused it; the reader's plain-words reason.
+    Refused(String),
+}
+
 /// One statement transaction. `row` is its 0-based position in the source's list; `balance_paise`
 /// is `None` where the source carries no running balance for it.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -110,9 +110,10 @@ pub fn parse_ledger_opening_coverage(
             .text
             .trim()
             .to_string();
-        // A present-but-EMPTY amount is not zero (§6.4). Skipping it would count
-        // the ledger as carrying no opening, so a response that drops the value
-        // could let the scan complete while omitting that ledger's opening bills.
+        // A present-but-EMPTY amount is not zero (`IMPLEMENTATION_GUIDE.md` §6.4).
+        // Skipping it would count the ledger as carrying no opening, so a
+        // response that drops the value could let the scan complete while
+        // omitting that ledger's opening bills.
         if opening.is_empty() {
             return Err(OutstandingsError::InvalidResponse(
                 "ledger_opening_balance_empty",
@@ -122,11 +123,12 @@ pub fn parse_ledger_opening_coverage(
             openings += 1;
         }
     }
-    // A successful-but-EMPTY collection is the false-empty route of §2.8 applied
-    // to masters: every company that has vouchers also has ledgers, so zero rows
-    // here means the response is not describing the book we asked about. Counting
-    // it as "no openings" would publish a Complete voucher-only report while
-    // omitting every ledger-opening bill.
+    // A successful-but-EMPTY collection is the false-empty route of
+    // `IMPLEMENTATION_GUIDE.md` §2.8 applied to masters: every company that has
+    // vouchers also has ledgers, so zero rows here means the response is not
+    // describing the book we asked about. Counting it as "no openings" would
+    // publish a Complete voucher-only report while omitting every ledger-opening
+    // bill.
     if ledgers.is_empty() {
         return Err(OutstandingsError::InvalidResponse(
             "ledger_coverage_response_empty",

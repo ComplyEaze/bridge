@@ -167,8 +167,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   approval window and nothing was sent; one was approved, and one Journal was
   posted and then verified by `verify_import`. The same candidate's macOS build
   was started and read the company list, and in Claude Desktop on macOS its
-  tools loaded in a chat. The record is the maintainer's dated notes and
-  screenshots, kept privately. This was one run, not a controlled test of each
+  tools loaded in a chat. This was one run, not a controlled test of each
   key of the window.
 - A build of 0.4.1 on a Mac, on 2 October 2026. What was run: the package CI built
   for the version pull request, not the published file. The maintainer installed
@@ -177,7 +176,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   started again on its own after the upgrade (its start time was read from the
   process list). `tally_status` and `list_companies` then answered against
   licensed TallyPrime Silver 7.1 holding the lab's own synthetic companies.
-  The record is our dated notes, kept privately. What was not run:
+  What was not run:
   the published file is built again on another runner, and its program file
   differs from the one tested. We ran both builds without Tally: each reports
   version 0.4.1, lists 21 tools and gives the same answer to `tally_status`. We
@@ -189,7 +188,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   and Claude Desktop builds an extension's identity partly from it); the
   settings did not carry over. `tally_status` and `list_companies` then
   answered against licensed TallyPrime Silver 7.1 holding the lab's own
-  companies. The record is our dated notes, kept privately. What was not run:
+  companies. What was not run:
   the published file is built again on another runner, and its program file
   differs from the one tested. We ran the published Mac file without Tally: it
   reports version 0.4.2, lists 22 tools with posting off (24 with it on), and
@@ -207,8 +206,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   ticked and saved the extension started at once and `tally_status` answered,
   though the assistant first called a leftover second entry for the same
   extension, which failed the same way; after Claude Desktop was quit and reopened there was one
-  connector and the company list was returned. The record is the maintainer's
-  dated notes, kept privately. What was not run: the published file, quitting and
+  connector and the company list was returned. What was not run: the published file, quitting and
   reopening without ticking the box, installing over a release older than 0.4.2,
   a fresh install, and Windows.
 - A package for 0.5.1 on a Mac, on 8 October 2026. What was run: a package built on that Mac from the Terms-setting
@@ -243,8 +241,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   and building the file was refused, with no file written; after "Suspense" was
   created in Tally by a separate one-ledger import, outside this tool, a file of
   six vouchers was built. We have not imported
-  that file or read it back, and no real statement has been run. The record is our
-  dated notes, kept privately.
+  that file or read it back, and no real statement has been run.
 
 Not yet run by us in a controlled test: posting with a published package
 against a live TallyPrime; each way of declining in the Windows approval window

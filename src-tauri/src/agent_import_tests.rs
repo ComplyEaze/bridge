@@ -399,6 +399,10 @@ fn import_ledger_append_rolls_back_a_partial_failing_write() {
             Ok(())
         }
 
+        fn sync_entry(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+
         fn truncate(&mut self, length: u64) -> std::io::Result<()> {
             self.bytes.truncate(length as usize);
             Ok(())

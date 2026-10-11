@@ -13,7 +13,10 @@
 //! and the rendering. The reads that fill `LedgerFacts` belong to the build.
 
 use super::{xml_escape, EntrySide, ImportEntry, ImportVoucher};
-use crate::tally::approved_import::{InvoiceAnswers, InvoiceReadPlan};
+use crate::tally::approved_import::{
+    ApprovedImportAdmissionError, InvoiceAnswers, InvoicePrecheck, InvoicePrecheckInput,
+    InvoiceReadPlan,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
@@ -1059,35 +1062,40 @@ pub(super) fn queued_invoice_for<'a>(
     }
 }
 
-/// Whether the plan the queue sent is the one this invoice calls for. The
-/// requests are a function of the invoice alone, apart from the number's
-/// control, which is the journal's: a plan that differs in any other request is
-/// a wiring fault, and a control that moved since the plan is a change. The
-/// ledger count is not compared: whether it is needed depends on the marks, and
-/// the judge asks for it.
+/// Whether the plan the queue sent is the one this invoice calls for. Every
+/// part of it is a function of the invoice and the clock alone (the company,
+/// the date the listing is read as of, and each request, the ledger count's
+/// among them) apart from the number's control, which is the journal's: a plan
+/// that differs in any other part is a wiring fault, and a control that moved
+/// since the plan is a change. The precheck is the invoice module's own
+/// function; the judge decides again whatever it answered.
 pub(super) fn fit_plan(
     wanted: &InvoiceReadPlan,
     carried: &InvoiceReadPlan,
-) -> Result<(), crate::tally::approved_import::ApprovedImportAdmissionError> {
-    use crate::tally::approved_import::ApprovedImportAdmissionError as Refusal;
+) -> Result<(), ApprovedImportAdmissionError> {
     let InvoiceReadPlan {
-        listing_as_of: _,
-        ledger_count: _,
+        company_name,
+        listing_as_of,
+        precheck: _,
+        ledger_count,
         rates,
         voucher_types,
         number,
         number_control,
         registration,
     } = wanted;
-    if *rates != carried.rates
+    if *company_name != carried.company_name
+        || *listing_as_of != carried.listing_as_of
+        || *ledger_count != carried.ledger_count
+        || *rates != carried.rates
         || *voucher_types != carried.voucher_types
         || *number != carried.number
         || *registration != carried.registration
     {
-        return Err(Refusal::AdmissionInconsistent);
+        return Err(ApprovedImportAdmissionError::AdmissionInconsistent);
     }
     if *number_control != carried.number_control {
-        return Err(Refusal::InvoiceMastersChanged {
+        return Err(ApprovedImportAdmissionError::InvoiceMastersChanged {
             field: "number_control",
         });
     }
@@ -1098,19 +1106,19 @@ pub(super) fn fit_plan(
 /// the build judged them by and held to what the build recorded (#1337).
 ///
 /// Refused, each before any intent: a plan that is not the one this invoice
-/// calls for (a wiring fault); a number control that moved since the plan; a
-/// book that outgrew the size gate since the build; the judge's own refusal;
-/// and an observation that differs from the recorded one, naming the first
-/// field that does.
+/// calls for on `today` (a wiring fault); a number control that moved since the
+/// plan; the judge's own refusal; and an observation that differs from the
+/// recorded one, naming the first field that does. The size limits and the
+/// currency were judged before the plan's reads were sent.
 pub(super) fn admit_queued_invoice(
     voucher: &ImportVoucher,
     company_name: &str,
     company_guid: &str,
     catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
     control: &super::ledger::NumberControl,
+    today: &bridge_tally_core::TallyDate,
     queued: &crate::tally::approved_import::QueuedInvoice<'_>,
-) -> Result<(), crate::tally::approved_import::ApprovedImportAdmissionError> {
-    use crate::tally::approved_import::ApprovedImportAdmissionError as Refusal;
+) -> Result<(), ApprovedImportAdmissionError> {
     let mut fresh = voucher.clone();
     let recorded = fresh
         .invoice
@@ -1123,40 +1131,15 @@ pub(super) fn admit_queued_invoice(
         catalogue,
         control,
     };
-    let refused = |verdict: Verdict| match verdict {
-        Verdict::Refused(refusals) => match refusals.first() {
-            Some(first) => Refusal::InvoiceRefused {
-                code: first.code.to_string(),
-            },
-            None => Refusal::InvoiceMastersChanged {
-                field: NOT_RECORDED,
-            },
-        },
-        Verdict::Failed(code) => Refusal::InvoiceRefused { code },
-        // A request the plan does not carry is a plan that does not fit.
-        Verdict::Need(_) => Refusal::AdmissionInconsistent,
-    };
-    // What the queue read must be what this invoice's admission reads: the
-    // requests are a function of the invoice alone, apart from the control,
-    // which is the journal's.
-    let wanted = judge
-        .plan(
-            queued.plan.listing_as_of.clone(),
-            queued.plan.ledger_count.is_some(),
-        )
-        .map_err(refused)?;
+    // What the queue read must be what this invoice's admission reads.
+    let wanted = judge.plan(today.clone()).map_err(queued_refusal)?;
     fit_plan(&wanted, queued.plan)?;
     match judge.judge(queued.answers) {
         Ok(observed) => match first_difference(recorded.as_ref(), Some(&observed)) {
             None => Ok(()),
-            Some(field) => Err(Refusal::InvoiceMastersChanged { field }),
+            Some(field) => Err(ApprovedImportAdmissionError::InvoiceMastersChanged { field }),
         },
-        // The book outgrew the size gate while the approval waited: the count
-        // the gate now needs was not part of the plan.
-        Err(Verdict::Need(Need::LedgerCount)) => {
-            Err(Refusal::InvoiceMastersChanged { field: "book_size" })
-        }
-        Err(verdict) => Err(refused(verdict)),
+        Err(verdict) => Err(queued_refusal(verdict)),
     }
 }
 
@@ -1663,6 +1646,88 @@ fn admitted(
         .map_err(|error| Verdict::Failed(error.to_string()))
 }
 
+/// The size limits on a book, judged on its marks (and its ledger count when
+/// the master mark is over the gate's mark): the marks it admits, a refusal,
+/// or `Need::LedgerCount`. The build's judge and the queue's precheck both call
+/// it, so the limits have one copy and are decided before the listing is read
+/// (#1337).
+fn size_gate(
+    marks: &str,
+    ledger_count: Option<&str>,
+    company_name: &str,
+    company_guid: &str,
+) -> Result<super::PreImportMark, Verdict> {
+    let mark = super::pre_import_mark_of(marks, company_guid).map_err(Verdict::Failed)?;
+    // The duplicate-number read and the read-back each walk the book's
+    // vouchers (a formula decides the rows, so Tally evaluates every
+    // voucher): at the build, at both re-reads, after the post and at
+    // every later verification. The voucher mark bounds that walk.
+    if let Some(refusal) = voucher_mark_refusal(mark.value) {
+        return Err(refusing(refusal));
+    }
+    match mark.master_value {
+        Some(value) if mark_admits(value) => {}
+        // The mark counts every master alteration, so a long-lived or
+        // stock-heavy book is over it whatever its ledger count: the
+        // company's own count of its ledgers can admit such a book.
+        Some(value) => {
+            let Some(body) = ledger_count else {
+                return Err(Verdict::Need(Need::LedgerCount));
+            };
+            let count = bridge_tally_protocol::outstandings_shared::parse_company_ledger_count(
+                body,
+                company_name,
+                company_guid,
+            )
+            .map_err(|_| unusable("invoice_book_size_unreadable"))?;
+            if let Some(refusal) = ledger_count_refusal(count.map(|count| count.get()), value) {
+                return Err(refusing(refusal));
+            }
+        }
+        None => return Err(refusing(refuse("invoice_book_size_unknown"))),
+    }
+    Ok(mark)
+}
+
+/// What the endpoint queue asks before it sends any read of an invoice's
+/// masters (#1337): the company's currency, then the size limits, judged on the
+/// marks and currencies it has already read. A book the limits or the currency
+/// refuse is refused with none of the listing, rates, voucher types, number or
+/// registration reads sent, as the build refuses it.
+pub(super) fn queued_precheck(
+    input: &InvoicePrecheckInput<'_>,
+) -> Result<InvoicePrecheck, ApprovedImportAdmissionError> {
+    super::post::admit_post_currency(input.currencies)?;
+    match size_gate(
+        input.marks,
+        input.ledger_count,
+        input.company_name,
+        input.company_guid,
+    ) {
+        Ok(_) => Ok(InvoicePrecheck::Admitted),
+        Err(Verdict::Need(Need::LedgerCount)) => Ok(InvoicePrecheck::NeedsLedgerCount),
+        Err(verdict) => Err(queued_refusal(verdict)),
+    }
+}
+
+/// What a judge's verdict is as a refusal in the queue: the admission's own
+/// refusal under its code, a read that could not be used under its code, or,
+/// for a request the plan does not carry, a plan that does not fit.
+fn queued_refusal(verdict: Verdict) -> ApprovedImportAdmissionError {
+    match verdict {
+        Verdict::Refused(refusals) => match refusals.first() {
+            Some(first) => ApprovedImportAdmissionError::InvoiceRefused {
+                code: first.code.to_string(),
+            },
+            None => ApprovedImportAdmissionError::InvoiceMastersChanged {
+                field: NOT_RECORDED,
+            },
+        },
+        Verdict::Failed(code) => ApprovedImportAdmissionError::InvoiceReadUnusable { code },
+        Verdict::Need(_) => ApprovedImportAdmissionError::AdmissionInconsistent,
+    }
+}
+
 impl InvoiceJudge<'_> {
     fn as_of(&self) -> Result<String, Verdict> {
         super::super::normalized_date(&self.voucher.date)
@@ -1730,20 +1795,18 @@ impl InvoiceJudge<'_> {
         admitted(request).map(Some)
     }
 
-    /// The plan an admission that read the answers it did makes: every request
-    /// fixed from the invoice, the ledger count only when it was read.
+    /// The plan of an admission: every request fixed from the invoice, the
+    /// ledger count's included, which the queue sends only when its precheck
+    /// asks for it.
     pub(super) fn plan(
         &self,
         listing_as_of: bridge_tally_core::TallyDate,
-        counted: bool,
     ) -> Result<InvoiceReadPlan, Verdict> {
         Ok(InvoiceReadPlan {
+            company_name: self.company_name.to_string(),
             listing_as_of,
-            ledger_count: if counted {
-                Some(self.request(Need::LedgerCount)?)
-            } else {
-                None
-            },
+            precheck: queued_precheck,
+            ledger_count: self.request(Need::LedgerCount)?,
             rates: self.request(Need::Rates)?,
             voucher_types: self.request(Need::VoucherTypes)?,
             number: self.request(Need::Number)?,
@@ -1773,35 +1836,12 @@ impl InvoiceJudge<'_> {
         let Some(marks) = answers.marks.as_deref() else {
             return Err(Verdict::Need(Need::Marks));
         };
-        let mark = super::pre_import_mark_of(marks, self.company_guid).map_err(Verdict::Failed)?;
-        // The duplicate-number read and the read-back each walk the book's
-        // vouchers (a formula decides the rows, so Tally evaluates every
-        // voucher): at the build, at both re-reads, after the post and at
-        // every later verification. The voucher mark bounds that walk.
-        if let Some(refusal) = voucher_mark_refusal(mark.value) {
-            return Err(refusing(refusal));
-        }
-        match mark.master_value {
-            Some(value) if mark_admits(value) => {}
-            // The mark counts every master alteration, so a long-lived or
-            // stock-heavy book is over it whatever its ledger count: the
-            // company's own count of its ledgers can admit such a book.
-            Some(value) => {
-                let Some(body) = answers.ledger_count.as_deref() else {
-                    return Err(Verdict::Need(Need::LedgerCount));
-                };
-                let count = bridge_tally_protocol::outstandings_shared::parse_company_ledger_count(
-                    body,
-                    self.company_name,
-                    self.company_guid,
-                )
-                .map_err(|_| unusable("invoice_book_size_unreadable"))?;
-                if let Some(refusal) = ledger_count_refusal(count.map(|count| count.get()), value) {
-                    return Err(refusing(refusal));
-                }
-            }
-            None => return Err(refusing(refuse("invoice_book_size_unknown"))),
-        }
+        let mark = size_gate(
+            marks,
+            answers.ledger_count.as_deref(),
+            self.company_name,
+            self.company_guid,
+        )?;
 
         // 1. The compliance listing.
         let Some(listing) = answers.listing.as_ref() else {
@@ -2097,14 +2137,11 @@ impl super::super::Server {
                 },
             }
         };
-        let counted = answers.ledger_count.is_some();
-        let plan = judge
-            .plan(today, counted)
-            .map_err(|verdict| match verdict {
-                Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
-                Verdict::Failed(code) => failed_with(code),
-                Verdict::Need(_) => failed("invoice_read_plan_inconsistent"),
-            })?;
+        let plan = judge.plan(today).map_err(|verdict| match verdict {
+            Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
+            Verdict::Failed(code) => failed_with(code),
+            Verdict::Need(_) => failed("invoice_read_plan_inconsistent"),
+        })?;
         if let Some(detail) = voucher.invoice.as_mut() {
             detail.observed = Some(observed);
         }

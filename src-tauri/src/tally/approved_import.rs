@@ -79,11 +79,18 @@ pub(crate) struct ApprovedImport {
 /// has one copy and a master added to the admission reaches the queue with it.
 #[derive(Clone, Debug)]
 pub(crate) struct InvoiceReadPlan {
+    /// The company the reads are about, as the admission names it.
+    pub(crate) company_name: String,
     /// The date the compliance listing is read as of.
     pub(crate) listing_as_of: TallyDate,
-    /// The company's own ledger count, sent only when the book's master mark
-    /// was over the size gate's mark at the build.
-    pub(crate) ledger_count: Option<AgentReadRequest>,
+    /// What the queue may do with the marks and currencies it has read before
+    /// it sends any of the reads below. The admission provides it, so the size
+    /// limits and the currency are judged by the rule the build judges them by,
+    /// ahead of the reads they spare.
+    pub(crate) precheck: InvoicePrechecker,
+    /// The company's own ledger count: sent only when the precheck asks for it,
+    /// for a book over the master mark.
+    pub(crate) ledger_count: AgentReadRequest,
     pub(crate) rates: AgentReadRequest,
     pub(crate) voucher_types: AgentReadRequest,
     pub(crate) number: AgentReadRequest,
@@ -91,6 +98,32 @@ pub(crate) struct InvoiceReadPlan {
     pub(crate) number_control: Option<AgentReadRequest>,
     pub(crate) registration: AgentReadRequest,
 }
+
+/// What the queue has read when it asks whether an invoice's reads may go on.
+pub(crate) struct InvoicePrecheckInput<'a> {
+    /// The all-company marks, as the binding reads began.
+    pub(crate) marks: &'a str,
+    /// The company's Currency masters, as the queue read them.
+    pub(crate) currencies: &'a str,
+    /// The company's ledger count, once the precheck has asked for it.
+    pub(crate) ledger_count: Option<&'a str>,
+    pub(crate) company_name: &'a str,
+    pub(crate) company_guid: &'a str,
+}
+
+/// The precheck's answer when it refuses nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InvoicePrecheck {
+    /// The limits and the currency admit the book: send the rest of the plan.
+    Admitted,
+    /// The master mark is over the size gate's mark: the ledger count decides.
+    NeedsLedgerCount,
+}
+
+/// A function of the invoice module that the queue runs before the plan's
+/// reads, so that this layer does not call that one.
+pub(crate) type InvoicePrechecker =
+    fn(&InvoicePrecheckInput<'_>) -> Result<InvoicePrecheck, ApprovedImportAdmissionError>;
 
 /// What the queue read for an [`InvoiceReadPlan`], or what the build has read
 /// of one so far: each answer is `None` until it is read. The admission's judge
@@ -506,6 +539,12 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// series set back to Automatic, a registration lapsed (#1337).
     #[error("{code}")]
     InvoiceRefused { code: String },
+    /// A read of an invoice's masters that could not be used (a response that
+    /// does not parse, a request that is not admitted), under the code that
+    /// names it. Not a master that moved, and not the admission refusing the
+    /// invoice (#1337).
+    #[error("{code}")]
+    InvoiceReadUnusable { code: String },
 }
 
 /// The data-free code a group snapshot refusal carries as its `cause`, for

@@ -1800,18 +1800,24 @@ pub(crate) fn observed_opening_boundary(
     }
 }
 
-/// An invoice plan's reads on `client`, in the order the admission makes them
-/// (#1337): the ledger count when the plan has one, the compliance listing, the
-/// rates, the voucher types, the number, the number's control, the company's
-/// registration. Each goes through the identity-bracketed paired read, and the
-/// listing through the bracketed source read. `marks` is the all-company marks
-/// read as the queue's binding reads began, which the size gate judges.
+/// An invoice plan's reads on `client` (#1337). First the plan's precheck is
+/// asked, on the marks the queue read as its binding reads began and the
+/// currencies it read: the currency and the size limits are judged, as the
+/// build judges them, before any read of the plan is sent. When the book is
+/// over the master mark the precheck asks for the ledger count, which is read
+/// and the precheck asked again. Then the reads, in the order the admission
+/// makes them: the compliance listing, the rates, the voucher types, the
+/// number, the number's control, the company's registration. Each goes through
+/// the identity-bracketed paired read, and the listing through the bracketed
+/// source read.
 async fn read_invoice_plan(
     client: &TallyClient,
     identity: &VerifiedCompanyIdentity,
     plan: &super::approved_import::InvoiceReadPlan,
     marks: &str,
+    currencies: &str,
 ) -> anyhow::Result<(super::approved_import::InvoiceAnswers, RuntimeReadEvidence)> {
+    use super::approved_import::{InvoicePrecheck, InvoicePrecheckInput};
     async fn paired(
         client: &TallyClient,
         identity: &VerifiedCompanyIdentity,
@@ -1829,8 +1835,25 @@ async fn read_invoice_plan(
         marks: Some(marks.to_string()),
         ..Default::default()
     };
-    if let Some(request) = &plan.ledger_count {
-        answers.ledger_count = Some(paired(client, identity, request, &mut evidence).await?);
+    let precheck = |ledger_count: Option<&str>| {
+        (plan.precheck)(&InvoicePrecheckInput {
+            marks,
+            currencies,
+            ledger_count,
+            company_name: &plan.company_name,
+            company_guid: identity.company_guid(),
+        })
+    };
+    if precheck(None)? == InvoicePrecheck::NeedsLedgerCount {
+        let count = paired(client, identity, &plan.ledger_count, &mut evidence).await?;
+        let verdict = precheck(Some(&count));
+        answers.ledger_count = Some(count);
+        // Asked with its answer, the precheck admits or refuses.
+        if verdict? == InvoicePrecheck::NeedsLedgerCount {
+            return Err(
+                super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent.into(),
+            );
+        }
     }
     let currency_read = read_classified_currency_with_extent(client, identity)
         .await
@@ -4044,6 +4067,7 @@ impl TallyRuntime {
                                     &identity,
                                     plan,
                                     &binding_marks.text,
+                                    &currencies.body,
                                 ))
                                 .await
                                 .map_err(|error| {

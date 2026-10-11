@@ -589,11 +589,13 @@ fn plan_of(voucher: &ImportVoucher, control: &ledger::NumberControl) -> InvoiceR
         catalogue: &catalogue,
         control,
     }
-    .plan(
-        bridge_tally_core::TallyDate::parse("20261010".to_string()).unwrap(),
-        false,
-    )
+    .plan(today())
     .unwrap()
+}
+
+/// The day the plans here are made on.
+fn today() -> bridge_tally_core::TallyDate {
+    bridge_tally_core::TallyDate::parse("20261010".to_string()).unwrap()
 }
 
 fn known_control() -> ledger::NumberControl {
@@ -614,8 +616,7 @@ fn a_plan_that_is_not_the_invoices_does_not_fit_it() {
     let plan = plan_of(&voucher, &ledger::NumberControl::NeverSent);
     assert_eq!(invoice::fit_plan(&plan, &plan), Ok(()));
     // Another number and another financial year are each another invoice's
-    // plan; the voucher type is judged, not requested, and the date a listing
-    // is read as of is the clock's.
+    // plan; the voucher type is judged, not requested.
     let mut other_number = voucher.clone();
     other_number.voucher_number = Some("TG/25-26/901".to_string());
     let mut other_year = voucher.clone();
@@ -628,9 +629,21 @@ fn a_plan_that_is_not_the_invoices_does_not_fit_it() {
             "{other:?}"
         );
     }
+    // The company, the day the listing is read as of and the ledger count's
+    // request are each held to the invoice too.
+    let mut other_company = plan.clone();
+    other_company.company_name = "ANOTHER LAB".to_string();
     let mut later = plan.clone();
     later.listing_as_of = bridge_tally_core::TallyDate::parse("20261011".to_string()).unwrap();
-    assert_eq!(invoice::fit_plan(&plan, &later), Ok(()));
+    let mut other_count = plan.clone();
+    other_count.ledger_count = plan.rates.clone();
+    for carried in [other_company, later, other_count] {
+        assert_eq!(
+            invoice::fit_plan(&plan, &carried),
+            Err(AdmissionInconsistent),
+            "{carried:?}"
+        );
+    }
 }
 
 /// The journal's control moved between the plan and the queue (another invoice
@@ -773,6 +786,7 @@ fn the_queue_refuses_a_plan_that_does_not_fit_before_judging_any_answer() {
             LAB_GUID,
             &catalogue,
             control,
+            &today(),
             &QueuedInvoice {
                 plan: carried,
                 answers: &answers,
@@ -802,4 +816,93 @@ fn the_queue_refuses_a_plan_that_does_not_fit_before_judging_any_answer() {
             })
         );
     }
+}
+
+fn marks_of(vouchers: u64, masters: u64) -> String {
+    format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+         <COMPANY NAME=\"{LAB}\"><GUID TYPE=\"String\">{LAB_GUID}</GUID>\
+         <ALTVCHID TYPE=\"Number\"> {vouchers}</ALTVCHID><ALTMSTID TYPE=\"Number\"> {masters}</ALTMSTID>\
+         </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+    )
+}
+
+/// What the queue asks before it sends any read of the invoice (#1337): the
+/// currency, then the size limits, on what it has already read. Each outcome is
+/// decided here, on the marks and currencies alone, so a refusal needs no read
+/// of the plan; a read that cannot be used is told from a refusal by its type.
+#[test]
+fn the_queue_precheck_judges_the_currency_and_the_limits_before_any_read() {
+    use crate::tally::approved_import::{
+        ApprovedImportAdmissionError as Refusal, InvoicePrecheck, InvoicePrecheckInput,
+    };
+    let one_currency = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let two_currencies = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+    ));
+    // Tally's own count of a 4,339-ledger book (the size book's row), with the
+    // names the precheck is asked about.
+    let size_book_count = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/company-ledger-count.utf16le.xml"
+    ));
+    let check = |marks: &str, currencies: &str, count: Option<&str>, name: &str, guid: &str| {
+        invoice::queued_precheck(&InvoicePrecheckInput {
+            marks,
+            currencies,
+            ledger_count: count,
+            company_name: name,
+            company_guid: guid,
+        })
+    };
+    let at_lab = |marks: &str, currencies: &str, count: Option<&str>| {
+        check(marks, currencies, count, LAB, LAB_GUID)
+    };
+    // Admitted: under both marks, one currency master.
+    assert_eq!(
+        at_lab(&marks_of(16, 223), &one_currency, None),
+        Ok(InvoicePrecheck::Admitted)
+    );
+    // Over the voucher mark: refused as the build refuses it, with no count.
+    assert_eq!(
+        at_lab(&marks_of(25_001, 223), &one_currency, None),
+        Err(Refusal::InvoiceRefused {
+            code: "invoice_book_too_many_vouchers".to_string()
+        })
+    );
+    // Over the master mark: the ledger count decides, so it is asked for.
+    assert_eq!(
+        at_lab(&marks_of(16, 5_001), &one_currency, None),
+        Ok(InvoicePrecheck::NeedsLedgerCount)
+    );
+    // And with Tally's count of a book over the ledger limit, refused.
+    let size_marks = String::from(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+         <COMPANY NAME=\"BRIDGE SIZE 2K\"><GUID TYPE=\"String\">f8dab51e-a5d9-49d5-9232-54a16c8b95bb</GUID>\
+         <ALTVCHID TYPE=\"Number\"> 16</ALTVCHID><ALTMSTID TYPE=\"Number\"> 5001</ALTMSTID>\
+         </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+    );
+    assert_eq!(
+        check(
+            &size_marks,
+            &one_currency,
+            Some(&size_book_count),
+            "BRIDGE SIZE 2K",
+            "f8dab51e-a5d9-49d5-9232-54a16c8b95bb"
+        ),
+        Err(Refusal::InvoiceRefused {
+            code: "invoice_book_too_large".to_string()
+        })
+    );
+    // Two currency masters: the currency's own typed refusal, ahead of the limits.
+    assert!(matches!(
+        at_lab(&marks_of(25_001, 223), &two_currencies, None),
+        Err(Refusal::MultiCurrencyBook { .. })
+    ));
+    // Marks that cannot be read are a read that could not be used, not a refusal.
+    assert!(matches!(
+        at_lab("<ENVELOPE/>", &one_currency, None),
+        Err(Refusal::InvoiceReadUnusable { .. })
+    ));
 }

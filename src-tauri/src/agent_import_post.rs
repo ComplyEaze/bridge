@@ -1210,9 +1210,10 @@ impl Server {
                 // judge refused under, or the master that moved.
                 let invoice_refusal = error.chain().find_map(|cause| {
                     match cause.downcast_ref::<ApprovedImportAdmissionError>() {
-                        Some(ApprovedImportAdmissionError::InvoiceRefused { code }) => {
-                            Some(code.clone())
-                        }
+                        Some(
+                            ApprovedImportAdmissionError::InvoiceRefused { code }
+                            | ApprovedImportAdmissionError::InvoiceReadUnusable { code },
+                        ) => Some(code.clone()),
                         _ => None,
                     }
                 });
@@ -1395,10 +1396,20 @@ impl Server {
                 });
                 // A wire-gate refusal before the intent (#697) becomes the code
                 // itself in `from_runtime`; it is not repeated as the cause.
+                // The base currency a queued invoice read refused on (#1337),
+                // which would otherwise come back as the generic queue read.
+                let currency_cause = error.chain().find_map(|cause| {
+                    cause
+                        .downcast_ref::<crate::tally::runtime::CurrencyAdmissionRefusal>()
+                        .map(|refusal| refusal.0)
+                });
                 let mut failure = ToolFailure::from_runtime(code, error);
                 if failure.cause.is_none() {
-                    failure.cause =
-                        refusal_cause(&failure.code, group.or(invoice_field), transport);
+                    failure.cause = refusal_cause(
+                        &failure.code,
+                        group.or(invoice_field).or(currency_cause),
+                        transport,
+                    );
                 }
                 failure
             })?;
@@ -2166,12 +2177,18 @@ fn recheck_import_admission(
     if let Some((voucher, queued, control)) =
         super::invoice::queued_invoice_for(&line.vouchers, invoice, invoice_control)?
     {
+        let today = bridge_tally_core::TallyDate::parse(super::super::tally_host_today()).map_err(
+            |_| ApprovedImportAdmissionError::InvoiceReadUnusable {
+                code: "current_date_invalid".to_string(),
+            },
+        )?;
         super::invoice::admit_queued_invoice(
             voucher,
             company_name,
             company_guid,
             &catalogue,
             control,
+            &today,
             &queued,
         )?;
     }
@@ -2232,7 +2249,7 @@ fn recheck_import_admission(
 /// `CURRENCYNAME` is compared with it instead. A response that parses to no master, or
 /// does not parse (a master without a NAME does not), is
 /// `BaseCurrencyUndetermined`.
-fn admit_post_currency(currencies: &str) -> Result<(), ApprovedImportAdmissionError> {
+pub(super) fn admit_post_currency(currencies: &str) -> Result<(), ApprovedImportAdmissionError> {
     let currency = parse_company_currency(currencies)
         .map_err(|_| ApprovedImportAdmissionError::BaseCurrencyUndetermined)?;
     if BaseCurrencyName::of_single_master(&currency).is_some() {

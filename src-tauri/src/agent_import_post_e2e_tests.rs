@@ -5695,8 +5695,11 @@ struct Changed {
 }
 
 /// The pilot lab's replay, with some answers changed.
-fn pilot_lab_changed(changes: &[Changed]) -> (SequenceSimulator, Server, tempfile::TempDir) {
-    let plans = PILOT_ORDER
+fn pilot_lab_changed(
+    order: &str,
+    changes: &[Changed],
+) -> (SequenceSimulator, Server, tempfile::TempDir) {
+    let plans = order
         .chars()
         .enumerate()
         .map(|(position, letter)| {
@@ -5724,7 +5727,12 @@ struct PilotRun {
 }
 
 async fn pilot_post_changed(changes: &[Changed]) -> PilotRun {
-    let (simulator, server, directory) = pilot_lab_changed(changes);
+    pilot_post_changed_in(PILOT_ORDER, changes).await
+}
+
+/// As [`pilot_post_changed`], over another order of requests.
+async fn pilot_post_changed_in(order: &str, changes: &[Changed]) -> PilotRun {
+    let (simulator, server, directory) = pilot_lab_changed(order, changes);
     let remote_id = Uuid::parse_str("00000000-0000-4000-8000-000000000777").unwrap();
     let (response, journal_after_build) = TEST_QUALIFIED_VOUCHER_TYPES
         .scope(PILOT_QUALIFIED, async {
@@ -5762,18 +5770,18 @@ async fn pilot_post_changed(changes: &[Changed]) -> PilotRun {
 }
 
 /// The post was refused in the queue, loud and before anything was recorded or
-/// sent: every read up to the aim marks was made and the write was not, no
+/// sent: exactly `requests` requests were made and the write was not, no
 /// dispatch intent was journaled, and the only record added is the one
 /// verification status. Returns the refusal.
-fn pilot_refused_in_the_queue(run: &PilotRun, code: &str) -> Value {
+fn pilot_refused_in_the_queue(run: &PilotRun, code: &str, requests: usize) -> Value {
     let result = &run.response["structuredContent"]["result"];
     let error = &result["error"];
     assert_eq!(error["code"], code, "{}", run.response);
     assert_eq!(result["attempt_recorded"], false, "{}", run.response);
     assert_eq!(
         run.observed.len(),
-        PILOT_ORDER.find('Z').unwrap(),
-        "every read up to the aim marks, and no write"
+        requests,
+        "the requests sent, and no write"
     );
     assert!(run
         .observed
@@ -5791,7 +5799,9 @@ fn pilot_refused_in_the_queue(run: &PilotRun, code: &str) -> Value {
 
 /// The voucher type was changed between the build and the queue's re-read (the
 /// GUID the type is read with differs in its last hex digit): the post is
-/// refused as a master that moved, and the cause names it.
+/// refused as a master that moved, and the cause names it. SYNTHETIC answer: the
+/// captured one with that digit edited; it stands for a change, and is not
+/// Tally's answer to one.
 #[tokio::test]
 async fn a_voucher_type_that_changed_after_the_approval_is_refused_in_the_queue() {
     let run = pilot_post_changed(&[Changed {
@@ -5799,7 +5809,11 @@ async fn a_voucher_type_that_changed_after_the_approval_is_refused_in_the_queue(
         body: pilot_text('T').replacen("000000ce", "000000cf", 1),
     }])
     .await;
-    let error = pilot_refused_in_the_queue(&run, "import_invoice_masters_changed");
+    let error = pilot_refused_in_the_queue(
+        &run,
+        "import_invoice_masters_changed",
+        PILOT_ORDER.find('Z').unwrap(),
+    );
     assert_eq!(error["cause"], "voucher_type", "{}", run.response);
 }
 
@@ -5815,7 +5829,11 @@ async fn a_number_taken_after_the_approval_is_refused_in_the_queue_under_its_own
         )),
     }])
     .await;
-    let error = pilot_refused_in_the_queue(&run, "invoice_number_already_used");
+    let error = pilot_refused_in_the_queue(
+        &run,
+        "invoice_number_already_used",
+        PILOT_ORDER.find('Z').unwrap(),
+    );
     assert_eq!(error["cause"], Value::Null, "{}", run.response);
 }
 
@@ -5832,26 +5850,97 @@ async fn a_company_registration_that_lapsed_after_the_approval_is_refused_in_the
         body: tax_units.replacen(from, "<REGISTRATIONTYPE>Composition</REGISTRATIONTYPE>", 1),
     }])
     .await;
-    pilot_refused_in_the_queue(&run, "invoice_company_registration_not_regular");
+    pilot_refused_in_the_queue(
+        &run,
+        "invoice_company_registration_not_regular",
+        PILOT_ORDER.find('Z').unwrap(),
+    );
 }
 
-/// A book that outgrew the size gate while the approval waited has no ledger
-/// count in the plan, so the queue cannot judge it: refused as a master that
-/// moved, naming the book's size. The binding marks' master mark is edited to
-/// be over the gate.
+/// Where the queue's re-read of the invoice's masters starts in `PILOT_ORDER`:
+/// the number of requests made when it begins.
+fn pilot_queue_start() -> usize {
+    pilot_queue_range().start
+}
+
+/// The size limits and the currency are judged on what the queue has already
+/// read before any read of the invoice's plan is sent (#1337), as the build
+/// judges them before the listing is read. A book over the voucher mark is
+/// refused with the queue's reads up to its currency made and none of the
+/// invoice's.
 #[tokio::test]
-async fn a_book_that_outgrew_the_size_gate_after_the_approval_is_refused_in_the_queue() {
+async fn a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_invoice_read() {
     let at = PILOT_ORDER.find(PILOT_QUEUE_ANCHOR).unwrap();
     assert_eq!(&PILOT_ORDER[at..at + 1], "m");
     let marks = pilot_text('m');
-    assert_eq!(marks.matches(" 223</ALTMSTID>").count(), 1);
+    assert_eq!(marks.matches(" 16</ALTVCHID>").count(), 1);
     let run = pilot_post_changed(&[Changed {
         positions: vec![at],
-        body: marks.replacen(" 223</ALTMSTID>", " 5001</ALTMSTID>", 1),
+        body: marks.replacen(" 16</ALTVCHID>", " 25001</ALTVCHID>", 1),
     }])
     .await;
-    let error = pilot_refused_in_the_queue(&run, "import_invoice_masters_changed");
-    assert_eq!(error["cause"], "book_size", "{}", run.response);
+    pilot_refused_in_the_queue(&run, "invoice_book_too_many_vouchers", pilot_queue_start());
+}
+
+/// A book over the master mark has its ledger count asked for, and that read is
+/// the only one of the invoice's sent; the post is refused before the listing,
+/// the rates, the voucher types, the number or the registration is read.
+///
+/// SYNTHETIC answer: there is no capture of the ledger count of the pilot lab,
+/// only of another company's (the size book's, Tally's own bytes in
+/// `company-ledger-count`). The answer here is that capture with the size
+/// book's name and GUID replaced by the pilot lab's, so that the row is the
+/// company's. It shows that the queue asks the count only when the master mark
+/// is over, reads nothing else of the invoice first, and judges the count with
+/// the build's limit. It does not show that Tally answers the count request for
+/// the pilot lab with 4,339, or at all: the unedited capture is judged under
+/// its own company's name in the precheck's unit test.
+#[tokio::test]
+async fn a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_refusal() {
+    let at = PILOT_ORDER.find(PILOT_QUEUE_ANCHOR).unwrap();
+    let marks = pilot_text('m');
+    let count = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/company-ledger-count.utf16le.xml"
+    ))
+    .replace("BRIDGE SIZE 2K", "BRIDGE PILOT LAB")
+    .replace("f8dab51e-a5d9-49d5-9232-54a16c8b95bb", PILOT_GUID);
+    // The queue's currency read, then the ledger count's paired read (K).
+    let start = pilot_queue_start();
+    let order = format!("{}eKsKse{}", &PILOT_ORDER[..start], &PILOT_ORDER[start..]);
+    let run = pilot_post_changed_in(
+        &order,
+        &[
+            Changed {
+                positions: vec![at],
+                body: marks.replacen(" 223</ALTMSTID>", " 5001</ALTMSTID>", 1),
+            },
+            Changed {
+                positions: vec![start + 1, start + 3],
+                body: count,
+            },
+        ],
+    )
+    .await;
+    pilot_refused_in_the_queue(&run, "invoice_book_too_large", start + 6);
+}
+
+/// A currency master added while the approval waited is refused under its own
+/// code before any read of the invoice (the multi-currency capture stands for
+/// the queue's currency answer).
+#[tokio::test]
+async fn a_currency_added_after_the_approval_is_refused_before_any_invoice_read() {
+    let queue_currency = PILOT_ORDER.find(PILOT_QUEUE_ANCHOR).unwrap() + 8;
+    assert_eq!(&PILOT_ORDER[queue_currency..queue_currency + 3], "csc");
+    let run = pilot_post_changed(&[Changed {
+        positions: vec![queue_currency, queue_currency + 2],
+        body: two_currencies(),
+    }])
+    .await;
+    pilot_refused_in_the_queue(
+        &run,
+        "import_multi_currency_unsupported",
+        pilot_queue_start(),
+    );
 }
 
 /// A master changed after the queue's last invoice read is not seen by the
@@ -5867,5 +5956,5 @@ async fn a_master_mark_that_moves_after_the_invoice_reads_is_refused_by_the_aim_
         body: marks.replacen(" 223</ALTMSTID>", " 224</ALTMSTID>", 1),
     }])
     .await;
-    pilot_refused_in_the_queue(&run, "post_masters_moved");
+    pilot_refused_in_the_queue(&run, "post_masters_moved", PILOT_ORDER.find('Z').unwrap());
 }

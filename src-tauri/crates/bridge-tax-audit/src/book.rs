@@ -370,8 +370,12 @@ fn closing_stock(
         return ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd);
     };
     let mut at_end = summaries.iter().filter(|p| p.as_of.as_ref() == Some(to));
-    let (Some(part), None) = (at_end.next(), at_end.next()) else {
-        return ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd);
+    let part = match (at_end.next(), at_end.next()) {
+        (Some(part), None) => part,
+        (Some(_), Some(_)) => {
+            return ClosingStock::Unknown(ClosingStockUnknown::SeveralSummariesAtPeriodEnd)
+        }
+        (None, _) => return ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd),
     };
     match crate::stock_read::stock_snapshot(part, to.clone()) {
         Ok(snapshot) if snapshot.rows.is_empty() => {

@@ -13804,8 +13804,8 @@
   "by": "author",
   "what": "book.rs: two Stock Summaries dated the last day read as the first of them",
   "file": "src/book.rs",
-  "from": "let (Some(part), None) = (at_end.next(), at_end.next()) else {",
-  "to": "let (Some(part), _) = (at_end.next(), at_end.next()) else {"
+  "from": "        (Some(part), None) => part,",
+  "to": "        (Some(part), _) => part,"
  },
  {
   "id": "CS-6",
@@ -14046,5 +14046,29 @@
   "file": "src/book.rs",
   "from": "            Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),\n        },\n",
   "to": "            Err(_) => ClosingStock::Valued(0),\n        },\n"
+ },
+ {
+  "id": "CS-11",
+  "by": "author",
+  "what": "book.rs: several Stock Summaries dated the last day get the reason for none",
+  "file": "src/book.rs",
+  "from": "            return ClosingStock::Unknown(ClosingStockUnknown::SeveralSummariesAtPeriodEnd)\n",
+  "to": "            return ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd)\n"
+ },
+ {
+  "id": "STB-26",
+  "by": "author",
+  "what": "registry.rs: the financial_statements figure floor is one lower than a book with no stock term shows",
+  "file": "src/registry.rs",
+  "from": "which is all a book shows when neither stock term is known.\n        min_figures: 10,",
+  "to": "which is all a book shows when neither stock term is known.\n        min_figures: 9,"
+ },
+ {
+  "id": "STB-27",
+  "by": "author",
+  "what": "financial_statements.rs: the item basis does not say how a valueless Stock Summary reads",
+  "file": "src/financial_statements.rs",
+  "from": "            \"A stock item with no value counts as nothing, so a Stock Summary whose items all lack a \\\nclosing value shows a closing stock of zero; a Summary that lists no item at all is not taken as zero.\"\n                .to_string(),\n",
+  "to": ""
  }
 ]

@@ -677,6 +677,9 @@ Tally applies, which was not read."
             "Stock is Tally's own valuation of the stock items, not an independently counted or valued \
 physical stock figure; the books cannot show whether it was actually verified."
                 .to_string(),
+            "A stock item with no value counts as nothing, so a Stock Summary whose items all lack a \
+closing value shows a closing stock of zero; a Summary that lists no item at all is not taken as zero."
+                .to_string(),
         ]
     } else {
         vec![
@@ -1800,7 +1803,12 @@ closing value shows a closing stock of zero; a Summary that lists no item at all
         );
         none.vouchers.clear(); // no excluded-voucher figures on top
         let r = run(&none, &rules(), &BTreeSet::new(), None).unwrap();
-        assert_eq!(r.figures.len(), floor, "{:?}", r.figures.iter().map(|f| &f.id).collect::<Vec<_>>());
+        assert_eq!(
+            r.figures.len(),
+            floor,
+            "{:?}",
+            r.figures.iter().map(|f| &f.id).collect::<Vec<_>>()
+        );
 
         let mut ledgers = book();
         ledgers.vouchers.clear();

@@ -916,8 +916,10 @@ pub(super) fn classify_sales_invoice(
     };
     for index in [cgst, state_tax] {
         let name = &voucher.entries[index].ledger;
+        // A tax ledger the rate listing did not return has no known rate,
+        // which is not a rate that differs.
         let code = match facts.get(name).and_then(|fact| fact.rates.as_ref()) {
-            None => Some("invoice_tax_ledger_rate_mismatch"),
+            None => Some("invoice_tax_ledger_rate_unknown"),
             Some(row) => tax_ledger_refusal(row, half_milli),
         };
         if let Some(code) = code {

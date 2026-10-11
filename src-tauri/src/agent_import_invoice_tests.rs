@@ -2292,13 +2292,23 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
             "Output SGST"
         )]
     );
+    // A tax ledger the listing did not return: its rate is not known, which
+    // is not a rate that differs.
     assert_eq!(
         refused(&|f| f.get_mut("Output CGST").unwrap().rates = None),
         vec![refuse_ledger(
-            "invoice_tax_ledger_rate_mismatch",
+            "invoice_tax_ledger_rate_unknown",
             "Output CGST"
         )]
     );
+    assert_eq!(
+        refused(&|f| f.get_mut("Output SGST").unwrap().rates = None),
+        vec![refuse_ledger(
+            "invoice_tax_ledger_rate_unknown",
+            "Output SGST"
+        )]
+    );
+    // A tax ledger that was returned with another rate.
     assert_eq!(
         refused(&|f| f.get_mut("Output CGST").unwrap().rates = Some(tax_rates("2.5"))),
         vec![refuse_ledger(

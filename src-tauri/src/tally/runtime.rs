@@ -1,7 +1,5 @@
-use super::{
-    ConnectionStatus, TallyClient, TallyCompany, TallyConfig, TallyLedger, VerifiedCompanyIdentity,
-};
-use super::{TallyProbeResult, TallyVoucher};
+use super::TallyProbeResult;
+use super::{TallyClient, TallyCompany, TallyConfig, TallyLedger, VerifiedCompanyIdentity};
 use crate::endpoint_wire::WireGateConfig;
 use crate::observability::BodyBytesObservation;
 use crate::reports::party_ledger_master::PartyLedgerMasterSource;
@@ -11,7 +9,6 @@ use crate::tally::connector::SealedReadRequest;
 use crate::tally::runtime_control::{
     EndpointCircuitState, EndpointIdentity, EndpointRuntimeSnapshot, PortableReadRuntime,
     ReadAttempt, ReadExecutionError, ReadFailureClass, ReadOperation, ReadRetryPolicy,
-    TELEMETRY_PREVIEW_SCHEMA,
 };
 use crate::warning_codes::WarningCode;
 use bridge_tally_core::{DateSpan, ExactDecimal, TallyDate};
@@ -1064,13 +1061,6 @@ pub struct TallySessionSnapshot {
     pub last_success_unix_ms: Option<i64>,
     pub last_failure_unix_ms: Option<i64>,
     pub cached_capability_observed_at_unix_ms: Option<i64>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct TallyTelemetryPreviewExport {
-    pub schema: &'static str,
-    pub payload_sha256: String,
-    pub preview_json: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -2586,17 +2576,6 @@ impl TallyRuntime {
         result.map_err(map_execution_error)
     }
 
-    pub async fn check_connection(&self, config: TallyConfig) -> anyhow::Result<ConnectionStatus> {
-        let _lease = self.begin_ordinary_read(&config)?;
-        self.execute(
-            config,
-            ReadOperation::Status,
-            ReadRetryPolicy::transient_default(),
-            |client| async move { client.check_connection_strict().await },
-        )
-        .await
-    }
-
     pub async fn probe_with_observation(
         &self,
         config: TallyConfig,
@@ -3278,34 +3257,6 @@ impl TallyRuntime {
                         .await?;
                     bracket_verified_company_identity(&client, &identity).await?;
                     Ok(ledgers)
-                }
-            },
-        )
-        .await
-    }
-
-    pub async fn fetch_vouchers(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-        from: String,
-        to: String,
-    ) -> anyhow::Result<Vec<TallyVoucher>> {
-        let _lease = self.begin_ordinary_read(&config)?;
-        let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::transient_default(),
-            move |client| {
-                let identity = identity.clone();
-                let from = from.clone();
-                let to = to.clone();
-                async move {
-                    bracket_verified_company_identity(&client, &identity).await?;
-                    let vouchers = client.fetch_vouchers(&identity, &from, &to).await?;
-                    bracket_verified_company_identity(&client, &identity).await?;
-                    Ok(vouchers)
                 }
             },
         )
@@ -4649,15 +4600,6 @@ impl TallyRuntime {
         };
         drop(cache);
         Ok(Some(reservation))
-    }
-
-    pub fn telemetry_preview(&self) -> anyhow::Result<TallyTelemetryPreviewExport> {
-        let export = self.control.collector().privacy_reduced_export_v2()?;
-        Ok(TallyTelemetryPreviewExport {
-            schema: TELEMETRY_PREVIEW_SCHEMA,
-            payload_sha256: export.payload_sha256().to_string(),
-            preview_json: export.json().to_string(),
-        })
     }
 
     fn begin_ordinary_read(&self, config: &TallyConfig) -> anyhow::Result<OrdinaryReadLease> {

@@ -7,7 +7,7 @@ use std::sync::{
     Arc,
 };
 
-use super::xml_parser::{TallyLedger, TallyVoucher};
+use super::xml_parser::TallyLedger;
 use super::{
     standard_ledger_catalog::{
         parse_standard_ledger_catalog_response, render_standard_ledger_catalog_request,
@@ -35,10 +35,10 @@ use bridge_tally_protocol::{
         parse_compliance_ledger_snapshot_for_company, parse_native_group_snapshot_with_evidence,
         parse_native_ledger_snapshot_for_company, render_native_group_snapshot_request,
         render_native_ledger_export_request, render_native_ledger_snapshot_request,
-        render_native_ledger_snapshot_request_for_parents, render_native_voucher_export_request,
-        render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
-        BaseCurrencyName, ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
-        NativeLedgerSnapshotPeriod, NativeOutstandingsError,
+        render_native_ledger_snapshot_request_for_parents, render_party_ledger_master_request,
+        render_party_ledger_master_request_for_parents, BaseCurrencyName, ForeignCurrencyLedger,
+        LedgerSnapshotEntry, NativeLedgerExportPeriod, NativeLedgerSnapshotPeriod,
+        NativeOutstandingsError,
     },
     outstandings_shared::{
         parse_company_book_extent_v2, parse_company_ledger_count,
@@ -49,8 +49,8 @@ use bridge_tally_protocol::{
     parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
     parse_ledger_census_slice, parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_leaving_unparsed,
-    parse_native_party_ledger_master_structure, parse_native_voucher_source_records_with_evidence,
-    parse_standard_ledger_catalog, parse_standard_ledger_identity_observation,
+    parse_native_party_ledger_master_structure, parse_standard_ledger_catalog,
+    parse_standard_ledger_identity_observation,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
     ParsedExport, ParsedSourceRecord, PartyLedgerMasterRecord, StandardLedgerCatalogError,
     TallyTextEncoding, MAX_STANDARD_LEDGER_IDENTITY_ROWS,
@@ -1085,24 +1085,6 @@ impl TallyClient {
             observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         })
-    }
-
-    pub async fn check_connection(&self) -> anyhow::Result<ConnectionStatus> {
-        match self.check_connection_strict_with_wire_evidence().await {
-            Ok((status, _)) => Ok(status),
-            Err(error) => Ok(ConnectionStatus {
-                reachable: false,
-                compatible: false,
-                server_text: String::new(),
-                product: TallyProduct::Unknown,
-                error: Some(error.safe_code().to_string()),
-            }),
-        }
-    }
-
-    pub(crate) async fn check_connection_strict(&self) -> anyhow::Result<ConnectionStatus> {
-        let (status, _) = self.check_connection_strict_with_wire_evidence().await?;
-        Ok(status)
     }
 
     /// The `/status` read. Its one failure is the transport's own, so a caller
@@ -2454,54 +2436,6 @@ impl TallyClient {
     pub(crate) async fn status_probe(&self) -> anyhow::Result<()> {
         self.http.get_status_decoded().await?;
         Ok(())
-    }
-
-    pub async fn fetch_vouchers(
-        &self,
-        identity: &VerifiedCompanyIdentity,
-        from: &str,
-        to: &str,
-    ) -> anyhow::Result<Vec<TallyVoucher>> {
-        // Fail closed: `from`/`to` feed a quoted `$$Date:"..."` TDL formula
-        // argument, where XML escaping alone cannot contain an embedded
-        // quote (Tally decodes `&quot;` back to `"` before evaluating the
-        // formula). Requiring a validated `TallyDate` -- exactly 8 ASCII
-        // digits -- closes that off at the source instead of sanitising.
-        let from = bridge_tally_core::TallyDate::parse(from)
-            .context("voucher export from-date must be a valid YYYYMMDD date")?;
-        let to = bridge_tally_core::TallyDate::parse(to)
-            .context("voucher export to-date must be a valid YYYYMMDD date")?;
-        let xml = self
-            .post_xml(render_native_voucher_export_request(
-                identity.display_name(),
-                &from,
-                &to,
-            ))
-            .await?;
-        let parsed =
-            parse_native_voucher_source_records_with_evidence(&xml, identity.company_guid())?;
-        if parsed.records.is_empty() {
-            // A native Voucher collection carries no envelope company GUID,
-            // so a zero-row response has no per-row identity to bind to the
-            // pinned company either -- `parse_native_voucher_source_records_with_evidence`
-            // accepts it unauthenticated. Since the voucher request is now
-            // filtered by date, a refused period boundary yields the exact
-            // same zero-row, byte-identical response as a genuinely empty
-            // window. Confirm the pinned company out-of-band with the same
-            // GUID-verified, paired book-extent bracket the core window uses
-            // for exactly this situation (see `RuntimeTallyConnector::extract_core_window`
-            // in connector.rs), instead of accepting the empty result as-is.
-            // Paid only here: a non-empty response keeps its existing
-            // row-GUID binding and issues no extra request.
-            self.fetch_company_book_extent(identity).await.context(
-                "empty voucher response could not confirm the pinned company book extent",
-            )?;
-        }
-        Ok(parsed
-            .records
-            .into_iter()
-            .map(|record| record.record)
-            .collect())
     }
 
     pub(crate) fn reset_observed_body_bytes(&self) {

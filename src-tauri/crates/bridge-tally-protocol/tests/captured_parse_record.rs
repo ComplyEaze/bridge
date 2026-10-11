@@ -2443,6 +2443,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VERIFICATION,
     ),
     (
+        "tests/fixtures/agent/post-line-break-ledger-readback.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
         "tests/fixtures/agent/post-span-guid-absent.utf16le.xml",
         APP_VERIFICATION,
     ),

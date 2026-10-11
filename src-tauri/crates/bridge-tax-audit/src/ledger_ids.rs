@@ -19,8 +19,6 @@
 
 use std::collections::BTreeMap;
 
-use sha1::{Digest, Sha1};
-
 use crate::book::{Book, Ledger};
 use crate::error::{AuditError, Result};
 
@@ -48,7 +46,7 @@ pub fn guid_tag(guid: &str, what: &str) -> Result<String> {
     if normalized.is_empty() {
         return Err(missing_guid(what));
     }
-    Ok(crate::canonical::hex(&Sha1::digest(normalized.as_bytes()))[..8].to_string())
+    Ok(crate::support::hash8(&normalized))
 }
 
 /// See [`guid_tag`]. A ledger with a blank (post-normalisation) GUID falls back to hashing the
@@ -59,7 +57,7 @@ pub fn guid_tag(guid: &str, what: &str) -> Result<String> {
 /// because there is no Tally identity left to anchor it to.
 pub fn ledger_tag(ledger: &Ledger) -> Result<String> {
     if normalize_guid(&ledger.guid).is_empty() {
-        return Ok(crate::canonical::hex(&Sha1::digest(ledger.name.as_bytes()))[..8].to_string());
+        return Ok(crate::support::hash8(&ledger.name));
     }
     guid_tag(&ledger.guid, &format!("ledger {:?}", ledger.name))
 }
@@ -76,7 +74,7 @@ pub fn ledger_tag(ledger: &Ledger) -> Result<String> {
 pub fn stable_ledger_tag(book: &Book, name: &str) -> Result<String> {
     match book.ledgers.get(name) {
         Some(ledger) => ledger_tag(ledger),
-        None => Ok(crate::canonical::hex(&Sha1::digest(name.as_bytes()))[..8].to_string()),
+        None => Ok(crate::support::hash8(name)),
     }
 }
 

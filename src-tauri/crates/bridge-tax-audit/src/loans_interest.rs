@@ -30,7 +30,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use bridge_tally_primitives::TallyDate;
-use sha1::{Digest, Sha1};
 
 use crate::book::{Book, Voucher};
 use crate::cash_book_integrity::EXPENSE_GROUPS;
@@ -40,8 +39,8 @@ use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value}
 use crate::ledger_ids::stable_ledger_tag;
 use crate::rules::Rules;
 use crate::support::{
-    count, ledgers_by_tag, overflow, py_casefold, py_ci_eq, py_is_decimal, py_lower, py_repr_str,
-    py_split, py_strip, rupees, voucher_label,
+    count, hash8, ledgers_by_tag, overflow, py_casefold, py_ci_eq, py_is_decimal, py_lower,
+    py_repr_str, py_split, py_strip, rupees, voucher_label,
 };
 use crate::tds_payees::{deductor_question, deductor_status, DeductorActivity};
 
@@ -216,10 +215,6 @@ pub struct Inputs<'a> {
     pub deductor_activity: Option<DeductorActivity>,
     /// `[tds].previous_year_turnover_status` is a placeholder.
     pub turnover_is_placeholder: bool,
-}
-
-fn hash8(text: &str) -> String {
-    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()
 }
 
 /// Tally's Receipt base type, whatever its case or surrounding space.
@@ -4424,6 +4419,23 @@ mod tests {
         // The control: distinct GUIDs give two rows.
         let two = book(vec![taken("g1", "20250601"), taken("g2", "20250602")]);
         assert_eq!(run_on(&two, &rules).unwrap().findings.len(), 2);
+    }
+
+    /// A row's figure id ends with the first eight hex digits of the sha1 of its voucher's GUID
+    /// (`hashlib.sha1(b"g1").hexdigest()[:8]`, measured in Python), so a change to the shared tag
+    /// changes this module's ids.
+    #[test]
+    fn a_row_figure_id_ends_with_the_sha1_tag_of_its_voucher_guid() {
+        let rules = Rules::vendored().unwrap();
+        let r = run_on(&book(vec![taken("g1", "20250601")]), &rules).unwrap();
+        let ids: Vec<&str> = r
+            .figures
+            .iter()
+            .map(|f| f.id.as_str())
+            .filter(|id| id.contains(".clause31_row_amount_"))
+            .collect();
+        assert_eq!(ids.len(), 1);
+        assert!(ids[0].ends_with("_a46e558d"), "{}", ids[0]);
     }
 
     /// Without `[tds_rates].s194a_bp` coverage is not judged: no expected or covering figure, the

@@ -737,7 +737,7 @@ mod tests {
 }
 
 /// The reference's `_hash`: the first 8 hex characters of the text's SHA-1, as figure and finding
-/// ids use it. The one shared copy; the modules that still keep their own move here in a cleanup.
+/// ids use it. The one copy.
 pub(crate) fn hash8(text: &str) -> String {
     use sha1::{Digest, Sha1};
     crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()

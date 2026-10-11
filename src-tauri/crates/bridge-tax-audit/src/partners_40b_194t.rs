@@ -76,8 +76,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use sha1::{Digest, Sha1};
-
 use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::depreciation::civil_day_number;
 use crate::error::{AuditError, Result};
@@ -85,7 +83,7 @@ use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value}
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::Window;
 use crate::rules::Rules;
-use crate::support::{overflow, py_repr_str, rupees, voucher_label};
+use crate::support::{hash8, overflow, py_repr_str, rupees, voucher_label};
 use crate::tds_payees::py_format_g;
 use crate::PartnersConfig;
 
@@ -276,12 +274,6 @@ ledger",
         }
     }
     Ok(())
-}
-
-/// The reference's `_hash`: the first 8 hex characters of the key's SHA-1.
-fn hash8(key: &str) -> String {
-    let digest = Sha1::digest(key.as_bytes());
-    crate::canonical::hex(&digest)[..8].to_string()
 }
 
 /// `numerator / denominator` rounded half-up; 0 when either is not positive.

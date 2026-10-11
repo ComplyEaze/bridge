@@ -39,8 +39,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use sha1::{Digest, Sha1};
-
 use crate::book::{Book, Voucher, VoucherStatus};
 use crate::error::{AuditError, Result};
 use crate::findings::{pct_bp, Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
@@ -143,12 +141,7 @@ fn status_value(s: VoucherStatus) -> &'static str {
     }
 }
 
-/// The reference's `_hash`: sha1 of the text, first 8 hex digits.
-fn hash8(text: &str) -> String {
-    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()
-}
-
-use crate::support::voucher_label;
+use crate::support::{hash8, voucher_label};
 
 /// The excluded vouchers' refs carry the "excluded_voucher" kind: listing them is this figure's
 /// purpose, and POP-4 checks that each really is outside the books population.

@@ -309,6 +309,7 @@ mod tests {
                 ledger("Alpha B", "Sundry Debtors", "PAN-ONE"),
                 ledger("Sales", "Sales Accounts", ""),
                 ledger("Round Off", "Indirect Expenses", ""),
+                ledger("Loan Y", "Loans (Liability)", ""),
             ]
             .into_iter()
             .map(|l| (l.name.clone(), l))
@@ -331,6 +332,18 @@ mod tests {
                         ("Alpha B", -15_000_000),
                         ("Round Off", -100),
                     ],
+                ),
+                // A loan line is a ledger with no PAN, and a voucher naming no party is the
+                // unidentified bucket: both are unbound, neither is left out.
+                voucher(
+                    "e4",
+                    "Receipt",
+                    &[("Cash", 1_000_000), ("Loan Y", -1_000_000)],
+                ),
+                voucher(
+                    "e5",
+                    "Receipt",
+                    &[("Cash", 2_000_000), ("Sales", -2_000_000)],
                 ),
                 voucher(
                     "e3",
@@ -368,6 +381,7 @@ mod tests {
             15_000_100
         );
         assert_eq!(value("gap_rows_count"), 1);
+        assert_eq!(value("unbound_ledger_count"), 2);
         assert_eq!(r.findings.len(), 1);
         let cited: Vec<(&str, &str)> = r.findings[0]
             .evidence

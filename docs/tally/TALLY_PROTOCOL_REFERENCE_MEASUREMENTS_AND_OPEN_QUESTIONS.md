@@ -843,7 +843,7 @@ will not take ten times a 10K load.
 | --- | --- | --- |
 | Curated voucher payload | **3,142 B/voucher** | 6 vouchers, curated FETCH |
 | Wildcard voucher payload | **19,658 B/voucher** | same window, `ALLLEDGERENTRIES.*` |
-| Response cap | 32 MiB general; 40 MiB only for the closed wildcard outstandings request | Bridge-side limits; guide §2.5b |
+| Response cap | 32 MiB for every read (the 40 MiB exception for the wildcard outstandings request was deleted with that request, October 2026) | Bridge-side limits; guide §2.5b |
 | Segmentation ceiling | **Profile-specific; derived at runtime** | ~10,600 applies only to the older curated shape, not wildcard outstandings |
 | Independent corroboration | 10,000 vouchers/batch | `tally-database-loader` caps here to avoid hangs |
 | Whole demo book, wildcard | 2.94 MB / 150 vouchers | wide filter |

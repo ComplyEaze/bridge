@@ -43,7 +43,7 @@ pub fn bill_allocation_without_type_is_placeholder(name: Option<&str>) -> bool {
 }
 
 /// Tally's credit period on a bill: a magnitude and a unit, kept typed so a
-/// due date is a calendar operation (months are not a guessed number of days).
+/// month is never read as a guessed number of days.
 /// [`parse_credit_period`] returns an error for an unknown wire unit, never a
 /// default; the caller decides what that error costs (the agent `vouchers`
 /// read carries the text as `unrecognised`).

@@ -46,6 +46,12 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     write(&root.join("imports/b.xml"), b"0123456789");
     write(&root.join("imports/b.proof.json"), b"12345");
     write(&root.join("imports/b.proof.md"), b"123456");
+    let saved = format!("b.proof.20261009T101500123Z.{}", "a".repeat(64));
+    write(&root.join(format!("imports/{saved}.json")), b"1");
+    write(&root.join(format!("imports/{saved}.md")), b"12");
+    write(&root.join("imports/b.masters_verdict.json"), b"123");
+    write(&root.join("imports/b.baseline.1.json"), b"1234");
+    write(&root.join("imports/b.baseline.x.json"), b"1");
     write(&root.join("imports/b.approval_lapse.json"), b"1234567");
     write(&root.join("imports/b.masters_doubt.json"), b"12345678");
     write(&root.join("imports/b.baseline.json"), b"123456789");
@@ -64,11 +70,11 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     expect("journal", 1, journal_bytes.len() as u64);
     expect("egress_log", 1, 4);
     expect("locks", 2, 0);
-    expect("other", 2, 7);
+    expect("other", 3, 8);
     expect("import_files", 1, 10);
-    expect("proofs", 2, 11);
+    expect("proofs", 4, 14);
     expect("approval_notes", 1, 7);
-    expect("review_records", 3, 18);
+    expect("review_records", 5, 25);
     expect("bank_statements", 1, 11);
     expect("lab", 1, 3);
     assert_eq!(
@@ -239,6 +245,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             sent_or_found: 1,
             unsettled: 1,
             unsettled_no_response: 1,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 0
         })
     );
@@ -250,9 +257,31 @@ fn the_journal_is_absent_unreadable_or_counted() {
             sent_or_found: 0,
             unsettled: 0,
             unsettled_no_response: 0,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 1
         })
     );
+}
+
+/// A batch whose binding was refused is counted in its own class, and in no
+/// other class of unsettled batch (#1039).
+#[test]
+fn a_refused_binding_is_its_own_class_of_unsettled_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), None);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 4,
+        sent_or_found: 4,
+        unsettled: 3,
+        unsettled_no_response: 1,
+        unsettled_binding_refused: 1,
+        no_dispatch_never_verified: 0,
+    });
+    let journal = &to_json(&report, SystemTime::now(), None)["journal"];
+    assert_eq!(journal["not_settled"], 3);
+    assert_eq!(journal["not_settled_no_response"], 1);
+    assert_eq!(journal["not_settled_binding_refused"], 1);
+    assert_eq!(journal["not_settled_not_verified"], 1);
 }
 
 /// Whether serialized JSON `text` holds `path`, written as it is and as JSON
@@ -348,6 +377,7 @@ async fn the_tool_reports_without_a_path_and_takes_no_arguments() {
     assert_eq!(result["journal"]["state"], "read");
     assert_eq!(result["journal"]["not_settled"], 1);
     assert_eq!(result["journal"]["not_settled_no_response"], 1);
+    assert_eq!(result["journal"]["not_settled_binding_refused"], 0);
     assert_eq!(result["journal"]["not_settled_not_verified"], 0);
     assert_eq!(result["journal"]["no_dispatch_never_verified"], 0);
     assert_eq!(result["app_files_outside_this_folder_covered"], false);

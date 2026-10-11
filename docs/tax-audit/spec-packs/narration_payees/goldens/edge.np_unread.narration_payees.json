@@ -131,7 +131,7 @@
     },
     {
       "id": "narration_payees.unresolved_bank_total",
-      "value": 97105,
+      "value": 123554,
       "unit": "paise",
       "definition_sha256_16": "bb150e6493cc3554",
       "definition_text": "Bank payments on the ledgers read whose narration names no payee that can be read (a placeholder in place of the payee included).",
@@ -348,18 +348,8 @@
         },
         {
           "kind": "voucher",
-          "id": "u62",
-          "label": "Payment u62 on 2025-05-16"
-        },
-        {
-          "kind": "voucher",
           "id": "u63",
           "label": "Payment u63 on 2025-05-17"
-        },
-        {
-          "kind": "voucher",
-          "id": "u64",
-          "label": "Payment u64 on 2025-05-18"
         },
         {
           "kind": "voucher",
@@ -430,6 +420,51 @@
           "kind": "voucher",
           "id": "u83",
           "label": "Payment u83 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "u84",
+          "label": "Payment u84 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "u85",
+          "label": "Payment u85 on 2025-06-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "u86",
+          "label": "Payment u86 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "u87",
+          "label": "Payment u87 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "u88",
+          "label": "Payment u88 on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "u89",
+          "label": "Payment u89 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "u90",
+          "label": "Payment u90 on 2025-06-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "u91",
+          "label": "Payment u91 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "u92",
+          "label": "Payment u92 on 2025-06-13"
         }
       ]
     }
@@ -664,18 +699,8 @@
         },
         {
           "kind": "voucher",
-          "id": "u62",
-          "label": "Payment u62 on 2025-05-16"
-        },
-        {
-          "kind": "voucher",
           "id": "u63",
           "label": "Payment u63 on 2025-05-17"
-        },
-        {
-          "kind": "voucher",
-          "id": "u64",
-          "label": "Payment u64 on 2025-05-18"
         },
         {
           "kind": "voucher",
@@ -746,6 +771,51 @@
           "kind": "voucher",
           "id": "u83",
           "label": "Payment u83 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "u84",
+          "label": "Payment u84 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "u85",
+          "label": "Payment u85 on 2025-06-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "u86",
+          "label": "Payment u86 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "u87",
+          "label": "Payment u87 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "u88",
+          "label": "Payment u88 on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "u89",
+          "label": "Payment u89 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "u90",
+          "label": "Payment u90 on 2025-06-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "u91",
+          "label": "Payment u91 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "u92",
+          "label": "Payment u92 on 2025-06-13"
         }
       ],
       "title_sha256_16": "470a0a725268fb8c",

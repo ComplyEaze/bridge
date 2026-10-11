@@ -4,9 +4,14 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { deflateRawSync, gzipSync } from "node:zlib";
 import {
+  PDFIUM_OVERRIDE_MARKER,
+  POSITIVE_CONTROLS,
   SEAM_MARKER,
+  STANDIN_MARKER,
+  TEST_ONLY_MARKERS,
   assertNoTestSeam,
   holdsMarker,
   markedFiles,
@@ -17,10 +22,12 @@ function scratch() {
   return mkdtempSync(join(tmpdir(), "bridge-seam-scan-"));
 }
 
+/** A fake executable holding every marker (`true`), none (`false`) or the ones listed. */
 function binary(path, withMarker) {
+  const markers = withMarker === true ? TEST_ONLY_MARKERS : withMarker || [];
   const bytes = Buffer.concat([
     Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00, 0xff]),
-    Buffer.from(withMarker ? `..${SEAM_MARKER}..` : "..no seam here..", "utf8"),
+    Buffer.from(markers.length > 0 ? markers.map((marker) => `..${marker}..`).join("") : "..no seam here..", "utf8"),
     Buffer.from([0x00, 0x01]),
   ]);
   writeFileSync(path, bytes);
@@ -35,11 +42,45 @@ test("the marker is the one the Rust seam carries", () => {
   assert.ok(source.includes(`const SEAM_MARKER: &str = "${SEAM_MARKER}";`));
 });
 
+test("the PDFium marker is the variable the Rust override reads, under bare cfg(test)", () => {
+  const source = readFileSync(new URL("../src-tauri/src/agent_bank_statement.rs", import.meta.url), "utf8");
+  const lookup = `env::var_os("${PDFIUM_OVERRIDE_MARKER}")`;
+  assert.equal(source.split(lookup).length - 1, 1, "one lookup of the override");
+  assert.ok(source.includes(`    #[cfg(test)]\n    if let Some(path) = ${lookup} {`));
+});
+
+test("the stand-in marker is the one the approval stand-in example uses at run time", () => {
+  const source = readFileSync(new URL("../src-tauri/examples/approval_standin.rs", import.meta.url), "utf8");
+  assert.ok(source.includes(`const STANDIN_MARKER: &str = "${STANDIN_MARKER}";`));
+  assert.ok(source.includes("    std::hint::black_box(STANDIN_MARKER);\n"));
+});
+
+// Named, not read from TEST_ONLY_MARKERS, so a marker dropped from that list fails here.
+const EXPECTED_MARKERS = [SEAM_MARKER, PDFIUM_OVERRIDE_MARKER, STANDIN_MARKER];
+
+test("each marker has one positive control, on the test build that holds it", () => {
+  assert.deepEqual(POSITIVE_CONTROLS, {
+    harness: [SEAM_MARKER, PDFIUM_OVERRIDE_MARKER],
+    standin: [STANDIN_MARKER],
+  });
+  assert.deepEqual(Object.values(POSITIVE_CONTROLS).flat().sort(), [...EXPECTED_MARKERS].sort());
+});
+
+test("each marker alone marks a binary, and the refusal names it", () => {
+  assert.deepEqual(TEST_ONLY_MARKERS, EXPECTED_MARKERS);
+  const directory = scratch();
+  for (const marker of EXPECTED_MARKERS) {
+    const file = binary(join(directory, marker), [marker]);
+    assert.equal(holdsMarker(file), true, marker);
+    assert.throws(() => assertNoTestSeam([file]), (error) => error.message.includes(`(${marker})`), marker);
+  }
+});
+
 test("a binary holding the marker is found, and one without it is not", () => {
   const directory = scratch();
   assert.equal(holdsMarker(binary(join(directory, "marked"), true)), true);
   assert.equal(holdsMarker(binary(join(directory, "clean"), false)), false);
-  assert.throws(() => assertNoTestSeam([join(directory, "marked")]), /approval seam compiled into/);
+  assert.throws(() => assertNoTestSeam([join(directory, "marked")]), /test-only code compiled into/);
   assert.doesNotThrow(() => assertNoTestSeam([join(directory, "clean")]));
 });
 
@@ -171,14 +212,44 @@ test("a bundle hook that finds no executable fails rather than passing", () => {
 
 test("the command line fails on a marked binary and on a control that sees nothing", () => {
   const directory = scratch();
-  const script = new URL("./check-no-test-seam.mjs", import.meta.url);
+  const script = fileURLToPath(new URL("./check-no-test-seam.mjs", import.meta.url));
   const run = (...argumentsList) =>
-    spawnSync(process.execPath, [script.pathname, ...argumentsList], { encoding: "utf8" }).status;
+    spawnSync(process.execPath, [script, ...argumentsList], { encoding: "utf8" }).status;
   const marked = binary(join(directory, "marked"), true);
   const clean = binary(join(directory, "clean"), false);
   assert.equal(run(clean), 0);
   assert.equal(run(marked), 1);
   assert.equal(run(clean, marked), 1);
-  assert.equal(run("--expect-present", marked), 0);
-  assert.equal(run("--expect-present", clean), 1);
+  assert.equal(run("--expect-present", marked, ...EXPECTED_MARKERS), 0);
+  assert.equal(run("--expect-present", clean, ...EXPECTED_MARKERS), 1);
+  // A control must name what it expects, from the test-only markers.
+  assert.equal(run("--expect-present", marked), 1);
+  assert.equal(run("--expect-present", marked, "not-a-test-only-marker"), 1);
+  // A control that sees only some of the test-only code proves nothing about the rest.
+  for (const marker of EXPECTED_MARKERS) {
+    assert.equal(run("--expect-present", binary(join(directory, `only-${marker}`), [marker]), ...EXPECTED_MARKERS), 1, marker);
+  }
+});
+
+test("each positive control passes on its own test build and fails on the other's (#702)", () => {
+  const directory = scratch();
+  const script = fileURLToPath(new URL("./check-no-test-seam.mjs", import.meta.url));
+  const run = (...argumentsList) => spawnSync(process.execPath, [script, ...argumentsList], { encoding: "utf8" });
+  // What the run said is missing, so a control that fails for another reason does not pass a row.
+  const missing = (result) => [result.status, result.stderr.match(/does not hold (.*): the scan/)?.[1]];
+  for (const [control, expected] of Object.entries(POSITIVE_CONTROLS)) {
+    // The build the control is run on holds its own markers and none of the others'.
+    assert.equal(run("--expect-present", binary(join(directory, `${control}-own`), expected), ...expected).status, 0, control);
+    for (const [other, markers] of Object.entries(POSITIVE_CONTROLS)) {
+      if (other === control) continue;
+      const result = run("--expect-present", binary(join(directory, `${control}-on-${other}`), markers), ...expected);
+      assert.deepEqual(missing(result), [1, expected.join(", ")], `${control} on ${other}`);
+    }
+    // Missing any one of its markers fails it, while the file still holds another marker.
+    for (const marker of expected) {
+      const held = TEST_ONLY_MARKERS.filter((kept) => kept !== marker);
+      const result = run("--expect-present", binary(join(directory, `${control}-without-${marker}`), held), ...expected);
+      assert.deepEqual(missing(result), [1, marker], `${control} without ${marker}`);
+    }
+  }
 });

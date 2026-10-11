@@ -789,64 +789,99 @@ pub(crate) mod test_seam {
         );
     }
 
-    /// A script standing in for a dialog subprocess. Its first act is to
-    /// create `<script>.ran`, which [`stub_ran`] checks, so a row can tell a
-    /// refusal the script produced from a spawn that failed.
+    /// The dialog child's stand-in, `examples/approval_standin.rs` (#702),
+    /// built beside this test executable: `cargo test` and `cargo nextest
+    /// run` build examples, `cargo test --lib` does not. Missing, it fails the
+    /// test; it never skips it.
+    fn standin_example() -> std::path::PathBuf {
+        let test = std::env::current_exe().unwrap();
+        let profile = test.parent().and_then(std::path::Path::parent).unwrap();
+        let example = profile
+            .join("examples")
+            .join(format!("approval_standin{}", std::env::consts::EXE_SUFFIX));
+        assert!(
+            example.is_file(),
+            "{} is missing: build the approval_standin example (cargo test without --lib)",
+            example.display()
+        );
+        example
+    }
+
+    /// A directory for stand-ins, beside the example on the same volume, so
+    /// [`standin`] can link to it.
+    fn standin_directory() -> tempfile::TempDir {
+        tempfile::Builder::new()
+            .prefix("approval-standin-")
+            .tempdir_in(standin_example().parent().unwrap())
+            .unwrap()
+    }
+
+    /// A stand-in for a dialog subprocess that writes `answer`, with
+    /// `{NONCE}` replaced by the nonce it was sent, and exits with `exit_code`.
+    /// Its first act is to create an empty `<stand-in>.ran`, and its last,
+    /// just before it exits, is to save there the input it read. Each row
+    /// checks that input with [`assert_ran_to_its_end`], so a refusal the
+    /// stand-in produced is told apart from a spawn that failed, and from a
+    /// stand-in that died after starting, whose non-zero exit would otherwise
+    /// read as a person's decline.
     ///
-    /// Each call writes a file of its own, from a child process. The test
-    /// process never holds a writable descriptor to an executable. If it did,
-    /// another test thread's fork would inherit that descriptor until its
-    /// exec, and exec'ing the script in that window fails on Linux with "text
-    /// file busy" (ETXTBSY). That failure surfaces as `…_unavailable`, the
-    /// very code some rows expect (#704 review).
-    #[cfg(unix)]
-    fn stub(directory: &std::path::Path, body: &str) -> std::path::PathBuf {
-        use std::io::Write as _;
+    /// Each call is a hard link to the built example, never a copy. A link
+    /// opens no descriptor, so the test process never holds a writable one to
+    /// an executable. If it did, another test thread's fork would inherit that
+    /// descriptor until its exec, and exec'ing the stand-in in that window
+    /// fails on Linux with "text file busy" (ETXTBSY). That failure surfaces
+    /// as `…_unavailable`, the very code some rows expect (#704 review).
+    fn standin(directory: &std::path::Path, exit_code: i32, answer: &str) -> std::path::PathBuf {
         use std::sync::atomic::{AtomicUsize, Ordering};
         static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let path = directory.join(format!("stub-{}", NEXT.fetch_add(1, Ordering::Relaxed)));
-        #[expect(
-            clippy::disallowed_methods,
-            reason = "test only: writes a stub executable through sh"
-        )]
-        let mut writer = std::process::Command::new("sh")
-            .arg("-c")
-            .arg("cat > \"$1\" && chmod 755 \"$1\"")
-            .arg("sh")
-            .arg(&path)
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-            .unwrap();
-        writer
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(format!("#!/bin/sh\n: > \"$0.ran\"\n{body}\n").as_bytes())
-            .unwrap();
-        assert!(writer.wait().unwrap().success(), "the stub was written");
+        let path = directory.join(format!(
+            "row-{}{}",
+            NEXT.fetch_add(1, Ordering::Relaxed),
+            std::env::consts::EXE_SUFFIX
+        ));
+        std::fs::hard_link(standin_example(), &path).unwrap();
+        std::fs::write(beside(&path, ".answer"), format!("{exit_code}\n{answer}")).unwrap();
         path
     }
 
-    /// Whether the script at `stub` started: see [`stub`].
-    #[cfg(unix)]
-    fn stub_ran(stub: &std::path::Path) -> bool {
-        std::path::PathBuf::from(format!("{}.ran", stub.display())).exists()
+    fn beside(path: &std::path::Path, extension: &str) -> std::path::PathBuf {
+        let mut path = path.as_os_str().to_owned();
+        path.push(extension);
+        path.into()
     }
 
-    /// The control for [`stub_ran`]. A stand-in that cannot start is refused
-    /// as unavailable too, and leaves no marker. So each row's marker check is
-    /// what tells a refusal the script produced from a spawn that failed.
-    #[cfg(unix)]
+    /// What the stand-in at `standin` was last sent, or `None` if it never
+    /// started: see [`standin`].
+    fn standin_input(standin: &std::path::Path) -> Option<String> {
+        std::fs::read_to_string(beside(standin, ".ran")).ok()
+    }
+
+    /// The stand-in at `standin` ran to its end: it saved the input it was
+    /// sent, and the dialog child's own parser reads it as the parent's shape
+    /// for one voucher and `preview`.
+    fn assert_ran_to_its_end(standin: &std::path::Path, preview: &str, name: &str) {
+        let input = standin_input(standin).unwrap_or_default();
+        let (_, shown, text) = super::dialog_input(&input)
+            .unwrap_or_else(|| panic!("{name}: the stand-in did not run to its end"));
+        assert_eq!((shown, text), (ONE, preview), "{name}");
+    }
+
+    /// The control for [`standin_input`]. A stand-in that cannot start is
+    /// refused as unavailable too, and leaves no input behind. So each row's
+    /// input check is what tells a refusal the stand-in produced from a spawn
+    /// that failed.
     #[tokio::test]
     async fn a_stand_in_that_cannot_start_is_unavailable_and_leaves_no_marker() {
-        let directory = tempfile::tempdir().unwrap();
-        let script = directory.path().join("not-executable");
-        std::fs::write(&script, "#!/bin/sh\n: > \"$0.ran\"\nexit 0\n").unwrap();
+        let directory = standin_directory();
+        let path = directory
+            .path()
+            .join(format!("not-executable{}", std::env::consts::EXE_SUFFIX));
+        std::fs::write(&path, "not an executable image\n").unwrap();
         assert_eq!(
-            super::confirm_with(&script, ONE, "Post").await,
+            super::confirm_with(&path, ONE, "Post").await,
             Err("import_approval_unavailable".to_string())
         );
-        assert!(!stub_ran(&script));
+        assert_eq!(standin_input(&path), None);
     }
 
     /// Only the token echoing this call's nonce is an answer, and it is
@@ -854,58 +889,83 @@ pub(crate) mod test_seam {
     /// exit 1. A clean exit without the token is never that (#689): it is an
     /// executable that is not this dialog, so it is refused as unavailable:
     /// an older build that ignores `--confirm-review`, a process that echoes
-    /// its input, a token for another nonce, or the post dialog's token.
-    #[cfg(unix)]
+    /// its input, a token for another nonce, the post dialog's token, or the
+    /// token with stray output, with CRLF or without its newline.
     #[tokio::test]
     async fn the_review_is_answered_only_by_the_token_for_its_nonce() {
-        let directory = tempfile::tempdir().unwrap();
+        let directory = standin_directory();
         let answers = [
             (
                 "a person's decline: no token, exit 1",
-                "cat > /dev/null; exit 1",
+                1,
+                "",
                 Err("ack_review_declined"),
             ),
             (
                 "an older build exits 0",
-                "cat > /dev/null; exit 0",
+                0,
+                "",
                 Err("ack_review_unavailable"),
             ),
-            ("an echo of the input", "cat", Err("ack_review_unavailable")),
+            (
+                "an echo of the input",
+                0,
+                "{NONCE}\n1\nReview",
+                Err("ack_review_unavailable"),
+            ),
             (
                 "a token for another nonce",
-                "cat > /dev/null; echo bridge-review-acknowledged:00000000-0000-4000-8000-000000000000",
+                0,
+                "bridge-review-acknowledged:00000000-0000-4000-8000-000000000000\n",
                 Err("ack_review_unavailable"),
             ),
             (
                 "the post dialog's token for this nonce",
-                "read nonce; printf 'bridge-post-approved:%s\\n' \"$nonce\"; cat > /dev/null",
+                0,
+                "bridge-post-approved:{NONCE}\n",
+                Err("ack_review_unavailable"),
+            ),
+            (
+                "a log line, then the token",
+                0,
+                "starting\nbridge-review-acknowledged:{NONCE}\n",
+                Err("ack_review_unavailable"),
+            ),
+            (
+                "the token with CRLF",
+                0,
+                "bridge-review-acknowledged:{NONCE}\r\n",
+                Err("ack_review_unavailable"),
+            ),
+            (
+                "the token without its newline",
+                0,
+                "bridge-review-acknowledged:{NONCE}",
                 Err("ack_review_unavailable"),
             ),
             (
                 "the token, but a failing exit",
-                "read nonce; printf 'bridge-review-acknowledged:%s\\n' \"$nonce\"; cat > /dev/null; exit 1",
+                1,
+                "bridge-review-acknowledged:{NONCE}\n",
                 Ok(()),
             ),
         ];
-        for (name, body, expected) in answers {
+        for (name, exit_code, answer, expected) in answers {
             // The stand-in must have run: a spawn failure is also
             // `ack_review_unavailable`, and would pass a row without reaching
             // the clean-exit-without-token arm it is here to pin.
-            let script = stub(directory.path(), body);
-            let result = super::confirm_review_with(&script, ONE, "Review").await;
+            let path = standin(directory.path(), exit_code, answer);
+            let result = super::confirm_review_with(&path, ONE, "Review").await;
             assert_eq!(result, expected.map_err(str::to_string), "{name}");
-            assert!(stub_ran(&script), "{name}: the stand-in ran");
+            assert_ran_to_its_end(&path, "Review", name);
         }
         // The control: the token for this call's nonce is accepted.
-        let echoes_token = stub(
-            directory.path(),
-            "read nonce; printf 'bridge-review-acknowledged:%s\\n' \"$nonce\"; cat > /dev/null",
-        );
+        let echoes_token = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
         assert_eq!(
             super::confirm_review_with(&echoes_token, ONE, "Review").await,
             Ok(())
         );
-        assert!(stub_ran(&echoes_token));
+        assert_ran_to_its_end(&echoes_token, "Review", "the control");
     }
 
     /// The post dialog is answered only by the token echoing this call's
@@ -915,96 +975,83 @@ pub(crate) mod test_seam {
     /// executable that ignores `--confirm-journal`, one that echoes its input,
     /// a token for another nonce, the review dialog's token, or stray output.
     /// A failing exit is a decline, even after the right token.
-    #[cfg(unix)]
     #[tokio::test]
     async fn a_post_is_approved_only_by_the_token_for_its_nonce() {
-        let directory = tempfile::tempdir().unwrap();
-        for (name, body) in [
-            (
-                "a person's decline: no token, exit 1",
-                "cat > /dev/null; exit 1",
-            ),
+        let directory = standin_directory();
+        for (name, exit_code, answer) in [
+            ("a person's decline: no token, exit 1", 1, ""),
             (
                 "the token, but a failing exit",
-                "read nonce; printf 'bridge-post-approved:%s\\n' \"$nonce\"; cat > /dev/null; exit 1",
+                1,
+                "bridge-post-approved:{NONCE}\n",
             ),
         ] {
-            let script = stub(directory.path(), body);
+            let path = standin(directory.path(), exit_code, answer);
             assert_eq!(
-                super::confirm_with(&script, ONE, "Post").await,
+                super::confirm_with(&path, ONE, "Post").await,
                 Err("import_approval_declined".to_string()),
                 "{name}"
             );
-            assert!(stub_ran(&script), "{name}: the stand-in ran");
+            assert_ran_to_its_end(&path, "Post", name);
         }
-        for (name, body) in [
-            ("an executable ignoring the flag exits 0", "cat > /dev/null; exit 0"),
-            ("an echo of the input", "cat"),
+        for (name, answer) in [
+            ("an executable ignoring the flag exits 0", ""),
+            ("an echo of the input", "{NONCE}\n1\nPost"),
             (
                 "a token for another nonce",
-                "cat > /dev/null; echo bridge-post-approved:00000000-0000-4000-8000-000000000000",
+                "bridge-post-approved:00000000-0000-4000-8000-000000000000\n",
             ),
             (
                 "the review dialog's token for this nonce",
-                "read nonce; printf 'bridge-review-acknowledged:%s\\n' \"$nonce\"; cat > /dev/null",
+                "bridge-review-acknowledged:{NONCE}\n",
             ),
             // The answer is matched byte for byte, so any stray output, such
             // as a log line, is refused. That is fail-closed on purpose: do
             // not trim or search the output to "fix" it.
             (
                 "a log line, then the token",
-                "read nonce; echo starting; printf 'bridge-post-approved:%s\\n' \"$nonce\"; cat > /dev/null",
+                "starting\nbridge-post-approved:{NONCE}\n",
             ),
             (
                 "the token, then more output",
-                "read nonce; printf 'bridge-post-approved:%s\\nmore\\n' \"$nonce\"; cat > /dev/null",
+                "bridge-post-approved:{NONCE}\nmore\n",
             ),
+            // What a Windows `echo` writes (#702).
+            ("the token with CRLF", "bridge-post-approved:{NONCE}\r\n"),
             (
                 "the token without its newline",
-                "read nonce; printf 'bridge-post-approved:%s' \"$nonce\"; cat > /dev/null",
+                "bridge-post-approved:{NONCE}",
             ),
         ] {
             // The stand-in must have run: a spawn failure is also
             // `import_approval_unavailable`, and would pass this row without
             // reaching the clean-exit-without-token arm it is here to pin.
-            let script = stub(directory.path(), body);
+            let path = standin(directory.path(), 0, answer);
             assert_eq!(
-                super::confirm_with(&script, ONE, "Post").await,
+                super::confirm_with(&path, ONE, "Post").await,
                 Err("import_approval_unavailable".to_string()),
                 "{name}"
             );
-            assert!(stub_ran(&script), "{name}: the stand-in ran");
+            assert_ran_to_its_end(&path, "Post", name);
         }
         // The control: the token for this call's nonce, then a clean exit.
-        let approves = stub(
-            directory.path(),
-            "read nonce; printf 'bridge-post-approved:%s\\n' \"$nonce\"; cat > /dev/null",
-        );
+        let approves = standin(directory.path(), 0, "bridge-post-approved:{NONCE}\n");
         assert_eq!(super::confirm_with(&approves, ONE, "Post").await, Ok(()));
-        assert!(stub_ran(&approves));
+        assert_ran_to_its_end(&approves, "Post", "the control");
     }
 
-    /// Each call sends a nonce of its own: a stub that answers every call
+    /// Each call sends a nonce of its own: a stand-in that answers every call
     /// with the token for the nonce it read sees a different one each time.
-    #[cfg(unix)]
     #[tokio::test]
     async fn each_post_dialog_gets_a_fresh_nonce() {
-        let directory = tempfile::tempdir().unwrap();
-        let seen = directory.path().join("nonces");
-        let approves = stub(
-            directory.path(),
-            &format!(
-                "read nonce; echo \"$nonce\" >> '{}'; printf 'bridge-post-approved:%s\\n' \"$nonce\"; cat > /dev/null",
-                seen.display()
-            ),
-        );
+        let directory = standin_directory();
+        let approves = standin(directory.path(), 0, "bridge-post-approved:{NONCE}\n");
+        let mut nonces = Vec::new();
         for _ in 0..2 {
             assert_eq!(super::confirm_with(&approves, ONE, "Post").await, Ok(()));
+            let input = standin_input(&approves).expect("the stand-in ran");
+            nonces.push(input.lines().next().unwrap().to_string());
         }
-        assert!(stub_ran(&approves));
-        let nonces = std::fs::read_to_string(&seen).unwrap();
-        let nonces = nonces.lines().collect::<Vec<_>>();
-        assert_eq!(nonces.len(), 2);
         assert!(nonces
             .iter()
             .all(|nonce| uuid::Uuid::parse_str(nonce).is_ok()));
@@ -1015,31 +1062,21 @@ pub(crate) mod test_seam {
     /// name, on the line after the nonce, and then the preview (#746). The
     /// stand-in saves the bytes the parent sent, and the child's own parser
     /// reads them, so the writer and the parser are tested together.
-    #[cfg(unix)]
     #[tokio::test]
     async fn each_dialog_child_is_told_the_voucher_count() {
-        let directory = tempfile::tempdir().unwrap();
+        let directory = standin_directory();
         for (prefix, review, sent, preview) in [
             ("bridge-post-approved:", false, 200, "Post"),
             ("bridge-review-acknowledged:", true, 7, "Review"),
         ] {
-            let input = directory.path().join(format!("input-{sent}"));
-            let answers = stub(
-                directory.path(),
-                &format!(
-                    "cat > '{}'; nonce=$(head -n 1 '{}'); printf '{prefix}%s\\n' \"$nonce\"",
-                    input.display(),
-                    input.display()
-                ),
-            );
+            let answers = standin(directory.path(), 0, &format!("{prefix}{{NONCE}}\n"));
             let result = if review {
                 super::confirm_review_with(&answers, count(sent), preview).await
             } else {
                 super::confirm_with(&answers, count(sent), preview).await
             };
             assert_eq!(result, Ok(()), "{prefix}");
-            assert!(stub_ran(&answers), "{prefix}");
-            let input = std::fs::read_to_string(&input).unwrap();
+            let input = standin_input(&answers).expect("the stand-in ran");
             let (_, shown, text) = super::dialog_input(&input).expect("the parent's shape");
             assert_eq!((shown, text), (count(sent), preview), "{prefix}");
         }

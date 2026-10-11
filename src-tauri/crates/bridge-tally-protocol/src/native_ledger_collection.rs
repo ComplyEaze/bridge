@@ -6,6 +6,9 @@ use std::collections::{HashMap, HashSet};
 use quick_xml::{events::Event, name::QName, Reader};
 use serde::{Deserialize, Serialize};
 
+use crate::gst_details::{
+    GstDetailsObservation, RawGstDetailsEntry, RawGstRateDetails, RawGstStateDetails,
+};
 use crate::gst_registration::{GstRegistrationHistory, RawGstRegistrationEntry};
 use crate::{
     attr_value, configured_reader, native_ledger_guid_has_company_prefix,
@@ -46,6 +49,11 @@ pub struct PartyLedgerMasterFields {
     /// when the response carries no such element.
     #[serde(default)]
     pub gst_registrations: GstRegistrationHistory,
+    /// The dated GST rate and taxability details (`GSTDETAILS.LIST`), when the
+    /// request's FETCH names it. Not observed when the response carries no
+    /// such element. Nothing consumes it yet.
+    #[serde(default)]
+    pub gst_details: GstDetailsObservation,
 }
 
 /// The GST duty-head classification observed on one ledger master.
@@ -594,6 +602,8 @@ fn parse_native_ledger_collection_row_with_master_fields(
     // `None` until the response carries the element: absent is "not read",
     // never an empty history.
     let mut gst_registrations: Option<Vec<RawGstRegistrationEntry>> = None;
+    // Likewise `None` until a `GSTDETAILS.LIST` element appears.
+    let mut gst_details: Option<Vec<RawGstDetailsEntry>> = None;
     loop {
         match reader.read_event()? {
             Event::Start(child) => match child
@@ -804,6 +814,10 @@ fn parse_native_ledger_collection_row_with_master_fields(
                     let entry = read_gst_registration_entry(reader, &child)?;
                     gst_registrations.get_or_insert_with(Vec::new).push(entry);
                 }
+                b"GSTDETAILS.LIST" if retain_master_fields => {
+                    let entry = read_gst_details_entry(reader, &child)?;
+                    gst_details.get_or_insert_with(Vec::new).push(entry);
+                }
                 _ => {
                     let child_name = child.name().as_ref().to_owned();
                     reader.read_to_end(QName(&child_name).to_owned())?;
@@ -816,6 +830,13 @@ fn parse_native_ledger_collection_row_with_master_fields(
                 .to_ascii_uppercase()
                 .as_slice()
             {
+                b"GSTDETAILS.LIST" => {
+                    if retain_master_fields {
+                        gst_details
+                            .get_or_insert_with(Vec::new)
+                            .push(RawGstDetailsEntry::default());
+                    }
+                }
                 b"LEDGSTREGDETAILS.LIST" => {
                     if retain_master_fields {
                         gst_registrations
@@ -974,6 +995,9 @@ fn parse_native_ledger_collection_row_with_master_fields(
     if let Some(raw) = gst_registrations {
         master_fields.gst_registrations = GstRegistrationHistory::from_raw(raw);
     }
+    if let Some(raw) = gst_details {
+        master_fields.gst_details = GstDetailsObservation::from_raw(raw);
+    }
     Ok(ParsedNativeLedgerCollectionRow {
         ledger,
         fields: master_fields,
@@ -1034,6 +1058,244 @@ fn read_gst_registration_entry(
         }
     }
     Ok(entry)
+}
+
+/// One element's text exactly as sent: not trimmed, entity and numeric
+/// references resolved (a forbidden one arrives as the sanitiser's marker text).
+/// Nested markup inside the scalar fails the whole read, not one ledger, as
+/// for every master scalar; only the typed defects of `GstDetailsDefect` are
+/// per ledger.
+fn read_verbatim_text(reader: &mut Reader<&[u8]>, name: QName<'_>) -> anyhow::Result<String> {
+    let expected = name.as_ref().as_bytes().to_ascii_uppercase();
+    with_untrimmed_text(reader, |reader| {
+        let mut current = String::new();
+        loop {
+            match reader.read_event()? {
+                Event::Start(child) | Event::Empty(child) => {
+                    let child = child.name().as_ref().to_ascii_uppercase();
+                    anyhow::bail!("GST details scalar contained nested markup <{child}>");
+                }
+                Event::Text(text) => current.push_str(&quick_xml::escape::unescape(&text)?),
+                Event::GeneralRef(reference) => {
+                    current.push_str(&resolve_party_ledger_master_reference(reference)?);
+                }
+                Event::CData(text) => current.push_str(&text),
+                Event::End(end) => {
+                    if end.name().as_ref().as_bytes().to_ascii_uppercase() != expected {
+                        anyhow::bail!("GST details field closed unexpectedly");
+                    }
+                    return Ok(current);
+                }
+                Event::Eof => return Err(crate::RowCutOff.into()),
+                _ => {}
+            }
+        }
+    })
+}
+
+/// Stores a field's text once; a second sighting marks `repeated`.
+fn set_once(slot: &mut Option<String>, value: String, repeated: &mut bool) {
+    if slot.replace(value).is_some() {
+        *repeated = true;
+    }
+}
+
+/// One `GSTDETAILS.LIST` element. Children this slice does not model are
+/// consumed and not kept; each level records that it skipped one.
+fn read_gst_details_entry(
+    reader: &mut Reader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> anyhow::Result<RawGstDetailsEntry> {
+    let list_name = element.name().as_ref().as_bytes().to_vec();
+    let mut entry = RawGstDetailsEntry::default();
+    loop {
+        match reader.read_event()? {
+            Event::Start(child) => {
+                let upper = child.name().as_ref().as_bytes().to_ascii_uppercase();
+                match upper.as_slice() {
+                    b"APPLICABLEFROM" | b"TAXABILITY" | b"SRCOFGSTDETAILS"
+                    | b"GSTINELIGIBLEITC" => {
+                        let value = read_verbatim_text(reader, child.name())?;
+                        let slot = match upper.as_slice() {
+                            b"APPLICABLEFROM" => &mut entry.applicable_from,
+                            b"TAXABILITY" => &mut entry.taxability,
+                            b"SRCOFGSTDETAILS" => &mut entry.source,
+                            _ => &mut entry.itc_eligible,
+                        };
+                        set_once(slot, value, &mut entry.repeated_field);
+                    }
+                    b"STATEWISEDETAILS.LIST" => {
+                        let state = read_gst_state_details(reader, &child)?;
+                        entry.states.push(state);
+                    }
+                    _ => {
+                        entry.skipped = true;
+                        let child_name = child.name().as_ref().to_owned();
+                        reader.read_to_end(QName(&child_name).to_owned())?;
+                    }
+                }
+            }
+            Event::Empty(child) => {
+                let upper = child.name().as_ref().as_bytes().to_ascii_uppercase();
+                let slot = match upper.as_slice() {
+                    b"APPLICABLEFROM" => Some(&mut entry.applicable_from),
+                    b"TAXABILITY" => Some(&mut entry.taxability),
+                    b"SRCOFGSTDETAILS" => Some(&mut entry.source),
+                    b"GSTINELIGIBLEITC" => Some(&mut entry.itc_eligible),
+                    _ => None,
+                };
+                if let Some(slot) = slot {
+                    set_once(slot, String::new(), &mut entry.repeated_field);
+                } else if upper.as_slice() == b"STATEWISEDETAILS.LIST" {
+                    entry.states.push(RawGstStateDetails::default());
+                } else {
+                    entry.skipped = true;
+                }
+            }
+            Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
+            Event::Eof => return Err(crate::RowCutOff.into()),
+            // Text, a reference or CDATA directly in the list is content the parser does not read:
+            // it is flagged, so a list holding only that is not taken for an empty placeholder.
+            Event::Text(text) if !text.trim().is_empty() => entry.skipped = true,
+            Event::GeneralRef(_) | Event::CData(_) => entry.skipped = true,
+            _ => {}
+        }
+    }
+    Ok(entry)
+}
+
+fn read_gst_state_details(
+    reader: &mut Reader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> anyhow::Result<RawGstStateDetails> {
+    let list_name = element.name().as_ref().as_bytes().to_vec();
+    let mut state = RawGstStateDetails::default();
+    loop {
+        match reader.read_event()? {
+            Event::Start(child) => {
+                let upper = child.name().as_ref().as_bytes().to_ascii_uppercase();
+                match upper.as_slice() {
+                    b"STATENAME" => {
+                        let value = read_verbatim_text(reader, child.name())?;
+                        set_once(&mut state.state_name, value, &mut state.repeated_field);
+                    }
+                    b"RATEDETAILS.LIST" => {
+                        let rate = read_gst_rate_details(reader, &child)?;
+                        state.rates.push(rate);
+                    }
+                    b"GSTSLABRATES.LIST" => {
+                        // Present when it holds any element or non-blank text.
+                        if with_untrimmed_text(reader, |reader| {
+                            let mut depth = 0_usize;
+                            let mut held = false;
+                            loop {
+                                match reader.read_event()? {
+                                    Event::Start(_) => {
+                                        held = true;
+                                        depth += 1;
+                                    }
+                                    Event::Empty(_) => held = true,
+                                    Event::Text(text) => {
+                                        held |=
+                                            !quick_xml::escape::unescape(&text)?.trim().is_empty();
+                                    }
+                                    Event::GeneralRef(_) | Event::CData(_) => held = true,
+                                    Event::End(_) if depth > 0 => depth -= 1,
+                                    Event::End(_) => return Ok(held),
+                                    Event::Eof => return Err(crate::RowCutOff.into()),
+                                    _ => {}
+                                }
+                            }
+                        })? {
+                            state.slab_rates_present = true;
+                        }
+                    }
+                    _ => {
+                        state.skipped = true;
+                        let child_name = child.name().as_ref().to_owned();
+                        reader.read_to_end(QName(&child_name).to_owned())?;
+                    }
+                }
+            }
+            Event::Empty(child) => {
+                let upper = child.name().as_ref().as_bytes().to_ascii_uppercase();
+                match upper.as_slice() {
+                    b"STATENAME" => {
+                        set_once(
+                            &mut state.state_name,
+                            String::new(),
+                            &mut state.repeated_field,
+                        );
+                    }
+                    b"RATEDETAILS.LIST" => state.rates.push(RawGstRateDetails::default()),
+                    // An empty slab list holds nothing.
+                    b"GSTSLABRATES.LIST" => {}
+                    _ => state.skipped = true,
+                }
+            }
+            Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
+            Event::Eof => return Err(crate::RowCutOff.into()),
+            // Text, a reference or CDATA directly in the list is content the parser does not read:
+            // it is flagged, so a list holding only that is not taken for an empty placeholder.
+            Event::Text(text) if !text.trim().is_empty() => state.skipped = true,
+            Event::GeneralRef(_) | Event::CData(_) => state.skipped = true,
+            _ => {}
+        }
+    }
+    Ok(state)
+}
+
+fn read_gst_rate_details(
+    reader: &mut Reader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> anyhow::Result<RawGstRateDetails> {
+    let list_name = element.name().as_ref().as_bytes().to_vec();
+    let mut rate = RawGstRateDetails::default();
+    loop {
+        match reader.read_event()? {
+            Event::Start(child) => {
+                let upper = child.name().as_ref().as_bytes().to_ascii_uppercase();
+                match upper.as_slice() {
+                    b"GSTRATEDUTYHEAD" | b"GSTRATEVALUATIONTYPE" | b"GSTRATE" => {
+                        let value = read_verbatim_text(reader, child.name())?;
+                        let slot = match upper.as_slice() {
+                            b"GSTRATEDUTYHEAD" => &mut rate.duty_head,
+                            b"GSTRATEVALUATIONTYPE" => &mut rate.valuation_type,
+                            _ => &mut rate.rate,
+                        };
+                        set_once(slot, value, &mut rate.repeated_field);
+                    }
+                    _ => {
+                        rate.skipped = true;
+                        let child_name = child.name().as_ref().to_owned();
+                        reader.read_to_end(QName(&child_name).to_owned())?;
+                    }
+                }
+            }
+            Event::Empty(child) => {
+                let upper = child.name().as_ref().as_bytes().to_ascii_uppercase();
+                let slot = match upper.as_slice() {
+                    b"GSTRATEDUTYHEAD" => Some(&mut rate.duty_head),
+                    b"GSTRATEVALUATIONTYPE" => Some(&mut rate.valuation_type),
+                    b"GSTRATE" => Some(&mut rate.rate),
+                    _ => None,
+                };
+                if let Some(slot) = slot {
+                    set_once(slot, String::new(), &mut rate.repeated_field);
+                } else {
+                    rate.skipped = true;
+                }
+            }
+            Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
+            Event::Eof => return Err(crate::RowCutOff.into()),
+            // Text, a reference or CDATA directly in the list is content the parser does not read:
+            // it is flagged, so a list holding only that is not taken for an empty placeholder.
+            Event::Text(text) if !text.trim().is_empty() => rate.skipped = true,
+            Event::GeneralRef(_) | Event::CData(_) => rate.skipped = true,
+            _ => {}
+        }
+    }
+    Ok(rate)
 }
 
 struct ParsedNativeLedgerCollectionRow {

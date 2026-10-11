@@ -1,0 +1,174 @@
+{
+ "comment": "depreciation, a put-to-use date given for a GUID two vouchers hold (#1243): the client's list names a voucher by GUID, so the date applies to every voucher holding it. One GUID on two purchases of Machine A in May and June, put to use in December (both at half rate); two blank-GUID purchases of Machine B put to use in November (both at half rate); a purchase with a GUID of its own (its voucher date, full rate); a listed GUID no voucher holds. Unchanged by the reference's change: the guard that the list stays keyed by GUID.",
+ "groups": {
+  "Fixed Assets": null,
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Capital Account": null
+ },
+ "ledgers": [
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-dep_shared_guid_put_to_use-000"
+  },
+  {
+   "name": "Machine A",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_shared_guid_put_to_use-001"
+  },
+  {
+   "name": "Machine B",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_shared_guid_put_to_use-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-dep_shared_guid_put_to_use-003"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Edge Bank",
+   "opening": 2140935,
+   "debit": 0,
+   "credit": 1896557,
+   "closing": 244378
+  },
+  {
+   "ledger": "Machine A",
+   "opening": 0,
+   "debit": 1427839,
+   "credit": 0,
+   "closing": 1427839
+  },
+  {
+   "ledger": "Machine B",
+   "opening": 73402,
+   "debit": 468718,
+   "credit": 0,
+   "closing": 542120
+  },
+  {
+   "ledger": "Capital",
+   "opening": -2214337,
+   "debit": 0,
+   "credit": 0,
+   "closing": -2214337
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "dep-u-1",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "number": "Y1",
+   "lines": [
+    [
+     "Machine A",
+     640117
+    ],
+    [
+     "Edge Bank",
+     -640117
+    ]
+   ]
+  },
+  {
+   "guid": "dep-u-1",
+   "date": "2025-06-25",
+   "base_type": "Payment",
+   "number": "Y2",
+   "lines": [
+    [
+     "Machine A",
+     385209
+    ],
+    [
+     "Edge Bank",
+     -385209
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-05-19",
+   "base_type": "Payment",
+   "number": "Y3",
+   "lines": [
+    [
+     "Machine B",
+     270311
+    ],
+    [
+     "Edge Bank",
+     -270311
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-03",
+   "base_type": "Payment",
+   "number": "Y4",
+   "lines": [
+    [
+     "Machine B",
+     198407
+    ],
+    [
+     "Edge Bank",
+     -198407
+    ]
+   ]
+  },
+  {
+   "guid": "dep-u-2",
+   "date": "2025-06-30",
+   "base_type": "Payment",
+   "number": "Y5",
+   "lines": [
+    [
+     "Machine A",
+     402513
+    ],
+    [
+     "Edge Bank",
+     -402513
+    ]
+   ]
+  }
+ ],
+ "depreciation": {
+  "block_by_ledger": {
+   "Machine A": "plant_machinery_15",
+   "Machine B": "plant_machinery_15"
+  },
+  "opening_wdv_paise": {
+   "plant_machinery_15": 73402
+  },
+  "dep_expense_ledgers": [],
+  "put_to_use_by_voucher": {
+   "dep-u-1": "2025-12-01",
+   "": "2025-11-15",
+   "dep-u-9": "2025-10-20"
+  }
+ },
+ "tests": [
+  "depreciation"
+ ]
+}

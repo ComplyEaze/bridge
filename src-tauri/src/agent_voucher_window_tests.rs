@@ -2575,6 +2575,144 @@ async fn a_replay_refuses_a_voucher_created_above_the_first_reads_ceiling() {
     }
 }
 
+// --- the bracketed count (#1241) --------------------------------------------
+
+/// A divided read admitted against a census that names every GUID, and closed
+/// on the marks it opened on, is the one read that holds the token.
+#[tokio::test]
+async fn a_divided_counted_read_closed_on_its_opening_marks_holds_the_bracketed_count() {
+    let first = first_read().await;
+    assert!(first.counted());
+    assert!(first.bracketed.is_some());
+    assert!(matches!(
+        SecondRead::of(first.reads.clone(), first.witness.clone(), first.bracketed),
+        SecondRead::Spared(_)
+    ));
+}
+
+/// A window counted and read whole is admitted against its census (#985) but
+/// has no closing bracket, so it keeps its replay.
+#[tokio::test]
+async fn a_window_counted_and_read_whole_does_not_hold_the_bracketed_count() {
+    let mut plans = paired(&xml_plan(three_vouchers()));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(3)),
+        },
+        WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).counting_small_books(),
+    )
+    .await;
+    let outcome = outcome.unwrap();
+    assert!(outcome.counted());
+    assert!(!is_divided(&outcome.reads));
+    assert_eq!(
+        observed.len(),
+        12,
+        "the census and the window, no closing marks"
+    );
+    assert!(outcome.bracketed.is_none());
+    assert!(matches!(
+        SecondRead::of(
+            outcome.reads.clone(),
+            outcome.witness.clone(),
+            outcome.bracketed
+        ),
+        SecondRead::Replay(WindowPlanSource::Replay { .. })
+    ));
+}
+
+/// A window the caller counted itself (here with every GUID, as a held
+/// window's census is) opened on no marks, so nothing closes on them: divided
+/// and admitted against its census, it still holds no token.
+#[tokio::test]
+async fn a_divided_read_of_a_window_the_caller_counted_does_not_hold_the_bracketed_count() {
+    let guid = |value: u64| format!("{GUID}-{value:08x}").to_ascii_lowercase();
+    let census = WindowCensus::from_census_rows([
+        CensusRow {
+            day: day("20260801"),
+            alter_id: 1,
+            guid: guid(1),
+        },
+        CensusRow {
+            day: day("20260802"),
+            alter_id: 2,
+            guid: guid(2),
+        },
+    ])
+    .expect("a census of two distinct AlterIDs");
+    assert!(census.names_every_guid());
+    let mut plans = Vec::new();
+    for part in [
+        xml_plan(relabelled(&vouchers_kept(1), &[(1, "20260801")])),
+        xml_plan(relabelled(&vouchers_kept(1), &[(2, "20260802")])),
+    ] {
+        plans.extend(paired(&part));
+    }
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260801", "20260802"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Counted(census),
+        WindowReadLimits {
+            budget_bytes: wire_len(&xml_plan(vouchers_kept(1))),
+            default_bytes_per_voucher: wire_len(&xml_plan(vouchers_kept(1))),
+            max_reads: MAX_PLANNED_READS,
+            small_books: SmallBooks::Skip,
+        },
+    )
+    .await;
+    let outcome = outcome.unwrap();
+    assert!(is_divided(&outcome.reads));
+    assert_eq!(observed.len(), 12, "two parts, no marks");
+    assert!(outcome.bracketed.is_none());
+}
+
+/// A replay is itself the second read: it never holds the token, whatever it
+/// was admitted against.
+#[tokio::test]
+async fn a_replay_does_not_hold_the_bracketed_count() {
+    let first = first_read().await;
+    let (_, parts) = divided_first_read();
+    let mut plans = Vec::new();
+    for part in &parts {
+        plans.extend(paired(part));
+    }
+    plans.extend(paired(&marks_plan(3, 7)));
+    let (replay, _) = read_window(
+        plans,
+        ("20260801", "20260802"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::replay_of(first.reads.clone(), first.witness.clone()),
+        three_a_read(),
+    )
+    .await;
+    let replay = replay.unwrap();
+    assert!(is_divided(&replay.reads));
+    assert!(replay.bracketed.is_none());
+}
+
+/// Without the token the second read is the replay of exactly the parts read,
+/// carrying the witness.
+#[test]
+fn without_the_bracketed_count_the_second_read_is_a_replay_of_the_parts_read() {
+    let parts = vec![WindowPart {
+        from: tally_date("20260801"),
+        to: tally_date("20260802"),
+        span: None,
+    }];
+    match SecondRead::of(parts.clone(), None, None) {
+        SecondRead::Replay(WindowPlanSource::Replay {
+            parts: replayed,
+            witness: None,
+        }) => assert_eq!(replayed, parts),
+        _ => panic!("a read without the token replays its parts"),
+    }
+}
+
 #[tokio::test]
 async fn a_replay_of_a_divided_read_without_its_witness_is_refused_unread() {
     let first = first_read().await;
@@ -3932,6 +4070,9 @@ async fn an_audit_window_keeps_every_read_it_admitted_as_it_arrived() {
     let retained = retained.expect("a completed window yields its reads");
     assert_eq!(read.rows.len(), 3);
     assert_eq!(read.reads, divided_parts());
+    // Divided, counted by GUID and closed on its marks, but read by single
+    // reads: no token, so nothing is skipped on its account (#1241).
+    assert!(read.bracketed.is_none());
     // Opening marks, census, three parts, closing marks: six reads of three
     // legs each.
     assert_eq!(observed.len(), 18);
@@ -4340,7 +4481,9 @@ async fn an_audit_window_admits_its_data_against_the_census_it_read() {
         TallyRuntime::default(),
     )
     .await;
-    assert!(outcome.is_ok());
+    // An undivided read that closed on its marks is not a bracketed count: the
+    // token is for a read a replay would only repeat (#1241).
+    assert!(outcome.expect("admitted").bracketed.is_none());
     assert_eq!(retained.map(|reads| reads.len()), Some(4));
 }
 

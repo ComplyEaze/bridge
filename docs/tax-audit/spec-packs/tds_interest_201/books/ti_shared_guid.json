@@ -1,0 +1,258 @@
+{
+ "comment": "Vouchers that share a GUID, on a firm's book: one s.194H payee and one partner, 5 rows, 2 findings. CJ/01 (5 May, Rs 25,000) and CJ/02 (6 June, Rs 5,000) share the GUID ti-g-dup and credit Quince Agency: they are two credits; CJ/01 takes the total over the limit and is a tranche on 5 May, CJ/02 is a tranche on 6 June, and each tranche cites its own voucher only: one id, two labels, one in each. The two vouchers numbered CJ/03 (7 July, Rs 1,000 each) share the GUID ti-g-twin and also their number, type and date: two credits in one tranche, Rs 2,000, cited once. CJ/05 (8 August, Rs 2,000) shares the GUID ti-g-void with the cancelled CJ/06, which is not in the books population: CJ/05 is its own tranche. PJ/07 (interest, 30 September) and PJ/08 (salary, 31 December) share the GUID ti-g-pair and credit the one partner Rs 12,000 each: two credits, one tranche dated 31 December citing both, one id with two labels.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Sales Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_shared_guid-ledger-00"
+  },
+  {
+   "name": "Interest to Partners",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_shared_guid-ledger-01"
+  },
+  {
+   "name": "Partner Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_shared_guid-ledger-02"
+  },
+  {
+   "name": "Quince Agency",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_shared_guid-ledger-03"
+  },
+  {
+   "name": "Rowan Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_shared_guid-ledger-04"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_shared_guid-ledger-05"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Sales Commission",
+   "opening": 0,
+   "debit": 3400000,
+   "credit": 0,
+   "closing": 3400000
+  },
+  {
+   "ledger": "Interest to Partners",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 0,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Partner Salary",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 0,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Quince Agency",
+   "opening": 0,
+   "debit": 0,
+   "credit": 3400000,
+   "closing": -3400000
+  },
+  {
+   "ledger": "Rowan Capital",
+   "opening": -40000000,
+   "debit": 0,
+   "credit": 2400000,
+   "closing": -42400000
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 40000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 40000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-g-dup",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "number": "CJ/01",
+   "lines": [
+    [
+     "Sales Commission",
+     2500000
+    ],
+    [
+     "Quince Agency",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-g-dup",
+   "date": "2025-06-06",
+   "base_type": "Journal",
+   "number": "CJ/02",
+   "lines": [
+    [
+     "Sales Commission",
+     500000
+    ],
+    [
+     "Quince Agency",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-g-twin",
+   "date": "2025-07-07",
+   "base_type": "Journal",
+   "number": "CJ/03",
+   "lines": [
+    [
+     "Sales Commission",
+     100000
+    ],
+    [
+     "Quince Agency",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-g-twin",
+   "date": "2025-07-07",
+   "base_type": "Journal",
+   "number": "CJ/03",
+   "lines": [
+    [
+     "Sales Commission",
+     100000
+    ],
+    [
+     "Quince Agency",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-g-void",
+   "date": "2025-08-08",
+   "base_type": "Journal",
+   "number": "CJ/05",
+   "lines": [
+    [
+     "Sales Commission",
+     200000
+    ],
+    [
+     "Quince Agency",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-g-void",
+   "date": "2025-08-09",
+   "base_type": "Journal",
+   "number": "CJ/06",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Sales Commission",
+     900000
+    ],
+    [
+     "Quince Agency",
+     -900000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-g-pair",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "number": "PJ/07",
+   "lines": [
+    [
+     "Interest to Partners",
+     1200000
+    ],
+    [
+     "Rowan Capital",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-g-pair",
+   "date": "2025-12-31",
+   "base_type": "Journal",
+   "number": "PJ/08",
+   "lines": [
+    [
+     "Partner Salary",
+     1200000
+    ],
+    [
+     "Rowan Capital",
+     -1200000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Sales Commission": "194H"
+ },
+ "partners": {
+  "rowan": {
+   "capital_ledgers": [
+    "Rowan Capital"
+   ],
+   "interest_ledger": "Interest to Partners",
+   "remuneration_ledger": "Partner Salary"
+  }
+ },
+ "deed": {
+  "interest_rate_bp": 1200
+ }
+}

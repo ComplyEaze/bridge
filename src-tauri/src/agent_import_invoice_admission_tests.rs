@@ -191,7 +191,7 @@ fn sent(simulator: SequenceSimulator) -> usize {
 /// it or, with `observed`, as a build saved it for an unregistered customer.
 fn invoice_to(party: &str, filed: &str, observed: bool) -> ImportVoucher {
     let mut voucher = json!({
-        "bridge_txn_id":"t1", "date":"2026-03-10", "voucher_type":"Sales", "voucher_number":"TG/25-26/900",
+        "bridge_txn_id":"t1", "date":"20260310", "voucher_type":"Sales", "voucher_number":"TG/25-26/900",
         "invoice":{"voucher_type_name":filed,"place_of_supply":"Rajasthan"},
         "entries":[
             {"ledger":party,"amount":"11800.00","side":"Dr"},

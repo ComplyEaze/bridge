@@ -1,0 +1,268 @@
+{
+ "comment": "Names and labels, on a firm's book with five s.194H payees and one cash payment: 6 rows, 6 findings. The foreseeability list is matched on the payee's name exactly as written. n01 credits a ledger whose name is written with composed accented letters; the list names it with the same letters decomposed (a base letter and a combining accent), which is another text: not classified. n02 credits a ledger named in Devanagari, listed with the same text as foreseeable: classified; its voucher's number is in Devanagari and its voucher type is written with a combining accent, which the dump's label shows composed. n03 credits Teak  Brokers, a name with two spaces, listed with two spaces as one-off: classified; its number has a space on each side, kept in the label. n04 credits Ulmo Agency, listed in lower case: not classified; its number is empty, so its label uses the last 12 characters of its GUID, which has 20. n05 credits Vetiver Agency, not listed; its number is empty and its GUID has 3 characters, so its label uses the whole GUID. n06 pays Rs 26,000 in cash with no payee; the list has an entry for the text tds_payees uses for such a payee, (payee not named), as one-off, and the caller applies it, although tds_payees reports that entry as matching nothing.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Sales Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_names-ledger-00d"
+  },
+  {
+   "name": "Ébène Courtage",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_names-ledger-01d"
+  },
+  {
+   "name": "नीम दलाल",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_names-ledger-02d"
+  },
+  {
+   "name": "Teak  Brokers",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_names-ledger-03d"
+  },
+  {
+   "name": "Ulmo Agency",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_names-ledger-04d"
+  },
+  {
+   "name": "Vetiver Agency",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_names-ledger-05d"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "ti_names-ledger-06d"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_names-ledger-07d"
+  },
+  {
+   "name": "Proprietor Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_names-ledger-08d"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Sales Commission",
+   "opening": 0,
+   "debit": 14100000,
+   "credit": 0,
+   "closing": 14100000
+  },
+  {
+   "ledger": "Ébène Courtage",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2100000,
+   "closing": -2100000
+  },
+  {
+   "ledger": "नीम दलाल",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2200000,
+   "closing": -2200000
+  },
+  {
+   "ledger": "Teak  Brokers",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2300000,
+   "closing": -2300000
+  },
+  {
+   "ledger": "Ulmo Agency",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2400000,
+   "closing": -2400000
+  },
+  {
+   "ledger": "Vetiver Agency",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2500000,
+   "closing": -2500000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 10000000,
+   "debit": 0,
+   "credit": 2600000,
+   "closing": 7400000
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 40000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 40000000
+  },
+  {
+   "ledger": "Proprietor Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-n01",
+   "date": "2025-05-12",
+   "base_type": "Journal",
+   "number": "CJ/01",
+   "lines": [
+    [
+     "Sales Commission",
+     2100000
+    ],
+    [
+     "Ébène Courtage",
+     -2100000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-n02",
+   "date": "2025-06-16",
+   "base_type": "Journal",
+   "number": "दलाली ०२",
+   "vtype": "Journal é",
+   "lines": [
+    [
+     "Sales Commission",
+     2200000
+    ],
+    [
+     "नीम दलाल",
+     -2200000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-n03",
+   "date": "2025-07-21",
+   "base_type": "Journal",
+   "number": " CJ 03 ",
+   "lines": [
+    [
+     "Sales Commission",
+     2300000
+    ],
+    [
+     "Teak  Brokers",
+     -2300000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-names-voucher-n04",
+   "date": "2025-08-25",
+   "base_type": "Journal",
+   "number": "",
+   "lines": [
+    [
+     "Sales Commission",
+     2400000
+    ],
+    [
+     "Ulmo Agency",
+     -2400000
+    ]
+   ]
+  },
+  {
+   "guid": "n05",
+   "date": "2025-09-29",
+   "base_type": "Journal",
+   "number": "",
+   "lines": [
+    [
+     "Sales Commission",
+     2500000
+    ],
+    [
+     "Vetiver Agency",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-n06",
+   "date": "2025-10-27",
+   "base_type": "Payment",
+   "number": "CP/06",
+   "lines": [
+    [
+     "Sales Commission",
+     2600000
+    ],
+    [
+     "Petty Cash",
+     -2600000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Sales Commission": "194H"
+ },
+ "foreseeability": {
+  "Ébène Courtage": "one_off",
+  "नीम दलाल": "foreseeable",
+  "Teak  Brokers": "one_off",
+  "ulmo agency": "one_off",
+  "(payee not named)": "one_off"
+ }
+}

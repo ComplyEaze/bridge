@@ -1,0 +1,5 @@
+src-tauri/src/commands.rs
+src-tauri/src/lib.rs
+src/main.tsx
+removed-pin: src/GstScreen.tsx
+reviewer: lamemustafa

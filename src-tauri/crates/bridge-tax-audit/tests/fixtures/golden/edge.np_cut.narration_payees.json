@@ -1,0 +1,1610 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "narration_payees",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "491f22a8d7ad83c5",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded): debits to the ledgers the client lists, and any 194C-mapped ledger whose payees the TDS payee test could not name, when that test's finding lists them; bank payments read for the printed payee.",
+  "figures": [
+    {
+      "id": "narration_payees.added_ledgers_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "67832d0c861c0d90",
+      "definition_text": "194C-mapped ledgers read besides those the client lists, because the TDS payee test could not name the payee of their payments (its finding lists them; on a book whose vouchers share a blank or repeated identifier, a ledger debited on another voucher with the same identifier too). With no ledger listed or added, nothing was read.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.configured_ledgers_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "db736a29e0c67c2e",
+      "definition_text": "Ledgers the client lists as paid to payees named only in the bank narration.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.cut_handle_unjoined_count",
+      "value": 7,
+      "unit": "count",
+      "definition_sha256_16": "572435bbb39da9af",
+      "definition_text": "Bank payments whose UPI address one bank printed cut short and no single full address among the bank payments completes under an agreeing name (none, several, or one printed under another name): joined to no other payee by it.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "c05",
+          "label": "Payment c05 on 2025-04-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "c06",
+          "label": "Payment c06 on 2025-04-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "c07",
+          "label": "Payment c07 on 2025-04-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "c08",
+          "label": "Payment c08 on 2025-04-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "c11",
+          "label": "Payment c11 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "c13",
+          "label": "Payment c13 on 2025-04-14"
+        },
+        {
+          "kind": "voucher",
+          "id": "c24",
+          "label": "Payment c24 on 2025-04-25"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.elsewhere_over_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "1b9226a248db354e",
+      "definition_text": "Payees under both s.194C limits on the ledgers read, whose total with their debits to other ledgers exceeds the aggregate limit, or one of whose payments debits other ledgers by more than the single-sum limit.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.elsewhere_over_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "bef05cdfc659c919",
+      "definition_text": "The debits to other ledgers of every such payee, added together.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.not_through_bank_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "62b8d7662ebec896",
+      "definition_text": "Debits on the ledgers read with no bank leg (cash or journal): no payee is read from a bank narration for them.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payee_channel_07bc1eb6",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALONE",
+          "label": "SALONE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_0d76bf9a",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CEDARCO",
+          "label": "CEDARCO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_336bead1",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PEEPAL",
+          "label": "PEEPAL"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_38cffcee",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "A S ENTERPRISE / ASENTER / ASHOKA STORES",
+          "label": "A S ENTERPRISE / ASENTER / ASHOKA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_3cb6d205",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN B",
+          "label": "BANYAN B"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_576b48d0",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SAL NINE",
+          "label": "SAL NINE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_5cc6f0c8",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN",
+          "label": "BANYAN"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_8b4bfba0",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "NEEM TRADERS / NEEMTRAD",
+          "label": "NEEM TRADERS / NEEMTRAD"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_8e0001d8",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH",
+          "label": "PALASH"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_96e40e05",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALTWO",
+          "label": "SALTWO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_9e0f1dab",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DEODAR MILLS",
+          "label": "DEODAR MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_a77ea8e3",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH B",
+          "label": "PALASH B"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_cbe8076b",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN A",
+          "label": "BANYAN A"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_cfd4007e",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "KADAM NINE / KADAMNIN",
+          "label": "KADAM NINE / KADAMNIN"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_ee61cb58",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "TEAK / TEAKWOOD",
+          "label": "TEAK / TEAKWOOD"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_f79e62a4",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SHISHAM / SHISHAMCO",
+          "label": "SHISHAM / SHISHAMCO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_07bc1eb6",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALONE",
+          "label": "SALONE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_0d76bf9a",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CEDARCO",
+          "label": "CEDARCO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_336bead1",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PEEPAL",
+          "label": "PEEPAL"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_38cffcee",
+      "value": 3,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "A S ENTERPRISE / ASENTER / ASHOKA STORES",
+          "label": "A S ENTERPRISE / ASENTER / ASHOKA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_3cb6d205",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN B",
+          "label": "BANYAN B"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_576b48d0",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SAL NINE",
+          "label": "SAL NINE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_5cc6f0c8",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN",
+          "label": "BANYAN"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_8b4bfba0",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "NEEM TRADERS / NEEMTRAD",
+          "label": "NEEM TRADERS / NEEMTRAD"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_8e0001d8",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH",
+          "label": "PALASH"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_96e40e05",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALTWO",
+          "label": "SALTWO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_9e0f1dab",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DEODAR MILLS",
+          "label": "DEODAR MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_a77ea8e3",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH B",
+          "label": "PALASH B"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_cbe8076b",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN A",
+          "label": "BANYAN A"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_cfd4007e",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "KADAM NINE / KADAMNIN",
+          "label": "KADAM NINE / KADAMNIN"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_ee61cb58",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "TEAK / TEAKWOOD",
+          "label": "TEAK / TEAKWOOD"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_f79e62a4",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SHISHAM / SHISHAMCO",
+          "label": "SHISHAM / SHISHAMCO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_07bc1eb6",
+      "value": 905,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALONE",
+          "label": "SALONE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_0d76bf9a",
+      "value": 2473,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CEDARCO",
+          "label": "CEDARCO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_336bead1",
+      "value": 1495,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PEEPAL",
+          "label": "PEEPAL"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_38cffcee",
+      "value": 3060,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "A S ENTERPRISE / ASENTER / ASHOKA STORES",
+          "label": "A S ENTERPRISE / ASENTER / ASHOKA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_3cb6d205",
+      "value": 1887,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN B",
+          "label": "BANYAN B"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_576b48d0",
+      "value": 4844,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SAL NINE",
+          "label": "SAL NINE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_5cc6f0c8",
+      "value": 2086,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN",
+          "label": "BANYAN"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_8b4bfba0",
+      "value": 299,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "NEEM TRADERS / NEEMTRAD",
+          "label": "NEEM TRADERS / NEEMTRAD"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_8e0001d8",
+      "value": 4634,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH",
+          "label": "PALASH"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_96e40e05",
+      "value": 1094,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALTWO",
+          "label": "SALTWO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_9e0f1dab",
+      "value": 2270,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DEODAR MILLS",
+          "label": "DEODAR MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_a77ea8e3",
+      "value": 4443,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH B",
+          "label": "PALASH B"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_cbe8076b",
+      "value": 1690,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN A",
+          "label": "BANYAN A"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_cfd4007e",
+      "value": 3450,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "KADAM NINE / KADAMNIN",
+          "label": "KADAM NINE / KADAMNIN"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_ee61cb58",
+      "value": 701,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "TEAK / TEAKWOOD",
+          "label": "TEAK / TEAKWOOD"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_f79e62a4",
+      "value": 3848,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SHISHAM / SHISHAMCO",
+          "label": "SHISHAM / SHISHAMCO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_07bc1eb6",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALONE",
+          "label": "SALONE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_0d76bf9a",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CEDARCO",
+          "label": "CEDARCO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_336bead1",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PEEPAL",
+          "label": "PEEPAL"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_38cffcee",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "A S ENTERPRISE / ASENTER / ASHOKA STORES",
+          "label": "A S ENTERPRISE / ASENTER / ASHOKA STORES"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_3cb6d205",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN B",
+          "label": "BANYAN B"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_576b48d0",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SAL NINE",
+          "label": "SAL NINE"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_5cc6f0c8",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN",
+          "label": "BANYAN"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_8b4bfba0",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "NEEM TRADERS / NEEMTRAD",
+          "label": "NEEM TRADERS / NEEMTRAD"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_8e0001d8",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH",
+          "label": "PALASH"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_96e40e05",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALTWO",
+          "label": "SALTWO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_9e0f1dab",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DEODAR MILLS",
+          "label": "DEODAR MILLS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_a77ea8e3",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH B",
+          "label": "PALASH B"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_cbe8076b",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN A",
+          "label": "BANYAN A"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_cfd4007e",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "KADAM NINE / KADAMNIN",
+          "label": "KADAM NINE / KADAMNIN"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_ee61cb58",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "TEAK / TEAKWOOD",
+          "label": "TEAK / TEAKWOOD"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_f79e62a4",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SHISHAM / SHISHAMCO",
+          "label": "SHISHAM / SHISHAMCO"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_07bc1eb6",
+      "value": 905,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALONE",
+          "label": "SALONE"
+        },
+        {
+          "kind": "voucher",
+          "id": "c05",
+          "label": "Payment c05 on 2025-04-06"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_0d76bf9a",
+      "value": 2473,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CEDARCO",
+          "label": "CEDARCO"
+        },
+        {
+          "kind": "voucher",
+          "id": "c13",
+          "label": "Payment c13 on 2025-04-14"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_336bead1",
+      "value": 2780,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PEEPAL",
+          "label": "PEEPAL"
+        },
+        {
+          "kind": "voucher",
+          "id": "c07",
+          "label": "Payment c07 on 2025-04-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "c08",
+          "label": "Payment c08 on 2025-04-09"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_38cffcee",
+      "value": 8606,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "A S ENTERPRISE / ASENTER / ASHOKA STORES",
+          "label": "A S ENTERPRISE / ASENTER / ASHOKA STORES"
+        },
+        {
+          "kind": "voucher",
+          "id": "c14",
+          "label": "Payment c14 on 2025-04-15"
+        },
+        {
+          "kind": "voucher",
+          "id": "c15",
+          "label": "Payment c15 on 2025-04-16"
+        },
+        {
+          "kind": "voucher",
+          "id": "c16",
+          "label": "Payment c16 on 2025-04-17"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_3cb6d205",
+      "value": 1887,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN B",
+          "label": "BANYAN B"
+        },
+        {
+          "kind": "voucher",
+          "id": "c10",
+          "label": "Payment c10 on 2025-04-11"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_576b48d0",
+      "value": 4844,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SAL NINE",
+          "label": "SAL NINE"
+        },
+        {
+          "kind": "voucher",
+          "id": "c25",
+          "label": "Payment c25 on 2025-04-26"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_5cc6f0c8",
+      "value": 2086,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN",
+          "label": "BANYAN"
+        },
+        {
+          "kind": "voucher",
+          "id": "c11",
+          "label": "Payment c11 on 2025-04-12"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_8b4bfba0",
+      "value": 400,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "NEEM TRADERS / NEEMTRAD",
+          "label": "NEEM TRADERS / NEEMTRAD"
+        },
+        {
+          "kind": "voucher",
+          "id": "c01",
+          "label": "Payment c01 on 2025-04-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "c02",
+          "label": "Payment c02 on 2025-04-03"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_8e0001d8",
+      "value": 8888,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH",
+          "label": "PALASH"
+        },
+        {
+          "kind": "voucher",
+          "id": "c22",
+          "label": "Payment c22 on 2025-04-23"
+        },
+        {
+          "kind": "voucher",
+          "id": "c24",
+          "label": "Payment c24 on 2025-04-25"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_96e40e05",
+      "value": 1094,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALTWO",
+          "label": "SALTWO"
+        },
+        {
+          "kind": "voucher",
+          "id": "c06",
+          "label": "Payment c06 on 2025-04-07"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_9e0f1dab",
+      "value": 2270,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DEODAR MILLS",
+          "label": "DEODAR MILLS"
+        },
+        {
+          "kind": "voucher",
+          "id": "c12",
+          "label": "Payment c12 on 2025-04-13"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_a77ea8e3",
+      "value": 4443,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH B",
+          "label": "PALASH B"
+        },
+        {
+          "kind": "voucher",
+          "id": "c23",
+          "label": "Payment c23 on 2025-04-24"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_cbe8076b",
+      "value": 1690,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN A",
+          "label": "BANYAN A"
+        },
+        {
+          "kind": "voucher",
+          "id": "c09",
+          "label": "Payment c09 on 2025-04-10"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_cfd4007e",
+      "value": 6704,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "KADAM NINE / KADAMNIN",
+          "label": "KADAM NINE / KADAMNIN"
+        },
+        {
+          "kind": "voucher",
+          "id": "c17",
+          "label": "Payment c17 on 2025-04-18"
+        },
+        {
+          "kind": "voucher",
+          "id": "c18",
+          "label": "Payment c18 on 2025-04-19"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_ee61cb58",
+      "value": 1200,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "TEAK / TEAKWOOD",
+          "label": "TEAK / TEAKWOOD"
+        },
+        {
+          "kind": "voucher",
+          "id": "c03",
+          "label": "Payment c03 on 2025-04-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "c04",
+          "label": "Payment c04 on 2025-04-05"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_f79e62a4",
+      "value": 7496,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SHISHAM / SHISHAMCO",
+          "label": "SHISHAM / SHISHAMCO"
+        },
+        {
+          "kind": "voucher",
+          "id": "c19",
+          "label": "Payment c19 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "c20",
+          "label": "Payment c20 on 2025-04-21"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payees_count",
+      "value": 16,
+      "unit": "count",
+      "definition_sha256_16": "b6f907568524af65",
+      "definition_text": "Distinct payees printed by the bank: payments sharing a printed name or a whole UPI handle are one payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_over_194c_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "2400a2096d06bfa0",
+      "definition_text": "Of those, payees over a s.194C threshold.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_over_194c_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "121fee500217c9d5",
+      "definition_text": "Total paid to the payees over a threshold.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.placeholder_payee_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "78e46136ab75d08c",
+      "definition_text": "Bank payments on the ledgers read where the bank printed a placeholder (such as \"Bank Acc\" or \"PhonePe\") in place of the payee: not read as any payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.possible_same_40393523",
+      "value": 5663,
+      "unit": "paise",
+      "definition_sha256_16": "18ec6c9bccf9f2ed",
+      "definition_text": "Payees whose payments carry one shortened UPI address, or the one full address that completes it under another printed name: not joined. If they are one person, this is that payee's total.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "BANYAN / BANYAN A / BANYAN B",
+          "label": "BANYAN / BANYAN A / BANYAN B"
+        },
+        {
+          "kind": "voucher",
+          "id": "c09",
+          "label": "Payment c09 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "c10",
+          "label": "Payment c10 on 2025-04-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "c11",
+          "label": "Payment c11 on 2025-04-12"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.possible_same_59f85ebb",
+      "value": 13331,
+      "unit": "paise",
+      "definition_sha256_16": "18ec6c9bccf9f2ed",
+      "definition_text": "Payees whose payments carry one shortened UPI address, or the one full address that completes it under another printed name: not joined. If they are one person, this is that payee's total.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "PALASH / PALASH B",
+          "label": "PALASH / PALASH B"
+        },
+        {
+          "kind": "voucher",
+          "id": "c22",
+          "label": "Payment c22 on 2025-04-23"
+        },
+        {
+          "kind": "voucher",
+          "id": "c23",
+          "label": "Payment c23 on 2025-04-24"
+        },
+        {
+          "kind": "voucher",
+          "id": "c24",
+          "label": "Payment c24 on 2025-04-25"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.possible_same_84c9c03d",
+      "value": 1999,
+      "unit": "paise",
+      "definition_sha256_16": "18ec6c9bccf9f2ed",
+      "definition_text": "Payees whose payments carry one shortened UPI address, or the one full address that completes it under another printed name: not joined. If they are one person, this is that payee's total.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "SALONE / SALTWO",
+          "label": "SALONE / SALTWO"
+        },
+        {
+          "kind": "voucher",
+          "id": "c05",
+          "label": "Payment c05 on 2025-04-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "c06",
+          "label": "Payment c06 on 2025-04-07"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.possible_same_count",
+      "value": 4,
+      "unit": "count",
+      "definition_sha256_16": "4f94c204008d6113",
+      "definition_text": "Groups of payees that a shortened UPI address might join, listed apart and never joined.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.possible_same_d010f9fc",
+      "value": 4743,
+      "unit": "paise",
+      "definition_sha256_16": "18ec6c9bccf9f2ed",
+      "definition_text": "Payees whose payments carry one shortened UPI address, or the one full address that completes it under another printed name: not joined. If they are one person, this is that payee's total.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "CEDARCO / DEODAR MILLS",
+          "label": "CEDARCO / DEODAR MILLS"
+        },
+        {
+          "kind": "voucher",
+          "id": "c12",
+          "label": "Payment c12 on 2025-04-13"
+        },
+        {
+          "kind": "voucher",
+          "id": "c13",
+          "label": "Payment c13 on 2025-04-14"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.resolved_total",
+      "value": 57766,
+      "unit": "paise",
+      "definition_sha256_16": "0a0479b3fe570ca0",
+      "definition_text": "Total bank payments with a printed payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.same_day_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f0d6e165f7e7002d",
+      "definition_text": "Payees paid two or more times on one day, the day's total over the s.194C single-sum limit, counted once per payee and day.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.same_day_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8bc394ef74148d1d",
+      "definition_text": "The day totals of every payee paid more than once on one day, over the s.194C single-sum limit, added together.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.unresolved_bank_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "bb150e6493cc3554",
+      "definition_text": "Bank payments on the ledgers read whose narration names no payee that can be read (a placeholder in place of the payee included).",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "narration_payees/possible_same/all",
+      "clauses": [
+        "s.194C"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "groups",
+          "figure_id": "narration_payees.possible_same_count"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "c05",
+          "label": "Payment c05 on 2025-04-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "c06",
+          "label": "Payment c06 on 2025-04-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "c09",
+          "label": "Payment c09 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "c10",
+          "label": "Payment c10 on 2025-04-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "c11",
+          "label": "Payment c11 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "c12",
+          "label": "Payment c12 on 2025-04-13"
+        },
+        {
+          "kind": "voucher",
+          "id": "c13",
+          "label": "Payment c13 on 2025-04-14"
+        },
+        {
+          "kind": "voucher",
+          "id": "c22",
+          "label": "Payment c22 on 2025-04-23"
+        },
+        {
+          "kind": "voucher",
+          "id": "c23",
+          "label": "Payment c23 on 2025-04-24"
+        },
+        {
+          "kind": "voucher",
+          "id": "c24",
+          "label": "Payment c24 on 2025-04-25"
+        }
+      ],
+      "title_sha256_16": "c65a159c02767f59",
+      "title_text": "Payees that may be one person: they share a UPI address the bank printed cut short",
+      "limits_sha256_16": "b6077ed1650f46c1",
+      "limits_text": [
+        "One bank prints the UPI address cut short. These payees' payments carry the same shortened address, and no single full address among the bank payments completes it under an agreeing name (none does, several do, or the one that does is printed under another name), so they are not joined: two people can share it. If a group is one person, the payee's total is the group's, and a s.194C limit may be crossed."
+      ],
+      "ask_client_sha256_16": "1f72420a511e5458",
+      "ask_client_text": [
+        "For each group listed, whether the payees are one person."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "narration_payees.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

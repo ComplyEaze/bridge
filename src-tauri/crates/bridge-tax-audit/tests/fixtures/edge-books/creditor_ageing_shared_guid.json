@@ -1,0 +1,442 @@
+{
+ "comment": "creditor_ageing_43bh, vouchers that share a GUID (#1243). A micro creditor with an opening balance partly paid: one GUID on a bill and on its payment (both cited) and on a voucher that touches no creditor (not cited), a blank-GUID bill and a blank-GUID payment, one GUID, number, type and day on two bills (one ref, both walked), a blank-GUID voucher billing two creditors, and a blank-GUID voucher whose line is nil (not cited). A small creditor with an unpaid opening balance, a bill whose ref is identical to the micro creditor's two (the opening-dues finding cites it once) and the two-creditor voucher. An unclassified creditor with blank-GUID bills whose numbers differ only in case, and one GUID on bills numbered with a letter, an accented letter composed and decomposed, a full-width letter and a character beyond U+FFFF. A trader: one GUID on a bill and on a payment over it. The canonical dump sorts refs itself, so this golden does not pin the order the module emits them in.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Alder Micro",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-cg-l01"
+  },
+  {
+   "name": "Birch Small",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-cg-l02"
+  },
+  {
+   "name": "Cedar Unclassified",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-cg-l03"
+  },
+  {
+   "name": "Dogwood Trader",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-cg-l04"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-cg-l05"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-cg-l06"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alder Micro",
+   "opening": -2000,
+   "debit": 600,
+   "credit": 1490,
+   "closing": -2890
+  },
+  {
+   "ledger": "Birch Small",
+   "opening": -700,
+   "debit": 0,
+   "credit": 140,
+   "closing": -840
+  },
+  {
+   "ledger": "Cedar Unclassified",
+   "opening": 0,
+   "debit": 0,
+   "credit": 850,
+   "closing": -850
+  },
+  {
+   "ledger": "Dogwood Trader",
+   "opening": 0,
+   "debit": 650,
+   "credit": 400,
+   "closing": 250
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "edge-cg-a",
+   "date": "2025-12-01",
+   "base_type": "Purchase",
+   "number": "A-BILL",
+   "lines": [
+    [
+     "Alder Micro",
+     -900
+    ],
+    [
+     "Purchases",
+     900
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-a",
+   "date": "2025-12-20",
+   "base_type": "Payment",
+   "number": "A-PAY",
+   "lines": [
+    [
+     "Alder Micro",
+     500
+    ],
+    [
+     "Bank",
+     -500
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-a",
+   "date": "2025-12-25",
+   "base_type": "Journal",
+   "number": "X-OTHER",
+   "lines": [
+    [
+     "Purchases",
+     70
+    ],
+    [
+     "Bank",
+     -70
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-03-25",
+   "base_type": "Purchase",
+   "number": "A-B1",
+   "lines": [
+    [
+     "Alder Micro",
+     -300
+    ],
+    [
+     "Purchases",
+     300
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-03-26",
+   "base_type": "Payment",
+   "number": "A-P1",
+   "lines": [
+    [
+     "Alder Micro",
+     100
+    ],
+    [
+     "Bank",
+     -100
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-twin",
+   "date": "2026-01-15",
+   "base_type": "Purchase",
+   "number": "TW",
+   "lines": [
+    [
+     "Alder Micro",
+     -110
+    ],
+    [
+     "Purchases",
+     110
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-twin",
+   "date": "2026-01-15",
+   "base_type": "Purchase",
+   "number": "TW",
+   "lines": [
+    [
+     "Alder Micro",
+     -140
+    ],
+    [
+     "Purchases",
+     140
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-twin",
+   "date": "2026-01-15",
+   "base_type": "Purchase",
+   "number": "TW",
+   "lines": [
+    [
+     "Birch Small",
+     -60
+    ],
+    [
+     "Purchases",
+     60
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-02-10",
+   "base_type": "Journal",
+   "number": "AB-SPLIT",
+   "lines": [
+    [
+     "Alder Micro",
+     -40
+    ],
+    [
+     "Birch Small",
+     -50
+    ],
+    [
+     "Purchases",
+     90
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-03-20",
+   "base_type": "Purchase",
+   "number": "B-ONLY",
+   "lines": [
+    [
+     "Birch Small",
+     -30
+    ],
+    [
+     "Purchases",
+     30
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2026-03-21",
+   "base_type": "Journal",
+   "number": "Z0",
+   "lines": [
+    [
+     "Alder Micro",
+     0
+    ],
+    [
+     "Purchases",
+     10
+    ],
+    [
+     "Bank",
+     -10
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-11-01",
+   "base_type": "Purchase",
+   "number": "c-b1",
+   "lines": [
+    [
+     "Cedar Unclassified",
+     -500
+    ],
+    [
+     "Purchases",
+     500
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-11-01",
+   "base_type": "Purchase",
+   "number": "C-B1",
+   "lines": [
+    [
+     "Cedar Unclassified",
+     -200
+    ],
+    [
+     "Purchases",
+     200
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-uni",
+   "date": "2025-11-02",
+   "base_type": "Purchase",
+   "number": "\ud83d\udcd11",
+   "lines": [
+    [
+     "Cedar Unclassified",
+     -10
+    ],
+    [
+     "Purchases",
+     10
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-uni",
+   "date": "2025-11-02",
+   "base_type": "Purchase",
+   "number": "\uff211",
+   "lines": [
+    [
+     "Cedar Unclassified",
+     -20
+    ],
+    [
+     "Purchases",
+     20
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-uni",
+   "date": "2025-11-02",
+   "base_type": "Purchase",
+   "number": "\u00e91",
+   "lines": [
+    [
+     "Cedar Unclassified",
+     -30
+    ],
+    [
+     "Purchases",
+     30
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-uni",
+   "date": "2025-11-02",
+   "base_type": "Purchase",
+   "number": "z1",
+   "lines": [
+    [
+     "Cedar Unclassified",
+     -40
+    ],
+    [
+     "Purchases",
+     40
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-uni",
+   "date": "2025-11-02",
+   "base_type": "Purchase",
+   "number": "e\u03011",
+   "lines": [
+    [
+     "Cedar Unclassified",
+     -50
+    ],
+    [
+     "Purchases",
+     50
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-d",
+   "date": "2025-10-01",
+   "base_type": "Purchase",
+   "number": "D-1",
+   "lines": [
+    [
+     "Dogwood Trader",
+     -400
+    ],
+    [
+     "Purchases",
+     400
+    ]
+   ]
+  },
+  {
+   "guid": "edge-cg-d",
+   "date": "2025-10-05",
+   "base_type": "Payment",
+   "number": "D-2",
+   "lines": [
+    [
+     "Dogwood Trader",
+     650
+    ],
+    [
+     "Bank",
+     -650
+    ]
+   ]
+  }
+ ],
+ "cash": [],
+ "bank": [
+  "Bank"
+ ],
+ "creditors": [
+  "Alder Micro",
+  "Birch Small",
+  "Cedar Unclassified",
+  "Dogwood Trader"
+ ],
+ "creditor_ageing": {
+  "supplier_classification": {
+   "Alder Micro": "micro",
+   "Birch Small": "small",
+   "Dogwood Trader": "trader"
+  }
+ },
+ "tests": [
+  "creditor_ageing_43bh"
+ ]
+}

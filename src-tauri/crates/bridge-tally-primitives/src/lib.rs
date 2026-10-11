@@ -1,7 +1,7 @@
 //! Portable Tally value types shared by the read protocol and the domain core.
 //!
-//! These are pure primitives: an exact decimal, a validated Tally date, and the
-//! shared error. They live below `bridge-tally-core` deliberately.
+//! These are pure primitives: an exact decimal, a validated Tally date, the
+//! shared error, and which characters a reader sees ([`text`]). They live below `bridge-tally-core` deliberately.
 //! `bridge-tally-core` once carried delivery/destination capability, and the
 //! sealed read-only `bridge-tally-live-read` controller is still forbidden from
 //! reaching that crate by `scripts/check-tally-live-read-boundary.mjs`. Keeping
@@ -11,6 +11,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
 pub mod exact_arithmetic;
+pub mod text;
 
 /// Maximum accepted `ExactDecimal` lexeme length.
 pub const MAX_EXACT_DECIMAL_BYTES: usize = 256;

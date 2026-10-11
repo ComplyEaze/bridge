@@ -588,6 +588,69 @@ impl CashFlowBasis {
     }
 }
 
+/// What a company features read found, held for its headline.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct CompanyFeaturesBasis {
+    cost_centres: bridge_tally_protocol::native_company_features::NativeSetting,
+    gst: bridge_tally_protocol::native_company_features::NativeSetting,
+    batch_wise: bridge_tally_protocol::native_company_features::NativeSetting,
+    currency: bridge_tally_protocol::native_company_features::NativeCurrencySymbol,
+}
+
+impl CompanyFeaturesBasis {
+    pub(super) fn new(
+        features: &bridge_tally_protocol::native_company_features::NativeCompanyFeatures,
+    ) -> Self {
+        Self {
+            cost_centres: features.cost_centres,
+            gst: features.gst,
+            batch_wise: features.batch_wise,
+            currency: features.base_currency.clone(),
+        }
+    }
+
+    /// Whether Tally sent every setting this read returns.
+    pub(super) fn all_reported(&self) -> bool {
+        use bridge_tally_protocol::native_company_features::NativeSetting::NotReported;
+        ![self.cost_centres, self.gst, self.batch_wise].contains(&NotReported)
+    }
+
+    pub(super) fn headline(&self, company: &CompanyName) -> Headline {
+        use bridge_tally_protocol::native_company_features::{NativeCurrencySymbol, NativeSetting};
+        let word = |setting: NativeSetting| match setting {
+            NativeSetting::Yes => "on",
+            NativeSetting::No => "off",
+            NativeSetting::NotReported => "not sent by Tally",
+        };
+        let mut lead = format!(
+            "The settings Tally's company record holds today for {}: cost centres {}, GST {}, batch-wise stock {}.",
+            company.quoted(),
+            word(self.cost_centres),
+            word(self.gst),
+            word(self.batch_wise)
+        );
+        if !self.all_reported() {
+            lead.push_str(
+                " A setting Tally did not send is not reported; that is not the same as off.",
+            );
+        }
+        lead.push_str(
+            " They are not what the books contain or what they were during a year, and each of the three has been compared with Tally's own screen, on synthetic books.",
+        );
+        match &self.currency {
+            NativeCurrencySymbol::Reported(symbol) => lead.push_str(&format!(
+                " The company's currency symbol is {symbol}: a symbol, not a currency code."
+            )),
+            NativeCurrencySymbol::NotReported => lead.push_str(" Tally sent no currency symbol."),
+        }
+        Headline {
+            lead,
+            rows: None,
+            page: None,
+        }
+    }
+}
+
 impl Headline {
     /// The same headline after a byte cap left `shown` rows of its page.
     fn restated(mut self, shown: usize) -> Self {

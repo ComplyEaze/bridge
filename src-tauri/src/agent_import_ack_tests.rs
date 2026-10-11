@@ -113,7 +113,11 @@ async fn an_approved_review_is_recorded_once_and_changes_no_verdict() {
     let (server, args) = doubted(&simulator, directory.path());
     let approval = ScriptedApproval::approving();
 
+    // Its two verifications and the record replace and remove nothing they
+    // find (#911), the pending masters mark and the doubt included.
+    let found = every_file(directory.path());
     let response = acknowledge(&server, args.clone(), approval.clone()).await;
+    assert_nothing_replaced(&found, directory.path());
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["operator_review"]["state"], "current", "{response}");
     assert_eq!(approval.reviews().len(), 1, "{response}");
@@ -134,7 +138,9 @@ async fn an_approved_review_is_recorded_once_and_changes_no_verdict() {
     );
 
     // A later readback keeps every verdict it had, and reports the review.
+    let found = every_file(directory.path());
     let verified = server.call_tool("verify_import", args).await;
+    assert_nothing_replaced(&found, directory.path());
     let result = &verified["structuredContent"]["result"];
     assert_eq!(
         result["dispatch"]["state"], "reconciliation_required",
@@ -899,8 +905,14 @@ async fn a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_requ
                 &fs::read(imports.join(format!("{}.masters_check.json", line.batch_id))).unwrap(),
             )
             .unwrap();
+            // The masters verdict has a file of its own beside the pending
+            // mark (#911); the step verdict is kept in the check record.
+            let masters_verdict: Value = serde_json::from_slice(
+                &fs::read(imports.join(format!("{}.masters_verdict.json", line.batch_id))).unwrap(),
+            )
+            .unwrap();
             let verdict = if kind == "masters" {
-                &check
+                &masters_verdict
             } else {
                 &check["batch_step"]
             };
@@ -991,11 +1003,8 @@ async fn an_unnamed_review_beside_a_doubt_without_its_file_is_refused_before_any
             fs::remove_dir_all(&step_doubt).unwrap();
         }
         assert_eq!(step_doubt.is_file(), !step_file_fails, "{code}");
-        // The check record holds both doubts, each marked when its file failed.
-        let check: Value = serde_json::from_slice(
-            &fs::read(imports.join(format!("{}.masters_check.json", line.batch_id))).unwrap(),
-        )
-        .unwrap();
+        // The records hold both doubts, each marked when its file failed.
+        let check = recorded_checks(&imports, &line.batch_id);
         assert_eq!(check["state"], "posted_under_changed_masters", "{check}");
         assert_eq!(check["doubt_record"], "unavailable", "{check}");
         assert_eq!(check["batch_step"]["state"], "unmatched", "{check}");
@@ -1053,12 +1062,9 @@ async fn two_doubts_without_their_files_are_refused_named_or_not() {
     fs::remove_dir_all(&step_doubt).unwrap();
     let masters_doubt = imports.join(format!("{}.masters_doubt.json", line.batch_id));
     assert!(masters_doubt.is_file(), "the masters doubt was written");
-    // The check record holds both doubts: the masters one unmarked, since its
-    // file was written, and the step one marked, since its file was not.
-    let check: Value = serde_json::from_slice(
-        &fs::read(imports.join(format!("{}.masters_check.json", line.batch_id))).unwrap(),
-    )
-    .unwrap();
+    // The records hold both doubts: the masters one unmarked, since its file
+    // was written, and the step one marked, since its file was not.
+    let check = recorded_checks(&imports, &line.batch_id);
     assert_eq!(check["state"], "posted_under_changed_masters", "{check}");
     assert_eq!(check["doubt_record"], Value::Null, "{check}");
     assert_eq!(check["batch_step"]["state"], "unmatched", "{check}");
@@ -1393,13 +1399,7 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
         result["dispatch"]["state"], "reconciliation_required",
         "{verified}"
     );
-    let markdown = fs::read_to_string(
-        server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{D3_BATCH}.proof.md")),
-    )
-    .unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(D3_BATCH)[1]).unwrap();
     assert!(
         markdown
             .contains("Readback counts: matching 49, divergent 0, not effective 1, not found 0"),
@@ -1545,13 +1545,7 @@ async fn a_cancelled_voucher_entered_again_by_hand_is_reported_not_attributed() 
                  "alter_id":1790,"voucher_number":"353","before_pre_import_mark":false}]}}]),
         "{verified}"
     );
-    let markdown = fs::read_to_string(
-        server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{L1_BATCH}.proof.md")),
-    )
-    .unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(L1_BATCH)[1]).unwrap();
     assert!(
         markdown
             .contains("Readback counts: matching 49, divergent 0, not effective 1, not found 0"),
@@ -1671,13 +1665,7 @@ async fn a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown
         result["verification_status"], "verification_incomplete",
         "{verified}"
     );
-    let markdown = fs::read_to_string(
-        server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{D3_BATCH}.proof.md")),
-    )
-    .unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(D3_BATCH)[1]).unwrap();
     assert!(
         markdown.contains("this report does not confirm posting"),
         "{markdown}"
@@ -2205,4 +2193,16 @@ async fn an_unreadable_record_beside_a_pending_check_answers_before_any_request(
     );
     assert!(approval.reviews().is_empty(), "no dialog");
     assert!(sent(simulator).is_empty(), "no request");
+}
+
+/// The masters verdict as its own file holds it, with the step verdict the
+/// check record keeps beside it (#911).
+fn recorded_checks(imports: &Path, batch_id: &str) -> Value {
+    let read = |name: &str| -> Value {
+        serde_json::from_slice(&fs::read(imports.join(format!("{batch_id}.{name}"))).unwrap())
+            .unwrap()
+    };
+    let mut verdict = read("masters_verdict.json");
+    verdict["batch_step"] = read("masters_check.json")["batch_step"].clone();
+    verdict
 }

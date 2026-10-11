@@ -106,13 +106,14 @@ The ordinary default tools, in name order:
 - `validate_masters`
 - `verify_import`
 - `voucher_presence`
+- `voucher_read_cost`
 - `voucher_schema`
 - `vouchers`
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `company_features` is in the source after
-release 0.5.0 and is not in a published build yet. `local_data_report` (also
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features` and `voucher_read_cost` are in the source after
+release 0.5.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -1239,6 +1240,42 @@ or the wider read an empty window gets in each of the two reads (each pays its o
 census when the book is large; the verdict is then `not_established`). A
 `ledger_movement` refusal states no block yet. The result of a quick call is
 unchanged.
+
+### What one windowed call will cost, before it runs (`voucher_read_cost`, #1465)
+
+`voucher_read_cost` takes `company_guid` and nothing else: no window, because the figure has none.
+The census a window read pays follows the book's voucher mark, not the window, so a narrower window
+does not lower it and N one-day calls pay it N times. The tool reads the company's marks once (the
+paired, identity-bracketed read every windowed call opens with: the identity read, then one marks read;
+no census and no voucher request) and says, for `vouchers`, `ledger_movement` and `verify_import`
+each, how many census reads one call of it will send on this book.
+
+- `voucher_mark` is the mark that read saw. `per_call` has one entry per tool: `state: counted` with
+  `census_reads` and `floor_seconds`, or `state: refused_by_allowance` with `code:
+  voucher_window_book_too_large` and `limit_census_reads` (a mark above 2,097,152, the refusal the read
+  itself makes, from the same function; no floor is given for a read that sends no census).
+- `census_reads` is **derived** from the mark and the read's own rules (`census_read_count`, which the
+  read also calls), never a second copy of them. `vouchers` counts a small book (#1314), so it sends at
+  least one census read on any book that has held a voucher; `ledger_movement` and `verify_import` send
+  none while the mark times their default voucher size fits one request (a mark of 170 or less). A
+  book that has never held a voucher (no mark) sends none, and only then is the count 0.
+- `floor_seconds` is **derived from the gate's rule**, as `read_cost.floor_seconds` is, and from the
+  same function: (N - 1) x 0.5 s, rounded down. It is the least time spent on the gaps between census
+  reads of a call that is not refused earlier. It leaves out every data part, and the recorded runs took
+  more than twice their floor. There is no estimate and no field for one: a computed figure was cut from
+  #1289, and a floor is never presented as one.
+- `measured` is **constant text**: census runs the protocol reference records (§11c.5), each with its
+  book, host, date, confidence and `not_a_bound: true`. Bridge computes nothing from them. The book's
+  mark is rounded (it is not a lab company).
+- `host_limits` is the block `read_cost` states, unchanged.
+- If the marks cannot be read, the call fails with the code that read gives (for example
+  `master_checkpoint_not_observed`) and states no figure; a missing figure is never 0.
+- It is as of its own read of the mark. The call that follows reads the mark again. It refuses
+  nothing; `vouchers` and the other two read as before.
+
+Not covered: the data parts (they need the census), the second read an empty `vouchers` window gets (it
+pays its own census on a large book), the second window read of `ledger_movement` (it sends no census),
+`outstandings` and `voucher_presence`. Windows hosts are not measured.
 
 ### Search and summaries in `vouchers` (#1230)
 

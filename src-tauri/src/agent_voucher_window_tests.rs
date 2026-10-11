@@ -2275,6 +2275,54 @@ fn census_spans_tile_the_mark_and_none_holds_more_than_one_census() {
     assert_eq!(census_spans(249_948, 8192).unwrap().count(), 31);
 }
 
+/// `voucher_read_cost` states a call's census before it runs from `census_read_count`;
+/// the read decides whether to count with `skips_census` and then walks `census_spans`.
+/// One rule, so the two agree on every mark, including the boundaries.
+#[test]
+fn the_census_a_read_sends_is_the_count_the_preview_states() {
+    let counting =
+        WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).counting_small_books();
+    let skipping = WindowReadLimits::for_shape(VoucherReadShape::Movement);
+    // A book that never held a voucher sends none, whatever the limits say.
+    assert_eq!(census_read_count(0, counting), Ok(0));
+    assert_eq!(census_read_count(0, skipping), Ok(0));
+    // A counting read sends one census for the smallest book that has a voucher;
+    // a skipping one sends none while the mark times the default voucher fits.
+    assert_eq!(census_read_count(1, counting), Ok(1));
+    assert_eq!(census_read_count(170, skipping), Ok(0));
+    assert_eq!(census_read_count(171, skipping), Ok(1));
+    // The live book of §11c.1 is 31 census reads at the production width.
+    assert_eq!(census_read_count(249_948, counting), Ok(31));
+    let largest = MAX_CENSUS_READS as u64 * counting.census_capacity();
+    assert_eq!(census_read_count(largest, counting), Ok(256));
+    assert_eq!(
+        census_read_count(largest + 1, counting),
+        Err(BOOK_TOO_LARGE)
+    );
+    for limits in [counting, skipping] {
+        for mark in [
+            0,
+            1,
+            42,
+            43,
+            170,
+            171,
+            8_192,
+            8_193,
+            249_948,
+            largest,
+            largest + 1,
+        ] {
+            let expected = if skips_census(mark, limits) {
+                Ok(0)
+            } else {
+                census_spans(mark, limits.census_capacity()).map(|spans| spans.count() as u64)
+            };
+            assert_eq!(census_read_count(mark, limits), expected, "mark {mark}");
+        }
+    }
+}
+
 #[test]
 fn a_book_needing_more_census_spans_than_allowed_is_refused_before_any_is_made() {
     let largest = MAX_CENSUS_READS as u64 * 4096;

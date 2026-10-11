@@ -36,6 +36,7 @@ DEFAULT_TOOLS = {
     "validate_masters",
     "verify_import",
     "voucher_presence",
+    "voucher_read_cost",
     "voucher_schema",
     "vouchers",
 }

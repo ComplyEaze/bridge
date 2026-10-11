@@ -523,7 +523,7 @@ fn a_name_or_identity_hidden_inside_an_unknown_element_is_refused() {
         changed.replace_range(span.clone(), &replacement);
         changed
     };
-    let hidden: [(&str, String); 10] = [
+    let hidden: [(&str, String); 11] = [
         (
             "the language list inside a wrapper",
             in_language_list(format!("<X>{language_list}</X>")),
@@ -556,6 +556,10 @@ fn a_name_or_identity_hidden_inside_an_unknown_element_is_refused() {
         (
             "an empty language list inside a wrapper",
             in_row("<X><LANGUAGENAME.LIST/></X>"),
+        ),
+        (
+            "a hidden NAME followed by a clean unknown element",
+            in_row("<X><NAME/></X><Y></Y>"),
         ),
         (
             "a NAME after a sibling element closed",

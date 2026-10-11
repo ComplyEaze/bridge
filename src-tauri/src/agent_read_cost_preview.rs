@@ -13,7 +13,8 @@
 //!   gate's rule, and the floor is the one `read_cost.floor_seconds` states
 //!   (`census_floor_ms`, one rule for both). The floor is the least time spent on
 //!   the gaps between census reads of a call that is not refused earlier. It leaves
-//!   out every data part and the empty-window re-read;
+//!   out every data part and the wider re-read an empty window gets in `vouchers`
+//!   and `ledger_movement`;
 //! - the `measured` block is **constant text**: census runs recorded in the public
 //!   protocol reference, each with its host, date, confidence and "not a bound".
 //!   Bridge computes no estimate from them. If one is wanted later it gets its own
@@ -42,15 +43,6 @@ impl CensusCost {
         match census_read_count(high_water, limits) {
             Ok(reads) => Self::Reads(reads),
             Err(code) => Self::Refused(code),
-        }
-    }
-
-    /// The floor in whole seconds, rounded down. A refused read sends no census,
-    /// so there is none to state.
-    fn floor_seconds(self) -> Option<u64> {
-        match self {
-            Self::Reads(reads) => Some(census_floor_ms(reads) / 1000),
-            Self::Refused(_) => None,
         }
     }
 
@@ -140,7 +132,7 @@ const LIMITATIONS: [&str; 7] = [
     "A narrower window does not lower the census count: the census follows the book's mark, not the window. Reading N days in N calls pays it N times. Only the data parts follow the window.",
     "The census count and the floor are derived from the mark and the gate's rules, not measured on this book. The floor is the least time spent on the half-second gap between census reads, for a call that is not refused earlier; it leaves out every data part, and the recorded runs under measured took more than twice their floor.",
     "No estimate is made. The measured block is constant text from the protocol reference and is not a bound.",
-    "A `vouchers` window with no voucher is read once more, a day wider on each side, which pays its own census on a large book and is not counted here. `ledger_movement` reads its window twice; the second read sends no census.",
+    "A `vouchers` or `ledger_movement` window with no row is read once more, a day wider on each side, which pays its own census on a large book and is not counted here. `ledger_movement` also reads its window twice; the second read sends no census.",
     "Nothing here is a limit or a refusal except `refused_by_allowance`, which is the refusal the read itself makes. Bridge is not told which host timeout applies: host_limits states what has been measured.",
     "The mark is read from Tally's company record; an absent voucher mark on a verified company means it has never held a voucher, and then no census is sent.",
 ];
@@ -151,12 +143,14 @@ fn say(mark: u64, costs: &[(&'static str, CensusCost)]) -> String {
         .iter()
         .map(|(tool, cost)| match cost {
             CensusCost::Reads(0) => format!("{tool} sends no census"),
-            CensusCost::Reads(reads) => format!(
-                "{tool} sends {reads} census read{} and takes at least {} second{} of gaps between them (derived)",
-                if *reads == 1 { "" } else { "s" },
-                cost.floor_seconds().unwrap_or(0),
-                if cost.floor_seconds() == Some(1) { "" } else { "s" },
-            ),
+            CensusCost::Reads(reads) => {
+                let floor = census_floor_ms(*reads) / 1000;
+                format!(
+                    "{tool} sends {reads} census read{} and takes at least {floor} second{} of gaps between them (derived)",
+                    if *reads == 1 { "" } else { "s" },
+                    if floor == 1 { "" } else { "s" },
+                )
+            }
             CensusCost::Refused(code) => format!("{tool} is refused as {code}"),
         })
         .collect::<Vec<_>>()

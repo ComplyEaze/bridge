@@ -45,7 +45,8 @@ These changes are in source and not yet in a published build.
   #1465, after #1239). It reads only the company's marks (the read every windowed call opens with) and sends no
   census and no voucher request. The census follows the book's voucher mark, not the window, so the figure is for
   one call: a narrower window does not lower it, and N calls pay it N times. The count and the floor are derived
-  from the mark and the read's own rules, not measured on the book; no estimate is made. Beside them are the
+  from the mark and the read's own rules, not measured on the book, and they leave out the data parts and the
+  wider re-read an empty window gets in `vouchers` and `ledger_movement`; no estimate is made. Beside them are the
   census runs the protocol reference records (one book, about 250,000 vouchers, 31 census reads), as data marked
   as not a bound. Nothing is refused on it. Not measured: Windows hosts, and any book other than that one.
 

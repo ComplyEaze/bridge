@@ -5650,6 +5650,44 @@ async fn vouchers_states_its_read_cost_from_eighteen_census_reads_and_not_from_o
     assert!(window.get("read_cost").is_none(), "{window}");
 }
 
+/// bridge#1465: what `voucher_read_cost` states before a call is what a real
+/// `vouchers` call then sends. The same scripted book is read twice, once by the
+/// preview (the identity read and one marks read) and once by the real call
+/// (whose window reports the census requests it sent), at two sizes; the
+/// counts and, where the real call states one, the floor must be equal. A change
+/// to the census rule at the read that is not made at the preview fails here.
+#[tokio::test]
+async fn the_preview_states_the_census_reads_a_real_vouchers_call_then_sends() {
+    let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
+    for reads in [3_u64, 18] {
+        let real = call_vouchers_over(census_plans_of(reads)).await;
+        assert_eq!(real["isError"], false, "{real}");
+        let window = &real["structuredContent"]["result"]["window"];
+        let sent = window["census"]["requests"].clone();
+        assert_eq!(
+            sent, reads,
+            "the real call sent {reads} census reads: {window}"
+        );
+
+        let mut plans = identity_plans();
+        plans.extend(paired(&mark(reads * capacity)));
+        let one = OneServer::spawn(plans);
+        let preview = one
+            .server
+            .call_tool("voucher_read_cost", json!({"company_guid": GUID}))
+            .await;
+        assert_eq!(preview["isError"], false, "{preview}");
+        let stated = &preview["structuredContent"]["result"]["per_call"]["vouchers"];
+        assert_eq!(stated["census_reads"], sent, "reads {reads}: {stated}");
+        // The real call states its floor from 16 reads on; it is the same figure.
+        if let Some(floor) = window["read_cost"].get("floor_seconds") {
+            assert_eq!(&stated["floor_seconds"], floor, "reads {reads}: {stated}");
+        }
+        // The preview sent the identity read and one marks read, and nothing else.
+        assert_eq!(one.requests(), 10);
+    }
+}
+
 /// A later page is served from the held window in about a second, so it must not
 /// repeat what the first page's read cost: it keeps the first page's timings and
 /// no `read_cost`.

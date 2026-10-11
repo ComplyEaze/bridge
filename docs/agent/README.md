@@ -1273,8 +1273,9 @@ each, how many census reads one call of it will send on this book.
 - It is as of its own read of the mark. The call that follows reads the mark again. It refuses
   nothing; `vouchers` and the other two read as before.
 
-Not covered: the data parts (they need the census), the second read an empty `vouchers` window gets (it
-pays its own census on a large book), the second window read of `ledger_movement` (it sends no census),
+Not covered: the data parts (they need the census), the wider read an empty window gets in `vouchers` and in
+`ledger_movement` (it pays its own census on a large book), the second window read of `ledger_movement`
+(it sends no census),
 `outstandings` and `voucher_presence`. Windows hosts are not measured.
 
 ### Search and summaries in `vouchers` (#1230)

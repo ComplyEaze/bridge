@@ -30,3 +30,9 @@ b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5  w7c-readback-s
 # W9 (one ledger read two ways for its HSN/SAC and type of supply; steps in W9-README.md)
 71154d26a2239b0a9b2b3da35ef938abb7afe9134b3d0c4caeaf4bfa2010c04f  w9-ledger-hsn-all.xml
 ece27a8864b3b2d36bc97e8e8d5e9052e7c89d46824bfca9dcb9db20af9625fe  w9-ledger-hsn-fields.xml
+# W10 (rate history, GST switch, 12% and 18% single-rate bills; steps in W10-README.md)
+bd6fb5b6f933a505227f7ff2ad1a5ba9f9fed705500e0657e7f68dfac8ef38fb  w10-rates-build-window.xml
+21217d1d75dfc5a91d4816753cc36941f6a266cbd422b15070b3de9902d55d9c  w10-rates-late-window.xml
+a9725222e696368aaca63d056a5df2ca42921e3596d9a835bcb30deb3e93075c  w10-rates-early-window.xml
+e10e6269e2bb5c1dee54ba3d140bfee83003b35a17ef3001977d9005554879ab  w10-ledger-gst-switch-fields.xml
+850ffa0355be2fa98097791575f301897f1fc2391e88a5208bdb4d6a1fe10247  w10-status-window-0806.xml

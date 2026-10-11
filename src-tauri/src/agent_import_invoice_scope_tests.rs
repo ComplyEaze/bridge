@@ -184,20 +184,37 @@ fn an_answer_that_is_not_the_scopes_is_refused_on_its_rows() {
     }
 }
 
+/// The case-changed request is, byte for byte, the one the lab answered: the
+/// scoped request with only its formula's parent spelled `SALES ACCOUNTS`. A
+/// part naming that spelling is planned from a catalogue that holds it
+/// (SYNTHETIC catalogue; the request bytes are the lab's).
+#[test]
+fn the_case_changed_filter_is_the_request_the_lab_answered() {
+    let scope = scope_of(&synthetic(&[("Sales", "SALES ACCOUNTS")]), &["Sales"]).unwrap();
+    let rendered =
+        wire::render_ledger_rates_request_for_parents(PILOT, WINDOW, scope.part()).unwrap();
+    assert_eq!(captured(CASE_CHANGED_REQUEST), rendered);
+}
+
 /// `$Parent` folds case on this book (reference 11e): the filter spelled
 /// `SALES ACCOUNTS` returned the four `Sales Accounts` ledgers, each row
-/// carrying the book's own spelling. That is why a scope refuses a book with a
-/// parent that differs from a scoped one only in case, and why the proof
-/// compares each row's parent exactly.
+/// carrying the book's own spelling. The proof compares each row's parent
+/// exactly, so that answer is exactly the rows of a scope whose parent is the
+/// book's `Sales Accounts`, and not the rows of the lab invoice's four-parent
+/// scope. That is also why a scope refuses a book with a case-twin parent: the
+/// filter cannot tell the twins apart.
 #[test]
-fn a_filter_in_another_case_returned_rows_in_the_books_spelling() {
-    let request = captured(CASE_CHANGED_REQUEST);
-    assert!(request.contains("$Parent = \"SALES ACCOUNTS\""));
+fn a_filter_in_another_case_returned_rows_the_books_spelling_proves() {
+    let scope = scope_of(&pilot_catalogue(), &["BRIDGE Svc 998313 5%"]).unwrap();
+    assert_eq!(parents_of(&scope), ["Sales Accounts"]);
+    assert_eq!(scope.part().ledger_count(), 4);
     let rows = listed(CASE_CHANGED_ANSWER);
-    assert_eq!(rows.len(), 4);
     assert!(rows
         .iter()
         .all(|row| row.parent.as_deref() == Some("Sales Accounts")));
+    assert_eq!(scope.prove(&rows), Ok(()));
+    let invoice = scope_of(&pilot_catalogue(), &LEGS).unwrap();
+    assert!(invoice.prove(&rows).is_err());
 }
 
 /// One row changed in the lab's real answer is refused under the way it

@@ -1723,6 +1723,12 @@ const ROWS: &[Row] = &[
         parser: "parse_native_party_ledger_master_records_with_evidence(STOCK LAB)",
         parse: |_, text| party_masters(text, STOCK_LAB_GUID),
     },
+    Row {
+        fixture: "tests/fixtures/ledger_gst_details_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(PILOT LAB)",
+        parse: |_, text| party_masters(text, "6b43e498-430c-4d5c-bfef-d32e2ab93c85"),
+    },
     // Group snapshots: tests/native_outstandings_live_fixtures.rs, tests/native_core_regressions.rs,
     // tests/decoder_convergence.rs, src/native_outstandings/wire_group_tests.rs; the app's replays
     // (src/reports/statements_tests.rs, src/agent_register_tests.rs, src/agent_import_bank_tests.rs,

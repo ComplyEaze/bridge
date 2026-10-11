@@ -5532,6 +5532,35 @@ fn built_or_panic(outcome: Result<ToolOutcome, ToolFailure>) -> ToolOutcome {
     }
 }
 
+/// Each element directly under the root of Tally's answer to an import, with
+/// its text, in answer order. A malformed answer panics; an element with no
+/// text reads as empty.
+fn pilot_answer_elements(xml: &str) -> Vec<(String, String)> {
+    let mut reader = quick_xml::Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut depth = 0usize;
+    let mut elements = Vec::new();
+    loop {
+        match reader.read_event().expect("a well-formed import answer") {
+            quick_xml::events::Event::Start(start) => {
+                depth += 1;
+                if depth == 2 {
+                    let name = start.name().as_ref().to_string();
+                    elements.push((name, String::new()));
+                }
+            }
+            quick_xml::events::Event::Text(text) if depth == 2 => {
+                elements.last_mut().unwrap().1.push_str(&text);
+            }
+            quick_xml::events::Event::End(_) => depth -= 1,
+            quick_xml::events::Event::Eof => break,
+            _ => {}
+        }
+    }
+    assert_eq!(depth, 0, "the answer's elements are all closed");
+    elements
+}
+
 fn pilot_args(walk_in: &str, cgst: &str, party: &str) -> Value {
     json!({"company_guid":PILOT_GUID, "vouchers":[{
     "bridge_txn_id":"t1", "date":"2026-08-01", "voucher_type":"Sales", "voucher_number":"BP/26-27/0010",
@@ -5615,6 +5644,40 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
         ),
         (&json!(1), &json!(0), &json!(0))
     );
+    // Every counter of Tally's answer to the import, by name: the seven the
+    // code parses, from its own parse, and all eight, COMBINED among them, from
+    // the committed answer's elements, each present exactly once.
+    for (name, value) in [
+        ("created", 1),
+        ("altered", 0),
+        ("deleted", 0),
+        ("ignored", 0),
+        ("errors", 0),
+        ("cancelled", 0),
+        ("exceptions", 0),
+    ] {
+        assert_eq!(counters[name], json!(value), "{name}");
+    }
+    let answered = pilot_answer_elements(&captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml"
+    )));
+    for (name, value) in [
+        ("CREATED", "1"),
+        ("ALTERED", "0"),
+        ("DELETED", "0"),
+        ("COMBINED", "0"),
+        ("IGNORED", "0"),
+        ("CANCELLED", "0"),
+        ("ERRORS", "0"),
+        ("EXCEPTIONS", "0"),
+    ] {
+        let found = answered
+            .iter()
+            .filter(|(element, _)| element == name)
+            .map(|(_, text)| text.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(found, [value], "{name}");
+    }
     // Every answer was asked for, none more; the one write is the request Tally
     // accepted, once.
     assert_eq!(observed.len(), PILOT_ORDER.len());
@@ -5664,6 +5727,27 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
         ),
         (Some(16), Some(223))
     );
+    // The company's marks around the import, read by the code's own parser
+    // from the two committed marks answers the replay served: the voucher mark
+    // stepped by one and the master mark did not move.
+    let marks_before = crate::agent::parse_company_marks(
+        &captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-before-post.utf16le.xml"
+        )),
+        PILOT_GUID,
+    )
+    .unwrap();
+    let marks_after = crate::agent::parse_company_marks(
+        &captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"
+        )),
+        PILOT_GUID,
+    )
+    .unwrap();
+    assert_eq!(marks_before, (16, 223));
+    assert_eq!(marks_after.0, 17);
+    assert_eq!(marks_after.1, 223);
+    assert_eq!(marks_after.1, marks_before.1);
 }
 
 /// The walk-in ledger's row is spelled `BRIDGE Walk-in` in the pilot lab's

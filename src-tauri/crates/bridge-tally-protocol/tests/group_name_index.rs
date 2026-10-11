@@ -495,6 +495,128 @@ fn a_body_cut_after_a_complete_row_is_refused_as_unterminated() {
     }
 }
 
+/// The children the six captures show under a row and under its language list
+/// are stepped over or read; any other child is searched for a name, an
+/// identity or a row hidden inside it, and refused if one is there. The
+/// snapshot parser reads none of these rows differently.
+#[test]
+fn a_name_or_identity_hidden_inside_an_unknown_element_is_refused() {
+    let text = shape_lab();
+    let snapshot = parse_native_group_snapshot(&text, SHAPE_GUID).unwrap();
+    let row_number = row_of(&text, "Bank OD A/c");
+    let row_open = "<GROUP NAME=\"Bank OD A/c\"";
+    let row_start = text.find(row_open).unwrap();
+    let row_close = row_start + text[row_start..].find("</GROUP>").unwrap();
+    let span = language_list_span(&text, row_open);
+    let language_list = text[span.clone()].to_string();
+    let list_start = language_list.find("<NAME.LIST").unwrap();
+    let list_end = language_list.find("</NAME.LIST>").unwrap() + "</NAME.LIST>".len();
+    let list_close = language_list.rfind("</LANGUAGENAME.LIST>").unwrap();
+
+    let in_row = |inserted: &str| {
+        let mut changed = text.clone();
+        changed.insert_str(row_close, inserted);
+        changed
+    };
+    let in_language_list = |replacement: String| {
+        let mut changed = text.clone();
+        changed.replace_range(span.clone(), &replacement);
+        changed
+    };
+    let hidden: [(&str, String); 10] = [
+        (
+            "the language list inside a wrapper",
+            in_language_list(format!("<X>{language_list}</X>")),
+        ),
+        (
+            "the name list inside a wrapper in the language list",
+            in_language_list(format!(
+                "{}<X>{}</X>{}",
+                &language_list[..list_start],
+                &language_list[list_start..list_end],
+                &language_list[list_end..]
+            )),
+        ),
+        (
+            "a GUID inside a wrapper in the language list",
+            in_language_list(format!(
+                "{}<X><GUID>g</GUID></X>{}",
+                &language_list[..list_close],
+                &language_list[list_close..]
+            )),
+        ),
+        (
+            "a nested GUID",
+            in_row("<X><GUID>3a6bd6e1-b835-4bff-89dd-8a6af138c346-ffffffff</GUID></X>"),
+        ),
+        (
+            "a nested GROUP",
+            in_row("<X><GROUP NAME=\"Hidden\"><PARENT>p</PARENT></GROUP></X>"),
+        ),
+        (
+            "an empty language list inside a wrapper",
+            in_row("<X><LANGUAGENAME.LIST/></X>"),
+        ),
+        (
+            "a NAME after a sibling element closed",
+            in_row("<X><Y></Y><NAME>Hidden</NAME></X>"),
+        ),
+        ("a nested NAME", in_row("<X><NAME>Hidden</NAME></X>")),
+        (
+            "a deeply nested empty NAME.LIST",
+            in_row("<X><Y><Z><NAME.LIST/></Z></Y></X>"),
+        ),
+        ("a nested self-closing NAME", in_row("<X><NAME/></X>")),
+    ];
+    for (label, changed) in hidden {
+        assert_eq!(
+            parse(&changed),
+            Err(GroupNameIndexError::HiddenInUnknownElement { row: row_number }),
+            "{label}"
+        );
+    }
+
+    // The same bytes read by the snapshot parser are not read differently.
+    for changed in [
+        in_row("<X><GUID>g</GUID></X>"),
+        in_row("<X><GROUP NAME=\"Hidden\"><GUID>h</GUID></GROUP></X>"),
+        in_language_list(format!("<X>{language_list}</X>")),
+    ] {
+        assert_eq!(
+            parse_native_group_snapshot(&changed, SHAPE_GUID).as_ref(),
+            Ok(&snapshot)
+        );
+    }
+
+    // An unknown element with nothing hidden in it is not refused.
+    let control = parse(&text).unwrap();
+    assert_eq!(parse(&in_row("<X><Y>text</Y></X>")), Ok(control.clone()));
+    assert_eq!(
+        parse(&in_language_list(format!(
+            "{}<FLAG><Y>1</Y></FLAG>{}",
+            &language_list[..list_close],
+            &language_list[list_close..]
+        ))),
+        Ok(control)
+    );
+
+    // Cut inside the unknown element, the search cannot finish. The snapshot
+    // parser keeps its own code for the same bytes.
+    let cut = format!("{}<X>", &text[..row_close]);
+    assert_eq!(
+        parse_native_group_snapshot(&cut, SHAPE_GUID),
+        Err(NativeOutstandingsError::InvalidResponse(
+            "ledger_subtree_unterminated"
+        ))
+    );
+    assert_eq!(
+        parse(&cut),
+        Err(GroupNameIndexError::Response(
+            NativeOutstandingsError::InvalidResponse("group_row_unterminated")
+        ))
+    );
+}
+
 /// A `GROUP` that is not under `ENVELOPE/BODY/DATA/COLLECTION` would be
 /// stepped over by the row walk, leaving fewer rows than Tally sent; the index
 /// refuses it. The bare `CMPINFO` counter is the one `GROUP` allowed elsewhere.

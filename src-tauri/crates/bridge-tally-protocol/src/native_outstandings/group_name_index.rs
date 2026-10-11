@@ -76,6 +76,10 @@ pub enum GroupNameIndexError {
     /// The row holds names in a shape no capture shows, where reading around
     /// it would drop a name silently.
     UnrecognisedNameShape { row: usize, shape: NameShape },
+    /// An element no capture shows holds a `GROUP`, `GUID`, `NAME`,
+    /// `NAME.LIST` or `LANGUAGENAME.LIST` somewhere inside it (in the row or in
+    /// its language list), where a name or identity could be read around.
+    HiddenInUnknownElement { row: usize },
     /// A `GROUP` element sits outside `ENVELOPE/BODY/DATA/COLLECTION` (the
     /// `CMPINFO` counter excepted), so the rows read would be fewer than sent.
     GroupOutsideCollection,
@@ -131,6 +135,7 @@ pub fn parse_group_name_index(
             alter_ids,
             names,
             unrecognised_name_shape,
+            hidden_in_unknown_element,
         } = walked_row.row.identity;
 
         let guid = single(guids, row, |row| GroupNameIndexError::GuidRepeatedInRow {
@@ -153,6 +158,9 @@ pub fn parse_group_name_index(
         let alter_id =
             parse_alter_id(&alter_id).ok_or(GroupNameIndexError::AlterIdNotNumeric { row })?;
 
+        if hidden_in_unknown_element {
+            return Err(GroupNameIndexError::HiddenInUnknownElement { row });
+        }
         if let Some(shape) = unrecognised_name_shape {
             return Err(GroupNameIndexError::UnrecognisedNameShape { row, shape });
         }

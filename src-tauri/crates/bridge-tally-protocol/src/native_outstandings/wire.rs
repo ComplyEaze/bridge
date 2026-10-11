@@ -994,6 +994,81 @@ pub(super) struct GroupRowIdentity {
     /// The first name-bearing shape met that the walk read around instead of
     /// into, if any: the index refuses it so no name is dropped silently.
     pub(super) unrecognised_name_shape: Option<NameShape>,
+    /// Whether an element outside the captured vocabulary holds a `GROUP`,
+    /// `GUID`, `NAME`, `NAME.LIST` or `LANGUAGENAME.LIST` somewhere inside it.
+    pub(super) hidden_in_unknown_element: bool,
+}
+
+/// The children of a `GROUP` row, other than the ones the index reads, that the
+/// captured rows show: all leaves. Anything else in a row is searched.
+/// Derived from the six committed group captures.
+const CAPTURED_ROW_CHILDREN: [&str; 6] = [
+    "ISREVENUE",
+    "MASTERID",
+    "PARENTSTRUCTURE",
+    "PRIMARYGRPPARENT",
+    "RESERVEDNAME",
+    "RESERVENAME",
+];
+
+/// The child of a `LANGUAGENAME.LIST`, other than `NAME.LIST`, that the
+/// captures show.
+const CAPTURED_LANGUAGE_LIST_CHILDREN: [&str; 1] = ["LANGUAGEID"];
+
+/// Steps over the subtree of a child just started: unread if the capture shows
+/// it, otherwise searched for what must not hide there.
+fn skip_child(
+    reader: &mut Reader<&[u8]>,
+    child: &BytesStart<'_>,
+    captured: &[&str],
+    identity: &mut GroupRowIdentity,
+) -> Result<(), NativeOutstandingsError> {
+    let name = child.name();
+    if captured
+        .iter()
+        .any(|known| name.as_ref().eq_ignore_ascii_case(known))
+    {
+        return skip_subtree(reader);
+    }
+    identity.hidden_in_unknown_element |= subtree_hides_a_name(reader)?;
+    Ok(())
+}
+
+/// Consumes the subtree of an element just started and reports whether any
+/// element inside it is one the index reads or counts.
+fn subtree_hides_a_name(reader: &mut Reader<&[u8]>) -> Result<bool, NativeOutstandingsError> {
+    const HIDDEN: [&str; 5] = ["GROUP", "GUID", "NAME", "NAME.LIST", "LANGUAGENAME.LIST"];
+    let is_hidden = |name: QName<'_>| {
+        HIDDEN
+            .iter()
+            .any(|hidden| name.as_ref().eq_ignore_ascii_case(hidden))
+    };
+    let mut depth = 1_u32;
+    let mut found = false;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| NativeOutstandingsError::InvalidResponse("group_xml_malformed"))?
+        {
+            Event::Start(inner) => {
+                depth += 1;
+                found |= is_hidden(inner.name());
+            }
+            Event::Empty(inner) => found |= is_hidden(inner.name()),
+            Event::End(_) => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok(found);
+                }
+            }
+            Event::Eof => {
+                return Err(NativeOutstandingsError::InvalidResponse(
+                    "group_row_unterminated",
+                ))
+            }
+            _ => {}
+        }
+    }
 }
 
 impl GroupRowIdentity {
@@ -1088,6 +1163,9 @@ fn parse_group_row(
                 identity.note_shape(NameShape::NameListOutsideLanguageList);
                 skip_subtree(reader)?;
             }
+            Event::Start(child) if index => {
+                skip_child(reader, &child, &CAPTURED_ROW_CHILDREN, &mut identity)?;
+            }
             Event::Start(_) => skip_subtree(reader)?,
             Event::Empty(child) if index && child.name().as_ref().eq_ignore_ascii_case("GUID") => {
                 identity.guids.push(String::new());
@@ -1171,7 +1249,9 @@ fn read_language_name_list(
             Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("NAME") => {
                 identity.note_shape(NameShape::NameDirectlyUnderLanguageList);
             }
-            Event::Start(_) => skip_subtree(reader)?,
+            Event::Start(child) => {
+                skip_child(reader, &child, &CAPTURED_LANGUAGE_LIST_CHILDREN, identity)?;
+            }
             Event::End(end)
                 if end
                     .name()

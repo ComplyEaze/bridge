@@ -44,33 +44,42 @@ fn the_gst_duty_head_table_lists_six_distinct_heads_and_six_distinct_spellings()
     }
 }
 
-/// A head added to the enum fails to compile here until its spelling is
-/// written down, and fails the assertions until it is in `ALL`.
+/// One list of `variant => spelling` pairs writes both the exhaustive `match`
+/// and the array of every variant the test checks, so the two cannot differ: a
+/// head added to the enum fails to compile here until it is listed, and once
+/// listed it is checked against `ALL`.
+macro_rules! expected_gst_duty_heads {
+    ($($variant:ident => $spelling:literal),+ $(,)?) => {
+        fn expected_spelling(head: GstDutyHead) -> &'static str {
+            match head {
+                $(GstDutyHead::$variant => $spelling),+
+            }
+        }
+        fn every_listed_variant() -> Vec<GstDutyHead> {
+            vec![$(GstDutyHead::$variant),+]
+        }
+    };
+}
+expected_gst_duty_heads! {
+    Cgst => "CGST",
+    Igst => "IGST",
+    StateTax => "State Tax",
+    SgstUtgst => "SGST/UTGST",
+    UtTax => "UT Tax",
+    Cess => "Cess",
+}
+
 #[test]
 fn the_gst_duty_head_table_holds_every_variant_with_its_spelling() {
-    fn expected_spelling(head: GstDutyHead) -> &'static str {
-        match head {
-            GstDutyHead::Cgst => "CGST",
-            GstDutyHead::Igst => "IGST",
-            GstDutyHead::StateTax => "State Tax",
-            GstDutyHead::SgstUtgst => "SGST/UTGST",
-            GstDutyHead::UtTax => "UT Tax",
-            GstDutyHead::Cess => "Cess",
-        }
+    let listed = every_listed_variant();
+    for head in &listed {
+        assert!(GstDutyHead::ALL.contains(head), "{head:?} is not in ALL");
     }
-    let every_variant = [
-        GstDutyHead::Cgst,
-        GstDutyHead::Igst,
-        GstDutyHead::StateTax,
-        GstDutyHead::SgstUtgst,
-        GstDutyHead::UtTax,
-        GstDutyHead::Cess,
-    ];
-    for head in every_variant {
-        assert!(GstDutyHead::ALL.contains(&head), "{head:?} is not in ALL");
+    for head in GstDutyHead::ALL {
+        assert!(listed.contains(&head), "{head:?} is in ALL but not listed");
         assert_eq!(head.tally_spelling(), expected_spelling(head), "{head:?}");
     }
-    assert_eq!(GstDutyHead::ALL.len(), every_variant.len());
+    assert_eq!(GstDutyHead::ALL.len(), listed.len());
 }
 
 /// Anything outside the table stays unrecognised, including the spellings

@@ -1577,7 +1577,7 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 - **What ComplyEaze Bridge does with it.** `company_features` returns the cost-centre, GST and batch-wise settings, each as yes, no or not_reported (an element Tally did not send is never read as no; an empty or odd one refuses the read), each saying what it rests on, and the symbol. The row is bound to the verified company by its GUID, name, company number and books-from date. Nothing it returns changes what another tool reads or refuses; `stock_summary` reads its own inventory, integrated and batch-wise flags from its own request. All three settings equalled the screen on three synthetic books, so each carries `compared_with_tally_screen_on_synthetic_books`.
 - **Not measured:** the 14 flags the tool does not return against the screen; a setting changed inside a sitting (the GST reading above is one such case, unexplained); books with vouchers; macOS; a setting changed one at a time; Education mode; any release other than 7.1; a book with companies that share a GUID; a client book.
 
-### 12a.18 A company's GST registration is a tax unit, with dated rows
+### 12a.19 A company's GST registration is a tax unit, with dated rows
 
 **PARTIAL: VERIFIED 2026-10-09, licensed TallyPrime 7.1 Silver**, one synthetic company (`BRIDGE PILOT LAB`) with one GST registration, one run, read by an outside contributor before any voucher was keyed; the request was the code's collection typed by hand and sent as UTF-8 (`pilot-lab/PROVENANCE.md`), where ComplyEaze Bridge sends UTF-16.
 

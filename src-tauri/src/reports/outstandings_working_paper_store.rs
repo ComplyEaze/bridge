@@ -185,8 +185,9 @@ impl PartyStatementSourceStore {
 }
 
 /// Copies a working-paper source only after the completed result passes
-/// cardinality, source-byte, and text-size budgets. `None` is the legacy path,
-/// whose missing unallocated control cannot substantiate an all-party paper.
+/// cardinality, source-byte, and text-size budgets. `None` when the result is
+/// not complete or carries no unallocated control, which cannot substantiate an
+/// all-party paper.
 pub fn source_from_complete_result(
     result: &OutstandingsLoadResult,
     company_guid: &str,

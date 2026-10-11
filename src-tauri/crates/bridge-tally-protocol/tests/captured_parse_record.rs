@@ -2283,12 +2283,8 @@ const APP_HIGH_WATER: &str = "recorded by the app crate's record (#1198 slice 2)
      parse_company_high_water / parse_company_marks (a company ALTVCHID/ALTMSTID read)";
 const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slice 2): \
      parse_agent_rows_withholding (src/currency_composite_tests.rs only classifies its amounts)";
-const VOUCHER_SCAN_AND_APP: &str = "recorded by the app crate's record (#1198 slice 2): \
-     parse_agent_rows; this crate parses it only through the voucher-scan feature's pub(super) \
-     parse_segment (behind verify_segment_pair), which the default build does not compile";
-const VOUCHER_SCAN_ONLY: &str = "parsed only by the voucher-scan feature's pub(super) \
-     parse_segment (behind verify_segment_pair), which the default build does not compile; no \
-     public parser of the default build reads this voucher export";
+const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
+     crate reads: its only reader, the voucher-scan parser, was removed; kept as captured evidence";
 const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
@@ -2535,30 +2531,30 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/agent/vouchers-forex-composite-20260915.utf16le.xml",
         APP_FOREX_VOUCHERS,
     ),
-    // The legacy voucher-scan exports.
+    // Voucher exports captured for the removed voucher-scan parser.
     (
         "tests/fixtures/unit_a_optional_voucher_live.xml",
-        VOUCHER_SCAN_AND_APP,
+        APP_VOUCHER_ROWS,
     ),
     (
         "tests/fixtures/vouchers_agst_ref_reopen_live.utf16le.xml",
-        VOUCHER_SCAN_AND_APP,
+        APP_VOUCHER_ROWS,
     ),
     (
         "tests/fixtures/vouchers_gst_credit_periods_live.utf16le.xml",
-        VOUCHER_SCAN_AND_APP,
+        APP_VOUCHER_ROWS,
     ),
     (
         "tests/fixtures/vouchers_settle_then_reopen_live.utf16le.xml",
-        VOUCHER_SCAN_AND_APP,
+        APP_VOUCHER_ROWS,
     ),
     (
         "tests/fixtures/unit_a_vouchers_wildcard_live.xml",
-        VOUCHER_SCAN_ONLY,
+        VOUCHER_EXPORT_NO_PARSER,
     ),
     (
         "tests/fixtures/vouchers_ageing_corpus_live.utf16le.xml",
-        VOUCHER_SCAN_ONLY,
+        VOUCHER_EXPORT_NO_PARSER,
     ),
     // Built-in reports no parser reads.
     (

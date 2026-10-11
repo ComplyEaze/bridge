@@ -85,8 +85,8 @@
 //    read, pulled in with `#[path]` or `include!` from outside src-tauri or as
 //    a non-`.rs` file; features the shipped build turns on that the run does
 //    not (tauri.conf.json's build features, `tauri build --features`); other
-//    features the run does not enable (voucher-scan, the calibration harness,
-//    lab-writes and bridge-tally-protocol's evidence features); Linux-only code; path dependencies that are not workspace
+//    features the run does not enable (lab-writes and
+//    bridge-tally-protocol's evidence features); Linux-only code; path dependencies that are not workspace
 //    members (clippy does not lint them; measured); and tests, examples and
 //    benches, which do not ship. Measured on a two-file crate: a listed call
 //    made by a dependency's own `macro_rules!` macro fires and is attributed to

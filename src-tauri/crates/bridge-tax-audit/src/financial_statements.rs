@@ -1506,9 +1506,9 @@ P&L/Balance Sheet report"
 net profit was derived"
         );
         assert_eq!(f.confidence, Confidence::NeedsDocument);
-        assert_eq!(f.limits.len(), 3);
+        assert_eq!(f.limits.len(), 4);
         assert_eq!(
-            f.limits[2],
+            f.limits[3],
             "Opening stock is held on the stock items, not on a ledger, and was not taken: the read \
 does not show the trial balance starting on the books' first day; no gross profit or net profit is \
 shown."
@@ -1531,7 +1531,7 @@ shown."
         assert!(!has_figure(&closing_unknown, "stock_to_turnover_pct_bp"));
         let f = &closing_unknown.findings[0];
         assert_eq!(
-            f.limits[2],
+            f.limits[3],
             "Closing stock is held on the stock items, not on a ledger, and was not taken: the read \
 has no Stock Summary dated the trial balance's last day; no gross profit or net profit is shown."
         );
@@ -1547,11 +1547,11 @@ has no Stock Summary dated the trial balance's last day; no gross profit or net 
         assert!(!has_figure(&both, "opening_stock"));
         assert!(!has_figure(&both, "closing_stock"));
         let f = &both.findings[0];
-        assert_eq!(f.limits.len(), 4);
-        assert!(f.limits[2].starts_with(
+        assert_eq!(f.limits.len(), 5);
+        assert!(f.limits[3].starts_with(
             "Opening stock is held on the stock items, not on a ledger, and was not read;"
         ));
-        assert!(f.limits[3].starts_with(
+        assert!(f.limits[4].starts_with(
             "Closing stock is held on the stock items, not on a ledger, and was unreadable;"
         ));
         assert_eq!(f.ask_client.len(), 2);
@@ -1560,7 +1560,7 @@ has no Stock Summary dated the trial balance's last day; no gross profit or net 
         let half = item_book(OpeningStock::Valued(200_000), ClosingStock::NotApplicable);
         let r = run(&half, &rules(), &BTreeSet::new(), None).unwrap();
         assert!(!has_figure(&r, "gross_profit"));
-        assert!(r.findings[0].limits[2].starts_with(
+        assert!(r.findings[0].limits[3].starts_with(
             "Closing stock is held on the stock items, not on a ledger, and was not read;"
         ));
     }
@@ -1579,7 +1579,7 @@ has no Stock Summary dated the trial balance's last day; no gross profit or net 
         assert_eq!(fig(&r, "opening_stock"), Value::Int(200_000));
         assert_eq!(fig(&r, "closing_stock"), Value::Int(300_000));
         assert_eq!(
-            r.findings[0].limits[2],
+            r.findings[0].limits[3],
             "A ledger under Stock-in-Hand carries a value on a book that keeps its stock on the \
 stock items, and the two were not added, in case the stock is counted twice; no gross profit or net \
 profit is shown."
@@ -1622,6 +1622,13 @@ profit is shown."
         assert_eq!(r.findings[0].confidence, Confidence::Computed);
         assert!(r.findings[0].limits[0]
             .starts_with("The gross profit ratio uses the stock items' values"));
+        // How a Summary row with no value, and a Summary with no row, read: said beside the rule.
+        assert_eq!(r.findings[0].limits.len(), 3);
+        assert_eq!(
+            r.findings[0].limits[2],
+            "A stock item with no value counts as nothing, so a Stock Summary whose items all lack a \
+closing value shows a closing stock of zero; a Summary that lists no item at all is not taken as zero."
+        );
         assert!(check_invariants(&b, &r).unwrap().is_empty());
 
         let off = run(
@@ -1773,11 +1780,31 @@ profit is shown."
                 assert!(!has_figure(&r, name), "{what}: {name} must not be shown");
             }
             assert!(
-                r.findings[0].limits[2].starts_with("A ledger under Stock-in-Hand carries a value"),
+                r.findings[0].limits[3].starts_with("A ledger under Stock-in-Hand carries a value"),
                 "{what}: {:?}",
                 r.findings[0].limits
             );
             assert!(check_invariants(&b, &r).unwrap().is_empty(), "{what}");
         }
+    }
+
+    /// The registry's figure floor is exactly what a book shows when neither stock term is known,
+    /// and a book on the ledger basis shows at least the 18 the floor used to be, so a ledger
+    /// book that loses figures does not hide behind the lower floor.
+    #[test]
+    fn the_figure_floor_is_what_a_book_with_no_stock_term_shows() {
+        let floor = crate::registry::find(TEST_ID).unwrap().min_figures;
+        let mut none = item_book(
+            OpeningStock::Unknown(OpeningStockUnknown::NotRead),
+            ClosingStock::Unknown(ClosingStockUnknown::NotRead),
+        );
+        none.vouchers.clear(); // no excluded-voucher figures on top
+        let r = run(&none, &rules(), &BTreeSet::new(), None).unwrap();
+        assert_eq!(r.figures.len(), floor, "{:?}", r.figures.iter().map(|f| &f.id).collect::<Vec<_>>());
+
+        let mut ledgers = book();
+        ledgers.vouchers.clear();
+        let r = run(&ledgers, &rules(), &BTreeSet::new(), None).unwrap();
+        assert!(r.figures.len() >= 18, "{}", r.figures.len());
     }
 }

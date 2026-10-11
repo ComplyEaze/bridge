@@ -10,6 +10,7 @@ A ledger-wise trial balance of a book with integrated inventory leaves out the s
 - `edge-books/fs_stock_opening_unknown.json`: the opening stock was not taken. No gross profit or net profit is shown, and the limit names the term and why.
 - `edge-books/fs_stock_closing_unknown.json`: no Stock Summary is dated the trial balance's last day. No gross profit or net profit is shown, and the limit names the term and why.
 - `edge-books/fs_stock_ledger_integrated.json`: both terms known, and a Stock-in-Hand ledger carries a value. The two are not added, and no profit is shown.
+- `edge-books/fs_stock_both_unknown.json`: neither term was read. No profit and no stock figure is shown; the book shows ten figures, the registry's floor.
 - Not reached: how `load_book` decides the terms from a read. The crate's unit tests and `tests/read_store.rs` cover that.
 - Not established: whether the stock items' values follow the request's window, and whether the audit reads Bridge produces carry a Stock Summary at the period end.
 - Regression fixtures only: they prove the port and the reference agree on the same book, and nothing about reading Tally.
@@ -26,3 +27,4 @@ The books are hand-written scenarios, not generated from any data. Their goldens
 | `fs_stock_opening_unknown.json` | 1,997 | `380adf5411318041367b306b9883233da63b9391327e36379bf979cb3b737b36` | `edge-books/fs_stock_opening_unknown.json` |
 | `fs_stock_closing_unknown.json` | 2,012 | `e721e3ac83528523b3683521a9b8bff71689e9bc5cff248227bdf3d8367243d8` | `edge-books/fs_stock_closing_unknown.json` |
 | `fs_stock_ledger_integrated.json` | 2,259 | `0714902d2c53e8600ab16e78f51fd36c7b774c301d36a68fdaddb234c4d97491` | `edge-books/fs_stock_ledger_integrated.json` |
+| `fs_stock_both_unknown.json` | 2,002 | `98b1cd667de0f8d6943e7c7fab465ca6cfb0eab9ba71a65b0e19f96655e9c6c1` | `edge-books/fs_stock_both_unknown.json` |

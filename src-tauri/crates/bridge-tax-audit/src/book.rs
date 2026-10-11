@@ -329,6 +329,8 @@ pub enum ClosingStockUnknown {
     NoSummaryAtPeriodEnd,
     /// The Stock Summary part dated that day did not parse.
     Unreadable,
+    /// The read has more than one Stock Summary dated that window's last day, so none is taken.
+    SeveralSummariesAtPeriodEnd,
     /// The Stock Summary part dated that day parsed and lists no stock item. An empty list is not
     /// a closing stock of zero: whether Tally lists items that hold no stock is not measured.
     NoStockItems,
@@ -342,6 +344,9 @@ impl ClosingStockUnknown {
                 "not taken: the read has no Stock Summary dated the trial balance's last day"
             }
             Self::Unreadable => "unreadable",
+            Self::SeveralSummariesAtPeriodEnd => {
+                "not taken: the read has more than one Stock Summary dated the trial balance's last day"
+            }
             Self::NoStockItems => {
                 "not taken: the Stock Summary dated the trial balance's last day lists no stock items"
             }
@@ -2096,7 +2101,7 @@ mod tests {
         );
         assert_eq!(
             closing_stock(Some(true), &[summary.clone(), summary.clone()], Some(&to)),
-            ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd)
+            ClosingStock::Unknown(ClosingStockUnknown::SeveralSummariesAtPeriodEnd)
         );
         let broken = stock_summary_part(
             "20260331",
@@ -2135,6 +2140,10 @@ mod tests {
             "not taken: the read has no Stock Summary dated the trial balance's last day"
         );
         assert_eq!(ClosingStockUnknown::Unreadable.as_str(), "unreadable");
+        assert_eq!(
+            ClosingStockUnknown::SeveralSummariesAtPeriodEnd.as_str(),
+            "not taken: the read has more than one Stock Summary dated the trial balance's last day"
+        );
         assert_eq!(
             ClosingStockUnknown::NoStockItems.as_str(),
             "not taken: the Stock Summary dated the trial balance's last day lists no stock items"

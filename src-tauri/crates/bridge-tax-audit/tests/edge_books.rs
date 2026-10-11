@@ -229,6 +229,7 @@ fn closing_stock(s: &Value) -> ClosingStock {
                     U::NoSummaryAtPeriodEnd,
                     U::Unreadable,
                     U::NoStockItems,
+                    U::SeveralSummariesAtPeriodEnd,
                 ]
                 .into_iter()
                 .find(|u| v.as_str() == Some(u.as_str()))

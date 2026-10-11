@@ -31,11 +31,11 @@ use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
     cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
-    creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register,
-    knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees, partners_40b_194t,
-    party_identity, party_monthly, questionnaire_cl13, read_scope, related_parties_cl23,
-    specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock, stock_read,
-    tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
+    creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements,
+    high_value_register, knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees,
+    partners_40b_194t, party_identity, party_monthly, questionnaire_cl13, read_scope,
+    related_parties_cl23, specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock,
+    stock_read, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
     RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
@@ -859,6 +859,13 @@ fn check(name: &str) {
                 let terms = strs(&s["own_account_terms"]);
                 let r = cash_book_integrity::run(&book, &rules, &cash, &bank, &terms).unwrap();
                 let c = cash_book_integrity::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "financial_statements" => {
+                // As `parity/edge_golden.py` runs it: no partners' interest ledgers and no report
+                // totals.
+                let r = financial_statements::run(&book, &rules, &BTreeSet::new(), None).unwrap();
+                let c = financial_statements::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
             "cash_payments_40a3" => {

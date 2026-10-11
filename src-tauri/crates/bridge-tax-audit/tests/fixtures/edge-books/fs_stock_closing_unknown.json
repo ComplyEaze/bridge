@@ -1,0 +1,62 @@
+{
+ "comment": "financial_statements (#1505): integrated inventory, no Stock Summary dated the trial balance's last day. No gross or net profit is shown, and the limit says why.",
+ "groups": {
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-sales"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-purchases"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rent"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2000000,
+   "closing": -2000000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 0,
+   "closing": 200000
+  }
+ ],
+ "vouchers": [],
+ "cash": [],
+ "bank": [],
+ "opening_stock": 800000,
+ "closing_stock": "not taken: the read has no Stock Summary dated the trial balance's last day",
+ "tests": [
+  "financial_statements"
+ ]
+}

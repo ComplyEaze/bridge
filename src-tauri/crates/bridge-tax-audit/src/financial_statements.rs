@@ -1099,4 +1099,394 @@ P&L/Balance Sheet report"
         assert!(v[0].contains("FS-2: fresh recompute of net_profit (480000p)"));
         assert!(v[1].contains("FS-2: fresh recompute of closing_stock (550000p)"));
     }
+
+    // --- #1505: stock from the stock items on a book that keeps inventory integrated ---
+
+    use crate::book::{ClosingStock, ClosingStockUnknown, OpeningStock, OpeningStockUnknown};
+
+    /// `book()` without its Stock-in-Hand ledgers, as Tally holds a book with integrated
+    /// inventory: stock only on the stock items. Sales 10,000, purchases 6,000, freight 500, job
+    /// work 300, rent 1,200, partners' interest 400, interest received 100 (rupees).
+    fn item_book(opening: OpeningStock, closing: ClosingStock) -> Book {
+        let mut b = book();
+        for name in ["Stale Stock", "Still Stock"] {
+            b.ledgers.remove(name);
+            b.tb.remove(name);
+        }
+        b.opening_stock = opening;
+        b.closing_stock = closing;
+        b
+    }
+
+    fn has_figure(r: &TestResult, name: &str) -> bool {
+        r.figures
+            .iter()
+            .any(|f| f.id == format!("{TEST_ID}.{name}"))
+    }
+
+    const NO_PROFIT: [&str; 5] = [
+        "gross_profit",
+        "gross_profit_pct_bp",
+        "net_profit",
+        "net_profit_pct_bp",
+        "profit_before_partner_interest",
+    ];
+
+    /// The issue's example in rupees: opening stock 2,000 and closing stock 3,000 on the items.
+    /// GP = 10,000 + 300 - (2,000 + 6,000 + 500 - 3,000) = 4,800; NP = 4,800 - 1,600 + 100 = 3,300.
+    /// With both stock terms read as zero, as before, GP would be 3,800.
+    #[test]
+    fn an_integrated_book_takes_both_stock_terms_from_the_stock_items() {
+        let b = item_book(OpeningStock::Valued(200_000), ClosingStock::Valued(300_000));
+        let r = run(&b, &rules(), &interest(), None).unwrap();
+        assert_eq!(fig(&r, "opening_stock"), Value::Int(200_000));
+        assert_eq!(fig(&r, "closing_stock"), Value::Int(300_000));
+        assert_eq!(fig(&r, "gross_profit"), Value::Int(480_000));
+        assert_eq!(fig(&r, "gross_profit_pct_bp"), Value::Int(4800));
+        assert_eq!(fig(&r, "net_profit"), Value::Int(330_000));
+        assert_eq!(fig(&r, "net_profit_pct_bp"), Value::Int(3300));
+        assert_eq!(fig(&r, "stock_to_turnover_pct_bp"), Value::Int(3000));
+        assert_eq!(
+            fig(&r, "profit_before_partner_interest"),
+            Value::Int(370_000)
+        );
+        // The ledger-only figures are not shown for stock that sits on no ledger.
+        assert!(!has_figure(&r, "closing_stock_tb_field"));
+        assert!(!has_figure(
+            &r,
+            "stock_in_hand_ledgers_with_stale_tb_closing_field_count"
+        ));
+        assert!(r.figures.iter().all(|f| {
+            !["opening_stock", "closing_stock"]
+                .iter()
+                .any(|n| f.id == format!("{TEST_ID}.{n}"))
+                || f.evidence.is_empty()
+        }));
+        assert!(check_invariants(&b, &r).unwrap().is_empty());
+    }
+
+    /// The lab's inventory book (#692, Book B) in paise: sales 1,400, purchase 3,000, freight 500,
+    /// no opening stock, closing stock 2,100. Tally's own P&L showed gross profit 500 and nett
+    /// profit 0; with no stock term the crate gave -1,600 and -2,100.
+    #[test]
+    fn the_lab_book_b_shape_ties_the_gross_and_net_profit_tally_showed() {
+        let mut b = item_book(OpeningStock::Valued(0), ClosingStock::Valued(210_000));
+        for name in [
+            "Freight",
+            "Job Work",
+            "Rent",
+            "Interest to Partners",
+            "Interest Received",
+        ] {
+            b.ledgers.remove(name);
+            b.tb.remove(name);
+        }
+        b.tb.get_mut("Sales").unwrap().closing_paise = -140_000;
+        b.tb.get_mut("Purchases").unwrap().closing_paise = 300_000;
+        b.ledgers.insert(
+            "Freight".to_string(),
+            ledger("Freight", &["Indirect Expenses"]),
+        );
+        b.tb.insert(
+            "Freight".to_string(),
+            TbRow {
+                opening_paise: 0,
+                debit_paise: 50_000,
+                credit_paise: 0,
+                closing_paise: 50_000,
+            },
+        );
+        let r = run(
+            &b,
+            &rules(),
+            &BTreeSet::new(),
+            Some(&report(0, Some(210_000))),
+        )
+        .unwrap();
+        assert_eq!(fig(&r, "gross_profit"), Value::Int(50_000));
+        assert_eq!(fig(&r, "net_profit"), Value::Int(0));
+        assert_eq!(r.findings[0].confidence, Confidence::Computed);
+        assert!(check_invariants(&b, &r).unwrap().is_empty());
+    }
+
+    /// A book that does not keep inventory integrated is read exactly as before, whatever the
+    /// closing term says: the whole result equals the one the ledgers alone give.
+    #[test]
+    fn a_book_that_is_not_integrated_keeps_the_ledger_path() {
+        let mut b = book();
+        b.closing_stock = ClosingStock::Valued(999_999);
+        let r = run(&b, &rules(), &interest(), None).unwrap();
+        assert_eq!(
+            format!("{r:?}"),
+            format!("{:?}", run(&book(), &rules(), &interest(), None).unwrap())
+        );
+        assert_eq!(fig(&r, "closing_stock"), Value::Int(550_000));
+        assert_eq!(fig(&r, "gross_profit"), Value::Int(630_000));
+    }
+
+    /// A term that is not known is reported and never read as zero: no gross or net profit, no
+    /// ratio on them, and a limit that names the term and why. The known term and the rest stay.
+    #[test]
+    fn an_unknown_stock_term_shows_no_profit_and_says_which() {
+        let report_less = |opening, closing| {
+            let b = item_book(opening, closing);
+            let r = run(&b, &rules(), &interest(), None).unwrap();
+            for name in NO_PROFIT {
+                assert!(!has_figure(&r, name), "{name} must not be shown");
+            }
+            assert_eq!(fig(&r, "sales"), Value::Int(1_000_000));
+            assert_eq!(fig(&r, "partner_interest"), Value::Int(40_000));
+            assert!(check_invariants(&b, &r).unwrap().is_empty());
+            r
+        };
+        let opening_unknown = report_less(
+            OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart),
+            ClosingStock::Valued(300_000),
+        );
+        assert!(!has_figure(&opening_unknown, "opening_stock"));
+        assert_eq!(fig(&opening_unknown, "closing_stock"), Value::Int(300_000));
+        assert_eq!(
+            fig(&opening_unknown, "stock_to_turnover_pct_bp"),
+            Value::Int(3000)
+        );
+        let f = &opening_unknown.findings[0];
+        assert_eq!(
+            f.title,
+            "Report tie not performed on net profit: the stock is not known, so no gross profit or \
+net profit was derived"
+        );
+        assert_eq!(f.confidence, Confidence::NeedsDocument);
+        assert_eq!(f.limits.len(), 3);
+        assert_eq!(
+            f.limits[2],
+            "Opening stock is held on the stock items, not on a ledger, and was not taken: the read \
+does not show the trial balance starting on the books' first day; no gross profit or net profit is \
+shown."
+        );
+        assert_eq!(
+            f.ask_client,
+            ["Tally's Stock Summary as at the first day of the books, for the opening stock."]
+        );
+        assert!(!f
+            .facts
+            .iter()
+            .any(|(k, _)| k == "opening_stock" || k == "gross_profit" || k == "net_profit"));
+
+        let closing_unknown = report_less(
+            OpeningStock::Valued(200_000),
+            ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd),
+        );
+        assert_eq!(fig(&closing_unknown, "opening_stock"), Value::Int(200_000));
+        assert!(!has_figure(&closing_unknown, "closing_stock"));
+        assert!(!has_figure(&closing_unknown, "stock_to_turnover_pct_bp"));
+        let f = &closing_unknown.findings[0];
+        assert_eq!(
+            f.limits[2],
+            "Closing stock is held on the stock items, not on a ledger, and was not taken: the read \
+has no Stock Summary dated the trial balance's last day; no gross profit or net profit is shown."
+        );
+        assert_eq!(
+            f.ask_client,
+            ["Tally's Stock Summary as at the last day of the period, for the closing stock."]
+        );
+
+        let both = report_less(
+            OpeningStock::Unknown(OpeningStockUnknown::NotRead),
+            ClosingStock::Unknown(ClosingStockUnknown::Unreadable),
+        );
+        assert!(!has_figure(&both, "opening_stock"));
+        assert!(!has_figure(&both, "closing_stock"));
+        let f = &both.findings[0];
+        assert_eq!(f.limits.len(), 4);
+        assert!(f.limits[2].starts_with(
+            "Opening stock is held on the stock items, not on a ledger, and was not read;"
+        ));
+        assert!(f.limits[3].starts_with(
+            "Closing stock is held on the stock items, not on a ledger, and was unreadable;"
+        ));
+        assert_eq!(f.ask_client.len(), 2);
+
+        // A hand-built book with only an opening term is not read as having a closing one.
+        let half = item_book(OpeningStock::Valued(200_000), ClosingStock::NotApplicable);
+        let r = run(&half, &rules(), &BTreeSet::new(), None).unwrap();
+        assert!(!has_figure(&r, "gross_profit"));
+        assert!(r.findings[0].limits[2].starts_with(
+            "Closing stock is held on the stock items, not on a ledger, and was not read;"
+        ));
+    }
+
+    /// Stock on a Stock-in-Hand ledger beside stock on the items is never added to it: the profit
+    /// is not shown and the limit says why. The known terms still show.
+    #[test]
+    fn a_stock_in_hand_ledger_beside_the_items_is_not_added() {
+        let mut b = book();
+        b.opening_stock = OpeningStock::Valued(200_000);
+        b.closing_stock = ClosingStock::Valued(300_000);
+        let r = run(&b, &rules(), &BTreeSet::new(), None).unwrap();
+        for name in NO_PROFIT {
+            assert!(!has_figure(&r, name), "{name} must not be shown");
+        }
+        assert_eq!(fig(&r, "opening_stock"), Value::Int(200_000));
+        assert_eq!(fig(&r, "closing_stock"), Value::Int(300_000));
+        assert_eq!(
+            r.findings[0].limits[2],
+            "A ledger under Stock-in-Hand carries a value on a book that keeps its stock on the \
+stock items, and the two were not added, in case the stock is counted twice; no gross profit or net \
+profit is shown."
+        );
+        assert_eq!(
+            r.findings[0].ask_client,
+            ["Whether the Stock-in-Hand ledger carries stock that the stock items also hold."]
+        );
+        // A Stock-in-Hand ledger that carries nothing does not stop the items being used.
+        for name in ["Stale Stock", "Still Stock"] {
+            *b.tb.get_mut(name).unwrap() = TbRow {
+                opening_paise: 0,
+                debit_paise: 0,
+                credit_paise: 0,
+                closing_paise: 0,
+            };
+        }
+        let r = run(&b, &rules(), &BTreeSet::new(), None).unwrap();
+        assert_eq!(fig(&r, "gross_profit"), Value::Int(480_000));
+    }
+
+    /// FS-1 ties the item-based figures to Tally's report as it tied the ledger-based ones.
+    #[test]
+    fn the_report_tie_works_on_the_item_basis() {
+        let b = item_book(OpeningStock::Valued(200_000), ClosingStock::Valued(300_000));
+        let r = run(
+            &b,
+            &rules(),
+            &BTreeSet::new(),
+            Some(&report(330_000, Some(300_000))),
+        )
+        .unwrap();
+        assert_eq!(
+            fig(&r, "report_tie_status"),
+            Value::Text("performed: net profit and closing stock".to_string())
+        );
+        assert_eq!(fig(&r, "report_net_profit_diff"), Value::Int(0));
+        assert_eq!(fig(&r, "report_closing_stock_diff"), Value::Int(0));
+        assert_eq!(r.findings[0].confidence, Confidence::Computed);
+        assert!(r.findings[0].limits[0]
+            .starts_with("The gross profit ratio uses the stock items' values"));
+        assert!(check_invariants(&b, &r).unwrap().is_empty());
+
+        let off = run(
+            &b,
+            &rules(),
+            &BTreeSet::new(),
+            Some(&report(430_000, Some(250_000))),
+        )
+        .unwrap();
+        assert_eq!(off.findings[0].confidence, Confidence::JudgementRequired);
+        let v = check_invariants(&b, &off).unwrap();
+        assert_eq!(v.len(), 2, "{v:?}");
+        assert!(v[0].starts_with("FS-1: derived net_profit (330000p)"));
+        assert!(v[1].starts_with("FS-1: derived closing_stock (300000p)"));
+
+        // Without a report, the tie is not performed and the title does not say the stock is a
+        // ledger's.
+        let r = run(&b, &rules(), &BTreeSet::new(), None).unwrap();
+        assert!(r.findings[0]
+            .title
+            .ends_with("from the Trial Balance and the stock items only"));
+    }
+
+    /// With the net profit unknown, only a closing stock tie can be performed, and the status
+    /// says exactly that.
+    #[test]
+    fn a_report_beside_an_unknown_term_ties_only_what_is_known() {
+        let opening_unknown = item_book(
+            OpeningStock::Unknown(OpeningStockUnknown::NotRead),
+            ClosingStock::Valued(300_000),
+        );
+        let r = run(
+            &opening_unknown,
+            &rules(),
+            &BTreeSet::new(),
+            Some(&report(330_000, Some(300_000))),
+        )
+        .unwrap();
+        assert_eq!(
+            fig(&r, "report_tie_status"),
+            Value::Text("performed: closing stock only".to_string())
+        );
+        assert_eq!(fig(&r, "report_net_profit"), Value::Int(330_000));
+        assert!(!has_figure(&r, "report_net_profit_diff"));
+        assert_eq!(fig(&r, "report_closing_stock_diff"), Value::Int(0));
+        assert!(check_invariants(&opening_unknown, &r).unwrap().is_empty());
+
+        for (b, rep) in [
+            (&opening_unknown, report(330_000, None)),
+            (
+                &item_book(
+                    OpeningStock::Valued(200_000),
+                    ClosingStock::Unknown(ClosingStockUnknown::NotRead),
+                ),
+                report(330_000, Some(300_000)),
+            ),
+        ] {
+            let r = run(b, &rules(), &BTreeSet::new(), Some(&rep)).unwrap();
+            assert_eq!(
+                fig(&r, "report_tie_status"),
+                Value::Text(
+                    "not performed: the stock is not known, so no net profit was derived"
+                        .to_string()
+                )
+            );
+            assert!(!has_figure(&r, "report_closing_stock_diff"));
+            assert_eq!(r.findings[0].confidence, Confidence::NeedsDocument);
+        }
+    }
+
+    /// FS-2 follows the book's own terms: a profit published for a book whose stock is unknown,
+    /// or one the item terms do not support, is caught.
+    #[test]
+    fn fs2_follows_the_stock_basis() {
+        let items = item_book(OpeningStock::Valued(200_000), ClosingStock::Valued(300_000));
+        let mut r = run(&items, &rules(), &BTreeSet::new(), None).unwrap();
+        for f in &mut r.figures {
+            if f.id.ends_with(".net_profit") {
+                f.value = Value::Int(380_000); // the figure with both stock terms read as zero
+            }
+            if f.id.ends_with(".closing_stock") {
+                f.value = Value::Int(0);
+            }
+        }
+        let v = check_invariants(&items, &r).unwrap();
+        assert_eq!(v.len(), 2, "{v:?}");
+        assert!(v[0].contains("FS-2: fresh recompute of net_profit (330000p)"));
+        assert!(v[1].contains("FS-2: fresh recompute of closing_stock (300000p)"));
+
+        let unknown = item_book(
+            OpeningStock::Valued(200_000),
+            ClosingStock::Unknown(ClosingStockUnknown::NotRead),
+        );
+        let honest = run(&unknown, &rules(), &BTreeSet::new(), None).unwrap();
+        let mut forged = honest.clone();
+        forged.figures.extend(
+            run(&items, &rules(), &BTreeSet::new(), None)
+                .unwrap()
+                .figures
+                .into_iter()
+                .filter(|f| f.id.ends_with(".net_profit") || f.id.ends_with(".closing_stock")),
+        );
+        let v = check_invariants(&unknown, &forged).unwrap();
+        assert_eq!(v.len(), 2, "{v:?}");
+        assert!(v[0].contains(
+            "FS-2: net_profit (330000p) is published although a stock term is not known"
+        ));
+        assert!(
+            v[1].contains("FS-2: closing_stock (300000p) is published although it is not known")
+        );
+
+        // And a profit left out of a book whose terms are all known.
+        let mut dropped = run(&items, &rules(), &BTreeSet::new(), None).unwrap();
+        dropped.figures.retain(|f| !f.id.ends_with(".net_profit"));
+        let v = check_invariants(&items, &dropped).unwrap();
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains("FS-2: net_profit is not published although the stock terms are known (fresh recompute 330000p)"));
+    }
 }

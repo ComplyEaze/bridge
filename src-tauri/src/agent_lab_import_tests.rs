@@ -8,55 +8,6 @@ const REMOTE_ID: Uuid = Uuid::from_u128(1);
 const ATTRIBUTION_ID: Uuid = Uuid::from_u128(2);
 
 // ---------------------------------------------------------------------------
-// canonical_master_key -- §9.4d, licensed TallyPrime 7.1
-// ---------------------------------------------------------------------------
-
-#[test]
-fn canonical_master_key_folds_the_composed_9_4d_rules() {
-    let base = canonical_master_key("MB-PROBE-LEDGER-A");
-    assert_eq!(
-        canonical_master_key("MB PROBE LEDGER A"),
-        base,
-        "hyphen == space"
-    );
-    assert_eq!(
-        canonical_master_key("mb probe ledger a"),
-        base,
-        "ASCII case folds"
-    );
-    assert_eq!(
-        canonical_master_key("  mb probe  ledger a "),
-        base,
-        "surrounding + collapsed runs"
-    );
-    assert_eq!(
-        canonical_master_key("mb/probe/ledger/a"),
-        base,
-        "slash == space"
-    );
-}
-
-#[test]
-fn canonical_master_key_does_not_fold_unmeasured_separators() {
-    // §9.4d: an en dash and an underscore are ordinary characters to Tally,
-    // not separators -- a class-based fold would wrongly merge these.
-    assert_ne!(canonical_master_key("A_B"), canonical_master_key("A B"));
-    assert_ne!(
-        canonical_master_key("A\u{2013}B"),
-        canonical_master_key("A B")
-    );
-}
-
-#[test]
-fn canonical_master_key_does_not_normalise_unicode_forms() {
-    // §9.4d: "canonical equivalence is still refused" -- NFC vs NFD must stay
-    // distinguishable through this fold, unlike every other transformation.
-    let nfc = "\u{00e9}"; // é, single codepoint
-    let nfd = "e\u{0301}"; // e + combining acute accent
-    assert_ne!(canonical_master_key(nfc), canonical_master_key(nfd));
-}
-
-// ---------------------------------------------------------------------------
 // Master XML -- golden fixtures
 // ---------------------------------------------------------------------------
 

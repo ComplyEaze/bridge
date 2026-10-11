@@ -28,7 +28,7 @@ other companies' programs and they change, so a screen of yours may differ a lit
 
 **You need three things on one computer:**
 
-- **A Windows PC, or a Mac with an Apple chip (M1 or newer).** Macs with an Intel chip are not supported.
+- **A Windows PC (x64), or a Mac with an Apple chip (M1 or newer).** Macs with an Intel chip are not supported.
 - **TallyPrime, opening on that same computer.** A Tally that you can open only on another computer cannot be reached.
 - **Claude Desktop.** This is the Claude program you install on your computer; Claude in a web browser will not work
   for this. Get it from <https://claude.com/download>, install it, and sign in to your Claude account. In one test on
@@ -74,7 +74,9 @@ key; **Ctrl** is the **Control** key.
      > to port 9000 in Windows. The Mac side must listen on the Mac's own loopback address only (127.0.0.1), not on
      > all of the Mac's addresses. If the rule cannot be limited like that, the Mac's firewall must block the port
      > from outside. Two tests: (1) `http://localhost:9000/status` opens in Safari on the Mac; (2) from another
-     > computer on the same network, `http://<this Mac's network address>:9000/status` must NOT open.
+     > computer on the same network, first confirm it can reach this Mac at all (for example, it can open a page or
+     > a shared folder the Mac offers); then `http://<this Mac's network address>:9000/status` must NOT open. A
+     > computer that cannot reach the Mac at all proves nothing.
 
 In Claude Desktop on a Mac, a candidate build of 0.4.0 has been installed and its tools have loaded in a chat. The
 package CI built for 0.4.1 was later installed over it, and two tools, `tally_status` and `list_companies`, answered
@@ -153,9 +155,9 @@ A settings window opens with five lines. Go from top to bottom.
 | Line | What to do | What it is |
 | --- | --- | --- |
 | **I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)** | Read the [Terms of Use](https://bridge.complyeaze.com/terms). Then **tick** this box. If you do not own the practice, the owner should read and agree first. | Your agreement. Until you tick it, ComplyEaze Bridge does not read from Tally, and from release 0.5.1 every tool answers that the Terms of Use are not accepted and names this setting (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). In 0.5.0, after an update from 0.4.2, Claude Desktop may not start ComplyEaze Bridge: on a Mac with an error that does not mention the Terms, on one Windows computer with no error (bridge#1413). |
-| **Tally host** | Do not change it. It says `localhost`. | "This computer". Only this computer is accepted. |
+| **Tally host** | Do not change it. It says `localhost`. | "This computer". Only a local address is accepted. |
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
-| **Response redaction** | Do not change it. It says `none`. | A way to hide things from Claude. The other two values are `mask_parties` (shortens party names; some names are not shortened, see [Security and privacy](../security-and-privacy.md)) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Amounts are never hidden. |
+| **Response redaction** | Do not change it. It says `none`. | A way to limit what reaches the AI provider in Claude's answers. The other two values are `mask_parties` (shortens party names; some names are not shortened, see [Security and privacy](../security-and-privacy.md)) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Amounts, GSTIN and PAN, and company names are never hidden. |
 | **Allow voucher posting (Journal, Payment, Receipt, Contra)** | Leave it **off**. | Lets Claude make entries in Tally, each one only after you approve it. |
 
 Click **Save**.
@@ -170,7 +172,7 @@ background.
 - **Mac:** click **Claude** in the menu bar at the top of the screen and choose **Quit Claude**. Then open Claude
   Desktop again.
 
-Do this on both. In our one test of each, a Mac needed it and Windows did not. That was a first install.
+Do this on both.
 
 On the Mac in the 0.5.0 note under Step 4, Claude Desktop started ComplyEaze Bridge as soon as the settings were saved
 and a new chat got an answer from it, but the assistant first called a leftover second entry for the same extension,
@@ -205,7 +207,7 @@ Still stuck? See [Help](#help).
   [Privacy Policy](https://bridge.complyeaze.com/privacy).
 - **Take a backup first** (Alt+Y, Backup & Restore, in TallyPrime).
 - **Leave Tally's port alone.** Do not open it to the internet, and do not try to reach a Tally on another computer.
-  ComplyEaze Bridge accepts only this computer.
+  ComplyEaze Bridge accepts only a local address on this computer.
 - **Reading and posting are separate.** Asking questions reads. Preparing a voucher file and reading a bank statement
   write nothing to Tally. Only posting writes, and it is off in a new install.
 
@@ -229,9 +231,13 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 
 - **Remove:** open Settings, then Extensions, click ComplyEaze Bridge and uninstall it there. This changes nothing in
   Tally. If you want Tally as it was, set **TallyPrime acts as** back to what you wrote down in Step 1. Removing it
-  may not remove ComplyEaze Bridge's data folder: the receipt log and the saved copies of vouchers, which are not
-  masked, stay on the computer. Section 7 of the [Privacy Policy](https://bridge.complyeaze.com/privacy) explains how
-  to archive or remove them.
+  may leave ComplyEaze Bridge's data folder on the computer, unencrypted. It holds the import journal and saved batches
+  (every voucher it prepared or posted, with dates, narrations, amounts and ledgers, unmasked), the bank-statement
+  proposals (every row of a statement you asked it to read, with date, amount, bank reference and narration,
+  unmasked), and the receipt log (tool names, times and sizes; no names or amounts). Section 7 of the
+  [Privacy Policy](https://bridge.complyeaze.com/privacy) explains how to archive them: keep the import journal in an
+  encrypted archive rather than deleting it. Section 4 of [Security and privacy](../security-and-privacy.md) lists
+  every file.
 - **Update:** it does not update by itself. Stop ComplyEaze Bridge, and every other program that uses it, before you
   update, as the paragraph on upgrading under "The limits of posting" says. Keep the data folder. Install the newer file
   as in Step 3, then look at the settings in Step 4. What we saw, release by release:

@@ -86,10 +86,10 @@ once from Tally in a chat on 2 October 2026. The question in Step 6 has not been
 Tally can answer other programs on the same computer, such as ComplyEaze Bridge. This is switched off until you turn
 it on. It changes one setting in TallyPrime and no data.
 
-**A caution before you turn it on.** With this setting on, Tally answers on the port to other computers too, without
-asking for a password. In one test on 2 October 2026 with TallyPrime 7.1, a browser on another computer on the same
-network opened the Tally computer's network address and the port, and got Tally's "TallyPrime Server is Running"
-answer. ComplyEaze Bridge only ever calls Tally from this same computer, but the setting is Tally's own. What keeps
+**A caution before you turn it on.** With this setting on, Tally may answer other computers on the same network too,
+without asking for a password. In one test by a maintainer on TallyPrime 7.1, a browser on another computer on the
+same network opened the Tally computer's network address and the port, and got Tally's "TallyPrime Server is Running"
+answer. We did not test what else the gateway shows. ComplyEaze Bridge only ever calls Tally from this same computer, but the setting is Tally's own. What keeps
 other computers out is this computer's firewall. Check that the firewall does not allow incoming connections to the
 port, and that you are on a network you trust.
 
@@ -118,7 +118,7 @@ addresses appear, delete what is there, type exactly this, and press **Enter**. 
 
 ## Step 2. Download ComplyEaze Bridge
 
-1. Open the [Download page](https://bridge.complyeaze.com/download).
+1. Open the [Download page](https://bridge.complyeaze.com/download.html).
 2. Click **Download for Windows** or **Download for Mac**, to match your computer. (On a Mac choose **Download for
    Mac**, even though Tally is inside Windows.)
 3. The file goes to your **Downloads** folder. Its name starts with `bridge-tally` and ends with `.mcpb`. You do not
@@ -138,7 +138,7 @@ computer cannot confirm who made it. Keep the file only if you got it from the p
    Claude Desktop's own. It tells you that an extension is a program that gets access to your computer, and that this
    one is **not verified by Anthropic**. Both are true. Read it.
    - What ComplyEaze Bridge does with that access: it talks to Tally on this computer; it keeps a receipt of each
-     tool call on this computer; it saves there the voucher files it prepares and the bank statements it reads; and
+     tool call on this computer; it saves there the voucher files it prepares and the voucher proposals it builds from bank statements; and
      it reads a file when a request names one.
    - If you do not want to go on, close the page and stop here.
 6. To go on, click **Install**.
@@ -207,7 +207,7 @@ Still stuck? See [Help](#help).
 - **Leave Tally's port alone.** Do not open it to the internet, and do not try to reach a Tally on another computer.
   ComplyEaze Bridge accepts only this computer.
 - **Reading and posting are separate.** Asking questions reads. Preparing a voucher file and reading a bank statement
-  write nothing to Tally. Only posting writes, and it is off.
+  write nothing to Tally. Only posting writes, and it is off in a new install.
 
 ## If you turn posting on
 
@@ -217,11 +217,11 @@ in the settings. Read [The limits of posting](#the-limits-of-posting) before you
 Even with posting on, **every voucher needs your approval** in a separate ComplyEaze Bridge window that shows the
 voucher:
 
-![The two approval windows, drawn as a diagram. Windows: "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel. Mac: "ComplyEaze Bridge — approve one voucher" with Cancel and Post voucher.](./img/install-approval.svg)
+![The two approval windows, drawn as a diagram. Windows: "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel. Mac: "ComplyEaze Bridge — approve one voucher" with Post voucher and Cancel.](./img/install-approval.svg)
 
 - **Windows:** the window asks "post this voucher?" with **Yes**, **No** and **Cancel**. Only **Yes** posts. **No**
   is the button already chosen, so pressing Enter does not post.
-- **Mac:** the window says "approve one voucher" with **Cancel** and **Post voucher**. Only **Post voucher** posts.
+- **Mac:** the window says "approve one voucher" with **Post voucher** and **Cancel**. Only **Post voucher** posts; pressing Return may leave the window open.
 
 There is no tool to undo or delete a posted voucher. A wrong entry must be corrected by hand in Tally.
 
@@ -229,7 +229,7 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 
 - **Remove:** open Settings, then Extensions, click ComplyEaze Bridge and uninstall it there. This changes nothing in
   Tally. If you want Tally as it was, set **TallyPrime acts as** back to what you wrote down in Step 1. Removing it
-  does not remove ComplyEaze Bridge's data folder: the receipt log and the saved copies of vouchers, which are not
+  may not remove ComplyEaze Bridge's data folder: the receipt log and the saved copies of vouchers, which are not
   masked, stay on the computer. Section 7 of the [Privacy Policy](https://bridge.complyeaze.com/privacy) explains how
   to archive or remove them.
 - **Update:** it does not update by itself. Stop ComplyEaze Bridge, and every other program that uses it, before you

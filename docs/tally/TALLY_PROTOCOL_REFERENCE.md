@@ -231,6 +231,9 @@ base revision.
 <a id="919-a-keyed-purchase-invoice-as-the-voucher-export-reads-it"></a>
 
 [9.19 A keyed Purchase invoice, as the voucher export reads it](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#919-a-keyed-purchase-invoice-as-the-voucher-export-reads-it)
+<a id="920-the-gstr-1-status-of-one-voucher-type-in-a-window-read-by-the-types-name-with-a-narrow-field-list"></a>
+
+[9.20 The GSTR-1 status of one voucher type in a window, read by the type's name with a narrow field list](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#920-the-gstr-1-status-of-one-voucher-type-in-a-window-read-by-the-types-name-with-a-narrow-field-list)
 <a id="914-a-remoteid-upsert-re-states-the-voucher-cancel-optional-delete-and-recreate"></a>
 
 [9.14 A `REMOTEID` upsert re-states the voucher: cancel, optional, delete and recreate](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#914-a-remoteid-upsert-re-states-the-voucher-cancel-optional-delete-and-recreate)
